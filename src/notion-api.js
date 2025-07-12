@@ -159,16 +159,11 @@ export class NotionAPI {
 
   async updatePageProperties(pageId, properties) {
     try {
-      console.log(chalk.gray(`API call: updating page ${pageId}`));
-      console.log(chalk.gray(`Properties:`, JSON.stringify(properties, null, 2)));
-      
       const response = await this.notion.pages.update({
         page_id: pageId,
         properties
       });
       
-      console.log(chalk.gray(`API response received - page updated`));
-      console.log(chalk.gray(`Response properties:`, JSON.stringify(response.properties, null, 2)));
       return response;
     } catch (error) {
       console.error(chalk.red(`API Error for page ${pageId}:`), error);

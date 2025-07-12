@@ -203,51 +203,13 @@ export class CLIInterface {
       if (!selectedTags || selectedTags.length === 0) return;
 
       // Verify the selected tags exist by checking their IDs
-      console.log(chalk.blue('Verifying selected tags...'));
       for (const tag of selectedTags) {
-        console.log(chalk.gray(`  Verifying tag: ${tag.title} (ID: ${tag.id})`));
         try {
-          const tagPage = await this.notionAPI.notion.pages.retrieve({ page_id: tag.id });
-          console.log(chalk.green(`  ✅ Tag verified: ${this.notionAPI.extractTitle(tagPage)}`));
+          await this.notionAPI.notion.pages.retrieve({ page_id: tag.id });
         } catch (error) {
-          console.log(chalk.red(`  ❌ Tag verification failed: ${tag.title} - ${error.message}`));
+          console.log(chalk.red(`❌ Tag verification failed: ${tag.title} - ${error.message}`));
           return;
         }
-      }
-
-      // Note: Tag/Knowledge Vault property exists in pages but not in schema
-      // We know it exists with ID "YubG" from page-level debugging
-      console.log(chalk.blue('Using Tag/Knowledge Vault property (known to exist from page data)...'));
-      console.log(chalk.gray('  Property: Tag/Knowledge Vault (ID: YubG, type: relation)'));
-      console.log(chalk.green('  ✅ Proceeding with known property - not visible in schema but functional'));
-
-      // Test if we can make relation updates at all by checking Projects relation
-      console.log(chalk.blue('Testing relation update permissions...'));
-      try {
-        const testTask = selectedTasks[0];
-        console.log(chalk.gray(`  Testing with task: ${testTask.title}`));
-        
-        // Get current Projects relation
-        const currentProjects = testTask.properties['Projects (DB)']?.relation || [];
-        console.log(chalk.gray(`  Current projects: ${currentProjects.length} relations`));
-        
-        // Try a minimal test update (just touching the property without changing it)
-        const testUpdate = {
-          page_id: testTask.id,
-          properties: {
-            'Projects (DB)': {
-              relation: currentProjects // Keep existing relations
-            }
-          }
-        };
-        
-        console.log(chalk.gray('  Attempting test relation update...'));
-        const testResult = await this.notionAPI.notion.pages.update(testUpdate);
-        console.log(chalk.green(`  ✅ Relation update test successful`));
-      } catch (error) {
-        console.log(chalk.red(`  ❌ Relation update test failed: ${error.message}`));
-        console.log(chalk.yellow('  This suggests a permissions issue with relation properties'));
-        return;
       }
 
       // Assign tags to selected tasks
@@ -1348,16 +1310,6 @@ export class CLIInterface {
     const tagArray = Array.isArray(tags) ? tags : [tags];
     
     console.log(chalk.blue(`\n🔄 Assigning tags "${tagNames}" to ${tasks.length} tasks...`));
-    
-    // Log task details for debugging
-    tasks.forEach(task => {
-      console.log(chalk.gray(`  Task: ${task.title} (ID: ${task.id})`));
-    });
-    
-    // Log tag details for debugging
-    tagArray.forEach(tag => {
-      console.log(chalk.gray(`  Tag: ${tag.title} (ID: ${tag.id})`));
-    });
 
     const updates = tasks.map(task => ({
       pageId: task.id,
@@ -1367,9 +1319,6 @@ export class CLIInterface {
         }
       }
     }));
-    
-    // Log the exact update payload for debugging
-    console.log(chalk.gray('Update payload:'), JSON.stringify(updates[0], null, 2));
 
     try {
       const results = await this.notionAPI.batchUpdatePages(updates);
