@@ -1079,7 +1079,9 @@ export class CLIInterface {
     }));
 
     try {
-      const results = await this.notionAPI.batchUpdatePages(updates);
+      // Use higher concurrency for date updates since they're simple property changes
+      const batchOptions = tasks.length > 10 ? { concurrency: 8, delayMs: 50 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
       
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
@@ -1321,7 +1323,9 @@ export class CLIInterface {
     }));
 
     try {
-      const results = await this.notionAPI.batchUpdatePages(updates);
+      // Use optimized batch processing for tag assignments
+      const batchOptions = tasks.length > 5 ? { concurrency: 6, delayMs: 80 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
       
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;

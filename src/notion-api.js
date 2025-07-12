@@ -171,21 +171,64 @@ export class NotionAPI {
     }
   }
 
-  async batchUpdatePages(updates) {
+  async batchUpdatePages(updates, options = {}) {
+    const { 
+      concurrency = 5, // Maximum concurrent requests
+      delayMs = 100,    // Delay between batches to respect rate limits
+      showProgress = updates.length > 10 // Show progress for larger batches
+    } = options;
+
+    // Process updates in concurrent batches
     const results = [];
-    for (const update of updates) {
-      try {
-        const response = await this.updatePageProperties(update.pageId, update.properties);
-        results.push({ pageId: update.pageId, success: true, response });
-      } catch (error) {
-        console.error(`Error updating page ${update.pageId}:`, error.message);
-        results.push({ 
-          pageId: update.pageId, 
-          success: false, 
-          error: error.message 
-        });
+    const totalBatches = Math.ceil(updates.length / concurrency);
+    
+    for (let i = 0; i < updates.length; i += concurrency) {
+      const batch = updates.slice(i, i + concurrency);
+      const batchNumber = Math.floor(i / concurrency) + 1;
+      
+      if (showProgress) {
+        const processed = Math.min(i + concurrency, updates.length);
+        console.log(chalk.gray(`  Processing batch ${batchNumber}/${totalBatches} (${processed}/${updates.length} items)...`));
+      }
+      
+      // Process this batch concurrently
+      const batchPromises = batch.map(async (update) => {
+        try {
+          const response = await this.updatePageProperties(update.pageId, update.properties);
+          return { pageId: update.pageId, success: true, response };
+        } catch (error) {
+          console.error(`Error updating page ${update.pageId}:`, error.message);
+          return { 
+            pageId: update.pageId, 
+            success: false, 
+            error: error.message 
+          };
+        }
+      });
+
+      // Wait for all requests in this batch to complete
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      // Extract results from Promise.allSettled format
+      batchResults.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          // This shouldn't happen since we catch errors above, but just in case
+          results.push({
+            pageId: 'unknown',
+            success: false,
+            error: result.reason?.message || 'Unknown error'
+          });
+        }
+      });
+
+      // Add delay between batches to respect rate limits (except for last batch)
+      if (i + concurrency < updates.length && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
+
     return results;
   }
 
