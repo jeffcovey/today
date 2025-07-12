@@ -1,2 +1,2 @@
 # notion-cli
-A command line interface for manipulation a Notion database
+A command line interface for manipulating a Notion database
