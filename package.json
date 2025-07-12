@@ -1,0 +1,26 @@
+{
+  "name": "notion-cli",
+  "version": "1.0.0",
+  "description": "A command line interface for manipulating a Notion database",
+  "main": "src/index.js",
+  "bin": {
+    "notion-cli": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "inquirer": "^9.2.12",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
