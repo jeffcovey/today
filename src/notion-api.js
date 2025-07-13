@@ -280,6 +280,16 @@ export class NotionAPI extends NotionAPIBase {
       }
     }
 
+    // Invalidate relevant caches after successful updates
+    const successfulUpdates = results.filter(r => r.success);
+    if (successfulUpdates.length > 0) {
+      // Invalidate task cache since any page update could affect task status
+      await this.statusCache.invalidateTaskCache();
+      
+      // Clear routine caches to ensure fresh data
+      await this.statusCache.clearAllRoutineCache();
+    }
+
     return results;
   }
 

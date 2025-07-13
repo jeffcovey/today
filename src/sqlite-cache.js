@@ -512,6 +512,10 @@ export class SQLiteCache {
     this.db.exec(`DELETE FROM tag_cache; DELETE FROM cache_metadata WHERE cache_type = 'tags';`);
   }
 
+  async clearAllRoutineCache() {
+    this.db.exec(`DELETE FROM routine_items_cache;`);
+  }
+
   async updateTasksInCache(databaseId, updatedTasks) {
     try {
       const now = Date.now();
