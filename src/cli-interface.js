@@ -18,6 +18,9 @@ export class CLIInterface {
       const choice = await this.showMainMenu(database);
       
       switch (choice) {
+        case 'morning_routine':
+          await this.handleMorningRoutine();
+          break;
         case 'stage_assignment':
           await this.handleStageAssignment(database);
           break;
@@ -32,6 +35,12 @@ export class CLIInterface {
           break;
         case 'batch_editing':
           await this.handleBatchEditing(database);
+          break;
+        case 'evening_tasks':
+          await this.handleEveningTasks();
+          break;
+        case 'day_end_chores':
+          await this.handleDayEndChores();
           break;
         case 'exit':
           console.log(chalk.yellow('\n👋 Goodbye!'));
@@ -87,9 +96,38 @@ export class CLIInterface {
 
   async showMainMenu(database) {
     try {
-      // Check for tasks that need Stage assignment and Project assignment
+      // Check for tasks that need Stage assignment and Project assignment (fetch all for accurate counts)
       console.log(chalk.blue('Checking available actions...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 100, true);
+      const items = await this.notionAPI.getDatabaseItems(database.id, 100, {
+        filterActionableItems: true,
+        sortByCreated: true,
+        useCache: true,
+        fetchAll: true  // Get all items for accurate counts
+      });
+      
+      // Check for uncompleted Morning Routine items
+      let morningRoutineItems = [];
+      try {
+        morningRoutineItems = await this.notionAPI.getMorningRoutineItems();
+      } catch (error) {
+        // Morning Routine database might not be accessible, continue without it
+      }
+      
+      // Check for uncompleted Evening Tasks items
+      let eveningTasksItems = [];
+      try {
+        eveningTasksItems = await this.notionAPI.getEveningTasksItems();
+      } catch (error) {
+        // Evening Tasks database might not be accessible, continue without it
+      }
+      
+      // Check for uncompleted Day-End Chores items
+      let dayEndChoresItems = [];
+      try {
+        dayEndChoresItems = await this.notionAPI.getDayEndChoresItems();
+      } catch (error) {
+        // Day-End Chores database might not be accessible, continue without it
+      }
       
       // Check for tasks without Stage
       const tasksWithoutStage = items.filter(item => {
@@ -123,6 +161,11 @@ export class CLIInterface {
       // Build menu choices based on available tasks
       const choices = [];
 
+      // Add Morning Routine at the top if there are uncompleted items
+      if (morningRoutineItems.length > 0) {
+        choices.push({ name: `🌅 Complete morning routine (${morningRoutineItems.length} remaining)`, value: 'morning_routine' });
+      }
+
       if (tasksWithoutStage.length > 0) {
         choices.push({ name: `🎭 Assign Stage to tasks (${tasksWithoutStage.length} available)`, value: 'stage_assignment' });
       }
@@ -140,6 +183,17 @@ export class CLIInterface {
       }
 
       choices.push({ name: '✏️  Batch edit task properties', value: 'batch_editing' });
+      
+      // Add Evening Tasks at the end if there are uncompleted items
+      if (eveningTasksItems.length > 0) {
+        choices.push({ name: `🌙 Complete evening tasks (${eveningTasksItems.length} remaining)`, value: 'evening_tasks' });
+      }
+      
+      // Add Day-End Chores below Evening Tasks if there are uncompleted items
+      if (dayEndChoresItems.length > 0) {
+        choices.push({ name: `🏠 Complete day-end chores (${dayEndChoresItems.length} remaining)`, value: 'day_end_chores' });
+      }
+      
       choices.push({ name: '🚪 Exit', value: 'exit' });
 
       const { choice } = await inquirer.prompt([
@@ -165,7 +219,7 @@ export class CLIInterface {
     try {
       // Load all actionable items to find tasks without tags
       console.log(chalk.blue('Loading actionable tasks...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 100, true);
+      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
       if (items.length === 0) {
         console.log(chalk.yellow('No actionable items found.'));
         return;
@@ -222,13 +276,42 @@ export class CLIInterface {
     }
   }
 
+  async handleMorningRoutine() {
+    console.log(chalk.blue('\n🌅 Morning Routine Mode'));
+    
+    try {
+      // Load uncompleted morning routine items
+      console.log(chalk.blue('Loading morning routine items...'));
+      const items = await this.notionAPI.getMorningRoutineItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.green('🎉 All morning routine items are complete!'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} uncompleted morning routine items`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select morning routine items to mark as done`);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markMorningRoutineItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Error in morning routine:'), error.message);
+      if (error.message.includes('Morning Routine database not found')) {
+        console.log(chalk.yellow('Make sure the Notion integration has access to the Morning Routine database.'));
+      }
+    }
+  }
+
   async handleDoDateEditing(database) {
     console.log(chalk.blue('\n📅 Do Date Editing Mode'));
     
     try {
       // Load all actionable items to find tasks with Do Date set
       console.log(chalk.blue('Loading tasks with Do Date...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 100, true);
+      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
       if (items.length === 0) {
         console.log(chalk.yellow('No actionable items found.'));
         return;
@@ -273,7 +356,7 @@ export class CLIInterface {
     try {
       // Load all actionable items to find tasks without Stage
       console.log(chalk.blue('Loading actionable tasks...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 100, true);
+      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
       if (items.length === 0) {
         console.log(chalk.yellow('No actionable items found.'));
         return;
@@ -336,9 +419,14 @@ export class CLIInterface {
       const selectedProject = await this.selectProject(projects);
       if (!selectedProject) return;
 
-      // Load all actionable items to find unassigned tasks
-      console.log(chalk.blue('Loading actionable tasks...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 100, true); // useCache = true
+      // Load ALL actionable items to find unassigned tasks (use pagination to get all items)
+      console.log(chalk.blue('Loading all actionable tasks...'));
+      const items = await this.notionAPI.getDatabaseItems(database.id, 100, {
+        filterActionableItems: true,
+        sortByCreated: true,
+        useCache: true,
+        fetchAll: true  // This will fetch all items using pagination
+      });
       if (items.length === 0) {
         console.log(chalk.yellow('No actionable items found.'));
         return;
@@ -1063,6 +1151,184 @@ export class CLIInterface {
         return null;
       }
       throw error;
+    }
+  }
+
+  async markMorningRoutineItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} morning routine items as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      // Use optimized batch processing for checkbox updates
+      const batchOptions = items.length > 5 ? { concurrency: 8, delayMs: 50 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} morning routine items as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected morning routine items are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Morning routine update failed:'), error.message);
+    }
+  }
+
+  async handleEveningTasks() {
+    console.log(chalk.blue('\n🌙 Evening Tasks Mode'));
+    
+    try {
+      // Load uncompleted evening tasks items
+      console.log(chalk.blue('Loading evening tasks items...'));
+      const items = await this.notionAPI.getEveningTasksItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.green('🎉 All evening tasks are complete!'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} uncompleted evening tasks`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select evening tasks to mark as done`);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markEveningTasksItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Error in evening tasks:'), error.message);
+      if (error.message.includes('Evening Tasks database not found')) {
+        console.log(chalk.yellow('Make sure the Notion integration has access to the Evening Tasks database.'));
+      }
+    }
+  }
+
+  async markEveningTasksItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} evening tasks as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      // Use optimized batch processing for checkbox updates
+      const batchOptions = items.length > 5 ? { concurrency: 8, delayMs: 50 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} evening tasks as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected evening tasks are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Evening tasks update failed:'), error.message);
+    }
+  }
+
+  async handleDayEndChores() {
+    console.log(chalk.blue('\n🏠 Day-End Chores Mode'));
+    
+    try {
+      // Load uncompleted day-end chores items
+      console.log(chalk.blue('Loading day-end chores items...'));
+      const items = await this.notionAPI.getDayEndChoresItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.green('🎉 All day-end chores are complete!'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} uncompleted day-end chores`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select day-end chores to mark as done`);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markDayEndChoresItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Error in day-end chores:'), error.message);
+      if (error.message.includes('Day-End Chores database not found')) {
+        console.log(chalk.yellow('Make sure the Notion integration has access to the Day-End Chores database.'));
+      }
+    }
+  }
+
+  async markDayEndChoresItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} day-end chores as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      // Use optimized batch processing for checkbox updates
+      const batchOptions = items.length > 5 ? { concurrency: 8, delayMs: 50 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} day-end chores as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected day-end chores are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Day-end chores update failed:'), error.message);
     }
   }
 

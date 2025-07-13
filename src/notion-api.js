@@ -103,9 +103,39 @@ export class NotionAPI {
         ];
       }
 
-      const response = await this.notion.databases.query(queryParams);
+      // Handle pagination if pageSize > 100 or if options.fetchAll is true
+      let allResults = [];
+      let hasMore = true;
+      let nextCursor = undefined;
+      const actualPageSize = Math.min(pageSize, 100); // Notion API max is 100 per request
+      const fetchAll = options.fetchAll || pageSize > 100;
+      
+      while (hasMore && (fetchAll || allResults.length < pageSize)) {
+        const currentQuery = {
+          ...queryParams,
+          page_size: actualPageSize,
+          ...(nextCursor && { start_cursor: nextCursor })
+        };
 
-      const tasks = response.results.map(page => ({
+        const response = await this.notion.databases.query(currentQuery);
+        
+        allResults = allResults.concat(response.results);
+        hasMore = response.has_more;
+        nextCursor = response.next_cursor;
+        
+        // If not fetching all and we have enough results, break
+        if (!fetchAll && allResults.length >= pageSize) {
+          allResults = allResults.slice(0, pageSize);
+          break;
+        }
+        
+        // Add a small delay between requests to be nice to the API
+        if (hasMore && fetchAll) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      const tasks = allResults.map(page => ({
         id: page.id,
         title: this.extractTitle(page),
         properties: page.properties,
@@ -267,6 +297,57 @@ export class NotionAPI {
     }
   }
 
+  async getMorningRoutineDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const morningRoutineDB = databases.find(db => 
+        db.title.toLowerCase().includes('morning routine')
+      );
+      
+      if (!morningRoutineDB) {
+        throw new Error('Morning Routine database not found');
+      }
+      
+      return morningRoutineDB;
+    } catch (error) {
+      throw new Error(`Failed to find Morning Routine database: ${error.message}`);
+    }
+  }
+
+  async getEveningTasksDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const eveningTasksDB = databases.find(db => 
+        db.title.toLowerCase().includes('evening tasks')
+      );
+      
+      if (!eveningTasksDB) {
+        throw new Error('Evening Tasks database not found');
+      }
+      
+      return eveningTasksDB;
+    } catch (error) {
+      throw new Error(`Failed to find Evening Tasks database: ${error.message}`);
+    }
+  }
+
+  async getDayEndChoresDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const dayEndChoresDB = databases.find(db => 
+        db.title.toLowerCase().includes('day-end chores')
+      );
+      
+      if (!dayEndChoresDB) {
+        throw new Error('Day-End Chores database not found');
+      }
+      
+      return dayEndChoresDB;
+    } catch (error) {
+      throw new Error(`Failed to find Day-End Chores database: ${error.message}`);
+    }
+  }
+
   async getAllProjects() {
     try {
       const projectsDB = await this.getProjectsDatabase();
@@ -328,6 +409,111 @@ export class NotionAPI {
       return projects;
     } catch (error) {
       throw new Error(`Failed to fetch projects: ${error.message}`);
+    }
+  }
+
+  async getMorningRoutineItems() {
+    try {
+      const morningRoutineDB = await this.getMorningRoutineDatabase();
+      if (!morningRoutineDB) {
+        throw new Error('Morning Routine database not found');
+      }
+
+      const queryParams = {
+        database_id: morningRoutineDB.id,
+        page_size: 100,
+        // Filter for items where Done is not checked
+        filter: {
+          property: 'Done',
+          checkbox: { 
+            equals: false
+          }
+        }
+      };
+
+      const response = await this.notion.databases.query(queryParams);
+      
+      const items = response.results.map(page => ({
+        id: page.id,
+        title: this.extractTitle(page),
+        properties: page.properties,
+        created_time: page.created_time,
+        last_edited_time: page.last_edited_time
+      }));
+
+      return items;
+    } catch (error) {
+      throw new Error(`Failed to fetch morning routine items: ${error.message}`);
+    }
+  }
+
+  async getEveningTasksItems() {
+    try {
+      const eveningTasksDB = await this.getEveningTasksDatabase();
+      if (!eveningTasksDB) {
+        throw new Error('Evening Tasks database not found');
+      }
+
+      const queryParams = {
+        database_id: eveningTasksDB.id,
+        page_size: 100,
+        // Filter for items where Done is not checked
+        filter: {
+          property: 'Done',
+          checkbox: { 
+            equals: false
+          }
+        }
+      };
+
+      const response = await this.notion.databases.query(queryParams);
+      
+      const items = response.results.map(page => ({
+        id: page.id,
+        title: this.extractTitle(page),
+        properties: page.properties,
+        created_time: page.created_time,
+        last_edited_time: page.last_edited_time
+      }));
+
+      return items;
+    } catch (error) {
+      throw new Error(`Failed to fetch evening tasks items: ${error.message}`);
+    }
+  }
+
+  async getDayEndChoresItems() {
+    try {
+      const dayEndChoresDB = await this.getDayEndChoresDatabase();
+      if (!dayEndChoresDB) {
+        throw new Error('Day-End Chores database not found');
+      }
+
+      const queryParams = {
+        database_id: dayEndChoresDB.id,
+        page_size: 100,
+        // Filter for items where Done is not checked
+        filter: {
+          property: 'Done',
+          checkbox: { 
+            equals: false
+          }
+        }
+      };
+
+      const response = await this.notion.databases.query(queryParams);
+      
+      const items = response.results.map(page => ({
+        id: page.id,
+        title: this.extractTitle(page),
+        properties: page.properties,
+        created_time: page.created_time,
+        last_edited_time: page.last_edited_time
+      }));
+
+      return items;
+    } catch (error) {
+      throw new Error(`Failed to fetch day-end chores items: ${error.message}`);
     }
   }
 
