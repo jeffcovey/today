@@ -68,11 +68,6 @@ export class SQLiteCache {
         cached_at INTEGER NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS routine_items_cache (
-        database_type TEXT PRIMARY KEY,
-        items TEXT NOT NULL,
-        cached_at INTEGER NOT NULL
-      );
 
       CREATE TABLE IF NOT EXISTS database_cache (
         id TEXT PRIMARY KEY,
@@ -136,13 +131,6 @@ export class SQLiteCache {
         VALUES (?, ?, ?, ?)
       `),
 
-      // Routine items cache
-      getCachedRoutineItems: this.db.prepare('SELECT * FROM routine_items_cache WHERE database_type = ?'),
-      setCachedRoutineItems: this.db.prepare(`
-        INSERT OR REPLACE INTO routine_items_cache 
-        (database_type, items, cached_at)
-        VALUES (?, ?, ?)
-      `),
 
       // Database cache
       getCachedDatabases: this.db.prepare('SELECT * FROM database_cache ORDER BY title'),
@@ -512,9 +500,6 @@ export class SQLiteCache {
     this.db.exec(`DELETE FROM tag_cache; DELETE FROM cache_metadata WHERE cache_type = 'tags';`);
   }
 
-  async clearAllRoutineCache() {
-    this.db.exec(`DELETE FROM routine_items_cache;`);
-  }
 
   async updateTasksInCache(databaseId, updatedTasks) {
     try {
@@ -560,40 +545,6 @@ export class SQLiteCache {
     }
   }
 
-  // Routine items caching methods
-  async getCachedRoutineItems(databaseType) {
-    try {
-      const row = this.statements.getCachedRoutineItems.get(databaseType);
-      if (!row) return null;
-
-      // Check if cache is still fresh (15 minutes)
-      const cacheAge = Date.now() - row.cached_at;
-      const fifteenMinutes = 15 * 60 * 1000;
-      if (cacheAge > fifteenMinutes) {
-        return null;
-      }
-
-      return {
-        items: JSON.parse(row.items),
-        cachedAt: new Date(row.cached_at).toISOString()
-      };
-    } catch (error) {
-      console.error('Error getting cached routine items:', error);
-      return null;
-    }
-  }
-
-  async setCachedRoutineItems(databaseType, items) {
-    try {
-      this.statements.setCachedRoutineItems.run(
-        databaseType,
-        JSON.stringify(items),
-        Date.now()
-      );
-    } catch (error) {
-      console.error('Error setting cached routine items:', error);
-    }
-  }
 
   async getMostRecentTaskTime(databaseId) {
     try {

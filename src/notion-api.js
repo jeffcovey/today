@@ -280,18 +280,26 @@ export class NotionAPI extends NotionAPIBase {
       }
     }
 
-    // Invalidate relevant caches after successful updates
+    // Update caches with the actual changes made
     const successfulUpdates = results.filter(r => r.success);
     if (successfulUpdates.length > 0) {
-      // Invalidate task cache since any page update could affect task status
-      await this.statusCache.invalidateTaskCache();
+      // Use the unified task cache update system
+      const updatedTasks = successfulUpdates.map(update => {
+        const originalUpdate = updates.find(u => u.pageId === update.pageId);
+        return {
+          id: update.pageId,
+          properties: originalUpdate.properties,
+          last_edited_time: new Date().toISOString()
+        };
+      });
       
-      // Clear routine caches to ensure fresh data
-      await this.statusCache.clearAllRoutineCache();
+      // Update task cache - this will work for all database types including routines
+      await this.statusCache.updateTasksInCache(null, updatedTasks);
     }
 
     return results;
   }
+
 
   async getDatabaseItemsIncremental(databaseId, lastSyncTime, options = {}) {
     try {
@@ -595,44 +603,21 @@ export class NotionAPI extends NotionAPIBase {
 
   async getMorningRoutineItems() {
     try {
-      // Check cache first
-      const cached = await this.statusCache.getCachedRoutineItems('morning_routine');
-      if (cached) {
-        return cached.items;
-      }
-
       const morningRoutineDB = await this.getMorningRoutineDatabase();
       if (!morningRoutineDB) {
         throw new Error('Morning Routine database not found');
       }
 
-      const queryParams = {
-        database_id: morningRoutineDB.id,
-        page_size: 100,
-        // Filter for items where Done is not checked
-        filter: {
-          property: 'Done',
-          checkbox: { 
-            equals: false
-          }
-        }
-      };
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(morningRoutineDB.id, 100, { 
+        useCache: true,
+        fetchAll: true 
+      });
 
-      const response = await this.notion.databases.query(queryParams);
-      
-      const items = response.results.map(page => ({
-        id: page.id,
-        title: this.extractTitle(page),
-        properties: page.properties,
-        url: page.url,
-        created_time: page.created_time,
-        last_edited_time: page.last_edited_time
-      }));
-
-      // Cache the results
-      await this.statusCache.setCachedRoutineItems('morning_routine', items);
-
-      return items;
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
     } catch (error) {
       throw new Error(`Failed to fetch morning routine items: ${error.message}`);
     }
@@ -640,44 +625,21 @@ export class NotionAPI extends NotionAPIBase {
 
   async getEveningTasksItems() {
     try {
-      // Check cache first
-      const cached = await this.statusCache.getCachedRoutineItems('evening_tasks');
-      if (cached) {
-        return cached.items;
-      }
-
       const eveningTasksDB = await this.getEveningTasksDatabase();
       if (!eveningTasksDB) {
         throw new Error('Evening Tasks database not found');
       }
 
-      const queryParams = {
-        database_id: eveningTasksDB.id,
-        page_size: 100,
-        // Filter for items where Done is not checked
-        filter: {
-          property: 'Done',
-          checkbox: { 
-            equals: false
-          }
-        }
-      };
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(eveningTasksDB.id, 100, { 
+        useCache: true,
+        fetchAll: true 
+      });
 
-      const response = await this.notion.databases.query(queryParams);
-      
-      const items = response.results.map(page => ({
-        id: page.id,
-        title: this.extractTitle(page),
-        properties: page.properties,
-        url: page.url,
-        created_time: page.created_time,
-        last_edited_time: page.last_edited_time
-      }));
-
-      // Cache the results
-      await this.statusCache.setCachedRoutineItems('evening_tasks', items);
-
-      return items;
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
     } catch (error) {
       throw new Error(`Failed to fetch evening tasks items: ${error.message}`);
     }
@@ -685,44 +647,21 @@ export class NotionAPI extends NotionAPIBase {
 
   async getDayEndChoresItems() {
     try {
-      // Check cache first
-      const cached = await this.statusCache.getCachedRoutineItems('day_end_chores');
-      if (cached) {
-        return cached.items;
-      }
-
       const dayEndChoresDB = await this.getDayEndChoresDatabase();
       if (!dayEndChoresDB) {
         throw new Error('Day-End Chores database not found');
       }
 
-      const queryParams = {
-        database_id: dayEndChoresDB.id,
-        page_size: 100,
-        // Filter for items where Done is not checked
-        filter: {
-          property: 'Done',
-          checkbox: { 
-            equals: false
-          }
-        }
-      };
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(dayEndChoresDB.id, 100, { 
+        useCache: true,
+        fetchAll: true 
+      });
 
-      const response = await this.notion.databases.query(queryParams);
-      
-      const items = response.results.map(page => ({
-        id: page.id,
-        title: this.extractTitle(page),
-        properties: page.properties,
-        url: page.url,
-        created_time: page.created_time,
-        last_edited_time: page.last_edited_time
-      }));
-
-      // Cache the results
-      await this.statusCache.setCachedRoutineItems('day_end_chores', items);
-
-      return items;
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
     } catch (error) {
       throw new Error(`Failed to fetch day-end chores items: ${error.message}`);
     }
