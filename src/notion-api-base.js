@@ -67,7 +67,9 @@ export class NotionAPIBase {
       if (sorts) queryParams.sorts = sorts;
 
       // Step 3: Execute query with pagination
-      console.log(`${logPrefix} Fetching ${cacheKey} from Notion API...`);
+      if (logPrefix) {
+        console.log(`${logPrefix} Fetching ${cacheKey} from Notion API...`);
+      }
       let allResults = [];
       let hasMore = true;
       let nextCursor = undefined;

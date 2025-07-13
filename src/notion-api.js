@@ -48,7 +48,10 @@ export class NotionAPI extends NotionAPIBase {
       if (options.useCache) {
         const cached = await this.statusCache.getCachedTasks(databaseId);
         if (cached && cached.tasks && cached.tasks.length > 0) {
-          console.log('📋 Using cached task data');
+          // Only log cache usage for main database calls, not routine checks
+          if (!options.skipCacheLogging) {
+            console.log('📋 Using cached task data');
+          }
           
           // Check if we should do incremental sync
           const mostRecentTime = await this.statusCache.getMostRecentTaskTime(databaseId);
@@ -56,7 +59,7 @@ export class NotionAPI extends NotionAPIBase {
             // Fetch only newer items and merge
             try {
               const newerItems = await this.getDatabaseItemsIncremental(databaseId, mostRecentTime, options);
-              if (newerItems.length > 0) {
+              if (newerItems.length > 0 && !options.skipCacheLogging) {
                 console.log(`📋 Synced ${newerItems.length} newer items`);
                 // The incremental sync will update the cache, so get fresh cache
                 const updatedCache = await this.statusCache.getCachedTasks(databaseId);
@@ -348,7 +351,7 @@ export class NotionAPI extends NotionAPIBase {
         fetchAll: true,
         mapResult: (page) => this.mapPage(page),
         useCache: false,
-        logPrefix: '🔄'
+        logPrefix: options.skipCacheLogging ? null : '🔄'
       });
 
       // Merge with existing cache if we have new items
@@ -608,10 +611,11 @@ export class NotionAPI extends NotionAPIBase {
         throw new Error('Morning Routine database not found');
       }
 
-      // Use the unified getDatabaseItems method
+      // Use the unified getDatabaseItems method  
       const allItems = await this.getDatabaseItems(morningRoutineDB.id, 100, { 
         useCache: true,
-        fetchAll: true 
+        fetchAll: true,
+        skipCacheLogging: true
       });
 
       // Filter for uncompleted items dynamically
@@ -633,7 +637,8 @@ export class NotionAPI extends NotionAPIBase {
       // Use the unified getDatabaseItems method
       const allItems = await this.getDatabaseItems(eveningTasksDB.id, 100, { 
         useCache: true,
-        fetchAll: true 
+        fetchAll: true,
+        skipCacheLogging: true
       });
 
       // Filter for uncompleted items dynamically
@@ -655,7 +660,8 @@ export class NotionAPI extends NotionAPIBase {
       // Use the unified getDatabaseItems method
       const allItems = await this.getDatabaseItems(dayEndChoresDB.id, 100, { 
         useCache: true,
-        fetchAll: true 
+        fetchAll: true,
+        skipCacheLogging: true
       });
 
       // Filter for uncompleted items dynamically
