@@ -1,0 +1,491 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+
+export class SQLiteCache {
+  constructor() {
+    this.cacheDir = path.join(process.cwd(), '.notion-cache');
+    this.dbPath = path.join(this.cacheDir, 'notion-cache.db');
+    this.db = null;
+    this.ensureCacheDir();
+    this.initDatabase();
+  }
+
+  ensureCacheDir() {
+    try {
+      fs.mkdirSync(this.cacheDir, { recursive: true });
+    } catch (error) {
+      // Directory already exists, that's fine
+    }
+  }
+
+  initDatabase() {
+    this.db = new Database(this.dbPath);
+    
+    // Create tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cache_metadata (
+        database_id TEXT PRIMARY KEY,
+        cache_type TEXT NOT NULL,
+        last_edited_time TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS task_cache (
+        id TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        properties TEXT NOT NULL,
+        url TEXT NOT NULL,
+        created_time TEXT NOT NULL,
+        last_edited_time TEXT,
+        cached_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS project_cache (
+        id TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        created_time TEXT NOT NULL,
+        status TEXT,
+        cached_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS tag_cache (
+        id TEXT PRIMARY KEY,
+        database_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        created_time TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS status_groups_cache (
+        database_id TEXT PRIMARY KEY,
+        status_groups TEXT NOT NULL,
+        last_edited_time TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_task_cache_database_id ON task_cache(database_id);
+      CREATE INDEX IF NOT EXISTS idx_project_cache_database_id ON project_cache(database_id);
+      CREATE INDEX IF NOT EXISTS idx_tag_cache_database_id ON tag_cache(database_id);
+      CREATE INDEX IF NOT EXISTS idx_cache_metadata_type ON cache_metadata(cache_type);
+    `);
+
+    // Prepare statements for better performance
+    this.statements = {
+      // Cache metadata
+      getCacheMetadata: this.db.prepare('SELECT * FROM cache_metadata WHERE database_id = ? AND cache_type = ?'),
+      setCacheMetadata: this.db.prepare(`
+        INSERT OR REPLACE INTO cache_metadata (database_id, cache_type, last_edited_time, cached_at)
+        VALUES (?, ?, ?, ?)
+      `),
+
+      // Task cache
+      getCachedTasks: this.db.prepare('SELECT * FROM task_cache WHERE database_id = ?'),
+      setCachedTask: this.db.prepare(`
+        INSERT OR REPLACE INTO task_cache 
+        (id, database_id, title, properties, url, created_time, last_edited_time, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `),
+      deleteCachedTasks: this.db.prepare('DELETE FROM task_cache WHERE database_id = ?'),
+
+      // Project cache
+      getCachedProjects: this.db.prepare('SELECT * FROM project_cache WHERE database_id = ?'),
+      setCachedProject: this.db.prepare(`
+        INSERT OR REPLACE INTO project_cache 
+        (id, database_id, title, url, created_time, status, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `),
+      deleteCachedProjects: this.db.prepare('DELETE FROM project_cache WHERE database_id = ?'),
+
+      // Tag cache
+      getCachedTags: this.db.prepare('SELECT * FROM tag_cache WHERE database_id = ?'),
+      setCachedTag: this.db.prepare(`
+        INSERT OR REPLACE INTO tag_cache 
+        (id, database_id, title, url, created_time, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `),
+      deleteCachedTags: this.db.prepare('DELETE FROM tag_cache WHERE database_id = ?'),
+
+      // Status groups
+      getCachedStatusGroups: this.db.prepare('SELECT * FROM status_groups_cache WHERE database_id = ?'),
+      setCachedStatusGroups: this.db.prepare(`
+        INSERT OR REPLACE INTO status_groups_cache 
+        (database_id, status_groups, last_edited_time, cached_at)
+        VALUES (?, ?, ?, ?)
+      `)
+    };
+  }
+
+  // Task caching methods
+  async getCachedTasks(databaseId) {
+    try {
+      const rows = this.statements.getCachedTasks.all(databaseId);
+      if (rows.length === 0) return null;
+
+      const tasks = rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        properties: JSON.parse(row.properties),
+        url: row.url,
+        created_time: row.created_time,
+        ...(row.last_edited_time && { last_edited_time: row.last_edited_time })
+      }));
+
+      // Get metadata to return with tasks
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tasks');
+      return {
+        tasks,
+        lastEditedTime: metadata?.last_edited_time,
+        cachedAt: new Date(metadata?.cached_at || 0).toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting cached tasks:', error);
+      return null;
+    }
+  }
+
+  async setCachedTasks(databaseId, tasks, lastEditedTime) {
+    const transaction = this.db.transaction((databaseId, tasks, lastEditedTime) => {
+      const now = Date.now();
+
+      // Update metadata first
+      this.statements.setCacheMetadata.run(databaseId, 'tasks', lastEditedTime, now);
+
+      // Delete existing cache for this database
+      this.statements.deleteCachedTasks.run(databaseId);
+
+      // Insert new tasks
+      for (const task of tasks) {
+        this.statements.setCachedTask.run(
+          task.id,
+          databaseId,
+          task.title,
+          JSON.stringify(task.properties),
+          task.url,
+          task.created_time,
+          task.last_edited_time || null,
+          now
+        );
+      }
+    });
+
+    transaction(databaseId, tasks, lastEditedTime);
+  }
+
+  async isTaskCacheValid(databaseId, currentLastEditedTime, checkRecentPages = false) {
+    try {
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tasks');
+      if (!metadata) return false;
+
+      // Check if the database was modified after our cache
+      const cachedTime = new Date(metadata.last_edited_time);
+      const currentTime = new Date(currentLastEditedTime);
+      
+      // If database timestamp indicates changes, cache is invalid
+      if (currentTime > cachedTime) {
+        return false;
+      }
+
+      // For relation-sensitive queries, also check if cache is older than 1 hour
+      if (checkRecentPages) {
+        const cacheAge = Date.now() - metadata.cached_at;
+        const oneHour = 60 * 60 * 1000;
+        if (cacheAge > oneHour) {
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Project caching methods
+  async getCachedProjects(databaseId) {
+    try {
+      const rows = this.statements.getCachedProjects.all(databaseId);
+      if (rows.length === 0) return null;
+
+      const projects = rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        url: row.url,
+        created_time: row.created_time,
+        status: row.status
+      }));
+
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'projects');
+      return {
+        projects,
+        lastEditedTime: metadata?.last_edited_time,
+        cachedAt: new Date(metadata?.cached_at || 0).toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting cached projects:', error);
+      return null;
+    }
+  }
+
+  async setCachedProjects(databaseId, projects, lastEditedTime) {
+    const transaction = this.db.transaction((databaseId, projects, lastEditedTime) => {
+      const now = Date.now();
+
+      // Update metadata first
+      this.statements.setCacheMetadata.run(databaseId, 'projects', lastEditedTime, now);
+
+      // Delete existing cache
+      this.statements.deleteCachedProjects.run(databaseId);
+
+      // Insert new projects
+      for (const project of projects) {
+        this.statements.setCachedProject.run(
+          project.id,
+          databaseId,
+          project.title,
+          project.url,
+          project.created_time,
+          project.status || null,
+          now
+        );
+      }
+    });
+
+    transaction(databaseId, projects, lastEditedTime);
+  }
+
+  async isProjectCacheValid(databaseId, currentLastEditedTime) {
+    try {
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'projects');
+      if (!metadata) return false;
+
+      const cachedTime = new Date(metadata.last_edited_time);
+      const currentTime = new Date(currentLastEditedTime);
+      
+      return currentTime <= cachedTime;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Tag caching methods
+  async getCachedTags(databaseId) {
+    try {
+      const rows = this.statements.getCachedTags.all(databaseId);
+      if (rows.length === 0) return null;
+
+      const tags = rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        url: row.url,
+        created_time: row.created_time
+      }));
+
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tags');
+      return {
+        tags,
+        lastEditedTime: metadata?.last_edited_time,
+        cachedAt: new Date(metadata?.cached_at || 0).toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting cached tags:', error);
+      return null;
+    }
+  }
+
+  async setCachedTags(databaseId, tags, lastEditedTime) {
+    const transaction = this.db.transaction((databaseId, tags, lastEditedTime) => {
+      const now = Date.now();
+
+      // Update metadata first
+      this.statements.setCacheMetadata.run(databaseId, 'tags', lastEditedTime, now);
+
+      // Delete existing cache
+      this.statements.deleteCachedTags.run(databaseId);
+
+      // Insert new tags
+      for (const tag of tags) {
+        this.statements.setCachedTag.run(
+          tag.id,
+          databaseId,
+          tag.title,
+          tag.url,
+          tag.created_time,
+          now
+        );
+      }
+    });
+
+    transaction(databaseId, tags, lastEditedTime);
+  }
+
+  async isTagCacheValid(databaseId, currentLastEditedTime) {
+    try {
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tags');
+      if (!metadata) return false;
+
+      const cachedTime = new Date(metadata.last_edited_time);
+      const currentTime = new Date(currentLastEditedTime);
+      
+      return currentTime <= cachedTime;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Status groups methods (keeping existing interface)
+  async getCachedStatusGroups(databaseId) {
+    try {
+      const row = this.statements.getCachedStatusGroups.get(databaseId);
+      if (!row) return null;
+
+      return {
+        statusGroups: JSON.parse(row.status_groups),
+        lastEditedTime: row.last_edited_time,
+        cachedAt: new Date(row.cached_at).toISOString()
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async setCachedStatusGroups(databaseId, statusGroups, lastEditedTime) {
+    this.statements.setCachedStatusGroups.run(
+      databaseId,
+      JSON.stringify(statusGroups),
+      lastEditedTime,
+      Date.now()
+    );
+  }
+
+  async isCacheValid(databaseId, currentLastEditedTime) {
+    try {
+      const cached = await this.getCachedStatusGroups(databaseId);
+      if (!cached) return false;
+
+      const cachedTime = new Date(cached.lastEditedTime);
+      const currentTime = new Date(currentLastEditedTime);
+      
+      return currentTime <= cachedTime;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Status groups logic (keeping existing interface)
+  async getCompleteGroupStatuses(databaseId, notionAPI) {
+    try {
+      // First get the database to check last_edited_time
+      const database = await notionAPI.notion.databases.retrieve({
+        database_id: databaseId
+      });
+
+      const currentLastEditedTime = database.last_edited_time;
+
+      // Check if we have valid cached data
+      if (await this.isCacheValid(databaseId, currentLastEditedTime)) {
+        const cached = await this.getCachedStatusGroups(databaseId);
+        return cached.statusGroups.completeStatuses;
+      }
+
+      // Cache is invalid or doesn't exist, fetch fresh data
+      const statusProperty = this.findStatusProperty(database.properties);
+      if (!statusProperty) {
+        throw new Error('No status property found in database');
+      }
+
+      const statusGroups = this.extractStatusGroups(statusProperty);
+      
+      // Cache the results
+      await this.setCachedStatusGroups(databaseId, statusGroups, currentLastEditedTime);
+      
+      return statusGroups.completeStatuses;
+    } catch (error) {
+      throw new Error(`Failed to get Complete group statuses: ${error.message}`);
+    }
+  }
+
+  findStatusProperty(properties) {
+    for (const [name, property] of Object.entries(properties)) {
+      if (property.type === 'status') {
+        return property;
+      }
+    }
+    return null;
+  }
+
+  extractStatusGroups(statusProperty) {
+    const { options, groups } = statusProperty.status;
+    
+    // Create a map of option_id to option name
+    const optionMap = {};
+    options.forEach(option => {
+      optionMap[option.id] = option.name;
+    });
+
+    // Find the Complete group and get all its status names
+    const completeGroup = groups.find(group => 
+      group.name.toLowerCase() === 'complete' || 
+      group.name.toLowerCase() === 'completed'
+    );
+
+    let completeStatuses = [];
+    if (completeGroup) {
+      completeStatuses = completeGroup.option_ids.map(optionId => 
+        optionMap[optionId]
+      ).filter(Boolean);
+    }
+
+    // Also extract all groups for potential future use
+    const allGroups = groups.map(group => ({
+      name: group.name,
+      color: group.color,
+      statuses: group.option_ids.map(optionId => optionMap[optionId]).filter(Boolean)
+    }));
+
+    return {
+      completeStatuses,
+      allGroups,
+      options
+    };
+  }
+
+  // Utility methods
+  async clearCache() {
+    this.db.exec(`
+      DELETE FROM task_cache;
+      DELETE FROM project_cache;
+      DELETE FROM tag_cache;
+      DELETE FROM status_groups_cache;
+      DELETE FROM cache_metadata;
+    `);
+  }
+
+  async invalidateTaskCache() {
+    this.db.exec(`DELETE FROM task_cache; DELETE FROM cache_metadata WHERE cache_type = 'tasks';`);
+  }
+
+  async invalidateProjectCache() {
+    this.db.exec(`DELETE FROM project_cache; DELETE FROM cache_metadata WHERE cache_type = 'projects';`);
+  }
+
+  async invalidateTagCache() {
+    this.db.exec(`DELETE FROM tag_cache; DELETE FROM cache_metadata WHERE cache_type = 'tags';`);
+  }
+
+  async updateTasksInCache(databaseId, updatedTasks) {
+    // For SQLite, it's more efficient to just invalidate and let it re-cache
+    // since updates are typically small compared to full cache size
+    await this.invalidateTaskCache();
+  }
+
+  close() {
+    if (this.db) {
+      this.db.close();
+    }
+  }
+}

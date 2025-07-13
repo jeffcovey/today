@@ -46,15 +46,67 @@ program
 
 program
   .command('clear-cache')
-  .description('Clear cached status group information')
+  .description('Clear all cached data (tasks, projects, tags, status groups)')
   .action(async () => {
     try {
-      const { StatusCache } = await import('./status-cache.js');
-      const cache = new StatusCache();
+      const { SQLiteCache } = await import('./sqlite-cache.js');
+      const cache = new SQLiteCache();
       await cache.clearCache();
+      cache.close();
       console.log(chalk.green('✅ Cache cleared successfully'));
     } catch (error) {
       console.error(chalk.red('Error clearing cache:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('cache-info')
+  .description('Show cache statistics and information')
+  .action(async () => {
+    try {
+      const { SQLiteCache } = await import('./sqlite-cache.js');
+      const cache = new SQLiteCache();
+      
+      // Get cache statistics
+      const stats = cache.db.prepare(`
+        SELECT 
+          'Tasks' as type, COUNT(*) as count, 
+          MIN(cached_at) as oldest, MAX(cached_at) as newest
+        FROM task_cache
+        UNION ALL
+        SELECT 
+          'Projects' as type, COUNT(*) as count,
+          MIN(cached_at) as oldest, MAX(cached_at) as newest  
+        FROM project_cache
+        UNION ALL
+        SELECT 
+          'Tags' as type, COUNT(*) as count,
+          MIN(cached_at) as oldest, MAX(cached_at) as newest
+        FROM tag_cache
+        UNION ALL
+        SELECT 
+          'Status Groups' as type, COUNT(*) as count,
+          MIN(cached_at) as oldest, MAX(cached_at) as newest
+        FROM status_groups_cache
+      `).all();
+
+      console.log(chalk.blue('\n📊 Cache Statistics:'));
+      stats.forEach(stat => {
+        if (stat.count > 0) {
+          const oldestDate = new Date(stat.oldest).toLocaleString();
+          const newestDate = new Date(stat.newest).toLocaleString();
+          console.log(`${chalk.green(stat.type)}: ${stat.count} items`);
+          console.log(`  Oldest: ${chalk.gray(oldestDate)}`);
+          console.log(`  Newest: ${chalk.gray(newestDate)}`);
+        } else {
+          console.log(`${chalk.yellow(stat.type)}: No cached items`);
+        }
+      });
+
+      cache.close();
+    } catch (error) {
+      console.error(chalk.red('Error getting cache info:'), error.message);
       process.exit(1);
     }
   });

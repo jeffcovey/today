@@ -1,15 +1,23 @@
 import { Client } from '@notionhq/client';
 import chalk from 'chalk';
-import { StatusCache } from './status-cache.js';
+import { SQLiteCache } from './sqlite-cache.js';
 
 export class NotionAPI {
   constructor(token) {
     this.notion = new Client({ auth: token });
-    this.statusCache = new StatusCache();
+    this.statusCache = new SQLiteCache();
+    this.databaseCache = new Map(); // Cache for database list
+    this.databaseCacheExpiry = 0;
   }
 
   async getDatabases() {
     try {
+      // Check if we have a valid cache (5 minutes expiry)
+      const now = Date.now();
+      if (this.databaseCache.size > 0 && now < this.databaseCacheExpiry) {
+        return Array.from(this.databaseCache.values());
+      }
+
       const response = await this.notion.search({
         filter: {
           property: 'object',
@@ -17,11 +25,20 @@ export class NotionAPI {
         }
       });
       
-      return response.results.map(db => ({
+      const databases = response.results.map(db => ({
         id: db.id,
         title: db.title?.[0]?.plain_text || 'Untitled Database',
         url: db.url
       }));
+
+      // Cache databases for 5 minutes
+      this.databaseCache.clear();
+      databases.forEach(db => {
+        this.databaseCache.set(db.id, db);
+      });
+      this.databaseCacheExpiry = now + (5 * 60 * 1000); // 5 minutes
+
+      return databases;
     } catch (error) {
       throw new Error(`Failed to fetch databases: ${error.message}`);
     }
@@ -437,6 +454,7 @@ export class NotionAPI {
         id: page.id,
         title: this.extractTitle(page),
         properties: page.properties,
+        url: page.url,
         created_time: page.created_time,
         last_edited_time: page.last_edited_time
       }));
@@ -472,6 +490,7 @@ export class NotionAPI {
         id: page.id,
         title: this.extractTitle(page),
         properties: page.properties,
+        url: page.url,
         created_time: page.created_time,
         last_edited_time: page.last_edited_time
       }));
@@ -507,6 +526,7 @@ export class NotionAPI {
         id: page.id,
         title: this.extractTitle(page),
         properties: page.properties,
+        url: page.url,
         created_time: page.created_time,
         last_edited_time: page.last_edited_time
       }));
@@ -832,6 +852,13 @@ export class NotionAPI {
     } catch (error) {
       console.error('Error fetching debug items:', error.message);
       throw error;
+    }
+  }
+
+  // Cleanup method to properly close database connections
+  close() {
+    if (this.statusCache && typeof this.statusCache.close === 'function') {
+      this.statusCache.close();
     }
   }
 }

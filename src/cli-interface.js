@@ -98,6 +98,7 @@ export class CLIInterface {
     try {
       // Check for tasks that need Stage assignment and Project assignment (fetch all for accurate counts)
       console.log(chalk.blue('Checking available actions...'));
+      
       const items = await this.notionAPI.getDatabaseItems(database.id, 100, {
         filterActionableItems: true,
         sortByCreated: true,
@@ -105,54 +106,53 @@ export class CLIInterface {
         fetchAll: true  // Get all items for accurate counts
       });
       
-      // Check for uncompleted Morning Routine items
-      let morningRoutineItems = [];
-      try {
-        morningRoutineItems = await this.notionAPI.getMorningRoutineItems();
-      } catch (error) {
-        // Morning Routine database might not be accessible, continue without it
-      }
+      // Check for uncompleted routine items in parallel for better performance
+      const [morningRoutineItems, eveningTasksItems, dayEndChoresItems] = await Promise.allSettled([
+        this.notionAPI.getMorningRoutineItems().catch(() => []),
+        this.notionAPI.getEveningTasksItems().catch(() => []),
+        this.notionAPI.getDayEndChoresItems().catch(() => [])
+      ]);
       
-      // Check for uncompleted Evening Tasks items
-      let eveningTasksItems = [];
-      try {
-        eveningTasksItems = await this.notionAPI.getEveningTasksItems();
-      } catch (error) {
-        // Evening Tasks database might not be accessible, continue without it
-      }
+      const morningItems = morningRoutineItems.status === 'fulfilled' ? morningRoutineItems.value : [];
+      const eveningItems = eveningTasksItems.status === 'fulfilled' ? eveningTasksItems.value : [];
+      const choreItems = dayEndChoresItems.status === 'fulfilled' ? dayEndChoresItems.value : [];
       
-      // Check for uncompleted Day-End Chores items
-      let dayEndChoresItems = [];
-      try {
-        dayEndChoresItems = await this.notionAPI.getDayEndChoresItems();
-      } catch (error) {
-        // Day-End Chores database might not be accessible, continue without it
-      }
+      // Check for tasks without Stage, Project, Tags, and Do Date in one pass for efficiency
+      const tasksWithoutStage = [];
+      const unassignedTasks = [];
+      const untaggedTasks = [];
+      const tasksWithDoDate = [];
       
-      // Check for tasks without Stage
-      const tasksWithoutStage = items.filter(item => {
+      // Single pass through items to avoid multiple iterations
+      for (const item of items) {
         const stageProp = item.properties['Stage'];
-        return !stageProp || !stageProp.select || !stageProp.select.name;
-      });
-
-      // Check for tasks without Project assignment
-      const unassignedTasks = items.filter(item => {
         const projectProp = item.properties['Projects (DB)'];
-        return !projectProp || !projectProp.relation || projectProp.relation.length === 0;
-      });
-
-      // Check for tasks without Tag assignment
-      const untaggedTasks = items.filter(item => {
         const tagProp = item.properties['Tag/Knowledge Vault'];
-        return !tagProp || !tagProp.relation || tagProp.relation.length === 0;
-      });
-
-      // Check for tasks with Do Date set (for editing)
-      const tasksWithDoDate = items.filter(item => {
         const doDateProp = item.properties['Do Date'];
-        return doDateProp && doDateProp.date && doDateProp.date.start;
-      }).sort((a, b) => {
-        // Sort by Do Date, soonest first
+        
+        // Check Stage
+        if (!stageProp || !stageProp.select || !stageProp.select.name) {
+          tasksWithoutStage.push(item);
+        }
+        
+        // Check Project
+        if (!projectProp || !projectProp.relation || projectProp.relation.length === 0) {
+          unassignedTasks.push(item);
+        }
+        
+        // Check Tag
+        if (!tagProp || !tagProp.relation || tagProp.relation.length === 0) {
+          untaggedTasks.push(item);
+        }
+        
+        // Check Do Date
+        if (doDateProp && doDateProp.date && doDateProp.date.start) {
+          tasksWithDoDate.push(item);
+        }
+      }
+      
+      // Sort Do Date tasks once at the end
+      tasksWithDoDate.sort((a, b) => {
         const dateA = new Date(a.properties['Do Date'].date.start);
         const dateB = new Date(b.properties['Do Date'].date.start);
         return dateA - dateB;
@@ -162,8 +162,8 @@ export class CLIInterface {
       const choices = [];
 
       // Add Morning Routine at the top if there are uncompleted items
-      if (morningRoutineItems.length > 0) {
-        choices.push({ name: `🌅 Complete morning routine (${morningRoutineItems.length} remaining)`, value: 'morning_routine' });
+      if (morningItems.length > 0) {
+        choices.push({ name: `🌅 Complete morning routine (${morningItems.length} remaining)`, value: 'morning_routine' });
       }
 
       if (tasksWithoutStage.length > 0) {
@@ -185,13 +185,13 @@ export class CLIInterface {
       choices.push({ name: '✏️  Batch edit task properties', value: 'batch_editing' });
       
       // Add Evening Tasks at the end if there are uncompleted items
-      if (eveningTasksItems.length > 0) {
-        choices.push({ name: `🌙 Complete evening tasks (${eveningTasksItems.length} remaining)`, value: 'evening_tasks' });
+      if (eveningItems.length > 0) {
+        choices.push({ name: `🌙 Complete evening tasks (${eveningItems.length} remaining)`, value: 'evening_tasks' });
       }
       
       // Add Day-End Chores below Evening Tasks if there are uncompleted items
-      if (dayEndChoresItems.length > 0) {
-        choices.push({ name: `🏠 Complete day-end chores (${dayEndChoresItems.length} remaining)`, value: 'day_end_chores' });
+      if (choreItems.length > 0) {
+        choices.push({ name: `🏠 Complete day-end chores (${choreItems.length} remaining)`, value: 'day_end_chores' });
       }
       
       choices.push({ name: '🚪 Exit', value: 'exit' });
@@ -239,7 +239,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${untaggedTasks.length} untagged tasks`));
 
       // Let user select tasks to assign tags to
-      const selectedTasks = await this.selectItems(untaggedTasks, `Select tasks to assign tags to`);
+      const selectedTasks = await this.selectItems(untaggedTasks, `Select tasks to assign tags to`, true);
       if (selectedTasks.length === 0) return;
 
       // Load all tags from Tag/Knowledge Vault database
@@ -292,7 +292,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${items.length} uncompleted morning routine items`));
 
       // Let user select items to mark as done
-      const selectedItems = await this.selectItems(items, `Select morning routine items to mark as done`);
+      const selectedItems = await this.selectItems(items, `Select morning routine items to mark as done`, true);
       if (selectedItems.length === 0) return;
 
       // Mark selected items as done
@@ -336,7 +336,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${tasksWithDoDate.length} tasks with Do Date set (sorted by date)`));
 
       // Let user select tasks to edit Do Date for
-      const selectedTasks = await this.selectItems(tasksWithDoDate, `Select tasks to edit Do Date for`);
+      const selectedTasks = await this.selectItems(tasksWithDoDate, `Select tasks to edit Do Date for`, true);
       if (selectedTasks.length === 0) return;
 
       // Let user select a new date using month view picker
@@ -376,7 +376,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${tasksWithoutStage.length} tasks without Stage`));
 
       // Let user select tasks to assign Stage to
-      const selectedTasks = await this.selectItems(tasksWithoutStage, `Select tasks to assign a Stage to`);
+      const selectedTasks = await this.selectItems(tasksWithoutStage, `Select tasks to assign a Stage to`, true);
       if (selectedTasks.length === 0) return;
 
       // Get Stage options from database schema
@@ -448,7 +448,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${unassignedTasks.length} unassigned tasks`));
 
       // Let user select tasks to assign to the project
-      const selectedTasks = await this.selectItems(unassignedTasks, `Select unassigned tasks to assign to "${selectedProject.title}"`);
+      const selectedTasks = await this.selectItems(unassignedTasks, `Select unassigned tasks to assign to "${selectedProject.title}"`, true);
       if (selectedTasks.length === 0) return;
 
       // Assign tasks to project
@@ -507,9 +507,44 @@ export class CLIInterface {
     await this.confirmAndExecute(selectedItems, newValues, propertiesToEdit);
   }
 
-  async selectItems(items, message = 'Select items to edit') {
+  async selectItems(items, message = 'Select items to edit', showOpenOption = true) {
     try {
-      // Go directly to item selection interface
+      // If URL opening is requested, show the option first
+      if (showOpenOption && items.length > 0) {
+        const isCodespace = process.env.CODESPACES === 'true';
+        const openText = isCodespace ? '🔗 Get item URL' : '🌐 Open item in browser';
+        
+        const actionChoices = [
+          { name: '✅ Select items for editing', value: 'select' },
+          { name: openText, value: 'open' },
+          { name: '❌ Cancel', value: 'cancel' }
+        ];
+
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: actionChoices
+          }
+        ]);
+
+        switch (action) {
+          case 'open':
+            const itemToOpen = await this.selectSingleItemToOpen(items);
+            if (itemToOpen) {
+              await this.openItemInBrowser(itemToOpen);
+            }
+            return []; // Return empty since this was just for opening URL
+          case 'cancel':
+            return [];
+          case 'select':
+            // Continue to selection below
+            break;
+        }
+      }
+
+      // Original checkbox interface with all keyboard shortcuts preserved
       const choices = [
         ...items.map(item => {
           const createdDate = this.formatCreatedDate(item.created_time);
@@ -550,11 +585,15 @@ export class CLIInterface {
         { name: '← Cancel', value: '__cancel__', checked: false }
       ];
 
+      const helpMessage = showOpenOption 
+        ? `${message} (${items.length} items, use spacebar to select, 'a' to select all, 'i' to invert selection, enter to confirm)`
+        : `${message} (${items.length} items, use spacebar to select, enter to confirm)`;
+
       const { selectedItems } = await inquirer.prompt([
         {
           type: 'checkbox',
           name: 'selectedItems',
-          message: `${message} (${items.length} items, use spacebar to select, enter to confirm):`,
+          message: helpMessage,
           choices,
           pageSize: 15,
           validate: (input) => {
@@ -581,6 +620,112 @@ export class CLIInterface {
         process.exit(0);
       }
       throw error;
+    }
+  }
+
+  async selectSingleItemToOpen(items) {
+    const choices = [
+      ...items.map(item => {
+        const createdDate = this.formatCreatedDate(item.created_time);
+        let doDateStr = '';
+        const doDateProp = item.properties['Do Date'];
+        if (doDateProp && doDateProp.date && doDateProp.date.start) {
+          const doDate = new Date(doDateProp.date.start);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          doDate.setHours(0, 0, 0, 0);
+          
+          const diffDays = Math.floor((doDate - today) / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 0) {
+            doDateStr = chalk.red(' [Due Today]');
+          } else if (diffDays === 1) {
+            doDateStr = chalk.yellow(' [Due Tomorrow]');
+          } else if (diffDays < 0) {
+            doDateStr = chalk.red(` [Overdue by ${Math.abs(diffDays)} days]`);
+          } else if (diffDays <= 7) {
+            doDateStr = chalk.yellow(` [Due in ${diffDays} days]`);
+          } else {
+            doDateStr = chalk.gray(` [Due ${doDate.toLocaleDateString()}]`);
+          }
+        }
+        
+        const displayName = `${item.title}${doDateStr} ${createdDate}`;
+        
+        return {
+          name: displayName,
+          value: item,
+          short: item.title
+        };
+      }),
+      new inquirer.Separator(),
+      { name: '← Back', value: null }
+    ];
+
+    const { selectedItem } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'selectedItem',
+        message: 'Select an item to open in browser:',
+        choices,
+        pageSize: 15
+      }
+    ]);
+
+    return selectedItem;
+  }
+
+  async openItemInBrowser(item) {
+    try {
+      if (!item || !item.url) {
+        console.error(chalk.red(`❌ Item has no URL available`));
+        return;
+      }
+
+      console.log(chalk.blue(`Opening "${item.title}" in browser...`));
+      
+      // Check if we're in a GitHub Codespace or other headless environment
+      const isCodespace = process.env.CODESPACES === 'true';
+      const isHeadless = process.env.DISPLAY === undefined && process.platform === 'linux';
+      
+      if (isCodespace || isHeadless) {
+        // In GitHub Codespace or headless environment, just show the URL
+        console.log(chalk.green(`📋 Notion page URL copied below:`));
+        console.log(chalk.cyan(`${item.url}`));
+        console.log(chalk.yellow(`💡 Tip: Ctrl+Click (or Cmd+Click) the URL above to open in your browser`));
+        return;
+      }
+      
+      // Use the system's default browser to open the URL
+      const { exec } = await import('child_process');
+      const util = await import('util');
+      const execAsync = util.promisify(exec);
+      
+      let openCommand;
+      const platform = process.platform;
+      
+      if (platform === 'darwin') {
+        openCommand = `open "${item.url}"`;
+      } else if (platform === 'win32') {
+        openCommand = `start "" "${item.url}"`;
+      } else {
+        // Linux and other Unix-like systems - check if xdg-open exists
+        try {
+          await execAsync('which xdg-open');
+          openCommand = `xdg-open "${item.url}"`;
+        } catch (whichError) {
+          // xdg-open not available, fall back to showing URL
+          console.log(chalk.yellow(`xdg-open not available. Here's the URL:`));
+          console.log(chalk.cyan(`${item.url}`));
+          return;
+        }
+      }
+      
+      await execAsync(openCommand);
+      console.log(chalk.green(`✅ Opened "${item.title}" in browser`));
+    } catch (error) {
+      console.error(chalk.red(`❌ Failed to open browser: ${error.message}`));
+      console.log(chalk.yellow(`You can manually open: ${item.url}`));
     }
   }
 
@@ -1210,7 +1355,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${items.length} uncompleted evening tasks`));
 
       // Let user select items to mark as done
-      const selectedItems = await this.selectItems(items, `Select evening tasks to mark as done`);
+      const selectedItems = await this.selectItems(items, `Select evening tasks to mark as done`, true);
       if (selectedItems.length === 0) return;
 
       // Mark selected items as done
@@ -1279,7 +1424,7 @@ export class CLIInterface {
       console.log(chalk.blue(`\nFound ${items.length} uncompleted day-end chores`));
 
       // Let user select items to mark as done
-      const selectedItems = await this.selectItems(items, `Select day-end chores to mark as done`);
+      const selectedItems = await this.selectItems(items, `Select day-end chores to mark as done`, true);
       if (selectedItems.length === 0) return;
 
       // Mark selected items as done
