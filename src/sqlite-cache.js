@@ -76,10 +76,54 @@ export class SQLiteCache {
         cached_at INTEGER NOT NULL
       );
 
+      -- Time tracking and sync state
+      CREATE TABLE IF NOT EXISTS time_entries_sync (
+        id TEXT PRIMARY KEY,
+        toggl_id TEXT,
+        focus_id TEXT,
+        processed_at INTEGER,
+        pillar_id TEXT,
+        duration INTEGER,
+        description TEXT,
+        project_name TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS streaks_data (
+        id TEXT PRIMARY KEY,
+        streak_name TEXT,
+        current_count INTEGER,
+        last_updated TEXT,
+        data_hash TEXT,
+        notion_page_id TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS temporal_sync (
+        date TEXT PRIMARY KEY,
+        day_id TEXT,
+        week_id TEXT,
+        created_at INTEGER,
+        synced_at INTEGER,
+        week_start_date TEXT,
+        previous_day_id TEXT
+      );
+
+      -- Toggl project to Notion pillar mappings
+      CREATE TABLE IF NOT EXISTS project_pillar_mapping (
+        toggl_project_id TEXT PRIMARY KEY,
+        notion_pillar_id TEXT,
+        project_name TEXT,
+        pillar_name TEXT,
+        updated_at INTEGER
+      );
+
       CREATE INDEX IF NOT EXISTS idx_task_cache_database_id ON task_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_project_cache_database_id ON project_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_tag_cache_database_id ON tag_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_cache_metadata_type ON cache_metadata(cache_type);
+      CREATE INDEX IF NOT EXISTS idx_time_entries_toggl_id ON time_entries_sync(toggl_id);
+      CREATE INDEX IF NOT EXISTS idx_time_entries_pillar_id ON time_entries_sync(pillar_id);
+      CREATE INDEX IF NOT EXISTS idx_temporal_sync_date ON temporal_sync(date);
+      CREATE INDEX IF NOT EXISTS idx_project_pillar_mapping_project ON project_pillar_mapping(toggl_project_id);
     `);
 
     // Prepare statements for better performance

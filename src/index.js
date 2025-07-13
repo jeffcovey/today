@@ -21,6 +21,82 @@ program
   .description('CLI for batch editing Notion database items')
   .version('1.0.0');
 
+// Temporal management commands
+program
+  .command('temporal')
+  .description('Manage days and weeks in Notion')
+  .option('--create-missing-days', 'Create missing day and week entries with relationships')
+  .option('--start-date <date>', 'Start date for operations (YYYY-MM-DD)')
+  .option('--end-date <date>', 'End date for operations (YYYY-MM-DD)')
+  .action(async (options) => {
+    try {
+      const token = process.env.NOTION_TOKEN;
+      if (!token) {
+        console.error(chalk.red('NOTION_TOKEN environment variable is required'));
+        process.exit(1);
+      }
+
+      const notionAPI = new NotionAPI(token);
+
+      if (options.createMissingDays) {
+        const startDate = options.startDate ? new Date(options.startDate) : null;
+        const endDate = options.endDate ? new Date(options.endDate) : null;
+        
+        console.log(chalk.blue('Creating missing days and weeks...'));
+        await notionAPI.createMissingDaysAndWeeks(startDate, endDate);
+        console.log(chalk.green('✅ Successfully created missing days and weeks'));
+      } else {
+        console.log(chalk.yellow('No temporal operation specified. Use --help for options.'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Error in temporal operations:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Daily automation commands
+program
+  .command('daily')
+  .description('Run daily automation tasks')
+  .option('--reset-routines', 'Reset routine checkboxes to unchecked')
+  .option('--mark-repeating-tasks', 'Reset completed repeating tasks')
+  .option('--create-temporal', 'Create missing days/weeks')
+  .option('--all', 'Run all daily automation tasks')
+  .action(async (options) => {
+    try {
+      const token = process.env.NOTION_TOKEN;
+      if (!token) {
+        console.error(chalk.red('NOTION_TOKEN environment variable is required'));
+        process.exit(1);
+      }
+
+      const notionAPI = new NotionAPI(token);
+
+      if (options.all || options.createTemporal) {
+        console.log(chalk.blue('Creating missing days and weeks...'));
+        await notionAPI.createMissingDaysAndWeeks();
+      }
+
+      if (options.all || options.resetRoutines) {
+        console.log(chalk.blue('Resetting routine checkboxes...'));
+        await notionAPI.resetRoutineCheckboxes();
+      }
+
+      if (options.all || options.markRepeatingTasks) {
+        console.log(chalk.blue('Marking completed repeating tasks...'));
+        await notionAPI.markCompletedRepeatingTasksAsRepeating();
+      }
+
+      if (!options.all && !options.resetRoutines && !options.markRepeatingTasks && !options.createTemporal) {
+        console.log(chalk.yellow('No daily operation specified. Use --help for options.'));
+      }
+
+    } catch (error) {
+      console.error(chalk.red('Error in daily operations:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program
   .command('edit')
   .description('Interactive mode to select and edit database items')

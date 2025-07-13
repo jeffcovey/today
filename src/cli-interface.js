@@ -42,6 +42,15 @@ export class CLIInterface {
         case 'batch_editing':
           await this.handleBatchEditing(database);
           break;
+        case 'todays_plan':
+          await this.handleTodaysPlan();
+          break;
+        case 'now_and_then':
+          await this.handleNowAndThen();
+          break;
+        case 'inboxes':
+          await this.handleInboxes();
+          break;
         case 'evening_tasks':
           await this.handleEveningTasks();
           break;
@@ -132,15 +141,21 @@ export class CLIInterface {
       }
       
       // Check for uncompleted routine items in parallel for better performance
-      const [morningRoutineItems, eveningTasksItems, dayEndChoresItems] = await Promise.allSettled([
+      const [morningRoutineItems, eveningTasksItems, dayEndChoresItems, todaysPlanItems, nowAndThenItems, inboxesItems] = await Promise.allSettled([
         this.notionAPI.getMorningRoutineItems().catch(() => []),
         this.notionAPI.getEveningTasksItems().catch(() => []),
-        this.notionAPI.getDayEndChoresItems().catch(() => [])
+        this.notionAPI.getDayEndChoresItems().catch(() => []),
+        this.notionAPI.getTodaysPlanItems().catch(() => []),
+        this.notionAPI.getNowAndThenItems().catch(() => []),
+        this.notionAPI.getInboxesItems().catch(() => [])
       ]);
       
       const morningItems = morningRoutineItems.status === 'fulfilled' ? morningRoutineItems.value : [];
       const eveningItems = eveningTasksItems.status === 'fulfilled' ? eveningTasksItems.value : [];
       const choreItems = dayEndChoresItems.status === 'fulfilled' ? dayEndChoresItems.value : [];
+      const planItems = todaysPlanItems.status === 'fulfilled' ? todaysPlanItems.value : [];
+      const quickItems = nowAndThenItems.status === 'fulfilled' ? nowAndThenItems.value : [];
+      const inboxItems = inboxesItems.status === 'fulfilled' ? inboxesItems.value : [];
 
       // Get today's tasks from cached data - tasks with Repeat Start today or earlier
       const today = new Date();
@@ -278,12 +293,27 @@ export class CLIInterface {
 
       choices.push({ name: '✏️  Batch edit task properties', value: 'batch_editing' });
       
-      // Add Evening Tasks at the end if there are uncompleted items
+      // Add Today's Plan if there are uncompleted items
+      if (planItems.length > 0) {
+        choices.push({ name: `📋 Manage today's plan (${planItems.length} remaining)`, value: 'todays_plan' });
+      }
+
+      // Add Quick Tasks if there are items due
+      if (quickItems.length > 0) {
+        choices.push({ name: `⚡ Quick tasks (${quickItems.length} available)`, value: 'now_and_then' });
+      }
+
+      // Add Inboxes if there are items to process
+      if (inboxItems.length > 0) {
+        choices.push({ name: `📥 Process inboxes (${inboxItems.length} items)`, value: 'inboxes' });
+      }
+      
+      // Add Evening Tasks if there are uncompleted items
       if (eveningItems.length > 0) {
         choices.push({ name: `🌙 Complete evening tasks (${eveningItems.length} remaining)`, value: 'evening_tasks' });
       }
       
-      // Add Day-End Chores below Evening Tasks if there are uncompleted items
+      // Add Day-End Chores if there are uncompleted items
       if (choreItems.length > 0) {
         choices.push({ name: `🏠 Complete day-end chores (${choreItems.length} remaining)`, value: 'day_end_chores' });
       }
@@ -1837,6 +1867,198 @@ export class CLIInterface {
       }
     } catch (error) {
       console.error(chalk.red('Day-end chores update failed:'), error.message);
+    }
+  }
+
+  async handleTodaysPlan() {
+    console.log(chalk.blue('\n📋 Today\'s Plan Mode'));
+    
+    try {
+      // Load uncompleted today's plan items
+      console.log(chalk.blue('Loading today\'s plan items...'));
+      const items = await this.notionAPI.getTodaysPlanItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.green('🎉 All today\'s plan items are complete!'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} uncompleted plan items`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select plan items to mark as done`, true);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markTodaysPlanItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Today\'s plan update failed:'), error.message);
+    }
+  }
+
+  async handleNowAndThen() {
+    console.log(chalk.blue('\n⚡ Quick Tasks (Now & Then) Mode'));
+    
+    try {
+      // Load now and then items
+      console.log(chalk.blue('Loading quick tasks...'));
+      const items = await this.notionAPI.getNowAndThenItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.yellow('No quick tasks available at the moment.'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} quick tasks`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select quick tasks to mark as done`, true);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markNowAndThenItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Quick tasks update failed:'), error.message);
+    }
+  }
+
+  async handleInboxes() {
+    console.log(chalk.blue('\n📥 Inbox Processing Mode'));
+    
+    try {
+      // Load inbox items
+      console.log(chalk.blue('Loading inbox items...'));
+      const items = await this.notionAPI.getInboxesItems();
+      
+      if (items.length === 0) {
+        console.log(chalk.green('🎉 All inboxes are empty!'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${items.length} inbox items to process`));
+
+      // Let user select items to mark as done
+      const selectedItems = await this.selectItems(items, `Select inbox items to mark as done`, true);
+      if (selectedItems.length === 0) return;
+
+      // Mark selected items as done
+      await this.markInboxItemsDone(selectedItems);
+    } catch (error) {
+      console.error(chalk.red('Inbox processing failed:'), error.message);
+    }
+  }
+
+  async markTodaysPlanItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} plan items as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      const results = await this.notionAPI.batchUpdatePages(updates);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} plan items as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected plan items are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Plan items update failed:'), error.message);
+    }
+  }
+
+  async markNowAndThenItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} quick tasks as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      const results = await this.notionAPI.batchUpdatePages(updates);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} quick tasks as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected quick tasks are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Quick tasks update failed:'), error.message);
+    }
+  }
+
+  async markInboxItemsDone(items) {
+    console.log(chalk.blue(`\n🔄 Marking ${items.length} inbox items as done...`));
+    
+    const updates = items.map(item => ({
+      pageId: item.id,
+      properties: {
+        'Done': {
+          checkbox: true
+        }
+      }
+    }));
+
+    try {
+      const results = await this.notionAPI.batchUpdatePages(updates);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} inbox items as done`));
+      
+      if (successful > 0) {
+        if (successful === items.length) {
+          console.log(chalk.green('🎉 All selected inbox items are now processed!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to update ${failed} items`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Inbox items update failed:'), error.message);
     }
   }
 

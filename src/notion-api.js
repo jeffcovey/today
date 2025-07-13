@@ -286,18 +286,27 @@ export class NotionAPI extends NotionAPIBase {
     // Update caches with the actual changes made
     const successfulUpdates = results.filter(r => r.success);
     if (successfulUpdates.length > 0) {
-      // Use the unified task cache update system
-      const updatedTasks = successfulUpdates.map(update => {
-        const originalUpdate = updates.find(u => u.pageId === update.pageId);
-        return {
-          id: update.pageId,
-          properties: originalUpdate.properties,
-          last_edited_time: new Date().toISOString()
-        };
-      });
-      
-      // Update task cache - this will work for all database types including routines
-      await this.statusCache.updateTasksInCache(null, updatedTasks);
+      // For routine databases, we need to clear their cache to ensure fresh counts
+      // This is simpler than trying to determine which database each update belongs to
+      try {
+        const routineDatabases = await Promise.allSettled([
+          this.getMorningRoutineDatabase().catch(() => null),
+          this.getEveningTasksDatabase().catch(() => null), 
+          this.getDayEndChoresDatabase().catch(() => null),
+          this.getTodaysPlanDatabase().catch(() => null),
+          this.getNowAndThenDatabase().catch(() => null),
+          this.getInboxesDatabase().catch(() => null)
+        ]);
+
+        // Clear cache for each routine database to force fresh fetch
+        for (const dbResult of routineDatabases) {
+          if (dbResult.status === 'fulfilled' && dbResult.value) {
+            await this.statusCache.clearTasksCache(dbResult.value.id);
+          }
+        }
+      } catch (error) {
+        console.warn('Warning: Could not clear routine caches after update:', error.message);
+      }
     }
 
     return results;
@@ -540,6 +549,189 @@ export class NotionAPI extends NotionAPIBase {
     }
   }
 
+  async getActionItemsDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const actionItemsDB = databases.find(db => 
+        db.title.toLowerCase().includes('action items') ||
+        db.title.toLowerCase().includes('tasks')
+      );
+      
+      if (!actionItemsDB) {
+        throw new Error('Action Items database not found');
+      }
+      
+      return actionItemsDB;
+    } catch (error) {
+      throw new Error(`Failed to find Action Items database: ${error.message}`);
+    }
+  }
+
+  async getDaysDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const daysDB = databases.find(db => 
+        db.title.toLowerCase() === 'days' ||
+        db.title.toLowerCase().includes('daily') && db.title.toLowerCase().includes('tracking')
+      );
+      
+      if (!daysDB) {
+        throw new Error('Days database not found');
+      }
+      
+      return daysDB;
+    } catch (error) {
+      throw new Error(`Failed to find Days database: ${error.message}`);
+    }
+  }
+
+  async getWeeksDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const weeksDB = databases.find(db => 
+        db.title.toLowerCase() === 'weeks' ||
+        db.title.toLowerCase().includes('weekly')
+      );
+      
+      if (!weeksDB) {
+        throw new Error('Weeks database not found');
+      }
+      
+      return weeksDB;
+    } catch (error) {
+      throw new Error(`Failed to find Weeks database: ${error.message}`);
+    }
+  }
+
+  async getTodaysPlanDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const todaysPlanDB = databases.find(db => {
+        const title = db.title.toLowerCase();
+        return title.includes('today') && title.includes('plan');
+      });
+      
+      if (!todaysPlanDB) {
+        throw new Error("Today's Plan database not found");
+      }
+      
+      return todaysPlanDB;
+    } catch (error) {
+      throw new Error(`Failed to find Today's Plan database: ${error.message}`);
+    }
+  }
+
+  async getNowAndThenDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const nowAndThenDB = databases.find(db => 
+        db.title.toLowerCase().includes('now and then') ||
+        db.title.toLowerCase().includes('now & then') ||
+        db.title.toLowerCase().includes('quick tasks')
+      );
+      
+      if (!nowAndThenDB) {
+        throw new Error('Now and Then database not found');
+      }
+      
+      return nowAndThenDB;
+    } catch (error) {
+      throw new Error(`Failed to find Now and Then database: ${error.message}`);
+    }
+  }
+
+  async getInboxesDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const inboxesDB = databases.find(db => 
+        db.title.toLowerCase().includes('inbox') ||
+        db.title.toLowerCase() === 'inboxes'
+      );
+      
+      if (!inboxesDB) {
+        throw new Error('Inboxes database not found');
+      }
+      
+      return inboxesDB;
+    } catch (error) {
+      throw new Error(`Failed to find Inboxes database: ${error.message}`);
+    }
+  }
+
+  async getPillarsDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const pillarsDB = databases.find(db => 
+        db.title.toLowerCase().includes('pillar') ||
+        db.title.toLowerCase().includes('life areas') ||
+        db.title.toLowerCase().includes('time tracking')
+      );
+      
+      if (!pillarsDB) {
+        throw new Error('Pillars database not found');
+      }
+      
+      return pillarsDB;
+    } catch (error) {
+      throw new Error(`Failed to find Pillars database: ${error.message}`);
+    }
+  }
+
+  async getMonthsDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const monthsDB = databases.find(db => 
+        db.title.toLowerCase() === 'months' ||
+        db.title.toLowerCase().includes('monthly')
+      );
+      
+      if (!monthsDB) {
+        throw new Error('Months database not found');
+      }
+      
+      return monthsDB;
+    } catch (error) {
+      throw new Error(`Failed to find Months database: ${error.message}`);
+    }
+  }
+
+  async getQuartersDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const quartersDB = databases.find(db => 
+        db.title.toLowerCase() === 'quarters' ||
+        db.title.toLowerCase().includes('quarterly')
+      );
+      
+      if (!quartersDB) {
+        throw new Error('Quarters database not found');
+      }
+      
+      return quartersDB;
+    } catch (error) {
+      throw new Error(`Failed to find Quarters database: ${error.message}`);
+    }
+  }
+
+  async getYearsDatabase() {
+    try {
+      const databases = await this.getDatabases();
+      const yearsDB = databases.find(db => 
+        db.title.toLowerCase() === 'years' ||
+        db.title.toLowerCase().includes('yearly') ||
+        db.title.toLowerCase().includes('annual')
+      );
+      
+      if (!yearsDB) {
+        throw new Error('Years database not found');
+      }
+      
+      return yearsDB;
+    } catch (error) {
+      throw new Error(`Failed to find Years database: ${error.message}`);
+    }
+  }
+
   async getAllProjects() {
     try {
       const projectsDB = await this.getProjectsDatabase();
@@ -670,6 +862,342 @@ export class NotionAPI extends NotionAPIBase {
       );
     } catch (error) {
       throw new Error(`Failed to fetch day-end chores items: ${error.message}`);
+    }
+  }
+
+  async getTodaysPlanItems() {
+    try {
+      const todaysPlanDB = await this.getTodaysPlanDatabase();
+      if (!todaysPlanDB) {
+        throw new Error('Today\'s Plan database not found');
+      }
+
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(todaysPlanDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch today's plan items: ${error.message}`);
+    }
+  }
+
+  async getNowAndThenItems() {
+    try {
+      const nowAndThenDB = await this.getNowAndThenDatabase();
+      if (!nowAndThenDB) {
+        throw new Error('Now and Then database not found');
+      }
+
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(nowAndThenDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch now and then items: ${error.message}`);
+    }
+  }
+
+  async getInboxesItems() {
+    try {
+      const inboxesDB = await this.getInboxesDatabase();
+      if (!inboxesDB) {
+        throw new Error('Inboxes database not found');
+      }
+
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(inboxesDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for uncompleted items dynamically  
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch inboxes items: ${error.message}`);
+    }
+  }
+
+  // Temporal management methods
+  async createMissingDaysAndWeeks(startDate = null, endDate = null) {
+    const { TemporalManager } = await import('./temporal-manager.js');
+    const temporalManager = new TemporalManager(this, this.statusCache);
+    return await temporalManager.createMissingDaysAndWeeks(startDate, endDate);
+  }
+
+  async getDaysItems() {
+    try {
+      const daysDB = await this.getDaysDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(daysDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      return allItems;
+    } catch (error) {
+      throw new Error(`Failed to fetch days items: ${error.message}`);
+    }
+  }
+
+  async getWeeksItems() {
+    try {
+      const weeksDB = await this.getWeeksDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(weeksDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      return allItems;
+    } catch (error) {
+      throw new Error(`Failed to fetch weeks items: ${error.message}`);
+    }
+  }
+
+  async getTodaysPlanItems() {
+    try {
+      const todaysPlanDB = await this.getTodaysPlanDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(todaysPlanDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for uncompleted items dynamically (if they have a Done property)
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch today's plan items: ${error.message}`);
+    }
+  }
+
+  async getNowAndThenItems() {
+    try {
+      const nowAndThenDB = await this.getNowAndThenDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(nowAndThenDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for items that are due (if they have a Due property)
+      return allItems.filter(item => 
+        item.properties?.Due?.formula?.checkbox || 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch now and then items: ${error.message}`);
+    }
+  }
+
+  async getInboxesItems() {
+    try {
+      const inboxesDB = await this.getInboxesDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(inboxesDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      // Filter for uncompleted items dynamically
+      return allItems.filter(item => 
+        !item.properties?.Done?.checkbox
+      );
+    } catch (error) {
+      throw new Error(`Failed to fetch inboxes items: ${error.message}`);
+    }
+  }
+
+  async getPillarsItems() {
+    try {
+      const pillarsDB = await this.getPillarsDatabase();
+      
+      // Use the unified getDatabaseItems method
+      const allItems = await this.getDatabaseItems(pillarsDB.id, 100, { 
+        useCache: true,
+        fetchAll: true,
+        skipCacheLogging: true
+      });
+
+      return allItems;
+    } catch (error) {
+      throw new Error(`Failed to fetch pillars items: ${error.message}`);
+    }
+  }
+
+  // Routine reset automation methods
+  async resetAllRoutines() {
+    console.log('🔄 Starting routine reset automation...');
+    
+    try {
+      await Promise.all([
+        this.resetRoutineCheckboxes(),
+        this.markCompletedRepeatingTasksAsRepeating()
+      ]);
+      
+      console.log('✅ Successfully completed routine reset automation');
+    } catch (error) {
+      console.error('❌ Failed to complete routine reset automation:', error.message);
+      throw error;
+    }
+  }
+
+  async resetRoutineCheckboxes() {
+    const routineDatabases = [
+      { name: 'Morning Routine', getter: 'getMorningRoutineDatabase' },
+      { name: 'Evening Tasks', getter: 'getEveningTasksDatabase' },
+      { name: 'Day-End Chores', getter: 'getDayEndChoresDatabase' },
+      { name: "Today's Plan", getter: 'getTodaysPlanDatabase' },
+      { name: 'Inboxes', getter: 'getInboxesDatabase' }
+    ];
+
+    for (const routine of routineDatabases) {
+      try {
+        console.log(`🔄 Resetting ${routine.name} checkboxes...`);
+        
+        const database = await this[routine.getter]();
+        await this.uncheckDonePropertyInDatabase(database.id, routine.name);
+        
+        console.log(`✅ Reset ${routine.name} checkboxes`);
+      } catch (error) {
+        console.warn(`⚠️ Could not reset ${routine.name}: ${error.message}`);
+      }
+    }
+  }
+
+  async uncheckDonePropertyInDatabase(databaseId, databaseName) {
+    // Get all items with Done = true
+    const checkedItems = await this.queryDatabase({
+      databaseId,
+      cacheKey: `reset_${databaseName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      getCacheData: null, // Don't use cache for this operation
+      setCacheData: null,
+      isValidCache: null,
+      filter: {
+        property: 'Done',
+        checkbox: { equals: true }
+      },
+      useCache: false,
+      fetchAll: true,
+      mapResult: (page) => this.mapPage(page)
+    });
+
+    if (checkedItems.length === 0) {
+      console.log(`  No checked items found in ${databaseName}`);
+      return;
+    }
+
+    console.log(`  Found ${checkedItems.length} checked items in ${databaseName}`);
+
+    // Create batch update to uncheck all Done properties
+    const updates = checkedItems.map(item => ({
+      pageId: item.id,
+      properties: {
+        Done: { checkbox: false }
+      }
+    }));
+
+    // Use existing batchUpdatePages which will handle cache updates
+    const results = await this.batchUpdatePages(updates);
+    
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+
+    console.log(`  ✅ Unchecked ${successful} items in ${databaseName}`);
+    if (failed > 0) {
+      console.warn(`  ⚠️ Failed to uncheck ${failed} items in ${databaseName}`);
+    }
+  }
+
+  async markCompletedRepeatingTasksAsRepeating() {
+    console.log('🔄 Marking completed repeating tasks as repeating...');
+    
+    try {
+      // Get the action items database
+      const actionItemsDB = await this.getActionItemsDatabase();
+      
+      // Query for tasks that are Done and have a repeat schedule
+      const completedRepeatingTasks = await this.queryDatabase({
+        databaseId: actionItemsDB.id,
+        cacheKey: 'completed_repeating_tasks',
+        getCacheData: null,
+        setCacheData: null,
+        isValidCache: null,
+        filter: {
+          and: [
+            {
+              property: 'Repeat Every (Days)',
+              number: { is_not_empty: true }
+            },
+            { 
+              property: 'Status', 
+              status: { equals: '✅ Done' } 
+            }
+          ]
+        },
+        useCache: false,
+        fetchAll: true,
+        mapResult: (page) => this.mapPage(page)
+      });
+
+      if (completedRepeatingTasks.length === 0) {
+        console.log('  No completed repeating tasks found');
+        return;
+      }
+
+      console.log(`  Found ${completedRepeatingTasks.length} completed repeating tasks`);
+
+      // Create batch update to mark as repeating
+      const updates = completedRepeatingTasks.map(task => ({
+        pageId: task.id,
+        properties: {
+          Status: { 
+            status: { name: '♻️ Repeating' } 
+          }
+        }
+      }));
+
+      const results = await this.batchUpdatePages(updates);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(`  ✅ Marked ${successful} tasks as repeating`);
+      if (failed > 0) {
+        console.warn(`  ⚠️ Failed to mark ${failed} tasks as repeating`);
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to mark completed repeating tasks:', error.message);
+      throw error;
     }
   }
 

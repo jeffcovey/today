@@ -4,7 +4,7 @@
   "description": "A command line interface for manipulating a Notion database",
   "main": "src/index.js",
   "bin": {
-    "notion-cli": "./src/index.js"
+    "notion-cli": "./bin/notion-cli"
   },
   "scripts": {
     "start": "node src/index.js",
