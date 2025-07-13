@@ -160,8 +160,8 @@ export class NotionAPI {
         created_time: page.created_time
       }));
 
-      // Cache the results if caching is enabled
-      if (options.useCache) {
+      // Always cache the results (unless explicitly disabled)
+      if (options.useCache !== false) {
         const database = await this.notion.databases.retrieve({
           database_id: databaseId
         });
@@ -431,6 +431,12 @@ export class NotionAPI {
 
   async getMorningRoutineItems() {
     try {
+      // Check cache first
+      const cached = await this.statusCache.getCachedRoutineItems('morning_routine');
+      if (cached) {
+        return cached.items;
+      }
+
       const morningRoutineDB = await this.getMorningRoutineDatabase();
       if (!morningRoutineDB) {
         throw new Error('Morning Routine database not found');
@@ -459,6 +465,9 @@ export class NotionAPI {
         last_edited_time: page.last_edited_time
       }));
 
+      // Cache the results
+      await this.statusCache.setCachedRoutineItems('morning_routine', items);
+
       return items;
     } catch (error) {
       throw new Error(`Failed to fetch morning routine items: ${error.message}`);
@@ -467,6 +476,12 @@ export class NotionAPI {
 
   async getEveningTasksItems() {
     try {
+      // Check cache first
+      const cached = await this.statusCache.getCachedRoutineItems('evening_tasks');
+      if (cached) {
+        return cached.items;
+      }
+
       const eveningTasksDB = await this.getEveningTasksDatabase();
       if (!eveningTasksDB) {
         throw new Error('Evening Tasks database not found');
@@ -495,6 +510,9 @@ export class NotionAPI {
         last_edited_time: page.last_edited_time
       }));
 
+      // Cache the results
+      await this.statusCache.setCachedRoutineItems('evening_tasks', items);
+
       return items;
     } catch (error) {
       throw new Error(`Failed to fetch evening tasks items: ${error.message}`);
@@ -503,6 +521,12 @@ export class NotionAPI {
 
   async getDayEndChoresItems() {
     try {
+      // Check cache first
+      const cached = await this.statusCache.getCachedRoutineItems('day_end_chores');
+      if (cached) {
+        return cached.items;
+      }
+
       const dayEndChoresDB = await this.getDayEndChoresDatabase();
       if (!dayEndChoresDB) {
         throw new Error('Day-End Chores database not found');
@@ -530,6 +554,9 @@ export class NotionAPI {
         created_time: page.created_time,
         last_edited_time: page.last_edited_time
       }));
+
+      // Cache the results
+      await this.statusCache.setCachedRoutineItems('day_end_chores', items);
 
       return items;
     } catch (error) {

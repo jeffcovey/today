@@ -13,6 +13,9 @@ export class CLIInterface {
     const database = await this.selectDatabase();
     if (!database) return;
 
+    // Preload cache in background while showing initial menu
+    this.preloadCache(database);
+
     // Step 2: Main menu loop
     while (true) {
       const choice = await this.showMainMenu(database);
@@ -96,15 +99,35 @@ export class CLIInterface {
 
   async showMainMenu(database) {
     try {
-      // Check for tasks that need Stage assignment and Project assignment (fetch all for accurate counts)
-      console.log(chalk.blue('Checking available actions...'));
+      // First, try to use cached data for immediate display
+      let items = [];
+      let usingCache = false;
       
-      const items = await this.notionAPI.getDatabaseItems(database.id, 100, {
-        filterActionableItems: true,
-        sortByCreated: true,
-        useCache: true,
-        fetchAll: true  // Get all items for accurate counts
-      });
+      // Check if we have cached data available
+      const cachedData = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      if (cachedData && cachedData.tasks) {
+        items = cachedData.tasks.filter(item => {
+          // Apply same filtering as would be done by the API
+          const statusProp = item.properties?.Status;
+          if (statusProp?.status?.name === '✅ Done') return false;
+          return true;
+        });
+        usingCache = true;
+      }
+      
+      // If no cache or very few items, fetch immediately
+      if (items.length === 0) {
+        console.log(chalk.blue('Loading available actions...'));
+        items = await this.notionAPI.getDatabaseItems(database.id, 100, {
+          filterActionableItems: true,
+          sortByCreated: true,
+          useCache: true,
+          fetchAll: true
+        });
+      } else {
+        // We have cache, start background refresh
+        this.backgroundRefresh(database);
+      }
       
       // Check for uncompleted routine items in parallel for better performance
       const [morningRoutineItems, eveningTasksItems, dayEndChoresItems] = await Promise.allSettled([
@@ -211,6 +234,41 @@ export class CLIInterface {
       }
       throw error;
     }
+  }
+
+  // Preload cache in background
+  async preloadCache(database) {
+    // Don't block - run in background
+    setImmediate(async () => {
+      try {
+        await this.notionAPI.getDatabaseItems(database.id, 100, {
+          filterActionableItems: true,
+          sortByCreated: true,
+          useCache: true,
+          fetchAll: true
+        });
+      } catch (error) {
+        // Silently fail - cache loading is not critical
+      }
+    });
+  }
+
+  // Background refresh of data
+  async backgroundRefresh(database) {
+    // Don't block - run in background
+    setImmediate(async () => {
+      try {
+        // Force a fresh fetch to update cache
+        await this.notionAPI.getDatabaseItems(database.id, 100, {
+          filterActionableItems: true,
+          sortByCreated: true,
+          useCache: false,  // Force fresh data
+          fetchAll: true
+        });
+      } catch (error) {
+        // Silently fail - background refresh is not critical
+      }
+    });
   }
 
   async handleTagAssignment(database) {

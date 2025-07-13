@@ -68,6 +68,12 @@ export class SQLiteCache {
         cached_at INTEGER NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS routine_items_cache (
+        database_type TEXT PRIMARY KEY,
+        items TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_task_cache_database_id ON task_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_project_cache_database_id ON project_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_tag_cache_database_id ON tag_cache(database_id);
@@ -116,6 +122,14 @@ export class SQLiteCache {
         INSERT OR REPLACE INTO status_groups_cache 
         (database_id, status_groups, last_edited_time, cached_at)
         VALUES (?, ?, ?, ?)
+      `),
+
+      // Routine items cache
+      getCachedRoutineItems: this.db.prepare('SELECT * FROM routine_items_cache WHERE database_type = ?'),
+      setCachedRoutineItems: this.db.prepare(`
+        INSERT OR REPLACE INTO routine_items_cache 
+        (database_type, items, cached_at)
+        VALUES (?, ?, ?)
       `)
     };
   }
@@ -478,9 +492,82 @@ export class SQLiteCache {
   }
 
   async updateTasksInCache(databaseId, updatedTasks) {
-    // For SQLite, it's more efficient to just invalidate and let it re-cache
-    // since updates are typically small compared to full cache size
-    await this.invalidateTaskCache();
+    try {
+      const now = Date.now();
+      
+      // Update specific tasks in the cache without invalidating everything
+      const updateTask = this.db.prepare(`
+        UPDATE task_cache 
+        SET title = ?, properties = ?, url = ?, last_edited_time = ?, cached_at = ?
+        WHERE id = ? AND database_id = ?
+      `);
+      
+      const transaction = this.db.transaction((tasks) => {
+        for (const task of tasks) {
+          updateTask.run(
+            task.title,
+            JSON.stringify(task.properties),
+            task.url,
+            task.last_edited_time || null,
+            now,
+            task.id,
+            databaseId
+          );
+        }
+      });
+      
+      transaction(updatedTasks);
+      
+      // Also update the metadata timestamp to reflect that we've updated the cache
+      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tasks');
+      if (metadata) {
+        this.statements.setCacheMetadata.run(
+          databaseId, 
+          'tasks', 
+          metadata.last_edited_time, 
+          now
+        );
+      }
+    } catch (error) {
+      console.error('Error updating tasks in cache:', error);
+      // Only invalidate if update fails
+      await this.invalidateTaskCache();
+    }
+  }
+
+  // Routine items caching methods
+  async getCachedRoutineItems(databaseType) {
+    try {
+      const row = this.statements.getCachedRoutineItems.get(databaseType);
+      if (!row) return null;
+
+      // Check if cache is still fresh (15 minutes)
+      const cacheAge = Date.now() - row.cached_at;
+      const fifteenMinutes = 15 * 60 * 1000;
+      if (cacheAge > fifteenMinutes) {
+        return null;
+      }
+
+      return {
+        items: JSON.parse(row.items),
+        cachedAt: new Date(row.cached_at).toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting cached routine items:', error);
+      return null;
+    }
+  }
+
+  async setCachedRoutineItems(databaseType, items) {
+    try {
+      this.statements.setCachedRoutineItems.run(
+        databaseType,
+        JSON.stringify(items),
+        Date.now()
+      );
+    } catch (error) {
+      console.error('Error setting cached routine items:', error);
+    }
   }
 
   close() {
