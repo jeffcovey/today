@@ -74,6 +74,13 @@ export class SQLiteCache {
         cached_at INTEGER NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS database_cache (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        cached_at INTEGER NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_task_cache_database_id ON task_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_project_cache_database_id ON project_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_tag_cache_database_id ON tag_cache(database_id);
@@ -97,6 +104,11 @@ export class SQLiteCache {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `),
       deleteCachedTasks: this.db.prepare('DELETE FROM task_cache WHERE database_id = ?'),
+      getMostRecentTaskTime: this.db.prepare(`
+        SELECT MAX(last_edited_time) as max_time 
+        FROM task_cache 
+        WHERE database_id = ? AND last_edited_time IS NOT NULL
+      `),
 
       // Project cache
       getCachedProjects: this.db.prepare('SELECT * FROM project_cache WHERE database_id = ?'),
@@ -130,7 +142,16 @@ export class SQLiteCache {
         INSERT OR REPLACE INTO routine_items_cache 
         (database_type, items, cached_at)
         VALUES (?, ?, ?)
-      `)
+      `),
+
+      // Database cache
+      getCachedDatabases: this.db.prepare('SELECT * FROM database_cache ORDER BY title'),
+      setCachedDatabase: this.db.prepare(`
+        INSERT OR REPLACE INTO database_cache 
+        (id, title, url, cached_at)
+        VALUES (?, ?, ?, ?)
+      `),
+      deleteDatabases: this.db.prepare('DELETE FROM database_cache')
     };
   }
 
@@ -567,6 +588,63 @@ export class SQLiteCache {
       );
     } catch (error) {
       console.error('Error setting cached routine items:', error);
+    }
+  }
+
+  async getMostRecentTaskTime(databaseId) {
+    try {
+      const result = this.statements.getMostRecentTaskTime.get(databaseId);
+      return result?.max_time || null;
+    } catch (error) {
+      console.error('Error getting most recent task time:', error);
+      return null;
+    }
+  }
+
+  // Database caching methods
+  async getCachedDatabases() {
+    try {
+      const rows = this.statements.getCachedDatabases.all();
+      if (rows.length === 0) return null;
+
+      // Check if cache is older than 1 hour
+      const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      if (rows[0].cached_at < oneHourAgo) {
+        return null; // Cache expired
+      }
+
+      return rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        url: row.url
+      }));
+    } catch (error) {
+      console.error('Error getting cached databases:', error);
+      return null;
+    }
+  }
+
+  async setCachedDatabases(databases) {
+    try {
+      const transaction = this.db.transaction(() => {
+        // Clear existing databases
+        this.statements.deleteDatabases.run();
+        
+        // Insert new databases
+        const now = Date.now();
+        for (const db of databases) {
+          this.statements.setCachedDatabase.run(
+            db.id,
+            db.title,
+            db.url,
+            now
+          );
+        }
+      });
+      
+      transaction();
+    } catch (error) {
+      console.error('Error setting cached databases:', error);
     }
   }
 

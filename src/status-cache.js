@@ -350,4 +350,5 @@ export class StatusCache {
       // File doesn't exist, that's fine
     }
   }
+
 }

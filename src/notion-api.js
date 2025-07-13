@@ -1,10 +1,11 @@
 import { Client } from '@notionhq/client';
 import chalk from 'chalk';
 import { SQLiteCache } from './sqlite-cache.js';
+import { NotionAPIBase } from './notion-api-base.js';
 
-export class NotionAPI {
+export class NotionAPI extends NotionAPIBase {
   constructor(token) {
-    this.notion = new Client({ auth: token });
+    super(token);
     this.statusCache = new SQLiteCache();
     this.databaseCache = new Map(); // Cache for database list
     this.databaseCacheExpiry = 0;
@@ -12,12 +13,13 @@ export class NotionAPI {
 
   async getDatabases() {
     try {
-      // Check if we have a valid cache (5 minutes expiry)
-      const now = Date.now();
-      if (this.databaseCache.size > 0 && now < this.databaseCacheExpiry) {
-        return Array.from(this.databaseCache.values());
+      // First check SQLite cache
+      const cachedDatabases = await this.statusCache.getCachedDatabases();
+      if (cachedDatabases) {
+        return cachedDatabases;
       }
 
+      console.log('📋 Fetching databases from Notion API...');
       const response = await this.notion.search({
         filter: {
           property: 'object',
@@ -31,12 +33,8 @@ export class NotionAPI {
         url: db.url
       }));
 
-      // Cache databases for 5 minutes
-      this.databaseCache.clear();
-      databases.forEach(db => {
-        this.databaseCache.set(db.id, db);
-      });
-      this.databaseCacheExpiry = now + (5 * 60 * 1000); // 5 minutes
+      // Cache databases in SQLite
+      await this.statusCache.setCachedDatabases(databases);
 
       return databases;
     } catch (error) {
@@ -48,23 +46,28 @@ export class NotionAPI {
     try {
       // Check if we should use cache for this request
       if (options.useCache) {
-        // Get database info to check last_edited_time
-        const database = await this.notion.databases.retrieve({
-          database_id: databaseId
-        });
-
-        const currentLastEditedTime = database.last_edited_time;
-
-        // For relation-sensitive queries (like project assignments), be more conservative with caching
-        const checkRecentPages = options.filterActionableItems || false;
-
-        // Check if we have valid cached data
-        if (await this.statusCache.isTaskCacheValid(databaseId, currentLastEditedTime, checkRecentPages)) {
-          const cached = await this.statusCache.getCachedTasks(databaseId);
-          if (cached && cached.tasks) {
-            console.log('📋 Using cached task data');
-            return cached.tasks;
+        const cached = await this.statusCache.getCachedTasks(databaseId);
+        if (cached && cached.tasks && cached.tasks.length > 0) {
+          console.log('📋 Using cached task data');
+          
+          // Check if we should do incremental sync
+          const mostRecentTime = await this.statusCache.getMostRecentTaskTime(databaseId);
+          if (mostRecentTime && !options.skipIncrementalSync) {
+            // Fetch only newer items and merge
+            try {
+              const newerItems = await this.getDatabaseItemsIncremental(databaseId, mostRecentTime, options);
+              if (newerItems.length > 0) {
+                console.log(`📋 Synced ${newerItems.length} newer items`);
+                // The incremental sync will update the cache, so get fresh cache
+                const updatedCache = await this.statusCache.getCachedTasks(databaseId);
+                return updatedCache?.tasks || cached.tasks;
+              }
+            } catch (incrementalError) {
+              console.warn('Incremental sync failed, using cache:', incrementalError.message);
+            }
           }
+          
+          return cached.tasks;
         }
       }
 
@@ -157,7 +160,8 @@ export class NotionAPI {
         title: this.extractTitle(page),
         properties: page.properties,
         url: page.url,
-        created_time: page.created_time
+        created_time: page.created_time,
+        last_edited_time: page.last_edited_time
       }));
 
       // Always cache the results (unless explicitly disabled)
@@ -279,12 +283,162 @@ export class NotionAPI {
     return results;
   }
 
+  async getDatabaseItemsIncremental(databaseId, lastSyncTime, options = {}) {
+    try {
+      // Build filter for items newer than lastSyncTime
+      const baseFilters = [];
+      
+      // Add the timestamp filter
+      baseFilters.push({
+        timestamp: 'last_edited_time',
+        last_edited_time: {
+          after: lastSyncTime
+        }
+      });
+
+      // Add actionable item filters if specified
+      if (options.filterActionableItems) {
+        try {
+          const completeStatuses = await this.statusCache.getCompleteGroupStatuses(databaseId, this);
+          completeStatuses.forEach(status => {
+            baseFilters.push({
+              property: 'Status',
+              status: { does_not_equal: status }
+            });
+          });
+        } catch (error) {
+          // Fallback to hardcoded exclusion
+          baseFilters.push({
+            property: 'Status',
+            status: { does_not_equal: '✅ Done' }
+          });
+        }
+      }
+
+      const filter = baseFilters.length > 1 ? { and: baseFilters } : baseFilters[0];
+      
+      // Use centralized queryDatabase method
+      const newerItems = await this.queryDatabase({
+        databaseId,
+        cacheKey: 'incrementalTasks',
+        getCacheData: null, // Don't use cache for incremental
+        setCacheData: null, // Don't cache incremental results separately
+        isValidCache: null,
+        filter,
+        sorts: options.sortByCreated ? [{ timestamp: 'created_time', direction: 'descending' }] : null,
+        pageSize: 100,
+        fetchAll: true,
+        mapResult: (page) => this.mapPage(page),
+        useCache: false,
+        logPrefix: '🔄'
+      });
+
+      // Merge with existing cache if we have new items
+      if (newerItems.length > 0) {
+        await this.mergeWithCache(databaseId, newerItems);
+      }
+
+      return newerItems;
+    } catch (error) {
+      throw new Error(`Incremental sync failed: ${error.message}`);
+    }
+  }
+
+  async mergeWithCache(databaseId, newerItems) {
+    try {
+      const cached = await this.statusCache.getCachedTasks(databaseId);
+      if (!cached || !cached.tasks) return;
+
+      // Create a map of existing items by ID for efficient lookup
+      const existingItemsMap = new Map(cached.tasks.map(item => [item.id, item]));
+      
+      // Update or add newer items
+      for (const newerItem of newerItems) {
+        existingItemsMap.set(newerItem.id, newerItem);
+      }
+
+      // Convert back to array
+      const mergedTasks = Array.from(existingItemsMap.values());
+      
+      // Get database info for cache update
+      const database = await this.notion.databases.retrieve({ database_id: databaseId });
+      
+      // Update cache with merged data
+      await this.statusCache.setCachedTasks(databaseId, mergedTasks, database.last_edited_time);
+    } catch (error) {
+      console.error('Failed to merge with cache:', error.message);
+    }
+  }
+
   async getActionableItems(databaseId, pageSize = 100, useCache = true) {
     return this.getDatabaseItems(databaseId, pageSize, {
       filterActionableItems: true,
       sortByCreated: true,
       useCache: useCache
     });
+  }
+
+  async getTasksWithDoDate(databaseId, useCache = true) {
+    try {
+      // Build filter for Do Date tasks
+      const baseFilter = {
+        property: 'Do Date',
+        date: { is_not_empty: true }
+      };
+
+      // Add status filter to exclude completed tasks
+      let statusFilters = [];
+      try {
+        const completeStatuses = await this.statusCache.getCompleteGroupStatuses(databaseId, this);
+        statusFilters = completeStatuses.map(status => ({
+          property: 'Status',
+          status: { does_not_equal: status }
+        }));
+      } catch (error) {
+        // Fallback to hardcoded exclusion
+        statusFilters = [{
+          property: 'Status',
+          status: { does_not_equal: '✅ Done' }
+        }];
+      }
+
+      const filter = {
+        and: [baseFilter, ...statusFilters]
+      };
+
+      // For now, don't use caching for Do Date filtered queries
+      // TODO: Implement separate caching for filtered queries in SQLiteCache
+      return await this.queryDatabase({
+        databaseId,
+        cacheKey: 'doDateTasks',
+        getCacheData: null, // Disable cache get for now
+        setCacheData: null, // Disable cache set for now
+        isValidCache: null, // Disable cache validation for now
+        filter,
+        sorts: [{
+          property: 'Do Date',
+          direction: 'ascending'
+        }],
+        pageSize: 100,
+        fetchAll: true,
+        mapResult: (page) => this.mapPage(page),
+        useCache: false, // Disable caching for filtered queries
+        logPrefix: '📅'
+      });
+    } catch (error) {
+      console.error('Error fetching Do Date tasks:', error);
+      // Fallback to the old method if the new one fails
+      console.log('Falling back to traditional filtering method...');
+      const allItems = await this.getActionableItems(databaseId, 1000, useCache);
+      return allItems.filter(item => {
+        const doDateProp = item.properties['Do Date'];
+        return doDateProp && doDateProp.date && doDateProp.date.start;
+      }).sort((a, b) => {
+        const dateA = new Date(a.properties['Do Date'].date.start);
+        const dateB = new Date(b.properties['Do Date'].date.start);
+        return dateA - dateB;
+      });
+    }
   }
 
   async getProjectsDatabase() {
@@ -614,23 +768,6 @@ export class NotionAPI {
     }
   }
 
-  extractTitle(page) {
-    // Try to find a title property
-    for (const value of Object.values(page.properties)) {
-      if (value.type === 'title' && value.title?.[0]?.plain_text) {
-        return value.title[0].plain_text;
-      }
-    }
-    
-    // Fallback to any rich_text property
-    for (const value of Object.values(page.properties)) {
-      if (value.type === 'rich_text' && value.rich_text?.[0]?.plain_text) {
-        return value.rich_text[0].plain_text;
-      }
-    }
-    
-    return 'Untitled';
-  }
 
   formatPropertyValue(property) {
     switch (property.type) {

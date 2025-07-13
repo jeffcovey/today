@@ -57,7 +57,6 @@ export class CLIInterface {
 
   async selectDatabase() {
     try {
-      console.log(chalk.blue('Fetching your databases...'));
       const databases = await this.notionAPI.getDatabases();
 
       if (databases.length === 0) {
@@ -144,14 +143,12 @@ export class CLIInterface {
       const tasksWithoutStage = [];
       const unassignedTasks = [];
       const untaggedTasks = [];
-      const tasksWithDoDate = [];
       
       // Single pass through items to avoid multiple iterations
       for (const item of items) {
         const stageProp = item.properties['Stage'];
         const projectProp = item.properties['Projects (DB)'];
         const tagProp = item.properties['Tag/Knowledge Vault'];
-        const doDateProp = item.properties['Do Date'];
         
         // Check Stage
         if (!stageProp || !stageProp.select || !stageProp.select.name) {
@@ -167,15 +164,13 @@ export class CLIInterface {
         if (!tagProp || !tagProp.relation || tagProp.relation.length === 0) {
           untaggedTasks.push(item);
         }
-        
-        // Check Do Date
-        if (doDateProp && doDateProp.date && doDateProp.date.start) {
-          tasksWithDoDate.push(item);
-        }
       }
       
-      // Sort Do Date tasks once at the end
-      tasksWithDoDate.sort((a, b) => {
+      // Get Do Date tasks from cache only - filter the existing items
+      const tasksWithDoDate = items.filter(item => {
+        const doDateProp = item.properties['Do Date'];
+        return doDateProp && doDateProp.date && doDateProp.date.start;
+      }).sort((a, b) => {
         const dateA = new Date(a.properties['Do Date'].date.start);
         const dateB = new Date(b.properties['Do Date'].date.start);
         return dateA - dateB;
@@ -275,13 +270,16 @@ export class CLIInterface {
     console.log(chalk.blue('\n🏷️  Tag Assignment Mode'));
     
     try {
-      // Load all actionable items to find tasks without tags
+      // Get tasks from cache only - no API calls needed
       console.log(chalk.blue('Loading actionable tasks...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
-      if (items.length === 0) {
-        console.log(chalk.yellow('No actionable items found.'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
         return;
       }
+
+      const items = cached.tasks;
 
       // Get tasks that have no tags assigned
       const untaggedTasks = items.filter(item => {
@@ -367,20 +365,20 @@ export class CLIInterface {
     console.log(chalk.blue('\n📅 Do Date Editing Mode'));
     
     try {
-      // Load all actionable items to find tasks with Do Date set
+      // Get tasks from cache only - no API calls needed
       console.log(chalk.blue('Loading tasks with Do Date...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
-      if (items.length === 0) {
-        console.log(chalk.yellow('No actionable items found.'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
         return;
       }
 
-      // Get tasks that have Do Date set and sort by date
-      const tasksWithDoDate = items.filter(item => {
+      // Filter for tasks with Do Date from cached data
+      const tasksWithDoDate = cached.tasks.filter(item => {
         const doDateProp = item.properties['Do Date'];
         return doDateProp && doDateProp.date && doDateProp.date.start;
       }).sort((a, b) => {
-        // Sort by Do Date, soonest first
         const dateA = new Date(a.properties['Do Date'].date.start);
         const dateB = new Date(b.properties['Do Date'].date.start);
         return dateA - dateB;
@@ -412,13 +410,16 @@ export class CLIInterface {
     console.log(chalk.blue('\n🎭 Stage Assignment Mode'));
     
     try {
-      // Load all actionable items to find tasks without Stage
+      // Get tasks from cache only - no API calls needed
       console.log(chalk.blue('Loading actionable tasks...'));
-      const items = await this.notionAPI.getActionableItems(database.id, 1000, true);
-      if (items.length === 0) {
-        console.log(chalk.yellow('No actionable items found.'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
         return;
       }
+
+      const items = cached.tasks;
 
       // Get tasks that have no Stage set
       const tasksWithoutStage = items.filter(item => {
@@ -477,18 +478,16 @@ export class CLIInterface {
       const selectedProject = await this.selectProject(projects);
       if (!selectedProject) return;
 
-      // Load ALL actionable items to find unassigned tasks (use pagination to get all items)
+      // Get tasks from cache only - no API calls needed
       console.log(chalk.blue('Loading all actionable tasks...'));
-      const items = await this.notionAPI.getDatabaseItems(database.id, 100, {
-        filterActionableItems: true,
-        sortByCreated: true,
-        useCache: true,
-        fetchAll: true  // This will fetch all items using pagination
-      });
-      if (items.length === 0) {
-        console.log(chalk.yellow('No actionable items found.'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
         return;
       }
+
+      const items = cached.tasks;
 
       // Get tasks that are not assigned to ANY project
       const unassignedTasks = items.filter(item => {
@@ -522,9 +521,16 @@ export class CLIInterface {
   async handleBatchEditing(database) {
     console.log(chalk.blue('\n✏️  Batch Editing Mode'));
     
-    // Step 2: Load database schema and items
+    // Step 2: Load database schema and get items from cache
     const schema = await this.notionAPI.getDatabaseSchema(database.id);
-    const items = await this.notionAPI.getActionableItems(database.id);
+    
+    const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+    if (!cached || !cached.tasks) {
+      console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
+      return;
+    }
+
+    const items = cached.tasks;
 
     if (items.length === 0) {
       console.log(chalk.yellow('No actionable items found (excluding completed tasks).'));
