@@ -24,6 +24,9 @@ export class CLIInterface {
         case 'morning_routine':
           await this.handleMorningRoutine();
           break;
+        case 'todays_tasks':
+          await this.handleTodaysTasks(database);
+          break;
         case 'stage_assignment':
           await this.handleStageAssignment(database);
           break;
@@ -138,6 +141,74 @@ export class CLIInterface {
       const morningItems = morningRoutineItems.status === 'fulfilled' ? morningRoutineItems.value : [];
       const eveningItems = eveningTasksItems.status === 'fulfilled' ? eveningTasksItems.value : [];
       const choreItems = dayEndChoresItems.status === 'fulfilled' ? dayEndChoresItems.value : [];
+
+      // Get today's tasks from cached data - tasks with Repeat Start today or earlier
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today for comparison
+      
+      // Debug: Check for Repeat Start property
+      let itemsWithRepeatStart = items.filter(item => {
+        const prop = item.properties['Repeat Start'];
+        // Handle both date and formula types
+        if (prop && prop.type === 'formula' && prop.formula?.type === 'date') {
+          return prop.formula.date && prop.formula.date.start;
+        }
+        return prop && prop.date && prop.date.start;
+      });
+      
+      const todaysTasks = items.filter(item => {
+        // Try 'Repeat Start' first, then 'Start/Repeat Date'
+        let startRepeatProp = item.properties['Repeat Start'];
+        let dateValue = null;
+        
+        if (startRepeatProp) {
+          if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+            dateValue = startRepeatProp.formula.date?.start;
+          } else if (startRepeatProp.date) {
+            dateValue = startRepeatProp.date.start;
+          }
+        }
+        
+        // Fallback to 'Start/Repeat Date' if no date found
+        if (!dateValue) {
+          startRepeatProp = item.properties['Start/Repeat Date'];
+          if (startRepeatProp) {
+            if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+              dateValue = startRepeatProp.formula.date?.start;
+            } else if (startRepeatProp.date) {
+              dateValue = startRepeatProp.date.start;
+            }
+          }
+        }
+        
+        if (!dateValue) {
+          return false;
+        }
+        
+        const startDate = new Date(dateValue);
+        const isToday = startDate <= today;
+        
+        return isToday;
+      }).sort((a, b) => {
+        // Sort by date, earliest first
+        const getDateValue = (prop) => {
+          if (prop?.type === 'formula' && prop.formula?.type === 'date') {
+            return prop.formula.date?.start;
+          } else if (prop?.date) {
+            return prop.date.start;
+          }
+          return null;
+        };
+        
+        const propA = a.properties['Repeat Start'] || a.properties['Start/Repeat Date'];
+        const propB = b.properties['Repeat Start'] || b.properties['Start/Repeat Date'];
+        const dateA = new Date(getDateValue(propA));
+        const dateB = new Date(getDateValue(propB));
+        return dateA - dateB;
+      });
+      
+      
+      
       
       // Check for tasks without Stage, Project, Tags, and Do Date in one pass for efficiency
       const tasksWithoutStage = [];
@@ -182,6 +253,11 @@ export class CLIInterface {
       // Add Morning Routine at the top if there are uncompleted items
       if (morningItems.length > 0) {
         choices.push({ name: `🌅 Complete morning routine (${morningItems.length} remaining)`, value: 'morning_routine' });
+      }
+
+      // Add Today's Tasks if there are any
+      if (todaysTasks.length > 0) {
+        choices.push({ name: `📆 Today's tasks (${todaysTasks.length} available)`, value: 'todays_tasks' });
       }
 
       if (tasksWithoutStage.length > 0) {
@@ -358,6 +434,90 @@ export class CLIInterface {
       if (error.message.includes('Morning Routine database not found')) {
         console.log(chalk.yellow('Make sure the Notion integration has access to the Morning Routine database.'));
       }
+    }
+  }
+
+  async handleTodaysTasks(database) {
+    console.log(chalk.blue('\n📆 Today\'s Tasks Mode'));
+    
+    try {
+      // Get tasks from cache only - no API calls needed
+      console.log(chalk.blue('Loading today\'s tasks...'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
+        return;
+      }
+
+      // Filter for tasks with Repeat Start today or earlier
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today for comparison
+      
+      const todaysTasks = cached.tasks.filter(item => {
+        // Try 'Repeat Start' first, then 'Start/Repeat Date'
+        let startRepeatProp = item.properties['Repeat Start'];
+        let dateValue = null;
+        
+        if (startRepeatProp) {
+          if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+            dateValue = startRepeatProp.formula.date?.start;
+          } else if (startRepeatProp.date) {
+            dateValue = startRepeatProp.date.start;
+          }
+        }
+        
+        // Fallback to 'Start/Repeat Date' if no date found
+        if (!dateValue) {
+          startRepeatProp = item.properties['Start/Repeat Date'];
+          if (startRepeatProp) {
+            if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+              dateValue = startRepeatProp.formula.date?.start;
+            } else if (startRepeatProp.date) {
+              dateValue = startRepeatProp.date.start;
+            }
+          }
+        }
+        
+        if (!dateValue) {
+          return false;
+        }
+        
+        const startDate = new Date(dateValue);
+        return startDate <= today;
+      }).sort((a, b) => {
+        // Sort by date, earliest first
+        const getDateValue = (prop) => {
+          if (prop?.type === 'formula' && prop.formula?.type === 'date') {
+            return prop.formula.date?.start;
+          } else if (prop?.date) {
+            return prop.date.start;
+          }
+          return null;
+        };
+        
+        const propA = a.properties['Repeat Start'] || a.properties['Start/Repeat Date'];
+        const propB = b.properties['Repeat Start'] || b.properties['Start/Repeat Date'];
+        const dateA = new Date(getDateValue(propA));
+        const dateB = new Date(getDateValue(propB));
+        return dateA - dateB;
+      });
+
+      if (todaysTasks.length === 0) {
+        console.log(chalk.yellow('No tasks found for today or earlier.'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${todaysTasks.length} tasks for today or earlier (sorted by date)`));
+
+      // Let user select tasks to mark as done
+      const selectedTasks = await this.selectItems(todaysTasks, `Select today's tasks to mark as done`, true);
+      if (selectedTasks.length === 0) return;
+
+      // Mark selected tasks as done
+      await this.markTodaysTasksDone(selectedTasks, database);
+    } catch (error) {
+      console.error(chalk.red('Error in today\'s tasks:'), error.message);
     }
   }
 
@@ -636,8 +796,54 @@ export class CLIInterface {
               doDateStr = chalk.gray(` [Due ${doDate.toLocaleDateString()}]`);
             }
           }
+
+          // Check if this item has a Repeat Start date and format it
+          let startRepeatStr = '';
+          let startRepeatProp = item.properties['Repeat Start'];
+          let dateValue = null;
           
-          const displayName = `${item.title}${doDateStr} ${createdDate}`;
+          if (startRepeatProp) {
+            if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+              dateValue = startRepeatProp.formula.date?.start;
+            } else if (startRepeatProp.date) {
+              dateValue = startRepeatProp.date.start;
+            }
+          }
+          
+          // Fallback to 'Start/Repeat Date' if no date found
+          if (!dateValue) {
+            startRepeatProp = item.properties['Start/Repeat Date'];
+            if (startRepeatProp) {
+              if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
+                dateValue = startRepeatProp.formula.date?.start;
+              } else if (startRepeatProp.date) {
+                dateValue = startRepeatProp.date.start;
+              }
+            }
+          }
+          
+          if (dateValue) {
+            const startDate = new Date(dateValue);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            startDate.setHours(0, 0, 0, 0);
+            
+            const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+              startRepeatStr = chalk.green(' [Today]');
+            } else if (diffDays === 1) {
+              startRepeatStr = chalk.cyan(' [Yesterday]');
+            } else if (diffDays > 1) {
+              startRepeatStr = chalk.cyan(` [${diffDays} days ago]`);
+            } else if (diffDays === -1) {
+              startRepeatStr = chalk.blue(' [Tomorrow]');
+            } else if (diffDays < -1) {
+              startRepeatStr = chalk.blue(` [In ${Math.abs(diffDays)} days]`);
+            }
+          }
+          
+          const displayName = `${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
           
           return {
             name: displayName,
@@ -713,8 +919,35 @@ export class CLIInterface {
             doDateStr = chalk.gray(` [Due ${doDate.toLocaleDateString()}]`);
           }
         }
+
+        // Check if this item has a Repeat Start date and format it
+        let startRepeatStr = '';
+        let startRepeatProp = item.properties['Repeat Start'];
+        if (!startRepeatProp || !startRepeatProp.date || !startRepeatProp.date.start) {
+          startRepeatProp = item.properties['Start/Repeat Date'];
+        }
+        if (startRepeatProp && startRepeatProp.date && startRepeatProp.date.start) {
+          const startDate = new Date(startRepeatProp.date.start);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          startDate.setHours(0, 0, 0, 0);
+          
+          const diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 0) {
+            startRepeatStr = chalk.green(' [Today]');
+          } else if (diffDays === 1) {
+            startRepeatStr = chalk.cyan(' [Yesterday]');
+          } else if (diffDays > 1) {
+            startRepeatStr = chalk.cyan(` [${diffDays} days ago]`);
+          } else if (diffDays === -1) {
+            startRepeatStr = chalk.blue(' [Tomorrow]');
+          } else if (diffDays < -1) {
+            startRepeatStr = chalk.blue(` [In ${Math.abs(diffDays)} days]`);
+          }
+        }
         
-        const displayName = `${item.title}${doDateStr} ${createdDate}`;
+        const displayName = `${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
         
         return {
           name: displayName,
@@ -1400,6 +1633,72 @@ export class CLIInterface {
       }
     } catch (error) {
       console.error(chalk.red('Morning routine update failed:'), error.message);
+    }
+  }
+
+  async markTodaysTasksDone(tasks, database) {
+    console.log(chalk.blue(`\n🔄 Marking ${tasks.length} today's tasks as done...`));
+    
+    // Get the correct "Done" status from the database's status groups
+    let doneStatusName = '✅ Done'; // Default fallback
+    try {
+      const completeStatuses = await this.notionAPI.statusCache.getCompleteGroupStatuses(database.id, this.notionAPI);
+      if (completeStatuses.length > 0) {
+        doneStatusName = completeStatuses[0]; // Use the first complete status
+      }
+    } catch (error) {
+      console.warn('Could not get status groups, using default "Done" status');
+    }
+
+    const updates = tasks.map(task => ({
+      pageId: task.id,
+      properties: {
+        'Status': {
+          status: { name: doneStatusName }
+        }
+      }
+    }));
+
+    try {
+      // Use optimized batch processing for status updates
+      const batchOptions = tasks.length > 5 ? { concurrency: 6, delayMs: 80 } : {};
+      const results = await this.notionAPI.batchUpdatePages(updates, batchOptions);
+      
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(chalk.green(`\n✅ Successfully marked ${successful} today's tasks as done`));
+      
+      if (successful > 0) {
+        // Update cache for successfully completed tasks
+        const successfulTaskIds = results
+          .filter(r => r.success)
+          .map(r => r.pageId);
+        
+        try {
+          const updatedTasks = await this.notionAPI.getUpdatedTasks(successfulTaskIds);
+          await this.notionAPI.statusCache.updateTasksInCache(database.id, updatedTasks);
+          console.log(chalk.blue(`🔄 Updated ${successfulTaskIds.length} tasks in cache`));
+        } catch (error) {
+          // Fall back to full cache invalidation if targeted update fails
+          await this.notionAPI.statusCache.invalidateTaskCache();
+          console.log(chalk.blue('🔄 Cache refreshed'));
+        }
+        
+        if (successful === tasks.length) {
+          console.log(chalk.green('🎉 All selected today\'s tasks are now complete!'));
+        }
+      }
+      
+      if (failed > 0) {
+        console.log(chalk.red(`❌ Failed to mark ${failed} tasks as done`));
+        const failedResults = results.filter(r => !r.success);
+        for (const result of failedResults) {
+          console.log(chalk.red(`  - ${result.pageId}: ${result.error}`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Today\'s tasks update failed:'), error.message);
     }
   }
 
