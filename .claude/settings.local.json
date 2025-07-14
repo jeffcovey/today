@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(true)",
+      "Bash(npm install)",
+      "Bash(node:*)",
+      "WebFetch(domain:developers.notion.com)",
+      "Bash(ls:*)",
+      "Bash(npm run edit:*)",
+      "Bash(grep:*)",
+      "Bash(npm run check-schema:*)",
+      "Bash(npm run start:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run clear-cache:*)",
+      "Bash(npm start)",
+      "Bash(timeout 30s npm start edit)",
+      "Bash(timeout 15s npm start edit)",
+      "Bash(timeout 10s npm start edit)",
+      "Bash(npm start:*)",
+      "Bash(timeout 25s npm start edit)",
+      "Bash(notion-cli daily:*)",
+      "Bash(notion-cli debug:*)",
+      "Bash(notion-cli edit:*)",
+      "Bash(bin/notion-cli edit:*)"
+    ],
+    "deny": []
+  }
+}

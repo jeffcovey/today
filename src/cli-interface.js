@@ -161,32 +161,30 @@ export class CLIInterface {
       const today = new Date();
       today.setHours(23, 59, 59, 999); // End of today for comparison
       
-      // Debug: Check for Repeat Start property
-      let itemsWithRepeatStart = items.filter(item => {
-        const prop = item.properties['Repeat Start'];
-        // Handle both date and formula types
-        if (prop && prop.type === 'formula' && prop.formula?.type === 'date') {
-          return prop.formula.date && prop.formula.date.start;
-        }
-        return prop && prop.date && prop.date.start;
-      });
-      
       const todaysTasks = items.filter(item => {
-        // Try 'Repeat Start' first, then 'Start/Repeat Date'
-        let startRepeatProp = item.properties['Repeat Start'];
+        // Try 'Start/Repeat Date' first (this is the primary field), then 'Repeat Start'
+        let startRepeatProp = item.properties['Start/Repeat Date'];
         let dateValue = null;
         
         if (startRepeatProp) {
-          if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
-            dateValue = startRepeatProp.formula.date?.start;
+          if (startRepeatProp.type === 'formula') {
+            // Handle different formula result types
+            if (startRepeatProp.formula?.type === 'date' && startRepeatProp.formula.date?.start) {
+              dateValue = startRepeatProp.formula.date.start;
+            } else if (startRepeatProp.formula?.date?.start) {
+              dateValue = startRepeatProp.formula.date.start;
+            } else if (typeof startRepeatProp.formula === 'string') {
+              // Sometimes formula returns a date string directly
+              dateValue = startRepeatProp.formula;
+            }
           } else if (startRepeatProp.date) {
             dateValue = startRepeatProp.date.start;
           }
         }
         
-        // Fallback to 'Start/Repeat Date' if no date found
+        // Fallback to 'Repeat Start' if no date found
         if (!dateValue) {
-          startRepeatProp = item.properties['Start/Repeat Date'];
+          startRepeatProp = item.properties['Repeat Start'];
           if (startRepeatProp) {
             if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
               dateValue = startRepeatProp.formula.date?.start;
@@ -203,8 +201,12 @@ export class CLIInterface {
         const startDate = new Date(dateValue);
         const isToday = startDate <= today;
         
+        
         return isToday;
-      }).sort((a, b) => {
+      });
+      
+      
+      const sortedTodaysTasks = todaysTasks.sort((a, b) => {
         // Sort by date, earliest first
         const getDateValue = (prop) => {
           if (prop?.type === 'formula' && prop.formula?.type === 'date') {
@@ -271,8 +273,8 @@ export class CLIInterface {
       }
 
       // Add Today's Tasks if there are any
-      if (todaysTasks.length > 0) {
-        choices.push({ name: `📆 Today's tasks (${todaysTasks.length} available)`, value: 'todays_tasks' });
+      if (sortedTodaysTasks.length > 0) {
+        choices.push({ name: `📆 Today's tasks (${sortedTodaysTasks.length} available)`, value: 'todays_tasks' });
       }
 
       if (tasksWithoutStage.length > 0) {
@@ -485,21 +487,29 @@ export class CLIInterface {
       today.setHours(23, 59, 59, 999); // End of today for comparison
       
       const todaysTasks = cached.tasks.filter(item => {
-        // Try 'Repeat Start' first, then 'Start/Repeat Date'
-        let startRepeatProp = item.properties['Repeat Start'];
+        // Try 'Start/Repeat Date' first (this is the primary field), then 'Repeat Start'
+        let startRepeatProp = item.properties['Start/Repeat Date'];
         let dateValue = null;
         
         if (startRepeatProp) {
-          if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
-            dateValue = startRepeatProp.formula.date?.start;
+          if (startRepeatProp.type === 'formula') {
+            // Handle different formula result types
+            if (startRepeatProp.formula?.type === 'date' && startRepeatProp.formula.date?.start) {
+              dateValue = startRepeatProp.formula.date.start;
+            } else if (startRepeatProp.formula?.date?.start) {
+              dateValue = startRepeatProp.formula.date.start;
+            } else if (typeof startRepeatProp.formula === 'string') {
+              // Sometimes formula returns a date string directly
+              dateValue = startRepeatProp.formula;
+            }
           } else if (startRepeatProp.date) {
             dateValue = startRepeatProp.date.start;
           }
         }
         
-        // Fallback to 'Start/Repeat Date' if no date found
+        // Fallback to 'Repeat Start' if no date found
         if (!dateValue) {
-          startRepeatProp = item.properties['Start/Repeat Date'];
+          startRepeatProp = item.properties['Repeat Start'];
           if (startRepeatProp) {
             if (startRepeatProp.type === 'formula' && startRepeatProp.formula?.type === 'date') {
               dateValue = startRepeatProp.formula.date?.start;
@@ -526,8 +536,8 @@ export class CLIInterface {
           return null;
         };
         
-        const propA = a.properties['Repeat Start'] || a.properties['Start/Repeat Date'];
-        const propB = b.properties['Repeat Start'] || b.properties['Start/Repeat Date'];
+        const propA = a.properties['Start/Repeat Date'] || a.properties['Repeat Start'];
+        const propB = b.properties['Start/Repeat Date'] || b.properties['Repeat Start'];
         const dateA = new Date(getDateValue(propA));
         const dateB = new Date(getDateValue(propB));
         return dateA - dateB;
@@ -1666,6 +1676,53 @@ export class CLIInterface {
     }
   }
 
+  groupTasksByDate(tasks) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const groups = {
+      today: [],
+      overdue: []
+    };
+    
+    tasks.forEach(task => {
+      const getDateValue = (prop) => {
+        if (prop?.type === 'formula' && prop.formula?.type === 'date') {
+          return prop.formula.date?.start;
+        } else if (prop?.date) {
+          return prop.date.start;
+        }
+        return null;
+      };
+      
+      const startRepeatProp = task.properties['Repeat Start'] || task.properties['Start/Repeat Date'];
+      const dateValue = getDateValue(startRepeatProp);
+      
+      if (dateValue) {
+        const taskDate = new Date(dateValue);
+        taskDate.setHours(0, 0, 0, 0);
+        
+        if (taskDate.getTime() === today.getTime()) {
+          groups.today.push(task);
+        } else if (taskDate < today) {
+          groups.overdue.push(task);
+        }
+      }
+    });
+    
+    return groups;
+  }
+  
+  displayGroupedTasks(groupedTasks) {
+    if (groupedTasks.today.length > 0) {
+      console.log(chalk.green(`\n📅 Today (${groupedTasks.today.length} tasks)`));
+    }
+    
+    if (groupedTasks.overdue.length > 0) {
+      console.log(chalk.red(`\n⏰ Overdue (${groupedTasks.overdue.length} tasks)`));
+    }
+  }
+
   async markTodaysTasksDone(tasks, database) {
     console.log(chalk.blue(`\n🔄 Marking ${tasks.length} today's tasks as done...`));
     
@@ -1992,7 +2049,7 @@ export class CLIInterface {
     const updates = items.map(item => ({
       pageId: item.id,
       properties: {
-        'Done': {
+        'Toggle': {
           checkbox: true
         }
       }

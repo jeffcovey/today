@@ -544,6 +544,15 @@ export class SQLiteCache {
     this.db.exec(`DELETE FROM tag_cache; DELETE FROM cache_metadata WHERE cache_type = 'tags';`);
   }
 
+  async clearTasksCache(databaseId) {
+    try {
+      this.statements.deleteCachedTasks.run(databaseId);
+      this.db.prepare('DELETE FROM cache_metadata WHERE database_id = ? AND cache_type = ?').run(databaseId, 'tasks');
+    } catch (error) {
+      console.error('Error clearing tasks cache:', error);
+    }
+  }
+
 
   async updateTasksInCache(databaseId, updatedTasks) {
     try {
