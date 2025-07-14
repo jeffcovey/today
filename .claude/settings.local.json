@@ -22,7 +22,9 @@
       "Bash(notion-cli daily:*)",
       "Bash(notion-cli debug:*)",
       "Bash(notion-cli edit:*)",
-      "Bash(bin/notion-cli edit:*)"
+      "Bash(bin/notion-cli edit:*)",
+      "Bash(npm search:*)",
+      "Bash(claude --version)"
     ],
     "deny": []
   }
