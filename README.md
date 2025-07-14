@@ -263,6 +263,42 @@ npm start
 notion-cli temporal --create-missing-days --start-date $(date +%Y-%m-%d) --end-date $(date -d '+7 days' +%Y-%m-%d)
 ```
 
+## Remote Development with VS Code Tunnel
+
+The Docker container includes VS Code CLI with tunnel support, allowing you to access your development environment from anywhere.
+
+### Starting a VS Code Tunnel
+
+```bash
+# From within the container (or Docker Compose shell)
+code tunnel --accept-server-license-terms
+
+# The tunnel will start in /app directory by default
+# You can also specify a different directory:
+cd /workspaces/notion-cli && code tunnel --accept-server-license-terms
+```
+
+### Authentication
+
+1. On first run, you'll receive a device code (e.g., `5AB0-0AF9`)
+2. Visit https://github.com/login/device
+3. Enter the provided code
+4. Once authenticated, you'll receive a tunnel URL (e.g., `https://vscode.dev/tunnel/<machine-name>`)
+
+### Using the Tunnel
+
+- Access your tunnel URL from any browser
+- VS Code will open with full access to your container environment
+- The tunnel persists as long as the container is running
+- To stop the tunnel, press `Ctrl+C` in the terminal
+
+### Alternative Authentication Providers
+
+```bash
+# Use Microsoft account instead of GitHub
+code tunnel user login --provider microsoft
+```
+
 ## Development
 
 ```bash

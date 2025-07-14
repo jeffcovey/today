@@ -1,0 +1,6 @@
+#!/bin/sh
+# VS Code tunnel helper script
+# Starts tunnel in the workspace directory
+
+cd /workspaces/notion-cli
+exec code tunnel "$@"
