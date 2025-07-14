@@ -11,6 +11,6 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install",
+	"postCreateCommand": "npm install && npm install -g @anthropic-ai/claude-code",
 	"workspaceFolder": "/workspaces/notion-cli"
 }

@@ -23,7 +23,9 @@
       "Bash(notion-cli debug:*)",
       "Bash(notion-cli edit:*)",
       "Bash(bin/notion-cli edit:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(/usr/local/bin/code:*)",
+      "Bash(ln:*)"
     ],
     "deny": []
   }
