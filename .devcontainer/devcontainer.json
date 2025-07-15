@@ -1,8 +1,17 @@
 {
 	"name": "Node.js Notion CLI",
-	"image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 	"features": {
-		"ghcr.io/devcontainers/features/git:1": {}
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/sshd:1": {
+			"version": "latest"
+		},
+		"ghcr.io/tailscale/codespace/tailscale:1": {
+			"version": "latest",
+			"authkey": "${localEnv:TAILSCALE_AUTHKEY}"
+		}
 	},
 	"customizations": {
 		"vscode": {
@@ -11,6 +20,22 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install && npm install -g @anthropic-ai/claude-code",
+	"postCreateCommand": "npm install --omit=dev",
+	"postStartCommand": "bin/devcontainer-startup",
+	"containerEnv": {
+		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
+		"DEVCONTAINER_PROJECT": "notion-cli"
+	},
+	"forwardPorts": [2222, 8080],
+	"portsAttributes": {
+		"2222": {
+			"label": "SSH",
+			"onAutoForward": "notify"
+		},
+		"8080": {
+			"label": "Code Server",
+			"onAutoForward": "notify"
+		}
+	},
 	"workspaceFolder": "/workspaces/notion-cli"
 }

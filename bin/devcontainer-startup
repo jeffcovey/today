@@ -1,0 +1,54 @@
+#!/bin/bash
+# Main startup script for devcontainer
+set -e
+
+echo "=== DevContainer Startup ==="
+echo "Project: $(basename "$(pwd)")"
+echo "Time: $(date)"
+
+# Run existing setup scripts
+if [ -f "bin/setup-ssh" ]; then
+    echo "Setting up SSH..."
+    bash bin/setup-ssh || echo "SSH setup failed, continuing..."
+fi
+
+# Setup Tailscale hostname
+if [ -f "bin/setup-tailscale-hostname" ]; then
+    echo "Setting up Tailscale hostname..."
+    bash bin/setup-tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
+fi
+
+# Start code-server
+if [ -f "bin/start-code-server" ]; then
+    echo "Starting code-server..."
+    bash bin/start-code-server || echo "code-server startup failed"
+fi
+
+# Create a summary file for easy access
+mkdir -p ~/.config/devcontainer
+cat > ~/.config/devcontainer/access-info.txt <<EOF
+=== DevContainer Access Information ===
+Generated: $(date)
+Project: $(basename "$(pwd)")
+
+SSH Access:
+  Port: 2222
+  Command: ssh -p 2222 user@<container-ip>
+
+Code Server Access:
+  Port: 8081
+  Tailscale IP: $(tailscale ip -4 2>/dev/null || echo "Not available")
+  URL: http://$(tailscale ip -4 2>/dev/null || echo "localhost"):8081
+
+To view this information again:
+  cat ~/.config/devcontainer/access-info.txt
+
+To restart code-server:
+  bin/start-code-server
+EOF
+
+echo ""
+echo "=== Access Information ==="
+cat ~/.config/devcontainer/access-info.txt
+echo ""
+echo "DevContainer startup complete!"

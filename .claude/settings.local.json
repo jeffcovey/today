@@ -25,7 +25,24 @@
       "Bash(bin/notion-cli edit:*)",
       "Bash(chmod:*)",
       "Bash(/usr/local/bin/code:*)",
-      "Bash(ln:*)"
+      "Bash(ln:*)",
+      "Bash(rm:*)",
+      "Bash(./bin/tunnel:*)",
+      "Bash(/workspaces/notion-cli/.vscode-cli/code --help)",
+      "Bash(VSCODE_TUNNEL_PLATFORM=linux-arm64 /workspaces/notion-cli/.vscode-cli/code tunnel --help)",
+      "Bash(/workspaces/notion-cli/.vscode-cli/code tunnel --help)",
+      "Bash(strace:*)",
+      "Bash(cat:*)",
+      "Bash(code-server:*)",
+      "Bash(code tunnel:*)",
+      "Bash(pkill:*)",
+      "Bash(jobs)",
+      "Bash(timeout:*)",
+      "Bash(sudo netstat:*)",
+      "Bash(killall:*)",
+      "Bash(/usr/bin/code-server --bind-addr 0.0.0.0:8080 --auth none /workspaces/notion-cli)",
+      "Bash(/usr/bin/code-server:*)",
+      "Bash(bin/start-code-server:*)"
     ],
     "deny": []
   }

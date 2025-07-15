@@ -1,0 +1,61 @@
+#!/bin/bash
+# SSH setup script for VS Code Remote SSH access
+# Sets up SSH server with key-based authentication
+
+set -e
+
+echo "Setting up SSH server for VS Code Remote SSH..."
+
+# Generate SSH host keys if they don't exist
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    echo "Generating SSH host keys..."
+    sudo ssh-keygen -A
+fi
+
+# Create SSH key pair for the user if it doesn't exist
+if [ ! -f /home/node/.ssh/id_rsa ]; then
+    echo "Generating SSH key pair for user 'node'..."
+    mkdir -p /home/node/.ssh
+    ssh-keygen -t rsa -b 4096 -f /home/node/.ssh/id_rsa -N "" -C "devcontainer-$(hostname)"
+    
+    # Set up authorized_keys for passwordless login
+    cp /home/node/.ssh/id_rsa.pub /home/node/.ssh/authorized_keys
+    chmod 600 /home/node/.ssh/authorized_keys
+    chmod 700 /home/node/.ssh
+    chown -R node:node /home/node/.ssh
+fi
+
+# Configure SSH daemon
+sudo tee /etc/ssh/sshd_config.d/devcontainer.conf > /dev/null << 'EOF'
+# Dev container SSH configuration
+Port 2222
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+X11Forwarding yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
+
+# Start SSH service
+echo "Starting SSH daemon..."
+sudo service ssh start
+
+# Display connection information
+echo ""
+echo "✅ SSH server setup complete!"
+echo ""
+echo "To connect from VS Code:"
+echo "1. Install the 'Remote - SSH' extension"
+echo "2. Open Command Palette (Cmd/Ctrl+Shift+P)"
+echo "3. Run 'Remote-SSH: Connect to Host...'"
+echo "4. Use: node@localhost:2222"
+echo ""
+echo "SSH key location: /home/node/.ssh/id_rsa"
+echo "Copy this key to your local machine for passwordless access."
+echo ""
+echo "To copy the private key:"
+echo "cat /home/node/.ssh/id_rsa"
+echo ""

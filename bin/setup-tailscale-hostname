@@ -1,0 +1,54 @@
+#!/bin/bash
+set -e
+
+# Get project and host information
+PROJECT_NAME=$(basename "$(pwd)")
+HOST_MACHINE=$(hostname -s 2>/dev/null || hostname)
+PARENT_HOST="${DEVCONTAINER_HOST_MACHINE:-unknown}"
+
+# Create a meaningful hostname
+# Format: project-host-suffix (limited to 63 chars for DNS compatibility)
+TAILSCALE_HOSTNAME="${PROJECT_NAME}-${PARENT_HOST}"
+# Sanitize: lowercase, replace invalid chars with hyphens
+TAILSCALE_HOSTNAME=$(echo "$TAILSCALE_HOSTNAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+# Truncate to 63 chars if needed
+TAILSCALE_HOSTNAME=${TAILSCALE_HOSTNAME:0:63}
+
+echo "Setting Tailscale hostname to: $TAILSCALE_HOSTNAME"
+
+# Wait for Tailscale to be ready
+echo "Waiting for Tailscale..."
+for i in {1..30}; do
+    if tailscale status &>/dev/null; then
+        break
+    fi
+    sleep 1
+done
+
+# Set the hostname if Tailscale is available
+if command -v tailscale &> /dev/null && tailscale status &>/dev/null; then
+    # Note: This requires appropriate Tailscale ACL permissions
+    # The container needs to be able to set its own hostname
+    echo "Tailscale is ready, attempting to set hostname..."
+    
+    # Get current status
+    CURRENT_HOSTNAME=$(tailscale status --json | jq -r '.Self.HostName' 2>/dev/null || echo "")
+    echo "Current hostname: $CURRENT_HOSTNAME"
+    
+    # Note: Direct hostname setting might require admin API access
+    # For now, we'll document the desired hostname
+    echo "Desired hostname: $TAILSCALE_HOSTNAME"
+    
+    # Save the configuration for reference
+    mkdir -p ~/.config/tailscale
+    cat > ~/.config/tailscale/hostname.conf <<EOF
+PROJECT_NAME=$PROJECT_NAME
+PARENT_HOST=$PARENT_HOST
+DESIRED_HOSTNAME=$TAILSCALE_HOSTNAME
+TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+EOF
+    
+    echo "Configuration saved to ~/.config/tailscale/hostname.conf"
+else
+    echo "Tailscale not available or not authenticated"
+fi
