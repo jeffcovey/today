@@ -1,0 +1,51 @@
+#!/bin/sh
+# VS Code tunnel helper script
+# Downloads and uses standalone VS Code CLI for tunnel functionality
+
+# Detect architecture and OS
+ARCH=$(uname -m)
+OS=$(uname -s)
+
+# Check if standalone code CLI exists
+if [ ! -f /workspaces/notion-cli/.vscode-cli/code ]; then
+    echo "Downloading VS Code CLI for tunnel support..."
+    mkdir -p /workspaces/notion-cli/.vscode-cli
+    
+    if [ "$OS" = "Darwin" ]; then
+        # macOS
+        if [ "$ARCH" = "arm64" ]; then
+            CLI_ARCH="cli-darwin-arm64"
+        else
+            CLI_ARCH="cli-darwin-x64"
+        fi
+    elif [ "$OS" = "Linux" ]; then
+        # Linux - use Alpine builds for containers
+        if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+            CLI_ARCH="cli-alpine-arm64"
+        elif [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+            CLI_ARCH="cli-alpine-x64"
+        else
+            echo "Unsupported Linux architecture: $ARCH"
+            exit 1
+        fi
+    else
+        echo "Unsupported OS: $OS"
+        exit 1
+    fi
+    
+    echo "Detected $OS/$ARCH, downloading $CLI_ARCH version..."
+    curl -Lk "https://code.visualstudio.com/sha/download?build=stable&os=$CLI_ARCH" --output /tmp/vscode_cli.tar.gz
+    tar -xf /tmp/vscode_cli.tar.gz -C /workspaces/notion-cli/.vscode-cli
+    rm /tmp/vscode_cli.tar.gz
+fi
+
+cd /workspaces/notion-cli
+
+# Set architecture for VS Code server download
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    export VSCODE_CLI_PLATFORM="linux-arm64"
+else
+    export VSCODE_CLI_PLATFORM="linux-x64"
+fi
+
+exec /workspaces/notion-cli/.vscode-cli/code tunnel "$@"

@@ -2,8 +2,18 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for native modules and curl
+RUN apk add --no-cache python3 make g++ curl
+
+# Install VS Code CLI with tunnel support
+RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /tmp/vscode_cli.tar.gz && \
+    tar -xf /tmp/vscode_cli.tar.gz -C /tmp/ && \
+    mv /tmp/code /usr/local/bin/code-cli && \
+    rm /tmp/vscode_cli.tar.gz && \
+    chmod +x /usr/local/bin/code-cli
+
+# Install claude CLI
+RUN npm install -g @anthropic-ai/claude-code
 
 # Copy package files
 COPY package.json ./
