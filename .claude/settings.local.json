@@ -42,7 +42,8 @@
       "Bash(killall:*)",
       "Bash(/usr/bin/code-server --bind-addr 0.0.0.0:8080 --auth none /workspaces/notion-cli)",
       "Bash(/usr/bin/code-server:*)",
-      "Bash(bin/start-code-server:*)"
+      "Bash(bin/start-code-server:*)",
+      "Bash(bin/notion-cli daily:*)"
     ],
     "deny": []
   }

@@ -247,12 +247,14 @@ class TemporalManager {
     
     console.log(`Creating week: ${weekTitle}`);
 
-    const properties = {
-      Date: {
-        date: {
-          start: week.startStr,
-          end: week.endStr
-        }
+    const properties = {};
+
+    // Get the date property name dynamically
+    const dateProperty = await this.getDatePropertyName(weeksDBId);
+    properties[dateProperty] = {
+      date: {
+        start: week.startStr,
+        end: week.endStr
       }
     };
 
@@ -291,15 +293,18 @@ class TemporalManager {
     
     console.log(`Creating day: ${dayTitle}`);
 
-    const properties = {
-      Date: {
-        date: {
-          start: day.dateStr
-        }
-      },
-      Week: {
-        relation: [{ id: day.week.id }]
+    const properties = {};
+
+    // Get the date property name dynamically
+    const dateProperty = await this.getDatePropertyName(daysDBId);
+    properties[dateProperty] = {
+      date: {
+        start: day.dateStr
       }
+    };
+
+    properties.Week = {
+      relation: [{ id: day.week.id }]
     };
 
     // Add previous day relationship if it exists
@@ -354,6 +359,25 @@ class TemporalManager {
     } catch (error) {
       console.warn(`Warning: Could not determine title property for database ${databaseId}, using 'Name'`);
       return 'Name';
+    }
+  }
+
+  async getDatePropertyName(databaseId) {
+    try {
+      const database = await this.notionAPI.notion.databases.retrieve({ database_id: databaseId });
+      
+      // Find the date property
+      for (const [propertyName, propertyConfig] of Object.entries(database.properties)) {
+        if (propertyConfig.type === 'date') {
+          return propertyName;
+        }
+      }
+      
+      // Fallback to common names
+      return 'Date';
+    } catch (error) {
+      console.warn(`Warning: Could not determine date property for database ${databaseId}, using 'Date'`);
+      return 'Date';
     }
   }
 
@@ -582,12 +606,14 @@ class TemporalManager {
     
     console.log(`Creating year: ${yearTitle}`);
 
-    const properties = {
-      Date: {
-        date: {
-          start: `${year}-01-01`,
-          end: `${year}-12-31`
-        }
+    const properties = {};
+
+    // Get the date property name dynamically
+    const dateProperty = await this.getDatePropertyName(yearsDBId);
+    properties[dateProperty] = {
+      date: {
+        start: `${year}-01-01`,
+        end: `${year}-12-31`
       }
     };
 
@@ -615,12 +641,14 @@ class TemporalManager {
     
     console.log(`Creating quarter: ${quarterTitle}`);
 
-    const properties = {
-      Date: {
-        date: {
-          start: this.formatDate(quarter.start),
-          end: this.formatDate(quarter.end)
-        }
+    const properties = {};
+
+    // Get the date property name dynamically
+    const dateProperty = await this.getDatePropertyName(quartersDBId);
+    properties[dateProperty] = {
+      date: {
+        start: this.formatDate(quarter.start),
+        end: this.formatDate(quarter.end)
       }
     };
 
@@ -656,12 +684,14 @@ class TemporalManager {
     
     console.log(`Creating month: ${monthTitle}`);
 
-    const properties = {
-      Date: {
-        date: {
-          start: this.formatDate(month.start),
-          end: this.formatDate(month.end)
-        }
+    const properties = {};
+
+    // Get the date property name dynamically
+    const dateProperty = await this.getDatePropertyName(monthsDBId);
+    properties[dateProperty] = {
+      date: {
+        start: this.formatDate(month.start),
+        end: this.formatDate(month.end)
       }
     };
 
