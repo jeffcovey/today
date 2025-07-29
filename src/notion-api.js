@@ -11,6 +11,24 @@ export class NotionAPI extends NotionAPIBase {
     this.databaseCacheExpiry = 0;
   }
 
+  extractTitle(page) {
+    // Handle different property names for title across databases
+    const titlePropertyNames = ['Name', 'Title', 'Task', 'Project', 'Item', 'Action Item'];
+    
+    for (const propName of titlePropertyNames) {
+      if (page.properties[propName]) {
+        const prop = page.properties[propName];
+        if (prop.title && prop.title.length > 0) {
+          return prop.title[0].plain_text || 'Untitled';
+        } else if (prop.rich_text && prop.rich_text.length > 0) {
+          return prop.rich_text[0].plain_text || 'Untitled';
+        }
+      }
+    }
+    
+    return 'Untitled';
+  }
+
   async getDatabases() {
     try {
       // First check SQLite cache
@@ -67,6 +85,22 @@ export class NotionAPI extends NotionAPIBase {
               }
             } catch (incrementalError) {
               console.warn('Incremental sync failed, using cache:', incrementalError.message);
+            }
+          }
+          
+          // Fetch database icon if not already present on cached tasks
+          if (cached.tasks.length > 0 && !cached.tasks[0].databaseIcon) {
+            try {
+              const database = await this.notion.databases.retrieve({
+                database_id: databaseId
+              });
+              if (database.icon) {
+                cached.tasks.forEach(task => {
+                  task.databaseIcon = database.icon;
+                });
+              }
+            } catch (error) {
+              // Ignore error, just continue without icon
             }
           }
           
@@ -164,14 +198,24 @@ export class NotionAPI extends NotionAPIBase {
         properties: page.properties,
         url: page.url,
         created_time: page.created_time,
-        last_edited_time: page.last_edited_time
+        last_edited_time: page.last_edited_time,
+        icon: page.icon  // Include individual page icon
       }));
 
-      // Always cache the results (unless explicitly disabled)
-      if (options.useCache !== false) {
-        const database = await this.notion.databases.retrieve({
-          database_id: databaseId
+      // Fetch database to get icon and for caching
+      const database = await this.notion.databases.retrieve({
+        database_id: databaseId
+      });
+      
+      // Add database icon to each task if available
+      if (database.icon) {
+        tasks.forEach(task => {
+          task.databaseIcon = database.icon;
         });
+      }
+
+      // Cache the results (unless explicitly disabled)
+      if (options.useCache !== false) {
         await this.statusCache.setCachedTasks(databaseId, tasks, database.last_edited_time);
       }
 
@@ -1499,6 +1543,101 @@ export class NotionAPI extends NotionAPIBase {
     } catch (error) {
       console.error('Error fetching debug items:', error.message);
       throw error;
+    }
+  }
+
+  // Get all searchable items across all databases
+  async getAllSearchableItems() {
+    const allItems = [];
+    const databases = [];
+
+    try {
+      // Get Action Items (main tasks)
+      const actionItemsDB = await this.getActionItemsDatabase();
+      if (actionItemsDB) {
+        const actionItems = await this.getDatabaseItems(actionItemsDB.id, 100, {
+          filterActionableItems: true,
+          useCache: true,
+          fetchAll: true,
+          skipCacheLogging: true
+        });
+        allItems.push(...actionItems.map(item => ({
+          ...item,
+          _database: 'Action Items',
+          _databaseId: actionItemsDB.id
+        })));
+        databases.push({ id: actionItemsDB.id, name: 'Action Items', type: 'tasks' });
+      }
+
+      // Get Morning Routine items
+      try {
+        const morningItems = await this.getMorningRoutineItems();
+        allItems.push(...morningItems.map(item => ({
+          ...item,
+          _database: 'Morning Routine',
+          _databaseId: null
+        })));
+        databases.push({ name: 'Morning Routine', type: 'routine' });
+      } catch (e) {
+        // Database might not exist
+      }
+
+      // Get Today's Plan items
+      try {
+        const planItems = await this.getTodaysPlanItems();
+        allItems.push(...planItems.map(item => ({
+          ...item,
+          _database: "Today's Plan",
+          _databaseId: null
+        })));
+        databases.push({ name: "Today's Plan", type: 'plan' });
+      } catch (e) {
+        // Database might not exist
+      }
+
+      // Get Evening Tasks
+      try {
+        const eveningItems = await this.getEveningTasksItems();
+        allItems.push(...eveningItems.map(item => ({
+          ...item,
+          _database: 'Evening Tasks',
+          _databaseId: null
+        })));
+        databases.push({ name: 'Evening Tasks', type: 'routine' });
+      } catch (e) {
+        // Database might not exist
+      }
+
+      // Get Day-End Chores
+      try {
+        const choreItems = await this.getDayEndChoresItems();
+        allItems.push(...choreItems.map(item => ({
+          ...item,
+          _database: 'Day-End Chores',
+          _databaseId: null
+        })));
+        databases.push({ name: 'Day-End Chores', type: 'chores' });
+      } catch (e) {
+        // Database might not exist
+      }
+
+      // Get Inbox items
+      try {
+        const inboxItems = await this.getInboxesItems();
+        allItems.push(...inboxItems.map(item => ({
+          ...item,
+          _database: 'Inboxes',
+          _databaseId: null
+        })));
+        databases.push({ name: 'Inboxes', type: 'inbox' });
+      } catch (e) {
+        // Database might not exist
+      }
+
+      return { items: allItems, databases };
+    } catch (error) {
+      console.error('Error getting searchable items:', error.message);
+      return { items: allItems, databases };
     }
   }
 

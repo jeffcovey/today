@@ -43,7 +43,13 @@
       "Bash(/usr/bin/code-server --bind-addr 0.0.0.0:8080 --auth none /workspaces/notion-cli)",
       "Bash(/usr/bin/code-server:*)",
       "Bash(bin/start-code-server:*)",
-      "Bash(bin/notion-cli daily:*)"
+      "Bash(bin/notion-cli daily:*)",
+      "Bash(python3:*)",
+      "Bash(ollama pull:*)",
+      "Bash(touch:*)",
+      "Bash(npm test:*)",
+      "Bash(sqlite3:*)",
+      "Bash(source .env)"
     ],
     "deny": []
   }
