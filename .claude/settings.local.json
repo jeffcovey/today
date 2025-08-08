@@ -44,7 +44,14 @@
       "Bash(/usr/bin/code-server:*)",
       "Bash(bin/start-code-server:*)",
       "Bash(bin/notion-cli daily:*)",
-      "Bash(npm run notion-cli:*)"
+      "Bash(npm run notion-cli:*)",
+      "Bash(python3:*)",
+      "Bash(ollama pull:*)",
+      "Bash(touch:*)",
+      "Bash(npm test:*)",
+      "Bash(sqlite3:*)",
+      "Bash(source .env)",
+      "Bash(npm update:*)"
     ],
     "deny": []
   }

@@ -1,0 +1,1129 @@
+{
+  "timestamp": "2025-07-21T23:07:22.463Z",
+  "summary": {
+    "total_source_tasks": 323,
+    "migrated": 212,
+    "duplicates": 0,
+    "errors": 111
+  },
+  "duplicates": [],
+  "migrated": [
+    "Check SAGE Events",
+    "Update Prime Timers listings",
+    "Fix pagination items counts",
+    "Check Public/Private Status Of “Favorite Pictures”",
+    "Port tests from users/events",
+    "Set the Trip form to take only future dates",
+    "Enable drag-and-drop uploading for places, groups, and events",
+    "Replace Autoprefixer (deprecated)",
+    "Fix \"People nearby\" showing all when empty",
+    "Add attended Events to the Trips index",
+    "Show Travel On Profile",
+    "Add “The Woods Campground” to Places",
+    "Update domains that access Google Cloud Platform API key",
+    "Create migration for Image subjects",
+    "Primetimer’s email",
+    "Replace Message Box When User Has Been Contacted",
+    "Pick An Item to Make",
+    "Fix Law Article Searches",
+    "Assign Trip PublicActivity to Trip taker",
+    "Announce Second Home And Trips",
+    "Add Story Ratings",
+    "Move Image md5 checks into a job",
+    "Add to Places: Vitambi Springs Resort and Campground",
+    "Announce Second Homes And Trips",
+    "Use Bootstrap Badges For Inbox Counts",
+    "Add Photos",
+    "Add 440 Castro to Places",
+    "Fix Law Article Posting To Twitter",
+    "Link members to their partners",
+    "Ask Users To Check Their Place Listing",
+    "Site is down",
+    "Add disclaimers that Meetups are the responsibility of their organizers",
+    "Show \"Distance from\" in User turbo frames, like those on Place show pages",
+    "Schedule checks of the PT newsletter",
+    "Address African Sugarsons",
+    "Write To Patreon Members Without OG Accounts",
+    "Check /var/www/.deleted",
+    "Remove State, City, etc. from User",
+    "Restore Front chat window",
+    "Cancel oldergay-chat Nanode",
+    "Test Message Embargoes",
+    "add \"are you human?\" checking to account creation",
+    "Fix Working Copy On The Phone",
+    "Remove duplicates in has_and_belongs_to_many associations",
+    "Fix The “Choose File” Image Upload Field",
+    "Gray out future DateAdded images in the Image index",
+    "Play with pages",
+    "Check OlderGay Services",
+    "Use a currency converter in the Patreon controller",
+    "Let admins remove people from Images",
+    "Follow Google Ads Recommendations",
+    "Fix “Show All” Line Breaks",
+    "Fix KPlumb’s favorites deletion",
+    "Remove User location info when saved as nil",
+    "Complete “SMART” Entries For rails_admin",
+    "Add moving PictureSubjects to Canonical porting",
+    "Show count of members attending events in the newsletter",
+    "Investigate gems added by Turbo chat example",
+    "Write members about the gallery loading problem",
+    "Report To Patreon",
+    "Check The Prime Timers Facebook Group",
+    "Add Cactus Campground to Places",
+    "Fix the Pictures breadcrumb",
+    "Add Silver | Flickr to scripts",
+    "Add Celebration Of Friends Events",
+    "Move to Markdown pipeline",
+    "Test that rails_admin or /changes is shielded by CanCanCan",
+    "Improve Images",
+    "Update Pied Piper Cruises",
+    "check that private photos don't appear as profile photos",
+    "Add Headers Encouraging Newsletter Subscriptions",
+    "Post an announcement about spam/scammers",
+    "Add Southern Arizona Senior Pride to Groups",
+    "Finish Old Project Tasks",
+    "Fix Mehul's event deleting problem",
+    "Block new Images in /images",
+    "Find out how Jones sent so many messages (sent all at once?)",
+    "Try turning Cloudflare Rocket Loading back on",
+    "Delegate gallery processing",
+    "Delete old trips by cron",
+    "Stop Retaining Text In Message Form",
+    "Try adding the blueimp-min code directly in the page",
+    "Block banned users from Discourse",
+    "Fix responsive gallery images",
+    "Add Custom Error Pages",
+    "Add An Embargo Check To The Conversations Controller",
+    "Reply to Discourse comments",
+    "Incorporate premailer to the newsletter",
+    "Add a “Delete now” button to messages",
+    "Link favorite stories from User show pages",
+    "Review The Dashboard Filters",
+    "Add Sauna Bruc to Places",
+    "Add to User show page",
+    "Add \"Show my favorites\" to /images",
+    "Add CMEN Events To Our Calendar",
+    "Update CanCanCan For Chats",
+    "Test that Trips with invalid dates are rejected",
+    "Let Users submit Groups, Places, Events",
+    "Restart Process Image Contributions • Dead Man's Snitch — A dead simple Cron Job Monitoring service",
+    "Add meetups to menus",
+    "Block messages with fastdate in the body",
+    "Add a Cities project",
+    "Put Count Of Chatters Under Header",
+    "Add tasks for Patreon poll projects",
+    "Test replacing an image with a larger version",
+    "Display trip dates in a mini calendar view",
+    "Make Bottom Pagination Go To Top",
+    "Add Members To Searches During Travel Period",
+    "Add trips by people following/followed",
+    "Point Leslie Jordan to the Prime Timers Convention",
+    "Check that meetup.users includes organizer",
+    "Add end dates to Events, rewrite CleanUserLocationsJob",
+    "Check that the anti-Cloudflare code is in the right spot",
+    "Look for large sent mailboxes",
+    "Shorten Event Titles",
+    "Fix blank Turbo frames",
+    "Create Montages Of DateAdded Photos",
+    "Fix The Patreon Webhook",
+    "See where .css files are after moving off Sprockets",
+    "Replace Sass",
+    "Add City Guide tasks",
+    "Remove Old Heroku Stack Apps",
+    "Cancel users’ Discourse accounts on OG account deletion",
+    "Notify User of Image processing problems",
+    "Fix “Profile” link in footer",
+    "Add Place And Group Searches",
+    "Let Users opt out of birthday greetings",
+    "Ask the PT hosts how many items to make",
+    "Re-enable Akismet checks on replies to messages",
+    "Update associated Trips when Events update",
+    "Remove db/ and tmp/ files",
+    "Happy Birthday Jeff!",
+    "notify users by email when a trip is deleted because an event is deleted",
+    "Create “What’s New” Discourse form",
+    "Add speaker circles to newsletter Discourse list",
+    "“Add to my calendar”?",
+    "Follow Up On User Tharan",
+    "Make PictureSubjects of ProfileImages",
+    "Try Font Awesome For Rating Stars",
+    "Urgent Issue with New Pics",
+    "Fix DSIncubus’s Long Profile Description",
+    "Add Locations To Tweets",
+    "Bug when we Impersonate spam...",
+    "Fix port_discourse_comments execution time",
+    "Let meetups be recurring?",
+    "Fix web previews of pages",
+    "Process PDF Files With Hazel",
+    "Limit Messages Pulled In room#show",
+    "Reply To StackOverflow Helper",
+    "Handle direct spam messages on Discourse",
+    "Replace Galleries with “In this photo”",
+    "Fix Owners Of Discourse Threads",
+    "Fix Password Resets When There’s An Unread Message",
+    "Try turning off Boostrap styling on the image upload field",
+    "Fix Deleting Events",
+    "Fix /galleries/chuck",
+    "Add people who liked a photo you uploaded",
+    "Create a personal updates Discourse forum",
+    "Restore the Rails version in Gemfile when security is fixed",
+    "Add a check that a new User's age is 18+",
+    "Make flagging unwelcome direct messages easier",
+    "Add Meetups",
+    "Make Maps With Dots",
+    "Upgrade To Bootstrap 5",
+    "Move ol-lg-6, etc. to row-cols",
+    "Improve geodata usage",
+    "Move Conversations With Banned Members To Trash",
+    "Add Calendar Views To The Events Page",
+    "create a SpamReport when a member reports spam",
+    "Notify attendees if a Meetup is deleted",
+    "Let Users archive messages",
+    "Try Google Identity Verification On The Mini",
+    "Create a second upload area for pending Images",
+    "Add New Members Attending An Event You’re Attending",
+    "Research spam filters for the messaging system",
+    "Notify nearby people as soon as a trip is planned (newsletter)",
+    "Try Galleria",
+    "Add Photos",
+    "Remove Member’s Discourse Profile Photo",
+    "Replace Changes",
+    "Enable multi-participant Meetup conversations",
+    "Suggest that members create a meetup after creating a trip",
+    "Add The Apollo Questions And Answers To The Law Section",
+    "Add Webpacker Tasks",
+    "Add People Coming To Your Area To The Newsletter",
+    "Ask Guys to review after a meetup",
+    "Check That We’re Testing Image Quotas",
+    "Try other JavaScript image galleries",
+    "Show \"Distance from\" in User turbo frames, like those on Place show pages",
+    "Add “Pictures you might like”",
+    "Test that ban_justification appears",
+    "Post A News Item Asking About Subscriptions",
+    "Optimize Memory Usage",
+    "Check Stories For Member Authors",
+    "Add Tests Of Setting City, Etc. To Nil",
+    "Mark Photos of Members",
+    "Handle setting privacy on uploaded images",
+    "Add to PublicActivity",
+    "Make conversations go directly to the latest post",
+    "fix the theming of the comment section of the bottom of older gay pages",
+    "Check Ramesh’s Images That Won’t Resize",
+    "Try Font Awesome Pulled Icons",
+    "Reduce advertising in Africa?",
+    "Notify attendees if a Meetup is updated",
+    "Fix deleting events",
+    "Clean duplicates and non-canonical Images",
+    "Add IMEN, CMEN, and GNI Gatherings To Events",
+    "Add a story",
+    "Restore “Distance from” to indices",
+    "Improve photos",
+    "Fix Front-reported bugs",
+    "Don’t show PublicActivity headers to not-logged-in users who can’t access them"
+  ],
+  "errors": [
+    {
+      "title": "Add :history to some slugs",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Standardize tags",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move all Edit & Delete links on show pages into Topmenu",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Update CanCanCan for chat access",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check two campgrounds",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add “I am in these photos” to upload form",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Let Users List A Second Home",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Put count of chatters under header",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Benno Frisch | Flickr to scripts",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Ban members over 90 who haven’t logged in for over a year",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix sorting User index by distance",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Show two pins for Users with two locations",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Highlight Results In Text Searches",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Sync Syncthing",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix The Text Of Page Comments",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add A Story",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Upgrade Ruby to 3.0.2",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Point Profile Images To Canonical Versions?",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add attended meetups to User show",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix empty profile_image PublicActivity columns",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Trips to Public Activity",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix links from Font Awesome icons",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "fix the same User showing up multiple times on an Event",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Review ActiveStorage documentation",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Shrink The Events Section",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Prime Timers of Kamloops to Groups",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Put member galleries behind the paywall",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Pineapple Point to Places",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Hide trips from public activity if not logged in",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move “Events Attending” into “Travel Plans”",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix the one-line stories",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "FIXME: WTF: FilterImageContributionsJob.perform_later(@image_contribution)",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add clean_trips to cron",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Pass Overcommit Tests",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move trips into a turbo frame and place them below other models",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Is this a Lady?",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Remove the domain-specific code, including tests",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add video uploads",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move away from the Autoprefixer gem",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "remove self from \"People traveling near self\"",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Prime Timers Events To The Calendar",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix Unedited Images Index",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Test Google Translate Cloudflare app",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check that four Prime Timers cruises are in our Events section",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Make A Logo For The Swag",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Write members not subscribed to the newsletter",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Find a more permanent spam solution",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Delete ICs with no attached files",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Talk to Johann_Sebastian_Moz about his posts",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Expand @metric",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "learn to write tests for active job",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add “Schedule A Meetup” to the newsletter",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Decide where to search User stories",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Handle Timezones!",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Deal with unrealistically old members",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Meetups Nearby to the newsletter",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Update The Townhouse of New York",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Write a policy about Discourse spam",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add New/Updated Events Near You",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Make projects for the Patreon poll",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Law Harrington Center To Places",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Sort Tags Alphabetically",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Is this a Lady?",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add Australian groups",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Uninstall BlueImp",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Invite more Discourse moderators",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add (sub)collections to Image search",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Update .form-group divs",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move Cloudflare Script Above Front One",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix Gallery (sub)collections",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Update FLL Spots",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check Message sending",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Let Patrons Download Images?",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Look for rails_bootstrap_forms css",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add to Events: No More Neckties Virtual Book Launch",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Send a reminder to attendees two days prior",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Consider Bert’s Question",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Paginate conversations",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add End Dates To Events",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix deleting favourite pictures",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Let Jeff know when the pre-2021 Law Articles can be made public",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Test that geocoded Users appear in searches",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Explain the Front Chat is for tech support",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check Thursday: Send the test newsletters to the whole staff",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add In Memoriam profiles",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Research Video Chat Options",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Write newsletter tests",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Move Mr. Todo Tasks To Notion",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add HTML multiple file upload support",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Try Adding Turbo Exclusions To Gallery Picture Links",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Follow up on the member who asked for help",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add/remove attended Events to the User's travel schedule",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add a second cron job to keep Patreon members in sync",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Empty The Team Inboxes In Front",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix Flash Close Buttons",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check Possible Spammer",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix  image gallery script loading time",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Test adding and removing Locations",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix Richard’s favorite images",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add \"Meetup here\" to Places",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Check Possible Spammer Accounts",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Add A User Trust Score?",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Make “Top Link” primary again on Images index",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "remove the fastdate cron job once we're clear",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "write attendees when an Event changes",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Handle User quotas",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "See why new places and groups aren’t appearing in public activity",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Show nearby Meetups on Trip show pages",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Deal with the latest spammers",
+      "error": "Conflict occurred while saving. Please try again."
+    },
+    {
+      "title": "Fix Chronological Sorting Of The Events Index",
+      "error": "Conflict occurred while saving. Please try again."
+    }
+  ],
+  "retry_timestamp": "2025-07-21T23:15:51.467Z",
+  "retry_summary": {
+    "attempted": 111,
+    "successful": 111,
+    "failed": 0
+  },
+  "retry_successful": [
+    {
+      "title": "Add :history to some slugs",
+      "id": "18d6ea92-4f60-4988-9ea1-9c1cac4f51e2"
+    },
+    {
+      "title": "Standardize tags",
+      "id": "47cb37cd-d686-4697-9d8d-de95422a494a"
+    },
+    {
+      "title": "Move all Edit & Delete links on show pages into Topmenu",
+      "id": "55a34d34-7b4a-4ff9-ab9d-1ddda81c6ca0"
+    },
+    {
+      "title": "Update CanCanCan for chat access",
+      "id": "cb049590-43dc-4e45-9ebf-1a1ad1fda2cd"
+    },
+    {
+      "title": "Add “I am in these photos” to upload form",
+      "id": "11583ccf-70b1-44fd-ad11-61d0703e4b52"
+    },
+    {
+      "title": "Check two campgrounds",
+      "id": "3ff1b473-698b-4beb-9fff-bd0334705ea8"
+    },
+    {
+      "title": "Let Users List A Second Home",
+      "id": "eeb1deaf-d303-4ce3-8ecf-7ba4094fca66"
+    },
+    {
+      "title": "Put count of chatters under header",
+      "id": "1a44c07a-21a4-4bdc-8c5a-c9f2511b9291"
+    },
+    {
+      "title": "Add Benno Frisch | Flickr to scripts",
+      "id": "409f6f1c-a5e1-487c-a8c1-148715d0e642"
+    },
+    {
+      "title": "Ban members over 90 who haven’t logged in for over a year",
+      "id": "f8d7c538-d169-46d1-b368-f851dd8c81be"
+    },
+    {
+      "title": "Fix sorting User index by distance",
+      "id": "280a29c3-8e31-4708-a46a-c4f64e8a5a7e"
+    },
+    {
+      "title": "Show two pins for Users with two locations",
+      "id": "82989996-4c18-4402-8c78-b1bc59781ef0"
+    },
+    {
+      "title": "Highlight Results In Text Searches",
+      "id": "111ba5b4-2d2d-4198-bd74-e5877243cc98"
+    },
+    {
+      "title": "Sync Syncthing",
+      "id": "d34671ae-5cb8-4c68-aca8-d956fe418a81"
+    },
+    {
+      "title": "Fix The Text Of Page Comments",
+      "id": "d8aa4d14-f1d5-438d-80d9-148b1814ed6f"
+    },
+    {
+      "title": "Upgrade Ruby to 3.0.2",
+      "id": "688061e3-56ce-4d80-8c1d-4ab4fa58db74"
+    },
+    {
+      "title": "Add A Story",
+      "id": "94921315-5df0-4661-9e91-3c86e51bab12"
+    },
+    {
+      "title": "Point Profile Images To Canonical Versions?",
+      "id": "a0d4e939-0c5f-4952-abb0-31821c0e4d39"
+    },
+    {
+      "title": "Fix empty profile_image PublicActivity columns",
+      "id": "b41f15b9-4816-41fd-842c-99cf6b12466e"
+    },
+    {
+      "title": "Add attended meetups to User show",
+      "id": "baa2291e-e1d7-476b-9e52-99de9ce11058"
+    },
+    {
+      "title": "Add Trips to Public Activity",
+      "id": "27c1db0c-6caa-465c-ad13-7134d741380f"
+    },
+    {
+      "title": "Fix links from Font Awesome icons",
+      "id": "975e2e63-d837-45b8-b9de-bc92ec372869"
+    },
+    {
+      "title": "fix the same User showing up multiple times on an Event",
+      "id": "f24e927f-1436-47f4-ac81-9ec2f7389b52"
+    },
+    {
+      "title": "Shrink The Events Section",
+      "id": "55efb129-643e-4193-bae5-0dd22a05aa75"
+    },
+    {
+      "title": "Review ActiveStorage documentation",
+      "id": "6adfe998-6a50-4086-b466-43c4fcc7716d"
+    },
+    {
+      "title": "Add Pineapple Point to Places",
+      "id": "8e117acd-4db7-4923-b6ab-373d85249ff4"
+    },
+    {
+      "title": "Put member galleries behind the paywall",
+      "id": "8f3c4ec0-9420-4c03-96fe-11e1e7aa5284"
+    },
+    {
+      "title": "Add Prime Timers of Kamloops to Groups",
+      "id": "92305346-21af-4839-9c7c-9aa6ce20316c"
+    },
+    {
+      "title": "Fix the one-line stories",
+      "id": "d2021a86-fe4b-4197-abc8-2470bab89658"
+    },
+    {
+      "title": "Hide trips from public activity if not logged in",
+      "id": "0f6613be-9b45-41e0-96e8-468e009353b6"
+    },
+    {
+      "title": "Move “Events Attending” into “Travel Plans”",
+      "id": "1e53923a-9d4c-47d4-988a-e81796e411ec"
+    },
+    {
+      "title": "Add clean_trips to cron",
+      "id": "8eabbc13-2363-4197-a438-bd96c40888a7"
+    },
+    {
+      "title": "Pass Overcommit Tests",
+      "id": "df34b238-6bcc-4eb9-8a30-ffc2a67635f6"
+    },
+    {
+      "title": "FIXME: WTF: FilterImageContributionsJob.perform_later(@image_contribution)",
+      "id": "10a1757f-bd5d-4d5d-8a7d-1d860a7d7efd"
+    },
+    {
+      "title": "Move trips into a turbo frame and place them below other models",
+      "id": "6e4965df-dc13-4d00-ad22-4a9ea94c188c"
+    },
+    {
+      "title": "Is this a Lady?",
+      "id": "9bc97cfd-cf92-4252-a2e2-387ccb06db10"
+    },
+    {
+      "title": "Remove the domain-specific code, including tests",
+      "id": "ed94539a-f0d6-49b3-b10e-0fb1ee59f710"
+    },
+    {
+      "title": "Move away from the Autoprefixer gem",
+      "id": "0a1ba9fb-9dae-4c67-b1af-f3d415e61eec"
+    },
+    {
+      "title": "remove self from \"People traveling near self\"",
+      "id": "22e88a22-308f-4167-ad0e-e56a79730857"
+    },
+    {
+      "title": "Add video uploads",
+      "id": "31312ec1-30fc-415e-89aa-15ff23fc2fcf"
+    },
+    {
+      "title": "Add Prime Timers Events To The Calendar",
+      "id": "630762e5-28f6-471d-92b8-6367308e53a8"
+    },
+    {
+      "title": "Fix Unedited Images Index",
+      "id": "4e25f91b-3535-4ba1-acd5-ea0a8a641c39"
+    },
+    {
+      "title": "Check that four Prime Timers cruises are in our Events section",
+      "id": "cb0b5b37-610a-40ab-8f98-580d6f5db8d2"
+    },
+    {
+      "title": "Test Google Translate Cloudflare app",
+      "id": "f26da428-4f5c-4733-860e-664fd814dd2e"
+    },
+    {
+      "title": "Write members not subscribed to the newsletter",
+      "id": "10ef82e9-c8a7-4d4f-9c37-23298e064534"
+    },
+    {
+      "title": "Make A Logo For The Swag",
+      "id": "41b336dd-7b44-4a04-bb02-a055fed3cc3a"
+    },
+    {
+      "title": "Find a more permanent spam solution",
+      "id": "84edc24a-8cf6-4887-9ef5-d3815daa70ee"
+    },
+    {
+      "title": "Delete ICs with no attached files",
+      "id": "d018e1da-497a-4128-951e-857545d5f777"
+    },
+    {
+      "title": "Talk to Johann_Sebastian_Moz about his posts",
+      "id": "20042b4b-6edf-48f1-9dc3-5a14d8fb0047"
+    },
+    {
+      "title": "Expand @metric",
+      "id": "4b7a0ecd-fca5-4dcc-9351-bb6964ef83e1"
+    },
+    {
+      "title": "learn to write tests for active job",
+      "id": "782bdc50-adfe-460b-bdc6-4400485d5527"
+    },
+    {
+      "title": "Decide where to search User stories",
+      "id": "dd780137-ccac-4cc6-83e0-e096d1e34326"
+    },
+    {
+      "title": "Add “Schedule A Meetup” to the newsletter",
+      "id": "f27e552b-45a9-40d6-bdab-ad58d21eb089"
+    },
+    {
+      "title": "Handle Timezones!",
+      "id": "24e853e2-a8c7-4ab8-8918-8cbf70b60a5b"
+    },
+    {
+      "title": "Add Meetups Nearby to the newsletter",
+      "id": "44a969f1-553d-4096-8dba-39a4419336e7"
+    },
+    {
+      "title": "Deal with unrealistically old members",
+      "id": "61c23bb1-974a-40ca-b791-4110b5e77667"
+    },
+    {
+      "title": "Add New/Updated Events Near You",
+      "id": "79f23006-e489-4d01-920a-9465f9011e5d"
+    },
+    {
+      "title": "Update The Townhouse of New York",
+      "id": "7a2bee12-00e8-4aab-8c95-df9b6a9f0ee6"
+    },
+    {
+      "title": "Write a policy about Discourse spam",
+      "id": "0fc70886-858d-4eb2-a6ed-d35333201432"
+    },
+    {
+      "title": "Make projects for the Patreon poll",
+      "id": "3dc80f6b-04d1-4ac2-84ee-166a3d0e8c95"
+    },
+    {
+      "title": "Add Law Harrington Center To Places",
+      "id": "0a0ed99d-08e9-4415-90f2-b2963ecff400"
+    },
+    {
+      "title": "Sort Tags Alphabetically",
+      "id": "66092d31-8a04-4626-b9d3-c012ce3c323f"
+    },
+    {
+      "title": "Is this a Lady?",
+      "id": "6e95e0fa-20c5-49ce-b55d-938e371472e7"
+    },
+    {
+      "title": "Uninstall BlueImp",
+      "id": "9c2093ae-f89b-4733-bbfd-40dc37d5d9bd"
+    },
+    {
+      "title": "Add Australian groups",
+      "id": "a2ea279a-2338-4b9c-91f7-456d221defb0"
+    },
+    {
+      "title": "Invite more Discourse moderators",
+      "id": "17a362d3-f392-454e-a55b-1d6c21ac2adc"
+    },
+    {
+      "title": "Update .form-group divs",
+      "id": "6516ebc2-bcc1-4799-b76d-756a698e435b"
+    },
+    {
+      "title": "Add (sub)collections to Image search",
+      "id": "6fe0fdca-2338-4d2e-8001-4a0f33857db8"
+    },
+    {
+      "title": "Move Cloudflare Script Above Front One",
+      "id": "8929ae5e-238e-421b-a84a-8c08c48f8ea7"
+    },
+    {
+      "title": "Fix Gallery (sub)collections",
+      "id": "414fd434-2387-40fc-8e76-f9da9e947698"
+    },
+    {
+      "title": "Update FLL Spots",
+      "id": "6c247b96-4a1a-418b-b04e-4fd70474d379"
+    },
+    {
+      "title": "Check Message sending",
+      "id": "b6c8a7cc-d5f6-4b27-afc8-555b3374d06f"
+    },
+    {
+      "title": "Let Patrons Download Images?",
+      "id": "e5b5b4e1-927d-4bb2-be4d-f1d9200ee64c"
+    },
+    {
+      "title": "",
+      "id": "030c078d-08f4-465a-8999-55f0f93a34e3"
+    },
+    {
+      "title": "Look for rails_bootstrap_forms css",
+      "id": "48aa5c3d-6118-402a-bcd6-cc721ddba87e"
+    },
+    {
+      "title": "Add to Events: No More Neckties Virtual Book Launch",
+      "id": "5c33195b-b0a3-45ce-b8f1-e7604cc73ae5"
+    },
+    {
+      "title": "Send a reminder to attendees two days prior",
+      "id": "6e92dcad-cdd4-46fd-89cf-791a7d6710cf"
+    },
+    {
+      "title": "Paginate conversations",
+      "id": "afef9c64-f8db-4d3b-a13c-c47d859d31bb"
+    },
+    {
+      "title": "Consider Bert’s Question",
+      "id": "b877358f-4a75-4ec7-971a-2702c0103d6f"
+    },
+    {
+      "title": "Add End Dates To Events",
+      "id": "d6765ee6-e151-4f55-9c11-b0bd91bf7838"
+    },
+    {
+      "title": "Fix deleting favourite pictures",
+      "id": "6347d667-4a02-476b-9951-6fb47231ee83"
+    },
+    {
+      "title": "Let Jeff know when the pre-2021 Law Articles can be made public",
+      "id": "cc7ea71e-c6c8-4bd8-b221-7a66259116da"
+    },
+    {
+      "title": "Check Thursday: Send the test newsletters to the whole staff",
+      "id": "17f553b5-7045-4e9e-a7dd-7f93a8aadac7"
+    },
+    {
+      "title": "Test that geocoded Users appear in searches",
+      "id": "39d1bed5-b4df-4571-ae9f-e22b66121022"
+    },
+    {
+      "title": "Explain the Front Chat is for tech support",
+      "id": "93f1c004-81ec-4af0-94e9-fd3462867a64"
+    },
+    {
+      "title": "Add In Memoriam profiles",
+      "id": "b63a71bb-bc7f-46f7-b156-ab48dbd4d9d8"
+    },
+    {
+      "title": "Write newsletter tests",
+      "id": "cc522fc9-7535-4850-97f2-2ec28b163c31"
+    },
+    {
+      "title": "Research Video Chat Options",
+      "id": "e709160e-206e-4d3f-981f-e660c7d6b5fc"
+    },
+    {
+      "title": "Add HTML multiple file upload support",
+      "id": "07febae4-8aed-4e80-8fae-2a8e8274cbea"
+    },
+    {
+      "title": "Move Mr. Todo Tasks To Notion",
+      "id": "97f6f4e1-0f56-495e-9372-f904ec948617"
+    },
+    {
+      "title": "Try Adding Turbo Exclusions To Gallery Picture Links",
+      "id": "a19a5130-b9d5-415e-b21a-db09ab2ba90f"
+    },
+    {
+      "title": "Follow up on the member who asked for help",
+      "id": "d5a8a35e-3b46-41d2-b167-b3d9f89ad9fb"
+    },
+    {
+      "title": "Add/remove attended Events to the User's travel schedule",
+      "id": "14e44b07-7fe0-4bbb-9918-26006b22d98c"
+    },
+    {
+      "title": "Empty The Team Inboxes In Front",
+      "id": "d7e03ca7-7d25-4778-92b6-43f6aef247cf"
+    },
+    {
+      "title": "Add a second cron job to keep Patreon members in sync",
+      "id": "f09bf406-1c2a-4848-91dd-c923001e5a9b"
+    },
+    {
+      "title": "Fix Flash Close Buttons",
+      "id": "fad7334a-c197-4dea-824c-34f3e01ad7c0"
+    },
+    {
+      "title": "Check Possible Spammer",
+      "id": "726a4790-4689-40e3-bd4e-d02a93d008e7"
+    },
+    {
+      "title": "Fix  image gallery script loading time",
+      "id": "9135af8b-0284-41e1-839c-b7d9ee16c255"
+    },
+    {
+      "title": "Test adding and removing Locations",
+      "id": "23332d76-957b-414b-b79e-558f2ba811dc"
+    },
+    {
+      "title": "Fix Richard’s favorite images",
+      "id": "594d108e-bc40-4a19-8e33-2d1575beb5b5"
+    },
+    {
+      "title": "Add \"Meetup here\" to Places",
+      "id": "af7e049f-ca23-47f2-abf0-36f81a9e6594"
+    },
+    {
+      "title": "Check Possible Spammer Accounts",
+      "id": "08b12115-10e5-40dc-89e1-ba5d96d344c9"
+    },
+    {
+      "title": "Add A User Trust Score?",
+      "id": "62385e1f-58fe-4dac-ba84-98847b31151a"
+    },
+    {
+      "title": "remove the fastdate cron job once we're clear",
+      "id": "0768fa69-8f53-4259-8d6d-c52781d844e8"
+    },
+    {
+      "title": "write attendees when an Event changes",
+      "id": "7b38aad2-a204-49d9-a1fa-22928d19ab44"
+    },
+    {
+      "title": "Make “Top Link” primary again on Images index",
+      "id": "8fb932b4-700f-4867-bdae-d7dc91ef4d1d"
+    },
+    {
+      "title": "Show nearby Meetups on Trip show pages",
+      "id": "a7f2c1fa-5530-4da9-817d-99f95dcf98ca"
+    },
+    {
+      "title": "See why new places and groups aren’t appearing in public activity",
+      "id": "aa157cad-895f-430d-929e-0d6d7dd72580"
+    },
+    {
+      "title": "Handle User quotas",
+      "id": "bb31d8fa-e805-41ba-9c67-6ce9da18e977"
+    },
+    {
+      "title": "Fix Chronological Sorting Of The Events Index",
+      "id": "4432303b-01f8-4d53-a15e-46d55667d256"
+    },
+    {
+      "title": "Deal with the latest spammers",
+      "id": "4e83730b-7761-4623-92c0-0c6d23e19150"
+    }
+  ],
+  "retry_failed": [],
+  "final_summary": {
+    "total_source_tasks": 323,
+    "total_migrated": 323,
+    "total_failed": 0,
+    "migration_success_rate": "100%"
+  }
+}

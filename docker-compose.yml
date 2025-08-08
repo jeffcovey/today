@@ -3,9 +3,18 @@ version: '3.8'
 services:
   notion-cli:
     build: .
+    container_name: notion-cli
     environment:
       - NOTION_TOKEN=${NOTION_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      # Persist cache between runs
+      - notion-cache:/app/.notion-cache
+      # Mount your .env file
+      - ./.env:/app/.env:ro
     stdin_open: true
     tty: true
-    volumes:
-      - ./.env:/app/.env:ro
+
+volumes:
+  notion-cache:
+    driver: local

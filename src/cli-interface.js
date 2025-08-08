@@ -1,9 +1,11 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import { NaturalLanguageSearch } from './natural-language-search.js';
 
 export class CLIInterface {
   constructor(notionAPI) {
     this.notionAPI = notionAPI;
+    this.nlSearch = new NaturalLanguageSearch();
   }
 
   async start() {
@@ -56,6 +58,12 @@ export class CLIInterface {
           break;
         case 'day_end_chores':
           await this.handleDayEndChores();
+          break;
+        case 'natural_search':
+          await this.handleNaturalLanguageSearch(database);
+          break;
+        case 'unified_search':
+          await this.handleUnifiedSearch();
           break;
         case 'exit':
           console.log(chalk.yellow('\n👋 Goodbye!'));
@@ -294,6 +302,8 @@ export class CLIInterface {
       }
 
       choices.push({ name: '✏️  Batch edit task properties', value: 'batch_editing' });
+      choices.push({ name: '🔍 Search tasks (natural language)', value: 'natural_search' });
+      choices.push({ name: '🔎 Search all databases', value: 'unified_search' });
       
       // Add Today's Plan if there are uncompleted items
       if (planItems.length > 0) {
@@ -883,7 +893,8 @@ export class CLIInterface {
             }
           }
           
-          const displayName = `${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
+          const icon = this.getItemIcon(item);
+          const displayName = `${icon}${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
           
           return {
             name: displayName,
@@ -987,7 +998,8 @@ export class CLIInterface {
           }
         }
         
-        const displayName = `${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
+        const icon = this.getItemIcon(item);
+        const displayName = `${icon}${item.title}${doDateStr}${startRepeatStr} ${createdDate}`;
         
         return {
           name: displayName,
@@ -1439,6 +1451,60 @@ export class CLIInterface {
     if (diffDays < 7) return `(${diffDays} days ago)`;
     
     return `(${date.toLocaleDateString()})`;
+  }
+
+  getItemIcon(item) {
+    // Check if item has an icon or database icon
+    const icon = item.icon || item.databaseIcon;
+    if (!icon) return '';
+    
+    // Handle emoji icons
+    if (icon.type === 'emoji') {
+      return icon.emoji + ' ';
+    }
+    
+    // Handle external icons (SVG URLs from Notion)
+    if (icon.type === 'external' && icon.external?.url) {
+      // Extract icon name from URL if possible
+      const url = icon.external.url;
+      if (url.includes('/icons/')) {
+        // Notion's built-in icons - try to map to emoji equivalents
+        // Check for specific checkmark colors first
+        if (url.includes('checkmark_yellow')) return '✅ ';
+        if (url.includes('checkmark_green')) return '✅ ';
+        if (url.includes('checkmark_blue')) return '☑️ ';
+        if (url.includes('checkmark_red')) return '❌ ';
+        if (url.includes('checkmark')) return '✓ ';
+        if (url.includes('check')) return '✓ ';
+        // Other icons
+        if (url.includes('gym')) return '🏋️ ';
+        if (url.includes('home')) return '🏠 ';
+        if (url.includes('work')) return '💼 ';
+        if (url.includes('calendar')) return '📅 ';
+        if (url.includes('book')) return '📚 ';
+        if (url.includes('computer')) return '💻 ';
+        if (url.includes('phone')) return '📱 ';
+        if (url.includes('email')) return '📧 ';
+        if (url.includes('heart')) return '❤️ ';
+        if (url.includes('star')) return '⭐ ';
+        if (url.includes('grid')) return '🗂️ ';
+        if (url.includes('list')) return '📋 ';
+        if (url.includes('board')) return '📊 ';
+        if (url.includes('target')) return '🎯 ';
+        if (url.includes('flag')) return '🚩 ';
+        if (url.includes('inbox')) return '📥 ';
+        if (url.includes('archive')) return '📦 ';
+      }
+      // Default icon for external URLs we can't map
+      return '• ';
+    }
+    
+    // Handle file icons (uploaded images)
+    if (item.icon.type === 'file') {
+      return '📎 '; // Generic attachment icon
+    }
+    
+    return '';
   }
 
   async selectDateWithMonthView() {
@@ -2522,6 +2588,283 @@ export class CLIInterface {
       }
     } catch (error) {
       console.error(chalk.red('Batch assignment failed:'), error.message);
+    }
+  }
+
+  async handleNaturalLanguageSearch(database) {
+    console.log(chalk.blue('\n🔍 Natural Language Search'));
+    
+    try {
+      // Get query from user
+      const { query } = await inquirer.prompt([{
+        type: 'input',
+        name: 'query',
+        message: 'What would you like to search for?',
+        default: 'something fun',
+        validate: (input) => input.trim().length > 0 || 'Please enter a search query'
+      }]);
+
+      // Get all tasks from cache
+      console.log(chalk.blue('Searching...'));
+      const cached = await this.notionAPI.statusCache.getCachedTasks(database.id);
+      
+      if (!cached || !cached.tasks) {
+        console.log(chalk.yellow('No cached tasks found. Please refresh the main menu first.'));
+        return;
+      }
+
+      // Filter out done tasks
+      const activeTasks = cached.tasks.filter(item => {
+        const statusProp = item.properties?.Status;
+        return statusProp?.status?.name !== '✅ Done';
+      });
+
+      // Perform natural language search
+      const searchResults = await this.nlSearch.searchTasks(activeTasks, query);
+      
+      if (searchResults.results.length === 0) {
+        console.log(chalk.yellow(`No tasks found matching "${query}"`));
+        console.log(chalk.gray('Try different keywords or phrases like: "fun", "friends", "github", "home", etc.'));
+        return;
+      }
+
+      console.log(chalk.green(`\nFound ${searchResults.totalFound} tasks matching "${query}"`));
+      if (searchResults.totalFound > 10) {
+        console.log(chalk.gray(`(Showing top 10 results)`));
+      }
+
+      // Display results and let user interact with them
+      while (true) {
+        const choices = searchResults.results.map((task, index) => {
+          // Tasks from cache have title directly, not in properties
+          const icon = this.getItemIcon(task);
+          const title = task.title || task.properties?.Name?.title?.[0]?.text?.content || 'Untitled';
+          const project = task.properties?.['Projects (DB)']?.relation?.[0];
+          const projectName = project ? ` [${cached.projects?.find(p => p.id === project.id)?.title || 'Unknown'}]` : '';
+          const doDate = task.properties?.['Do Date']?.date?.start;
+          const dateStr = doDate ? ` 📅 ${new Date(doDate).toLocaleDateString()}` : '';
+          
+          return {
+            name: `${index + 1}. ${icon}${title}${projectName}${dateStr}`,
+            value: task
+          };
+        });
+
+        choices.push({ name: chalk.gray('← Back to search'), value: 'back' });
+        choices.push({ name: chalk.gray('← Back to main menu'), value: 'exit' });
+
+        const { selectedItem } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedItem',
+          message: 'Select a task to perform actions:',
+          choices,
+          pageSize: 15
+        }]);
+
+        if (selectedItem === 'exit') {
+          return;
+        }
+
+        if (selectedItem === 'back') {
+          // Let them search again
+          return await this.handleNaturalLanguageSearch(database);
+        }
+
+        // Show task actions
+        const taskTitle = selectedItem.title || selectedItem.properties?.Name?.title?.[0]?.text?.content || 'Untitled';
+        const { action } = await inquirer.prompt([{
+          type: 'list',
+          name: 'action',
+          message: `What would you like to do with "${taskTitle}"?`,
+          choices: [
+            { name: '✅ Mark as done', value: 'done' },
+            { name: '🔗 Open in Notion', value: 'open' },
+            { name: '📋 Copy URL', value: 'copy' },
+            { name: chalk.gray('← Back'), value: 'back' }
+          ]
+        }]);
+
+        if (action === 'done') {
+          // Mark task as done
+          try {
+            await this.notionAPI.updatePage(selectedItem.id, {
+              'Status': {
+                status: { name: '✅ Done' }
+              }
+            });
+            console.log(chalk.green(`✅ Marked "${taskTitle}" as done`));
+            
+            // Remove from results
+            const index = searchResults.results.indexOf(selectedItem);
+            searchResults.results.splice(index, 1);
+            
+            if (searchResults.results.length === 0) {
+              console.log(chalk.yellow('All search results have been processed.'));
+              return;
+            }
+          } catch (error) {
+            console.error(chalk.red(`Failed to mark task as done: ${error.message}`));
+          }
+        } else if (action === 'open') {
+          // Open URL
+          const url = selectedItem.url;
+          console.log(chalk.blue(`Opening: ${url}`));
+          const { default: open } = await import('open');
+          await open(url);
+        } else if (action === 'copy') {
+          // Copy URL to clipboard
+          const url = selectedItem.url;
+          try {
+            const { default: clipboardy } = await import('clipboardy');
+            await clipboardy.write(url);
+            console.log(chalk.green('✅ URL copied to clipboard'));
+          } catch (error) {
+            console.log(chalk.yellow(`URL: ${url}`));
+          }
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Error in natural language search:'), error.message);
+    }
+  }
+
+  async handleUnifiedSearch() {
+    console.log(chalk.blue('\n🔎 Unified Search (All Databases)'));
+    
+    try {
+      // Get query from user
+      const { query } = await inquirer.prompt([{
+        type: 'input',
+        name: 'query',
+        message: 'What would you like to search for across all databases?',
+        default: 'what should I do today?',
+        validate: (input) => input.trim().length > 0 || 'Please enter a search query'
+      }]);
+
+      // Get all searchable items
+      console.log(chalk.blue('Loading items from all databases...'));
+      const { items: allItems, databases } = await this.notionAPI.getAllSearchableItems();
+      
+      if (!allItems || allItems.length === 0) {
+        console.log(chalk.yellow('No items found across any database.'));
+        return;
+      }
+
+      console.log(chalk.gray(`Searching across ${databases.length} databases: ${databases.map(d => d.name).join(', ')}`));
+      console.log(chalk.gray(`Total items to search: ${allItems.length}`));
+
+      // Perform natural language search across all items
+      const searchResults = await this.nlSearch.searchItems(allItems, query, 'unified');
+      
+      if (searchResults.results.length === 0) {
+        console.log(chalk.yellow(`No items found matching "${query}"`));
+        return;
+      }
+
+      console.log(chalk.green(`\nFound ${searchResults.totalFound} items matching "${query}"`));
+      if (searchResults.totalFound > 10) {
+        console.log(chalk.gray(`(Showing top 10 results)`));
+      }
+
+      // Display results with database info
+      while (true) {
+        const choices = searchResults.results.map((item, index) => {
+          const icon = this.getItemIcon(item);
+          const title = item.title || item.properties?.Name?.title?.[0]?.text?.content || 'Untitled';
+          const database = item._database || 'Unknown';
+          const doDate = item.properties?.['Do Date']?.date?.start;
+          const dateStr = doDate ? ` 📅 ${new Date(doDate).toLocaleDateString()}` : '';
+          const doneStatus = item.properties?.Done?.checkbox ? ' ✓' : '';
+          
+          return {
+            name: `${index + 1}. [${database}] ${icon}${title}${doneStatus}${dateStr}`,
+            value: item
+          };
+        });
+
+        choices.push({ name: chalk.gray('← Back to search'), value: 'back' });
+        choices.push({ name: chalk.gray('← Back to main menu'), value: 'exit' });
+
+        const { selectedItem } = await inquirer.prompt([{
+          type: 'list',
+          name: 'selectedItem',
+          message: 'Select an item to perform actions:',
+          choices,
+          pageSize: 15
+        }]);
+
+        if (selectedItem === 'exit') {
+          return;
+        }
+
+        if (selectedItem === 'back') {
+          // Let them search again
+          return await this.handleUnifiedSearch();
+        }
+
+        // Show item actions
+        const itemTitle = selectedItem.title || selectedItem.properties?.Name?.title?.[0]?.text?.content || 'Untitled';
+        const database = selectedItem._database || 'Unknown';
+        
+        const { action } = await inquirer.prompt([{
+          type: 'list',
+          name: 'action',
+          message: `What would you like to do with "${itemTitle}" from ${database}?`,
+          choices: [
+            { name: '✅ Mark as done', value: 'done' },
+            { name: '🔗 Open in Notion', value: 'open' },
+            { name: '📋 Copy URL', value: 'copy' },
+            { name: chalk.gray('← Back'), value: 'back' }
+          ]
+        }]);
+
+        if (action === 'done') {
+          // Mark item as done
+          try {
+            const updateProps = {};
+            
+            // Different databases use different properties
+            if (selectedItem._database === 'Action Items') {
+              updateProps.Status = { status: { name: '✅ Done' } };
+            } else {
+              // All other databases use the Done checkbox
+              updateProps.Done = { checkbox: true };
+            }
+            
+            await this.notionAPI.updatePage(selectedItem.id, updateProps);
+            console.log(chalk.green(`✅ Marked "${itemTitle}" as done in ${database}`));
+            
+            // Remove from results
+            const index = searchResults.results.indexOf(selectedItem);
+            searchResults.results.splice(index, 1);
+            
+            if (searchResults.results.length === 0) {
+              console.log(chalk.yellow('All search results have been processed.'));
+              return;
+            }
+          } catch (error) {
+            console.error(chalk.red(`Failed to mark item as done: ${error.message}`));
+          }
+        } else if (action === 'open') {
+          // Open URL
+          const url = selectedItem.url;
+          console.log(chalk.blue(`Opening: ${url}`));
+          const { default: open } = await import('open');
+          await open(url);
+        } else if (action === 'copy') {
+          // Copy URL to clipboard
+          const url = selectedItem.url;
+          try {
+            const { default: clipboardy } = await import('clipboardy');
+            await clipboardy.write(url);
+            console.log(chalk.green('✅ URL copied to clipboard'));
+          } catch (error) {
+            console.log(chalk.yellow(`URL: ${url}`));
+          }
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Error in unified search:'), error.message);
     }
   }
 }

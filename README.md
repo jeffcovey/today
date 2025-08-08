@@ -26,6 +26,13 @@ A comprehensive command line interface for managing Notion databases with both i
 - 🎭 Assign Stage properties to tasks
 - 🔄 Interactive CLI with confirmation steps
 
+### 🔍 **Natural Language Search**
+- 🤖 AI-powered search across any Notion database
+- 💬 Ask questions like "what should I work on?" or "I'm bored"
+- 🎯 Handles direct searches, complex queries, and mood-based requests
+- 🔄 Multiple AI backends: Claude API, local Ollama, or basic search
+- 🔐 Privacy-conscious with automatic fallback
+
 ### 🏗️ **Technical Features**
 - 💾 **SQLite Caching** - High-performance local caching with incremental sync
 - 🐳 **Docker Support** - Easy deployment and automation

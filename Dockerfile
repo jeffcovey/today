@@ -16,7 +16,7 @@ RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alp
 RUN npm install -g @anthropic-ai/claude-code
 
 # Copy package files
-COPY package.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm install
@@ -27,6 +27,9 @@ COPY bin/ ./bin/
 
 # Make the CLI executable
 RUN chmod +x ./bin/notion-cli
+
+# Create directory for cache
+RUN mkdir -p /app/.notion-cache
 
 # Set up environment
 ENV NODE_ENV=production
