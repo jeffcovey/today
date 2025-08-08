@@ -452,13 +452,29 @@ export class NotionAPI extends NotionAPIBase {
     });
   }
 
+  // Alias for backward compatibility
   async getTasksWithDoDate(databaseId, useCache = true) {
+    return this.getTasksDueToday(databaseId, useCache);
+  }
+
+  async getTasksDueToday(databaseId, useCache = true) {
     try {
-      // Build filter for Do Date tasks
-      const baseFilter = {
-        property: 'Do Date',
-        date: { is_not_empty: true }
-      };
+      // Get today's date in YYYY-MM-DD format for comparison
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+
+      // Build filter for Start/Repeat Date tasks on or before today
+      const baseFilters = [
+        {
+          property: 'Start/Repeat Date',
+          date: { is_not_empty: true }
+        },
+        {
+          property: 'Start/Repeat Date',
+          date: { on_or_before: todayStr }
+        }
+      ];
 
       // Add status filter to exclude completed tasks
       let statusFilters = [];
@@ -477,20 +493,20 @@ export class NotionAPI extends NotionAPIBase {
       }
 
       const filter = {
-        and: [baseFilter, ...statusFilters]
+        and: [...baseFilters, ...statusFilters]
       };
 
-      // For now, don't use caching for Do Date filtered queries
+      // For now, don't use caching for filtered queries
       // TODO: Implement separate caching for filtered queries in SQLiteCache
       return await this.queryDatabase({
         databaseId,
-        cacheKey: 'doDateTasks',
+        cacheKey: 'startRepeatTasks',
         getCacheData: null, // Disable cache get for now
         setCacheData: null, // Disable cache set for now
         isValidCache: null, // Disable cache validation for now
         filter,
         sorts: [{
-          property: 'Do Date',
+          property: 'Start/Repeat Date',
           direction: 'ascending'
         }],
         pageSize: 100,
@@ -500,16 +516,30 @@ export class NotionAPI extends NotionAPIBase {
         logPrefix: '📅'
       });
     } catch (error) {
-      console.error('Error fetching Do Date tasks:', error);
+      console.error('Error fetching Start/Repeat Date tasks:', error);
       // Fallback to the old method if the new one fails
       console.log('Falling back to traditional filtering method...');
       const allItems = await this.getActionableItems(databaseId, 1000, useCache);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
       return allItems.filter(item => {
+        // Try Start/Repeat Date first, then fall back to Do Date
+        const startRepeatProp = item.properties['Start/Repeat Date'];
         const doDateProp = item.properties['Do Date'];
-        return doDateProp && doDateProp.date && doDateProp.date.start;
+        
+        const dateProp = startRepeatProp || doDateProp;
+        if (!dateProp || !dateProp.date || !dateProp.date.start) return false;
+        
+        // Include only tasks on or before today
+        const taskDate = new Date(dateProp.date.start);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate <= today;
       }).sort((a, b) => {
-        const dateA = new Date(a.properties['Do Date'].date.start);
-        const dateB = new Date(b.properties['Do Date'].date.start);
+        const dateAProp = a.properties['Start/Repeat Date'] || a.properties['Do Date'];
+        const dateBProp = b.properties['Start/Repeat Date'] || b.properties['Do Date'];
+        const dateA = new Date(dateAProp.date.start);
+        const dateB = new Date(dateBProp.date.start);
         return dateA - dateB;
       });
     }

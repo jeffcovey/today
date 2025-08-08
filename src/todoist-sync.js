@@ -76,16 +76,24 @@ export class TodoistSync {
       await this.reconstructMappingsFromTodoist(projectName);
     }
     
-    const notionTasks = await this.notionAPI.getTasksWithDoDate(databaseId);
-    console.log(`Found ${notionTasks.length} tasks with Do Date in Notion`);
+    const notionTasks = await this.notionAPI.getTasksDueToday(databaseId);
+    console.log(`Found ${notionTasks.length} tasks with Start/Repeat Date on or before today in Notion`);
     
-    // Also check for tasks that HAD mappings but no longer have Do Dates
+    // Count how many have Do Date set
+    const tasksWithDoDate = notionTasks.filter(t => t.properties['Do Date']?.date?.start);
+    const tasksWithoutDoDate = notionTasks.filter(t => !t.properties['Do Date']?.date?.start);
+    
+    if (tasksWithDoDate.length !== notionTasks.length) {
+      console.log(chalk.gray(`  ${tasksWithDoDate.length} have Do Date set, ${tasksWithoutDoDate.length} without Do Date`));
+    }
+    
+    // Also check for tasks that HAD mappings but no longer have dates or are in the future
     const syncedNotionIds = Array.from(this.syncMapping.keys());
     const currentNotionIds = new Set(notionTasks.map(t => t.id));
     const removedFromNotion = syncedNotionIds.filter(id => !currentNotionIds.has(id));
     
     if (removedFromNotion.length > 0) {
-      console.log(chalk.yellow(`Found ${removedFromNotion.length} tasks that lost their Do Date`));
+      console.log(chalk.yellow(`Found ${removedFromNotion.length} tasks that are no longer due today or earlier`));
     }
     
     // Debug: Check mapping size
@@ -251,7 +259,7 @@ export class TodoistSync {
             
             if (dryRun) {
               console.log(chalk.yellow(taskStillExists ? 
-                `Would remove from Todoist: task no longer has Do Date` :
+                `Would remove from Todoist: task no longer due today or earlier` :
                 `Would remove from Todoist: task deleted from Notion`));
               deleted++;
             } else {
@@ -492,7 +500,11 @@ export class TodoistSync {
 
   extractNotionTaskData(notionTask) {
     const title = this.notionAPI.extractTitle(notionTask);
+    // Use Do Date for syncing the actual due date to Todoist
+    // Start/Repeat Date is just for filtering what tasks to include
     const doDate = notionTask.properties['Do Date']?.date?.start;
+    const dueDate = doDate; // Only sync if Do Date is set
+    
     const status = notionTask.properties['Status']?.status?.name;
     const priority = notionTask.properties['Priority']?.select?.name;
     const project = notionTask.properties['Project']?.relation?.[0]?.id;
@@ -512,14 +524,14 @@ export class TodoistSync {
     
     return {
       title,
-      dueDate: doDate,
+      dueDate,
       isCompleted: status === '✅ Done',
       priority: this.mapNotionPriorityToTodoist(priority),
       labels: tags,
       description,
       lastEdited,
       notionUrl,
-      hash: this.generateTaskHash({title, doDate, status, priority, tags})
+      hash: this.generateTaskHash({title, dueDate, status, priority, tags})
     };
   }
 
@@ -532,7 +544,7 @@ export class TodoistSync {
     return {
       title: todoistTask.content,
       dueDate: todoistTask.due?.date || todoistTask.due?.datetime || null,  // Explicitly null if no date
-      isCompleted: todoistTask.isCompleted || false,
+      isCompleted: todoistTask.is_completed || false,  // Fixed: use is_completed not isCompleted
       priority: this.mapTodoistPriorityToNotion(todoistTask.priority),
       tags: todoistTask.labels || [],
       description: todoistTask.description
@@ -689,7 +701,8 @@ export class TodoistSync {
       };
     }
     
-    // Update Do Date if defined
+    // Update Do Date if defined (Start/Repeat Date is a formula, can't be updated directly)
+    // Tasks with Start/Repeat Date will have their due dates managed by Notion's repeating logic
     if (taskData.dueDate !== undefined) {
       properties['Do Date'] = {
         date: taskData.dueDate ? { start: taskData.dueDate } : null

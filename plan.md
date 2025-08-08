@@ -1,6 +1,6 @@
 # Concerns
 
-Thing I'm worried about on August 8, 2025:
+Things I'm worried about on August 8, 2025:
 
 - I'm not keeping track of my income and expenses, especially long-term expenses like homeowners insurance, and I'm afraid I'll have to keep withdrawing from my Roth 401k.
 - I'm overdue replying to Melv and David Edwards and Rosemary
