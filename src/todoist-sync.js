@@ -129,7 +129,16 @@ export class TodoistSync {
                                 !existingMapping.notion_last_edited || 
                                 new Date(taskData.lastEdited) > new Date(existingMapping.notion_last_edited);
           
-          if (notionModified && (!existingMapping || existingMapping.notion_hash !== taskData.hash)) {
+          // Check which side was modified more recently
+          let notionIsNewer = true;  // Default to Notion if no comparison possible
+          if (notionModified && existingMapping && existingMapping.todoist_last_edited) {
+            const notionTime = new Date(taskData.lastEdited);
+            const todoistTime = new Date(existingMapping.todoist_last_edited);
+            notionIsNewer = notionTime > todoistTime;
+          }
+          
+          // Only sync from Notion to Todoist if Notion changed AND is newer
+          if (notionModified && (!existingMapping || existingMapping.notion_hash !== taskData.hash) && notionIsNewer) {
             if (dryRun) {
               actions.push({
                 action: 'UPDATE',
@@ -203,7 +212,8 @@ export class TodoistSync {
             if (todoistId) {
               await this.syncCache.saveSyncMapping(task.notionId, todoistId, task.hash, {
                 notionLastEdited: task.lastEdited,
-                notionHash: task.hash
+                notionHash: task.hash,
+                todoistLastEdited: new Date().toISOString()  // Set current time as Todoist's update time
               });
               this.syncMapping.set(task.notionId, todoistId);
               created++;
@@ -225,7 +235,8 @@ export class TodoistSync {
           for (const task of tasksToUpdate) {
             await this.syncCache.saveSyncMapping(task.notionId, task.id, task.hash, {
               notionLastEdited: task.lastEdited,
-              notionHash: task.hash
+              notionHash: task.hash,
+              todoistLastEdited: new Date().toISOString()  // Update Todoist's last edited time
             });
             updated++;
           }
@@ -389,13 +400,21 @@ export class TodoistSync {
             tags: taskData.tags
           });
           
-          // Only update if Todoist has changed since last sync
+          // Check if Todoist has changed since last sync
           const todoistChanged = !existingMapping || 
                                 !existingMapping.todoist_hash || 
                                 existingMapping.todoist_hash !== todoistHash;
           
+          // Check which side was modified more recently
+          let todoistIsNewer = false;
+          if (todoistChanged && existingMapping) {
+            const todoistTime = new Date(taskData.lastEdited);
+            const notionTime = existingMapping.notion_last_edited ? new Date(existingMapping.notion_last_edited) : new Date(0);
+            todoistIsNewer = todoistTime > notionTime;
+          }
           
-          if (todoistChanged) {
+          // Only sync from Todoist to Notion if Todoist changed AND is newer
+          if (todoistChanged && (!existingMapping || todoistIsNewer)) {
             if (dryRun) {
               actions.push({
                 action: 'UPDATE',
@@ -480,6 +499,7 @@ export class TodoistSync {
           
           await this.syncCache.saveSyncMapping(notionId, todoistTask.id, null, {
             notionLastEdited: currentNotionPage.last_edited_time,
+            todoistLastEdited: taskData.lastEdited,  // Save Todoist's last edited time
             todoistHash: todoistHash,
             notionHash: existingMapping?.notion_hash || null
           });
@@ -547,7 +567,8 @@ export class TodoistSync {
       isCompleted: todoistTask.is_completed || false,  // Fixed: use is_completed not isCompleted
       priority: this.mapTodoistPriorityToNotion(todoistTask.priority),
       tags: todoistTask.labels || [],
-      description: todoistTask.description
+      description: todoistTask.description,
+      lastEdited: todoistTask.updated_at || todoistTask.created_at  // Track Todoist's last update time
     };
   }
 
