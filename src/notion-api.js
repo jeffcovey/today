@@ -459,6 +459,44 @@ export class NotionAPI extends NotionAPIBase {
 
   async getTasksDueToday(databaseId, useCache = true) {
     try {
+      // If caching is enabled, try to use cached actionable items and filter client-side
+      if (useCache) {
+        try {
+          // Get all actionable items from cache (this uses the existing cache infrastructure)
+          const allItems = await this.getActionableItems(databaseId, 1000, true);
+          
+          // Filter client-side for tasks due today or earlier
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const filteredItems = allItems.filter(item => {
+            // Check Start/Repeat Date first, then fall back to Do Date
+            const startRepeatProp = item.properties['Start/Repeat Date'];
+            const doDateProp = item.properties['Do Date'];
+            
+            const dateProp = startRepeatProp || doDateProp;
+            if (!dateProp || !dateProp.date || !dateProp.date.start) return false;
+            
+            // Include only tasks on or before today
+            const taskDate = new Date(dateProp.date.start);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate <= today;
+          }).sort((a, b) => {
+            const dateAProp = a.properties['Start/Repeat Date'] || a.properties['Do Date'];
+            const dateBProp = b.properties['Start/Repeat Date'] || b.properties['Do Date'];
+            const dateA = new Date(dateAProp.date.start);
+            const dateB = new Date(dateBProp.date.start);
+            return dateA - dateB;
+          });
+          
+          console.log(chalk.gray(`  (Using cached data, filtered ${filteredItems.length} from ${allItems.length} items)`));
+          return filteredItems;
+        } catch (cacheError) {
+          console.log(chalk.gray('Cache miss or error, fetching from API...'));
+          // Fall through to API query
+        }
+      }
+
       // Get today's date in YYYY-MM-DD format for comparison
       const today = new Date();
       today.setHours(0, 0, 0, 0);
