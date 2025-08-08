@@ -188,6 +188,20 @@ program
   });
 
 program
+  .command('tag-review')
+  .description('Review and categorize untagged action items')
+  .action(async () => {
+    try {
+      const { TagAnalyzer } = await import('./tag-analyzer.js');
+      const analyzer = new TagAnalyzer();
+      await analyzer.run();
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('debug')
   .description('Debug database items to examine status property structure')
   .option('--task <title>', 'Debug a specific task by title')
