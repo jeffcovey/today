@@ -76,7 +76,7 @@ export class TodoistSync {
       await this.reconstructMappingsFromTodoist(projectName);
     }
     
-    const notionTasks = await this.notionAPI.getTasksDueToday(databaseId);
+    const notionTasks = await this.notionAPI.getTasksDueToday(databaseId, false); // Disable cache for sync
     console.log(`Found ${notionTasks.length} tasks with Start/Repeat Date on or before today in Notion`);
     
     // Count how many have Do Date set
@@ -772,7 +772,8 @@ export class TodoistSync {
       console.log(chalk.yellow.bold(`Tasks to Update (${updates.length}):`));
       updates.forEach((action, i) => {
         if (i < 5) {
-          console.log(chalk.yellow(`  • ${action.notion.title}`));
+          const title = action.todoist?.title || action.notion?.title || action.changes?.title || 'Task';
+          console.log(chalk.yellow(`  • ${title}`));
           if (action.changes.dueDate) {
             console.log(chalk.gray(`    Due date: ${new Date(action.changes.dueDate).toLocaleDateString()}`));
           }
