@@ -202,6 +202,65 @@ program
   });
 
 program
+  .command('sync')
+  .description('Sync tasks between Notion and Todoist')
+  .option('--notion-to-todoist', 'Sync from Notion to Todoist only')
+  .option('--todoist-to-notion', 'Sync from Todoist to Notion only')
+  .option('--project <name>', 'Todoist project name (default: "Notion Tasks")')
+  .option('--dry-run', 'Preview what would be synced without making changes')
+  .action(async (options) => {
+    try {
+      const notionToken = process.env.NOTION_TOKEN;
+      const todoistToken = process.env.TODOIST_TOKEN;
+      
+      if (!notionToken) {
+        console.error(chalk.red('Error: NOTION_TOKEN environment variable is required'));
+        process.exit(1);
+      }
+      
+      if (!todoistToken) {
+        console.error(chalk.red('Error: TODOIST_TOKEN environment variable is required'));
+        console.log(chalk.yellow('Get your token from: https://todoist.com/app/settings/integrations'));
+        process.exit(1);
+      }
+      
+      const { TodoistSync } = await import('./todoist-sync.js');
+      const notionAPI = new NotionAPI(notionToken);
+      const databases = await notionAPI.getDatabases();
+      
+      const actionItemsDB = databases.find(db => 
+        db.title.toLowerCase().includes('action items')
+      );
+      
+      if (!actionItemsDB) {
+        console.error(chalk.red('Error: No "Action Items" database found'));
+        process.exit(1);
+      }
+      
+      const sync = new TodoistSync(todoistToken, notionAPI);
+      const projectName = options.project || 'Notion Tasks';
+      const dryRun = options.dryRun || false;
+      
+      if (options.notionToTodoist) {
+        await sync.syncNotionToTodoist(actionItemsDB.id, projectName, dryRun);
+      } else if (options.todoistToNotion) {
+        await sync.syncTodoistToNotion(actionItemsDB.id, projectName, dryRun);
+      } else {
+        await sync.performTwoWaySync(actionItemsDB.id, projectName, dryRun);
+      }
+      
+      if (dryRun) {
+        console.log(chalk.magenta.bold('\n⚠️  This was a dry run. No changes were made.'));
+        console.log(chalk.cyan('Remove --dry-run to perform the actual sync.'));
+      }
+      
+    } catch (error) {
+      console.error(chalk.red('Error during sync:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('debug')
   .description('Debug database items to examine status property structure')
   .option('--task <title>', 'Debug a specific task by title')

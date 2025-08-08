@@ -97,6 +97,17 @@ export class SQLiteCache {
         notion_page_id TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS todoist_sync_mapping (
+        notion_id TEXT PRIMARY KEY,
+        todoist_id TEXT NOT NULL,
+        last_synced INTEGER NOT NULL,
+        sync_hash TEXT,
+        notion_last_edited TEXT,
+        todoist_last_edited TEXT,
+        notion_hash TEXT,
+        todoist_hash TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS temporal_sync (
         date TEXT PRIMARY KEY,
         day_id TEXT,
@@ -529,6 +540,7 @@ export class SQLiteCache {
       DELETE FROM tag_cache;
       DELETE FROM status_groups_cache;
       DELETE FROM cache_metadata;
+      DELETE FROM todoist_sync_mapping;
     `);
   }
 
@@ -653,6 +665,62 @@ export class SQLiteCache {
       transaction();
     } catch (error) {
       console.error('Error setting cached databases:', error);
+    }
+  }
+
+  async initSyncTables() {
+    // Tables are already created in initDatabase, this is for compatibility
+    return true;
+  }
+
+  async getSyncMappings() {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM todoist_sync_mapping');
+      return stmt.all();
+    } catch (error) {
+      console.error('Error getting sync mappings:', error);
+      return [];
+    }
+  }
+
+  async saveSyncMapping(notionId, todoistId, syncHash = null, metadata = {}) {
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO todoist_sync_mapping 
+        (notion_id, todoist_id, last_synced, sync_hash, notion_last_edited, todoist_last_edited, notion_hash, todoist_hash) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        notionId, 
+        todoistId, 
+        Date.now(), 
+        syncHash,
+        metadata.notionLastEdited || null,
+        metadata.todoistLastEdited || null,
+        metadata.notionHash || null,
+        metadata.todoistHash || null
+      );
+    } catch (error) {
+      console.error('Error saving sync mapping:', error);
+    }
+  }
+
+  async getSyncMapping(notionId) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM todoist_sync_mapping WHERE notion_id = ?');
+      return stmt.get(notionId);
+    } catch (error) {
+      console.error('Error getting sync mapping:', error);
+      return null;
+    }
+  }
+
+  async deleteSyncMapping(notionId) {
+    try {
+      const stmt = this.db.prepare('DELETE FROM todoist_sync_mapping WHERE notion_id = ?');
+      stmt.run(notionId);
+    } catch (error) {
+      console.error('Error deleting sync mapping:', error);
     }
   }
 
