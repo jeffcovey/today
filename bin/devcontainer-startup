@@ -6,16 +6,13 @@ echo "=== DevContainer Startup ==="
 echo "Project: $(basename "$(pwd)")"
 echo "Time: $(date)"
 
-# Run existing setup scripts
-if [ -f "bin/setup-ssh" ]; then
+# Run setup scripts using unified setup command
+if [ -f "bin/setup" ]; then
     echo "Setting up SSH..."
-    bash bin/setup-ssh || echo "SSH setup failed, continuing..."
-fi
-
-# Setup Tailscale hostname
-if [ -f "bin/setup-tailscale-hostname" ]; then
+    bash bin/setup --ssh || echo "SSH setup failed, continuing..."
+    
     echo "Setting up Tailscale hostname..."
-    bash bin/setup-tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
+    bash bin/setup --tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
 fi
 
 # Start code-server

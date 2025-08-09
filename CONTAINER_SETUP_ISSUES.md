@@ -82,7 +82,7 @@ Most issues have been resolved, with one known limitation:
 - Executes tunnel command using `/workspaces/notion-cli/.vscode-cli/code tunnel`
 - ⚠️ **Note**: Has ARM64 server limitation - consider using SSH instead
 
-**`bin/setup-ssh`**:
+**`bin/setup --ssh`**:
 - Sets up SSH server with key-based authentication
 - Generates SSH host keys and user key pair automatically
 - Configures SSH daemon on port 2222
@@ -95,7 +95,7 @@ Most issues have been resolved, with one known limitation:
 For secure remote access from anywhere (like your iPad), use Tailscale:
 
 1. **Automatic Setup**: Tailscale is configured in devcontainer.json
-2. **Authentication**: Run `bin/setup-tailscale` after container rebuild
+2. **Authentication**: Run `bin/setup --tailscale` after container rebuild
 3. **iPad Access**: See `IPAD_ACCESS_GUIDE.md` for detailed instructions
 4. **Benefits**:
    - ✅ Works from anywhere with internet
@@ -131,7 +131,7 @@ The devcontainer is configured to automatically set up SSH during container crea
 - ✅ **Works offline** - no internet dependency after setup
 
 ### Manual SSH Setup
-If needed, run: `bin/setup-ssh`
+If needed, run: `bin/setup --ssh`
 
 ## Important Note
 The Dockerfile in the root directory is NOT being used by VS Code devcontainers. The devcontainer uses the configuration in `.devcontainer/devcontainer.json` instead.

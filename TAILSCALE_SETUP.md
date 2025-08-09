@@ -42,7 +42,7 @@ Docker Container (Tailscale + SSH/VS Code)
    - Use official Tailscale devcontainer feature
    - Configure authentication method
 
-2. **Create setup script (bin/setup-tailscale)**
+2. **Create setup script (bin/setup --tailscale)**
    - Check Tailscale status
    - Guide through authentication
    - Display connection info
@@ -79,7 +79,7 @@ Docker Container (Tailscale + SSH/VS Code)
 export TAILSCALE_AUTHKEY="tskey-auth-xxxx"
 
 # Option B: Interactive authentication after rebuild
-bin/setup-tailscale
+bin/setup --tailscale
 ```
 
 ### 2. Get Connection Info
@@ -100,7 +100,7 @@ tailscale ip -4
 ## Troubleshooting
 
 ### Tailscale not starting
-- Ensure you've authenticated (run `bin/setup-tailscale`)
+- Ensure you've authenticated (run `bin/setup --tailscale`)
 - Check status: `tailscale status`
 - View logs: `tailscale bugreport`
 

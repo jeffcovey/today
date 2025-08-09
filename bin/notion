@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Run daily automation tasks
+// Unified Notion CLI entry point
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { spawn } from 'child_process';
@@ -11,9 +11,21 @@ const __dirname = dirname(__filename);
 // Path to the main index.js file
 const mainScript = join(__dirname, '..', 'src', 'index.js');
 
-// Forward daily command with all arguments
-const args = ['daily', ...process.argv.slice(2)];
-const child = spawn('node', [mainScript, ...args], {
+// Parse arguments to handle --command format
+const args = process.argv.slice(2);
+let finalArgs = [];
+
+// Check if using --command format
+if (args[0] && args[0].startsWith('--')) {
+  const command = args[0].substring(2); // Remove --
+  finalArgs = [command, ...args.slice(1)];
+} else {
+  // Pass through arguments as-is for backward compatibility
+  finalArgs = args;
+}
+
+// Forward all arguments to the main script
+const child = spawn('node', [mainScript, ...finalArgs], {
   stdio: 'inherit',
   cwd: process.cwd()
 });

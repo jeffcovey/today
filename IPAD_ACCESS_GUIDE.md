@@ -32,7 +32,7 @@ cd /path/to/notion-cli
 ### 3. Authenticate Tailscale in Container
 ```bash
 # After rebuild, in container terminal
-bin/setup-tailscale
+bin/setup --tailscale
 
 # Follow prompts to authenticate
 # Note the Tailscale IP (e.g., 100.101.102.103)

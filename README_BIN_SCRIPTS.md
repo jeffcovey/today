@@ -6,33 +6,35 @@ All scripts are located in the `bin/` directory and can be executed directly wit
 
 ### Core Commands
 
-#### `bin/notion-cli`
-Main CLI entry point for all Notion operations.
+#### `bin/notion`
+Unified CLI entry point for all Notion operations.
 ```bash
-bin/notion-cli --help              # Show all available commands
-bin/notion-cli edit                # Interactive task editing mode
-bin/notion-cli clear-cache         # Clear all cached data
-bin/notion-cli cache-info          # Show cache statistics
-bin/notion-cli tag-review          # Review and categorize untagged items
-bin/notion-cli debug               # Debug database items
-```
+bin/notion --help              # Show all available commands
+bin/notion edit                # Interactive task editing mode
+bin/notion clear-cache         # Clear all cached data
+bin/notion cache-info          # Show cache statistics
+bin/notion tag-review          # Review and categorize untagged items
+bin/notion debug               # Debug database items
 
-#### `bin/notion-edit`
-Quick access to interactive editing mode.
-```bash
-bin/notion-edit                    # Start interactive task editor
+# Using -- prefix for specific commands
+bin/notion --edit              # Alternative: Start interactive editor
+bin/notion --daily --all       # Alternative: Run daily automation
+bin/notion --sync              # Alternative: Sync with Todoist
 ```
 
 ### Sync Commands
 
-#### `bin/notion-sync`
-Sync tasks between Notion and Todoist.
+#### Sync Commands
+Sync tasks between Notion and Todoist using the unified `notion` command.
 ```bash
-bin/notion-sync --dry-run          # Preview sync without making changes
-bin/notion-sync                    # Perform two-way sync
-bin/notion-sync --notion-to-todoist # One-way: Notion → Todoist
-bin/notion-sync --todoist-to-notion # One-way: Todoist → Notion
-bin/notion-sync --project "Work"   # Use custom Todoist project
+bin/notion sync --dry-run          # Preview sync without making changes
+bin/notion sync                    # Perform two-way sync
+bin/notion sync --notion-to-todoist # One-way: Notion → Todoist
+bin/notion sync --todoist-to-notion # One-way: Todoist → Notion
+bin/notion sync --project "Work"   # Use custom Todoist project
+
+# Alternative syntax
+bin/notion --sync --dry-run        # Using -- prefix
 ```
 
 #### `bin/sync-scheduler`
@@ -45,13 +47,16 @@ bin/sync-scheduler --config        # Show current configuration
 
 ### Automation Commands
 
-#### `bin/notion-daily`
-Run daily automation tasks.
+#### Daily Automation
+Run daily automation tasks using the unified `notion` command.
 ```bash
-bin/notion-daily --all             # Run all daily tasks
-bin/notion-daily --reset-routines  # Reset routine checkboxes
-bin/notion-daily --mark-repeating-tasks # Reset completed repeating tasks
-bin/notion-daily --create-temporal # Create missing days/weeks
+bin/notion daily --all             # Run all daily tasks
+bin/notion daily --reset-routines  # Reset routine checkboxes
+bin/notion daily --mark-repeating-tasks # Reset completed repeating tasks
+bin/notion daily --create-temporal # Create missing days/weeks
+
+# Alternative syntax
+bin/notion --daily --all           # Using -- prefix
 ```
 
 ## Quick Start Examples
@@ -59,10 +64,10 @@ bin/notion-daily --create-temporal # Create missing days/weeks
 ### First-Time Sync Setup
 ```bash
 # 1. Preview what will be synced
-bin/notion-sync --dry-run
+bin/notion sync --dry-run
 
 # 2. If everything looks good, run the sync
-bin/notion-sync
+bin/notion sync
 
 # 3. Set up automated sync
 bin/sync-scheduler
@@ -71,10 +76,10 @@ bin/sync-scheduler
 ### Daily Workflow
 ```bash
 # Morning: Run daily automation
-bin/notion-daily --all
+bin/notion daily --all
 
 # Throughout the day: Edit tasks interactively
-bin/notion-edit
+bin/notion edit
 
 # Check sync status
 bin/sync-scheduler --config
@@ -83,13 +88,13 @@ bin/sync-scheduler --config
 ### Troubleshooting
 ```bash
 # Check cache status
-bin/notion-cli cache-info
+bin/notion cache-info
 
 # Clear cache if needed
-bin/notion-cli clear-cache
+bin/notion clear-cache
 
 # Debug specific issues
-bin/notion-cli debug --list-all-dbs
+bin/notion debug --list-all-dbs
 ```
 
 ## Making Scripts Globally Available
@@ -104,9 +109,8 @@ export PATH="$PATH:/path/to/notion-cli/bin"
 
 ### Option 2: Create Symlinks
 ```bash
-# Create symlinks in /usr/local/bin
-sudo ln -s /path/to/notion-cli/bin/notion-sync /usr/local/bin/notion-sync
-sudo ln -s /path/to/notion-cli/bin/notion-edit /usr/local/bin/notion-edit
+# Create symlink in /usr/local/bin
+sudo ln -s /path/to/notion-cli/bin/notion /usr/local/bin/notion
 # ... etc for other scripts
 ```
 

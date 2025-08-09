@@ -45,8 +45,8 @@ Located in `/workspaces/notion-cli/bin/`:
 
 - **devcontainer-startup**: Main orchestrator script
 - **start-code-server**: Manages code-server process
-- **setup-tailscale-hostname**: Configures meaningful hostnames
-- **setup-ssh**: Configures SSH access
+- **setup --tailscale-hostname**: Configures meaningful hostnames
+- **setup --ssh**: Configures SSH access
 
 ### Service Naming
 

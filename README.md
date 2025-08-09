@@ -118,7 +118,7 @@ docker-compose up --build
 npm start
 
 # Using Docker Compose
-docker-compose run notion-cli
+docker-compose run notion
 
 # Direct edit command
 npm run start edit
@@ -130,32 +130,32 @@ npm run start edit
 
 ```bash
 # Run all daily automation tasks
-notion-cli daily --all
+notion daily --all
 
 # Individual operations
-notion-cli daily --reset-routines          # Reset routine checkboxes
-notion-cli daily --mark-repeating-tasks    # Handle completed repeating tasks  
-notion-cli daily --create-temporal         # Create missing days/weeks
+notion daily --reset-routines          # Reset routine checkboxes
+notion daily --mark-repeating-tasks    # Handle completed repeating tasks  
+notion daily --create-temporal         # Create missing days/weeks
 ```
 
 #### Temporal Management
 
 ```bash
 # Create missing days and weeks with relationships
-notion-cli temporal --create-missing-days
+notion temporal --create-missing-days
 
 # Specify date range
-notion-cli temporal --create-missing-days --start-date 2024-01-01 --end-date 2024-01-31
+notion temporal --create-missing-days --start-date 2024-01-01 --end-date 2024-01-31
 ```
 
 #### Docker Automation Examples
 
 ```bash
 # Daily automation via Docker (great for cron)
-docker run --env-file .env notion-cli daily --all
+docker run --env-file .env notion daily --all
 
 # Create missing temporal entries
-docker run --env-file .env notion-cli temporal --create-missing-days
+docker run --env-file .env notion temporal --create-missing-days
 ```
 
 ## How It Works
@@ -214,7 +214,7 @@ The CLI includes comprehensive error handling:
 **Morning:**
 ```bash
 # Reset routines for the day and create any missing temporal entries
-notion-cli daily --all
+notion daily --all
 
 # Or use interactive mode to check off morning routine items
 npm start
@@ -261,13 +261,13 @@ npm start
 **Daily Cron Job:**
 ```bash
 # Add to your cron (runs daily at 6 AM)
-0 6 * * * docker run --env-file /path/to/.env notion-cli daily --all
+0 6 * * * docker run --env-file /path/to/.env notion daily --all
 ```
 
 **Weekly Temporal Sync:**
 ```bash
 # Ensure Days and Weeks are created for the next week
-notion-cli temporal --create-missing-days --start-date $(date +%Y-%m-%d) --end-date $(date -d '+7 days' +%Y-%m-%d)
+notion temporal --create-missing-days --start-date $(date +%Y-%m-%d) --end-date $(date -d '+7 days' +%Y-%m-%d)
 ```
 
 ## Remote Development with VS Code Tunnel
@@ -282,7 +282,7 @@ code tunnel --accept-server-license-terms
 
 # The tunnel will start in /app directory by default
 # You can also specify a different directory:
-cd /workspaces/notion-cli && code tunnel --accept-server-license-terms
+cd /workspaces/notion && code tunnel --accept-server-license-terms
 ```
 
 ### Authentication

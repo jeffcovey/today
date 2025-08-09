@@ -10,7 +10,7 @@ This sync system provides two-way synchronization between your Notion Action Ite
 ## Prerequisites
 
 1. **Notion Integration Token**
-   - Already configured if you're using the notion-cli
+   - Already configured if you're using the notion
 
 2. **Todoist API Token**
    - Get yours from: https://todoist.com/app/settings/integrations
@@ -76,7 +76,7 @@ Sync directions:
 Add to your crontab (`crontab -e`):
 ```bash
 # Sync every 15 minutes
-*/15 * * * * cd /path/to/notion-cli && bin/sync-scheduler --once >> .sync.log 2>&1
+*/15 * * * * cd /path/to/notion && bin/sync-scheduler --once >> .sync.log 2>&1
 ```
 
 ### Option 4: macOS LaunchAgent
@@ -90,13 +90,13 @@ Create `~/Library/LaunchAgents/com.user.notion-todoist-sync.plist`:
     <string>com.user.notion-todoist-sync</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/path/to/notion-cli/bin/sync-scheduler</string>
+        <string>/path/to/notion/bin/sync-scheduler</string>
         <string>--once</string>
     </array>
     <key>StartInterval</key>
     <integer>900</integer>
     <key>WorkingDirectory</key>
-    <string>/path/to/notion-cli</string>
+    <string>/path/to/notion</string>
     <key>StandardOutPath</key>
     <string>/tmp/notion-sync.log</string>
     <key>StandardErrorPath</key>
@@ -157,7 +157,7 @@ cat .sync-config.json | jq '.lastSync'
 ### Clear Sync Cache
 If you need to reset the sync mappings:
 ```bash
-bin/notion-cli clear-cache
+bin/notion clear-cache
 ```
 
 ## Troubleshooting
@@ -170,7 +170,7 @@ bin/notion-cli clear-cache
 
 ### Duplicate Tasks
 - This usually means the sync mapping was lost
-- Clear cache and re-sync: `bin/notion-cli clear-cache && bin/notion-sync`
+- Clear cache and re-sync: `bin/notion clear-cache && bin/notion-sync`
 
 ### Performance Issues
 - Reduce sync frequency in `.sync-config.json`
