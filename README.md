@@ -1,6 +1,6 @@
-# Notion CLI
+# Today
 
-A comprehensive command line interface for managing Notion databases with both interactive editing and automated productivity workflows. Built for daily productivity management with powerful automation features.
+A personal command center for reviewing everything coming in, managing plans and dreams, and deciding what to do each day to be happy and productive. Integrates multiple data sources including Notion, Todoist, email, and more to create a unified daily workflow.
 
 ## Features
 

@@ -1,7 +1,7 @@
 {
-  "name": "notion-cli",
+  "name": "today",
   "version": "1.0.0",
-  "description": "A command line interface for manipulating a Notion database",
+  "description": "A personal command center for reviewing inputs, managing plans and dreams, and deciding what to do each day",
   "main": "src/index.js",
   "bin": {
     "notion": "./bin/notion",

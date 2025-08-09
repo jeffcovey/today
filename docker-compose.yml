@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  notion-cli:
+  today:
     build: .
-    container_name: notion-cli
+    container_name: today
     environment:
       - NOTION_TOKEN=${NOTION_TOKEN}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
