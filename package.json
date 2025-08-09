@@ -4,7 +4,8 @@
   "description": "A command line interface for manipulating a Notion database",
   "main": "src/index.js",
   "bin": {
-    "notion-cli": "./bin/notion-cli"
+    "notion-cli": "./bin/notion-cli",
+    "email-cli": "./bin/email-cli"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -20,7 +21,9 @@
     "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
     "dotenv": "^17.2.1",
+    "imapflow": "^1.0.191",
     "inquirer": "^12.9.0",
+    "mailparser": "^3.7.4",
     "open": "^10.2.0"
   },
   "type": "module",

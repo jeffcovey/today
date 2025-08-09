@@ -22,6 +22,12 @@ export class SQLiteCache {
   initDatabase() {
     this.db = new Database(this.dbPath);
     
+    // Enable WAL mode for better concurrent access
+    this.db.pragma('journal_mode = WAL');
+    
+    // Set busy timeout to 30 seconds - will retry if database is locked
+    this.db.pragma('busy_timeout = 30000');
+    
     // Create tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS cache_metadata (

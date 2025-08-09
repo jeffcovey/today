@@ -14,6 +14,91 @@ export class NaturalLanguageSearch {
     }
   }
 
+  // Generic method to ask Claude a question
+  async askClaude(systemPrompt, userQuery, options = {}) {
+    if (!this.client) {
+      throw new Error('Claude API not configured');
+    }
+
+    try {
+      const response = await this.client.messages.create({
+        model: options.model || 'claude-3-haiku-20240307',
+        max_tokens: options.maxTokens || 1000,
+        temperature: options.temperature || 0,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userQuery }
+        ]
+      });
+
+      return response.content[0].text;
+    } catch (error) {
+      console.error('Claude API error:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced method to filter data using Claude's understanding
+  async filterWithClaude(items, query, itemType = 'emails') {
+    if (!this.client) {
+      throw new Error('Claude API not configured');
+    }
+
+    const systemPrompt = `You are a smart filter for ${itemType}. The user will provide a natural language query and a list of items in JSON format. 
+    
+Your response must be ONLY a valid JSON array containing the items that match the user's query. No other text, explanation, or formatting.
+
+Use your understanding of natural language to interpret requests like:
+- "personal emails" (exclude newsletters, marketing, automated messages)
+- "important tasks" (high priority or urgent items)
+- "work stuff" (work-related items)
+- "from last week" (date filtering)
+- "unread" (status filtering)
+
+For "personal" emails, ONLY include emails from real people. Exclude ALL:
+- Marketing emails (sale, offer, deals, promo, discount, shop, store)
+- Newsletters (newsletter, marketing, updates, news, digest)
+- Automated messages (noreply, no-reply, alerts, notifications, automated)
+- Service/system emails ([MISSING], [REPORTING], monitoring, status)
+- Company broadcasts (not addressed to you personally)
+- Anything that looks automated or mass-sent
+
+Personal means: from an actual human writing to you specifically
+
+Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
+
+    try {
+      const response = await this.client.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 4000,
+        temperature: 0,
+        system: systemPrompt,
+        messages: [
+          { 
+            role: 'user', 
+            content: `Query: "${query}"\n\nItems to filter:\n${JSON.stringify(items, null, 2)}`
+          }
+        ]
+      });
+
+      const responseText = response.content[0].text.trim();
+      
+      // Try to extract JSON even if there's extra text
+      let jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.error('Claude response was not JSON:', responseText.substring(0, 100) + '...');
+        return items;
+      }
+      
+      const filteredItems = JSON.parse(jsonMatch[0]);
+      return Array.isArray(filteredItems) ? filteredItems : [];
+    } catch (error) {
+      console.error('Claude filtering error:', error.message);
+      // Fall back to returning all items
+      return items;
+    }
+  }
+
   // Search any Notion database items using available AI
   async searchItems(items, query, databaseType = 'tasks') {
     if (this.searchMethod === 'anthropic' && this.client) {
