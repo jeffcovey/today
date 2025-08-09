@@ -28,31 +28,50 @@ const config = {
 // ============ MAIN SCRIPT ============
 
 // Get draft content and metadata
-const content = editor.getText();
+let content = editor.getText();
 const lines = content.split('\n');
 const title = lines[0].replace(/^#\s*/, '').trim() || 'Untitled';
 const tags = draft.tags || [];
 
-// Determine file path based on content or tags
-let folder = config.defaultPath;
-if (content.includes('- [ ]') || content.includes('- [x]')) {
-    folder = 'notes/tasks/';
-} else if (tags.includes('idea')) {
-    folder = 'notes/ideas/';
-} else if (tags.includes('reference')) {
-    folder = 'notes/reference/';
+// Special handling for Streaks uploads
+let filepath;
+let commitMessage;
+
+if (title === 'Streaks') {
+    // Convert Streaks items to TaskPaper format
+    const convertedLines = lines.map((line, index) => {
+        if (index === 0) return line; // Keep header
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('- ')) {
+            return `- [ ] ${trimmed}`;
+        }
+        return line;
+    });
+    content = convertedLines.join('\n');
+    
+    // Fixed location for Streaks
+    filepath = 'notes/tasks/streaks-today.md';
+    commitMessage = 'Update Streaks tasks';
+} else {
+    // Normal file handling
+    let folder = config.defaultPath;
+    if (content.includes('- [ ]') || content.includes('- [x]')) {
+        folder = 'notes/tasks/';
+    } else if (tags.includes('idea')) {
+        folder = 'notes/ideas/';
+    } else if (tags.includes('reference')) {
+        folder = 'notes/reference/';
+    }
+    
+    // Generate filename (date-based or title-based)
+    const date = new Date();
+    const dateStr = date.toISOString().split('T')[0];
+    const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
+    const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
+    filepath = `${folder}${filename}`;
+    commitMessage = `Add note: ${title}`;
 }
-
-// Generate filename (date-based or title-based)
-const date = new Date();
-const dateStr = date.toISOString().split('T')[0];
-const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
-const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
-const filepath = `${folder}${filename}`;
-
-// Prepare commit message
-const commitMessage = `Add note: ${title}`;
 
 // GitHub API request
 const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filepath}`;
