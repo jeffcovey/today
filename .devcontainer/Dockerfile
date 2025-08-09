@@ -8,4 +8,4 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Set working directory
-WORKDIR /workspaces/notion-cli
+WORKDIR /workspaces/today
