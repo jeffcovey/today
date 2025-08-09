@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Script to sync notes bidirectionally with GitHub
+# Pulls latest notes from other devices and pushes local changes
+
+echo "📝 Syncing notes with GitHub..."
+
+# Ensure we're in the right directory
+cd "$(dirname "$0")/.." || exit
+
+# Check for local changes
+if [[ -n $(git status notes/ --porcelain 2>/dev/null) ]]; then
+    echo "📤 Pushing local note changes..."
+    git add notes/
+    git commit -m "Sync local notes" 2>/dev/null
+    git push origin main
+fi
+
+# Pull latest changes
+echo "📥 Pulling latest notes..."
+git pull origin main
+
+# Show recent notes
+echo ""
+echo "📚 Recent notes:"
+find notes -type f -name "*.md" -mtime -7 2>/dev/null | head -10
+
+echo ""
+echo "✅ Notes synced successfully!"
