@@ -492,7 +492,7 @@ export class TodoistSync {
       // Update sync mappings for successful updates
       for (let i = 0; i < results.length; i++) {
         if (results[i].success) {
-          const { notionId, todoistTask, todoistHash, existingMapping } = tasksToUpdate[i];
+          const { notionId, todoistTask, taskData, todoistHash, existingMapping } = tasksToUpdate[i];
           
           // Get the updated page to get its last_edited_time
           const currentNotionPage = results[i].response;
@@ -568,7 +568,7 @@ export class TodoistSync {
       priority: this.mapTodoistPriorityToNotion(todoistTask.priority),
       tags: todoistTask.labels || [],
       description: todoistTask.description,
-      lastEdited: todoistTask.updated_at || todoistTask.created_at  // Track Todoist's last update time
+      lastEdited: todoistTask.updatedAt || todoistTask.addedAt  // Fixed: use updatedAt (camelCase) not updated_at
     };
   }
 
