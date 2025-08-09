@@ -46,9 +46,9 @@ if (content.includes('- [ ]') || content.includes('- [x]')) {
 // Generate filename (date-based or title-based)
 const date = new Date();
 const dateStr = date.toISOString().split('T')[0];
-const timestamp = date.toISOString().replace(/[:.]/g, '-');
+const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
 const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-const filename = `${dateStr}-${titleSlug}.md`;
+const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
 const filepath = `${folder}${filename}`;
 
 // Prepare commit message
