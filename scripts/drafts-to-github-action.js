@@ -28,14 +28,14 @@ const config = {
 // ============ MAIN SCRIPT ============
 
 // Get draft content and metadata
-const draft = editor.getText();
-const lines = draft.split('\n');
+const content = editor.getText();
+const lines = content.split('\n');
 const title = lines[0].replace(/^#\s*/, '').trim() || 'Untitled';
-const tags = draft.getTemplateTag("tags") || [];
+const tags = draft.tags || [];
 
 // Determine file path based on content or tags
 let folder = config.defaultPath;
-if (draft.includes('- [ ]') || draft.includes('- [x]')) {
+if (content.includes('- [ ]') || content.includes('- [x]')) {
     folder = 'notes/tasks/';
 } else if (tags.includes('idea')) {
     folder = 'notes/ideas/';
@@ -74,7 +74,6 @@ if (checkResponse.success) {
 }
 
 // Prepare the content (base64 encoded)
-const content = draft;
 const contentBase64 = Base64.encode(content);
 
 // Create or update file
