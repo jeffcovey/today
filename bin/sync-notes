@@ -20,6 +20,17 @@ fi
 echo "📥 Pulling latest notes..."
 git pull origin main
 
+# Clean up empty files
+echo "🧹 Cleaning up empty files..."
+find notes -type f -empty -delete 2>/dev/null
+deleted_count=$(git status --porcelain notes/ | grep -c "^ D " || true)
+if [[ $deleted_count -gt 0 ]]; then
+    echo "  Removed $deleted_count empty file(s)"
+    git add notes/
+    git commit -m "Clean up empty note files" 2>/dev/null
+    git push origin main 2>/dev/null
+fi
+
 # Show recent notes
 echo ""
 echo "📚 Recent notes:"
