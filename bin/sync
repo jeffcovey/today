@@ -1,0 +1,360 @@
+#!/bin/bash
+# Unified sync script - Pull all external data sources
+# This script synchronizes all data sources to prepare for AI review
+
+set -e
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+print_header() {
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+    echo -e "${YELLOW}$1${NC}"
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+}
+
+# Track what was synced
+SYNC_SUMMARY=""
+
+# Main sync function
+main() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║       TODAY - Full Data Sync          ║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════╝${NC}"
+    echo ""
+    echo "Synchronizing all data sources..."
+    echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # 1. Sync GitHub Notes
+    print_header "📝 GitHub Notes"
+    if sync_github_notes; then
+        print_status "GitHub notes synced"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ GitHub notes\n"
+    else
+        print_error "GitHub notes sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ GitHub notes\n"
+    fi
+    
+    # 2. Sync Notion Database
+    print_header "📊 Notion Database"
+    if sync_notion; then
+        print_status "Notion database synced"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Notion database\n"
+    else
+        print_error "Notion sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Notion database\n"
+    fi
+    
+    # 3. Sync Todoist Tasks
+    print_header "✅ Todoist Tasks"
+    if sync_todoist; then
+        print_status "Todoist tasks synced"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Todoist tasks\n"
+    else
+        print_error "Todoist sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Todoist tasks\n"
+    fi
+    
+    # 4. Download New Emails
+    print_header "📧 Email Inbox"
+    if sync_email; then
+        print_status "Email downloaded"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Email inbox\n"
+    else
+        print_error "Email sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Email inbox\n"
+    fi
+    
+    # 5. Update Cache Statistics
+    print_header "💾 Cache Update"
+    if update_cache_stats; then
+        print_status "Cache statistics updated"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Cache updated\n"
+    else
+        print_error "Cache update failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Cache update\n"
+    fi
+    
+    # Print summary
+    print_header "📋 Sync Summary"
+    echo -e "$SYNC_SUMMARY"
+    echo "Completed at: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+    print_status "All data sources synchronized!"
+    echo ""
+    echo "Next step: Run 'notion --review' to get AI suggestions on what to do today"
+}
+
+# Sync GitHub notes
+sync_github_notes() {
+    # Change to project directory
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check for local changes first
+    if [[ -n $(git status notes/ --porcelain 2>/dev/null) ]]; then
+        print_info "Pushing local note changes..."
+        git add notes/ 2>/dev/null
+        git commit -m "Sync local notes" --quiet 2>/dev/null
+        git push origin main --quiet 2>/dev/null
+    fi
+    
+    # Pull latest changes
+    git pull origin main --quiet 2>/dev/null || {
+        print_info "No remote changes for notes"
+    }
+    
+    # Clean up empty files
+    find notes -type f -empty -delete 2>/dev/null
+    deleted_count=$(git status --porcelain notes/ | grep -c "^ D " || true)
+    if [[ $deleted_count -gt 0 ]]; then
+        print_info "Removed $deleted_count empty file(s)"
+        git add notes/
+        git commit -m "Clean up empty note files" --quiet 2>/dev/null
+        git push origin main --quiet 2>/dev/null
+    fi
+    
+    # Show note count
+    note_count=$(find notes -type f -name "*.md" 2>/dev/null | wc -l)
+    print_info "Total notes: $note_count"
+    
+    # Show recent notes (last 7 days)
+    recent_count=$(find notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    if [[ $recent_count -gt 0 ]]; then
+        print_info "Notes from last 7 days: $recent_count"
+        # Show up to 5 most recent notes
+        print_info "Most recent notes:"
+        find notes -type f -name "*.md" -mtime -7 2>/dev/null | head -5 | while read -r note; do
+            echo "  • $(basename "$note")"
+        done
+    fi
+    
+    return 0
+}
+
+# Sync Notion database
+sync_notion() {
+    # Use the notion CLI to refresh cache
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Clear and rebuild cache for fresh data
+    print_info "Refreshing Notion cache..."
+    
+    # Check if NOTION_TOKEN is configured
+    if ! grep -q "NOTION_TOKEN=" .env 2>/dev/null || grep -q "NOTION_TOKEN=your_notion" .env 2>/dev/null; then
+        print_info "Notion not configured, skipping"
+        print_info "Add NOTION_TOKEN to .env file"
+        return 0
+    fi
+    
+    # Check if we can connect to Notion
+    output=$(node -e "
+        import('dotenv').then(({config}) => {
+            config();
+            return import('./src/notion-api.js');
+        }).then(async ({NotionAPI}) => {
+            const token = process.env.NOTION_TOKEN;
+            if (!token || token === 'your_notion_integration_token_here') {
+                throw new Error('NOTION_TOKEN not configured');
+            }
+            const api = new NotionAPI(token);
+            const dbs = await api.getDatabases();
+            const dbCount = Object.keys(dbs).length;
+            console.log('Connected to ' + dbCount + ' databases');
+        }).catch(err => {
+            console.error('Failed:', err.message);
+            process.exit(1);
+        });
+    " 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        print_info "$output"
+        return 0
+    else
+        print_error "Notion connection failed"
+        if echo "$output" | grep -q "NOTION_TOKEN"; then
+            print_info "Please configure NOTION_TOKEN in .env file"
+        else
+            print_info "Error: $output"
+        fi
+        return 1
+    fi
+}
+
+# Sync Todoist tasks
+sync_todoist() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if Todoist token is configured
+    if ! grep -q "TODOIST_TOKEN=" .env 2>/dev/null || grep -q "TODOIST_TOKEN=your_todoist" .env 2>/dev/null; then
+        print_info "Todoist not configured, skipping"
+        return 0
+    fi
+    
+    # Run Todoist sync
+    print_info "Syncing with Todoist..."
+    
+    # Use the sync scheduler in one-shot mode
+    if bin/sync-scheduler --once 2>/dev/null; then
+        print_info "Todoist sync completed"
+        return 0
+    else
+        print_info "Todoist sync not available"
+        return 0
+    fi
+}
+
+# Sync email
+sync_email() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if email-cli/email binary exists
+    EMAIL_BIN=""
+    if [[ -f bin/email ]]; then
+        EMAIL_BIN="bin/email"
+    elif [[ -f bin/email-cli ]]; then
+        EMAIL_BIN="bin/email-cli"
+    else
+        print_info "Email CLI not available"
+        return 0
+    fi
+    
+    # Check if email credentials are configured
+    if ! grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null || ! grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
+        print_info "Email not configured, skipping"
+        print_info "Run 'email setup' for configuration instructions"
+        return 0
+    fi
+    
+    # Run email download - default to last 7 days for review
+    print_info "Downloading emails from last 7 days..."
+    
+    # Run email download and capture output
+    output=$($EMAIL_BIN download --days 7 2>&1) || {
+        print_error "Email download failed"
+        return 1
+    }
+    
+    # Show download results
+    if echo "$output" | grep -q "Downloaded"; then
+        # Extract number of emails downloaded
+        email_count=$(echo "$output" | grep -oE "Downloaded [0-9]+ email" | grep -oE "[0-9]+") || true
+        if [[ -n "$email_count" ]]; then
+            print_info "Downloaded $email_count new emails"
+        fi
+    else
+        print_info "No new emails to download"
+    fi
+    
+    # Show email stats
+    stats_output=$($EMAIL_BIN stats 2>&1 | grep "Total emails:" | cut -d: -f2 | xargs) || true
+    if [[ -n "$stats_output" ]]; then
+        print_info "Total emails in database: $stats_output"
+    fi
+    
+    return 0
+}
+
+# Update cache statistics
+update_cache_stats() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if cache database exists
+    CACHE_DB=".notion-cache/notion-cache.db"
+    if [[ ! -f "$CACHE_DB" ]]; then
+        print_info "Cache database not found, creating..."
+        mkdir -p .notion-cache
+    fi
+    
+    # Get cache statistics
+    cache_output=$(node -e "
+        import('dotenv').then(({config}) => {
+            config();
+            return import('./src/sqlite-cache.js');
+        }).then(({default: DatabaseCache}) => {
+            const cache = new DatabaseCache();
+            const stats = cache.getStatistics();
+            if (stats && stats.totalItems !== undefined) {
+                console.log('Items: ' + stats.totalItems);
+                console.log('Databases: ' + stats.totalDatabases);
+                const sizeInMB = stats.cacheSize ? (stats.cacheSize / 1024 / 1024).toFixed(2) : '0.00';
+                console.log('Size: ' + sizeInMB + ' MB');
+            } else {
+                console.log('Cache initialized');
+            }
+            cache.close();
+        }).catch((err) => {
+            console.error('Cache error: ' + err.message);
+            process.exit(1);
+        });
+    " 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        if [[ -n "$cache_output" ]]; then
+            while IFS= read -r line; do
+                print_info "$line"
+            done <<< "$cache_output"
+        fi
+        return 0
+    else
+        print_info "Cache initialization needed"
+        return 0
+    fi
+}
+
+# Parse command line arguments
+case "${1:-}" in
+    --notes)
+        # Sync only GitHub notes (replaces sync-notes script)
+        print_header "📝 GitHub Notes"
+        if sync_github_notes; then
+            print_status "Notes synced successfully!"
+        else
+            print_error "Notes sync failed"
+        fi
+        ;;
+    --quick)
+        # Quick sync - only critical sources
+        print_info "Quick sync mode - GitHub and Notion only"
+        sync_github_notes
+        sync_notion
+        ;;
+    --help|-h)
+        echo "Usage: sync [OPTIONS]"
+        echo ""
+        echo "Synchronize all data sources for the Today system"
+        echo ""
+        echo "Options:"
+        echo "  --notes    Sync GitHub notes only"
+        echo "  --quick    Quick sync (GitHub and Notion only)"
+        echo "  --help     Show this help message"
+        echo ""
+        echo "Data sources synced:"
+        echo "  • GitHub notes"
+        echo "  • Notion database"
+        echo "  • Todoist tasks"
+        echo "  • Email inbox"
+        echo "  • Local cache"
+        ;;
+    *)
+        main
+        ;;
+esac

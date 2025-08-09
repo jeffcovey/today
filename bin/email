@@ -18,7 +18,7 @@ Promise.all([
   import('../src/email-manager.js')
 ]).then(([{ EmailDownloader }, { EmailManager }]) => {
   program
-    .name('email-cli')
+    .name('email')
     .description('Email management CLI for downloading and managing emails')
     .version('1.0.0');
 
@@ -65,7 +65,7 @@ Promise.all([
         
         if (stats.total === 0) {
           console.log(chalk.yellow('No emails downloaded yet.'));
-          console.log('Run "email-cli download" to download emails.');
+          console.log('Run "email download" to download emails.');
         } else {
           console.log(chalk.green(`\nTotal emails: ${stats.total}`));
           console.log(chalk.gray(`Oldest email: ${stats.oldest ? new Date(stats.oldest).toLocaleDateString() : 'N/A'}`));

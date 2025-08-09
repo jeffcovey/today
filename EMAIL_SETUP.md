@@ -1,7 +1,7 @@
 # Email CLI Setup Guide
 
 ## Overview
-The email-cli tool allows you to download and manage emails from your iCloud account locally.
+The email tool allows you to download and manage emails from your iCloud account locally.
 
 ## Setup Instructions
 
@@ -33,7 +33,7 @@ Replace `xxxx-xxxx-xxxx-xxxx` with your actual app-specific password.
 If you haven't already, run:
 ```bash
 npm install
-npm link  # This makes email-cli available globally
+npm link  # This makes email available globally
 ```
 
 ## Usage
@@ -42,22 +42,22 @@ npm link  # This makes email-cli available globally
 
 Download last 30 days (default):
 ```bash
-email-cli download
+email download
 ```
 
 Download last 7 days:
 ```bash
-email-cli download --days 7
+email download --days 7
 ```
 
 Download from a specific account:
 ```bash
-email-cli download --account another@icloud.com
+email download --account another@icloud.com
 ```
 
 ### View Setup Instructions
 ```bash
-email-cli setup
+email setup
 ```
 
 ## Database Storage

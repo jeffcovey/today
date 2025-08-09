@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "bin": {
     "notion": "./bin/notion",
-    "email-cli": "./bin/email-cli"
+    "email": "./bin/email"
   },
   "scripts": {
     "start": "node src/index.js",
