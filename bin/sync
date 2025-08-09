@@ -244,12 +244,53 @@ sync_email() {
         return 0
     fi
     
-    # Run email download - default to last 7 days for review
-    print_info "Downloading emails from last 7 days..."
+    # Check when we last downloaded emails
+    LAST_EMAIL_SYNC=""
+    SYNC_NEEDED=true
     
-    # Run email download and capture output
-    output=$($EMAIL_BIN download --days 7 2>&1) || {
-        print_error "Email download failed"
+    if [[ -f .notion-cache/notion-cache.db ]]; then
+        # Get the timestamp of the most recent email
+        LAST_EMAIL_DATE=$(node -e "
+            const db = require('better-sqlite3')('.notion-cache/notion-cache.db');
+            const result = db.prepare('SELECT MAX(date) as latest, COUNT(*) as count FROM emails').get();
+            if (result && result.latest) {
+                const date = new Date(result.latest);
+                const now = new Date();
+                const hoursSince = (now - date) / (1000 * 60 * 60);
+                console.log(hoursSince.toFixed(1));
+            } else {
+                console.log('999');
+            }
+            db.close();
+        " 2>/dev/null || echo "999")
+        
+        # If we have recent emails (less than 2 hours old), just sync last day
+        if [[ $(echo "$LAST_EMAIL_DATE < 2" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
+            print_info "Recent emails found (${LAST_EMAIL_DATE} hours old), doing quick sync..."
+            DAYS_TO_SYNC=1
+        elif [[ $(echo "$LAST_EMAIL_DATE < 24" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
+            print_info "Emails are ${LAST_EMAIL_DATE} hours old, syncing last 3 days..."
+            DAYS_TO_SYNC=3
+        else
+            print_info "Emails are stale or missing, syncing last 7 days..."
+            DAYS_TO_SYNC=7
+        fi
+    else
+        print_info "No email database found, initial sync of 7 days..."
+        DAYS_TO_SYNC=7
+    fi
+    
+    # Run email download with appropriate time range
+    print_info "Downloading emails from last $DAYS_TO_SYNC days..."
+    
+    # Run email download and capture output (with timeout for long downloads)
+    output=$(timeout 60 $EMAIL_BIN download --days $DAYS_TO_SYNC 2>&1) || {
+        if [[ $? -eq 124 ]]; then
+            print_error "Email download timed out after 60 seconds"
+            print_info "Try running 'email download --days 1' for a quicker sync"
+        else
+            print_error "Email download failed"
+        fi
         return 1
     }
     
@@ -337,15 +378,33 @@ case "${1:-}" in
         sync_github_notes
         sync_notion
         ;;
+    --quick-email)
+        # Just sync last day of email quickly
+        print_header "📧 Quick Email Sync"
+        EMAIL_BIN=""
+        if [[ -f bin/email ]]; then
+            EMAIL_BIN="bin/email"
+        elif [[ -f bin/email-cli ]]; then
+            EMAIL_BIN="bin/email-cli"
+        fi
+        if [[ -n "$EMAIL_BIN" ]]; then
+            print_info "Downloading emails from last 24 hours..."
+            timeout 30 $EMAIL_BIN download --days 1 2>&1 | grep -E "Downloaded|Total" || true
+            print_status "Quick email sync complete"
+        else
+            print_error "Email CLI not found"
+        fi
+        ;;
     --help|-h)
         echo "Usage: sync [OPTIONS]"
         echo ""
         echo "Synchronize all data sources for the Today system"
         echo ""
         echo "Options:"
-        echo "  --notes    Sync GitHub notes only"
-        echo "  --quick    Quick sync (GitHub and Notion only)"
-        echo "  --help     Show this help message"
+        echo "  --notes       Sync GitHub notes only"
+        echo "  --quick       Quick sync (GitHub and Notion only)"
+        echo "  --quick-email Download last 24 hours of email (30s timeout)"
+        echo "  --help        Show this help message"
         echo ""
         echo "Data sources synced:"
         echo "  • GitHub notes"
