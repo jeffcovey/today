@@ -8,6 +8,27 @@ auto_dotenvx "$@"
 
 echo "📊 Starting daily review process..."
 
+# Check if Claude CLI is authenticated
+echo "🔐 Checking Claude authentication..."
+if ! claude --version >/dev/null 2>&1; then
+    echo ""
+    echo "⚠️  Claude CLI is not authenticated!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Claude is essential for daily reviews."
+    echo "Please authenticate now by running:"
+    echo ""
+    echo "  claude"
+    echo ""
+    echo "Then follow the browser prompt to login."
+    echo "After authentication, run 'bin/today' again."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    exit 1
+fi
+echo "✅ Claude is authenticated"
+echo ""
+
 # Check dependencies once per day (quietly) - skip in container if CI env var is set
 LAST_DEP_CHECK_FILE=".last-dep-check"
 TODAY_DATE=$(date +%Y-%m-%d)
