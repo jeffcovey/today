@@ -21,18 +21,20 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
+# Copy source code and configuration
 COPY src/ ./src/
 COPY bin/ ./bin/
+COPY config/ ./config/
+COPY TODAY.md ./
 
-# Make the CLI executable
-RUN chmod +x ./bin/notion-cli
+# Make all CLI scripts executable
+RUN chmod +x ./bin/*
 
-# Create directory for cache
-RUN mkdir -p /app/.notion-cache
+# Create directories for cache and config
+RUN mkdir -p /app/.notion-cache /app/config /app/notes
 
 # Set up environment
 ENV NODE_ENV=production
 
-# Set the entrypoint
-ENTRYPOINT ["./bin/notion-cli"]
+# Default to bash for interactive use
+CMD ["/bin/sh"]
