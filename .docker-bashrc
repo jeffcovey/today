@@ -43,7 +43,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Check if Claude is authenticated
-if ! claude --version >/dev/null 2>&1; then
+TEST_RESPONSE=$(echo "test" | claude 2>&1 | head -1)
+if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo "⚠️  Claude CLI needs authentication!"
     echo "   Run: claude"
     echo "   Then follow the browser prompt to login"

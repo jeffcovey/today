@@ -5,11 +5,10 @@
 echo "🔐 Checking Claude CLI authentication..."
 echo ""
 
-if claude --version >/dev/null 2>&1; then
-    echo "✅ Claude is authenticated and ready to use"
-    echo ""
-    claude --version
-else
+# Test by actually trying to use Claude
+TEST_RESPONSE=$(echo "test" | claude 2>&1 | head -1)
+
+if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo "⚠️  Claude is NOT authenticated"
     echo ""
     echo "To authenticate:"
@@ -19,4 +18,8 @@ else
     echo ""
     echo "Note: Authentication is stored in ~/.config/claude/"
     exit 1
+else
+    echo "✅ Claude is authenticated and ready to use"
+    echo ""
+    claude --version
 fi

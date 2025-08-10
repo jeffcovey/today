@@ -8,9 +8,10 @@ auto_dotenvx "$@"
 
 echo "📊 Starting daily review process..."
 
-# Check if Claude CLI is authenticated
+# Check if Claude CLI is authenticated by testing actual functionality
 echo "🔐 Checking Claude authentication..."
-if ! claude --version >/dev/null 2>&1; then
+TEST_RESPONSE=$(echo "test" | claude 2>&1 | head -1)
+if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo ""
     echo "⚠️  Claude CLI is not authenticated!"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
