@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Enable color support
+export TERM=xterm-256color
+
+# Set up a colorful prompt with container name
+export PS1='\[\033[01;32m\]🐳today\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\] \[\033[01;33m\]$\[\033[00m\] '
+
+# Aliases for colorful output
+alias ls='ls --color=auto'
+alias ll='ls -alF --color=auto'
+alias la='ls -A --color=auto'
+alias l='ls -CF --color=auto'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
+# Git aliases
+alias gs='git status'
+alias gp='git pull'
+alias gpu='git push'
+alias gd='git diff'
+alias gl='git log --oneline -10'
+
+# Project-specific aliases
+alias sync='bin/sync'
+alias today='bin/today'
+alias status='bin/status'
+alias mark='bin/mark-done'
+alias progress='bin/progress'
+
+# Welcome message
+echo ""
+echo "🚀 Welcome to Today CLI Container!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Quick commands:"
+echo "  today    - Run daily review"
+echo "  sync     - Sync all data"
+echo "  status   - Check task progress"
+echo "  mark     - Mark task as done"
+echo "  gp       - Git pull"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Set working directory reminder
+echo "📁 Working directory: $(pwd)"
+echo ""

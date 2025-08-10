@@ -39,5 +39,8 @@ ENV NODE_ENV=production
 # Configure git to trust the /app directory
 RUN git config --global --add safe.directory /app
 
-# Default to bash for interactive use
-CMD ["/bin/bash"]
+# Copy bashrc for colorful prompt
+COPY .docker-bashrc /root/.bashrc
+
+# Default to bash for interactive use (with login shell for .bashrc)
+CMD ["/bin/bash", "-l"]
