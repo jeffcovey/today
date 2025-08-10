@@ -8,6 +8,17 @@ auto_dotenvx "$@"
 
 echo "📊 Starting daily review process..."
 
+# Check dependencies once per day (quietly)
+LAST_DEP_CHECK_FILE=".last-dep-check"
+TODAY_DATE=$(date +%Y-%m-%d)
+
+if [ ! -f "$LAST_DEP_CHECK_FILE" ] || [ "$(cat $LAST_DEP_CHECK_FILE 2>/dev/null)" != "$TODAY_DATE" ]; then
+    echo "🔍 Checking for dependency updates..."
+    bin/update-deps --quiet
+    echo "$TODAY_DATE" > "$LAST_DEP_CHECK_FILE"
+    echo ""
+fi
+
 # Run sync to update all data sources
 echo "🔄 Syncing data sources..."
 bin/sync

@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules, curl, sqlite, and bash
-RUN apk add --no-cache python3 make g++ curl sqlite bash
+# Install build dependencies for native modules, curl, sqlite, bash, git, and SSH
+RUN apk add --no-cache python3 make g++ curl sqlite bash git openssh-client
 
 # Install VS Code CLI with tunnel support
 RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /tmp/vscode_cli.tar.gz && \
@@ -35,6 +35,9 @@ RUN mkdir -p /app/.notion-cache /app/config /app/notes
 
 # Set up environment
 ENV NODE_ENV=production
+
+# Configure git to trust the /app directory
+RUN git config --global --add safe.directory /app
 
 # Default to bash for interactive use
 CMD ["/bin/bash"]

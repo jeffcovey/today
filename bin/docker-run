@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Helper script to run docker-compose with .env.local if it exists
+
+# Check if .env.local exists
+if [ -f .env.local ]; then
+    echo "📁 Using .env.local for environment variables"
+    ENV_FILE="--env-file .env.local"
+else
+    echo "⚠️  No .env.local found. Make sure DOTENV_PRIVATE_KEY is set!"
+    ENV_FILE=""
+fi
+
+# Get the command (up, down, exec, etc.)
+COMMAND="$1"
+shift
+
+case "$COMMAND" in
+    up)
+        docker-compose $ENV_FILE up -d "$@"
+        echo "✅ Container started"
+        echo "📝 To enter the container, run: bin/docker-run exec"
+        ;;
+    down)
+        docker-compose $ENV_FILE down "$@"
+        echo "✅ Container stopped"
+        ;;
+    exec)
+        docker-compose $ENV_FILE exec today bash "$@"
+        ;;
+    build)
+        docker-compose $ENV_FILE build "$@"
+        echo "✅ Container rebuilt"
+        ;;
+    restart)
+        docker-compose $ENV_FILE down
+        docker-compose $ENV_FILE up -d
+        echo "✅ Container restarted"
+        echo "📝 To enter the container, run: bin/docker-run exec"
+        ;;
+    logs)
+        docker-compose $ENV_FILE logs "$@"
+        ;;
+    *)
+        echo "Usage: bin/docker-run [up|down|exec|build|restart|logs]"
+        echo ""
+        echo "Commands:"
+        echo "  up       - Start the container in background"
+        echo "  down     - Stop the container"
+        echo "  exec     - Enter the running container"
+        echo "  build    - Rebuild the container image"
+        echo "  restart  - Stop and restart the container"
+        echo "  logs     - Show container logs"
+        echo ""
+        echo "Examples:"
+        echo "  bin/docker-run up      # Start container"
+        echo "  bin/docker-run exec    # Enter container"
+        echo "  bin/docker-run restart # Restart after git pull"
+        exit 1
+        ;;
+esac

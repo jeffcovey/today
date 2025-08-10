@@ -7,18 +7,15 @@ services:
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
     volumes:
-      # Persist cache between runs
+      # Mount the entire project directory
+      - .:/app
+      # Use named volumes for caches to persist between container rebuilds
       - notion-cache:/app/.notion-cache
       - calendar-cache:/app/.calendar-cache
-      # Mount your .env file
-      - ./.env:/app/.env:ro
-      # Mount notes directory for persistence
-      - ./notes:/app/notes
-      # Mount sync config and logs
-      - ./.sync-config.json:/app/.sync-config.json
-      - ./.sync-log.json:/app/.sync-log.json
-      # Mount summary file
-      - ./SUMMARY.json:/app/SUMMARY.json
+      # Override node_modules to use container's version
+      - /app/node_modules
+      # Mount SSH directory for git operations (read-only)
+      - ~/.ssh:/root/.ssh:ro
     stdin_open: true
     tty: true
 
