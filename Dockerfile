@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules, curl, sqlite, and bash
-RUN apk add --no-cache python3 make g++ curl sqlite bash
+# Install build dependencies for native modules, curl, sqlite, bash, and git
+RUN apk add --no-cache python3 make g++ curl sqlite bash git
 
 # Install VS Code CLI with tunnel support
 RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /tmp/vscode_cli.tar.gz && \
