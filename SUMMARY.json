@@ -1,21 +1,119 @@
 {
   "meta": {
     "version": "2.0.0",
-    "last_updated": "2025-08-10T13:39:24.352Z",
+    "last_updated": "2025-08-10T13:55:03.323Z",
     "last_sync": {
-      "emails": "2025-08-10T13:18:33.000Z",
-      "tasks": "2025-08-10T13:39:24.352Z",
-      "notes": "2025-08-10T13:39:24.352Z",
+      "emails": "2025-08-10T13:41:18.000Z",
+      "tasks": "2025-08-10T13:55:03.323Z",
+      "notes": "2025-08-10T13:55:03.323Z",
       "todoist": ""
     },
-    "update_count": 11,
+    "update_count": 20,
     "retention_days": 7,
     "format": "incremental-summary"
   },
   "state": {
     "email_ids_seen": [
+      1384,
       1383,
-      1382
+      1382,
+      54,
+      1303,
+      1322,
+      1206,
+      1380,
+      53,
+      1302,
+      1321,
+      1379,
+      1238,
+      484,
+      1301,
+      483,
+      52,
+      1205,
+      1300,
+      51,
+      50,
+      1299,
+      1237,
+      1236,
+      1298,
+      1297,
+      1235,
+      1360,
+      1378,
+      1377,
+      48,
+      47,
+      482,
+      1320,
+      46,
+      1296,
+      1295,
+      45,
+      1376,
+      43,
+      44,
+      42,
+      39,
+      41,
+      40,
+      38,
+      36,
+      37,
+      32,
+      35,
+      33,
+      34,
+      30,
+      27,
+      31,
+      29,
+      28,
+      26,
+      1375,
+      25,
+      24,
+      1234,
+      1359,
+      1294,
+      481,
+      1204,
+      1203,
+      1358,
+      1357,
+      1319,
+      1156,
+      1318,
+      1202,
+      480,
+      1233,
+      479,
+      1356,
+      1374,
+      478,
+      1201,
+      1157,
+      23,
+      22,
+      1175,
+      1293,
+      21,
+      1373,
+      1372,
+      1371,
+      1370,
+      1369,
+      1317,
+      20,
+      19,
+      18,
+      1316,
+      1292,
+      1291,
+      1232,
+      1159
     ],
     "task_ids_seen": [
       "24a5e778-3096-818e-acdd-e4da98b1e9db",
@@ -472,23 +570,17 @@
   "changes": {
     "new_emails": [
       {
-        "id": 1383,
-        "uid": 38725,
-        "subject": "Body Acne? Not Today. 🚫",
-        "from_address": "\"Proactiv\" <info@proactiv.com>",
-        "date": "2025-08-10T13:18:33.000Z",
-        "folder": "@SaneNews"
-      },
-      {
-        "id": 1382,
-        "uid": 23428,
-        "subject": "My Owner Passed Away!",
-        "from_address": "\"Lloyd Estates Lost & Found Posts\" <reply@is.email.nextdoor.com>",
-        "date": "2025-08-10T12:47:36.000Z",
-        "folder": "@SaneLater"
+        "id": 1384,
+        "uid": 184923,
+        "subject": "We noticed a new login to your Todoist account",
+        "from_address": "\"Todoist\" <no-reply@todoist.com>",
+        "date": "2025-08-10T13:41:18.000Z",
+        "folder": "INBOX"
       }
     ],
-    "deleted_emails": [],
+    "deleted_emails": [
+      1161
+    ],
     "replied_emails": [],
     "new_tasks": [],
     "completed_tasks": [],
@@ -520,7 +612,48 @@
     "deadlines": {}
   },
   "communications": {
-    "pending_responses": [],
+    "pending_responses": [
+      {
+        "subject": "[SaneBox] Please review 153 recent messages",
+        "from": "\"SaneBox Digest\"",
+        "date": "2025-08-10T02:01:37.000Z"
+      },
+      {
+        "subject": "Jeffrey Covey, will you rate your transaction at Amazon.com?",
+        "from": "\"Amazon Marketplace\"",
+        "date": "2025-08-09T22:15:42.000Z"
+      },
+      {
+        "subject": "Serge wrote you a review",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T20:13:47.000Z"
+      },
+      {
+        "subject": "Write a review for Serge’s group",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T20:04:29.000Z"
+      },
+      {
+        "subject": "New reply from gator",
+        "from": "help@oldergay.men",
+        "date": "2025-08-09T17:22:59.000Z"
+      },
+      {
+        "subject": "Automation mentioned you in Reply to Rosemary",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-09T16:31:22.000Z"
+      },
+      {
+        "subject": "Anthony wrote you a review",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T05:54:03.000Z"
+      },
+      {
+        "subject": "[SaneBox] Please review 129 recent messages",
+        "from": "\"SaneBox Digest\"",
+        "date": "2025-08-09T01:59:59.000Z"
+      }
+    ],
     "follow_ups": [],
     "key_conversations": {}
   },
@@ -532,10 +665,11 @@
   },
   "recommendations": {
     "daily_focus": [
-      "Complete quick wins to build momentum",
-      "Address pending communications",
-      "Review progress on today's priorities",
-      "Review and address noted concerns"
+      "Set up a simple expense tracking system immediately - create a daily log in Notion or spreadsheet to record all income and expenses, especially noting upcoming insurance payments and 401k withdrawals to get financial visibility within the next week",
+      "Respond to the 3 overdue messages today - prioritize replying to Melv, David Edwards, and Rosemary with brief acknowledgments even if full responses aren't ready, to maintain relationships",
+      "Process the 8 important emails in batches - tackle SaneBox digest first (153 messages), then handle the Airbnb reviews and other notifications in order of urgency",
+      "Schedule 20-30 minutes of cardio exercise daily starting tomorrow - even brisk walking counts toward lowering your resting heart rate per Apple Health's concern",
+      "Create a simple weekly alcohol tracker to monitor and gradually reduce daily consumption - set specific alcohol-free days this week to support hip recovery without relying on alcohol for pain management"
     ],
     "weekly_goals": [],
     "process_improvements": []
@@ -586,10 +720,98 @@
         "preview": "This directory contains notes captured via Drafts and synced through GitHub."
       }
     ],
-    "important_emails": [],
+    "important_emails": [
+      {
+        "subject": "[SaneBox] Please review 153 recent messages",
+        "from": "\"SaneBox Digest\"",
+        "date": "2025-08-10T02:01:37.000Z"
+      },
+      {
+        "subject": "Jeffrey Covey, will you rate your transaction at Amazon.com?",
+        "from": "\"Amazon Marketplace\"",
+        "date": "2025-08-09T22:15:42.000Z"
+      },
+      {
+        "subject": "Serge wrote you a review",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T20:13:47.000Z"
+      },
+      {
+        "subject": "Write a review for Serge’s group",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T20:04:29.000Z"
+      },
+      {
+        "subject": "New reply from gator",
+        "from": "help@oldergay.men",
+        "date": "2025-08-09T17:22:59.000Z"
+      },
+      {
+        "subject": "Automation mentioned you in Reply to Rosemary",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-09T16:31:22.000Z"
+      },
+      {
+        "subject": "Anthony wrote you a review",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-09T05:54:03.000Z"
+      },
+      {
+        "subject": "[SaneBox] Please review 129 recent messages",
+        "from": "\"SaneBox Digest\"",
+        "date": "2025-08-09T01:59:59.000Z"
+      }
+    ],
     "top_email_senders": {
+      "\"Todoist\"": 2,
       "\"Proactiv\"": 1,
-      "\"Lloyd Estates Lost & Found Posts\"": 1
+      "\"Lloyd Estates Lost & Found Posts\"": 2,
+      "\"Apple\"": 1,
+      "\"ScanDigital\"": 1,
+      "\"ScanCafe\"": 1,
+      "\"Creativebug\"": 1,
+      "\"Airbnb\"": 12,
+      "\"Frankie Parson\"": 1,
+      "\"Sovendus voordeelmailing\"": 1,
+      "\"Amazon.com\"": 3,
+      "\"Team Snapchat\"": 1,
+      "\"Money Making Moves\"": 2,
+      "\"SCOTTeVEST SALE\"": 1,
+      "\"gespraeche\"": 1,
+      "\"jeffcovey\"": 3,
+      "\"Big 5 Sporting Goods - Weekly Ad\"": 1,
+      "\"Specsavers Optometrists\"": 1,
+      "\"SaneBox Digest\"": 2,
+      "\"Rainbow Shops\"": 5,
+      "\"Amazon Marketplace\"": 1,
+      "\"Instacart\"": 1,
+      "\"Lloyd Estates Trending Posts\"": 2,
+      "\"Honeybadger Notifications\"": 4,
+      "\"SilverDaddies.com\"": 1,
+      "\"amazon.com\"": 1,
+      "\"PrivateMeet North Andrews Gardens\"": 1,
+      "\"Grubhub\"": 1,
+      "wildhybrid@aol.com": 1,
+      "\"Instagram\"": 1,
+      "\"Road Scholar\"": 1,
+      "help@oldergay.men": 1,
+      "\"Notion Team\"": 21,
+      "\"GitHub\"": 2,
+      "\"Vince on Facebook\"": 1,
+      "\"Honeybadger Support\"": 1,
+      "\"Zeel\"": 1,
+      "\"Knights Gear\"": 1,
+      "\"Big 5 Sporting Goods\"": 2,
+      "\"Create Your Cruise\"": 1,
+      "\"Walmart\"": 1,
+      "\"mydates\"": 1,
+      "\"T-Mobile USA\"": 1,
+      "no-reply@specsavers.com": 1,
+      "\"Fort Lauderdale Prime Gentlemen Inc.\"": 2,
+      "\"New York Public Library\"": 1,
+      "\"Factor_\"": 1,
+      "\"dependabot[bot]\"": 2,
+      "\"San Antonio Zoo\"": 1
     }
   }
 }

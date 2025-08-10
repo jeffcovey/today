@@ -6,6 +6,7 @@ autoDotenvx();
 
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
@@ -154,7 +155,7 @@ async function tableExists(tableName) {
   }
 }
 
-async function getNewEmails(summary) {
+async function getRecentEmails(summary) {
   // First check if emails table exists
   if (!await tableExists('emails')) {
     console.log('No emails table found');
@@ -180,15 +181,15 @@ async function getNewEmails(summary) {
     return [];
   }
 
-  const lastSync = summary.meta.last_sync.emails || '1970-01-01';
   const hasDateCol = columns.includes('date');
   
   let query;
   if (hasDateCol) {
+    // Get emails from last 3 days for content analysis
     query = `
       SELECT ${selectCols.join(', ')}
       FROM emails 
-      WHERE date > '${lastSync}'
+      WHERE date > datetime('now', '-3 days')
       ORDER BY date DESC
       LIMIT 100
     `;
@@ -467,7 +468,69 @@ async function extractEmailContent(emails) {
   return content;
 }
 
-async function generateRecommendations(summary) {
+async function generateAIInsights(summary) {
+  // Use Claude to generate deeper insights from the data
+  try {
+    console.log('🤖 Generating AI insights...');
+    
+    // Create a focused prompt for Claude - simplified to avoid escaping issues
+    const promptData = {
+      concerns_count: summary.content.concerns.length,
+      first_concern: summary.content.concerns[0] || 'None',
+      overdue_count: summary.content.overdue_tasks.length,
+      urgent_count: summary.content.urgent_tasks.length,
+      email_count: summary.content.important_emails.length,
+      contacts: summary.content.people_to_contact.length
+    };
+    
+    // Write prompt to temp file to avoid shell escaping issues
+    const tempFile = path.join(os.tmpdir(), `claude-prompt-${Date.now()}.txt`);
+    const prompt = `Analyze this daily summary and provide 3-5 specific actionable recommendations as a JSON array:
+
+Current situation:
+- ${promptData.concerns_count} concerns noted (top: "${promptData.first_concern.substring(0, 50)}...")
+- ${promptData.overdue_count} overdue tasks
+- ${promptData.urgent_count} urgent tasks for today
+- ${promptData.email_count} important emails to address
+- ${promptData.contacts} people to contact
+
+Return ONLY a JSON array of recommendation strings, like:
+["Address the financial tracking concern by...", "Clear overdue tasks starting with...", "Schedule time for..."]`;
+    
+    await fs.writeFile(tempFile, prompt);
+    
+    // Call Claude with the temp file
+    const claudeResponse = execSync(
+      `cat "${tempFile}" | claude 2>/dev/null || echo '[]'`,
+      { encoding: 'utf-8', maxBuffer: 1024 * 1024 }
+    ).trim();
+    
+    // Clean up temp file
+    await fs.unlink(tempFile).catch(() => {});
+    
+    // Try to parse as JSON, fallback to basic recommendations
+    try {
+      const insights = JSON.parse(claudeResponse);
+      if (Array.isArray(insights)) {
+        return insights;
+      }
+    } catch (e) {
+      // Fallback to parsing text response
+      if (claudeResponse && claudeResponse.length > 10) {
+        return claudeResponse.split('\n')
+          .filter(line => line.trim().length > 0)
+          .slice(0, 5);
+      }
+    }
+  } catch (error) {
+    console.log('Could not generate AI insights, using defaults');
+  }
+  
+  // Fallback to time-based recommendations
+  return generateBasicRecommendations(summary);
+}
+
+async function generateBasicRecommendations(summary) {
   const hour = new Date().getHours();
   const recommendations = [];
   
@@ -505,7 +568,7 @@ async function generateRecommendations(summary) {
   return recommendations;
 }
 
-async function updateSummary() {
+async function updateSummary(useAI = true) {
   const summary = await loadSummary();
   const now = new Date().toISOString();
   
@@ -532,16 +595,16 @@ async function updateSummary() {
   summary.content.recent_notes = noteContent.recent_notes;
 
   if (dbExists) {
-    // Get incremental updates from database
-    const newEmails = await getNewEmails(summary);
+    // Get recent data from database for analysis
+    const recentEmails = await getRecentEmails(summary);
     const tasks = await getTasks(summary);
     
     // Update state tracking for emails
     const previousEmailIds = new Set(summary.state.email_ids_seen);
-    const currentEmailIds = new Set(newEmails.map(e => e.id || e.uid));
+    const currentEmailIds = new Set(recentEmails.map(e => e.id || e.uid));
     
     // Track email changes
-    summary.changes.new_emails = newEmails.filter(e => {
+    summary.changes.new_emails = recentEmails.filter(e => {
       const id = e.id || e.uid;
       return !previousEmailIds.has(id);
     });
@@ -572,8 +635,8 @@ async function updateSummary() {
     summary.state.task_ids_seen = Array.from(currentTaskIds);
     
     // Update sync timestamps
-    if (newEmails.length > 0 && newEmails[0].date) {
-      summary.meta.last_sync.emails = newEmails[0].date;
+    if (recentEmails.length > 0 && recentEmails[0].date) {
+      summary.meta.last_sync.emails = recentEmails[0].date;
     }
     summary.meta.last_sync.tasks = now;
     
@@ -602,7 +665,7 @@ async function updateSummary() {
     });
     
     // Extract meaningful email content
-    const emailContent = await extractEmailContent(newEmails);
+    const emailContent = await extractEmailContent(recentEmails);
     summary.content.important_emails = emailContent.important_emails;
     summary.content.top_email_senders = emailContent.top_email_senders;
     
@@ -610,11 +673,15 @@ async function updateSummary() {
     summary.communications.pending_responses = emailContent.important_emails;
     
     // Log what we found
-    console.log(`Found ${newEmails.length} emails, ${tasks.length} tasks`);
+    console.log(`Found ${recentEmails.length} emails, ${tasks.length} tasks`);
   }
   
-  // Generate recommendations based on all the data
-  summary.recommendations.daily_focus = await generateRecommendations(summary);
+  // Generate AI-powered recommendations based on all the data
+  if (useAI) {
+    summary.recommendations.daily_focus = await generateAIInsights(summary);
+  } else {
+    summary.recommendations.daily_focus = await generateBasicRecommendations(summary);
+  }
   
   // Update metadata
   summary.meta.last_updated = now;
@@ -636,7 +703,13 @@ async function updateSummary() {
   return summary;
 }
 
-// Run the update
-updateSummary().catch(console.error);
+// Check for command line arguments
+const args = process.argv.slice(2);
+const useAI = !args.includes('--no-ai');
+
+// Run the update with AI flag
+if (import.meta.url === `file://${process.argv[1]}`) {
+  updateSummary(useAI).catch(console.error);
+}
 
 export { updateSummary };
