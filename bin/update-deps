@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Script to update all dependencies and check for vulnerabilities
+
+echo "🔄 Updating npm dependencies..."
+echo ""
+
+# Check for vulnerabilities first
+echo "📊 Current vulnerability status:"
+npm audit
+
+echo ""
+echo "🔧 Fixing any vulnerabilities..."
+npm audit fix
+
+echo ""
+echo "📦 Updating all dependencies..."
+npm update --save
+
+echo ""
+echo "🚀 Checking for major version updates..."
+npx npm-check-updates
+
+echo ""
+echo "📊 Final vulnerability check:"
+npm audit
+
+echo ""
+echo "✅ Dependency update complete!"
+echo ""
+echo "To update major versions, run:"
+echo "  npx npm-check-updates -u && npm install"
+echo ""
+echo "Remember to test after updating and commit changes:"
+echo "  git add package*.json && git commit -m 'chore: Update dependencies'"
