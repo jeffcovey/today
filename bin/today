@@ -130,16 +130,37 @@ if [ -f SUMMARY.json ]; then
         echo "📝 Appending to existing review: $REVIEW_FILE"
     fi
     
-    echo "🤖 Starting interactive Claude session..."
+    echo "🤖 Starting Claude session..."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo "📝 Review will be saved to: $REVIEW_FILE"
     echo "   (Click the path above to open the file)"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
+    echo "🔄 Sending request to Claude (timeout: 60s)..."
+    echo ""
     
-    # Run Claude interactively and capture output
-    CLAUDE_OUTPUT=$(cat "$TEMP_FILE" | claude 2>&1 | tee /dev/tty)
+    # Run Claude with timeout and capture output
+    CLAUDE_OUTPUT=$(timeout 60 bash -c "cat '$TEMP_FILE' | claude" 2>&1 | tee /dev/tty)
+    CLAUDE_EXIT_CODE=$?
+    
+    # Check if timeout occurred
+    if [ $CLAUDE_EXIT_CODE -eq 124 ]; then
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "⏱️ Claude request timed out after 60 seconds"
+        echo ""
+        echo "This might be due to:"
+        echo "  - Network issues"
+        echo "  - Claude service being slow"
+        echo "  - Authentication problems"
+        echo ""
+        echo "Try running 'claude' directly to test the connection"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        rm "$TEMP_FILE"
+        exit 1
+    fi
     
     # Check if Claude returned an error
     if echo "$CLAUDE_OUTPUT" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
