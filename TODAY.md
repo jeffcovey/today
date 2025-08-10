@@ -20,11 +20,34 @@ Please help me review my current situation and decide what to do today to be hap
 
 ### Guidelines
 
+#### Schedule
+
 I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to stretch, etc. before I start work. I go to bed around 9:30PM, but I like to go offline for the last couple of hours. I should wrap up the day's work and plan tomorrow by mid-evening.
+
+#### Streaks
 
 notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
 
+#### Hosting
+
 My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someone is coming, I need to make up the room in time for their arrival at 3PM. If someone is leaving, I need to clean up the room after they're gone at their 12PM check-out time.
+
+#### Stages
+
+I like to arrange my days around three themes, “On Stage”, “Back Stage”, and “Off Stage”. The idea is to group together similar tasks. Examples:
+
+  * Front Stage: Chores when I’m “on stage” with other people. Meetings, phone calls, customer support, email replies, etc.
+  * Back Stage: Maintenance tasks that other people don’t see. Tidying my physical and digital spaces, paying bills, fixing bugs that aren’t user-facing, etc.
+  * Off Stage: Personal time, to get a break and refresh myself before going back to work. Going out, enjoying Nature, seeing friends, catching up personal correspondence, reading a good book, etc.
+
+I try to follow this schedule:
+
+  * Front Stage: Monday, Wednesday, Saturday
+  * Back Stage: Thursday, Sunday
+  * Off Stage: Tuesday, Friday
+ 
+We shouldn’t neglect things that *have* to be done today, but **as much as possible, we should PRIORITIZE WORK/PLAY THAT MATCHES THE DAY’S THEME**.
+ 
 
 ### Data Inputs
 
