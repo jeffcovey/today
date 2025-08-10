@@ -1,19 +1,20 @@
 {
   "meta": {
     "version": "2.0.0",
-    "last_updated": "2025-08-10T19:55:44.190Z",
+    "last_updated": "2025-08-10T22:38:51.586Z",
     "last_sync": {
-      "emails": "2025-08-10T18:26:44.000Z",
-      "tasks": "2025-08-10T19:55:44.190Z",
-      "notes": "2025-08-10T19:55:44.190Z",
+      "emails": "2025-08-10T20:15:46.000Z",
+      "tasks": "2025-08-10T22:38:51.586Z",
+      "notes": "2025-08-10T22:38:51.586Z",
       "todoist": ""
     },
-    "update_count": 31,
+    "update_count": 32,
     "retention_days": 7,
     "format": "incremental-summary"
   },
   "state": {
     "email_ids_seen": [
+      786,
       25,
       762,
       720,
@@ -112,8 +113,7 @@
       524,
       614,
       697,
-      89,
-      595
+      89
     ],
     "task_ids_seen": [
       "24b5e778-3096-8136-8c5f-d648ccd1ba9c",
@@ -564,23 +564,38 @@
       "daily/2025-08-10-135749-concerns.md": "2025-08-10T18:25:00.392Z",
       "daily/2025-08-08-concerns.md": "2025-08-10T18:25:00.392Z",
       "daily/2025-08-10-103745-concerns.md": "2025-08-10T18:25:00.392Z",
+      "daily/2025-08-10-182214-concerns.md": "2025-08-10T22:31:56.402Z",
       "daily/2025-08-10-114713-concerns.md": "2025-08-10T18:25:00.392Z",
       "tasks/2025-08-09-120652-remove-tmp-groups-page-backup-html.md": "2025-08-10T18:25:00.395Z",
-      "tasks/streaks-today.md": "2025-08-10T18:25:00.395Z",
+      "tasks/streaks-today.md": "2025-08-10T22:37:15.312Z",
       "reviews/README.md": "2025-08-10T18:25:00.392Z",
-      "reviews/2025-08-10.md": "2025-08-10T19:39:58.895Z"
+      "reviews/2025-08-10.md": "2025-08-10T22:37:59.000Z"
     },
     "todoist_ids_seen": []
   },
   "changes": {
-    "new_emails": [],
-    "deleted_emails": [],
+    "new_emails": [
+      {
+        "id": 786,
+        "uid": 38734,
+        "subject": "Jeffrey, don’t miss out on 1,000 Bonus Points. ",
+        "from_address": "\"Hilton Honors\" <noreply@h5.hilton.com>",
+        "date": "2025-08-10T20:15:46.000Z",
+        "folder": "@SaneNews"
+      }
+    ],
+    "deleted_emails": [
+      595
+    ],
     "replied_emails": [],
     "new_tasks": [],
     "completed_tasks": [],
     "modified_tasks": [],
-    "new_notes": [],
+    "new_notes": [
+      "daily/2025-08-10-182214-concerns.md"
+    ],
     "modified_notes": [
+      "tasks/streaks-today.md",
       "reviews/2025-08-10.md"
     ],
     "deleted_notes": []
@@ -661,11 +676,8 @@
   },
   "recommendations": {
     "daily_focus": [
-      "Address the financial tracking concern by setting up a simple expense tracking system today using a spreadsheet or app like Mint/YNAB to monitor income, expenses, and upcoming costs like homeowners insurance",
-      "Clear the 8 important emails requiring responses, starting with overdue personal replies to Melv, David Edwards, and Rosemary mentioned in your concerns",
-      "Schedule 30 minutes of cardio exercise daily to address the high resting heart rate flagged by Apple Health",
-      "Send an update to OGM members about recent work and address any pending bug reports or help requests",
-      "Review and prepare for this week's 4 events, especially deciding on the Palm Springs trip with Lou by considering trust and relationship dynamics"
+      "Claude AI usage limit reached|1754870400",
+      "[]"
     ],
     "weekly_goals": [],
     "process_improvements": []
@@ -716,8 +728,8 @@
         "preview": "- I am sitting at the computer too much, and not exercising"
       },
       {
-        "file": "2025-08-10-114713-concerns.md",
-        "preview": "- My Duolingo time is entirely about chess now, and I'm neglecting my Duolingo language studies"
+        "file": "2025-08-10-182214-concerns.md",
+        "preview": "- I've put off my trip to the southern Maya sites for too many years. COVID is no longer an excuse. "
       }
     ],
     "important_emails": [
@@ -763,6 +775,7 @@
       }
     ],
     "top_email_senders": {
+      "\"Hilton Honors\"": 1,
       "\"GitHub\"": 3,
       "\"Honeybadger Notifications\"": 4,
       "\"Instagram\"": 2,
@@ -812,8 +825,7 @@
       "\"Knights Gear\"": 1,
       "\"Create Your Cruise\"": 1,
       "\"Walmart\"": 1,
-      "\"mydates\"": 1,
-      "\"T-Mobile USA\"": 1
+      "\"mydates\"": 1
     },
     "calendar_today": [],
     "calendar_week": [
