@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Script to quickly add progress notes to today's review
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+TODAY_DATE=$(date +%Y-%m-%d)
+REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+TIMESTAMP=$(date +"%H:%M")
+
+# Check if review file exists
+if [ ! -f "$REVIEW_FILE" ]; then
+    echo "❌ No review file for today. Run 'bin/today' first to create one."
+    exit 1
+fi
+
+# If no arguments provided, open in editor
+if [ $# -eq 0 ]; then
+    # Try to find an editor
+    if command -v code &> /dev/null; then
+        code "$REVIEW_FILE"
+    elif command -v nano &> /dev/null; then
+        nano "$REVIEW_FILE"
+    elif command -v vim &> /dev/null; then
+        vim "$REVIEW_FILE"
+    else
+        echo "📝 Today's review: $REVIEW_FILE"
+        echo "Please provide a progress note as an argument, or open the file manually"
+    fi
+else
+    # Add progress note with timestamp
+    echo "" >> "$REVIEW_FILE"
+    echo "### Progress Update ($TIMESTAMP)" >> "$REVIEW_FILE"
+    echo "$*" >> "$REVIEW_FILE"
+    
+    echo "✅ Progress note added to $REVIEW_FILE"
+    echo "   $TIMESTAMP: $*"
+fi

@@ -10,102 +10,69 @@ cat TODAY.md | claude
 
 Or use the shortcut that does everything:
 ```bash
-bin/today  # Syncs, generates summary, and sends to Claude
+bin/today  # Syncs, generates summary, sends to Claude, and saves to notes/reviews/
 ```
 
+**Review Notes:** Each run of `bin/today` automatically saves Claude's analysis to `notes/reviews/YYYY-MM-DD.md`. Run multiple times during the day to track progress - subsequent runs append updates with timestamps.
+
 ## Instructions
-Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized.
+Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and analyzed.
 
-**Summary Available:** `SUMMARY.json` contains a comprehensive summary with:
-- Actual content: task titles, email subjects, note excerpts, concerns
-- Incremental tracking: new/modified/deleted items since last review
-- AI-ready insights: urgent tasks, overdue items, people to contact
-- Time-based recommendations: contextual suggestions based on time of day
+**IMPORTANT: All data has already been extracted and analyzed in the SUMMARY.json below. DO NOT query databases or files directly - everything you need is in the summary:**
 
-**Important:** Use simple, direct commands to access data. Avoid complex node scripts or Task tools. Use commands like:
-- `sqlite3 .notion-cache/notion-cache.db "SELECT * FROM task_cache WHERE ..."`
-- `find notes -type f -name "*.md" -mtime -7`
-- `bin/email list --limit 20`
-- `head -20 notes/daily/*.md`
+The SUMMARY.json contains:
+- **content.concerns**: My current worries and issues from notes
+- **content.urgent_tasks**: Tasks due today/tomorrow with titles
+- **content.overdue_tasks**: Tasks past their due date
+- **content.task_categories**: Breakdown of tasks by category
+- **content.important_emails**: Emails needing attention
+- **content.people_to_contact**: People mentioned in notes as needing contact
+- **changes**: New/modified items since last review
+- **recommendations.daily_focus**: Time-based suggestions
 
-## Available Data Sources
+Please use ONLY the summary data below to provide your analysis. Focus on:
+1. Address the concerns listed
+2. Prioritize the urgent/overdue tasks
+3. Suggest which emails need responses
+4. Recommend a schedule for today
 
-### 📝 Local Notes
-- Location: `notes/` directory
-- Recent notes from the last 7 days
-- Daily notes, task notes, concerns
+## Data Already Extracted in Summary Below
 
-### ✅ Notion Databases
-- Action Items - tasks with stages, due dates, tags
-- Morning Routine, Evening Tasks, Day-End Chores
-- Today's Plan, Now and Then (quick tasks)
-- Inboxes (items to process)
-- Days, Weeks, Months tracking
+The SUMMARY.json below contains all relevant data already extracted from:
+- 📝 Local notes (concerns, recent files)
+- ✅ Notion databases (442 tasks categorized)  
+- 📧 Email database (recent messages analyzed)
+- 🔄 Incremental changes since last review
 
-### 📧 Email Database
-- Location: `.notion-cache/notion-cache.db` (emails table)
-- Last 7 days of emails downloaded
-- 4000+ emails in database
-- Access with: `bin/email list --limit 20` or `sqlite3 .notion-cache/notion-cache.db "SELECT subject, from_address, date FROM emails ORDER BY date DESC LIMIT 20"`
-
-### 💾 SQLite Database Schema
-Tables in `.notion-cache/notion-cache.db`:
-- `task_cache` - Notion tasks with title, due_date, stage, tags, description
-- `emails` - Email messages with subject, from_address, date, text_content
-- `database_cache` - Metadata about Notion databases
-- `cache_metadata` - Cache sync timestamps
-- `project_pillar_mapping` - Project to pillar relationships
-
-### 🔄 Todoist
-- Two-way sync with Notion when configured
-- Task management integration
+**DO NOT attempt to query these sources directly. Use only the SUMMARY.json data provided below.**
 
 ## What I Need From You
 
-**Note:** Please analyze the data directly using the simple commands provided. Don't use complex analysis tools or agents - just query the databases and files directly.
+Based on the SUMMARY.json data below, please provide:
 
 ### 1. Current Status Assessment
-- What looks most urgent based on the data?
-- What patterns do you see?
+- What looks most urgent based on the summary data?
+- What patterns do you see in the content?
 - What might be falling through the cracks?
 
-### 2. Today's Priorities
-Please suggest my top 3-5 priorities for today based on:
-- Due dates and deadlines
-- Important vs urgent matrix
-- Energy and time available
-- What would move the needle most
+### 2. Today's Top 3-5 Priorities
+Based on the summary's urgent_tasks, overdue_tasks, and concerns
 
-### 3. Quick Wins
-- What can I complete in under 15 minutes?
-- What would create momentum?
-- What would clear mental space?
+### 3. Quick Wins (under 15 minutes)
+From the tasks and emails in the summary
 
-### 4. Deep Work Recommendation
-- What deserves 1-2 hours of focused time?
-- What creative or complex work needs attention?
+### 4. Deep Work Recommendation (1-2 hours)
+What complex work needs focused attention?
 
-### 5. Communications
-- Which emails need responses today?
-- What outreach should I make?
-- What conversations to prioritize?
+### 5. Communications to Address
+Based on important_emails and people_to_contact in the summary
 
 ### 6. Evening Planning
-- What to review at end of day?
-- What to prepare for tomorrow?
-- What to capture or document?
+What to review and prepare based on the data
 
 ### 7. Self-Care Check
-- What would support my wellbeing today?
-- Am I overlooking rest or joy?
-- What would make today satisfying?
-
-## Context for Today
-[Add any specific context here - meetings, energy level, specific concerns, etc.]
-
-## Specific Questions
-[Add any specific questions you want answered]
+Address any wellbeing concerns from the summary
 
 ---
 
-Please analyze my data and provide specific, actionable recommendations for today. Use the actual data from my systems, not generic advice.
+Please analyze the SUMMARY.json below and provide specific, actionable recommendations for today.

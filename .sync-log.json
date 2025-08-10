@@ -92,5 +92,47 @@
         "actions": []
       }
     }
+  },
+  {
+    "timestamp": "2025-08-10T14:12:33.298Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      }
+    }
+  },
+  {
+    "timestamp": "2025-08-10T14:21:58.495Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      }
+    }
   }
 ]
