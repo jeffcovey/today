@@ -141,6 +141,22 @@ if [ -f SUMMARY.json ]; then
     # Run Claude interactively and capture output
     CLAUDE_OUTPUT=$(cat "$TEMP_FILE" | claude 2>&1 | tee /dev/tty)
     
+    # Check if Claude returned an error
+    if echo "$CLAUDE_OUTPUT" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "❌ Claude authentication failed!"
+        echo ""
+        echo "Please authenticate Claude:"
+        echo "  1. Run: claude"
+        echo "  2. Follow the browser prompt to login"
+        echo "  3. Then run 'bin/today' again"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        rm "$TEMP_FILE"
+        exit 1
+    fi
+    
     # Save Claude's analysis to the review file with timestamp
     if [ ! -z "$CLAUDE_OUTPUT" ]; then
         # Find the last "Update" section and replace it with Claude's output
@@ -184,18 +200,27 @@ if [ -f SUMMARY.json ]; then
         mv "$TEMP_REVIEW" "$REVIEW_FILE"
     fi
     
-    # After Claude exits, remind about saving
+    # After Claude exits successfully
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "✅ Claude session ended"
-    echo ""
-    echo "📝 Claude's analysis has been saved to:"
-    echo "   $REVIEW_FILE"
-    echo ""
-    echo "💡 Track your progress using:"
-    echo "   bin/mark-done 'task description'  # Mark a task as complete"
-    echo "   bin/mark-done 1                   # Mark task #1 as complete"
-    echo "   bin/progress 'note'               # Add a general note"
+    
+    # Check if we got a meaningful response
+    if [ -z "$CLAUDE_OUTPUT" ] || [ "$CLAUDE_OUTPUT" = "" ]; then
+        echo "⚠️  No response from Claude"
+        echo ""
+        echo "The review file was prepared but Claude didn't provide analysis."
+        echo "Check your authentication and try again."
+    else
+        echo "✅ Claude session ended successfully"
+        echo ""
+        echo "📝 Claude's analysis has been saved to:"
+        echo "   $REVIEW_FILE"
+        echo ""
+        echo "💡 Track your progress using:"
+        echo "   bin/mark-done 'task description'  # Mark a task as complete"
+        echo "   bin/mark-done 1                   # Mark task #1 as complete"
+        echo "   bin/progress 'note'               # Add a general note"
+    fi
     echo ""
     
     # Cleanup
