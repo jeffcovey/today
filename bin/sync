@@ -88,7 +88,17 @@ main() {
         SYNC_SUMMARY="${SYNC_SUMMARY}✗ Email inbox\n"
     fi
     
-    # 5. Update Cache Statistics
+    # 5. Sync Calendar Events
+    print_header "📅 Calendar Events"
+    if sync_calendar; then
+        print_status "Calendar events synced"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Calendar events\n"
+    else
+        print_error "Calendar sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Calendar events\n"
+    fi
+    
+    # 6. Update Cache Statistics
     print_header "💾 Cache Update"
     if update_cache_stats; then
         print_status "Cache statistics updated"
@@ -347,6 +357,26 @@ sync_email() {
     fi
     
     return 0
+}
+
+# Sync calendar events
+sync_calendar() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Run calendar sync
+    SYNC_OUTPUT=$(bin/calendar sync 2>&1)
+    if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [1-9]"; then
+        # Actually synced some events (not 0)
+        # Show quick summary of today's events
+        TODAY_COUNT=$(bin/calendar today 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
+        if [[ "$TODAY_COUNT" -gt 0 ]]; then
+            print_info "$TODAY_COUNT events scheduled for today"
+        fi
+        return 0
+    else
+        print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
+        return 1
+    fi
 }
 
 # Update cache statistics

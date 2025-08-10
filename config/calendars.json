@@ -1,0 +1,34 @@
+{
+  "public_calendars": [
+    {
+      "name": "TripIt",
+      "url": "https://www.tripit.com/feed/ical/private/F7734ED6-A925E297FB844E7EB8D8A52DD26D50A4/tripit.ics",
+      "type": "travel",
+      "enabled": true
+    },
+    {
+      "name": "Airbnb - Listing 1",
+      "url": "https://www.airbnb.com/calendar/ical/654509710197762744.ics?s=a099f3cadff1c1a986c244ff56dce901",
+      "type": "rental",
+      "enabled": true
+    },
+    {
+      "name": "Airbnb - Listing 2",
+      "url": "https://www.airbnb.com/calendar/ical/649941570252334317.ics?s=75d716b066015b8ff1cb63818a0ddaef",
+      "type": "rental",
+      "enabled": true
+    },
+    {
+      "name": "MisterB&B - Room 1",
+      "url": "https://www.misterbandb.com/rooms/811614/ical_export.ics?it=8XWdAfP-DsrqOuCgn6cD9Q",
+      "type": "rental",
+      "enabled": true
+    },
+    {
+      "name": "MisterB&B - Room 2",
+      "url": "https://www.misterbandb.com/rooms/806492/ical_export.ics?it=vCHlbLHv_aLnSKcNvBSvvw",
+      "type": "rental",
+      "enabled": true
+    }
+  ]
+}

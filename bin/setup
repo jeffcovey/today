@@ -32,6 +32,7 @@ Options:
     --tailscale         Setup Tailscale VPN for secure connectivity
     --tailscale-hostname Configure Tailscale hostname
     --dotenvx           Setup dotenvx for encrypted environment sync
+    --calendar          Setup calendar integrations (Google & iCloud)
     --all               Run all setup tasks
     --help              Display this help message
 
@@ -39,6 +40,7 @@ Examples:
     setup --ssh          # Setup SSH server only
     setup --tailscale    # Setup Tailscale only
     setup --dotenvx      # Setup encrypted env sync
+    setup --calendar     # Setup calendar integrations
     setup --all          # Run all setups
 
 EOF
@@ -282,6 +284,182 @@ EOF
     fi
 }
 
+# Calendar Setup Function
+setup_calendar() {
+    print_status "Setting up calendar integrations..."
+    echo ""
+    
+    # Check current .env for calendar settings
+    GOOGLE_CONFIGURED=false
+    ICLOUD_CONFIGURED=false
+    
+    if [ -f .env ]; then
+        if grep -q "GOOGLE_SERVICE_ACCOUNT_KEY_PATH=" .env && ! grep -q "GOOGLE_SERVICE_ACCOUNT_KEY_PATH=your" .env 2>/dev/null; then
+            # Also check if the key file exists
+            KEY_PATH=$(grep "GOOGLE_SERVICE_ACCOUNT_KEY_PATH=" .env | cut -d'=' -f2)
+            if [ -f "$KEY_PATH" ]; then
+                GOOGLE_CONFIGURED=true
+            fi
+        fi
+        if grep -q "ICLOUD_USERNAME=" .env && ! grep -q "ICLOUD_USERNAME=your@icloud" .env 2>/dev/null; then
+            ICLOUD_CONFIGURED=true
+        fi
+    fi
+    
+    echo "📅 Calendar Integration Setup"
+    echo "=============================="
+    echo ""
+    
+    # Google Calendar Setup
+    echo "🔷 Google Calendar"
+    echo "------------------"
+    if $GOOGLE_CONFIGURED; then
+        print_status "✅ Google Calendar is configured"
+        if grep -q "GOOGLE_CALENDAR_ID=" .env 2>/dev/null; then
+            CALENDAR_ID=$(grep "GOOGLE_CALENDAR_ID=" .env | cut -d'=' -f2)
+            echo "   Calendar ID: $CALENDAR_ID"
+        fi
+    else
+        print_warning "⚠️  Google Calendar not configured"
+        echo ""
+        echo "To set up Google Calendar (Service Account - Recommended):"
+        echo "1. Go to https://console.cloud.google.com/"
+        echo "2. Create a new project (or select existing)"
+        echo "3. Enable the Google Calendar API:"
+        echo "   - Go to 'APIs & Services' > 'Enable APIs and Services'"
+        echo "   - Search for 'Google Calendar API' and enable it"
+        echo "4. Create a Service Account:"
+        echo "   - Go to 'APIs & Services' > 'Credentials'"
+        echo "   - Click 'Create Credentials' > 'Service Account'"
+        echo "   - Give it a name like 'today-calendar-sync'"
+        echo "   - Click 'Create and Continue'"
+        echo "   - Skip optional steps, click 'Done'"
+        echo "5. Create a key for the Service Account:"
+        echo "   - Click on your new service account"
+        echo "   - Go to 'Keys' tab"
+        echo "   - Click 'Add Key' > 'Create new key'"
+        echo "   - Choose JSON format"
+        echo "   - Save the downloaded file as 'google-calendar-key.json' in project root"
+        echo "6. Share your calendar with the Service Account:"
+        echo "   - Copy the service account email (ends with @...iam.gserviceaccount.com)"
+        echo "   - Open Google Calendar"
+        echo "   - Go to Settings > Settings for my calendars > [Your Calendar]"
+        echo "   - Under 'Share with specific people', add the service account email"
+        echo "   - Set permission to 'See all event details'"
+        echo "7. Convert key to base64 and add to .env:"
+        echo "   Run: bin/encode-service-account"
+        echo "   This will give you a GOOGLE_SERVICE_ACCOUNT_KEY value for .env"
+        echo ""
+        echo "8. Add calendar IDs to .env:"
+        echo "   GOOGLE_CALENDAR_IDS=primary,work@group.calendar.google.com,personal@gmail.com"
+        echo "   (comma-separated list of calendars to sync)"
+        echo ""
+        echo "To find your Calendar IDs:"
+        echo "   - In Google Calendar, click the 3 dots next to each calendar"
+        echo "   - Go to 'Settings and sharing'"
+        echo "   - Find 'Calendar ID' (primary, your-email@gmail.com, or abc123@group.calendar.google.com)"
+        echo ""
+        echo "Note: After adding to .env, run 'npx dotenvx encrypt' to secure your credentials"
+    fi
+    echo ""
+    
+    # iCloud Calendar Setup
+    echo "🍎 iCloud Calendar"
+    echo "------------------"
+    if $ICLOUD_CONFIGURED; then
+        print_status "✅ iCloud Calendar is configured"
+        ICLOUD_USER=$(grep "ICLOUD_USERNAME=" .env | cut -d'=' -f2)
+        echo "   Username: $ICLOUD_USER"
+    else
+        print_warning "⚠️  iCloud Calendar not configured"
+        echo ""
+        echo "To set up iCloud Calendar:"
+        echo "1. Go to https://appleid.apple.com/account/manage"
+        echo "2. Sign in with your Apple ID"
+        echo "3. Under 'Sign-In and Security', find 'App-Specific Passwords'"
+        echo "4. Click '+' to generate a new password"
+        echo "5. Name it 'Today Calendar Sync' (or similar)"
+        echo "6. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)"
+        echo "7. Add to your .env file:"
+        echo "   ICLOUD_USERNAME=your@icloud.com"
+        echo "   ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx"
+        echo ""
+        echo "Note: App-specific passwords are required for 2FA-enabled accounts"
+    fi
+    echo ""
+    
+    # Public Calendar URLs
+    echo "🌐 Public Calendar URLs"
+    echo "-----------------------"
+    if [ -f config/calendars.json ]; then
+        CALENDAR_COUNT=$(grep -c '"url"' config/calendars.json 2>/dev/null || echo "0")
+        print_status "✅ Found $CALENDAR_COUNT public calendar URL(s) configured"
+        echo "   Edit config/calendars.json to add/remove calendars"
+    else
+        echo "ℹ️  No public calendars configured"
+        echo ""
+        echo "To add public calendar URLs:"
+        echo "1. Copy config/calendars.example.json to config/calendars.json"
+        echo "2. Add your calendar URLs (from Airbnb, TripIt, etc.)"
+        echo "3. Set 'enabled': true/false for each calendar"
+    fi
+    echo ""
+    
+    # Local Calendar File
+    echo "📁 Local Calendar File"
+    echo "----------------------"
+    if [ -f calendar.ics ]; then
+        print_status "✅ Local calendar.ics file found"
+        EVENT_COUNT=$(grep -c "BEGIN:VEVENT" calendar.ics 2>/dev/null || echo "0")
+        echo "   Events in file: $EVENT_COUNT"
+    else
+        echo "ℹ️  No local calendar.ics file found"
+        echo ""
+        echo "To use a local calendar file:"
+        echo "1. Export your calendar from any app as .ics file"
+        echo "2. Save it as 'calendar.ics' in the project root"
+        echo "3. The sync will automatically pick it up"
+    fi
+    echo ""
+    
+    # macOS Calendar
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "🖥️  macOS Calendar"
+        echo "------------------"
+        print_status "✅ macOS Calendar available (uses AppleScript)"
+        echo "   No configuration needed - works automatically"
+        echo ""
+    fi
+    
+    # Test calendar sync
+    echo "Testing calendar sync..."
+    SYNC_OUTPUT=$(bin/calendar sync 2>&1)
+    if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [1-9]"; then
+        # Actually synced some events (not 0)
+        print_status "✅ Calendar sync is working!"
+        
+        # Show summary
+        TODAY_COUNT=$(bin/calendar today 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
+        WEEK_COUNT=$(bin/calendar week 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
+        
+        if [ "$TODAY_COUNT" -gt 0 ] || [ "$WEEK_COUNT" -gt 0 ]; then
+            echo ""
+            echo "📊 Calendar Summary:"
+            echo "   Events today: $TODAY_COUNT"
+            echo "   Events this week: $WEEK_COUNT"
+        fi
+    else
+        print_warning "⚠️  No calendars are currently syncing"
+        echo "   Configure at least one calendar source above"
+    fi
+    
+    echo ""
+    echo "📝 Next Steps:"
+    echo "1. Configure your calendar credentials in .env"
+    echo "2. Run 'bin/sync' to sync all data including calendars"
+    echo "3. Run 'bin/today' to see your daily review with calendar events"
+}
+
 # Main script logic
 if [ $# -eq 0 ]; then
     show_help
@@ -301,6 +479,9 @@ case "$1" in
     --dotenvx)
         setup_dotenvx
         ;;
+    --calendar)
+        setup_calendar
+        ;;
     --all)
         print_status "Running all setup tasks..."
         echo ""
@@ -311,6 +492,8 @@ case "$1" in
         setup_tailscale_hostname
         echo ""
         setup_dotenvx
+        echo ""
+        setup_calendar
         print_status "✅ All setup tasks completed!"
         ;;
     --help|-h)

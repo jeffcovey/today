@@ -31,7 +31,9 @@ async function loadSummary() {
         task_categories: {},
         recent_notes: [],
         important_emails: [],
-        top_email_senders: {}
+        top_email_senders: {},
+        calendar_today: [],
+        calendar_week: []
       };
     }
     return summary;
@@ -92,7 +94,9 @@ async function loadSummary() {
         task_categories: {},
         recent_notes: [],
         important_emails: [],
-        top_email_senders: {}
+        top_email_senders: {},
+        calendar_today: [],
+        calendar_week: []
       },
       active_context: {
         projects: {},
@@ -432,6 +436,74 @@ async function extractTaskContent(tasks) {
   return content;
 }
 
+async function extractCalendarContent() {
+  const content = {
+    calendar_today: [],
+    calendar_week: []
+  };
+  
+  try {
+    // Check if calendar cache exists
+    const cacheFile = path.join(__dirname, '..', '.calendar-cache', 'events.json');
+    const cacheData = await fs.readFile(cacheFile, 'utf-8')
+      .then(JSON.parse)
+      .catch(() => null);
+    
+    if (!cacheData || !cacheData.events) {
+      return content;
+    }
+    
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    
+    // Extract today's events
+    content.calendar_today = cacheData.events
+      .filter(event => {
+        const eventDate = new Date(event.start);
+        return eventDate >= today && eventDate < tomorrow;
+      })
+      .map(event => ({
+        time: event.allDay ? 'All day' : new Date(event.start).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit' 
+        }),
+        title: event.title,
+        location: event.location,
+        calendar: event.calendar || event.source
+      }));
+    
+    // Extract this week's events
+    content.calendar_week = cacheData.events
+      .filter(event => {
+        const eventDate = new Date(event.start);
+        return eventDate >= today && eventDate < weekFromNow;
+      })
+      .slice(0, 20) // Limit to 20 events for the week
+      .map(event => ({
+        date: new Date(event.start).toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric' 
+        }),
+        time: event.allDay ? 'All day' : new Date(event.start).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit' 
+        }),
+        title: event.title,
+        location: event.location
+      }));
+  } catch (error) {
+    console.error('Error extracting calendar content:', error.message);
+  }
+  
+  return content;
+}
+
 async function extractEmailContent(emails) {
   const content = {
     important_emails: [],
@@ -480,7 +552,9 @@ async function generateAIInsights(summary) {
       overdue_count: summary.content.overdue_tasks.length,
       urgent_count: summary.content.urgent_tasks.length,
       email_count: summary.content.important_emails.length,
-      contacts: summary.content.people_to_contact.length
+      contacts: summary.content.people_to_contact.length,
+      events_today: summary.content.calendar_today.length,
+      events_week: summary.content.calendar_week.length
     };
     
     // Write prompt to temp file to avoid shell escaping issues
@@ -493,6 +567,8 @@ Current situation:
 - ${promptData.urgent_count} urgent tasks for today
 - ${promptData.email_count} important emails to address
 - ${promptData.contacts} people to contact
+- ${promptData.events_today} calendar events today
+- ${promptData.events_week} events this week
 
 Return ONLY a JSON array of recommendation strings, like:
 ["Address the financial tracking concern by...", "Clear overdue tasks starting with...", "Schedule time for..."]`;
@@ -593,6 +669,11 @@ async function updateSummary(useAI = true) {
   summary.content.concerns = noteContent.concerns;
   summary.content.people_to_contact = noteContent.people_to_contact;
   summary.content.recent_notes = noteContent.recent_notes;
+
+  // Extract calendar content
+  const calendarContent = await extractCalendarContent();
+  summary.content.calendar_today = calendarContent.calendar_today;
+  summary.content.calendar_week = calendarContent.calendar_week;
 
   if (dbExists) {
     // Get recent data from database for analysis
@@ -698,6 +779,8 @@ async function updateSummary(useAI = true) {
   console.log(`  - ${summary.content.overdue_tasks.length} overdue tasks`);
   console.log(`  - ${summary.content.important_emails.length} important emails`);
   console.log(`  - ${Object.keys(summary.content.top_email_senders).length} email senders`);
+  console.log(`  - ${summary.content.calendar_today.length} events today`);
+  console.log(`  - ${summary.content.calendar_week.length} events this week`);
   console.log(`📈 Changes: ${summary.changes.new_emails.length} new emails, ${summary.changes.new_tasks.length} new tasks, ${summary.changes.new_notes.length} new notes`);
   
   return summary;

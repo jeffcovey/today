@@ -1,0 +1,590 @@
+#!/usr/bin/env node
+
+// Calendar integration script for Google Calendar and iCloud
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
+import https from 'https';
+import http from 'http';
+import { google } from 'googleapis';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const CACHE_DIR = path.join(__dirname, '..', '.calendar-cache');
+const CACHE_FILE = path.join(CACHE_DIR, 'events.json');
+
+// Ensure cache directory exists
+await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
+
+class CalendarSync {
+  constructor() {
+    this.events = [];
+  }
+
+  // Google Calendar integration
+  async syncGoogleCalendar() {
+    try {
+      // Check for calendar configuration
+      const calendarIds = process.env.GOOGLE_CALENDAR_IDS || process.env.GOOGLE_CALENDAR_ID;
+      
+      if (!calendarIds) {
+        console.log('⚠️  Google Calendar not configured');
+        console.log('   Need GOOGLE_CALENDAR_IDS in .env');
+        console.log('   Run "bin/setup --calendar" for setup instructions');
+        return [];
+      }
+
+      // Parse multiple calendar IDs (comma-separated)
+      const calendars = calendarIds.split(',').map(id => id.trim()).filter(Boolean);
+      
+      // Get service account credentials - either from base64 env var or file
+      let auth;
+      
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        // Use base64-encoded key from environment variable
+        console.log('📅 Using embedded service account key...');
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+        
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        // Fall back to file path
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+        
+        try {
+          await fs.access(keyFilePath);
+        } catch {
+          console.log('⚠️  Google Calendar service account key file not found:', keyPath);
+          return [];
+        }
+        
+        auth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
+      } else {
+        console.log('⚠️  No Google service account credentials found');
+        console.log('   Set GOOGLE_SERVICE_ACCOUNT_KEY (base64) or GOOGLE_SERVICE_ACCOUNT_KEY_PATH');
+        return [];
+      }
+
+      console.log(`📅 Fetching events from ${calendars.length} calendar(s)...`);
+      
+      const calendar = google.calendar({ version: 'v3', auth });
+      
+      const now = new Date();
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const allEvents = [];
+      
+      // Fetch events from each calendar
+      for (const calendarId of calendars) {
+        try {
+          console.log(`   Fetching from calendar: ${calendarId}`);
+          const response = await calendar.events.list({
+            calendarId: calendarId === 'primary' ? 'primary' : calendarId,
+            timeMin: now.toISOString(),
+            timeMax: weekFromNow.toISOString(),
+            singleEvents: true,
+            orderBy: 'startTime',
+          });
+
+          const events = response.data.items || [];
+          console.log(`   ✓ Found ${events.length} events`);
+          
+          // Add calendar source to each event
+          const calendarEvents = events.map(event => ({
+            source: 'google',
+            calendar: calendarId,
+            id: event.id,
+            title: event.summary || 'Untitled',
+            start: event.start?.dateTime || event.start?.date,
+            end: event.end?.dateTime || event.end?.date,
+            location: event.location,
+            description: event.description,
+            allDay: !event.start?.dateTime
+          }));
+          
+          allEvents.push(...calendarEvents);
+        } catch (error) {
+          if (error.message?.includes('Not Found')) {
+            console.error(`   ❌ Calendar "${calendarId}" not found or not shared`);
+          } else if (error.message?.includes('Forbidden')) {
+            console.error(`   ❌ No permission for calendar "${calendarId}"`);
+          } else {
+            console.error(`   ❌ Error fetching from "${calendarId}": ${error.message}`);
+          }
+          // Continue with other calendars instead of returning
+        }
+      }
+      
+      console.log(`📅 Total: ${allEvents.length} events from Google Calendar`);
+      return allEvents;
+    } catch (error) {
+      console.error('Error with Google Calendar setup:', error.message);
+      return [];
+    }
+  }
+
+  // iCloud Calendar integration (via CalDAV)
+  async syncICloudCalendar() {
+    try {
+      // Check for iCloud credentials
+      if (!process.env.ICLOUD_USERNAME || !process.env.ICLOUD_APP_PASSWORD) {
+        console.log('⚠️  iCloud Calendar not configured (need ICLOUD_USERNAME and ICLOUD_APP_PASSWORD)');
+        console.log('   Get app-specific password at: https://appleid.apple.com/account/manage');
+        return [];
+      }
+
+      console.log('📅 Fetching iCloud Calendar events...');
+      
+      // We'll use a simple CalDAV request for iCloud
+      // This is a basic implementation - you might want to use a CalDAV library for production
+      const username = process.env.ICLOUD_USERNAME;
+      const password = process.env.ICLOUD_APP_PASSWORD;
+      
+      // iCloud CalDAV endpoint
+      const caldavUrl = `https://caldav.icloud.com/${username}/calendars/`;
+      
+      // For now, return empty - full CalDAV implementation would go here
+      console.log('ℹ️  iCloud CalDAV integration pending full implementation');
+      return [];
+      
+    } catch (error) {
+      console.error('Error fetching iCloud Calendar:', error.message);
+      return [];
+    }
+  }
+
+  // Fetch remote iCal URL
+  async fetchRemoteICal(url, name = 'Remote Calendar') {
+    return new Promise((resolve) => {
+      const client = url.startsWith('https') ? https : http;
+      
+      console.log(`   Fetching ${name}...`);
+      
+      const request = client.get(url, { timeout: 10000 }, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            const events = this.parseICalContent(data, name);
+            console.log(`   ✓ Found ${events.length} events from ${name}`);
+            resolve(events);
+          } else {
+            console.error(`   ❌ Failed to fetch ${name}: HTTP ${res.statusCode}`);
+            resolve([]);
+          }
+        });
+      });
+      
+      request.on('error', (err) => {
+        console.error(`   ❌ Error fetching ${name}: ${err.message}`);
+        resolve([]);
+      });
+      
+      request.on('timeout', () => {
+        console.error(`   ❌ Timeout fetching ${name}`);
+        request.destroy();
+        resolve([]);
+      });
+    });
+  }
+
+  // Parse iCal content (shared by file and URL methods)
+  parseICalContent(content, source = 'ical') {
+    const events = [];
+    
+    // Basic iCal parsing (simplified but handles multi-line values)
+    const lines = content.split(/\r?\n/);
+    let currentEvent = null;
+    let inEvent = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      
+      // Handle line continuations (lines starting with space or tab)
+      while (i + 1 < lines.length && (lines[i + 1].startsWith(' ') || lines[i + 1].startsWith('\t'))) {
+        line += lines[i + 1].substring(1);
+        i++;
+      }
+      
+      if (line === 'BEGIN:VEVENT') {
+        inEvent = true;
+        currentEvent = { source };
+      } else if (line === 'END:VEVENT' && currentEvent) {
+        inEvent = false;
+        
+        // Only add events with title and start date
+        if (currentEvent.title && currentEvent.start) {
+          // Check if event is in the future or recent past (last 7 days)
+          const eventDate = new Date(currentEvent.start);
+          const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          
+          if (eventDate >= weekAgo) {
+            events.push(currentEvent);
+          }
+        }
+        currentEvent = null;
+      } else if (inEvent && currentEvent) {
+        // Parse event properties
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const key = line.substring(0, colonIndex);
+          const value = line.substring(colonIndex + 1);
+          
+          // Handle different property formats
+          if (key.startsWith('SUMMARY')) {
+            currentEvent.title = value.trim()
+              .replace(/\\,/g, ',')
+              .replace(/\\n/g, '\n')
+              .replace(/\\\\/g, '\\');
+          } else if (key.startsWith('DTSTART')) {
+            currentEvent.start = this.parseICalDate(value.trim());
+            currentEvent.allDay = !value.includes('T');
+          } else if (key.startsWith('DTEND')) {
+            currentEvent.end = this.parseICalDate(value.trim());
+          } else if (key.startsWith('LOCATION')) {
+            currentEvent.location = value.trim()
+              .replace(/\\,/g, ',')
+              .replace(/\\n/g, '\n')
+              .replace(/\\\\/g, '\\');
+          } else if (key.startsWith('DESCRIPTION')) {
+            currentEvent.description = value.trim()
+              .replace(/\\,/g, ',')
+              .replace(/\\n/g, '\n')
+              .replace(/\\\\/g, '\\');
+          } else if (key === 'UID') {
+            currentEvent.id = value.trim();
+          }
+        }
+      }
+    }
+    
+    return events;
+  }
+
+  // Parse iCal/ICS format (for local calendar files)
+  async parseICalFile(filePath) {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const events = this.parseICalContent(content, 'ical-file');
+      return events;
+    } catch (error) {
+      console.error('Error parsing iCal file:', error.message);
+      return [];
+    }
+  }
+
+  parseICalDate(dateStr) {
+    // Handle both DATE and DATE-TIME formats
+    if (dateStr.length === 8) {
+      // YYYYMMDD format
+      return `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`;
+    } else if (dateStr.includes('T')) {
+      // YYYYMMDDTHHMMSS format
+      const date = dateStr.slice(0,8);
+      const time = dateStr.slice(9,15);
+      return `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${time.slice(0,2)}:${time.slice(2,4)}:${time.slice(4,6)}`;
+    }
+    return dateStr;
+  }
+
+  // macOS Calendar app integration (if running on Mac)
+  async syncMacCalendar() {
+    try {
+      // Check if we're on macOS
+      if (process.platform !== 'darwin') {
+        return [];
+      }
+
+      console.log('📅 Fetching macOS Calendar events...');
+      
+      // Use AppleScript to get calendar events
+      const script = `
+        set outputText to ""
+        set todayDate to current date
+        set weekFromNow to todayDate + (7 * days)
+        
+        tell application "Calendar"
+          set allCalendars to calendars
+          repeat with aCalendar in allCalendars
+            set calendarName to name of aCalendar
+            set theEvents to (every event of aCalendar whose start date ≥ todayDate and start date ≤ weekFromNow)
+            
+            repeat with anEvent in theEvents
+              set eventSummary to summary of anEvent
+              set eventStart to start date of anEvent
+              set eventEnd to end date of anEvent
+              set eventLocation to location of anEvent
+              
+              set outputText to outputText & "EVENT:" & eventSummary & "|"
+              set outputText to outputText & "START:" & eventStart & "|"
+              set outputText to outputText & "END:" & eventEnd & "|"
+              set outputText to outputText & "LOCATION:" & eventLocation & "|"
+              set outputText to outputText & "CALENDAR:" & calendarName & "\\n"
+            end repeat
+          end repeat
+        end tell
+        
+        return outputText
+      `;
+      
+      const result = execSync(`osascript -e '${script}'`, { encoding: 'utf-8' });
+      
+      const events = [];
+      const lines = result.split('\n').filter(line => line.trim());
+      
+      for (const line of lines) {
+        const parts = line.split('|');
+        const event = { source: 'macos-calendar' };
+        
+        for (const part of parts) {
+          const [key, value] = part.split(':', 2);
+          if (key === 'EVENT') event.title = value;
+          if (key === 'START') event.start = value;
+          if (key === 'END') event.end = value;
+          if (key === 'LOCATION') event.location = value;
+          if (key === 'CALENDAR') event.calendar = value;
+        }
+        
+        if (event.title) {
+          events.push(event);
+        }
+      }
+      
+      return events;
+    } catch (error) {
+      console.error('Error fetching macOS Calendar:', error.message);
+      return [];
+    }
+  }
+
+  // Main sync function
+  async sync() {
+    console.log('🔄 Syncing calendar events...');
+    
+    const allEvents = [];
+    
+    // Try each calendar source
+    const googleEvents = await this.syncGoogleCalendar();
+    const icloudEvents = await this.syncICloudCalendar();
+    const macEvents = await this.syncMacCalendar();
+    
+    // Check for local .ics files
+    const localIcsPath = path.join(__dirname, '..', 'calendar.ics');
+    if (await fs.access(localIcsPath).then(() => true).catch(() => false)) {
+      console.log('📅 Found local calendar.ics file');
+      const localEvents = await this.parseICalFile(localIcsPath);
+      allEvents.push(...localEvents);
+    }
+    
+    // Fetch public calendar URLs from configuration
+    const calendarsConfigPath = path.join(__dirname, '..', 'config', 'calendars.json');
+    try {
+      const configContent = await fs.readFile(calendarsConfigPath, 'utf-8');
+      const config = JSON.parse(configContent);
+      
+      if (config.public_calendars && config.public_calendars.length > 0) {
+        console.log(`📅 Fetching ${config.public_calendars.length} public calendar(s)...`);
+        
+        // Fetch all public calendars in parallel
+        const publicCalendarPromises = config.public_calendars
+          .filter(cal => cal.enabled !== false)
+          .map(cal => this.fetchRemoteICal(cal.url, cal.name));
+        
+        const publicCalendarResults = await Promise.all(publicCalendarPromises);
+        
+        // Flatten and add to all events
+        for (const events of publicCalendarResults) {
+          allEvents.push(...events);
+        }
+      }
+    } catch (error) {
+      // Config file doesn't exist or is invalid - that's OK
+      if (error.code !== 'ENOENT') {
+        console.log('   Note: calendars.json not found or invalid');
+      }
+    }
+    
+    // Combine all events
+    allEvents.push(...googleEvents, ...icloudEvents, ...macEvents);
+    
+    // Sort by start time
+    allEvents.sort((a, b) => {
+      const dateA = new Date(a.start || 0);
+      const dateB = new Date(b.start || 0);
+      return dateA - dateB;
+    });
+    
+    // Save to cache
+    const cacheData = {
+      last_sync: new Date().toISOString(),
+      total_events: allEvents.length,
+      events: allEvents
+    };
+    
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
+    
+    if (allEvents.length > 0) {
+      console.log(`✅ Synced ${allEvents.length} calendar events`);
+    } else {
+      console.log(`⚠️  No calendar events found - please configure at least one calendar source`);
+      console.log(`   Run 'bin/setup --calendar' for setup instructions`);
+      return allEvents; // Return empty array but don't claim success
+    }
+    
+    // Show today's events
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayEvents = allEvents.filter(event => {
+      const eventDate = new Date(event.start);
+      return eventDate >= today && eventDate < tomorrow;
+    });
+    
+    if (todayEvents.length > 0) {
+      console.log(`\n📆 Today's events:`);
+      for (const event of todayEvents) {
+        const time = new Date(event.start).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit' 
+        });
+        console.log(`  ${event.allDay ? 'All day' : time}: ${event.title}`);
+        if (event.location) console.log(`    📍 ${event.location}`);
+      }
+    }
+    
+    return allEvents;
+  }
+
+  // Get events for analysis
+  async getEventsForSummary() {
+    try {
+      // Read from cache if recent
+      const cacheData = await fs.readFile(CACHE_FILE, 'utf-8')
+        .then(JSON.parse)
+        .catch(() => null);
+      
+      if (cacheData && cacheData.last_sync) {
+        const lastSync = new Date(cacheData.last_sync);
+        const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
+        
+        if (hoursSince < 1) {
+          // Use cache if less than 1 hour old
+          return cacheData.events || [];
+        }
+      }
+      
+      // Otherwise sync fresh
+      return await this.sync();
+    } catch (error) {
+      console.error('Error getting calendar events:', error.message);
+      return [];
+    }
+  }
+}
+
+// Command line interface
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const command = process.argv[2];
+  const calSync = new CalendarSync();
+  
+  switch (command) {
+    case 'sync':
+      await calSync.sync();
+      break;
+      
+    case 'today':
+      const events = await calSync.getEventsForSummary();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const todayEvents = events.filter(event => {
+        const eventDate = new Date(event.start);
+        return eventDate >= today && eventDate < tomorrow;
+      });
+      
+      console.log(JSON.stringify(todayEvents, null, 2));
+      break;
+      
+    case 'week':
+      const weekEvents = await calSync.getEventsForSummary();
+      console.log(JSON.stringify(weekEvents, null, 2));
+      break;
+      
+    case 'setup':
+      console.log(`
+📅 Calendar Setup Instructions
+
+For Google Calendar (Service Account):
+1. Go to https://console.cloud.google.com/
+2. Create a new project or select existing
+3. Enable Google Calendar API:
+   - APIs & Services > Enable APIs > Search "Google Calendar API"
+4. Create Service Account:
+   - APIs & Services > Credentials > Create Credentials > Service Account
+   - Name it (e.g., "today-calendar-sync")
+   - Click Done
+5. Create key for Service Account:
+   - Click on your service account
+   - Keys tab > Add Key > Create new key > JSON
+   - Save as 'google-calendar-key.json' in project root
+6. Share your calendar:
+   - Copy service account email (ends with @...iam.gserviceaccount.com)
+   - In Google Calendar, go to Settings > Share with specific people
+   - Add the service account email with "See all event details" permission
+7. Add to .env:
+   GOOGLE_SERVICE_ACCOUNT_KEY_PATH=./google-calendar-key.json
+   GOOGLE_CALENDAR_ID=your-email@gmail.com  # or calendar ID
+
+For iCloud Calendar:
+1. Go to https://appleid.apple.com/account/manage
+2. Sign in and go to "Sign-In and Security"
+3. Under "App-Specific Passwords", generate new password
+4. Add to .env:
+   ICLOUD_USERNAME=your@icloud.com
+   ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+
+For Local Calendar:
+1. Export your calendar as .ics file
+2. Save as calendar.ics in project root
+
+For macOS Calendar:
+- Works automatically on Mac (uses AppleScript)
+      `);
+      break;
+      
+    default:
+      console.log(`
+Usage: calendar [command]
+
+Commands:
+  sync    - Sync all configured calendars
+  today   - Show today's events
+  week    - Show this week's events
+  setup   - Show setup instructions
+
+Calendar data is cached in .calendar-cache/events.json
+      `);
+  }
+}
+
+export { CalendarSync };

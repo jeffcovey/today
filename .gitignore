@@ -7,3 +7,6 @@ node_modules/
 dist/
 .notion-cache/
 .vscode-cli/
+
+# Google Calendar Service Account Key
+google-calendar-key.json

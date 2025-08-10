@@ -1,0 +1,21 @@
+{
+  "public_calendars": [
+    {
+      "name": "Example Travel Calendar",
+      "url": "https://example.com/calendar.ics",
+      "type": "travel",
+      "enabled": true
+    },
+    {
+      "name": "Example Work Calendar",
+      "url": "https://example.com/work.ics",
+      "type": "work",
+      "enabled": false
+    }
+  ],
+  "calendar_settings": {
+    "days_ahead": 7,
+    "days_behind": 7,
+    "cache_duration_minutes": 60
+  }
+}
