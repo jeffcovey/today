@@ -42,6 +42,14 @@ echo "  gp       - Git pull"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Check if Claude is authenticated
+if ! claude --version >/dev/null 2>&1; then
+    echo "⚠️  Claude CLI needs authentication!"
+    echo "   Run: claude"
+    echo "   Then follow the browser prompt to login"
+    echo ""
+fi
+
 # Set working directory reminder
 echo "📁 Working directory: $(pwd)"
 echo ""

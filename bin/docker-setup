@@ -14,6 +14,7 @@ if [ ! -f .env.local ]; then
     read -p "DOTENV_PRIVATE_KEY: " DOTENV_KEY
     
     echo "DOTENV_PRIVATE_KEY=$DOTENV_KEY" > .env.local
+    echo "# SKIP_DEP_CHECK=true  # Uncomment to skip dependency checks" >> .env.local
     echo ""
     echo "✅ Created .env.local"
 else

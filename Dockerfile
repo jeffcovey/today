@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules, curl, sqlite, bash, git, and SSH
-RUN apk add --no-cache python3 make g++ curl sqlite bash git openssh-client
+# Install build dependencies for native modules, curl, sqlite, bash, git, SSH, and vim
+RUN apk add --no-cache python3 make g++ curl sqlite bash git openssh-client vim
 
 # Install VS Code CLI with tunnel support
 RUN curl -Lk 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64' --output /tmp/vscode_cli.tar.gz && \
@@ -41,6 +41,9 @@ RUN git config --global --add safe.directory /app
 
 # Copy bashrc for colorful prompt
 COPY .docker-bashrc /root/.bashrc
+
+# Copy vimrc for better vim experience
+COPY .docker-vimrc /root/.vimrc
 
 # Default to bash for interactive use (with login shell for .bashrc)
 CMD ["/bin/bash", "-l"]

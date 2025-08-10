@@ -17,6 +17,8 @@ services:
       - /app/node_modules
       # Mount SSH directory for git operations (read-only)
       - ~/.ssh:/root/.ssh:ro
+      # Mount Claude CLI config directory for authentication persistence
+      - ~/.config/claude:/root/.config/claude
     stdin_open: true
     tty: true
 
