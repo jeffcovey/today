@@ -1,8 +1,16 @@
 node_modules
 npm-debug.log
-.env
 .git
 .gitignore
 README.md
 Dockerfile
 .dockerignore
+.notion-cache
+.calendar-cache
+.sync-log.json
+.sync-config.json
+notes/reviews/*
+SUMMARY.json
+.env.local
+.DS_Store
+*.log
