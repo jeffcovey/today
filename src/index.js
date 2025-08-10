@@ -137,6 +137,135 @@ program
   });
 
 program
+  .command('fetch-tasks')
+  .description('Fetch and cache all tasks from Notion')
+  .option('--verbose', 'Show detailed output')
+  .action(async (options) => {
+    try {
+      const token = process.env.NOTION_TOKEN;
+      if (!token) {
+        console.error(chalk.red('NOTION_TOKEN environment variable is required'));
+        process.exit(1);
+      }
+
+      const notionAPI = new NotionAPI(token);
+      const { SQLiteCache } = await import('./sqlite-cache.js');
+      const cache = new SQLiteCache();
+      
+      // Get all databases
+      const databases = await notionAPI.getDatabases();
+      console.log(chalk.blue(`Found ${databases.length} databases`));
+      
+      if (options.verbose) {
+        console.log(chalk.gray('All databases:'));
+        databases.forEach(db => {
+          console.log(chalk.gray(`  - ${db.title}`));
+        });
+      }
+      
+      // Look for task-related databases - use broader matching
+      const taskDatabases = databases.filter(db => {
+        const lowerTitle = db.title.toLowerCase();
+        // Include the actual database names from your Notion
+        return lowerTitle.includes('action') || 
+               lowerTitle.includes('task') || 
+               lowerTitle.includes('todo') ||
+               lowerTitle.includes('today') ||
+               lowerTitle.includes('routine') ||
+               lowerTitle.includes('now') ||
+               lowerTitle.includes('then') ||
+               lowerTitle.includes('morning') ||
+               lowerTitle.includes('evening') ||
+               lowerTitle.includes('chore') ||
+               lowerTitle.includes('plan') ||
+               db.title === 'Action Items';  // Exact match for your main task database
+      });
+      
+      if (options.verbose) {
+        console.log(chalk.gray(`Task databases: ${taskDatabases.map(d => d.title).join(', ')}`));
+      }
+      
+      let allTasks = [];
+      
+      for (const db of taskDatabases) {
+        const dbName = db.title;
+        const dbId = db.id;
+        try {
+          console.log(chalk.gray(`  Fetching from ${dbName}...`));
+          const items = await notionAPI.getDatabaseItems(dbId);
+          
+          // Extract task info from each item
+          const tasks = items.map(item => ({
+            id: item.id,
+            database: dbName,
+            title: item.properties?.Name?.title?.[0]?.text?.content ||
+                   item.properties?.Task?.title?.[0]?.text?.content ||
+                   item.properties?.Title?.title?.[0]?.text?.content ||
+                   'Untitled',
+            stage: item.properties?.Stage?.select?.name,
+            status: item.properties?.Status?.select?.name,
+            due_date: item.properties?.['Due Date']?.date?.start ||
+                      item.properties?.['Do Date']?.date?.start ||
+                      item.properties?.['Start/Repeat Date']?.date?.start,
+            tags: item.properties?.Tags?.multi_select?.map(t => t.name).join(', '),
+            priority: item.properties?.Priority?.select?.name,
+            last_edited: item.last_edited_time
+          }));
+          
+          allTasks = allTasks.concat(tasks);
+          console.log(chalk.gray(`    Found ${tasks.length} tasks`));
+        } catch (err) {
+          console.error(chalk.red(`  Error fetching ${dbName}: ${err.message}`));
+        }
+      }
+      
+      // Store tasks in cache
+      if (allTasks.length > 0) {
+        const db = cache.db;
+        
+        // Clear old task_cache
+        db.prepare('DELETE FROM task_cache').run();
+        
+        // Insert new tasks
+        const insert = db.prepare(`
+          INSERT INTO task_cache (id, database_id, title, properties, url, created_time, last_edited_time, cached_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        for (const task of allTasks) {
+          insert.run(
+            task.id,
+            task.database,
+            task.title,
+            JSON.stringify(task),
+            `https://notion.so/${task.id.replace(/-/g, '')}`,
+            task.last_edited || new Date().toISOString(),
+            task.last_edited || new Date().toISOString(),
+            Date.now()
+          );
+        }
+        
+        console.log(chalk.green(`✅ Cached ${allTasks.length} tasks total`));
+        
+        // Show some stats
+        const withDueDates = allTasks.filter(t => t.due_date).length;
+        const today = new Date().toISOString().split('T')[0];
+        const dueToday = allTasks.filter(t => t.due_date && t.due_date.startsWith(today)).length;
+        
+        console.log(chalk.gray(`  ${withDueDates} have due dates`));
+        console.log(chalk.gray(`  ${dueToday} are due today`));
+      } else {
+        console.log(chalk.yellow('No tasks found in Notion'));
+      }
+      
+      cache.close();
+    } catch (error) {
+      console.error(chalk.red('Error fetching tasks:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('cache-info')
   .description('Show cache statistics and information')
   .action(async () => {

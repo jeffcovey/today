@@ -1,0 +1,7 @@
+{
+  "intervalMinutes": 15,
+  "projectName": "Notion Tasks",
+  "enabled": true,
+  "lastSync": "2025-08-10T13:38:49.323Z",
+  "syncDirection": "two-way"
+}

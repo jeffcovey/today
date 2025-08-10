@@ -1,0 +1,15 @@
+#!/bin/bash
+# Universal wrapper to run any command with dotenvx if available
+# Usage: bin/with-env <command> [args...]
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+
+# Check if we should use dotenvx
+if has_dotenvx_encryption && has_dotenvx_installed; then
+    # Run with dotenvx
+    exec npx dotenvx run --quiet -- "$@"
+else
+    # Run normally (env vars from shell or .env if loaded)
+    exec "$@"
+fi

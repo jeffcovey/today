@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Quick review script that syncs, updates summary, and pipes to Claude
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+echo "📊 Starting daily review process..."
+
+# Run sync to update all data sources
+echo "🔄 Syncing data sources..."
+bin/sync
+
+# Update the comprehensive summary with content and changes
+echo "📝 Updating summary with content and changes..."
+bin/update-summary
+
+# Check if we should include the summary in the review
+if [ -f SUMMARY.json ]; then
+    echo "✅ Summary updated successfully"
+    
+    # Create a temporary file with both TODAY.md and summary info
+    TEMP_FILE=$(mktemp)
+    
+    # Add TODAY.md content
+    cat TODAY.md > "$TEMP_FILE"
+    
+    # Add comprehensive summary from SUMMARY.json
+    echo "" >> "$TEMP_FILE"
+    echo "## 📊 AI Summary and Analysis" >> "$TEMP_FILE"
+    echo "The SUMMARY.json file contains comprehensive content and tracking data:" >> "$TEMP_FILE"
+    echo '```json' >> "$TEMP_FILE"
+    # Include the entire summary since it now has meaningful content
+    cat SUMMARY.json >> "$TEMP_FILE" 2>/dev/null || echo "Unable to read summary" >> "$TEMP_FILE"
+    echo '```' >> "$TEMP_FILE"
+    
+    # Pipe to Claude
+    echo "🤖 Sending to Claude for analysis..."
+    cat "$TEMP_FILE" | claude
+    
+    # Cleanup
+    rm "$TEMP_FILE"
+else
+    # Fallback to original behavior
+    echo "⚠️  No summary file found, using standard review"
+    cat TODAY.md | claude
+fi

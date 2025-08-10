@@ -101,7 +101,9 @@
       "LS(*)",
       "Edit(*)",
       "MultiEdit(*)",
-      "Write(*)"
+      "Write(*)",
+      "Bash(bin/update-summary:*)",
+      "WebFetch(domain:dotenvx.com)"
     ],
     "deny": []
   }

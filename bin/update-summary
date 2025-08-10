@@ -1,0 +1,642 @@
+#!/usr/bin/env node
+
+// Auto-use dotenvx if available
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs/promises';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const SUMMARY_FILE = path.join(__dirname, '..', 'SUMMARY.json');
+const DB_PATH = path.join(__dirname, '..', '.notion-cache', 'notion-cache.db');
+const NOTES_DIR = path.join(__dirname, '..', 'notes');
+
+async function loadSummary() {
+  try {
+    const content = await fs.readFile(SUMMARY_FILE, 'utf-8');
+    const summary = JSON.parse(content);
+    // Ensure content object exists for older versions
+    if (!summary.content) {
+      summary.content = {
+        concerns: [],
+        people_to_contact: [],
+        urgent_tasks: [],
+        overdue_tasks: [],
+        task_categories: {},
+        recent_notes: [],
+        important_emails: [],
+        top_email_senders: {}
+      };
+    }
+    return summary;
+  } catch (error) {
+    console.error('Creating new summary file...');
+    return {
+      meta: {
+        version: "3.0.0",
+        last_updated: "",
+        last_sync: {
+          emails: "",
+          tasks: "",
+          notes: "",
+          todoist: ""
+        },
+        update_count: 0,
+        retention_days: 7,
+        format: "ai-content-summary"
+      },
+      state: {
+        email_ids_seen: [],
+        task_ids_seen: [],
+        note_files_seen: {},
+        todoist_ids_seen: []
+      },
+      changes: {
+        new_emails: [],
+        deleted_emails: [],
+        replied_emails: [],
+        new_tasks: [],
+        completed_tasks: [],
+        modified_tasks: [],
+        new_notes: [],
+        modified_notes: [],
+        deleted_notes: []
+      },
+      patterns: {
+        recurring_tasks: [],
+        time_blocks: {
+          morning: [],
+          afternoon: [],
+          evening: []
+        },
+        energy_patterns: {},
+        completion_velocity: {}
+      },
+      insights: {
+        bottlenecks: [],
+        strengths: [],
+        opportunities: [],
+        risks: []
+      },
+      content: {
+        concerns: [],
+        people_to_contact: [],
+        urgent_tasks: [],
+        overdue_tasks: [],
+        task_categories: {},
+        recent_notes: [],
+        important_emails: [],
+        top_email_senders: {}
+      },
+      active_context: {
+        projects: {},
+        relationships: {},
+        commitments: {},
+        deadlines: {}
+      },
+      communications: {
+        pending_responses: [],
+        follow_ups: [],
+        key_conversations: {}
+      },
+      metrics: {
+        task_completion_rate: 0,
+        email_response_time: 0,
+        focus_time_available: 0,
+        wellbeing_indicators: {}
+      },
+      recommendations: {
+        daily_focus: [],
+        weekly_goals: [],
+        process_improvements: []
+      },
+      history: {
+        recent_completions: [],
+        recent_decisions: [],
+        lessons_learned: []
+      }
+    };
+  }
+}
+
+// Get table columns dynamically
+async function getTableColumns(tableName) {
+  try {
+    const result = execSync(
+      `sqlite3 "${DB_PATH}" "PRAGMA table_info(${tableName});"`,
+      { encoding: 'utf-8' }
+    );
+    const lines = result.trim().split('\n');
+    return lines.map(line => {
+      const parts = line.split('|');
+      return parts[1]; // Column name is in second position
+    });
+  } catch (error) {
+    return [];
+  }
+}
+
+// Check if table exists
+async function tableExists(tableName) {
+  try {
+    const result = execSync(
+      `sqlite3 "${DB_PATH}" "SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}';"`,
+      { encoding: 'utf-8' }
+    );
+    return result.trim().length > 0;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function getNewEmails(summary) {
+  // First check if emails table exists
+  if (!await tableExists('emails')) {
+    console.log('No emails table found');
+    return [];
+  }
+
+  const columns = await getTableColumns('emails');
+  if (columns.length === 0) {
+    return [];
+  }
+
+  // Build query based on available columns
+  const selectCols = [];
+  if (columns.includes('id')) selectCols.push('id');
+  if (columns.includes('uid')) selectCols.push('uid');
+  if (columns.includes('subject')) selectCols.push('subject');
+  if (columns.includes('from_address')) selectCols.push('from_address');
+  if (columns.includes('date')) selectCols.push('date');
+  if (columns.includes('folder')) selectCols.push('folder');
+  
+  if (selectCols.length === 0) {
+    console.log('No useful columns in emails table');
+    return [];
+  }
+
+  const lastSync = summary.meta.last_sync.emails || '1970-01-01';
+  const hasDateCol = columns.includes('date');
+  
+  let query;
+  if (hasDateCol) {
+    query = `
+      SELECT ${selectCols.join(', ')}
+      FROM emails 
+      WHERE date > '${lastSync}'
+      ORDER BY date DESC
+      LIMIT 100
+    `;
+  } else {
+    // No date column, just get recent emails by ID
+    query = `
+      SELECT ${selectCols.join(', ')}
+      FROM emails 
+      ORDER BY id DESC
+      LIMIT 100
+    `;
+  }
+  
+  try {
+    const result = execSync(`sqlite3 -json "${DB_PATH}" "${query}"`, { encoding: 'utf-8' });
+    return JSON.parse(result || '[]');
+  } catch (error) {
+    console.error('Error fetching emails:', error.message);
+    return [];
+  }
+}
+
+async function getTasks(summary) {
+  // First check if task_cache table exists
+  if (!await tableExists('task_cache')) {
+    console.log('No task_cache table found');
+    return [];
+  }
+
+  const columns = await getTableColumns('task_cache');
+  if (columns.length === 0) {
+    return [];
+  }
+
+  // Build query based on available columns
+  const selectCols = [];
+  if (columns.includes('id')) selectCols.push('id');
+  if (columns.includes('title')) selectCols.push('title');
+  if (columns.includes('properties')) selectCols.push('properties');
+  if (columns.includes('last_edited_time')) selectCols.push('last_edited_time');
+  if (columns.includes('database_id')) selectCols.push('database_id');
+  
+  if (selectCols.length === 0) {
+    console.log('No useful columns in task_cache table');
+    return [];
+  }
+
+  // Simple query - just get all tasks since we can't filter by stage/due_date if they don't exist
+  const query = `
+    SELECT ${selectCols.join(', ')}
+    FROM task_cache
+    LIMIT 500
+  `;
+  
+  try {
+    const result = execSync(`sqlite3 -json "${DB_PATH}" "${query}"`, { encoding: 'utf-8' });
+    const tasks = JSON.parse(result || '[]');
+    
+    // If properties column exists, try to parse it for more info
+    if (columns.includes('properties')) {
+      return tasks.map(task => {
+        try {
+          const props = JSON.parse(task.properties || '{}');
+          return {
+            ...task,
+            // Extract useful fields from properties if they exist
+            stage: props.Stage?.select?.name,
+            due_date: props['Due Date']?.date?.start,
+            tags: props.Tags?.multi_select?.map(t => t.name).join(', ')
+          };
+        } catch (e) {
+          return task;
+        }
+      });
+    }
+    
+    return tasks;
+  } catch (error) {
+    console.error('Error fetching tasks:', error.message);
+    return [];
+  }
+}
+
+async function getNoteChanges(summary) {
+  const notesDir = path.join(__dirname, '..', 'notes');
+  const changes = {
+    new: [],
+    modified: [],
+    deleted: []
+  };
+  
+  try {
+    // Find all markdown files modified in last 7 days
+    const findCmd = `find "${notesDir}" -type f -name "*.md" -mtime -7 2>/dev/null || true`;
+    const files = execSync(findCmd, { encoding: 'utf-8' })
+      .split('\n')
+      .filter(f => f.length > 0);
+    
+    const currentFiles = {};
+    
+    for (const file of files) {
+      const stats = await fs.stat(file).catch(() => null);
+      if (stats) {
+        const relPath = path.relative(notesDir, file);
+        currentFiles[relPath] = stats.mtime.toISOString();
+        
+        if (!summary.state.note_files_seen[relPath]) {
+          changes.new.push(relPath);
+        } else if (summary.state.note_files_seen[relPath] < stats.mtime.toISOString()) {
+          changes.modified.push(relPath);
+        }
+      }
+    }
+    
+    // Check for deleted files
+    for (const file in summary.state.note_files_seen) {
+      if (!currentFiles[file]) {
+        changes.deleted.push(file);
+      }
+    }
+    
+    return { files: currentFiles, changes };
+  } catch (error) {
+    console.error('Error checking notes:', error.message);
+    return { files: {}, changes };
+  }
+}
+
+async function extractContentFromNotes(summary) {
+  const content = {
+    concerns: [],
+    people_to_contact: [],
+    recent_notes: []
+  };
+  
+  try {
+    // Read concerns note if it exists
+    const concernsPath = path.join(NOTES_DIR, 'daily', '2025-08-08-concerns.md');
+    const concernsText = await fs.readFile(concernsPath, 'utf-8').catch(() => '');
+    
+    if (concernsText) {
+      // Extract bullet points from concerns
+      content.concerns = concernsText.split('\n')
+        .filter(line => line.startsWith('- '))
+        .slice(0, 10)  // Top 10 concerns
+        .map(line => line.substring(2).trim());
+      
+      // Extract mentions of people to contact
+      const peopleRegex = /(?:reply|respond|contact|email|call|meet|talk)\s+(?:to\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g;
+      const peopleSet = new Set([...concernsText.matchAll(peopleRegex)].map(m => m[1]));
+      content.people_to_contact = Array.from(peopleSet);
+    }
+    
+    // Get other recent notes
+    const recentNotes = execSync(
+      `find "${NOTES_DIR}" -name "*.md" -mtime -3 -type f 2>/dev/null | head -5`,
+      { encoding: 'utf-8' }
+    ).trim().split('\n').filter(Boolean);
+    
+    for (const notePath of recentNotes) {
+      const name = path.basename(notePath);
+      const text = await fs.readFile(notePath, 'utf-8').catch(() => '');
+      const firstLine = text.split('\n').find(l => l.trim() && !l.startsWith('#')) || '';
+      content.recent_notes.push({
+        file: name,
+        preview: firstLine.slice(0, 100)
+      });
+    }
+  } catch (error) {
+    console.error('Error extracting note content:', error.message);
+  }
+  
+  return content;
+}
+
+async function extractTaskContent(tasks) {
+  const content = {
+    urgent_tasks: [],
+    overdue_tasks: [],
+    task_categories: {}
+  };
+  
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Parse tasks to extract meaningful info
+    const parsed = tasks.map(t => {
+      try {
+        const props = typeof t.properties === 'string' ? JSON.parse(t.properties) : (t.properties || {});
+        return {
+          id: t.id,
+          title: t.title || props.title || props.Name?.title?.[0]?.text?.content || 'Untitled',
+          due_date: props.due_date || props['Due Date']?.date?.start,
+          stage: props.stage || props.Stage?.select?.name,
+          database: t.database_id || props.database || 'Uncategorized',
+          priority: props.priority || props.Priority?.select?.name
+        };
+      } catch (e) {
+        return { 
+          id: t.id,
+          title: t.title || 'Untitled',
+          database: 'Uncategorized'
+        };
+      }
+    }).filter(t => t.title && t.title !== 'Untitled');
+    
+    // Find urgent tasks (due today or tomorrow)
+    content.urgent_tasks = parsed
+      .filter(t => t.due_date && t.due_date >= today && 
+              t.due_date <= new Date(Date.now() + 48*60*60*1000).toISOString().split('T')[0])
+      .slice(0, 10)
+      .map(t => ({
+        title: t.title,
+        due_date: t.due_date,
+        priority: t.priority
+      }));
+    
+    // Find overdue tasks
+    content.overdue_tasks = parsed
+      .filter(t => t.due_date && t.due_date < today)
+      .slice(0, 10)
+      .map(t => ({
+        title: t.title,
+        due_date: t.due_date,
+        days_overdue: Math.floor((Date.now() - new Date(t.due_date)) / (24*60*60*1000))
+      }));
+    
+    // Categorize tasks
+    parsed.forEach(t => {
+      const category = t.database || 'Uncategorized';
+      if (!content.task_categories[category]) {
+        content.task_categories[category] = 0;
+      }
+      content.task_categories[category]++;
+    });
+  } catch (error) {
+    console.error('Error extracting task content:', error.message);
+  }
+  
+  return content;
+}
+
+async function extractEmailContent(emails) {
+  const content = {
+    important_emails: [],
+    top_email_senders: {}
+  };
+  
+  try {
+    // Group by sender
+    emails.forEach(e => {
+      const sender = (e.from_address || 'Unknown').replace(/<.*>/, '').trim();
+      if (!content.top_email_senders[sender]) {
+        content.top_email_senders[sender] = 0;
+      }
+      content.top_email_senders[sender]++;
+    });
+    
+    // Find important emails by keywords
+    const importantKeywords = ['urgent', 'important', 'action', 'review', 'approve', 'deadline', 'overdue', 'reply', 'reminder'];
+    content.important_emails = emails
+      .filter(e => {
+        const subject = (e.subject || '').toLowerCase();
+        return importantKeywords.some(kw => subject.includes(kw));
+      })
+      .slice(0, 10)
+      .map(e => ({
+        subject: e.subject || 'No subject',
+        from: (e.from_address || 'Unknown').split('<')[0].trim(),
+        date: e.date
+      }));
+  } catch (error) {
+    console.error('Error extracting email content:', error.message);
+  }
+  
+  return content;
+}
+
+async function generateRecommendations(summary) {
+  const hour = new Date().getHours();
+  const recommendations = [];
+  
+  if (hour < 12) {
+    recommendations.push(
+      'Review urgent tasks and overdue items',
+      'Check for important emails requiring response',
+      'Plan deep work session for complex tasks'
+    );
+  } else if (hour < 17) {
+    recommendations.push(
+      'Complete quick wins to build momentum',
+      'Address pending communications',
+      'Review progress on today\'s priorities'
+    );
+  } else {
+    recommendations.push(
+      'Complete day-end chores',
+      'Review tomorrow\'s priorities',
+      'Capture thoughts and lessons learned'
+    );
+  }
+  
+  // Add specific recommendations based on data
+  if (summary.content.overdue_tasks.length > 5) {
+    recommendations.unshift(`Address ${summary.content.overdue_tasks.length} overdue tasks`);
+  }
+  if (summary.content.concerns.length > 0) {
+    recommendations.push('Review and address noted concerns');
+  }
+  if (summary.content.people_to_contact.length > 0) {
+    recommendations.push(`Reach out to: ${summary.content.people_to_contact.slice(0, 3).join(', ')}`);
+  }
+  
+  return recommendations;
+}
+
+async function updateSummary() {
+  const summary = await loadSummary();
+  const now = new Date().toISOString();
+  
+  // Check if database exists
+  let dbExists = false;
+  try {
+    await fs.access(DB_PATH);
+    dbExists = true;
+  } catch (error) {
+    console.log('Database not found, skipping database queries');
+  }
+
+  // Always update notes and extract content
+  const noteData = await getNoteChanges(summary);
+  summary.changes.new_notes = noteData.changes.new;
+  summary.changes.modified_notes = noteData.changes.modified;
+  summary.changes.deleted_notes = noteData.changes.deleted;
+  summary.state.note_files_seen = noteData.files;
+  
+  // Extract meaningful content from notes
+  const noteContent = await extractContentFromNotes(summary);
+  summary.content.concerns = noteContent.concerns;
+  summary.content.people_to_contact = noteContent.people_to_contact;
+  summary.content.recent_notes = noteContent.recent_notes;
+
+  if (dbExists) {
+    // Get incremental updates from database
+    const newEmails = await getNewEmails(summary);
+    const tasks = await getTasks(summary);
+    
+    // Update state tracking for emails
+    const previousEmailIds = new Set(summary.state.email_ids_seen);
+    const currentEmailIds = new Set(newEmails.map(e => e.id || e.uid));
+    
+    // Track email changes
+    summary.changes.new_emails = newEmails.filter(e => {
+      const id = e.id || e.uid;
+      return !previousEmailIds.has(id);
+    });
+    summary.changes.deleted_emails = summary.state.email_ids_seen.filter(id => !currentEmailIds.has(id));
+    
+    // Update state tracking for tasks
+    const previousTaskIds = new Set(summary.state.task_ids_seen);
+    const currentTaskIds = new Set(tasks.map(t => t.id));
+    
+    // Track task changes
+    summary.changes.new_tasks = tasks.filter(t => !previousTaskIds.has(t.id));
+    summary.changes.completed_tasks = summary.state.task_ids_seen
+      .filter(id => !currentTaskIds.has(id));
+    summary.changes.modified_tasks = tasks.filter(t => 
+      previousTaskIds.has(t.id) && 
+      t.last_edited_time && 
+      t.last_edited_time > summary.meta.last_sync.tasks
+    );
+    
+    // Extract meaningful task content
+    const taskContent = await extractTaskContent(tasks);
+    summary.content.urgent_tasks = taskContent.urgent_tasks;
+    summary.content.overdue_tasks = taskContent.overdue_tasks;
+    summary.content.task_categories = taskContent.task_categories;
+    
+    // Update state
+    summary.state.email_ids_seen = Array.from(currentEmailIds);
+    summary.state.task_ids_seen = Array.from(currentTaskIds);
+    
+    // Update sync timestamps
+    if (newEmails.length > 0 && newEmails[0].date) {
+      summary.meta.last_sync.emails = newEmails[0].date;
+    }
+    summary.meta.last_sync.tasks = now;
+    
+    // Calculate simple metrics
+    const completedToday = summary.changes.completed_tasks.length;
+    const newToday = summary.changes.new_tasks.length;
+    summary.metrics.task_completion_rate = newToday > 0 ? (completedToday / newToday) : 0;
+    
+    // Identify patterns from available data
+    const urgentTasks = tasks.filter(t => 
+      t.due_date && new Date(t.due_date) <= new Date(Date.now() + 24*60*60*1000)
+    );
+    
+    if (urgentTasks.length > 0) {
+      summary.insights.risks = [`${urgentTasks.length} tasks due within 24 hours`];
+    }
+    
+    // Update active context with what we have
+    summary.active_context.deadlines = {};
+    urgentTasks.forEach(t => {
+      summary.active_context.deadlines[t.id] = {
+        title: t.title,
+        due: t.due_date,
+        stage: t.stage
+      };
+    });
+    
+    // Extract meaningful email content
+    const emailContent = await extractEmailContent(newEmails);
+    summary.content.important_emails = emailContent.important_emails;
+    summary.content.top_email_senders = emailContent.top_email_senders;
+    
+    // Identify pending email responses (simple version)
+    summary.communications.pending_responses = emailContent.important_emails;
+    
+    // Log what we found
+    console.log(`Found ${newEmails.length} emails, ${tasks.length} tasks`);
+  }
+  
+  // Generate recommendations based on all the data
+  summary.recommendations.daily_focus = await generateRecommendations(summary);
+  
+  // Update metadata
+  summary.meta.last_updated = now;
+  summary.meta.last_sync.notes = now;
+  summary.meta.update_count++;
+  
+  // Save updated summary
+  await fs.writeFile(SUMMARY_FILE, JSON.stringify(summary, null, 2));
+  
+  console.log(`✅ Summary updated: ${summary.meta.update_count} updates today`);
+  console.log(`📊 Content extracted:`);
+  console.log(`  - ${summary.content.concerns.length} concerns`);
+  console.log(`  - ${summary.content.urgent_tasks.length} urgent tasks`);
+  console.log(`  - ${summary.content.overdue_tasks.length} overdue tasks`);
+  console.log(`  - ${summary.content.important_emails.length} important emails`);
+  console.log(`  - ${Object.keys(summary.content.top_email_senders).length} email senders`);
+  console.log(`📈 Changes: ${summary.changes.new_emails.length} new emails, ${summary.changes.new_tasks.length} new tasks, ${summary.changes.new_notes.length} new notes`);
+  
+  return summary;
+}
+
+// Run the update
+updateSummary().catch(console.error);
+
+export { updateSummary };

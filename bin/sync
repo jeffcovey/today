@@ -4,6 +4,10 @@
 
 set -e
 
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
 # Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -99,9 +103,18 @@ main() {
     echo -e "$SYNC_SUMMARY"
     echo "Completed at: $(date '+%Y-%m-%d %H:%M:%S')"
     echo ""
-    print_status "All data sources synchronized!"
+    
+    # Check if any sync failed
+    if echo -e "$SYNC_SUMMARY" | grep -q "✗"; then
+        print_error "Some data sources failed to sync"
+        echo "Please configure missing services in .env file"
+        exit 1
+    else
+        print_status "All data sources synchronized!"
+    fi
+    
     echo ""
-    echo "Next step: Run 'notion --review' to get AI suggestions on what to do today"
+    echo "Next step: Run 'bin/today' to get AI suggestions on what to do today"
 }
 
 # Sync GitHub notes
@@ -160,24 +173,22 @@ sync_notion() {
     
     # Check if NOTION_TOKEN is configured
     if ! grep -q "NOTION_TOKEN=" .env 2>/dev/null || grep -q "NOTION_TOKEN=your_notion" .env 2>/dev/null; then
-        print_info "Notion not configured, skipping"
+        print_error "Notion not configured"
         print_info "Add NOTION_TOKEN to .env file"
-        return 0
+        return 1
     fi
     
-    # Check if we can connect to Notion
+    # Check if we can connect to Notion and fetch tasks
     output=$(node -e "
-        import('dotenv').then(({config}) => {
-            config();
-            return import('./src/notion-api.js');
-        }).then(async ({NotionAPI}) => {
+        // Use environment variables already loaded by parent script
+        import('./src/notion-api.js').then(async ({NotionAPI}) => {
             const token = process.env.NOTION_TOKEN;
             if (!token || token === 'your_notion_integration_token_here') {
                 throw new Error('NOTION_TOKEN not configured');
             }
             const api = new NotionAPI(token);
             const dbs = await api.getDatabases();
-            const dbCount = Object.keys(dbs).length;
+            const dbCount = dbs.length;
             console.log('Connected to ' + dbCount + ' databases');
         }).catch(err => {
             console.error('Failed:', err.message);
@@ -187,6 +198,14 @@ sync_notion() {
     
     if [[ $? -eq 0 ]]; then
         print_info "$output"
+        
+        # Now fetch and cache all tasks
+        print_info "Fetching tasks from Notion..."
+        task_output=$(bin/notion fetch-tasks 2>&1 | tail -3)
+        echo "$task_output" | while IFS= read -r line; do
+            print_info "$line"
+        done
+        
         return 0
     else
         print_error "Notion connection failed"
@@ -205,8 +224,9 @@ sync_todoist() {
     
     # Check if Todoist token is configured
     if ! grep -q "TODOIST_TOKEN=" .env 2>/dev/null || grep -q "TODOIST_TOKEN=your_todoist" .env 2>/dev/null; then
-        print_info "Todoist not configured, skipping"
-        return 0
+        print_error "Todoist not configured"
+        print_info "Add TODOIST_TOKEN to .env file"
+        return 1
     fi
     
     # Run Todoist sync
@@ -233,15 +253,15 @@ sync_email() {
     elif [[ -f bin/email-cli ]]; then
         EMAIL_BIN="bin/email-cli"
     else
-        print_info "Email CLI not available"
-        return 0
+        print_error "Email CLI not available"
+        return 1
     fi
     
     # Check if email credentials are configured
     if ! grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null || ! grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
-        print_info "Email not configured, skipping"
+        print_error "Email not configured"
         print_info "Run 'email setup' for configuration instructions"
-        return 0
+        return 1
     fi
     
     # Check when we last downloaded emails
@@ -249,30 +269,42 @@ sync_email() {
     SYNC_NEEDED=true
     
     if [[ -f .notion-cache/notion-cache.db ]]; then
-        # Get the timestamp of the most recent email
-        LAST_EMAIL_DATE=$(node -e "
-            const db = require('better-sqlite3')('.notion-cache/notion-cache.db');
-            const result = db.prepare('SELECT MAX(date) as latest, COUNT(*) as count FROM emails').get();
-            if (result && result.latest) {
-                const date = new Date(result.latest);
+        # Get the timestamp of the most recent email and count
+        EMAIL_INFO=$(sqlite3 .notion-cache/notion-cache.db "SELECT MAX(date), COUNT(*) FROM emails" 2>/dev/null || echo "||0")
+        LAST_EMAIL_DATE=$(echo "$EMAIL_INFO" | cut -d'|' -f1)
+        EMAIL_COUNT=$(echo "$EMAIL_INFO" | cut -d'|' -f2)
+        
+        if [[ -n "$LAST_EMAIL_DATE" ]] && [[ "$EMAIL_COUNT" -gt 0 ]]; then
+            # Calculate hours since last email
+            HOURS_OLD=$(node -e "
+                const date = new Date('$LAST_EMAIL_DATE');
                 const now = new Date();
                 const hoursSince = (now - date) / (1000 * 60 * 60);
                 console.log(hoursSince.toFixed(1));
-            } else {
-                console.log('999');
-            }
-            db.close();
-        " 2>/dev/null || echo "999")
-        
-        # If we have recent emails (less than 2 hours old), just sync last day
-        if [[ $(echo "$LAST_EMAIL_DATE < 2" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
-            print_info "Recent emails found (${LAST_EMAIL_DATE} hours old), doing quick sync..."
-            DAYS_TO_SYNC=1
-        elif [[ $(echo "$LAST_EMAIL_DATE < 24" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
-            print_info "Emails are ${LAST_EMAIL_DATE} hours old, syncing last 3 days..."
-            DAYS_TO_SYNC=3
+            " 2>/dev/null || echo "999")
+            
+            # Smart sync based on recency and existing email count
+            if [[ $(echo "$HOURS_OLD < 2" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
+                print_info "Emails current (${HOURS_OLD}h old, $EMAIL_COUNT total), skipping sync"
+                return 0
+            elif [[ $(echo "$HOURS_OLD < 6" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
+                print_info "Recent emails (${HOURS_OLD}h old), quick sync..."
+                DAYS_TO_SYNC=1
+            elif [[ $(echo "$HOURS_OLD < 24" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
+                print_info "Emails ${HOURS_OLD}h old, syncing last 2 days..."
+                DAYS_TO_SYNC=2
+            else
+                # Only sync more days if we have few emails
+                if [[ "$EMAIL_COUNT" -lt 100 ]]; then
+                    print_info "Few emails found, syncing last 7 days..."
+                    DAYS_TO_SYNC=7
+                else
+                    print_info "Emails ${HOURS_OLD}h old, syncing last 3 days..."
+                    DAYS_TO_SYNC=3
+                fi
+            fi
         else
-            print_info "Emails are stale or missing, syncing last 7 days..."
+            print_info "No emails in database, initial sync of 7 days..."
             DAYS_TO_SYNC=7
         fi
     else
@@ -283,10 +315,13 @@ sync_email() {
     # Run email download with appropriate time range
     print_info "Downloading emails from last $DAYS_TO_SYNC days..."
     
-    # Run email download and capture output (with timeout for long downloads)
-    output=$(timeout 60 $EMAIL_BIN download --days $DAYS_TO_SYNC 2>&1) || {
+    # Run email download with dynamic timeout based on days
+    TIMEOUT=$((30 + $DAYS_TO_SYNC * 10))  # 30s base + 10s per day
+    print_info "Downloading emails (timeout: ${TIMEOUT}s)..."
+    
+    output=$(timeout $TIMEOUT $EMAIL_BIN download --days $DAYS_TO_SYNC 2>&1) || {
         if [[ $? -eq 124 ]]; then
-            print_error "Email download timed out after 60 seconds"
+            print_error "Email download timed out after $TIMEOUT seconds"
             print_info "Try running 'email download --days 1' for a quicker sync"
         else
             print_error "Email download failed"
@@ -321,16 +356,47 @@ update_cache_stats() {
     # Check if cache database exists
     CACHE_DB=".notion-cache/notion-cache.db"
     if [[ ! -f "$CACHE_DB" ]]; then
-        print_info "Cache database not found, creating..."
+        print_info "Cache database not found, initializing..."
         mkdir -p .notion-cache
+        # Create an empty database with the required tables
+        sqlite3 "$CACHE_DB" <<EOF
+CREATE TABLE IF NOT EXISTS emails (
+    id TEXT PRIMARY KEY,
+    subject TEXT,
+    from_address TEXT,
+    date TEXT,
+    has_been_replied_to INTEGER DEFAULT 0,
+    text_content TEXT
+);
+CREATE TABLE IF NOT EXISTS task_cache (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    due_date TEXT,
+    stage TEXT,
+    tags TEXT,
+    description TEXT,
+    last_edited_time TEXT
+);
+CREATE TABLE IF NOT EXISTS database_cache (
+    id TEXT PRIMARY KEY,
+    data TEXT
+);
+CREATE TABLE IF NOT EXISTS cache_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+CREATE TABLE IF NOT EXISTS project_pillar_mapping (
+    project_id TEXT,
+    pillar_id TEXT
+);
+EOF
+        print_info "Cache database initialized"
     fi
     
     # Get cache statistics
     cache_output=$(node -e "
-        import('dotenv').then(({config}) => {
-            config();
-            return import('./src/sqlite-cache.js');
-        }).then(({default: DatabaseCache}) => {
+        // Use environment variables already loaded by parent script
+        import('./src/sqlite-cache.js').then(({default: DatabaseCache}) => {
             const cache = new DatabaseCache();
             const stats = cache.getStatistics();
             if (stats && stats.totalItems !== undefined) {
@@ -389,7 +455,7 @@ case "${1:-}" in
         fi
         if [[ -n "$EMAIL_BIN" ]]; then
             print_info "Downloading emails from last 24 hours..."
-            timeout 30 $EMAIL_BIN download --days 1 2>&1 | grep -E "Downloaded|Total" || true
+            timeout 30 $EMAIL_BIN download --days 1 | grep -E "Downloaded|Total|✅" || true
             print_status "Quick email sync complete"
         else
             print_error "Email CLI not found"

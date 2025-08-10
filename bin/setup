@@ -31,12 +31,14 @@ Options:
     --ssh                Setup SSH server for remote access
     --tailscale         Setup Tailscale VPN for secure connectivity
     --tailscale-hostname Configure Tailscale hostname
+    --dotenvx           Setup dotenvx for encrypted environment sync
     --all               Run all setup tasks
     --help              Display this help message
 
 Examples:
     setup --ssh          # Setup SSH server only
     setup --tailscale    # Setup Tailscale only
+    setup --dotenvx      # Setup encrypted env sync
     setup --all          # Run all setups
 
 EOF
@@ -146,6 +148,88 @@ setup_tailscale() {
     fi
 }
 
+# Dotenvx Setup Function
+setup_dotenvx() {
+    print_status "Setting up dotenvx for encrypted environment sync..."
+    echo ""
+    
+    # Load common functions
+    source "$(dirname "$0")/lib/dotenvx-loader.sh"
+    
+    # Check if .env exists
+    if [ ! -f .env ]; then
+        print_error "❌ No .env file found. Please create one first."
+        return 1
+    fi
+    
+    # Install dotenvx if not already installed
+    if ! has_dotenvx_installed; then
+        echo "📦 Installing dotenvx..."
+        npm install -D @dotenvx/dotenvx
+    fi
+    
+    # Check if already encrypted
+    if has_dotenvx_encryption; then
+        print_warning "⚠️  Environment already encrypted"
+        echo "To re-encrypt with updated values, run:"
+        echo "  npx dotenvx encrypt"
+        echo ""
+        
+        # Check for decryption key
+        if [ -f .env.keys ]; then
+            echo "🔑 Your private key (from .env.keys):"
+            grep "DOTENV_PRIVATE_KEY" .env.keys | head -1
+        fi
+        return 0
+    fi
+    
+    # Encrypt the .env file
+    echo "🔒 Encrypting .env file..."
+    npx dotenvx encrypt
+    
+    # Check if encryption succeeded
+    if has_dotenvx_encryption; then
+        print_status "✅ Successfully encrypted environment variables"
+        
+        # Update .gitignore
+        echo "📝 Updating .gitignore..."
+        npx dotenvx ext gitignore --pattern .env.keys 2>/dev/null || true
+        
+        # Ensure .env is also ignored
+        if ! grep -q "^\.env$" .gitignore 2>/dev/null; then
+            echo ".env" >> .gitignore
+        fi
+        
+        echo ""
+        print_status "✅ Dotenvx setup complete!"
+        echo ""
+        echo "📋 Next steps:"
+        echo "1. Your private key is in .env.keys (DO NOT COMMIT)"
+        echo "2. The encrypted .env file is safe to commit"
+        echo "3. To use in other locations:"
+        echo "   - Pull the repo to get encrypted .env"
+        echo "   - Set: export DOTENV_PRIVATE_KEY='<key>'"
+        echo "   - Commands will auto-decrypt when run"
+        echo ""
+        echo "Example usage:"
+        echo "  bin/sync         # Will auto-use dotenvx"
+        echo "  bin/review       # Will auto-use dotenvx"
+        echo ""
+        
+        # Show the key for easy copying
+        if [ -f .env.keys ]; then
+            echo "🔑 Your private key (save this securely):"
+            grep "DOTENV_PRIVATE_KEY" .env.keys | head -1
+            echo ""
+            echo "Add to your shell profile (~/.bashrc or ~/.zshrc):"
+            echo "export $(grep "DOTENV_PRIVATE_KEY" .env.keys | head -1)"
+        fi
+    else
+        print_error "❌ Encryption failed"
+        return 1
+    fi
+}
+
 # Tailscale Hostname Setup Function
 setup_tailscale_hostname() {
     print_status "Configuring Tailscale hostname..."
@@ -214,6 +298,9 @@ case "$1" in
     --tailscale-hostname)
         setup_tailscale_hostname
         ;;
+    --dotenvx)
+        setup_dotenvx
+        ;;
     --all)
         print_status "Running all setup tasks..."
         echo ""
@@ -222,6 +309,8 @@ case "$1" in
         setup_tailscale
         echo ""
         setup_tailscale_hostname
+        echo ""
+        setup_dotenvx
         print_status "✅ All setup tasks completed!"
         ;;
     --help|-h)

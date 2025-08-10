@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Auto-use dotenvx if available
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
 // Run the Notion-Todoist sync scheduler
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';

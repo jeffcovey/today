@@ -4,11 +4,23 @@
 First run `bin/sync` to update all data sources, then pipe this file to Claude:
 ```bash
 bin/sync
-cat REVIEW.md | claude
+bin/update-summary  # Updates comprehensive summary with content
+cat TODAY.md | claude
+```
+
+Or use the shortcut that does everything:
+```bash
+bin/today  # Syncs, generates summary, and sends to Claude
 ```
 
 ## Instructions
 Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized.
+
+**Summary Available:** `SUMMARY.json` contains a comprehensive summary with:
+- Actual content: task titles, email subjects, note excerpts, concerns
+- Incremental tracking: new/modified/deleted items since last review
+- AI-ready insights: urgent tasks, overdue items, people to contact
+- Time-based recommendations: contextual suggestions based on time of day
 
 **Important:** Use simple, direct commands to access data. Avoid complex node scripts or Task tools. Use commands like:
 - `sqlite3 .notion-cache/notion-cache.db "SELECT * FROM task_cache WHERE ..."`

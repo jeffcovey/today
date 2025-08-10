@@ -1,5 +1,7 @@
 node_modules/
-.env
+# .env is encrypted inline with dotenvx, safe to commit
+# .env
+.env.keys
 *.log
 .DS_Store
 dist/

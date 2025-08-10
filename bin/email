@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// Auto-use dotenvx if available
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
 import { program } from 'commander';
 import { config } from 'dotenv';
 import path from 'path';
@@ -9,8 +13,10 @@ import chalk from 'chalk';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-config();
+// Load environment variables (fallback if not using dotenvx)
+if (!process.env.DOTENVX_RUNNING) {
+  config();
+}
 
 // Import commands
 Promise.all([
