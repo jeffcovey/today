@@ -12,18 +12,18 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.57.0",
+    "@anthropic-ai/sdk": "^0.59.0",
     "@doist/todoist-api-typescript": "^5.1.1",
     "@notionhq/client": "^4.0.1",
     "better-sqlite3": "^12.2.0",
-    "chalk": "^5.4.1",
+    "chalk": "^5.5.0",
     "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
     "dotenv": "^17.2.1",
-    "googleapis": "^118.0.0",
-    "imapflow": "^1.0.191",
-    "inquirer": "^12.9.0",
+    "googleapis": "^155.0.1",
+    "imapflow": "^1.0.193",
+    "inquirer": "^12.9.1",
     "mailparser": "^3.7.4",
     "open": "^10.2.0"
   },
