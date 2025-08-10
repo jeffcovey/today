@@ -14,6 +14,8 @@ services:
       - calendar-cache:/app/.calendar-cache
       # Override node_modules to use container's version
       - /app/node_modules
+      # Mount SSH directory for git operations (read-only)
+      - ~/.ssh:/root/.ssh:ro
     stdin_open: true
     tty: true
 

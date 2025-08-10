@@ -83,6 +83,7 @@ The docker-compose.yml mounts:
 - Entire project directory at `/app`
 - Named volumes for caches (persist between rebuilds)
 - Isolated node_modules (container-specific)
+- Your SSH keys from `~/.ssh` (read-only, for git operations)
 
 ### Data Persistence
 
@@ -95,6 +96,16 @@ These directories persist between container runs:
 - `SUMMARY.json` - Daily summary data
 
 ## Troubleshooting
+
+### Git SSH Issues
+If you get "Permission denied (publickey)" errors:
+1. Ensure your SSH key is added to GitHub
+2. Check that your SSH key exists: `ls ~/.ssh/id_*`
+3. Test SSH connection: `ssh -T git@github.com`
+4. If using a non-standard key name, configure git:
+   ```bash
+   git config core.sshCommand "ssh -i ~/.ssh/your_key"
+   ```
 
 ### Permission Issues
 If you get permission errors, ensure your user owns the files:
