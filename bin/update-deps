@@ -44,7 +44,8 @@ fi
 # Check for updates
 log ""
 log "📦 Checking for dependency updates..."
-UPDATES=$(npx npm-check-updates 2>/dev/null | grep -E "^\s+\S+\s+\^")
+# Use --timeout to prevent hanging and -y to skip prompts
+UPDATES=$(timeout 10 npx --yes npm-check-updates 2>/dev/null | grep -E "^\s+\S+\s+\^" || true)
 
 if [ ! -z "$UPDATES" ]; then
     alert "📦 Updates available:"

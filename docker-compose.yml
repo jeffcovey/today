@@ -6,6 +6,7 @@ services:
     container_name: today
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
+      - SKIP_DEP_CHECK=${SKIP_DEP_CHECK:-false}
     volumes:
       # Mount the entire project directory
       - .:/app

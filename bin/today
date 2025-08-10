@@ -8,15 +8,18 @@ auto_dotenvx "$@"
 
 echo "📊 Starting daily review process..."
 
-# Check dependencies once per day (quietly)
+# Check dependencies once per day (quietly) - skip in container if CI env var is set
 LAST_DEP_CHECK_FILE=".last-dep-check"
 TODAY_DATE=$(date +%Y-%m-%d)
 
-if [ ! -f "$LAST_DEP_CHECK_FILE" ] || [ "$(cat $LAST_DEP_CHECK_FILE 2>/dev/null)" != "$TODAY_DATE" ]; then
-    echo "🔍 Checking for dependency updates..."
-    bin/update-deps --quiet
-    echo "$TODAY_DATE" > "$LAST_DEP_CHECK_FILE"
-    echo ""
+# Skip dependency check if running in container with limited network
+if [ "$SKIP_DEP_CHECK" != "true" ]; then
+    if [ ! -f "$LAST_DEP_CHECK_FILE" ] || [ "$(cat $LAST_DEP_CHECK_FILE 2>/dev/null)" != "$TODAY_DATE" ]; then
+        echo "🔍 Checking for dependency updates (timeout in 10s)..."
+        timeout 10 bin/update-deps --quiet || echo "⚠️  Dependency check timed out, continuing..."
+        echo "$TODAY_DATE" > "$LAST_DEP_CHECK_FILE"
+        echo ""
+    fi
 fi
 
 # Run sync to update all data sources
