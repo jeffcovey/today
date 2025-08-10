@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# Script to mark tasks as done in today's review file
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+TODAY_DATE=$(date +%Y-%m-%d)
+REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+TIMESTAMP=$(date +"%H:%M")
+
+# Check if review file exists
+if [ ! -f "$REVIEW_FILE" ]; then
+    echo "❌ No review file for today. Run 'bin/today' first to create one."
+    exit 1
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Usage: bin/mark-done <task description or number>"
+    echo ""
+    echo "Examples:"
+    echo "  bin/mark-done 'Take a 20-minute walk'"
+    echo "  bin/mark-done 1  # marks first task as done"
+    exit 1
+fi
+
+# Create a temporary file
+TEMP_FILE=$(mktemp)
+
+# Process the review file and mark tasks as done
+if [[ "$1" =~ ^[0-9]+$ ]]; then
+    # Mark by task number
+    TASK_NUM=$1
+    COUNTER=0
+    FOUND=false
+    
+    while IFS= read -r line; do
+        # Look for task patterns (lines starting with - [ ] or numbered items)
+        if [[ "$line" =~ ^-\ \[\ \] ]] || [[ "$line" =~ ^[0-9]+\.\ .*\*\*.* ]]; then
+            COUNTER=$((COUNTER + 1))
+            if [ $COUNTER -eq $TASK_NUM ]; then
+                if [[ "$line" =~ ^-\ \[\ \] ]]; then
+                    # Checkbox format
+                    echo "${line/- \[ \]/- [x]} ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
+                else
+                    # Numbered format
+                    echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
+                fi
+                FOUND=true
+                COMPLETED_TASK="${line#- \[ \] }"
+                COMPLETED_TASK="${COMPLETED_TASK#[0-9]. }"
+            else
+                echo "$line" >> "$TEMP_FILE"
+            fi
+        else
+            echo "$line" >> "$TEMP_FILE"
+        fi
+    done < "$REVIEW_FILE"
+else
+    # Mark by matching text
+    SEARCH_TEXT="$*"
+    FOUND=false
+    
+    while IFS= read -r line; do
+        # Check if this line contains the search text
+        if [[ "$line" == *"$SEARCH_TEXT"* ]] && [[ "$line" != *"✓"* ]]; then
+            if [[ "$line" =~ ^-\ \[\ \] ]]; then
+                # Checkbox format
+                echo "${line/- \[ \]/- [x]} ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
+            elif [[ "$line" =~ ^[0-9]+\. ]]; then
+                # Numbered format
+                echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
+            else
+                # Other format - just append checkmark
+                echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
+            fi
+            FOUND=true
+            COMPLETED_TASK="$SEARCH_TEXT"
+        else
+            echo "$line" >> "$TEMP_FILE"
+        fi
+    done < "$REVIEW_FILE"
+fi
+
+if [ "$FOUND" = true ]; then
+    # Replace the original file
+    mv "$TEMP_FILE" "$REVIEW_FILE"
+    echo "✅ Marked as done: $COMPLETED_TASK"
+    echo "   Timestamp: $TIMESTAMP"
+    echo "   File: $REVIEW_FILE"
+else
+    rm "$TEMP_FILE"
+    echo "❌ Task not found. Current tasks in review:"
+    echo ""
+    # Show current uncompleted tasks
+    grep -E "^- \[ \]|^[0-9]+\." "$REVIEW_FILE" | grep -v "✓" | head -10
+fi

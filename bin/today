@@ -49,14 +49,18 @@ if [ -f SUMMARY.json ]; then
     echo "**Review file:** $REVIEW_FILE" >> "$TEMP_FILE"
     echo "**Time:** $TIMESTAMP" >> "$TEMP_FILE"
     echo "" >> "$TEMP_FILE"
-    echo "After I provide your daily review, you can:" >> "$TEMP_FILE"
-    echo "1. Ask follow-up questions about any recommendations" >> "$TEMP_FILE"
-    echo "2. Request help with specific tasks" >> "$TEMP_FILE"
-    echo "3. Update your priorities based on new information" >> "$TEMP_FILE"
+    echo "### Important Instructions for Claude:" >> "$TEMP_FILE"
+    echo "1. Format all tasks with checkboxes: - [ ] Task description" >> "$TEMP_FILE"
+    echo "2. Or use numbered format: 1. **Task name** (time estimate)" >> "$TEMP_FILE"
+    echo "3. Group tasks by time of day or category" >> "$TEMP_FILE"
+    echo "4. If updating an existing review, check which tasks are marked done (✓)" >> "$TEMP_FILE"
+    echo "5. Provide new recommendations based on completed tasks" >> "$TEMP_FILE"
     echo "" >> "$TEMP_FILE"
-    echo "💡 **Tip:** Copy important insights from our conversation and save them using:" >> "$TEMP_FILE"
+    echo "### Commands for the user:" >> "$TEMP_FILE"
     echo '```bash' >> "$TEMP_FILE"
-    echo 'bin/progress "Your note here"  # Adds timestamped note to review file' >> "$TEMP_FILE"
+    echo 'bin/mark-done "Take a 20-minute walk"  # Mark specific task as done' >> "$TEMP_FILE"
+    echo 'bin/mark-done 1                        # Mark task #1 as done' >> "$TEMP_FILE"
+    echo 'bin/progress "Additional note"         # Add a progress note' >> "$TEMP_FILE"
     echo '```' >> "$TEMP_FILE"
     
     # Create or prepare the review file header
@@ -93,19 +97,69 @@ if [ -f SUMMARY.json ]; then
     echo "🤖 Starting interactive Claude session..."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
+    echo "📝 Review will be saved to: $REVIEW_FILE"
+    echo "   (Click the path above to open the file)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
     
-    # Run Claude interactively
-    cat "$TEMP_FILE" | claude
+    # Run Claude interactively and capture output
+    CLAUDE_OUTPUT=$(cat "$TEMP_FILE" | claude 2>&1 | tee /dev/tty)
+    
+    # Save Claude's analysis to the review file with timestamp
+    if [ ! -z "$CLAUDE_OUTPUT" ]; then
+        # Find the last "Update" section and replace it with Claude's output
+        # Create a temporary file with the updated content
+        TEMP_REVIEW=$(mktemp)
+        
+        # If this is a new file or first entry, just append
+        if ! grep -q "^## Update" "$REVIEW_FILE" 2>/dev/null; then
+            cat "$REVIEW_FILE" > "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "## Update ($TIMESTAMP)" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "### Completed Since Last Review:" >> "$TEMP_REVIEW"
+            grep "✓" "$REVIEW_FILE" | tail -5 >> "$TEMP_REVIEW" 2>/dev/null || echo "None yet" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "### Claude's Updated Recommendations:" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "$CLAUDE_OUTPUT" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "---" >> "$TEMP_REVIEW"
+        else
+            # Find the last "Update" section and replace everything after it
+            # Keep everything up to and including the last "Update" header
+            awk '/^## Update \([0-9][0-9]:[0-9][0-9]\)$/ { found=NR } { lines[NR]=$0 } END { 
+                if (found) {
+                    for (i=1; i<=found; i++) print lines[i]
+                } else {
+                    for (i=1; i<=NR; i++) print lines[i]
+                }
+            }' "$REVIEW_FILE" > "$TEMP_REVIEW"
+            
+            # Add Claude's new analysis
+            echo "*Claude's analysis:*" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "$CLAUDE_OUTPUT" >> "$TEMP_REVIEW"
+            echo "" >> "$TEMP_REVIEW"
+            echo "---" >> "$TEMP_REVIEW"
+        fi
+        
+        # Replace the review file with the updated content
+        mv "$TEMP_REVIEW" "$REVIEW_FILE"
+    fi
     
     # After Claude exits, remind about saving
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "✅ Claude session ended"
     echo ""
-    echo "📝 Remember to save important insights using:"
-    echo "   bin/progress \"Your note here\""
+    echo "📝 Claude's analysis has been saved to:"
+    echo "   $REVIEW_FILE"
     echo ""
-    echo "📂 Review file: $REVIEW_FILE"
+    echo "💡 Track your progress using:"
+    echo "   bin/mark-done 'task description'  # Mark a task as complete"
+    echo "   bin/mark-done 1                   # Mark task #1 as complete"
+    echo "   bin/progress 'note'               # Add a general note"
     echo ""
     
     # Cleanup

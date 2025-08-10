@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Show today's task status from review file
+
+TODAY_DATE=$(date +%Y-%m-%d)
+REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+
+if [ ! -f "$REVIEW_FILE" ]; then
+    echo "❌ No review file for today. Run 'bin/today' first."
+    exit 1
+fi
+
+echo "📊 Today's Progress ($TODAY_DATE)"
+echo "════════════════════════════════════════"
+echo ""
+
+# Count completed vs total tasks
+TOTAL=$(grep -E "^- \[ \]|^- \[x\]|^[0-9]+\." "$REVIEW_FILE" | wc -l)
+COMPLETED=$(grep -E "✓" "$REVIEW_FILE" | wc -l)
+
+echo "📈 Progress: $COMPLETED/$TOTAL tasks completed"
+echo ""
+
+# Show completed tasks
+if [ $COMPLETED -gt 0 ]; then
+    echo "✅ Completed:"
+    grep "✓" "$REVIEW_FILE" | sed 's/^/   /'
+    echo ""
+fi
+
+# Show pending tasks
+PENDING=$(grep -E "^- \[ \]|^[0-9]+\." "$REVIEW_FILE" | grep -v "✓")
+if [ ! -z "$PENDING" ]; then
+    echo "⏳ Pending:"
+    echo "$PENDING" | head -10 | nl -w2 -s". " | sed 's/^/   /'
+    echo ""
+fi
+
+echo "📝 Review file: $REVIEW_FILE"
+echo ""
+echo "Commands:"
+echo "  bin/mark-done <task or number>  # Mark task as complete"
+echo "  bin/today                        # Get updated recommendations"
+echo "  bin/progress <note>              # Add a progress note"
