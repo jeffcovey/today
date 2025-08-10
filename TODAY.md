@@ -18,6 +18,16 @@ bin/today  # Syncs, generates summary, sends to Claude, and saves to notes/revie
 ## Instructions
 Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and analyzed.
 
+### Guidelines
+
+I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to stretch, etc. before I start work. I go to bed around 9:30PM, but I like to go offline for the last couple of hours. I should wrap up the day's work and plan tomorrow by mid-evening.
+
+notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
+
+My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someone is coming, I need to make up the room in time for their arrival at 3PM. If someone is leaving, I need to clean up the room after they're gone at their 12PM check-out time.
+
+### Data Inputs
+
 **IMPORTANT: All data has already been extracted and analyzed in the SUMMARY.json below. DO NOT query databases or files directly - everything you need is in the summary:**
 
 The SUMMARY.json contains:

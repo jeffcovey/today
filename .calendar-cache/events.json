@@ -1,0 +1,82 @@
+{
+  "last_sync": "2025-08-10T17:36:37.531Z",
+  "total_events": 8,
+  "events": [
+    {
+      "source": "Airbnb - Listing 2",
+      "start": "2025-08-08",
+      "allDay": true,
+      "end": "2025-08-09",
+      "title": "Reserved",
+      "id": "1418fb94e984-4281e16296064c2a67f9d0d82357adaa@airbnb.com",
+      "description": "Reservation URL: https://www.airbnb.com/hosting/reservations/details/HMDHYPYBWN\nPhone Number (Last 4 Digits): 1397"
+    },
+    {
+      "source": "Airbnb - Listing 1",
+      "start": "2025-08-09",
+      "allDay": true,
+      "end": "2025-08-10",
+      "title": "Reserved",
+      "id": "1418fb94e984-ca91dca57c22ef63cb73a021c9c7352d@airbnb.com",
+      "description": "Reservation URL: https://www.airbnb.com/hosting/reservations/details/HM3XKJAMHA\nPhone Number (Last 4 Digits): 5794"
+    },
+    {
+      "source": "google",
+      "calendar": "jeff.covey@gmail.com",
+      "id": "_ckp3ac1gc8pmcb9k60sj8b9k6kojgb9o6hh3cbb368rj4dr26dhm4db46p06cr3fetpm2tjmf4n62s3g_20250811",
+      "title": "Bulk trash pickup",
+      "start": "2025-08-11",
+      "end": "2025-08-12",
+      "allDay": true
+    },
+    {
+      "source": "google",
+      "calendar": "jeff.covey@gmail.com",
+      "id": "_69ijgeb5c9h3ebb670q30b9kc8p3cbb265i3ib9n6dhjgdb2cgojco9k6d06cr3fetpm2tjmf4n62s3g_20250812T140000Z",
+      "title": "Coffee and Conversation ",
+      "start": "2025-08-12T10:00:00-04:00",
+      "end": "2025-08-12T12:00:00-04:00",
+      "location": "The Pride Center at Equality Park2040 N Dixie Hwy, Wilton Manors, FL  33305, United States",
+      "allDay": false
+    },
+    {
+      "source": "google",
+      "calendar": "jeff.covey@gmail.com",
+      "id": "_8d1jidhj68s48ba68d2k4b9k8osk6b9p6p34cb9g8co3edq4711k2h2570_20250812T210000Z",
+      "title": "Prime Gentlemen Mixer",
+      "start": "2025-08-12T17:00:00-04:00",
+      "end": "2025-08-12T19:00:00-04:00",
+      "location": "Tropics Grille\n2000 Wilton Dr, Wilton Manors, FL  33305, United States",
+      "allDay": false
+    },
+    {
+      "source": "google",
+      "calendar": "jeff.covey@gmail.com",
+      "id": "_at4koh2v85854ia39ta5uham8l758npm68r38dhi6hfl6hajad4kujiv60",
+      "title": "Diner Run: Bagel Snack",
+      "start": "2025-08-14T13:00:00-04:00",
+      "end": "2025-08-14T16:00:00-04:00",
+      "location": "1237 Powerline Pompano Beach",
+      "description": "https://fortlauderdaleprimegentlemeninc.wildapricot.org/event-6264624?CalendarViewType=1&SelectedDate=8/7/2025\n\nThursday, August 14th, 1:00 pm            Bagel Snack  1237 Powerline Rd, Pompano Beach            RSVP needed  register or Doug Kent at dutchwood@att.net                     Bagel Snack will be our destination for our August 14, 2025 Diner Luncheon. Located at 1237 S. Powerline Rd. in Pompano Beach, it is the premier N.Y. Deli location in the area. Their philosophy is: if it isn&amp;#39;t exceptional, we won&amp;#39;t sell it. For over 40 years they have been serving South Florida with outstanding N.Y. Deli cuisine.                 ",
+      "allDay": false
+    },
+    {
+      "source": "Airbnb - Listing 2",
+      "start": "2025-08-29",
+      "allDay": true,
+      "end": "2025-08-30",
+      "title": "Reserved",
+      "id": "1418fb94e984-91aaa5b50a4b95ae602ef2a2c213365e@airbnb.com",
+      "description": "Reservation URL: https://www.airbnb.com/hosting/reservations/details/HMKM2K43YX\nPhone Number (Last 4 Digits): 4974"
+    },
+    {
+      "source": "Airbnb - Listing 1",
+      "start": "2025-12-23",
+      "allDay": true,
+      "end": "2026-01-05",
+      "title": "Reserved",
+      "id": "1418fb94e984-7150c61632dd555cadcba4d789f6d993@airbnb.com",
+      "description": "Reservation URL: https://www.airbnb.com/hosting/reservations/details/HM9449QKYP\nPhone Number (Last 4 Digits): 9952"
+    }
+  ]
+}

@@ -134,5 +134,68 @@
         "actions": []
       }
     }
+  },
+  {
+    "timestamp": "2025-08-10T14:48:50.292Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      }
+    }
+  },
+  {
+    "timestamp": "2025-08-10T17:25:35.520Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      }
+    }
+  },
+  {
+    "timestamp": "2025-08-10T17:36:14.762Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 19,
+        "errors": 0,
+        "actions": []
+      }
+    }
   }
 ]
