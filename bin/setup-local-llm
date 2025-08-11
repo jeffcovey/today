@@ -66,26 +66,51 @@ read -r MODEL_CHOICE
 # Start Ollama server if not running
 if ! pgrep -x "ollama" > /dev/null; then
     echo "Starting Ollama server..."
-    ollama serve > /dev/null 2>&1 &
-    sleep 3  # Give it time to start
+    if ! ollama serve > /dev/null 2>&1 &; then
+        echo "⚠️  Failed to start Ollama server"
+        echo "You may need to start it manually with: ollama serve"
+    else
+        sleep 3  # Give it time to start
+    fi
 fi
 
+MODEL_DOWNLOADED=false
 case $MODEL_CHOICE in
     1)
         echo "Downloading phi3 model (about 2.3GB)..."
-        ollama pull phi3
+        if ollama pull phi3 2>/dev/null; then
+            MODEL_DOWNLOADED=true
+            echo "✅ phi3 model downloaded successfully"
+        else
+            echo "❌ Failed to download phi3 model"
+        fi
         ;;
     2)
         echo "Downloading tinyllama model (about 638MB)..."
-        ollama pull tinyllama
+        if ollama pull tinyllama 2>/dev/null; then
+            MODEL_DOWNLOADED=true
+            echo "✅ tinyllama model downloaded successfully"
+        else
+            echo "❌ Failed to download tinyllama model"
+        fi
         ;;
     3)
         echo "Downloading mistral model (about 4.1GB)..."
-        ollama pull mistral
+        if ollama pull mistral 2>/dev/null; then
+            MODEL_DOWNLOADED=true
+            echo "✅ mistral model downloaded successfully"
+        else
+            echo "❌ Failed to download mistral model"
+        fi
         ;;
     4)
         echo "Downloading llama3 model (about 4.7GB)..."
-        ollama pull llama3
+        if ollama pull llama3 2>/dev/null; then
+            MODEL_DOWNLOADED=true
+            echo "✅ llama3 model downloaded successfully"
+        else
+            echo "❌ Failed to download llama3 model"
+        fi
         ;;
     n|N)
         echo "Skipping model download"
@@ -96,14 +121,40 @@ case $MODEL_CHOICE in
 esac
 
 echo ""
-echo "🎉 Setup complete!"
-echo ""
-echo "To test your local LLM:"
-echo "  ollama run $(ollama list 2>/dev/null | tail -n +2 | head -1 | awk '{print $1}') \"Hello, how are you?\""
-echo ""
-echo "The Today CLI will now automatically use your local LLM for:"
-echo "  - Daily summary recommendations (bin/update-summary)"
-echo "  - Simple email/task searches"
-echo "  - Basic intent classification"
-echo ""
-echo "This will help reduce your Claude API usage significantly!"
+
+# Check if we have any models installed
+INSTALLED_COUNT=$(ollama list 2>/dev/null | tail -n +2 | wc -l)
+
+if [ "$INSTALLED_COUNT" -gt 0 ] || [ "$MODEL_DOWNLOADED" = true ]; then
+    echo "🎉 Setup complete!"
+    echo ""
+    echo "To test your local LLM:"
+    MODEL_NAME=$(ollama list 2>/dev/null | tail -n +2 | head -1 | awk '{print $1}')
+    if [ -n "$MODEL_NAME" ]; then
+        echo "  ollama run $MODEL_NAME \"Hello, how are you?\""
+    else
+        echo "  ollama run <model_name> \"Hello, how are you?\""
+    fi
+    echo ""
+    echo "The Today CLI will now automatically use your local LLM for:"
+    echo "  - Daily summary recommendations (bin/update-summary)"
+    echo "  - Simple email/task searches"
+    echo "  - Basic intent classification"
+    echo ""
+    echo "This will help reduce your Claude API usage significantly!"
+else
+    echo "⚠️  Setup incomplete"
+    echo ""
+    echo "Ollama is installed but no models are available."
+    echo ""
+    echo "Common issues:"
+    echo "  1. The ollama binary may not be executable on this architecture"
+    echo "  2. The ollama server may not be running"
+    echo ""
+    echo "Try manually:"
+    echo "  1. Start server: ollama serve"
+    echo "  2. In another terminal: ollama pull tinyllama"
+    echo ""
+    echo "Or install Ollama from source for your architecture:"
+    echo "  https://github.com/ollama/ollama"
+fi
