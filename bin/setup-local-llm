@@ -13,6 +13,24 @@ ARCH="$(uname -m)"
 # Check if Ollama is installed
 if command -v ollama &> /dev/null; then
     echo "✅ Ollama is already installed"
+    
+    # Test if ollama actually works
+    if ! ollama --version &> /dev/null; then
+        echo "⚠️  Ollama binary found but cannot execute"
+        echo ""
+        echo "This usually means:"
+        echo "  • Architecture mismatch (binary compiled for different CPU)"
+        echo "  • Missing required libraries"
+        echo ""
+        echo "Current architecture: $(uname -m)"
+        echo ""
+        echo "To fix, reinstall Ollama for your architecture:"
+        echo "  • For x86_64: curl -fsSL https://ollama.com/install.sh | sh"
+        echo "  • For Docker: Consider using ollama/ollama Docker image"
+        echo "  • Or build from source: https://github.com/ollama/ollama"
+        exit 1
+    fi
+    
     echo ""
     echo "Available models:"
     ollama list
@@ -23,17 +41,36 @@ else
     read -r INSTALL_OLLAMA
     
     if [[ "$INSTALL_OLLAMA" == "y" ]]; then
+        # Check if we're in a container
+        if [ -f /.dockerenv ] || [ -n "$CONTAINER" ]; then
+            echo ""
+            echo "⚠️  Running in a container environment"
+            echo ""
+            echo "For containers, it's better to use Ollama as a separate service:"
+            echo ""
+            echo "Option 1: Use Docker Compose with ollama/ollama image"
+            echo "Option 2: Run on host and expose port 11434 to container"
+            echo ""
+            echo "Attempting standard install anyway..."
+        fi
+        
         echo "Installing Ollama..."
         
         if [[ "$OS" == "Linux" ]] || [[ "$OS" == "Darwin" ]]; then
             # Official Ollama install script
-            curl -fsSL https://ollama.com/install.sh | sh
+            if curl -fsSL https://ollama.com/install.sh | sh; then
+                echo "✅ Ollama installed successfully"
+            else
+                echo "❌ Ollama installation failed"
+                echo ""
+                echo "For containers, consider running Ollama as a separate service:"
+                echo "  docker run -d -v ollama:/root/.ollama -p 11434:11434 ollama/ollama"
+                exit 1
+            fi
         else
             echo "Please visit https://ollama.com/download to install Ollama for your system"
             exit 1
         fi
-        
-        echo "✅ Ollama installed successfully"
     else
         echo "Skipping Ollama installation"
         exit 0
