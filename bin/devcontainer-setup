@@ -48,9 +48,19 @@ else
 fi
 echo ""
 
-# Step 2: Rebuild native modules
-echo "Step 2: Native Modules"
-echo "----------------------"
+# Step 2: Install dependencies and rebuild native modules
+echo "Step 2: Dependencies & Native Modules"
+echo "-------------------------------------"
+
+# Check if node_modules exists
+if [ ! -d "node_modules" ] || [ ! -d "node_modules/@dotenvx/dotenvx" ]; then
+    echo "Installing npm dependencies..."
+    npm install 2>&1 | grep -v "npm WARN" | grep -v "deprecated" | tail -5
+    echo "✅ Dependencies installed"
+else
+    echo "✅ Dependencies already installed"
+fi
+
 echo "Rebuilding better-sqlite3 for this platform..."
 npm rebuild better-sqlite3 2>&1 | grep -v "npm WARN" | grep -v "deprecated"
 echo "✅ Native modules rebuilt"
