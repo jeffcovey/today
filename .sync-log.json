@@ -470,5 +470,26 @@
         "actions": []
       }
     }
+  },
+  {
+    "timestamp": "2025-08-11T17:46:58.589Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 3,
+        "deleted": 0,
+        "skipped": 7,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 3,
+        "skipped": 7,
+        "errors": 0,
+        "actions": []
+      }
+    }
   }
 ]

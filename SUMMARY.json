@@ -1,31 +1,73 @@
 {
   "meta": {
     "version": "2.0.0",
-    "last_updated": "2025-08-11T10:24:40.312Z",
+    "last_updated": "2025-08-11T17:47:17.597Z",
     "last_sync": {
-      "emails": "2025-08-11T10:16:52.000Z",
-      "tasks": "2025-08-11T10:24:40.312Z",
-      "notes": "2025-08-11T10:24:40.312Z",
+      "emails": "2025-08-11T17:40:53.000Z",
+      "tasks": "2025-08-11T17:47:17.597Z",
+      "notes": "2025-08-11T17:47:17.597Z",
       "todoist": ""
     },
-    "update_count": 35,
+    "update_count": 36,
     "retention_days": 7,
     "format": "incremental-summary"
   },
   "state": {
     "email_ids_seen": [
-      763,
-      762,
-      764,
+      771,
+      770,
+      769,
+      831,
+      834,
+      830,
+      829,
+      828,
+      827,
+      817,
+      823,
+      835,
+      809,
+      826,
+      822,
+      816,
+      810,
+      813,
+      811,
+      815,
+      812,
+      814,
+      768,
+      767,
+      825,
+      824,
+      821,
+      833,
+      782,
+      777,
+      820,
+      819,
+      818,
+      793,
+      798,
+      799,
+      792,
+      795,
+      797,
+      796,
+      832,
+      766,
+      803,
+      802,
+      794,
       765,
-      761,
-      760,
-      26,
+      801,
+      800,
+      804,
       88,
       671,
       736,
       663,
-      25,
+      805,
       689,
       24,
       662,
@@ -43,15 +85,15 @@
       20,
       686,
       733,
-      18,
+      807,
       685,
       17,
       732,
       684,
       86,
-      759,
-      16,
-      758,
+      791,
+      808,
+      772,
       683,
       682,
       499,
@@ -64,58 +106,25 @@
       680,
       668,
       661,
-      757,
+      784,
       679,
       667,
       678,
       677,
       666,
       500,
-      676,
-      665,
-      501,
-      675,
-      691,
-      660,
-      756,
-      502,
-      674,
-      690,
-      755,
-      664,
-      85,
-      673,
-      84,
-      504,
-      659,
-      672,
-      503,
-      505,
-      626,
-      551,
-      550,
-      625,
-      624,
-      549,
-      730,
-      754,
-      753,
-      13,
-      507,
-      83,
-      568,
-      12,
-      623,
-      622,
-      11,
-      752,
-      510,
-      630,
-      509,
-      629,
-      512
+      676
     ],
     "task_ids_seen": [
+      "24c5e778-3096-8158-a458-e06e3fe29e35",
+      "24c5e778-3096-8155-9a1f-f21e62e95458",
+      "24c5e778-3096-812e-b775-d9b5f87c85dd",
+      "24c5e778-3096-81a8-9323-ca37ebaa5a02",
+      "24c5e778-3096-817f-adf0-d4de88191f28",
+      "24c5e778-3096-810b-bb55-d4770d66db79",
+      "24c5e778-3096-815f-9732-e0043a4e431c",
+      "24c5e778-3096-818a-b4cb-d0c39619dd61",
+      "24c5e778-3096-8114-968f-e5f6161841ee",
       "24b5e778-3096-8136-8c5f-d648ccd1ba9c",
       "24b5e778-3096-81a0-b230-d8811d10d022",
       "24b5e778-3096-8146-a0be-e6ca68ef3444",
@@ -207,15 +216,6 @@
       "2375e778-3096-81b8-8ad2-cf469744880d",
       "2375e778-3096-8136-bfd7-e1f4f2514186",
       "2375e778-3096-8136-b366-cbcaf183daa4",
-      "2375e778-3096-8116-bc5b-dca9dda1ccbe",
-      "2375e778-3096-81d6-a170-e84c0a778c81",
-      "2375e778-3096-81a8-82e8-d545ba0ca5de",
-      "2375e778-3096-81cb-8814-df8eb8915342",
-      "2375e778-3096-811a-b8c0-cfa64bc13103",
-      "2375e778-3096-81b1-90e5-d68db3b4d28a",
-      "2375e778-3096-8113-a932-db5ced755499",
-      "2375e778-3096-8158-a985-e6b6a726fb94",
-      "2375e778-3096-812c-8770-ce11c8b6f32d",
       "a728232b-cbd7-4b04-a93d-008d890a492e",
       "49481e97-ba00-4edb-8595-24a64fab4e6d",
       "56f80168-7aab-40f9-8f0e-250c2fccfb8a",
@@ -560,16 +560,23 @@
       "d6b09999-30a5-4519-87e9-3abe9062040b"
     ],
     "note_files_seen": {
+      "tasks/2025-08-11-101611-both-of-the-guest-rooms-are-dirty-i-need-to-prepare-them-today-for-guests-who-may-reserve-the-room.md": "2025-08-11T17:27:34.993Z",
       "tasks/streaks-today.md": "2025-08-11T09:50:36.488Z",
+      "tasks/2025-08-11-074537-make-up-the-guest-rooms-today.md": "2025-08-11T17:27:34.992Z",
       "tasks/2025-08-09-120652-remove-tmp-groups-page-backup-html.md": "2025-08-09T20:22:47.371Z",
+      "tasks/2025-08-11-080559-i-should-really-catch-up-with-nelson-minar.md": "2025-08-11T17:27:34.992Z",
+      "daily/2025-08-11-095807-i-use-ynab-for-budgeting-i-spent-20-minutes-categorizing-transactions-and-unsubscribed-from-three-monthly-services-that-cost-about-10-each.md": "2025-08-11T17:27:34.990Z",
       "daily/2025-08-10-114713-concerns.md": "2025-08-10T17:33:06.291Z",
       "daily/2025-08-10-135749-concerns.md": "2025-08-10T18:22:10.656Z",
       "daily/2025-08-10-182214-concerns.md": "2025-08-10T22:42:54.654Z",
+      "daily/2025-08-11-131326-i-ve-been-decluttering-the-house-and-i-feel-much-better-in-the-simpler-space-i-should-continue-this.md": "2025-08-11T17:27:34.990Z",
       "daily/2025-08-11-054928-concerns.md": "2025-08-11T09:50:36.487Z",
+      "daily/2025-08-11-070133-i-did-a-30-minute-yoga-workout.md": "2025-08-11T17:27:34.989Z",
       "daily/2025-08-08-concerns.md": "2025-08-09T20:22:47.371Z",
       "daily/2025-08-10-103745-concerns.md": "2025-08-10T14:38:52.922Z",
       "README.md": "2025-08-09T20:22:47.371Z",
       "reviews/README.md": "2025-08-10T14:04:54.818Z",
+      "reviews/2025-08-11.md": "2025-08-11T17:27:34.991Z",
       "reviews/2025-08-10.md": "2025-08-10T22:42:54.655Z"
     },
     "todoist_ids_seen": []
@@ -577,75 +584,581 @@
   "changes": {
     "new_emails": [
       {
-        "id": 763,
-        "uid": 184977,
-        "subject": "n-cli edited Reply to Heroku",
+        "id": 771,
+        "uid": 185020,
+        "subject": "Automation mentioned you in Cut your hair",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-11T10:16:52.000Z",
+        "date": "2025-08-11T17:40:53.000Z",
         "folder": "INBOX"
       },
       {
-        "id": 762,
-        "uid": 184976,
-        "subject": "n-cli edited Get the pest control people to spray for ants",
+        "id": 770,
+        "uid": 185019,
+        "subject": "Automation mentioned you in Update \"today\"'s readme",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-11T10:16:52.000Z",
+        "date": "2025-08-11T17:40:52.000Z",
         "folder": "INBOX"
       },
       {
-        "id": 764,
-        "uid": 184978,
-        "subject": "n-cli edited Reply to Heroku",
+        "id": 769,
+        "uid": 185018,
+        "subject": "Automation mentioned you in Fix OGM text searches",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-11T10:16:51.000Z",
+        "date": "2025-08-11T17:40:50.000Z",
         "folder": "INBOX"
       },
       {
-        "id": 765,
-        "uid": 12337,
-        "subject": "🛳️Jeffrey - Regent Seven Seas World Wide Exclusive",
-        "from_address": "\"Create Your Cruise\" <harold@createyourcruise.com>",
-        "date": "2025-08-11T10:16:08.000Z",
+        "id": 831,
+        "uid": 38746,
+        "subject": "Act Now: Warm Weather cruises with $25 Deposits!",
+        "from_address": "\"Holland America Line\" <hollandamerica@m.hollandamerica.com>",
+        "date": "2025-08-11T17:05:54.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 834,
+        "uid": 12340,
+        "subject": "Don't miss your 20% off deal!",
+        "from_address": "\"Grubhub\" <email@a.grubhub.com>",
+        "date": "2025-08-11T16:21:41.000Z",
         "folder": "Advertisements"
       },
       {
-        "id": 761,
-        "uid": 184974,
-        "subject": "n-cli edited Use the Virgin Red points",
+        "id": 830,
+        "uid": 38745,
+        "subject": "You have a $10 unused restaurant credit",
+        "from_address": "\"Instacart\" <no-reply@customers.instacartemail.com>",
+        "date": "2025-08-11T16:11:45.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 829,
+        "uid": 38744,
+        "subject": "Grandparent-approved since 1978",
+        "from_address": "\"Road Scholar\" <contact_at_discover_roadscholar_org_hfbfpc27zv7ax9_f2qr5216@icloud.com>",
+        "date": "2025-08-11T16:10:51.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 828,
+        "uid": 38743,
+        "subject": "Spice up your routine! Now 100+ recipes",
+        "from_address": "\"HelloFresh\" <hello@c.hellofresh.com>",
+        "date": "2025-08-11T16:06:47.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 827,
+        "uid": 38742,
+        "subject": "FYI, There's a FLASH SALE Happening Now 💸",
+        "from_address": "\"SHEIN\" <shein@email.us.shein.com>",
+        "date": "2025-08-11T15:55:58.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 817,
+        "uid": 18507,
+        "subject": "Summer Staples: KofC T-Shirts & Hats",
+        "from_address": "\"Knights Gear\" <email@knightsgear.com>",
+        "date": "2025-08-11T15:32:29.000Z",
+        "folder": "@SaneBlackHole"
+      },
+      {
+        "id": 823,
+        "uid": 23440,
+        "subject": "I received a package with my address but not my...",
+        "from_address": "\"Lloyd Estates Lost & Found Posts\" <reply@is.email.nextdoor.com>",
+        "date": "2025-08-11T15:27:51.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 835,
+        "uid": 15403,
+        "subject": "Daily Digest from Honeybadger",
+        "from_address": "\"Honeybadger Support\" <support@honeybadger.io>",
+        "date": "2025-08-11T15:10:12.000Z",
+        "folder": "Bugs"
+      },
+      {
+        "id": 809,
+        "uid": 155027,
+        "subject": "Correction to Want Ads Email",
+        "from_address": "\"Fort Lauderdale Prime Gentlemen Inc.\" <FortLauderdalePrimeGentlemenInc@wildapricot.org>",
+        "date": "2025-08-11T15:09:10.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 826,
+        "uid": 38741,
+        "subject": "Shoes Worth Checking Off 🛒 ",
+        "from_address": "\"Rainbow Shops\" <RainbowShops@rainbowshops.com>",
+        "date": "2025-08-11T15:06:09.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 822,
+        "uid": 23439,
+        "subject": "Your credit card statement is available",
+        "from_address": "\"Chase\" <no.reply.alerts@chase.com>",
+        "date": "2025-08-11T14:47:25.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 816,
+        "uid": 18506,
+        "subject": "Claim Up to 20% Off ✨ 2 Days Only!",
+        "from_address": "\"Big 5 Sporting Goods\" <eteam@email.big5sportinggoods.com>",
+        "date": "2025-08-11T14:26:10.000Z",
+        "folder": "@SaneBlackHole"
+      },
+      {
+        "id": 810,
+        "uid": 155028,
+        "subject": "Automation mentioned you in Remove rake emergency:restart_web from scheduler",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-11T10:10:37.000Z",
+        "date": "2025-08-11T14:17:47.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 813,
+        "uid": 155031,
+        "subject": "Automation mentioned you in Look for more low profile but lawnmower proof lights for the yard",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T14:16:25.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 811,
+        "uid": 155029,
+        "subject": "Automation mentioned you in Add a light to the Curry tree",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T14:16:18.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 815,
+        "uid": 155033,
+        "subject": "Automation mentioned you in Look for an extra bicycle battery charger I can take with me",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T14:16:14.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 812,
+        "uid": 155030,
+        "subject": "Automation mentioned you in Try a smaller testing slug",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T14:16:14.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 814,
+        "uid": 155032,
+        "subject": "Automation mentioned you in Look for testing which checks that editing the image does not delete it",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T14:16:12.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 768,
+        "uid": 184998,
+        "subject": "Your Walgreens Coupon Awaits: Plus, Health Tips and News to Keep You Informed!",
+        "from_address": "\"Florida Blue\" <noreply@mbr.floridablue.com>",
+        "date": "2025-08-11T14:11:00.000Z",
         "folder": "INBOX"
       },
       {
-        "id": 760,
-        "uid": 184973,
+        "id": 767,
+        "uid": 184997,
+        "subject": "Re: A gentleman",
+        "from_address": "\"Nelson Minar\" <nelson@monkey.org>",
+        "date": "2025-08-11T13:36:05.000Z",
+        "folder": "INBOX"
+      },
+      {
+        "id": 825,
+        "uid": 38740,
+        "subject": "Overcome credit card debt for good",
+        "from_address": "\"LendingTree\" <email@savings.lendingtree.com>",
+        "date": "2025-08-11T13:23:45.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 824,
+        "uid": 38739,
+        "subject": "Automatic Payment Reminder: iPhone Loan",
+        "from_address": "\"Citizens Pay\" <mail@em.citizensbank.com>",
+        "date": "2025-08-11T13:01:42.000Z",
+        "folder": "@SaneNews"
+      },
+      {
+        "id": 821,
+        "uid": 23438,
+        "subject": "You've got 20 credits!",
+        "from_address": "\"Audible\" <do-not-reply@audible.com>",
+        "date": "2025-08-11T12:56:36.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 833,
+        "uid": 12339,
+        "subject": "Build your Kindle library for less",
+        "from_address": "\"Amazon.com\" <store-news@amazon.com>",
+        "date": "2025-08-11T12:11:16.000Z",
+        "folder": "Advertisements"
+      },
+      {
+        "id": 782,
+        "uid": 148847,
+        "subject": "Serge left a 5-star review!",
+        "from_address": "\"Airbnb\" <automated@airbnb.com>",
+        "date": "2025-08-11T12:10:12.000Z",
+        "folder": "Archive"
+      },
+      {
+        "id": 777,
+        "uid": 148839,
+        "subject": "Anthony left a 5-star review!",
+        "from_address": "\"Airbnb\" <automated@airbnb.com>",
+        "date": "2025-08-11T12:08:57.000Z",
+        "folder": "Archive"
+      },
+      {
+        "id": 820,
+        "uid": 23437,
+        "subject": "Your Week in Review -   Aug 03 - Aug 09",
+        "from_address": "\"Zero\" <no-reply_at_marketing_zerolongevity_com_eupdemqtfa_e472cd83@privaterelay.appleid.com>",
+        "date": "2025-08-11T11:40:21.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 819,
+        "uid": 23436,
+        "subject": "Valet Parking Tip: Pier 66 has at least 6 restaurants...",
+        "from_address": "\"Lloyd Estates Trending Posts\" <reply@is.email.nextdoor.com>",
+        "date": "2025-08-11T11:26:11.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 818,
+        "uid": 23435,
+        "subject": "Your HelloFresh box is on its way!",
+        "from_address": "\"HelloFresh\" <update@s.hellofresh.com>",
+        "date": "2025-08-11T11:21:51.000Z",
+        "folder": "@SaneLater"
+      },
+      {
+        "id": 793,
+        "uid": 155008,
+        "subject": "n-cli edited Figure out why the bike is squeaking",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:45.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 798,
+        "uid": 155013,
+        "subject": "n-cli edited Review Front insights",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:39.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 799,
+        "uid": 155014,
+        "subject": "n-cli edited Get the second shingles vaccine",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:38.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 792,
+        "uid": 155007,
+        "subject": "n-cli edited +Trip Prep",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:38.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 795,
+        "uid": 155010,
+        "subject": "n-cli edited Move cron scripts to Docker runs",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:37.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 797,
+        "uid": 155012,
+        "subject": "n-cli edited 80/20 non-health tasks",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:35.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 796,
+        "uid": 155011,
+        "subject": "n-cli edited Check second GitHub annual bill",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:44:35.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 832,
+        "uid": 12338,
+        "subject": "✈🛳️Jeffrey - Viking Ocean Cruises - Asia & More Sale with FREE Air, Gratuities, Upgrades and Beverages",
+        "from_address": "\"Create Your Cruise\" <harold@createyourcruise.com>",
+        "date": "2025-08-11T10:32:00.000Z",
+        "folder": "Advertisements"
+      },
+      {
+        "id": 766,
+        "uid": 18505,
+        "subject": "New Flash Deals—up to 65% off 🌟",
+        "from_address": "\"Walmart\" <newsletters@em.walmart.com>",
+        "date": "2025-08-11T10:24:14.000Z",
+        "folder": "@SaneBlackHole"
+      },
+      {
+        "id": 803,
+        "uid": 155018,
+        "subject": "n-cli edited Reply to Heroku",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:16:52.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 802,
+        "uid": 155017,
+        "subject": "n-cli edited Get the pest control people to spray for ants",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:16:52.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 794,
+        "uid": 155009,
+        "subject": "n-cli edited Reply to Heroku",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:16:51.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 801,
+        "uid": 155016,
+        "subject": "n-cli edited Use the Virgin Red points",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:10:37.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 800,
+        "uid": 155015,
         "subject": "n-cli edited Sell the exercise bike",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
         "date": "2025-08-11T10:10:36.000Z",
-        "folder": "INBOX"
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 804,
+        "uid": 155019,
+        "subject": "[OlderGay.Men Discussion] [Page comments] Video: Shackle On My Balls",
+        "from_address": "\"Tom59 via OlderGay.Men Discussion\" <notifications@oldergay.discoursemail.com>",
+        "date": "2025-08-11T08:27:17.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 805,
+        "uid": 155020,
+        "subject": "[OlderGay-Men/OlderGay.Men] Run failed: Staging API Tests - main (d7bb151)",
+        "from_address": "\"jeffcovey\" <notifications@github.com>",
+        "date": "2025-08-11T02:43:14.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 807,
+        "uid": 155022,
+        "subject": "Wisereads Vol. 103 — Learn Like an Athlete by David Perell, Flatland by Edwin Abbott, and more",
+        "from_address": "\"Readwise\" <hello@readwise.io>",
+        "date": "2025-08-10T21:38:00.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 791,
+        "uid": 155005,
+        "subject": "Write a review for Ashley’s group",
+        "from_address": "\"Airbnb\" <automated@airbnb.com>",
+        "date": "2025-08-10T17:16:27.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 808,
+        "uid": 155023,
+        "subject": "An app-specific password was generated for your Apple Account.",
+        "from_address": "\"Apple\" <noreply@email.apple.com>",
+        "date": "2025-08-10T17:09:52.000Z",
+        "folder": "Deleted Messages"
+      },
+      {
+        "id": 772,
+        "uid": 148834,
+        "subject": "A $61.11 USD payout was sent",
+        "from_address": "\"Airbnb\" <express@airbnb.com>",
+        "date": "2025-08-10T16:53:41.000Z",
+        "folder": "Archive"
+      },
+      {
+        "id": 784,
+        "uid": 154998,
+        "subject": "Reminder to write a review for Anthony’s group",
+        "from_address": "\"Airbnb\" <automated@airbnb.com>",
+        "date": "2025-08-10T14:22:30.000Z",
+        "folder": "Deleted Messages"
       }
     ],
     "deleted_emails": [
-      508,
-      627,
-      511,
-      628,
-      519,
-      633
+      763,
+      762,
+      764,
+      761,
+      760,
+      26,
+      25,
+      18,
+      759,
+      16,
+      758,
+      757,
+      665,
+      501,
+      675,
+      691,
+      660,
+      756,
+      502,
+      674,
+      690,
+      755,
+      664,
+      85,
+      673,
+      84,
+      504,
+      659,
+      672,
+      503,
+      505,
+      626,
+      551,
+      550,
+      625,
+      624,
+      549,
+      730,
+      754,
+      753,
+      13,
+      507,
+      83,
+      568,
+      12,
+      623,
+      622,
+      11,
+      752,
+      510,
+      630,
+      509,
+      629,
+      512
     ],
     "replied_emails": [],
-    "new_tasks": [],
-    "completed_tasks": [],
-    "modified_tasks": [
+    "new_tasks": [
       {
-        "id": "2495e778-3096-8186-9e7a-da64ba97d405",
+        "id": "24c5e778-3096-8158-a458-e06e3fe29e35",
         "title": "Untitled",
-        "properties": "{\"id\":\"2495e778-3096-8186-9e7a-da64ba97d405\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"stage\":\"Front Stage\",\"due_date\":\"2025-08-11\",\"priority\":\"⚪ Low\",\"last_edited\":\"2025-08-11T10:16:00.000Z\"}",
-        "last_edited_time": "2025-08-11T10:16:00.000Z",
+        "properties": "{\"id\":\"24c5e778-3096-8158-a458-e06e3fe29e35\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"due_date\":\"2025-08-11\",\"priority\":\"⚪ Low\",\"last_edited\":\"2025-08-11T17:40:00.000Z\"}",
+        "last_edited_time": "2025-08-11T17:40:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-8155-9a1f-f21e62e95458",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-8155-9a1f-f21e62e95458\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"due_date\":\"2025-08-11\",\"priority\":\"⚪ Low\",\"last_edited\":\"2025-08-11T17:40:00.000Z\"}",
+        "last_edited_time": "2025-08-11T17:40:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-812e-b775-d9b5f87c85dd",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-812e-b775-d9b5f87c85dd\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"due_date\":\"2025-08-11\",\"priority\":\"⚪ Low\",\"last_edited\":\"2025-08-11T17:40:00.000Z\"}",
+        "last_edited_time": "2025-08-11T17:40:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-81a8-9323-ca37ebaa5a02",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-81a8-9323-ca37ebaa5a02\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:17:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:17:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-817f-adf0-d4de88191f28",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-817f-adf0-d4de88191f28\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:16:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:16:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-810b-bb55-d4770d66db79",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-810b-bb55-d4770d66db79\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:16:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:16:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-815f-9732-e0043a4e431c",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-815f-9732-e0043a4e431c\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:16:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:16:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-818a-b4cb-d0c39619dd61",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-818a-b4cb-d0c39619dd61\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:15:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:15:00.000Z",
+        "database_id": "Action Items"
+      },
+      {
+        "id": "24c5e778-3096-8114-968f-e5f6161841ee",
+        "title": "Untitled",
+        "properties": "{\"id\":\"24c5e778-3096-8114-968f-e5f6161841ee\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"last_edited\":\"2025-08-11T14:15:00.000Z\"}",
+        "last_edited_time": "2025-08-11T14:15:00.000Z",
         "database_id": "Action Items"
       }
     ],
-    "new_notes": [],
+    "completed_tasks": [
+      "2375e778-3096-8116-bc5b-dca9dda1ccbe",
+      "2375e778-3096-81d6-a170-e84c0a778c81",
+      "2375e778-3096-81a8-82e8-d545ba0ca5de",
+      "2375e778-3096-81cb-8814-df8eb8915342",
+      "2375e778-3096-811a-b8c0-cfa64bc13103",
+      "2375e778-3096-81b1-90e5-d68db3b4d28a",
+      "2375e778-3096-8113-a932-db5ced755499",
+      "2375e778-3096-8158-a985-e6b6a726fb94",
+      "2375e778-3096-812c-8770-ce11c8b6f32d"
+    ],
+    "modified_tasks": [],
+    "new_notes": [
+      "tasks/2025-08-11-101611-both-of-the-guest-rooms-are-dirty-i-need-to-prepare-them-today-for-guests-who-may-reserve-the-room.md",
+      "tasks/2025-08-11-074537-make-up-the-guest-rooms-today.md",
+      "tasks/2025-08-11-080559-i-should-really-catch-up-with-nelson-minar.md",
+      "daily/2025-08-11-095807-i-use-ynab-for-budgeting-i-spent-20-minutes-categorizing-transactions-and-unsubscribed-from-three-monthly-services-that-cost-about-10-each.md",
+      "daily/2025-08-11-131326-i-ve-been-decluttering-the-house-and-i-feel-much-better-in-the-simpler-space-i-should-continue-this.md",
+      "daily/2025-08-11-070133-i-did-a-30-minute-yoga-workout.md",
+      "reviews/2025-08-11.md"
+    ],
     "modified_notes": [],
     "deleted_notes": []
   },
@@ -674,6 +1187,36 @@
   "communications": {
     "pending_responses": [
       {
+        "subject": "Grandparent-approved since 1978",
+        "from": "\"Road Scholar\"",
+        "date": "2025-08-11T16:10:51.000Z"
+      },
+      {
+        "subject": "Automatic Payment Reminder: iPhone Loan",
+        "from": "\"Citizens Pay\"",
+        "date": "2025-08-11T13:01:42.000Z"
+      },
+      {
+        "subject": "Serge left a 5-star review!",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-11T12:10:12.000Z"
+      },
+      {
+        "subject": "Anthony left a 5-star review!",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-11T12:08:57.000Z"
+      },
+      {
+        "subject": "Your Week in Review -   Aug 03 - Aug 09",
+        "from": "\"Zero\"",
+        "date": "2025-08-11T11:40:21.000Z"
+      },
+      {
+        "subject": "n-cli edited Review Front insights",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:44:39.000Z"
+      },
+      {
         "subject": "n-cli edited Reply to Heroku",
         "from": "\"Notion Team\"",
         "date": "2025-08-11T10:16:52.000Z"
@@ -692,54 +1235,68 @@
         "subject": "Write a review for Ashley’s group",
         "from": "\"Airbnb\"",
         "date": "2025-08-10T17:16:27.000Z"
-      },
-      {
-        "subject": "Reminder to write a review for Anthony’s group",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-10T14:22:30.000Z"
-      },
-      {
-        "subject": "[SaneBox] Please review 153 recent messages",
-        "from": "\"SaneBox Digest\"",
-        "date": "2025-08-10T02:01:37.000Z"
-      },
-      {
-        "subject": "Jeffrey Covey, will you rate your transaction at Amazon.com?",
-        "from": "\"Amazon Marketplace\"",
-        "date": "2025-08-09T22:15:42.000Z"
-      },
-      {
-        "subject": "Serge wrote you a review",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-09T20:13:47.000Z"
-      },
-      {
-        "subject": "Write a review for Serge’s group",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-09T20:04:29.000Z"
-      },
-      {
-        "subject": "New reply from gator",
-        "from": "help@oldergay.men",
-        "date": "2025-08-09T17:22:59.000Z"
       }
     ],
     "follow_ups": [],
     "key_conversations": {}
   },
   "metrics": {
-    "task_completion_rate": 0,
+    "task_completion_rate": 1,
     "email_response_time": 0,
     "focus_time_available": 0,
     "wellbeing_indicators": {}
   },
   "recommendations": {
     "daily_focus": [
-      "Address the financial tracking concern by setting up a simple expense tracking system today - start with a spreadsheet to log all income and expenses, especially recurring ones like homeowners insurance",
-      "Clear the backlog of overdue replies to Melv, David Edwards, and Rosemary within the next hour",
-      "Schedule 30 minutes for cardio exercise today to address the high resting heart rate concern",
-      "Process Airbnb guest reviews (Ashley, Anthony, Serge) during a focused 20-minute email block",
-      "Complete today's Streaks tasks (2m 30s reading) and address the pile of undone paperwork in small 15-minute chunks"
+      {
+        "concerns": "1. Overdue tasks (due within the next week)",
+        "overdue": false,
+        "urgent": true,
+        "important": false,
+        "email_people": true
+      },
+      {
+        "concerns": "2. Important emails",
+        "overdue": false,
+        "urgent": false,
+        "important": true,
+        "email_people": true
+      },
+      {
+        "concerns": "3. People to contact (within the next month)",
+        "overdue": false,
+        "urgent": false,
+        "important": false,
+        "email_people": true
+      },
+      {
+        "concerns": "4. Immediate priorities",
+        "overdue": false,
+        "urgent": true,
+        "important": true,
+        "email_people": true
+      },
+      {
+        "concerns": "5. Important email communication (within the next week)",
+        "overdue": false,
+        "urgent": false,
+        "important": true,
+        "email_people": true
+      },
+      {
+        "concerns": "6. People to follow-up on",
+        "overdue": true,
+        "urgent": false,
+        "important": false,
+        "email_people": false
+      },
+      {
+        "concerns": "7. Immediate priorities (within the next month)",
+        "overdue": true,
+        "urgent": true,
+        "important": false,
+        "email_people": false
+      }
     ],
     "weekly_goals": [],
     "process_improvements": []
@@ -774,27 +1331,57 @@
     },
     "recent_notes": [
       {
+        "file": "2025-08-11-101611-both-of-the-guest-rooms-are-dirty-i-need-to-prepare-them-today-for-guests-who-may-reserve-the-room.md",
+        "preview": "- [ ] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the"
+      },
+      {
         "file": "streaks-today.md",
         "preview": "- [ ] Read Saved Articles, 2m 30s"
+      },
+      {
+        "file": "2025-08-11-074537-make-up-the-guest-rooms-today.md",
+        "preview": "- [ ] make up the guest rooms today"
       },
       {
         "file": "2025-08-09-120652-remove-tmp-groups-page-backup-html.md",
         "preview": "- [ ] remove tmp/groups_page_backup.html"
       },
       {
-        "file": "2025-08-10-114713-concerns.md",
-        "preview": "- My Duolingo time is entirely about chess now, and I'm neglecting my Duolingo language studies"
-      },
-      {
-        "file": "2025-08-10-135749-concerns.md",
-        "preview": "- I need to spend more time outside "
-      },
-      {
-        "file": "2025-08-10-182214-concerns.md",
-        "preview": "- I've put off my trip to the southern Maya sites for too many years. COVID is no longer an excuse. "
+        "file": "2025-08-11-080559-i-should-really-catch-up-with-nelson-minar.md",
+        "preview": "- [ ] I should really catch up with Nelson Minar"
       }
     ],
     "important_emails": [
+      {
+        "subject": "Grandparent-approved since 1978",
+        "from": "\"Road Scholar\"",
+        "date": "2025-08-11T16:10:51.000Z"
+      },
+      {
+        "subject": "Automatic Payment Reminder: iPhone Loan",
+        "from": "\"Citizens Pay\"",
+        "date": "2025-08-11T13:01:42.000Z"
+      },
+      {
+        "subject": "Serge left a 5-star review!",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-11T12:10:12.000Z"
+      },
+      {
+        "subject": "Anthony left a 5-star review!",
+        "from": "\"Airbnb\"",
+        "date": "2025-08-11T12:08:57.000Z"
+      },
+      {
+        "subject": "Your Week in Review -   Aug 03 - Aug 09",
+        "from": "\"Zero\"",
+        "date": "2025-08-11T11:40:21.000Z"
+      },
+      {
+        "subject": "n-cli edited Review Front insights",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:44:39.000Z"
+      },
       {
         "subject": "n-cli edited Reply to Heroku",
         "from": "\"Notion Team\"",
@@ -814,51 +1401,42 @@
         "subject": "Write a review for Ashley’s group",
         "from": "\"Airbnb\"",
         "date": "2025-08-10T17:16:27.000Z"
-      },
-      {
-        "subject": "Reminder to write a review for Anthony’s group",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-10T14:22:30.000Z"
-      },
-      {
-        "subject": "[SaneBox] Please review 153 recent messages",
-        "from": "\"SaneBox Digest\"",
-        "date": "2025-08-10T02:01:37.000Z"
-      },
-      {
-        "subject": "Jeffrey Covey, will you rate your transaction at Amazon.com?",
-        "from": "\"Amazon Marketplace\"",
-        "date": "2025-08-09T22:15:42.000Z"
-      },
-      {
-        "subject": "Serge wrote you a review",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-09T20:13:47.000Z"
-      },
-      {
-        "subject": "Write a review for Serge’s group",
-        "from": "\"Airbnb\"",
-        "date": "2025-08-09T20:04:29.000Z"
-      },
-      {
-        "subject": "New reply from gator",
-        "from": "help@oldergay.men",
-        "date": "2025-08-09T17:22:59.000Z"
       }
     ],
     "top_email_senders": {
-      "\"Notion Team\"": 13,
-      "\"Create Your Cruise\"": 1,
+      "\"Notion Team\"": 24,
+      "\"Holland America Line\"": 1,
+      "\"Grubhub\"": 1,
+      "\"Instacart\"": 1,
+      "\"Road Scholar\"": 2,
+      "\"HelloFresh\"": 3,
+      "\"SHEIN\"": 1,
+      "\"Knights Gear\"": 1,
+      "\"Lloyd Estates Lost & Found Posts\"": 1,
+      "\"Honeybadger Support\"": 2,
+      "\"Fort Lauderdale Prime Gentlemen Inc.\"": 1,
+      "\"Rainbow Shops\"": 4,
+      "\"Chase\"": 1,
+      "\"Big 5 Sporting Goods\"": 3,
+      "\"Florida Blue\"": 2,
+      "\"Nelson Minar\"": 1,
+      "\"LendingTree\"": 2,
+      "\"Citizens Pay\"": 1,
+      "\"Audible\"": 1,
+      "\"Amazon.com\"": 1,
+      "\"Airbnb\"": 5,
+      "\"Zero\"": 1,
+      "\"Lloyd Estates Trending Posts\"": 1,
+      "\"Create Your Cruise\"": 2,
+      "\"Walmart\"": 1,
       "\"Tom59 via OlderGay.Men Discussion\"": 1,
-      "\"Money Making Moves\"": 2,
+      "\"Money Making Moves\"": 1,
       "\"Toggl Track\"": 1,
-      "\"Honeybadger Notifications\"": 6,
-      "\"Big 5 Sporting Goods\"": 2,
-      "\"jeffcovey\"": 3,
+      "\"Honeybadger Notifications\"": 5,
+      "\"jeffcovey\"": 1,
       "\"Facebook\"": 1,
-      "\"SaneBox Digest\"": 2,
-      "\"Creativebug\"": 2,
-      "\"Rainbow Shops\"": 5,
+      "\"SaneBox Digest\"": 1,
+      "\"Creativebug\"": 1,
       "\"herzensangelegenheiten\"": 1,
       "\"Lloyd Estates Recommendation Posts\"": 1,
       "\"Cloudflare\"": 1,
@@ -871,41 +1449,16 @@
       "\"Readwise\"": 1,
       "\"Hilton Honors\"": 1,
       "\"GitHub\"": 1,
-      "\"Instagram\"": 2,
+      "\"Instagram\"": 1,
       "\"FreizeitWelt\"": 1,
-      "\"Airbnb\"": 8,
-      "\"Apple\"": 2,
+      "\"Apple\"": 1,
       "\"بوابة الأحداث العلمية في ماليزيا\"": 1,
-      "\"HelloFresh\"": 1,
-      "\"Honeybadger Support\"": 1,
-      "wildhybrid@aol.com": 3,
-      "\"LendingTree\"": 1,
-      "\"Florida Blue\"": 1,
-      "\"Road Scholar\"": 2,
+      "wildhybrid@aol.com": 2,
       "\"Clay Team\"": 1,
       "\"Earth Runners\"": 2,
       "\"Kagi by With Reach\"": 1,
       "\"Todoist\"": 1,
-      "\"Proactiv\"": 1,
-      "\"Lloyd Estates Lost & Found Posts\"": 2,
-      "\"ScanDigital\"": 1,
-      "\"ScanCafe\"": 1,
-      "\"Frankie Parson\"": 1,
-      "\"Sovendus voordeelmailing\"": 1,
-      "\"Amazon.com\"": 1,
-      "\"Team Snapchat\"": 1,
-      "\"SCOTTeVEST SALE\"": 1,
-      "\"gespraeche\"": 1,
-      "\"Big 5 Sporting Goods - Weekly Ad\"": 1,
-      "\"Specsavers Optometrists\"": 1,
-      "\"Amazon Marketplace\"": 1,
-      "\"Instacart\"": 1,
-      "\"Lloyd Estates Trending Posts\"": 1,
-      "\"SilverDaddies.com\"": 1,
-      "\"amazon.com\"": 1,
-      "\"PrivateMeet North Andrews Gardens\"": 1,
-      "\"Grubhub\"": 1,
-      "help@oldergay.men": 1
+      "\"Proactiv\"": 1
     },
     "calendar_today": [
       {

@@ -76,15 +76,12 @@ export class TodoistSync {
       await this.reconstructMappingsFromTodoist(projectName);
     }
     
-    // Get tasks from Notion but filter to reasonable subset
-    const allTasks = await this.notionAPI.getAllTasks(databaseId, false);
+    // Use cached data for speed - get all actionable (non-complete) tasks
+    console.log(chalk.gray('Fetching tasks from Notion (using cache)...'));
+    const allTasks = await this.notionAPI.getActionableItems(databaseId, 1000, true);
     
-    // Filter to only incomplete tasks with reasonable sync criteria
+    // Filter to only tasks that should sync to Todoist
     const notionTasks = allTasks.filter(task => {
-      const status = task.properties['Status']?.status?.name;
-      const isComplete = status === '✅ Done';
-      if (isComplete) return false; // Skip completed tasks
-      
       // Include tasks that:
       // 1. Have a Do Date
       // 2. Have a Start/Repeat Date within 30 days
@@ -106,7 +103,7 @@ export class TodoistSync {
       return false; // Skip everything else
     });
     
-    console.log(`Filtered to ${notionTasks.length} syncable tasks from ${allTasks.length} total`);
+    console.log(`Filtered to ${notionTasks.length} syncable tasks from ${allTasks.length} actionable tasks`);
     
     // Count how many have Do Date set
     const tasksWithDoDate = notionTasks.filter(t => t.properties['Do Date']?.date?.start);
