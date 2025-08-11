@@ -12,3 +12,8 @@ dist/
 # Google Calendar Service Account Key
 google-calendar-key.json
 .last-dep-check
+
+# Runtime and sync files (instance-specific)
+.calendar-cache/
+.sync-config.json
+.sync-log.json
