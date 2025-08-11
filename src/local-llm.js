@@ -17,6 +17,9 @@ export class LocalLLM {
       execSync('which ollama', { stdio: 'ignore' });
       this.provider = 'ollama';
       
+      // Ensure Ollama server is running
+      this.ensureOllamaRunning();
+      
       // Check which models are available
       const models = execSync('ollama list 2>/dev/null', { encoding: 'utf-8' })
         .split('\n')
@@ -53,13 +56,53 @@ export class LocalLLM {
     }
   }
 
+  ensureOllamaRunning() {
+    try {
+      // Check if Ollama server is already running
+      execSync('curl -s http://localhost:11434/api/tags > /dev/null 2>&1', { stdio: 'ignore' });
+      // Server is running
+      return true;
+    } catch (e) {
+      // Server not running, try to start it
+      try {
+        console.log(chalk.gray('Starting Ollama server...'));
+        // Start ollama serve in background, redirect output to avoid noise
+        execSync('ollama serve > /dev/null 2>&1 &', { shell: '/bin/bash' });
+        // Give it a moment to start
+        execSync('sleep 2');
+        
+        // Verify it started
+        try {
+          execSync('curl -s http://localhost:11434/api/tags > /dev/null 2>&1', { stdio: 'ignore' });
+          console.log(chalk.green('✓ Ollama server started'));
+          return true;
+        } catch (verifyError) {
+          console.log(chalk.yellow('⚠ Ollama server may need manual start: ollama serve'));
+          return false;
+        }
+      } catch (startError) {
+        console.log(chalk.yellow('⚠ Could not auto-start Ollama server'));
+        return false;
+      }
+    }
+  }
+
   async isAvailable() {
+    if (this.initialized && this.provider === 'ollama') {
+      // Double-check that Ollama is still running
+      this.ensureOllamaRunning();
+    }
     return this.initialized;
   }
 
   async prompt(systemPrompt, userPrompt, options = {}) {
     if (!this.initialized) {
       throw new Error('No local LLM available');
+    }
+
+    // Ensure server is running before making request
+    if (this.provider === 'ollama') {
+      this.ensureOllamaRunning();
     }
 
     const maxTokens = options.maxTokens || 500;

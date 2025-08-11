@@ -457,6 +457,11 @@ export class NotionAPI extends NotionAPIBase {
     return this.getTasksDueToday(databaseId, useCache);
   }
 
+  async getAllTasks(databaseId, useCache = true) {
+    // Get ALL tasks from the database, no date filtering
+    return await this.getActionableItems(databaseId, 1000, useCache);
+  }
+
   async getTasksDueToday(databaseId, useCache = true) {
     try {
       // If caching is enabled, try to use cached actionable items and filter client-side

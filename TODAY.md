@@ -1,22 +1,49 @@
-# Daily Review Request
+# Daily Review Session
 
-## Prerequisites
-First run `bin/sync` to update all data sources, then pipe this file to Claude:
+## How This Works
+This file starts an interactive Claude session for your daily review. The `bin/today` script:
+1. Checks Claude authentication
+2. Syncs all data sources
+3. Updates the SUMMARY.json with comprehensive content
+4. Starts this interactive session where Claude will:
+   - Review all your data
+   - Create or update today's review file in `notes/reviews/YYYY-MM-DD.md`
+   - Provide recommendations based on your schedule and priorities
+   - Continue working with you as long as needed
+
+## Session Instructions for Claude
+
+### Initial Tasks
+When this session starts, please:
+1. Load and analyze the SUMMARY.json file
+2. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+3. Create or update the review file with your analysis
+4. Present your recommendations to the user
+
+### Review File Format
+The review file should include:
+- Daily priorities and recommendations
+- Tasks formatted with checkboxes: `- [ ] Task description`
+- Or numbered format: `1. **Task name** (time estimate)`
+- Group tasks by time of day or category
+- Track completed tasks with ✓ marks
+
+### Commands Available
+The user can use these commands during the session:
 ```bash
-bin/sync
-bin/update-summary  # Updates comprehensive summary with content
-cat TODAY.md | claude
+bin/mark-done "Take a 20-minute walk"  # Mark specific task as done
+bin/mark-done 1                        # Mark task #1 as done
+bin/progress "Additional note"         # Add a progress note
 ```
 
-Or use the shortcut that does everything:
-```bash
-bin/today  # Syncs, generates summary, sends to Claude, and saves to notes/reviews/
-```
+## Review Guidelines
+Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and the SUMMARY.json contains comprehensive analysis.
 
-**Review Notes:** Each run of `bin/today` automatically saves Claude's analysis to `notes/reviews/YYYY-MM-DD.md`. Run multiple times during the day to track progress - subsequent runs append updates with timestamps.
-
-## Instructions
-Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and analyzed.
+**IMPORTANT:** This is an interactive session. You can:
+- Take as long as needed to analyze the data
+- Create and update files
+- Run commands to help with the review
+- Continue working with me throughout the day
 
 ### Guidelines
 
@@ -71,15 +98,15 @@ Please use ONLY the summary data below to provide your analysis. Focus on:
 3. Suggest which emails need responses
 4. Recommend a schedule for today
 
-## Data Already Extracted in Summary Below
+## Data Sources
 
-The SUMMARY.json below contains all relevant data already extracted from:
+The SUMMARY.json file contains all relevant data already extracted from:
 - 📝 Local notes (concerns, recent files)
-- ✅ Notion databases (442 tasks categorized)  
+- ✅ Notion databases (tasks categorized by status and category)
 - 📧 Email database (recent messages analyzed)
 - 🔄 Incremental changes since last review
 
-**DO NOT attempt to query these sources directly. Use only the SUMMARY.json data provided below.**
+**First Action:** Read the SUMMARY.json file to get all the synchronized data, then create or update today's review file in `notes/reviews/`.
 
 ## What I Need From You
 
@@ -110,4 +137,18 @@ Address any wellbeing concerns from the summary
 
 ---
 
-Please analyze the SUMMARY.json below and provide specific, actionable recommendations for today.
+## Your First Steps
+
+1. **Read SUMMARY.json** to get all the synchronized data
+2. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md`
+3. **Analyze and Recommend** based on:
+   - Current concerns from notes
+   - Urgent and overdue tasks
+   - Important emails needing responses
+   - Today's theme (Front/Back/Off Stage)
+   - Daily habits from Streaks
+4. **Continue Supporting** - This is an interactive session, stay engaged and help throughout
+
+Please analyze the SUMMARY.json and provide specific, actionable recommendations for today.
+
+Let's begin the daily review!

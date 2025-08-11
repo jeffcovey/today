@@ -76,15 +76,44 @@ export class TodoistSync {
       await this.reconstructMappingsFromTodoist(projectName);
     }
     
-    const notionTasks = await this.notionAPI.getTasksDueToday(databaseId, false); // Disable cache for sync
-    console.log(`Found ${notionTasks.length} tasks with Start/Repeat Date on or before today in Notion`);
+    // Get tasks from Notion but filter to reasonable subset
+    const allTasks = await this.notionAPI.getAllTasks(databaseId, false);
+    
+    // Filter to only incomplete tasks with reasonable sync criteria
+    const notionTasks = allTasks.filter(task => {
+      const status = task.properties['Status']?.status?.name;
+      const isComplete = status === '✅ Done';
+      if (isComplete) return false; // Skip completed tasks
+      
+      // Include tasks that:
+      // 1. Have a Do Date
+      // 2. Have a Start/Repeat Date within 30 days
+      // 3. Are already synced (have mapping)
+      const hasDoDate = task.properties['Do Date']?.date?.start;
+      const startDate = task.properties['Start/Repeat Date']?.date?.start;
+      const isSynced = this.syncMapping.has(task.id);
+      
+      if (isSynced) return true; // Keep synced tasks
+      if (hasDoDate) return true; // Tasks with explicit Do Date
+      
+      if (startDate) {
+        const date = new Date(startDate);
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        return date <= thirtyDaysFromNow; // Tasks within 30 days
+      }
+      
+      return false; // Skip everything else
+    });
+    
+    console.log(`Filtered to ${notionTasks.length} syncable tasks from ${allTasks.length} total`);
     
     // Count how many have Do Date set
     const tasksWithDoDate = notionTasks.filter(t => t.properties['Do Date']?.date?.start);
     const tasksWithoutDoDate = notionTasks.filter(t => !t.properties['Do Date']?.date?.start);
     
     if (tasksWithDoDate.length !== notionTasks.length) {
-      console.log(chalk.gray(`  ${tasksWithDoDate.length} have Do Date set, ${tasksWithoutDoDate.length} without Do Date`));
+      console.log(chalk.gray(`  ${tasksWithDoDate.length} have Do Date set, ${tasksWithoutDoDate.length} will use Start/Repeat Date`));
     }
     
     // Also check for tasks that HAD mappings but no longer have dates or are in the future
@@ -199,14 +228,23 @@ export class TodoistSync {
     
     // Execute batch operations if not dry run
     if (!dryRun) {
-      // Batch create tasks
+      // Batch create tasks with size limit
       if (tasksToCreate.length > 0) {
-        console.log(chalk.cyan(`Creating ${tasksToCreate.length} tasks in batch...`));
+        const BATCH_SIZE = 50; // Todoist API batch limit
+        console.log(chalk.cyan(`Creating ${tasksToCreate.length} tasks (in batches of ${BATCH_SIZE})...`));
+        
         try {
-          const tempIdMapping = await this.batchSync.batchCreateTasks(tasksToCreate, todoistProject.id);
-          
-          // Save mappings for created tasks
-          for (const task of tasksToCreate) {
+          // Process in chunks
+          for (let i = 0; i < tasksToCreate.length; i += BATCH_SIZE) {
+            const batch = tasksToCreate.slice(i, i + BATCH_SIZE);
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(tasksToCreate.length / BATCH_SIZE);
+            console.log(chalk.gray(`  Processing batch ${batchNum}/${totalBatches}...`));
+            
+            const tempIdMapping = await this.batchSync.batchCreateTasks(batch, todoistProject.id);
+            
+            // Save mappings for created tasks in this batch
+            for (const task of batch) {
             const tempId = task.tempId;
             const todoistId = tempIdMapping[tempId];
             if (todoistId) {
@@ -219,26 +257,36 @@ export class TodoistSync {
               created++;
             }
           }
+          }
         } catch (error) {
           console.error(chalk.red(`Batch create failed: ${error.message}`));
           errors += tasksToCreate.length;
         }
       }
       
-      // Batch update tasks
+      // Batch update tasks with size limit
       if (tasksToUpdate.length > 0) {
-        console.log(chalk.cyan(`Updating ${tasksToUpdate.length} tasks in batch...`));
+        const BATCH_SIZE = 50;
+        console.log(chalk.cyan(`Updating ${tasksToUpdate.length} tasks (in batches of ${BATCH_SIZE})...`));
+        
         try {
-          await this.batchSync.batchUpdateTasks(tasksToUpdate);
-          
-          // Save mappings for updated tasks
-          for (const task of tasksToUpdate) {
+          for (let i = 0; i < tasksToUpdate.length; i += BATCH_SIZE) {
+            const batch = tasksToUpdate.slice(i, i + BATCH_SIZE);
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(tasksToUpdate.length / BATCH_SIZE);
+            console.log(chalk.gray(`  Processing batch ${batchNum}/${totalBatches}...`));
+            
+            await this.batchSync.batchUpdateTasks(batch);
+            
+            // Save mappings for updated tasks in this batch
+            for (const task of batch) {
             await this.syncCache.saveSyncMapping(task.notionId, task.id, task.hash, {
               notionLastEdited: task.lastEdited,
               notionHash: task.hash,
               todoistLastEdited: new Date().toISOString()  // Update Todoist's last edited time
             });
             updated++;
+          }
           }
         } catch (error) {
           console.error(chalk.red(`Batch update failed: ${error.message}`));
@@ -329,21 +377,11 @@ export class TodoistSync {
       await this.reconstructMappingsFromTodoist(projectName);
     }
     
-    const project = await this.getProject(projectName);
-    if (!project) {
-      console.log(chalk.yellow('No Todoist project found'));
-      return { created: 0, updated: 0, errors: 0 };
-    }
-    
-    // NOTE: Todoist API v2 limitation - getTasks only returns active tasks
-    // Completed tasks are not returned by the API
-    // To sync completed status from Todoist to Notion, we need to:
-    // 1. Track which tasks were previously synced
-    // 2. If a task is missing from active tasks, assume it was completed
-    
-    const taskResponse = await this.todoist.getTasks({ projectId: project.id });
+    // Get ALL tasks from ALL projects in Todoist
+    console.log(chalk.gray('Getting all tasks from Todoist (all projects)...'));
+    const taskResponse = await this.todoist.getTasks();
     const todoistTasks = taskResponse.results || taskResponse || [];
-    console.log(`Found ${todoistTasks.length} active tasks in Todoist`);
+    console.log(`Found ${todoistTasks.length} active tasks in Todoist across all projects`);
     console.log(chalk.yellow('⚠️  Note: Completed tasks in Todoist are not synced back to Notion (API limitation)'))
     
     const reversedMapping = new Map();
@@ -445,7 +483,7 @@ export class TodoistSync {
                 changes: {
                   title: taskData.title,
                   dueDate: taskData.dueDate,
-                  status: taskData.isCompleted ? '✅ Done' : '🚀 In Progress',
+                  status: taskData.isCompleted ? '✅ Done' : 'Not started',
                   priority: taskData.priority,
                   tags: taskData.tags
                 }
@@ -464,7 +502,8 @@ export class TodoistSync {
           } else {
             skipped++;
           }
-        } else if (taskData.dueDate) {
+        } else {
+          // Always create in Notion, we always have a date now
           if (dryRun) {
             actions.push({
               action: 'CREATE',
@@ -475,7 +514,8 @@ export class TodoistSync {
                 dueDate: taskData.dueDate,
                 status: taskData.isCompleted ? '✅ Done' : '🚀 In Progress',
                 priority: taskData.priority,
-                tags: taskData.tags
+                tags: taskData.tags,
+                project: taskData.projectName
               }
             });
             created++;
@@ -485,8 +525,6 @@ export class TodoistSync {
             this.syncMapping.set(notionTask.id, todoistTask.id);
             created++;
           }
-        } else {
-          skipped++;
         }
       } catch (error) {
         console.error(chalk.red(`Failed to sync task: ${error.message}`));
@@ -573,10 +611,11 @@ export class TodoistSync {
 
   extractNotionTaskData(notionTask) {
     const title = this.notionAPI.extractTitle(notionTask);
-    // Use Do Date for syncing the actual due date to Todoist
-    // Start/Repeat Date is just for filtering what tasks to include
+    // Use Do Date if available, otherwise use Start/Repeat Date, otherwise use today
     const doDate = notionTask.properties['Do Date']?.date?.start;
-    const dueDate = doDate; // Only sync if Do Date is set
+    const startDate = notionTask.properties['Start/Repeat Date']?.date?.start;
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = doDate || startDate || today; // Always have a date
     
     const status = notionTask.properties['Status']?.status?.name;
     const priority = notionTask.properties['Priority']?.select?.name;
@@ -614,14 +653,16 @@ export class TodoistSync {
   }
 
   extractTodoistTaskData(todoistTask) {
+    const today = new Date().toISOString().split('T')[0];
     return {
       title: todoistTask.content,
-      dueDate: todoistTask.due?.date || todoistTask.due?.datetime || null,  // Explicitly null if no date
+      dueDate: todoistTask.due?.date || todoistTask.due?.datetime || today,  // Use today if no date
       isCompleted: todoistTask.is_completed || false,  // Fixed: use is_completed not isCompleted
       priority: this.mapTodoistPriorityToNotion(todoistTask.priority),
       tags: todoistTask.labels || [],
       description: todoistTask.description,
-      lastEdited: todoistTask.updatedAt || todoistTask.addedAt  // Fixed: use updatedAt (camelCase) not updated_at
+      lastEdited: todoistTask.updatedAt || todoistTask.addedAt,  // Fixed: use updatedAt (camelCase) not updated_at
+      projectName: todoistTask.projectId  // Track which project it came from
     };
   }
 
@@ -737,7 +778,7 @@ export class TodoistSync {
       // Set Status if it exists
       if (database.properties['Status']) {
         properties['Status'] = {
-          status: { name: taskData.isCompleted ? '✅ Done' : '🚀 In Progress' }
+          status: { name: taskData.isCompleted ? '✅ Done' : 'Not started' }
         };
       }
       

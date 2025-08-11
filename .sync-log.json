@@ -428,5 +428,47 @@
         "actions": []
       }
     }
+  },
+  {
+    "timestamp": "2025-08-11T10:24:08.217Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 3,
+        "skipped": 8,
+        "errors": 0,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 8,
+        "errors": 0,
+        "actions": []
+      }
+    }
+  },
+  {
+    "timestamp": "2025-08-11T10:33:56.226Z",
+    "success": true,
+    "result": {
+      "notionToTodoist": {
+        "created": 0,
+        "updated": 0,
+        "deleted": 0,
+        "skipped": 8,
+        "errors": 1469,
+        "actions": []
+      },
+      "todoistToNotion": {
+        "created": 0,
+        "updated": 0,
+        "skipped": 8,
+        "errors": 3,
+        "actions": []
+      }
+    }
   }
 ]

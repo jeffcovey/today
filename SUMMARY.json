@@ -1,19 +1,25 @@
 {
   "meta": {
     "version": "2.0.0",
-    "last_updated": "2025-08-11T10:04:28.855Z",
+    "last_updated": "2025-08-11T10:24:40.312Z",
     "last_sync": {
-      "emails": "2025-08-11T08:27:17.000Z",
-      "tasks": "2025-08-11T10:04:28.855Z",
-      "notes": "2025-08-11T10:04:28.855Z",
+      "emails": "2025-08-11T10:16:52.000Z",
+      "tasks": "2025-08-11T10:24:40.312Z",
+      "notes": "2025-08-11T10:24:40.312Z",
       "todoist": ""
     },
-    "update_count": 34,
+    "update_count": 35,
     "retention_days": 7,
     "format": "incremental-summary"
   },
   "state": {
     "email_ids_seen": [
+      763,
+      762,
+      764,
+      765,
+      761,
+      760,
       26,
       88,
       671,
@@ -107,13 +113,7 @@
       630,
       509,
       629,
-      512,
-      508,
-      627,
-      511,
-      628,
-      519,
-      633
+      512
     ],
     "task_ids_seen": [
       "24b5e778-3096-8136-8c5f-d648ccd1ba9c",
@@ -577,102 +577,74 @@
   "changes": {
     "new_emails": [
       {
-        "id": 496,
-        "uid": 154856,
-        "subject": "Automation mentioned you in Look for John Boswell books",
+        "id": 763,
+        "uid": 184977,
+        "subject": "n-cli edited Reply to Heroku",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-10T15:47:56.000Z",
-        "folder": "Deleted Messages"
+        "date": "2025-08-11T10:16:52.000Z",
+        "folder": "INBOX"
       },
       {
-        "id": 659,
-        "uid": 18500,
-        "subject": "Stock up! 🤸 SUMMER EVENT! Incredibly LOW Prices now thru August 16th!",
-        "from_address": "\"Big 5 Sporting Goods - Weekly Ad\" <eteam@email.big5sportinggoods.com>",
-        "date": "2025-08-10T03:21:59.000Z",
-        "folder": "@SaneBlackHole"
-      },
-      {
-        "id": 549,
-        "uid": 154909,
-        "subject": "Hey Folks are you aware of the following:",
-        "from_address": "\"Lloyd Estates Trending Posts\" <reply@is.email.nextdoor.com>",
-        "date": "2025-08-09T21:28:00.000Z",
-        "folder": "Deleted Messages"
-      },
-      {
-        "id": 730,
-        "uid": 15396,
-        "subject": "[jeffcovey-sfpix/staging] Occurred: Recaptcha::RecaptchaError (#122019160)",
-        "from_address": "\"Honeybadger Notifications\" <notifications@honeybadger.io>",
-        "date": "2025-08-09T20:53:56.000Z",
-        "folder": "Bugs"
-      },
-      {
-        "id": 507,
-        "uid": 154867,
-        "subject": "It's time to order the CR2450 battery for your Fountain Switch",
-        "from_address": "\"amazon.com\" <no-reply@amazon.com>",
-        "date": "2025-08-09T18:45:06.000Z",
-        "folder": "Deleted Messages"
-      },
-      {
-        "id": 568,
-        "uid": 154928,
-        "subject": "Shahs Of Kabob Ft Lauderdale and more are now on Grubhub!",
-        "from_address": "\"Grubhub\" <email@a.grubhub.com>",
-        "date": "2025-08-09T18:18:01.000Z",
-        "folder": "Deleted Messages"
-      },
-      {
-        "id": 622,
-        "uid": 154982,
-        "subject": "Alaska’s Inside Passage: 500 miles of “Wow!”",
-        "from_address": "\"Road Scholar\" <contact_at_discover_roadscholar_org_hfbfpc27zv7ax9_f2qr5216@icloud.com>",
-        "date": "2025-08-09T17:34:46.000Z",
-        "folder": "Deleted Messages"
-      },
-      {
-        "id": 752,
-        "uid": 4643,
-        "subject": "A $67.90 USD payout was sent",
-        "from_address": "\"Airbnb\" <express@airbnb.com>",
-        "date": "2025-08-09T16:54:01.000Z",
-        "folder": "Hosting"
-      },
-      {
-        "id": 519,
-        "uid": 154879,
-        "subject": "Automation mentioned you in offer video chat help for Patrons",
+        "id": 762,
+        "uid": 184976,
+        "subject": "n-cli edited Get the pest control people to spray for ants",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-09T16:31:40.000Z",
-        "folder": "Deleted Messages"
+        "date": "2025-08-11T10:16:52.000Z",
+        "folder": "INBOX"
       },
       {
-        "id": 633,
-        "uid": 154994,
-        "subject": "Automation mentioned you in lower dynos to necessary levels",
+        "id": 764,
+        "uid": 184978,
+        "subject": "n-cli edited Reply to Heroku",
         "from_address": "\"Notion Team\" <notify@mail.notion.so>",
-        "date": "2025-08-09T16:31:39.000Z",
-        "folder": "Deleted Messages"
+        "date": "2025-08-11T10:16:51.000Z",
+        "folder": "INBOX"
+      },
+      {
+        "id": 765,
+        "uid": 12337,
+        "subject": "🛳️Jeffrey - Regent Seven Seas World Wide Exclusive",
+        "from_address": "\"Create Your Cruise\" <harold@createyourcruise.com>",
+        "date": "2025-08-11T10:16:08.000Z",
+        "folder": "Advertisements"
+      },
+      {
+        "id": 761,
+        "uid": 184974,
+        "subject": "n-cli edited Use the Virgin Red points",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:10:37.000Z",
+        "folder": "INBOX"
+      },
+      {
+        "id": 760,
+        "uid": 184973,
+        "subject": "n-cli edited Sell the exercise bike",
+        "from_address": "\"Notion Team\" <notify@mail.notion.so>",
+        "date": "2025-08-11T10:10:36.000Z",
+        "folder": "INBOX"
       }
     ],
     "deleted_emails": [
-      737,
-      693,
-      760,
-      506,
-      552,
-      569,
-      631,
-      513,
-      520,
-      634
+      508,
+      627,
+      511,
+      628,
+      519,
+      633
     ],
     "replied_emails": [],
     "new_tasks": [],
     "completed_tasks": [],
-    "modified_tasks": [],
+    "modified_tasks": [
+      {
+        "id": "2495e778-3096-8186-9e7a-da64ba97d405",
+        "title": "Untitled",
+        "properties": "{\"id\":\"2495e778-3096-8186-9e7a-da64ba97d405\",\"database\":\"Action Items\",\"title\":\"Untitled\",\"stage\":\"Front Stage\",\"due_date\":\"2025-08-11\",\"priority\":\"⚪ Low\",\"last_edited\":\"2025-08-11T10:16:00.000Z\"}",
+        "last_edited_time": "2025-08-11T10:16:00.000Z",
+        "database_id": "Action Items"
+      }
+    ],
     "new_notes": [],
     "modified_notes": [],
     "deleted_notes": []
@@ -701,6 +673,16 @@
   },
   "communications": {
     "pending_responses": [
+      {
+        "subject": "n-cli edited Reply to Heroku",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:16:52.000Z"
+      },
+      {
+        "subject": "n-cli edited Reply to Heroku",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:16:51.000Z"
+      },
       {
         "subject": "[SaneBox] Please review 37 recent messages",
         "from": "\"SaneBox Digest\"",
@@ -753,11 +735,11 @@
   },
   "recommendations": {
     "daily_focus": [
-      "Based on the analysis of the daily summary, here are the recommendations:",
-      "```json",
-      "[",
-      "  \"Address the financial tracking concern immediately by setting up a simple expense tracking system today - use a spreadsheet or app like Mint/YNAB to log all income and expenses, especially recurring ones like homeowners insurance\",",
-      "  \"Process the 8 important emails in a dedicated 45-minute block this morning, prioritizing replies to Melv, David Edwards, and Rosemary who are mentioned as overdue\","
+      "Address the financial tracking concern by setting up a simple expense tracking system today - start with a spreadsheet to log all income and expenses, especially recurring ones like homeowners insurance",
+      "Clear the backlog of overdue replies to Melv, David Edwards, and Rosemary within the next hour",
+      "Schedule 30 minutes for cardio exercise today to address the high resting heart rate concern",
+      "Process Airbnb guest reviews (Ashley, Anthony, Serge) during a focused 20-minute email block",
+      "Complete today's Streaks tasks (2m 30s reading) and address the pile of undone paperwork in small 15-minute chunks"
     ],
     "weekly_goals": [],
     "process_improvements": []
@@ -814,6 +796,16 @@
     ],
     "important_emails": [
       {
+        "subject": "n-cli edited Reply to Heroku",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:16:52.000Z"
+      },
+      {
+        "subject": "n-cli edited Reply to Heroku",
+        "from": "\"Notion Team\"",
+        "date": "2025-08-11T10:16:51.000Z"
+      },
+      {
         "subject": "[SaneBox] Please review 37 recent messages",
         "from": "\"SaneBox Digest\"",
         "date": "2025-08-11T02:08:15.000Z"
@@ -855,6 +847,8 @@
       }
     ],
     "top_email_senders": {
+      "\"Notion Team\"": 13,
+      "\"Create Your Cruise\"": 1,
       "\"Tom59 via OlderGay.Men Discussion\"": 1,
       "\"Money Making Moves\"": 2,
       "\"Toggl Track\"": 1,
@@ -883,7 +877,6 @@
       "\"Apple\"": 2,
       "\"بوابة الأحداث العلمية في ماليزيا\"": 1,
       "\"HelloFresh\"": 1,
-      "\"Notion Team\"": 14,
       "\"Honeybadger Support\"": 1,
       "wildhybrid@aol.com": 3,
       "\"LendingTree\"": 1,

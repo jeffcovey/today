@@ -63,6 +63,13 @@ fi
 echo "Would you like to download a model? (Enter number 1-4, or 'n' to skip)"
 read -r MODEL_CHOICE
 
+# Start Ollama server if not running
+if ! pgrep -x "ollama" > /dev/null; then
+    echo "Starting Ollama server..."
+    ollama serve > /dev/null 2>&1 &
+    sleep 3  # Give it time to start
+fi
+
 case $MODEL_CHOICE in
     1)
         echo "Downloading phi3 model (about 2.3GB)..."
