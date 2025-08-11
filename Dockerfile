@@ -18,8 +18,8 @@ RUN npm install -g @anthropic-ai/claude-code
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies (with native module rebuild)
+RUN npm install --build-from-source
 
 # Copy source code and configuration
 COPY src/ ./src/
