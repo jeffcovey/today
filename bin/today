@@ -10,7 +10,7 @@ echo "📊 Starting daily review process..."
 
 # Check if Claude CLI is authenticated by testing actual functionality
 echo "🔐 Checking Claude authentication..."
-TEST_RESPONSE=$(echo "test" | claude 2>&1 | head -1)
+TEST_RESPONSE=$(claude --print "Say 'ok'" 2>&1)
 if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo ""
     echo "⚠️  Claude CLI is not authenticated!"
@@ -77,7 +77,7 @@ if [ -f SUMMARY.json ]; then
     
     # Start interactive Claude session with TODAY.md
     echo "🤖 Starting Claude interactive session..."
-    claude < TODAY.md
+    cat TODAY.md | claude
     
     # After Claude session ends
     echo ""

@@ -5,8 +5,8 @@
 echo "🔐 Checking Claude CLI authentication..."
 echo ""
 
-# Test by actually trying to use Claude
-TEST_RESPONSE=$(echo "test" | claude 2>&1 | head -1)
+# Test by actually trying to use Claude in non-interactive mode
+TEST_RESPONSE=$(claude --print "Say 'ok'" 2>&1)
 
 if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo "⚠️  Claude is NOT authenticated"

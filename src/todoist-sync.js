@@ -483,7 +483,7 @@ export class TodoistSync {
                 changes: {
                   title: taskData.title,
                   dueDate: taskData.dueDate,
-                  status: taskData.isCompleted ? '✅ Done' : 'Not started',
+                  status: taskData.isCompleted ? '✅ Done' : '🗂️ To File',
                   priority: taskData.priority,
                   tags: taskData.tags
                 }
@@ -778,7 +778,7 @@ export class TodoistSync {
       // Set Status if it exists
       if (database.properties['Status']) {
         properties['Status'] = {
-          status: { name: taskData.isCompleted ? '✅ Done' : 'Not started' }
+          status: { name: taskData.isCompleted ? '✅ Done' : '🗂️ To File' }
         };
       }
       
