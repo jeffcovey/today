@@ -1,0 +1,1 @@
+- [ ] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the room.
