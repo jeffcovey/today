@@ -132,18 +132,45 @@ sync_github_notes() {
     # Change to project directory
     cd "$(dirname "$0")/.." || return 1
     
-    # Check for local changes first
-    if [[ -n $(git status notes/ --porcelain 2>/dev/null) ]]; then
-        print_info "Pushing local note changes..."
-        git add notes/ 2>/dev/null
-        git commit -m "Sync local notes" --quiet 2>/dev/null
-        git push origin main --quiet 2>/dev/null
+    # First, check if we can pull cleanly (no uncommitted changes in repo)
+    if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+        # We have local changes - check if they're just in notes/
+        if [[ -n $(git status notes/ --porcelain 2>/dev/null) ]]; then
+            print_info "Pushing local note changes..."
+            git add notes/ 2>/dev/null
+            git commit -m "Sync local notes" --quiet 2>/dev/null
+            git push origin main --quiet 2>/dev/null
+        else
+            # Changes in other files - stash them temporarily
+            print_info "Stashing local changes outside notes/..."
+            git stash push --quiet -m "sync-auto-stash" -- ':!notes/' 2>/dev/null
+            STASHED=true
+        fi
     fi
     
-    # Pull latest changes
-    git pull origin main --quiet 2>/dev/null || {
-        print_info "No remote changes for notes"
-    }
+    # Pull latest changes from remote
+    print_info "Pulling latest changes from GitHub..."
+    if git pull origin main --quiet 2>/dev/null; then
+        PULL_RESULT=$(git log --oneline -1 --format="%s")
+        if [[ "$PULL_RESULT" != *"Already up to date"* ]]; then
+            print_status "Pulled latest changes from GitHub"
+        fi
+    else
+        # Pull failed - check if it's a merge conflict
+        if git status | grep -q "You have unmerged paths"; then
+            print_error "Merge conflict detected - manual resolution needed"
+            print_info "Run 'git status' to see conflicts"
+            return 1
+        else
+            print_info "No remote changes to pull"
+        fi
+    fi
+    
+    # Restore stashed changes if we stashed them
+    if [[ "${STASHED:-false}" == "true" ]]; then
+        print_info "Restoring stashed changes..."
+        git stash pop --quiet 2>/dev/null || true
+    fi
     
     # Clean up empty files
     find notes -type f -empty -delete 2>/dev/null
