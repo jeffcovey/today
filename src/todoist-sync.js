@@ -335,14 +335,36 @@ export class TodoistSync {
       return { created: 0, updated: 0, errors: 0 };
     }
     
+    // NOTE: Todoist API v2 limitation - getTasks only returns active tasks
+    // Completed tasks are not returned by the API
+    // To sync completed status from Todoist to Notion, we need to:
+    // 1. Track which tasks were previously synced
+    // 2. If a task is missing from active tasks, assume it was completed
+    
     const taskResponse = await this.todoist.getTasks({ projectId: project.id });
     const todoistTasks = taskResponse.results || taskResponse || [];
-    console.log(`Found ${todoistTasks.length} tasks in Todoist`);
+    console.log(`Found ${todoistTasks.length} active tasks in Todoist`);
+    console.log(chalk.yellow('⚠️  Note: Completed tasks in Todoist are not synced back to Notion (API limitation)'))
     
     const reversedMapping = new Map();
     this.syncMapping.forEach((todoistId, notionId) => {
       reversedMapping.set(todoistId, notionId);
     });
+    
+    // Detect completed tasks: tasks that were mapped but are no longer in active list
+    const activeTaskIds = new Set(todoistTasks.map(t => t.id));
+    const completedInTodoist = [];
+    
+    for (const [notionId, todoistId] of this.syncMapping.entries()) {
+      if (!activeTaskIds.has(todoistId)) {
+        // Task was previously synced but is no longer active - likely completed
+        completedInTodoist.push({ notionId, todoistId });
+      }
+    }
+    
+    if (completedInTodoist.length > 0) {
+      console.log(chalk.green(`✓ Detected ${completedInTodoist.length} tasks completed in Todoist`));
+    }
     
     let created = 0, updated = 0, skipped = 0, errors = 0;
     const actions = [];
@@ -507,6 +529,37 @@ export class TodoistSync {
         } else {
           errors++;
         }
+      }
+    }
+    
+    // Now handle tasks that were completed in Todoist
+    if (completedInTodoist.length > 0 && !dryRun) {
+      console.log(chalk.gray('Marking completed tasks as Done in Notion...'));
+      
+      const completedUpdates = completedInTodoist.map(({ notionId }) => ({
+        pageId: notionId,
+        properties: {
+          'Done': { checkbox: true },
+          'Status': { status: { name: '✅ Done' } }
+        }
+      }));
+      
+      const completedResults = await this.notionAPI.batchUpdatePages(completedUpdates, {
+        concurrency: 5,
+        delayMs: 100,
+        showProgress: false
+      });
+      
+      let completedCount = 0;
+      for (const result of completedResults) {
+        if (result.success) {
+          completedCount++;
+        }
+      }
+      
+      if (completedCount > 0) {
+        console.log(chalk.green(`✓ Marked ${completedCount} tasks as Done in Notion`));
+        updated += completedCount;
       }
     }
     

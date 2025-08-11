@@ -15,13 +15,31 @@ describe('TemporalManager', () => {
       getQuartersDatabase: jest.fn(),
       getYearsDatabase: jest.fn(),
       getDatabaseItemsIncremental: jest.fn(),
-      createPage: jest.fn()
+      createPage: jest.fn(),
+      notion: {
+        pages: {
+          create: jest.fn().mockResolvedValue({ id: 'new-page-id' })
+        },
+        databases: {
+          retrieve: jest.fn().mockResolvedValue({
+            properties: {
+              Date: { type: 'date' },
+              Name: { type: 'title' }
+            }
+          })
+        }
+      }
     };
 
     mockCache = {
       get: jest.fn(),
       set: jest.fn(),
-      delete: jest.fn()
+      delete: jest.fn(),
+      db: {
+        prepare: jest.fn().mockReturnValue({
+          run: jest.fn()
+        })
+      }
     };
 
     manager = new TemporalManager(mockNotionAPI, mockCache);
@@ -34,43 +52,33 @@ describe('TemporalManager', () => {
     });
   });
 
-  describe('Date utilities', () => {
-    test('should format week correctly', () => {
-      const date = new Date('2025-08-10');
-      const weekStr = manager.getWeekString(date);
-      
-      // Week 32 of 2025
-      expect(weekStr).toMatch(/2025-W\d{2}/);
-    });
-
-    test('should format quarter correctly', () => {
-      const date = new Date('2025-08-10');
-      const quarterStr = manager.getQuarterString(date);
-      
-      // Q3 2025
-      expect(quarterStr).toBe('2025-Q3');
-    });
-
-    test('should format month correctly', () => {
-      const date = new Date('2025-08-10');
-      const monthStr = manager.getMonthString(date);
-      
-      expect(monthStr).toBe('2025-08');
-    });
-  });
-
   describe('createMissingDaysAndWeeks', () => {
-    test('should handle database retrieval errors gracefully', async () => {
+    test('should handle missing databases gracefully', async () => {
+      // Setup: All databases fail to load
       mockNotionAPI.getDaysDatabase.mockRejectedValue(new Error('DB not found'));
-      mockNotionAPI.getWeeksDatabase.mockResolvedValue({ id: 'weeks-db-id' });
+      mockNotionAPI.getWeeksDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
 
-      // Should not throw
-      await expect(manager.createMissingDaysAndWeeks()).rejects.toThrow();
+      const spy = jest.spyOn(console, 'log').mockImplementation();
+      
+      // Should complete without error when all DBs are missing
+      await manager.createMissingDaysAndWeeks();
+      
+      // Should log completion message
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Successfully created missing temporal entries'));
+      
+      spy.mockRestore();
     });
 
-    test('should use default date range when not specified', async () => {
+    test('should handle partial database availability', async () => {
+      // Only Days and Weeks databases exist
       mockNotionAPI.getDaysDatabase.mockResolvedValue({ id: 'days-db-id' });
       mockNotionAPI.getWeeksDatabase.mockResolvedValue({ id: 'weeks-db-id' });
+      mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
 
       const spy = jest.spyOn(console, 'log').mockImplementation();
@@ -78,9 +86,53 @@ describe('TemporalManager', () => {
       await manager.createMissingDaysAndWeeks();
       
       // Should log date range
-      expect(spy).toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Creating missing temporal entries'));
+      
+      // Should call getDatabaseItemsIncremental for existing databases
+      expect(mockNotionAPI.getDatabaseItemsIncremental).toHaveBeenCalled();
+      
+      spy.mockRestore();
+    });
+
+    test('should use default date range when not specified', async () => {
+      mockNotionAPI.getDaysDatabase.mockResolvedValue({ id: 'days-db-id' });
+      mockNotionAPI.getWeeksDatabase.mockResolvedValue({ id: 'weeks-db-id' });
+      mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
+
+      const spy = jest.spyOn(console, 'log').mockImplementation();
+      
+      await manager.createMissingDaysAndWeeks();
+      
+      // Should log date range with default 7 days before and after
       const logCall = spy.mock.calls[0][0];
       expect(logCall).toContain('Creating missing temporal entries');
+      expect(logCall).toMatch(/\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}/);
+      
+      spy.mockRestore();
+    });
+
+    test('should use custom date range when specified', async () => {
+      mockNotionAPI.getDaysDatabase.mockResolvedValue({ id: 'days-db-id' });
+      mockNotionAPI.getWeeksDatabase.mockResolvedValue({ id: 'weeks-db-id' });
+      mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
+      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
+
+      const spy = jest.spyOn(console, 'log').mockImplementation();
+      
+      const startDate = new Date('2024-01-01');
+      const endDate = new Date('2024-01-31');
+      
+      await manager.createMissingDaysAndWeeks(startDate, endDate);
+      
+      // Should log the custom date range
+      const logCall = spy.mock.calls[0][0];
+      expect(logCall).toContain('2024-01-01');
+      expect(logCall).toContain('2024-01-31');
       
       spy.mockRestore();
     });

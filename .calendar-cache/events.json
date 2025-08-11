@@ -1,16 +1,7 @@
 {
-  "last_sync": "2025-08-10T21:03:47.842Z",
-  "total_events": 8,
+  "last_sync": "2025-08-11T10:04:28.253Z",
+  "total_events": 7,
   "events": [
-    {
-      "source": "Airbnb - Listing 2",
-      "start": "2025-08-08",
-      "allDay": true,
-      "end": "2025-08-09",
-      "title": "Reserved",
-      "id": "1418fb94e984-4281e16296064c2a67f9d0d82357adaa@airbnb.com",
-      "description": "Reservation URL: https://www.airbnb.com/hosting/reservations/details/HMDHYPYBWN\nPhone Number (Last 4 Digits): 1397"
-    },
     {
       "source": "Airbnb - Listing 1",
       "start": "2025-08-09",

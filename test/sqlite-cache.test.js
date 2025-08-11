@@ -5,14 +5,16 @@ import path from 'path';
 
 describe('SQLiteCache', () => {
   let cache;
-  const testDbPath = './test-cache.db';
+  const testDatabaseId = 'test-db-123';
+  const cacheDir = path.join(process.cwd(), '.notion-cache');
+  const testDbPath = path.join(cacheDir, 'notion-cache.db');
 
   beforeEach(() => {
     // Clean up any existing test database
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
-    cache = new SQLiteCache(testDbPath);
+    cache = new SQLiteCache();
   });
 
   afterEach(() => {
@@ -25,86 +27,135 @@ describe('SQLiteCache', () => {
     }
   });
 
-  describe('Basic Operations', () => {
-    test('should set and get a value', async () => {
-      const key = 'test-key';
-      const value = { data: 'test data' };
+  describe('Task Cache Operations', () => {
+    test('should set and get cached tasks', async () => {
+      const tasks = [
+        {
+          id: 'task-1',
+          title: 'Test Task 1',
+          properties: { status: 'In Progress' },
+          url: 'https://notion.so/task-1',
+          created_time: '2024-01-01T00:00:00Z',
+          last_edited_time: '2024-01-01T12:00:00Z'
+        },
+        {
+          id: 'task-2',
+          title: 'Test Task 2',
+          properties: { status: 'Done' },
+          url: 'https://notion.so/task-2',
+          created_time: '2024-01-01T00:00:00Z',
+          last_edited_time: '2024-01-01T12:00:00Z'
+        }
+      ];
+      const lastEditedTime = '2024-01-01T12:00:00Z';
       
-      await cache.set(key, value);
-      const retrieved = await cache.get(key);
+      await cache.setCachedTasks(testDatabaseId, tasks, lastEditedTime);
+      const retrieved = await cache.getCachedTasks(testDatabaseId);
       
-      expect(retrieved).toEqual(value);
+      expect(retrieved).not.toBeNull();
+      expect(retrieved.tasks).toHaveLength(2);
+      expect(retrieved.tasks[0].title).toBe('Test Task 1');
+      expect(retrieved.lastEditedTime).toBe(lastEditedTime);
     });
 
-    test('should return null for non-existent key', async () => {
-      const result = await cache.get('non-existent');
+    test('should return null for non-existent database tasks', async () => {
+      const result = await cache.getCachedTasks('non-existent-db');
       expect(result).toBeNull();
     });
 
-    test('should handle TTL expiration', async () => {
-      const key = 'ttl-test';
-      const value = { data: 'expires soon' };
+    test('should validate task cache correctly', async () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'Test Task',
+        properties: {},
+        url: 'https://notion.so/task-1',
+        created_time: '2024-01-01T00:00:00Z'
+      }];
+      const lastEditedTime = '2024-01-01T12:00:00Z';
       
-      // Set with 1 second TTL
-      await cache.set(key, value, 1);
+      await cache.setCachedTasks(testDatabaseId, tasks, lastEditedTime);
       
-      // Should exist immediately
-      let retrieved = await cache.get(key);
-      expect(retrieved).toEqual(value);
+      // Cache should be valid for same timestamp
+      const isValid = await cache.isTaskCacheValid(testDatabaseId, lastEditedTime);
+      expect(isValid).toBe(true);
       
-      // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 1100));
-      
-      // Should be expired
-      retrieved = await cache.get(key);
-      expect(retrieved).toBeNull();
+      // Cache should be invalid for newer timestamp
+      const newerTime = '2024-01-01T13:00:00Z';
+      const isInvalid = await cache.isTaskCacheValid(testDatabaseId, newerTime);
+      expect(isInvalid).toBe(false);
     });
   });
 
-  describe('Delete Operations', () => {
-    test('should delete a key', async () => {
-      const key = 'delete-test';
-      const value = { data: 'to be deleted' };
+  describe('Project Cache Operations', () => {
+    test('should set and get cached projects', async () => {
+      const projects = [
+        {
+          id: 'project-1',
+          title: 'Test Project',
+          url: 'https://notion.so/project-1',
+          created_time: '2024-01-01T00:00:00Z',
+          status: 'Active'
+        }
+      ];
+      const lastEditedTime = '2024-01-01T12:00:00Z';
       
-      await cache.set(key, value);
-      expect(await cache.get(key)).toEqual(value);
+      await cache.setCachedProjects(testDatabaseId, projects, lastEditedTime);
+      const retrieved = await cache.getCachedProjects(testDatabaseId);
       
-      await cache.delete(key);
-      expect(await cache.get(key)).toBeNull();
-    });
-
-    test('should handle deleting non-existent key', async () => {
-      // Should not throw
-      await expect(cache.delete('non-existent')).resolves.not.toThrow();
+      expect(retrieved).not.toBeNull();
+      expect(retrieved.projects).toHaveLength(1);
+      expect(retrieved.projects[0].title).toBe('Test Project');
     });
   });
 
   describe('Clear Operations', () => {
-    test('should clear all entries', async () => {
-      await cache.set('key1', { data: 1 });
-      await cache.set('key2', { data: 2 });
-      await cache.set('key3', { data: 3 });
+    test('should clear all cache', async () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'Test Task',
+        properties: {},
+        url: 'https://notion.so/task-1',
+        created_time: '2024-01-01T00:00:00Z'
+      }];
       
-      await cache.clear();
+      await cache.setCachedTasks(testDatabaseId, tasks, '2024-01-01T12:00:00Z');
+      await cache.clearCache();
       
-      expect(await cache.get('key1')).toBeNull();
-      expect(await cache.get('key2')).toBeNull();
-      expect(await cache.get('key3')).toBeNull();
+      const result = await cache.getCachedTasks(testDatabaseId);
+      expect(result).toBeNull();
+    });
+
+    test('should clear tasks cache for specific database', async () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'Test Task',
+        properties: {},
+        url: 'https://notion.so/task-1',
+        created_time: '2024-01-01T00:00:00Z'
+      }];
+      
+      await cache.setCachedTasks(testDatabaseId, tasks, '2024-01-01T12:00:00Z');
+      await cache.clearTasksCache(testDatabaseId);
+      
+      const result = await cache.getCachedTasks(testDatabaseId);
+      expect(result).toBeNull();
     });
   });
 
-  describe('Error Handling', () => {
-    test('should handle invalid JSON gracefully', async () => {
-      // Directly insert invalid JSON
-      const db = cache.db;
-      db.prepare('INSERT INTO cache (key, value, expires_at) VALUES (?, ?, ?)').run(
-        'bad-json',
-        'not valid json',
-        Date.now() + 10000
-      );
+  describe('Database Cache Operations', () => {
+    test('should set and get cached databases', async () => {
+      const databases = [
+        { id: 'db-1', title: 'Tasks', url: 'https://notion.so/db-1' },
+        { id: 'db-2', title: 'Projects', url: 'https://notion.so/db-2' }
+      ];
       
-      const result = await cache.get('bad-json');
-      expect(result).toBeNull();
+      await cache.setCachedDatabases(databases);
+      const retrieved = await cache.getCachedDatabases();
+      
+      expect(retrieved).not.toBeNull();
+      expect(retrieved).toHaveLength(2);
+      expect(retrieved[0].title).toBe('Projects'); // Sorted by title
+      expect(retrieved[1].title).toBe('Tasks');
     });
   });
 });
