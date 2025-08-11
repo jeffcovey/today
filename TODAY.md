@@ -22,6 +22,8 @@ Please help me review my current situation and decide what to do today to be hap
 
 #### Schedule
 
+Unless I specify otherwise, I am usually in the Eastern United States (New York) time zone. Use that for calculating times and dates.
+
 I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to stretch, etc. before I start work. I go to bed around 9:30PM, but I like to go offline for the last couple of hours. I should wrap up the day's work and plan tomorrow by mid-evening.
 
 #### Streaks
