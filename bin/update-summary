@@ -541,21 +541,37 @@ async function extractEmailContent(emails) {
 }
 
 async function generateAIInsights(summary) {
-  // Use Claude to generate deeper insights from the data
+  // Try local LLM first, then Claude, then fallback
+  const promptData = {
+    concerns_count: summary.content.concerns.length,
+    first_concern: summary.content.concerns[0] || 'None',
+    overdue_count: summary.content.overdue_tasks.length,
+    urgent_count: summary.content.urgent_tasks.length,
+    email_count: summary.content.important_emails.length,
+    contacts: summary.content.people_to_contact.length,
+    events_today: summary.content.calendar_today.length,
+    events_week: summary.content.calendar_week.length
+  };
+  
+  // Try local LLM first (Ollama)
   try {
-    console.log('🤖 Generating AI insights...');
-    
-    // Create a focused prompt for Claude - simplified to avoid escaping issues
-    const promptData = {
-      concerns_count: summary.content.concerns.length,
-      first_concern: summary.content.concerns[0] || 'None',
-      overdue_count: summary.content.overdue_tasks.length,
-      urgent_count: summary.content.urgent_tasks.length,
-      email_count: summary.content.important_emails.length,
-      contacts: summary.content.people_to_contact.length,
-      events_today: summary.content.calendar_today.length,
-      events_week: summary.content.calendar_week.length
-    };
+    const { localLLM } = await import('../src/local-llm.js');
+    if (await localLLM.isAvailable()) {
+      console.log('🤖 Generating insights with local LLM...');
+      const insights = await localLLM.generateDailyRecommendations(promptData);
+      if (Array.isArray(insights) && insights.length > 0) {
+        return insights;
+      }
+    }
+  } catch (error) {
+    // Local LLM not available or failed
+  }
+  
+  // Fallback to Claude if available
+  try {
+    // Check if Claude CLI is available
+    execSync('which claude', { stdio: 'ignore' });
+    console.log('🤖 Generating insights with Claude...');
     
     // Write prompt to temp file to avoid shell escaping issues
     const tempFile = path.join(os.tmpdir(), `claude-prompt-${Date.now()}.txt`);
@@ -599,11 +615,68 @@ Return ONLY a JSON array of recommendation strings, like:
       }
     }
   } catch (error) {
-    console.log('Could not generate AI insights, using defaults');
+    console.log('Claude not available, using smart recommendations');
   }
   
-  // Fallback to time-based recommendations
-  return generateBasicRecommendations(summary);
+  // Smart fallback recommendations based on actual data
+  return generateSmartRecommendations(summary, promptData);
+}
+
+function generateSmartRecommendations(summary, data) {
+  const recommendations = [];
+  
+  // Priority-based recommendations
+  if (data.overdue_count > 0) {
+    const oldest = summary.content.overdue_tasks[0];
+    if (oldest) {
+      recommendations.push(`Clear ${data.overdue_count} overdue tasks, starting with "${oldest.title.substring(0, 30)}..."`);
+    }
+  }
+  
+  if (data.concerns_count > 0 && data.first_concern !== 'None') {
+    const concern = data.first_concern.substring(0, 80);
+    if (concern.includes('financial') || concern.includes('expense')) {
+      recommendations.push('Set up expense tracking spreadsheet and log today\'s transactions');
+    } else if (concern.includes('reply') || concern.includes('respond')) {
+      recommendations.push(`Address overdue communications: ${concern}`);
+    } else {
+      recommendations.push(`Take action on: ${concern}`);
+    }
+  }
+  
+  if (data.urgent_count > 3) {
+    recommendations.push(`Focus on ${data.urgent_count} urgent tasks - consider time-blocking your calendar`);
+  }
+  
+  if (data.email_count > 5) {
+    recommendations.push(`Process ${data.email_count} important emails in a dedicated 30-minute session`);
+  }
+  
+  if (data.contacts > 0) {
+    const people = summary.content.people_to_contact.slice(0, 3).join(', ');
+    recommendations.push(`Reach out to: ${people}`);
+  }
+  
+  if (data.events_today > 0) {
+    const event = summary.content.calendar_today[0];
+    recommendations.push(`Prepare for: ${event.title} at ${event.time}`);
+  }
+  
+  // Add time-based recommendation if we have room
+  const hour = new Date().getHours();
+  if (recommendations.length < 5) {
+    if (hour < 10) {
+      recommendations.push('Start with a quick win to build momentum for the day');
+    } else if (hour < 14) {
+      recommendations.push('Use peak energy for complex problem-solving tasks');
+    } else if (hour < 17) {
+      recommendations.push('Handle administrative tasks and communications');
+    } else {
+      recommendations.push('Review tomorrow\'s priorities and prepare for a strong start');
+    }
+  }
+  
+  return recommendations.slice(0, 5);
 }
 
 async function generateBasicRecommendations(summary) {

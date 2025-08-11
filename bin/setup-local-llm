@@ -1,0 +1,102 @@
+#!/bin/bash
+
+echo "🤖 Local LLM Setup for Today CLI"
+echo "================================"
+echo ""
+echo "This will help you set up a free, local AI to reduce Claude API usage."
+echo ""
+
+# Detect OS
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+# Check if Ollama is installed
+if command -v ollama &> /dev/null; then
+    echo "✅ Ollama is already installed"
+    echo ""
+    echo "Available models:"
+    ollama list
+else
+    echo "📦 Ollama is not installed."
+    echo ""
+    echo "Would you like to install Ollama? (y/n)"
+    read -r INSTALL_OLLAMA
+    
+    if [[ "$INSTALL_OLLAMA" == "y" ]]; then
+        echo "Installing Ollama..."
+        
+        if [[ "$OS" == "Linux" ]] || [[ "$OS" == "Darwin" ]]; then
+            # Official Ollama install script
+            curl -fsSL https://ollama.com/install.sh | sh
+        else
+            echo "Please visit https://ollama.com/download to install Ollama for your system"
+            exit 1
+        fi
+        
+        echo "✅ Ollama installed successfully"
+    else
+        echo "Skipping Ollama installation"
+        exit 0
+    fi
+fi
+
+echo ""
+echo "📚 Recommended models for Today CLI (in order of preference):"
+echo ""
+echo "1. phi3 (3.8B) - Fast, good for simple tasks, low memory usage"
+echo "2. tinyllama (1.1B) - Very fast, minimal memory, good enough for basic tasks"
+echo "3. mistral (7B) - Better quality, more memory needed"
+echo "4. llama3 (8B) - High quality, requires more resources"
+echo ""
+
+# Check which models are already installed
+INSTALLED_MODELS=$(ollama list 2>/dev/null | tail -n +2 | awk '{print $1}')
+
+if [[ -z "$INSTALLED_MODELS" ]]; then
+    echo "No models currently installed."
+else
+    echo "Currently installed models:"
+    echo "$INSTALLED_MODELS" | sed 's/^/  - /'
+    echo ""
+fi
+
+echo "Would you like to download a model? (Enter number 1-4, or 'n' to skip)"
+read -r MODEL_CHOICE
+
+case $MODEL_CHOICE in
+    1)
+        echo "Downloading phi3 model (about 2.3GB)..."
+        ollama pull phi3
+        ;;
+    2)
+        echo "Downloading tinyllama model (about 638MB)..."
+        ollama pull tinyllama
+        ;;
+    3)
+        echo "Downloading mistral model (about 4.1GB)..."
+        ollama pull mistral
+        ;;
+    4)
+        echo "Downloading llama3 model (about 4.7GB)..."
+        ollama pull llama3
+        ;;
+    n|N)
+        echo "Skipping model download"
+        ;;
+    *)
+        echo "Invalid choice, skipping model download"
+        ;;
+esac
+
+echo ""
+echo "🎉 Setup complete!"
+echo ""
+echo "To test your local LLM:"
+echo "  ollama run $(ollama list 2>/dev/null | tail -n +2 | head -1 | awk '{print $1}') \"Hello, how are you?\""
+echo ""
+echo "The Today CLI will now automatically use your local LLM for:"
+echo "  - Daily summary recommendations (bin/update-summary)"
+echo "  - Simple email/task searches"
+echo "  - Basic intent classification"
+echo ""
+echo "This will help reduce your Claude API usage significantly!"
