@@ -15,16 +15,23 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 
 ### Initial Tasks
 When this session starts, please:
-1. Load and analyze the SUMMARY.json file
-2. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
-3. **CRITICAL: Check yesterday's review file in `notes/reviews/` to see what was already completed**
-4. **CRITICAL: Calendar events in SUMMARY.json now include timezone information**
+1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
+2. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+   - **If today's review EXISTS**: 
+     - Load the existing review file
+     - Check SUMMARY.json's `meta.last_updated` timestamp
+     - Only analyze changes since the review was last modified
+     - Update the review with new information only
+     - This significantly reduces launch time!
+   - **If today's review DOESN'T exist**:
+     - Load and fully analyze the SUMMARY.json file
+     - Check yesterday's review to see what was completed
+     - Create a new review file with comprehensive analysis
+3. **CRITICAL: Calendar events in SUMMARY.json now include timezone information**
    - Events show both time and timezone (e.g., "10:00 AM America/New_York")
    - The originalTime and originalTimezone fields preserve the source data
    - No manual timezone conversion needed - we preserve what the calendar provides
-5. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
-6. Create or update the review file with your analysis, avoiding duplicate suggestions for completed items
-7. Present your recommendations to the user
+4. Present your recommendations to the user
 
 ### Review File Format
 The review file should include:
@@ -33,6 +40,18 @@ The review file should include:
 - Or numbered format: `1. **Task name** (time estimate)`
 - Group tasks by time of day or category
 - Track completed tasks with ✓ marks
+
+### Incremental Updates (Performance Optimization)
+When updating an existing review file:
+- Check SUMMARY.json's `changes` section for what's new
+- Look at `meta.last_updated` vs review file modification time
+- Only process and mention significant changes:
+  - New urgent emails (`changes.new_emails`)
+  - New or modified tasks (`changes.new_tasks`, `changes.modified_tasks`)
+  - Updated calendar events
+  - New concerns or notes
+- Append updates with timestamp like: `### Update (2:30 PM)`
+- This keeps launch times fast for subsequent `bin/today` runs
 
 ### Commands Available
 The user can use these commands during the session:
