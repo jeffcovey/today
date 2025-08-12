@@ -96,7 +96,8 @@ async function loadSummary() {
         important_emails: [],
         top_email_senders: {},
         calendar_today: [],
-        calendar_week: []
+        calendar_week: [],
+        ogm_work: []
       },
       active_context: {
         projects: {},
@@ -326,7 +327,8 @@ async function extractContentFromNotes(summary) {
   const content = {
     concerns: [],
     people_to_contact: [],
-    recent_notes: []
+    recent_notes: [],
+    ogm_work: []
   };
   
   try {
@@ -361,6 +363,51 @@ async function extractContentFromNotes(summary) {
         file: name,
         preview: firstLine.slice(0, 100)
       });
+    }
+    
+    // Extract OGM work items
+    const ogmWorkDir = path.join(NOTES_DIR, 'ogm-work');
+    try {
+      const ogmFiles = execSync(
+        `find "${ogmWorkDir}" -name "*.md" -type f 2>/dev/null`,
+        { encoding: 'utf-8' }
+      ).trim().split('\n').filter(Boolean);
+      
+      for (const ogmFile of ogmFiles) {
+        const text = await fs.readFile(ogmFile, 'utf-8').catch(() => '');
+        const lines = text.split('\n');
+        
+        // Extract unchecked tasks (- [ ])
+        const tasks = lines.filter(line => line.match(/^- \[ \]/));
+        
+        // Find priority indicators (look for P0, Critical, Urgent in the task or its parent section)
+        const criticalTasks = tasks.filter(t => {
+          // Check if task contains critical keywords
+          if (t.match(/P0|Critical.*Crisis|Urgent.*\(P0\)/i)) return true;
+          // Check if task is under a Critical/Urgent section
+          const taskIndex = lines.indexOf(t);
+          // Look backwards for section header
+          for (let i = taskIndex - 1; i >= 0; i--) {
+            if (lines[i].startsWith('##')) {
+              return lines[i].match(/Critical|Urgent.*\(P0\)/i);
+            }
+          }
+          return false;
+        });
+        const highPriorityTasks = tasks.filter(t => t.match(/P1|High Priority/i));
+        
+        if (tasks.length > 0) {
+          content.ogm_work.push({
+            file: path.basename(ogmFile),
+            total_tasks: tasks.length,
+            critical_count: criticalTasks.length,
+            high_priority_count: highPriorityTasks.length,
+            sample_tasks: tasks.slice(0, 3).map(t => t.replace(/^- \[ \] /, '').trim())
+          });
+        }
+      }
+    } catch (e) {
+      // No OGM work directory or files
     }
   } catch (error) {
     console.error('Error extracting note content:', error.message);
@@ -542,6 +589,11 @@ async function extractEmailContent(emails) {
 
 async function generateAIInsights(summary) {
   // Try local LLM first, then Claude, then fallback
+  const ogmTotalTasks = summary.content.ogm_work ? 
+    summary.content.ogm_work.reduce((sum, w) => sum + w.total_tasks, 0) : 0;
+  const ogmCriticalTasks = summary.content.ogm_work ?
+    summary.content.ogm_work.reduce((sum, w) => sum + w.critical_count, 0) : 0;
+    
   const promptData = {
     concerns_count: summary.content.concerns.length,
     first_concern: summary.content.concerns[0] || 'None',
@@ -550,7 +602,9 @@ async function generateAIInsights(summary) {
     email_count: summary.content.important_emails.length,
     contacts: summary.content.people_to_contact.length,
     events_today: summary.content.calendar_today.length,
-    events_week: summary.content.calendar_week.length
+    events_week: summary.content.calendar_week.length,
+    ogm_tasks: ogmTotalTasks,
+    ogm_critical: ogmCriticalTasks
   };
   
   // Try local LLM first (Ollama)
@@ -624,6 +678,11 @@ Return ONLY a JSON array of recommendation strings, like:
 
 function generateSmartRecommendations(summary, data) {
   const recommendations = [];
+  
+  // OGM critical work takes precedence
+  if (data.ogm_critical > 0) {
+    recommendations.push(`Focus on ${data.ogm_critical} critical OGM production issues`);
+  }
   
   // Priority-based recommendations
   if (data.overdue_count > 0) {
@@ -742,6 +801,7 @@ async function updateSummary(useAI = true) {
   summary.content.concerns = noteContent.concerns;
   summary.content.people_to_contact = noteContent.people_to_contact;
   summary.content.recent_notes = noteContent.recent_notes;
+  summary.content.ogm_work = noteContent.ogm_work;
 
   // Extract calendar content
   const calendarContent = await extractCalendarContent();
@@ -854,6 +914,14 @@ async function updateSummary(useAI = true) {
   console.log(`  - ${Object.keys(summary.content.top_email_senders).length} email senders`);
   console.log(`  - ${summary.content.calendar_today.length} events today`);
   console.log(`  - ${summary.content.calendar_week.length} events this week`);
+  
+  // Show OGM work if present
+  if (summary.content.ogm_work && summary.content.ogm_work.length > 0) {
+    const totalOgmTasks = summary.content.ogm_work.reduce((sum, w) => sum + w.total_tasks, 0);
+    const criticalOgmTasks = summary.content.ogm_work.reduce((sum, w) => sum + w.critical_count, 0);
+    console.log(`  - ${totalOgmTasks} OGM tasks (${criticalOgmTasks} critical)`);
+  }
+  
   console.log(`📈 Changes: ${summary.changes.new_emails.length} new emails, ${summary.changes.new_tasks.length} new tasks, ${summary.changes.new_notes.length} new notes`);
   
   return summary;
