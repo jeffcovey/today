@@ -1,5 +1,7 @@
-# Tasks
-
-
-<!-- Added from 2025-08-12-132158-UTC-test-tasks-md.md on 2025-08-12 17:22:16 UTC -->
+- [ ] remove tmp/groups_page_backup.html
+- [ ] make up the guest rooms today
+- [ ] I should really catch up with Nelson Minar
+- [ ] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the room.
+- [ ] try second fix.
+- [ ] fix UTC Drafts filename problem
 - [ ] test tasks.md
