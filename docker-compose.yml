@@ -7,6 +7,7 @@ services:
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
       - SKIP_DEP_CHECK=${SKIP_DEP_CHECK:-false}
+      - OLLAMA_HOST=http://ollama:11434
     volumes:
       # Mount the entire project directory
       - .:/app
@@ -21,9 +22,25 @@ services:
       - ~/.config/claude:/root/.config/claude
     stdin_open: true
     tty: true
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    # Uncomment to auto-pull a model on startup:
+    # entrypoint: ["/bin/bash", "-c"]
+    # command: ["ollama serve & sleep 5 && ollama pull tinyllama && tail -f /dev/null"]
 
 volumes:
   notion-cache:
     driver: local
   calendar-cache:
+    driver: local
+  ollama-data:
     driver: local

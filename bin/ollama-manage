@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Script to manage Ollama models in Docker container
+
+echo "🤖 Ollama Docker Management"
+echo "=========================="
+echo ""
+
+# Check if docker-compose is available
+if ! command -v docker-compose &> /dev/null && ! command -v docker &> /dev/null; then
+    echo "❌ Docker or docker-compose not found"
+    exit 1
+fi
+
+# Check if ollama container is running
+if ! docker ps | grep -q ollama; then
+    echo "⚠️  Ollama container is not running"
+    echo ""
+    echo "Start it with: docker-compose up -d ollama"
+    echo "Or: docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama"
+    exit 1
+fi
+
+echo "✅ Ollama container is running"
+echo ""
+
+# Function to execute ollama commands in container
+ollama_exec() {
+    docker exec ollama ollama "$@"
+}
+
+# Main menu
+case "${1:-menu}" in
+    list)
+        echo "📋 Installed models:"
+        ollama_exec list
+        ;;
+    
+    pull)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 pull <model-name>"
+            echo ""
+            echo "Recommended models:"
+            echo "  • tinyllama (1.1B) - Very fast, minimal memory"
+            echo "  • phi3 (3.8B) - Good balance of speed and quality"
+            echo "  • mistral (7B) - Better quality, more memory"
+            exit 1
+        fi
+        echo "📥 Pulling model: $2"
+        ollama_exec pull "$2"
+        ;;
+    
+    rm|remove)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 rm <model-name>"
+            exit 1
+        fi
+        echo "🗑️  Removing model: $2"
+        ollama_exec rm "$2"
+        ;;
+    
+    test)
+        MODEL="${2:-tinyllama}"
+        echo "🧪 Testing model: $MODEL"
+        echo "Prompt: 'What is 2+2?'"
+        echo ""
+        echo "Response:"
+        docker exec ollama sh -c "echo 'What is 2+2?' | ollama run $MODEL"
+        ;;
+    
+    menu|help|*)
+        echo "Usage: $0 [command] [args]"
+        echo ""
+        echo "Commands:"
+        echo "  list          - List installed models"
+        echo "  pull <model>  - Download a model"
+        echo "  rm <model>    - Remove a model"
+        echo "  test [model]  - Test a model (default: tinyllama)"
+        echo ""
+        echo "Quick start:"
+        echo "  1. Pull a model: $0 pull tinyllama"
+        echo "  2. Test it: $0 test tinyllama"
+        echo ""
+        echo "The Today CLI will automatically use available models."
+        ;;
+esac

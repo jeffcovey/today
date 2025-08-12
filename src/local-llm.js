@@ -12,7 +12,49 @@ export class LocalLLM {
   }
 
   detectAvailableProviders() {
-    // Check for Ollama
+    const ollamaHost = this.getOllamaHost();
+    
+    // If OLLAMA_HOST is set, we're using a remote Ollama service
+    if (process.env.OLLAMA_HOST) {
+      try {
+        // Check if remote Ollama is accessible
+        execSync(`curl -s ${ollamaHost}/api/tags > /dev/null 2>&1`, { stdio: 'ignore' });
+        this.provider = 'ollama';
+        
+        // Get available models from remote
+        const response = execSync(`curl -s ${ollamaHost}/api/tags`, { encoding: 'utf-8' });
+        const data = JSON.parse(response);
+        const models = data.models || [];
+        
+        if (models.length > 0) {
+          // Prefer smaller, faster models for simple tasks
+          const preferredModels = ['phi3', 'tinyllama', 'mistral', 'llama3', 'gemma'];
+          for (const preferred of preferredModels) {
+            const found = models.find(m => m.name && m.name.includes(preferred));
+            if (found) {
+              this.model = found.name.split(':')[0]; // Remove tag if present
+              break;
+            }
+          }
+          
+          if (!this.model) {
+            this.model = models[0].name.split(':')[0];
+          }
+          
+          console.log(chalk.green(`✓ Using remote Ollama at ${ollamaHost} with model: ${this.model}`));
+          this.initialized = true;
+        } else {
+          console.log(chalk.yellow(`No models available at ${ollamaHost}`));
+          console.log(chalk.gray('Pull a model in the Ollama container: docker exec ollama ollama pull tinyllama'));
+        }
+      } catch (e) {
+        console.log(chalk.yellow(`Cannot connect to Ollama at ${ollamaHost}`));
+        console.log(chalk.gray('Make sure the Ollama service is running: docker-compose up -d ollama'));
+      }
+      return;
+    }
+    
+    // Check for local Ollama
     try {
       execSync('which ollama', { stdio: 'ignore' });
       this.provider = 'ollama';
@@ -56,14 +98,26 @@ export class LocalLLM {
     }
   }
 
+  getOllamaHost() {
+    return process.env.OLLAMA_HOST || 'http://localhost:11434';
+  }
+
   ensureOllamaRunning() {
+    const ollamaHost = this.getOllamaHost();
     try {
       // Check if Ollama server is already running
-      execSync('curl -s http://localhost:11434/api/tags > /dev/null 2>&1', { stdio: 'ignore' });
+      execSync(`curl -s ${ollamaHost}/api/tags > /dev/null 2>&1`, { stdio: 'ignore' });
       // Server is running
       return true;
     } catch (e) {
-      // Server not running, try to start it
+      // If using remote host (Docker service), don't try to start locally
+      if (process.env.OLLAMA_HOST) {
+        console.log(chalk.yellow(`⚠ Cannot connect to Ollama at ${ollamaHost}`));
+        console.log(chalk.gray('Make sure the Ollama service is running'));
+        return false;
+      }
+      
+      // Server not running locally, try to start it
       try {
         console.log(chalk.gray('Starting Ollama server...'));
         // Start ollama serve in background, redirect output to avoid noise
@@ -73,7 +127,7 @@ export class LocalLLM {
         
         // Verify it started
         try {
-          execSync('curl -s http://localhost:11434/api/tags > /dev/null 2>&1', { stdio: 'ignore' });
+          execSync(`curl -s ${ollamaHost}/api/tags > /dev/null 2>&1`, { stdio: 'ignore' });
           console.log(chalk.green('✓ Ollama server started'));
           return true;
         } catch (verifyError) {
@@ -109,10 +163,35 @@ export class LocalLLM {
     const temperature = options.temperature || 0.7;
     
     try {
-      // Create a combined prompt for Ollama
+      // If using remote Ollama, use API instead of CLI
+      if (process.env.OLLAMA_HOST) {
+        const ollamaHost = this.getOllamaHost();
+        const requestBody = JSON.stringify({
+          model: this.model,
+          prompt: `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`,
+          stream: false,
+          options: {
+            temperature: temperature,
+            num_predict: maxTokens
+          }
+        });
+        
+        const response = execSync(
+          `curl -s -X POST ${ollamaHost}/api/generate -H "Content-Type: application/json" -d '${requestBody.replace(/'/g, "'\\''")}'`,
+          { 
+            encoding: 'utf-8',
+            maxBuffer: 1024 * 1024,
+            timeout: 30000 // 30 second timeout
+          }
+        );
+        
+        const data = JSON.parse(response);
+        return data.response || '';
+      }
+      
+      // Local Ollama - use CLI
       const fullPrompt = `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`;
       
-      // Use Ollama's CLI interface
       const response = execSync(
         `echo '${fullPrompt.replace(/'/g, "'\\''").replace(/\n/g, '\\n')}' | ollama run ${this.model} --verbose=false 2>/dev/null`,
         { 
