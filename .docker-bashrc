@@ -29,6 +29,12 @@ alias status='bin/status'
 alias mark='bin/mark-done'
 alias progress='bin/progress'
 
+# Configure git identity if not already set
+if ! git config user.email > /dev/null 2>&1; then
+    git config --global user.email "jeff.covey@pobox.com"
+    git config --global user.name "Jeff Covey"
+fi
+
 # Welcome message
 echo ""
 echo "🚀 Welcome to Today CLI Container!"
