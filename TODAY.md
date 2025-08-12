@@ -16,9 +16,10 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 ### Initial Tasks
 When this session starts, please:
 1. Load and analyze the SUMMARY.json file
-2. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
-3. Create or update the review file with your analysis
-4. Present your recommendations to the user
+2. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
+3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+4. Create or update the review file with your analysis
+5. Present your recommendations to the user
 
 ### Review File Format
 The review file should include:
@@ -67,7 +68,9 @@ My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someon
 
 #### Stages
 
-I like to arrange my days around three themes, “On Stage”, “Back Stage”, and “Off Stage”. The idea is to group together similar tasks. Examples:
+**⚠️ IMPORTANT FOR CLAUDE: Always calculate the actual day of the week from the date. Never infer the day from scheduled activities. Events may be scheduled on any day regardless of the theme.**
+
+I like to arrange my days around three themes, "On Stage", "Back Stage", and "Off Stage". The idea is to group together similar tasks. Examples:
 
   * Front Stage: Chores when I’m “on stage” with other people. Meetings, phone calls, customer support, email replies, etc.
   * Back Stage: Maintenance tasks that other people don’t see. Tidying my physical and digital spaces, paying bills, fixing bugs that aren’t user-facing, etc.
@@ -78,8 +81,17 @@ I try to follow this schedule:
   * Front Stage: Monday, Wednesday, Saturday
   * Back Stage: Thursday, Sunday
   * Off Stage: Tuesday, Friday
+
+**Day of Week Calculation Reminder:**
+- Monday = Front Stage
+- Tuesday = Off Stage
+- Wednesday = Front Stage
+- Thursday = Back Stage
+- Friday = Off Stage
+- Saturday = Front Stage
+- Sunday = Back Stage
  
-We shouldn’t neglect things that *have* to be done today, but **as much as possible, we should PRIORITIZE WORK/PLAY THAT MATCHES THE DAY’S THEME**.
+We shouldn't neglect things that *have* to be done today, but **as much as possible, we should PRIORITIZE WORK/PLAY THAT MATCHES THE DAY'S THEME**.
  
 
 ### Data Inputs
@@ -144,14 +156,15 @@ Address any wellbeing concerns from the summary
 ## Your First Steps
 
 1. **Read SUMMARY.json** to get all the synchronized data
-2. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md`
-3. **Analyze and Recommend** based on:
+2. **Calculate Day of Week** - ALWAYS determine the actual day from the date, never from activities
+3. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with correct day name
+4. **Analyze and Recommend** based on:
    - Current concerns from notes
    - Urgent and overdue tasks
    - Important emails needing responses
-   - Today's theme (Front/Back/Off Stage)
+   - Today's theme (Front/Back/Off Stage) based on the CALCULATED day
    - Daily habits from Streaks
-4. **Continue Supporting** - This is an interactive session, stay engaged and help throughout
+5. **Continue Supporting** - This is an interactive session, stay engaged and help throughout
 
 Please analyze the SUMMARY.json and provide specific, actionable recommendations for today.
 
