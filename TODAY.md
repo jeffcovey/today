@@ -53,6 +53,10 @@ Unless I specify otherwise, I am usually in the Eastern United States (New York)
 
 I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to stretch, etc. before I start work. I go to bed around 9:30PM, but I like to go offline for the last couple of hours. I should wrap up the day's work and plan tomorrow by mid-evening.
 
+#### Vocation
+
+I’m retired, and would like to remain that way if I can maintain my finances. I devote my life to https://oldergay.men/, a website for older gay men and their admirers. Aside from personal health and wellness, Older Gay Men is my passion and vocation.
+
 #### Streaks
 
 notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
