@@ -630,16 +630,21 @@ archive_completed_tasks() {
     
     # Rebuild the file
     {
-        # Active tasks (without trailing empty lines)
-        sed '/^$/d' "$ACTIVE_TASKS"
+        # Active tasks first (excluding Archive section and completed tasks)
+        awk '/^# Archive/ {exit} {print}' "$TASKS_FILE" | grep -v "^\- \[x\]" | sed '/^$/d'
         
-        # Add Archive section if it doesn't exist
-        if ! grep -q "^# Archive" "$TASKS_FILE"; then
-            echo ""
-            echo "# Archive"
-        else
-            # Keep existing archive section
-            awk '/^# Archive/,EOF' "$TASKS_FILE" | grep -v "^\- \[x\]" || true
+        # Add Archive section
+        echo ""
+        echo "# Archive"
+        
+        # Keep existing archive content (but not today's section if it exists)
+        if grep -q "^# Archive" "$TASKS_FILE"; then
+            awk '/^# Archive/,EOF' "$TASKS_FILE" | tail -n +2 | grep -v "^## $TODAY$" | \
+                awk -v today="## $TODAY" '
+                    /^##/ && $0 == today {skip=1; next}
+                    /^##/ && $0 != today {skip=0}
+                    !skip {print}
+                ' || true
         fi
         
         # Add today's completed tasks
