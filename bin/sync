@@ -519,6 +519,13 @@ process_inbox() {
         
         # Special case: Concerns file
         elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
+            # Remove title line and subsequent blank lines
+            CLEANED_CONTENT=$(echo "$CONTENT" | awk '
+                NR==1 && /^#.*[Cc]oncerns/ {next}  # Skip title line if it contains "concerns"
+                /^$/ && !started {next}            # Skip leading blank lines
+                {started=1; print}                 # Print everything else
+            ')
+            echo "$CLEANED_CONTENT" > "$file"  # Update content for move
             DEST_DIR="notes/concerns"
             DEST_FILE="$BASENAME"
             print_info "  • Concerns file → concerns/$BASENAME"
