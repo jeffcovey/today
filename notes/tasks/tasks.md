@@ -1,7 +1,11 @@
 - [ ] remove tmp/groups_page_backup.html
-- [ ] make up the guest rooms today
-- [ ] I should really catch up with Nelson Minar
-- [ ] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the room.
-- [ ] try second fix.
-- [ ] fix UTC Drafts filename problem
-- [ ] test tasks.md
+
+# Archive
+
+## 2025-08-12
+- [x] make up the guest rooms today
+- [x] I should really catch up with Nelson Minar
+- [x] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the room.
+- [x] try second fix.
+- [x] fix UTC Drafts filename problem
+- [x] test tasks.md
