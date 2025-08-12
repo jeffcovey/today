@@ -22,11 +22,11 @@ else
 fi
 
 echo ""
-echo "📦 Building Docker container..."
+echo "📦 Building Docker containers..."
 docker-compose --env-file .env.local build
 
 echo ""
-echo "🎯 Starting container..."
+echo "🎯 Starting containers (including Ollama service)..."
 docker-compose --env-file .env.local up -d
 
 echo ""
@@ -37,8 +37,9 @@ echo "Available commands:"
 echo ""
 echo "  bin/docker-run exec     # Enter the container"
 echo "  bin/docker-run restart  # Restart after updates"
-echo "  bin/docker-run down     # Stop the container"
+echo "  bin/docker-run down     # Stop the containers"
 echo "  bin/docker-run logs     # View container logs"
+echo "  bin/ollama-manage      # Manage Ollama models"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -53,4 +54,10 @@ echo "Then you can use:"
 echo "  bin/sync                # Sync all data"
 echo "  bin/today               # Run daily review"
 echo "  bin/status              # Check task progress"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "🤖 Optional: Setup Ollama for Local AI"
+echo ""
+echo "To reduce Claude API usage, pull a local model:"
+echo "  bin/ollama-manage pull tinyllama"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

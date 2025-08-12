@@ -18,8 +18,8 @@ bin/docker-setup
 This will:
 - Prompt for your DOTENV_PRIVATE_KEY
 - Create .env.local file
-- Build the Docker container
-- Start the container
+- Build the Docker containers (Today CLI and Ollama)
+- Start both containers
 
 ### Daily Usage
 
@@ -56,12 +56,26 @@ bin/docker-run restart
 
 All Docker commands use `.env.local` automatically if it exists:
 
-- `bin/docker-run up` - Start container in background
-- `bin/docker-run down` - Stop container
+- `bin/docker-run up` - Start containers in background
+- `bin/docker-run down` - Stop containers
 - `bin/docker-run exec` - Enter the running container
 - `bin/docker-run build` - Rebuild container image
-- `bin/docker-run restart` - Stop and restart container
+- `bin/docker-run restart` - Stop and restart containers
 - `bin/docker-run logs` - View container logs
+
+### Ollama Management
+
+Manage local AI models (runs in separate container):
+
+- `bin/ollama-manage list` - List installed models
+- `bin/ollama-manage pull <model>` - Download a model
+- `bin/ollama-manage rm <model>` - Remove a model
+- `bin/ollama-manage test [model]` - Test a model
+
+Recommended model for quick start:
+```bash
+bin/ollama-manage pull tinyllama  # Small, fast model (638MB)
+```
 
 ## Environment Setup
 
@@ -84,6 +98,7 @@ The docker-compose.yml mounts:
 - Named volumes for caches (persist between rebuilds)
 - Isolated node_modules (container-specific)
 - Your SSH keys from `~/.ssh` (read-only, for git operations)
+- Ollama models in `ollama-data` volume (persist between rebuilds)
 
 ### Data Persistence
 
@@ -94,6 +109,34 @@ These directories persist between container runs:
 - `.sync-config.json` - Sync configuration
 - `.sync-log.json` - Sync history
 - `SUMMARY.json` - Daily summary data
+
+## Local AI with Ollama
+
+The Docker setup includes Ollama as a separate service for local AI processing. This reduces Claude API usage for simple tasks.
+
+### Benefits
+- **Architecture Independence**: Ollama runs in its own container with the correct binary
+- **Persistent Models**: Models are stored in Docker volume, survive container rebuilds
+- **Automatic Discovery**: Today CLI automatically detects and uses Ollama service
+- **Resource Isolation**: Ollama runs independently, won't affect main container
+
+### Setup Ollama
+After running `bin/docker-setup`, pull a model:
+```bash
+# Pull a lightweight model (recommended for start)
+bin/ollama-manage pull tinyllama
+
+# Test it works
+bin/ollama-manage test
+```
+
+### How It Works
+- Ollama runs on port 11434 (exposed to host)
+- Today CLI connects via `OLLAMA_HOST=http://ollama:11434`
+- Used automatically for:
+  - Daily summary recommendations
+  - Simple email/task searches
+  - Basic intent classification
 
 ## Troubleshooting
 
