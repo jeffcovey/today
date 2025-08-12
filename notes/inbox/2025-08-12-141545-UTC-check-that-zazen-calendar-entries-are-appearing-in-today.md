@@ -1,0 +1,1 @@
+- [ ] check that zazen calendar entries are appearing in today

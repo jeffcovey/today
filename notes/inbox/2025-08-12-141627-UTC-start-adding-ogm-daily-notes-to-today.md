@@ -1,0 +1,1 @@
+- [ ] start adding OGM daily notes to Today
