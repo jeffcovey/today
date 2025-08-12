@@ -17,3 +17,4 @@ google-calendar-key.json
 .calendar-cache/
 .sync-config.json
 .sync-log.json
+SUMMARY.json

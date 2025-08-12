@@ -32,7 +32,8 @@ echo ""
 
 # Check dependencies once per day (quietly) - skip in container if CI env var is set
 LAST_DEP_CHECK_FILE=".last-dep-check"
-TODAY_DATE=$(date +%Y-%m-%d)
+# Use Eastern timezone as specified in TODAY.md
+TODAY_DATE=$(TZ='America/New_York' date +%Y-%m-%d)
 
 # Skip dependency check if running in container with limited network
 if [ "$SKIP_DEP_CHECK" != "true" ]; then
