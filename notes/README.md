@@ -28,6 +28,7 @@ This directory contains notes captured via Drafts and synced through GitHub.
   - Daily notes → `/daily/`
   - Ideas (tagged #idea) → `/ideas/`
   - Reference (tagged #reference) → `/reference/`
+  - OlderGay.Men work summaries → `/ogm-work/`
 
 ### 4. Syncing Locally
 Run `./scripts/sync-notes.sh` to pull latest notes from GitHub.
@@ -57,6 +58,17 @@ Project A:
 #idea
 
 Description of the new feature...
+```
+
+### OlderGay.Men Work Summary
+```markdown
+# OGM: Feature Implementation Plan
+#ogm-work
+
+Claude-generated summary of work to be done...
+- Task breakdown
+- Implementation steps
+- Testing requirements
 ```
 
 ## Tips

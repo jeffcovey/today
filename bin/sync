@@ -186,6 +186,12 @@ sync_github_notes() {
     note_count=$(find notes -type f -name "*.md" 2>/dev/null | wc -l)
     print_info "Total notes: $note_count"
     
+    # Count OGM work files
+    ogm_count=$(find notes/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
+    if [[ $ogm_count -gt 0 ]]; then
+        print_info "OlderGay.Men work summaries: $ogm_count"
+    fi
+    
     # Show recent notes (last 7 days)
     recent_count=$(find notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
     if [[ $recent_count -gt 0 ]]; then
