@@ -1,1 +1,0 @@
-- [ ] Order a copy of "In the Closet of the Vatican" @today
