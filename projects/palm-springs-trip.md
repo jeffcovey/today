@@ -17,11 +17,11 @@ Annual escape to Palm Springs with Lou. Focus on relaxation, pool time, and expl
 
 ### Planning Phase
 - [ ] Book flights (FLL to PSP)
-- [ ] Reserve hotel/Airbnb (prefer pool access)
-- [ ] Rent car or arrange transport
+- [x] Reserve hotel/Airbnb (prefer pool access)
+- [x] Rent car or arrange transport
 - [ ] Research restaurants
 - [ ] Check event calendar for September
-- [ ] Coordinate with Lou on preferences
+- [x] Coordinate with Lou on preferences
 
 ### Pre-Trip (1 week before)
 - [ ] Arrange house/room coverage
@@ -29,7 +29,7 @@ Annual escape to Palm Springs with Lou. Focus on relaxation, pool time, and expl
 - [ ] Prep guest rooms for any bookings
 - [ ] Pack summer clothes (hot in September!)
 - [ ] Refill prescriptions
-- [ ] Download offline maps
+- [x] Download offline maps
 
 ### During Trip
 - [ ] Daily pool time (mornings before heat)
