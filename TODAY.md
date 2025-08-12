@@ -138,6 +138,8 @@ The SUMMARY.json contains:
 - **content.task_categories**: Breakdown of tasks by category
 - **content.important_emails**: Emails needing attention
 - **content.people_to_contact**: People mentioned in notes as needing contact
+- **content.active_projects**: Active projects with progress and next milestones
+- **content.ogm_work**: OlderGay.Men work items and priorities
 - **changes**: New/modified items since last review
 - **recommendations.daily_focus**: Time-based suggestions
 

@@ -328,7 +328,8 @@ async function extractContentFromNotes(summary) {
     concerns: [],
     people_to_contact: [],
     recent_notes: [],
-    ogm_work: []
+    ogm_work: [],
+    active_projects: []
   };
   
   try {
@@ -423,6 +424,60 @@ async function extractContentFromNotes(summary) {
       }
     } catch (e) {
       // No OGM work directory or files
+    }
+    
+    // Extract active projects
+    const projectsDir = path.join(__dirname, '..', 'projects');
+    try {
+      const projectFiles = execSync(
+        `find "${projectsDir}" -name "*.md" -type f 2>/dev/null`,
+        { encoding: 'utf-8' }
+      ).trim().split('\n').filter(Boolean);
+      
+      for (const projectFile of projectFiles) {
+        const text = await fs.readFile(projectFile, 'utf-8').catch(() => '');
+        const lines = text.split('\n');
+        
+        // Extract project metadata
+        const title = lines.find(l => l.startsWith('# '))?.replace('# ', '').trim();
+        const status = lines.find(l => l.startsWith('**Status:**'))?.replace('**Status:**', '').trim();
+        const dates = lines.find(l => l.startsWith('**Dates:**'))?.replace('**Dates:**', '').trim();
+        const budget = lines.find(l => l.startsWith('**Budget:**'))?.replace('**Budget:**', '').trim();
+        
+        // Count tasks
+        const totalTasks = lines.filter(l => l.match(/^- \[ \]/)).length;
+        const completedTasks = lines.filter(l => l.match(/^- \[x\]/)).length;
+        
+        // Find next key date
+        let nextMilestone = null;
+        const keyDatesIndex = lines.findIndex(l => l.includes('## Key Dates'));
+        if (keyDatesIndex !== -1) {
+          for (let i = keyDatesIndex + 1; i < lines.length && !lines[i].startsWith('##'); i++) {
+            if (lines[i].match(/^-\s+\*\*.*\*\*:/)) {
+              const match = lines[i].match(/^-\s+\*\*(.*?)\*\*:\s+(.*)/);
+              if (match) {
+                nextMilestone = { date: match[1].trim(), description: match[2].trim() };
+                break;
+              }
+            }
+          }
+        }
+        
+        if (title && status !== 'Completed' && status !== 'Cancelled') {
+          content.active_projects.push({
+            file: path.basename(projectFile),
+            title,
+            status: status || 'Active',
+            dates,
+            budget,
+            progress: totalTasks > 0 ? `${completedTasks}/${totalTasks} tasks` : 'No tasks',
+            completion_rate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+            next_milestone: nextMilestone
+          });
+        }
+      }
+    } catch (e) {
+      // No projects directory or files
     }
   } catch (error) {
     console.error('Error extracting note content:', error.message);
@@ -865,6 +920,7 @@ async function updateSummary(useAI = true) {
   summary.content.people_to_contact = noteContent.people_to_contact;
   summary.content.recent_notes = noteContent.recent_notes;
   summary.content.ogm_work = noteContent.ogm_work;
+  summary.content.active_projects = noteContent.active_projects;
 
   // Extract calendar content
   const calendarContent = await extractCalendarContent();
@@ -983,6 +1039,11 @@ async function updateSummary(useAI = true) {
     const totalOgmTasks = summary.content.ogm_work.reduce((sum, w) => sum + w.total_tasks, 0);
     const criticalOgmTasks = summary.content.ogm_work.reduce((sum, w) => sum + w.critical_count, 0);
     console.log(`  - ${totalOgmTasks} OGM tasks (${criticalOgmTasks} critical)`);
+  }
+  
+  // Show active projects
+  if (summary.content.active_projects && summary.content.active_projects.length > 0) {
+    console.log(`  - ${summary.content.active_projects.length} active projects`);
   }
   
   console.log(`📈 Changes: ${summary.changes.new_emails.length} new emails, ${summary.changes.new_tasks.length} new tasks, ${summary.changes.new_notes.length} new notes`);
