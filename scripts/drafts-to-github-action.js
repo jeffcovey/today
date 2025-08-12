@@ -32,12 +32,16 @@ const lines = content.split('\n');
 const title = lines[0].replace(/^#\s*/, '').trim() || 'Untitled';
 
 // Always upload to inbox folder - bin/sync will process and file appropriately
-// Generate filename (date-based or title-based)
+// Generate filename (date-based or title-based) with timezone
 const date = new Date();
 const dateStr = date.toISOString().split('T')[0];
+// Use local time but include timezone identifier
 const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
+// Get timezone abbreviation (e.g., EST, PST, UTC)
+const tzMatch = date.toTimeString().match(/\(([A-Z]{3,4})\)/);
+const timezone = tzMatch ? tzMatch[1] : 'UTC';
 const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
+const filename = `${dateStr}-${timeStr}-${timezone}-${titleSlug}.md`;
 const filepath = `notes/inbox/${filename}`;
 const commitMessage = `Upload from Drafts: ${title}`;
 

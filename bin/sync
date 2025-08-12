@@ -81,6 +81,7 @@ main() {
     run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
     run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
+    run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
     run_sync_step "💾 Cache Update" update_cache_stats "Cache updated" "Cache updated"
     
     # Print summary
@@ -524,9 +525,40 @@ process_inbox() {
         
         # Task files (contains checkboxes)
         elif echo "$CONTENT" | grep -qE "^-\s*\[[ x]\]"; then
-            DEST_DIR="notes/tasks"
-            DEST_FILE="$BASENAME"
-            print_info "  • Task file → tasks/$BASENAME"
+            # Check if this file contains ONLY tasks (no other content)
+            TASK_ONLY=true
+            while IFS= read -r line; do
+                # Skip empty lines
+                if [[ -z "$line" ]] || [[ "$line" =~ ^[[:space:]]*$ ]]; then
+                    continue
+                fi
+                # Check if line is a task
+                if ! echo "$line" | grep -qE "^-\s*\[[ x]\]"; then
+                    TASK_ONLY=false
+                    break
+                fi
+            done <<< "$CONTENT"
+            
+            if [[ "$TASK_ONLY" == "true" ]]; then
+                # Append to consolidated tasks.md file
+                TASKS_FILE="notes/tasks/tasks.md"
+                mkdir -p notes/tasks 2>/dev/null
+                
+                # Simply append the tasks (no header, no timestamps)
+                echo "$CONTENT" >> "$TASKS_FILE"
+                
+                print_info "  • Task-only file → Appended to tasks/tasks.md"
+                print_info "    Added $(echo "$CONTENT" | grep -c "^-\s*\[[ x]\]") task(s)"
+                
+                # Delete the original file from inbox
+                rm "$file"
+                continue  # Skip the normal file move logic
+            else
+                # Mixed content - keep as separate file
+                DEST_DIR="notes/tasks"
+                DEST_FILE="$BASENAME"
+                print_info "  • Mixed task file → tasks/$BASENAME"
+            fi
         
         # Daily notes (default)
         else
@@ -559,6 +591,78 @@ process_inbox() {
         git add notes/ 2>/dev/null
         git commit -m "Process inbox: file notes to appropriate directories" --quiet 2>/dev/null
         git push origin main --quiet 2>/dev/null
+    fi
+    
+    return 0
+}
+
+# Archive completed tasks in tasks.md
+archive_completed_tasks() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    TASKS_FILE="notes/tasks/tasks.md"
+    
+    # Check if tasks.md exists
+    if [[ ! -f "$TASKS_FILE" ]]; then
+        print_info "No tasks.md file found"
+        return 0
+    fi
+    
+    # Check if there are any completed tasks
+    if ! grep -q "^\- \[x\]" "$TASKS_FILE" 2>/dev/null; then
+        print_info "No completed tasks to archive"
+        return 0
+    fi
+    
+    # Count completed tasks
+    COMPLETED_COUNT=$(grep -c "^\- \[x\]" "$TASKS_FILE")
+    
+    # Create temporary files
+    ACTIVE_TASKS=$(mktemp)
+    COMPLETED_TASKS=$(mktemp)
+    
+    # Separate active and completed tasks
+    grep -v "^\- \[x\]" "$TASKS_FILE" > "$ACTIVE_TASKS" || true
+    grep "^\- \[x\]" "$TASKS_FILE" > "$COMPLETED_TASKS" || true
+    
+    # Get today's date
+    TODAY=$(date +%Y-%m-%d)
+    
+    # Rebuild the file
+    {
+        # Active tasks (without trailing empty lines)
+        sed '/^$/d' "$ACTIVE_TASKS"
+        
+        # Add Archive section if it doesn't exist
+        if ! grep -q "^# Archive" "$TASKS_FILE"; then
+            echo ""
+            echo "# Archive"
+        else
+            # Keep existing archive section
+            awk '/^# Archive/,EOF' "$TASKS_FILE" | grep -v "^\- \[x\]" || true
+        fi
+        
+        # Add today's completed tasks
+        if [[ -s "$COMPLETED_TASKS" ]]; then
+            echo ""
+            echo "## $TODAY"
+            cat "$COMPLETED_TASKS"
+        fi
+    } > "${TASKS_FILE}.tmp"
+    
+    # Replace the original file
+    mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
+    
+    # Clean up temp files
+    rm -f "$ACTIVE_TASKS" "$COMPLETED_TASKS"
+    
+    # Clean up old archived tasks (older than 30 days)
+    THIRTY_DAYS_AGO=$(date -d "30 days ago" +%Y-%m-%d 2>/dev/null || date -v -30d +%Y-%m-%d 2>/dev/null || echo "")
+    if [[ -n "$THIRTY_DAYS_AGO" ]]; then
+        # This is complex to do in bash, so we'll keep it simple for now
+        print_info "Archived $COMPLETED_COUNT completed task(s) to $TODAY section"
+    else
+        print_info "Archived $COMPLETED_COUNT completed task(s)"
     fi
     
     return 0
@@ -659,6 +763,12 @@ case "${1:-}" in
             print_status "Inbox processed successfully!"
         else
             print_error "Inbox processing failed"
+        fi
+        
+        # Archive completed tasks
+        print_header "✅ Archive Tasks"
+        if archive_completed_tasks; then
+            print_status "Tasks archived successfully!"
         fi
         ;;
     --quick)
