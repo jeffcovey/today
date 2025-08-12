@@ -103,7 +103,8 @@
       "MultiEdit(*)",
       "Write(*)",
       "Bash(bin/update-summary:*)",
-      "WebFetch(domain:dotenvx.com)"
+      "WebFetch(domain:dotenvx.com)",
+      "Bash(time:*)"
     ],
     "deny": []
   }
