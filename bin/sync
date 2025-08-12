@@ -637,17 +637,27 @@ archive_completed_tasks() {
         echo ""
         echo "# Archive"
         
-        # Keep existing archive content (but not today's section if it exists)
+        # Keep existing archive content (but remove today's section if it exists - we'll rebuild it)
         if grep -q "^# Archive" "$TASKS_FILE"; then
-            awk '/^# Archive/,EOF' "$TASKS_FILE" | tail -n +2 | grep -v "^## $TODAY$" | \
-                awk -v today="## $TODAY" '
-                    /^##/ && $0 == today {skip=1; next}
-                    /^##/ && $0 != today {skip=0}
-                    !skip {print}
-                ' || true
+            awk -v today="$TODAY" '
+                /^# Archive/ {in_archive=1; next}  # Skip the Archive header line
+                in_archive && /^## / {
+                    # Check if this is today'"'"'s section
+                    if ($0 == "## " today) {
+                        skip=1
+                        next
+                    } else {
+                        skip=0
+                        print
+                        next
+                    }
+                }
+                in_archive && skip {next}  # Skip lines in today'"'"'s section
+                in_archive {print}  # Print other archive content
+            ' "$TASKS_FILE" || true
         fi
         
-        # Add today's completed tasks
+        # Add today's completed tasks (only if there are new ones)
         if [[ -s "$COMPLETED_TASKS" ]]; then
             echo ""
             echo "## $TODAY"
