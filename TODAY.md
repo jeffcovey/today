@@ -16,7 +16,11 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 ### Initial Tasks
 When this session starts, please:
 1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
-2. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+2. **⚠️ TIMEZONE CRITICAL: ALL timestamps in SUMMARY.json are in UTC (ending in Z). You MUST convert to Eastern Time (ET) unless user specifies otherwise:**
+   - **UTC timestamps like "12:13:44.577Z" = 8:13 AM Eastern (subtract 4 hours during EDT, 5 hours during EST)**
+   - **ASSUME Eastern Time Zone (New York/Florida) unless user indicates they're traveling**
+   - **NEVER use UTC time when discussing the current time of day**
+3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
    - **If today's review EXISTS**: 
      - Load the existing review file
      - Check SUMMARY.json's `meta.last_updated` timestamp
@@ -74,7 +78,12 @@ Please help me review my current situation and decide what to do today to be hap
 
 #### Schedule
 
-Unless I specify otherwise, I am usually in the Eastern United States (New York) time zone. Use that for calculating times and dates. My home is in Oakland Park, Florida.
+**🚨 TIMEZONE REMINDER: Unless I specify otherwise, assume Eastern Time (ET)!**
+- During Daylight Saving (March-November): Eastern Daylight Time (EDT) = UTC-4
+- During Standard Time (November-March): Eastern Standard Time (EST) = UTC-5
+- **ALL timestamps in SUMMARY.json are UTC - you MUST convert them!**
+- My home is in Oakland Park, Florida (Eastern Time Zone)
+- If I'm traveling, I'll let you know the local timezone
 
 I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to stretch, etc. before I start work. I go to bed around 9:30PM, but I like to go offline for the last couple of hours. I should wrap up the day's work and plan tomorrow by mid-evening.
 
@@ -180,8 +189,9 @@ Address any wellbeing concerns from the summary
 ## Your First Steps
 
 1. **Read SUMMARY.json** to get all the synchronized data
-2. **Calculate Day of Week** - ALWAYS determine the actual day from the date, never from activities
-3. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with correct day name
+2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** The `meta.last_updated` field shows when data was synced in UTC
+3. **Calculate Day of Week** - ALWAYS determine the actual day from the date, never from activities
+4. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with correct day name
 4. **Analyze and Recommend** based on:
    - Current concerns from notes
    - Urgent and overdue tasks
