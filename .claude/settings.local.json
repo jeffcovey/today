@@ -104,7 +104,10 @@
       "Write(*)",
       "Bash(bin/update-summary:*)",
       "WebFetch(domain:dotenvx.com)",
-      "Bash(time:*)"
+      "Bash(time:*)",
+      "Bash(od:*)",
+      "Bash(awk:*)",
+      "Bash(bash:*)"
     ],
     "deny": []
   }

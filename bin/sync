@@ -633,11 +633,17 @@ archive_completed_tasks() {
         # Active tasks first (excluding Archive section and completed tasks)
         awk '/^# Archive/ {exit} {print}' "$TASKS_FILE" | grep -v "^\- \[x\]" | sed '/^$/d'
         
+        # Also extract any incomplete tasks that were mistakenly in the archive
+        if grep -q "^# Archive" "$TASKS_FILE"; then
+            awk '/^# Archive/ {in_archive=1} in_archive && /^- \[ \]/ {print}' "$TASKS_FILE" || true
+        fi
+        
         # Add Archive section
         echo ""
         echo "# Archive"
         
         # Keep existing archive content (but remove today's section if it exists - we'll rebuild it)
+        # Also move any incomplete tasks back to active section
         if grep -q "^# Archive" "$TASKS_FILE"; then
             awk -v today="$TODAY" '
                 /^# Archive/ {in_archive=1; next}  # Skip the Archive header line
@@ -653,6 +659,7 @@ archive_completed_tasks() {
                     }
                 }
                 in_archive && skip {next}  # Skip lines in today'"'"'s section
+                in_archive && /^- \[ \]/ {next}  # Skip incomplete tasks in archive
                 in_archive {print}  # Print other archive content
             ' "$TASKS_FILE" || true
         fi
