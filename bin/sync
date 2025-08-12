@@ -493,6 +493,12 @@ process_inbox() {
             echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
             print_info "  • Streaks file → tasks/streaks-today.md"
         
+        # Special case: Concerns file
+        elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
+            DEST_DIR="notes/concerns"
+            DEST_FILE="$BASENAME"
+            print_info "  • Concerns file → concerns/$BASENAME"
+        
         # Task files (contains checkboxes)
         elif echo "$CONTENT" | grep -qE "^-\s*\[[ x]\]"; then
             DEST_DIR="notes/tasks"

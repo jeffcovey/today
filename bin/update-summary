@@ -332,22 +332,37 @@ async function extractContentFromNotes(summary) {
   };
   
   try {
-    // Read concerns note if it exists
-    const concernsPath = path.join(NOTES_DIR, 'daily', '2025-08-08-concerns.md');
-    const concernsText = await fs.readFile(concernsPath, 'utf-8').catch(() => '');
+    // Read all concern files from the concerns folder
+    const concernsDir = path.join(NOTES_DIR, 'concerns');
+    const concernFiles = execSync(
+      `find "${concernsDir}" -name "*.md" -type f 2>/dev/null | sort -r`,
+      { encoding: 'utf-8' }
+    ).trim().split('\n').filter(Boolean);
     
-    if (concernsText) {
-      // Extract bullet points from concerns
-      content.concerns = concernsText.split('\n')
-        .filter(line => line.startsWith('- '))
-        .slice(0, 10)  // Top 10 concerns
-        .map(line => line.substring(2).trim());
+    const allConcerns = [];
+    const allPeople = new Set();
+    
+    // Process each concern file (most recent first)
+    for (const concernFile of concernFiles.slice(0, 5)) { // Process up to 5 most recent
+      const concernsText = await fs.readFile(concernFile, 'utf-8').catch(() => '');
       
-      // Extract mentions of people to contact
-      const peopleRegex = /(?:reply|respond|contact|email|call|meet|talk)\s+(?:to\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g;
-      const peopleSet = new Set([...concernsText.matchAll(peopleRegex)].map(m => m[1]));
-      content.people_to_contact = Array.from(peopleSet);
+      if (concernsText) {
+        // Extract bullet points from this concern file
+        const concerns = concernsText.split('\n')
+          .filter(line => line.startsWith('- '))
+          .map(line => line.substring(2).trim());
+        allConcerns.push(...concerns);
+        
+        // Extract mentions of people to contact
+        const peopleRegex = /(?:reply|respond|contact|email|call|meet|talk)\s+(?:to\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g;
+        const people = [...concernsText.matchAll(peopleRegex)].map(m => m[1]);
+        people.forEach(p => allPeople.add(p));
+      }
     }
+    
+    // Deduplicate and limit concerns
+    content.concerns = [...new Set(allConcerns)].slice(0, 10); // Top 10 unique concerns
+    content.people_to_contact = Array.from(allPeople);
     
     // Get other recent notes
     const recentNotes = execSync(
