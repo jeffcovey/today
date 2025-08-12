@@ -24,29 +24,53 @@ config.token = credential.getValue("token");
 
 // ============ HELPER FUNCTIONS ============
 
-// Extract metadata from draft content
+// Extract metadata from draft content (now at bottom)
 function extractMetadata(content) {
-    const metadataRegex = /^---\n([\s\S]*?)\n---\n/;
-    const match = content.match(metadataRegex);
+    // Check for metadata at the bottom with clear separator
+    const bottomMetadataRegex = /\n\n<!-- sync-metadata -->\n---\n([\s\S]*?)\n---$/;
+    let match = content.match(bottomMetadataRegex);
     
-    if (!match) return { metadata: {}, content: content };
-    
-    const metadata = {};
-    const metadataText = match[1];
-    const lines = metadataText.split('\n');
-    
-    for (const line of lines) {
-        const [key, ...valueParts] = line.split(':');
-        if (key && valueParts.length > 0) {
-            metadata[key.trim()] = valueParts.join(':').trim();
+    if (match) {
+        // Found metadata at bottom
+        const metadata = {};
+        const metadataText = match[1];
+        const lines = metadataText.split('\n');
+        
+        for (const line of lines) {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+                metadata[key.trim()] = valueParts.join(':').trim();
+            }
         }
+        
+        const contentWithoutMetadata = content.replace(bottomMetadataRegex, '');
+        return { metadata, content: contentWithoutMetadata };
     }
     
-    const contentWithoutMetadata = content.replace(metadataRegex, '');
-    return { metadata, content: contentWithoutMetadata };
+    // Legacy: Check for metadata at top
+    const topMetadataRegex = /^---\n([\s\S]*?)\n---\n/;
+    match = content.match(topMetadataRegex);
+    
+    if (match) {
+        const metadata = {};
+        const metadataText = match[1];
+        const lines = metadataText.split('\n');
+        
+        for (const line of lines) {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+                metadata[key.trim()] = valueParts.join(':').trim();
+            }
+        }
+        
+        const contentWithoutMetadata = content.replace(topMetadataRegex, '');
+        return { metadata, content: contentWithoutMetadata };
+    }
+    
+    return { metadata: {}, content: content };
 }
 
-// Update metadata in content
+// Update metadata in content (now at bottom)
 function updateMetadata(content, updates) {
     const { metadata, content: rawContent } = extractMetadata(content);
     const newMetadata = { ...metadata, ...updates };
@@ -55,7 +79,8 @@ function updateMetadata(content, updates) {
         .map(([key, value]) => `${key}: ${value}`)
         .join('\n');
     
-    return `---\n${metadataText}\n---\n\n${rawContent}`;
+    // Add metadata at the bottom with clear separator
+    return `${rawContent.trim()}\n\n<!-- sync-metadata -->\n---\n${metadataText}\n---`;
 }
 
 // Generate path from tags if no today_path exists

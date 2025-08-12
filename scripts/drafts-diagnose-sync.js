@@ -5,26 +5,50 @@
 // 1. In Drafts, create a new Action called "Diagnose Sync"
 // 2. Add a "Script" step and paste this code
 
-// Extract metadata from draft content
+// Extract metadata from draft content (now at bottom)
 function extractMetadata(content) {
-    const metadataRegex = /^---\n([\s\S]*?)\n---\n/;
-    const match = content.match(metadataRegex);
+    // Check for metadata at the bottom with clear separator
+    const bottomMetadataRegex = /\n\n<!-- sync-metadata -->\n---\n([\s\S]*?)\n---$/;
+    let match = content.match(bottomMetadataRegex);
     
-    if (!match) return { metadata: {}, content: content };
-    
-    const metadata = {};
-    const metadataText = match[1];
-    const lines = metadataText.split('\n');
-    
-    for (const line of lines) {
-        const [key, ...valueParts] = line.split(':');
-        if (key && valueParts.length > 0) {
-            metadata[key.trim()] = valueParts.join(':').trim();
+    if (match) {
+        // Found metadata at bottom
+        const metadata = {};
+        const metadataText = match[1];
+        const lines = metadataText.split('\n');
+        
+        for (const line of lines) {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+                metadata[key.trim()] = valueParts.join(':').trim();
+            }
         }
+        
+        const contentWithoutMetadata = content.replace(bottomMetadataRegex, '');
+        return { metadata, content: contentWithoutMetadata };
     }
     
-    const contentWithoutMetadata = content.replace(metadataRegex, '');
-    return { metadata, content: contentWithoutMetadata };
+    // Legacy: Check for metadata at top
+    const topMetadataRegex = /^---\n([\s\S]*?)\n---\n/;
+    match = content.match(topMetadataRegex);
+    
+    if (match) {
+        const metadata = {};
+        const metadataText = match[1];
+        const lines = metadataText.split('\n');
+        
+        for (const line of lines) {
+            const [key, ...valueParts] = line.split(':');
+            if (key && valueParts.length > 0) {
+                metadata[key.trim()] = valueParts.join(':').trim();
+            }
+        }
+        
+        const contentWithoutMetadata = content.replace(topMetadataRegex, '');
+        return { metadata, content: contentWithoutMetadata };
+    }
+    
+    return { metadata: {}, content: content };
 }
 
 function diagnoseSyncIssues() {
