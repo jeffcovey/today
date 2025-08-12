@@ -493,6 +493,30 @@ process_inbox() {
             echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
             print_info "  • Streaks file → tasks/streaks-today.md"
         
+        # Special case: Progress note - append to today's review
+        elif [[ "$TITLE" == "Progress" ]]; then
+            TODAY_DATE=$(date +%Y-%m-%d)
+            REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+            TIMESTAMP=$(date +"%H:%M")
+            
+            # Extract content (everything after first line)
+            PROGRESS_CONTENT=$(echo "$CONTENT" | tail -n +2 | sed '/^$/d')
+            
+            if [[ -f "$REVIEW_FILE" ]]; then
+                # Append to review file
+                echo "" >> "$REVIEW_FILE"
+                echo "### Progress Update ($TIMESTAMP)" >> "$REVIEW_FILE"
+                echo "$PROGRESS_CONTENT" >> "$REVIEW_FILE"
+                print_info "  • Progress note → Added to today's review"
+                print_info "    $TIMESTAMP: $(echo "$PROGRESS_CONTENT" | head -1)"
+            else
+                print_error "  • No review file for today. Run 'bin/today' first"
+            fi
+            
+            # Delete the progress note from inbox
+            rm "$file"
+            continue  # Skip the normal file move logic
+        
         # Special case: Concerns file
         elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
             DEST_DIR="notes/concerns"
