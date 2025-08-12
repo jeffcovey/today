@@ -134,14 +134,39 @@ sync_github_notes() {
     
     # First, check if we can pull cleanly (no uncommitted changes in repo)
     if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
-        # We have local changes - check if they're just in notes/
-        if [[ -n $(git status notes/ --porcelain 2>/dev/null) ]]; then
+        # Check if there are changes ONLY in notes/ (no other staged or unstaged changes)
+        NOTES_CHANGES=$(git status notes/ --porcelain 2>/dev/null)
+        OTHER_CHANGES=$(git status --porcelain 2>/dev/null | grep -v "^.. notes/" || true)
+        
+        if [[ -n "$NOTES_CHANGES" ]] && [[ -z "$OTHER_CHANGES" ]]; then
+            # Only notes changes, safe to commit
             print_info "Pushing local note changes..."
             git add notes/ 2>/dev/null
             git commit -m "Sync local notes" --quiet 2>/dev/null
             git push origin main --quiet 2>/dev/null
+        elif [[ -n "$NOTES_CHANGES" ]]; then
+            # We have both notes changes and other changes
+            # First, stash any staged changes outside of notes/
+            if [[ -n $(git diff --cached --name-only | grep -v "^notes/" || true) ]]; then
+                print_info "Saving staged changes outside notes/..."
+                # Create a temporary commit to preserve staged state
+                git commit --quiet -m "temp: staged changes" -- ':!notes/' 2>/dev/null || true
+                TEMP_COMMIT=true
+            fi
+            
+            # Now commit just the notes
+            print_info "Pushing local note changes..."
+            git add notes/ 2>/dev/null
+            git commit -m "Sync local notes" --quiet 2>/dev/null
+            git push origin main --quiet 2>/dev/null
+            
+            # Restore the temporary commit if we made one
+            if [[ "${TEMP_COMMIT:-false}" == "true" ]]; then
+                print_info "Restoring staged changes..."
+                git reset --soft HEAD~1 2>/dev/null
+            fi
         else
-            # Changes in other files - stash them temporarily
+            # Changes in other files but not notes - stash them temporarily
             print_info "Stashing local changes outside notes/..."
             git stash push --quiet -m "sync-auto-stash" -- ':!notes/' 2>/dev/null
             STASHED=true

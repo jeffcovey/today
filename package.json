@@ -38,7 +38,7 @@
   "license": "MIT",
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.48.4",
-    "@types/jest": "^29.5.12",
+    "@types/jest": "^29.5.14",
     "jest": "^29.7.0"
   }
 }
