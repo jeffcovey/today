@@ -207,7 +207,25 @@ export class SQLiteCache {
   // Task caching methods
   async getCachedTasks(databaseId) {
     try {
-      const rows = this.statements.getCachedTasks.all(databaseId);
+      // First try with the ID as given
+      let rows = this.statements.getCachedTasks.all(databaseId);
+      
+      // If no results and it looks like a UUID, try to find by database name
+      // This handles the transition from storing by name to storing by ID
+      if (rows.length === 0 && databaseId.includes('-')) {
+        // Try common database names that might match this ID
+        const possibleNames = ['Action Items', 'Day-End Chores', 'Evening Tasks', 
+                               'Morning Routine', 'Packing List/Trip Tasks', 
+                               'Tag/Knowledge Vault', "Today's Plan"];
+        for (const name of possibleNames) {
+          rows = this.statements.getCachedTasks.all(name);
+          if (rows.length > 0) {
+            console.log(`📋 Found cache under name '${name}' for ID ${databaseId}`);
+            break;
+          }
+        }
+      }
+      
       if (rows.length === 0) return null;
 
       const tasks = rows.map(row => ({

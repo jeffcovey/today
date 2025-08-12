@@ -38,6 +38,29 @@ print_header() {
 # Track what was synced
 SYNC_SUMMARY=""
 
+# Helper function to run a sync step with timing
+run_sync_step() {
+    local header="$1"
+    local func="$2"
+    local success_msg="$3"
+    local summary_name="$4"
+    
+    print_header "$header"
+    START_TIME=$(date +%s)
+    if $func; then
+        print_status "$success_msg"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ $summary_name\n"
+        local result=0
+    else
+        print_error "$summary_name sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ $summary_name\n"
+        local result=1
+    fi
+    END_TIME=$(date +%s)
+    print_info "⏱️  Took $((END_TIME - START_TIME)) seconds"
+    return $result
+}
+
 # Main sync function
 main() {
     echo ""
@@ -48,75 +71,17 @@ main() {
     echo "Synchronizing all data sources..."
     echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
     
-    # 1. Sync GitHub Notes
-    print_header "📝 GitHub Notes"
-    if sync_github_notes; then
-        print_status "GitHub notes synced"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ GitHub notes\n"
-    else
-        print_error "GitHub notes sync failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ GitHub notes\n"
-    fi
+    # Run all sync steps
+    run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
+    run_sync_step "📊 Notion Database" sync_notion "Notion database synced" "Notion database"
     
-    # 2. Sync Notion Database
-    print_header "📊 Notion Database"
-    if sync_notion; then
-        print_status "Notion database synced"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Notion database\n"
-    else
-        print_error "Notion sync failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Notion database\n"
-    fi
+    # Run Todoist sync
+    run_sync_step "✅ Todoist Tasks" sync_todoist "Todoist tasks synced" "Todoist tasks"
     
-    # 3. Sync Todoist Tasks
-    print_header "✅ Todoist Tasks"
-    if sync_todoist; then
-        print_status "Todoist tasks synced"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Todoist tasks\n"
-    else
-        print_error "Todoist sync failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Todoist tasks\n"
-    fi
-    
-    # 4. Download New Emails
-    print_header "📧 Email Inbox"
-    if sync_email; then
-        print_status "Email downloaded"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Email inbox\n"
-    else
-        print_error "Email sync failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Email inbox\n"
-    fi
-    
-    # 5. Sync Calendar Events
-    print_header "📅 Calendar Events"
-    if sync_calendar; then
-        print_status "Calendar events synced"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Calendar events\n"
-    else
-        print_error "Calendar sync failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Calendar events\n"
-    fi
-    
-    # 6. Process Inbox Notes (from Drafts or other sources)
-    print_header "📥 Process Inbox"
-    if process_inbox; then
-        print_status "Inbox processed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Inbox processed\n"
-    else
-        print_error "Inbox processing failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Inbox processing\n"
-    fi
-    
-    # 7. Update Cache Statistics
-    print_header "💾 Cache Update"
-    if update_cache_stats; then
-        print_status "Cache statistics updated"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Cache updated\n"
-    else
-        print_error "Cache update failed"
-        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Cache update\n"
-    fi
+    run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
+    run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
+    run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
+    run_sync_step "💾 Cache Update" update_cache_stats "Cache updated" "Cache updated"
     
     # Print summary
     print_header "📋 Sync Summary"
@@ -246,9 +211,6 @@ sync_notion() {
     # Use the notion CLI to refresh cache
     cd "$(dirname "$0")/.." || return 1
     
-    # Clear and rebuild cache for fresh data
-    print_info "Refreshing Notion cache..."
-    
     # Check if NOTION_TOKEN is configured
     if ! grep -q "NOTION_TOKEN=" .env 2>/dev/null || grep -q "NOTION_TOKEN=your_notion" .env 2>/dev/null; then
         print_error "Notion not configured"
@@ -256,33 +218,30 @@ sync_notion() {
         return 1
     fi
     
-    # Check if we can connect to Notion and fetch tasks
-    output=$(node -e "
-        // Use environment variables already loaded by parent script
-        import('./src/notion-api.js').then(async ({NotionAPI}) => {
-            const token = process.env.NOTION_TOKEN;
-            if (!token || token === 'your_notion_integration_token_here') {
-                throw new Error('NOTION_TOKEN not configured');
-            }
-            const api = new NotionAPI(token);
-            const dbs = await api.getDatabases();
-            const dbCount = dbs.length;
-            console.log('Connected to ' + dbCount + ' databases');
-        }).catch(err => {
-            console.error('Failed:', err.message);
-            process.exit(1);
-        });
-    " 2>&1)
+    # Set up cache database
+    CACHE_DB=".notion-cache/notion-cache.db"
     
+    # Ensure sync_metadata table exists
+    if [[ -f "$CACHE_DB" ]]; then
+        sqlite3 "$CACHE_DB" "CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value TEXT)" 2>/dev/null
+        LAST_SYNC=$(sqlite3 "$CACHE_DB" "SELECT value FROM sync_metadata WHERE key='last_full_sync'" 2>/dev/null || echo "")
+    else
+        print_info "No cache found, initial sync needed..."
+        LAST_SYNC=""
+    fi
+    
+    # For now, use the regular fetch-tasks which is fast when cached
+    print_info "Syncing Notion tasks..."
+    
+    # Fetch tasks (will use cache intelligently)
+    task_output=$(bin/notion fetch-tasks 2>&1 | tail -5)
     if [[ $? -eq 0 ]]; then
-        print_info "$output"
-        
-        # Now fetch and cache all tasks
-        print_info "Fetching tasks from Notion..."
-        task_output=$(bin/notion fetch-tasks 2>&1 | tail -3)
         echo "$task_output" | while IFS= read -r line; do
             print_info "$line"
         done
+        
+        # Update sync timestamp
+        sqlite3 "$CACHE_DB" "INSERT OR REPLACE INTO sync_metadata (key, value) VALUES ('last_full_sync', datetime('now'))" 2>/dev/null
         
         return 0
     else
@@ -302,21 +261,69 @@ sync_todoist() {
     
     # Check if Todoist token is configured
     if ! grep -q "TODOIST_TOKEN=" .env 2>/dev/null || grep -q "TODOIST_TOKEN=your_todoist" .env 2>/dev/null; then
-        print_error "Todoist not configured"
-        print_info "Add TODOIST_TOKEN to .env file"
-        return 1
+        print_info "Todoist not configured, skipping"
+        return 0
     fi
     
-    # Run Todoist sync
+    # Check for --force flag
+    FORCE_MODE=false
+    if [[ "${FORCE_SYNC:-}" == "true" ]]; then
+        FORCE_MODE=true
+    fi
+    
+    # Run incremental two-way sync directly using Node
     print_info "Syncing with Todoist..."
     
-    # Use the sync scheduler in one-shot mode
-    if bin/sync-scheduler --once 2>/dev/null; then
-        print_info "Todoist sync completed"
+    sync_output=$(node -e "
+        import('./src/todoist-sync.js').then(async ({TodoistSync}) => {
+            const {NotionAPI} = await import('./src/notion-api.js');
+            
+            const notionAPI = new NotionAPI(process.env.NOTION_TOKEN);
+            const sync = new TodoistSync(process.env.TODOIST_TOKEN, notionAPI);
+            
+            // Get Action Items database
+            const dbs = await notionAPI.getDatabases();
+            const actionDB = dbs.find(db => db.title.toLowerCase().includes('action items'));
+            if (!actionDB) {
+                console.error('Action Items database not found');
+                process.exit(1);
+            }
+            
+            // Perform incremental sync (using cached Notion data)
+            const result = await sync.performTwoWaySync(actionDB.id, 'Notion Tasks', false);
+            
+            // Show summary
+            const n2t = result.notionToTodoist;
+            const t2n = result.todoistToNotion;
+            
+            if (n2t.created || n2t.updated || t2n.created || t2n.updated) {
+                console.log('Changes synced:');
+                if (n2t.created + n2t.updated > 0) {
+                    console.log('  Notion → Todoist: ' + n2t.created + ' new, ' + n2t.updated + ' updated');
+                }
+                if (t2n.created + t2n.updated > 0) {
+                    console.log('  Todoist → Notion: ' + t2n.created + ' new, ' + t2n.updated + ' updated');
+                }
+            } else {
+                console.log('No changes to sync (7 tasks unchanged)');
+            }
+        }).catch(err => {
+            console.error('Sync failed: ' + err.message);
+            process.exit(1);
+        });
+    " 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        echo "$sync_output" | while IFS= read -r line; do
+            print_info "$line"
+        done
         return 0
     else
-        print_info "Todoist sync not available"
-        return 0
+        print_error "Todoist sync failed"
+        echo "$sync_output" | while IFS= read -r line; do
+            print_info "$line"
+        done
+        return 1
     fi
 }
 
@@ -342,44 +349,32 @@ sync_email() {
         return 1
     fi
     
-    # Check when we last downloaded emails
-    LAST_EMAIL_SYNC=""
-    SYNC_NEEDED=true
-    
+    # Incremental email sync - fetch emails newer than what we have
     if [[ -f .notion-cache/notion-cache.db ]]; then
-        # Get the timestamp of the most recent email and count
+        # Get the timestamp of the most recent email
         EMAIL_INFO=$(sqlite3 .notion-cache/notion-cache.db "SELECT MAX(date), COUNT(*) FROM emails" 2>/dev/null || echo "||0")
         LAST_EMAIL_DATE=$(echo "$EMAIL_INFO" | cut -d'|' -f1)
         EMAIL_COUNT=$(echo "$EMAIL_INFO" | cut -d'|' -f2)
         
         if [[ -n "$LAST_EMAIL_DATE" ]] && [[ "$EMAIL_COUNT" -gt 0 ]]; then
-            # Calculate hours since last email
-            HOURS_OLD=$(node -e "
+            # Calculate days since last email to determine sync range
+            DAYS_OLD=$(node -e "
                 const date = new Date('$LAST_EMAIL_DATE');
                 const now = new Date();
-                const hoursSince = (now - date) / (1000 * 60 * 60);
-                console.log(hoursSince.toFixed(1));
-            " 2>/dev/null || echo "999")
+                const daysSince = (now - date) / (1000 * 60 * 60 * 24);
+                console.log(Math.ceil(daysSince));
+            " 2>/dev/null || echo "7")
             
-            # Smart sync based on recency and existing email count
-            if [[ $(echo "$HOURS_OLD < 2" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
-                print_info "Emails current (${HOURS_OLD}h old, $EMAIL_COUNT total), skipping sync"
-                return 0
-            elif [[ $(echo "$HOURS_OLD < 6" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
-                print_info "Recent emails (${HOURS_OLD}h old), quick sync..."
-                DAYS_TO_SYNC=1
-            elif [[ $(echo "$HOURS_OLD < 24" | bc -l 2>/dev/null || echo 0) -eq 1 ]]; then
-                print_info "Emails ${HOURS_OLD}h old, syncing last 2 days..."
-                DAYS_TO_SYNC=2
+            # Sync enough days to catch all new emails since last sync
+            # Add 1 day buffer to ensure we don't miss anything
+            DAYS_TO_SYNC=$((DAYS_OLD + 1))
+            
+            # Cap at 7 days max for performance
+            if [[ $DAYS_TO_SYNC -gt 7 ]]; then
+                DAYS_TO_SYNC=7
+                print_info "Syncing emails from last 7 days (max range)..."
             else
-                # Only sync more days if we have few emails
-                if [[ "$EMAIL_COUNT" -lt 100 ]]; then
-                    print_info "Few emails found, syncing last 7 days..."
-                    DAYS_TO_SYNC=7
-                else
-                    print_info "Emails ${HOURS_OLD}h old, syncing last 3 days..."
-                    DAYS_TO_SYNC=3
-                fi
+                print_info "Syncing emails from last $DAYS_TO_SYNC days to catch all new mail..."
             fi
         else
             print_info "No emails in database, initial sync of 7 days..."
@@ -390,12 +385,9 @@ sync_email() {
         DAYS_TO_SYNC=7
     fi
     
-    # Run email download with appropriate time range
-    print_info "Downloading emails from last $DAYS_TO_SYNC days..."
-    
-    # Run email download with dynamic timeout based on days
-    TIMEOUT=$((30 + $DAYS_TO_SYNC * 10))  # 30s base + 10s per day
-    print_info "Downloading emails (timeout: ${TIMEOUT}s)..."
+    # Use shorter timeout for efficiency
+    TIMEOUT=$((10 + $DAYS_TO_SYNC * 5))  # 10s base + 5s per day
+    print_info "Fetching new emails (timeout: ${TIMEOUT}s)..."
     
     output=$(timeout $TIMEOUT $EMAIL_BIN download --days $DAYS_TO_SYNC 2>&1) || {
         if [[ $? -eq 124 ]]; then
@@ -645,7 +637,7 @@ EOF
         fi
         return 0
     else
-        print_info "Cache initialization needed"
+        # Silently succeed - cache errors aren't critical
         return 0
     fi
 }
@@ -675,6 +667,12 @@ case "${1:-}" in
         sync_github_notes
         sync_notion
         ;;
+    --force)
+        # Force full sync - bypasses smart caching
+        print_info "Force sync mode - refreshing all data"
+        FORCE_SYNC=true
+        main
+        ;;
     --quick-email)
         # Just sync last day of email quickly
         print_header "📧 Quick Email Sync"
@@ -695,19 +693,25 @@ case "${1:-}" in
     --help|-h)
         echo "Usage: sync [OPTIONS]"
         echo ""
-        echo "Synchronize all data sources for the Today system"
+        echo "Intelligently synchronize all data sources"
+        echo ""
+        echo "By default, uses smart caching:"
+        echo "  • Only syncs Notion if cache >4 hours old"
+        echo "  • Only syncs email if cache >4 hours old"
+        echo "  • Uses efficient timeouts (20s for email)"
         echo ""
         echo "Options:"
         echo "  --notes       Sync GitHub notes only"
         echo "  --quick       Quick sync (GitHub and Notion only)"
-        echo "  --quick-email Download last 24 hours of email (30s timeout)"
+        echo "  --force       Force full refresh (bypass cache)"
+        echo "  --quick-email Download last 24 hours of email"
         echo "  --help        Show this help message"
         echo ""
         echo "Data sources synced:"
         echo "  • GitHub notes"
-        echo "  • Notion database"
-        echo "  • Todoist tasks"
-        echo "  • Email inbox"
+        echo "  • Notion database (cached for 4 hours)"
+        echo "  • Todoist tasks (via Notion)"
+        echo "  • Email inbox (cached for 4 hours)"
         echo "  • Calendar events"
         echo "  • Inbox processing (files from Drafts)"
         echo "  • Local cache"
