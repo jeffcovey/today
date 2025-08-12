@@ -98,7 +98,17 @@ main() {
         SYNC_SUMMARY="${SYNC_SUMMARY}✗ Calendar events\n"
     fi
     
-    # 6. Update Cache Statistics
+    # 6. Process Inbox Notes (from Drafts or other sources)
+    print_header "📥 Process Inbox"
+    if process_inbox; then
+        print_status "Inbox processed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ Inbox processed\n"
+    else
+        print_error "Inbox processing failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ Inbox processing\n"
+    fi
+    
+    # 7. Update Cache Statistics
     print_header "💾 Cache Update"
     if update_cache_stats; then
         print_status "Cache statistics updated"
@@ -437,6 +447,94 @@ sync_calendar() {
     fi
 }
 
+# Process inbox notes (from Drafts uploads)
+process_inbox() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Create inbox directory if it doesn't exist
+    mkdir -p notes/inbox 2>/dev/null
+    
+    # Check if there are any files in the inbox
+    INBOX_FILES=$(find notes/inbox -type f -name "*.md" 2>/dev/null)
+    if [[ -z "$INBOX_FILES" ]]; then
+        print_info "No files in inbox to process"
+        return 0
+    fi
+    
+    # Count files to process
+    FILE_COUNT=$(echo "$INBOX_FILES" | wc -l)
+    print_info "Processing $FILE_COUNT file(s) from inbox..."
+    
+    # Process each file
+    while IFS= read -r file; do
+        if [[ -z "$file" ]]; then
+            continue
+        fi
+        
+        BASENAME=$(basename "$file")
+        CONTENT=$(cat "$file" 2>/dev/null || echo "")
+        FIRST_LINE=$(echo "$CONTENT" | head -1)
+        TITLE=$(echo "$FIRST_LINE" | sed 's/^#\s*//' | sed 's/^-\s*\[\s*\]\s*//')
+        
+        # Determine destination based on content
+        DEST_DIR=""
+        DEST_FILE=""
+        
+        # Special case: Streaks file
+        if [[ "$TITLE" == "Streaks" ]]; then
+            # Convert Streaks items to TaskPaper format if needed
+            CONVERTED_CONTENT=$(echo "$CONTENT" | awk '
+                NR==1 {print; next}  # Keep header
+                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0; next}  # Add checkbox to non-checkbox lines
+                {print}  # Keep other lines as-is
+            ')
+            DEST_DIR="notes/tasks"
+            DEST_FILE="streaks-today.md"
+            echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
+            print_info "  • Streaks file → tasks/streaks-today.md"
+        
+        # Task files (contains checkboxes)
+        elif echo "$CONTENT" | grep -qE "^-\s*\[[ x]\]"; then
+            DEST_DIR="notes/tasks"
+            DEST_FILE="$BASENAME"
+            print_info "  • Task file → tasks/$BASENAME"
+        
+        # Daily notes (default)
+        else
+            DEST_DIR="notes/daily"
+            DEST_FILE="$BASENAME"
+            print_info "  • Daily note → daily/$BASENAME"
+        fi
+        
+        # Create destination directory if needed
+        mkdir -p "$DEST_DIR" 2>/dev/null
+        
+        # Move the file
+        DEST_PATH="$DEST_DIR/$DEST_FILE"
+        if [[ -f "$DEST_PATH" ]] && [[ "$DEST_FILE" != "streaks-today.md" ]]; then
+            # File exists and it's not streaks (which we always overwrite)
+            print_info "    File exists, skipping: $DEST_FILE"
+            rm "$file"  # Remove from inbox since it's a duplicate
+        else
+            mv "$file" "$DEST_PATH" 2>/dev/null && {
+                print_info "    ✓ Filed to $DEST_PATH"
+            } || {
+                print_error "    Failed to move $BASENAME"
+            }
+        fi
+    done <<< "$INBOX_FILES"
+    
+    # Commit any moved files
+    if [[ -n $(git status --porcelain notes/ 2>/dev/null) ]]; then
+        print_info "Committing filed notes..."
+        git add notes/ 2>/dev/null
+        git commit -m "Process inbox: file notes to appropriate directories" --quiet 2>/dev/null
+        git push origin main --quiet 2>/dev/null
+    fi
+    
+    return 0
+}
+
 # Update cache statistics
 update_cache_stats() {
     cd "$(dirname "$0")/.." || return 1
@@ -518,12 +616,20 @@ EOF
 # Parse command line arguments
 case "${1:-}" in
     --notes)
-        # Sync only GitHub notes (replaces sync-notes script)
+        # Sync only GitHub notes and process inbox (replaces sync-notes script)
         print_header "📝 GitHub Notes"
         if sync_github_notes; then
             print_status "Notes synced successfully!"
         else
             print_error "Notes sync failed"
+        fi
+        
+        # Also process inbox when syncing notes
+        print_header "📥 Process Inbox"
+        if process_inbox; then
+            print_status "Inbox processed successfully!"
+        else
+            print_error "Inbox processing failed"
         fi
         ;;
     --quick)
@@ -565,6 +671,8 @@ case "${1:-}" in
         echo "  • Notion database"
         echo "  • Todoist tasks"
         echo "  • Email inbox"
+        echo "  • Calendar events"
+        echo "  • Inbox processing (files from Drafts)"
         echo "  • Local cache"
         ;;
     *)

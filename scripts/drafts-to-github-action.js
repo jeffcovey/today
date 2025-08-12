@@ -11,10 +11,9 @@
 // ============ CONFIGURATION ============
 const config = {
     owner: 'OlderGay-Men',  // Organization name
-    repo: 'notion-cli',
+    repo: 'today',  // Changed from notion-cli to today repo
     token: 'YOUR_GITHUB_TOKEN', // Your personal access token (store in Drafts Credentials for security)
-    branch: 'main',
-    defaultPath: 'notes/daily/', // Default folder for notes
+    branch: 'main'
 };
 
 // Use Drafts Credential for secure token storage
@@ -31,47 +30,16 @@ const config = {
 let content = editor.getText();
 const lines = content.split('\n');
 const title = lines[0].replace(/^#\s*/, '').trim() || 'Untitled';
-const tags = draft.tags || [];
 
-// Special handling for Streaks uploads
-let filepath;
-let commitMessage;
-
-if (title === 'Streaks') {
-    // Convert Streaks items to TaskPaper format
-    const convertedLines = lines.map((line, index) => {
-        if (index === 0) return line; // Keep header
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('- ')) {
-            return `- [ ] ${trimmed}`;
-        }
-        return line;
-    });
-    content = convertedLines.join('\n');
-    
-    // Fixed location for Streaks
-    filepath = 'notes/tasks/streaks-today.md';
-    commitMessage = 'Update Streaks tasks';
-} else {
-    // Normal file handling
-    let folder = config.defaultPath;
-    if (content.includes('- [ ]') || content.includes('- [x]')) {
-        folder = 'notes/tasks/';
-    } else if (tags.includes('idea')) {
-        folder = 'notes/ideas/';
-    } else if (tags.includes('reference')) {
-        folder = 'notes/reference/';
-    }
-    
-    // Generate filename (date-based or title-based)
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0];
-    const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
-    const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
-    filepath = `${folder}${filename}`;
-    commitMessage = `Add note: ${title}`;
-}
+// Always upload to inbox folder - bin/sync will process and file appropriately
+// Generate filename (date-based or title-based)
+const date = new Date();
+const dateStr = date.toISOString().split('T')[0];
+const timeStr = date.toTimeString().split(' ')[0].replace(/:/g, '');  // HHMMSS format
+const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const filename = `${dateStr}-${timeStr}-${titleSlug}.md`;
+const filepath = `notes/inbox/${filename}`;
+const commitMessage = `Upload from Drafts: ${title}`;
 
 // GitHub API request
 const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filepath}`;
