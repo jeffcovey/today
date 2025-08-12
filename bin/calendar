@@ -109,6 +109,8 @@ class CalendarSync {
             title: event.summary || 'Untitled',
             start: event.start?.dateTime || event.start?.date,
             end: event.end?.dateTime || event.end?.date,
+            startTimeZone: event.start?.timeZone || null,  // Preserve original timezone
+            endTimeZone: event.end?.timeZone || null,      // Preserve original timezone
             location: event.location,
             description: event.description,
             allDay: !event.start?.dateTime
@@ -212,6 +214,7 @@ class CalendarSync {
     const lines = content.split(/\r?\n/);
     let currentEvent = null;
     let inEvent = false;
+    let currentTimezone = null;
     
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
@@ -220,6 +223,17 @@ class CalendarSync {
       while (i + 1 < lines.length && (lines[i + 1].startsWith(' ') || lines[i + 1].startsWith('\t'))) {
         line += lines[i + 1].substring(1);
         i++;
+      }
+      
+      // Track timezone definitions
+      if (line.startsWith('BEGIN:VTIMEZONE')) {
+        // Parse timezone ID from next lines
+        for (let j = i + 1; j < lines.length && !lines[j].startsWith('END:VTIMEZONE'); j++) {
+          if (lines[j].startsWith('TZID:')) {
+            currentTimezone = lines[j].substring(5);
+            break;
+          }
+        }
       }
       
       if (line === 'BEGIN:VEVENT') {
@@ -253,9 +267,23 @@ class CalendarSync {
               .replace(/\\n/g, '\n')
               .replace(/\\\\/g, '\\');
           } else if (key.startsWith('DTSTART')) {
+            // Check for timezone in the key (e.g., DTSTART;TZID=America/New_York)
+            if (key.includes('TZID=')) {
+              const tzMatch = key.match(/TZID=([^:;]+)/);
+              if (tzMatch) {
+                currentEvent.startTimeZone = tzMatch[1];
+              }
+            }
             currentEvent.start = this.parseICalDate(value.trim());
             currentEvent.allDay = !value.includes('T');
           } else if (key.startsWith('DTEND')) {
+            // Check for timezone in the key
+            if (key.includes('TZID=')) {
+              const tzMatch = key.match(/TZID=([^:;]+)/);
+              if (tzMatch) {
+                currentEvent.endTimeZone = tzMatch[1];
+              }
+            }
             currentEvent.end = this.parseICalDate(value.trim());
           } else if (key.startsWith('LOCATION')) {
             currentEvent.location = value.trim()

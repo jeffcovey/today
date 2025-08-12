@@ -514,15 +514,35 @@ async function extractCalendarContent() {
         const eventDate = new Date(event.start);
         return eventDate >= today && eventDate < tomorrow;
       })
-      .map(event => ({
-        time: event.allDay ? 'All day' : new Date(event.start).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit' 
-        }),
-        title: event.title,
-        location: event.location,
-        calendar: event.calendar || event.source
-      }));
+      .map(event => {
+        // Preserve the original time and timezone from the source
+        // Don't convert - just extract and display what we have
+        let timeDisplay = 'All day';
+        
+        if (!event.allDay) {
+          const eventDate = new Date(event.start);
+          // Show the time in its original timezone if we have it
+          if (event.startTimeZone) {
+            timeDisplay = eventDate.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              timeZone: event.startTimeZone
+            }) + ' ' + event.startTimeZone;
+          } else {
+            // Fall back to ISO string time if no timezone specified
+            timeDisplay = event.start;
+          }
+        }
+        
+        return {
+          time: timeDisplay,
+          title: event.title,
+          location: event.location,
+          calendar: event.calendar || event.source,
+          originalTime: event.start,  // Keep the raw time
+          originalTimezone: event.startTimeZone || null // Keep the timezone
+        };
+      });
     
     // Extract this week's events
     content.calendar_week = cacheData.events
@@ -531,19 +551,47 @@ async function extractCalendarContent() {
         return eventDate >= today && eventDate < weekFromNow;
       })
       .slice(0, 20) // Limit to 20 events for the week
-      .map(event => ({
-        date: new Date(event.start).toLocaleDateString('en-US', { 
-          weekday: 'short', 
-          month: 'short', 
-          day: 'numeric' 
-        }),
-        time: event.allDay ? 'All day' : new Date(event.start).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit' 
-        }),
-        title: event.title,
-        location: event.location
-      }));
+      .map(event => {
+        // Preserve the original time and timezone from the source
+        const eventDate = new Date(event.start);
+        
+        // Show date in the event's original timezone if available
+        const dateDisplay = event.startTimeZone 
+          ? eventDate.toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric',
+              timeZone: event.startTimeZone
+            })
+          : eventDate.toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric'
+            });
+        
+        let timeDisplay = 'All day';
+        if (!event.allDay) {
+          if (event.startTimeZone) {
+            timeDisplay = eventDate.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              timeZone: event.startTimeZone
+            }) + ' ' + event.startTimeZone;
+          } else {
+            // Fall back to ISO string time if no timezone specified
+            timeDisplay = event.start;
+          }
+        }
+        
+        return {
+          date: dateDisplay,
+          time: timeDisplay,
+          title: event.title,
+          location: event.location,
+          originalTime: event.start,  // Keep the raw time
+          originalTimezone: event.startTimeZone || null // Keep the timezone
+        };
+      });
   } catch (error) {
     console.error('Error extracting calendar content:', error.message);
   }

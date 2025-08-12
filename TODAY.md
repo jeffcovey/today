@@ -17,9 +17,14 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 When this session starts, please:
 1. Load and analyze the SUMMARY.json file
 2. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
-3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
-4. Create or update the review file with your analysis
-5. Present your recommendations to the user
+3. **CRITICAL: Check yesterday's review file in `notes/reviews/` to see what was already completed**
+4. **CRITICAL: Calendar events in SUMMARY.json now include timezone information**
+   - Events show both time and timezone (e.g., "10:00 AM America/New_York")
+   - The originalTime and originalTimezone fields preserve the source data
+   - No manual timezone conversion needed - we preserve what the calendar provides
+5. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+6. Create or update the review file with your analysis, avoiding duplicate suggestions for completed items
+7. Present your recommendations to the user
 
 ### Review File Format
 The review file should include:
