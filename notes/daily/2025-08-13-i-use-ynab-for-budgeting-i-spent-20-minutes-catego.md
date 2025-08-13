@@ -1,0 +1,1 @@
+I use YNAB for budgeting. I spent 20 minutes categorizing transactions, and unsubscribed from three monthly services that cost about $10 each.
