@@ -1,0 +1,1 @@
+- [ ] check that we have good indexes in our today.db
