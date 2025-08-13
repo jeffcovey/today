@@ -303,6 +303,32 @@ function pullFromGitHub() {
                     draft.addTag(tag);
                 }
                 
+                // Try to parse date from filename and set draft dates
+                // Common patterns: 2025-08-13, 2025-08-13-14:30:00-UTC
+                const dateMatch = file.path.match(/(\d{4}-\d{2}-\d{2})(?:[-_](\d{2})[:\-]?(\d{2})[:\-]?(\d{2}))?/);
+                if (dateMatch) {
+                    let dateStr = dateMatch[1]; // YYYY-MM-DD
+                    if (dateMatch[2]) {
+                        // Has time component
+                        dateStr += `T${dateMatch[2]}:${dateMatch[3] || '00'}:${dateMatch[4] || '00'}`;
+                    } else {
+                        dateStr += 'T12:00:00'; // Default to noon if no time
+                    }
+                    
+                    try {
+                        const parsedDate = new Date(dateStr);
+                        if (!isNaN(parsedDate.getTime())) {
+                            // Set both created and modified to the parsed date
+                            // This helps maintain chronological order in Drafts
+                            draft.createdAt = parsedDate;
+                            draft.modifiedAt = parsedDate;
+                            console.log(`Set draft date to ${parsedDate.toISOString()} from filename`);
+                        }
+                    } catch (e) {
+                        console.log(`Could not parse date from ${file.path}: ${e}`);
+                    }
+                }
+                
                 draft.update();
                 stats.created++;
                 console.log(`Created: ${file.path}`);
