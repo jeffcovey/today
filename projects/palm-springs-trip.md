@@ -3,8 +3,9 @@
 <img src="https://drupal-prod.visitcalifornia.com/sites/default/files/styles/opengraph_1200x630/public/palmsprings_1280x642.jpg.webp?itok=EdRS2Zil" width="400">
 
 **Dates:** September 4-12, 2025  
-**Status:** Planning  
+**Status:** ✅ BOOKED!  
 **Budget:** $2,500  
+**Tripit:** [View Trip Details on Tripit](https://www.tripit.com/trip/show?id=369697408)  
 
 ## Overview
 
@@ -29,9 +30,11 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 
 ### Planning Phase
 
-- [ ] Book flights (FLL to PSP)
-	- [ ] ⚠️ **Virgin Red points issue:** Cannot log into Virgin Atlantic account to use points (login broken since July account linking attempt - see below)
-	- [ ] Alternative: Book through Chase if Virgin issue not resolved
+- [x] ✅ **BOOKED FLIGHTS** (FLL to PSP) - August 13, 2025
+	- **Outbound Sept 4:** AA638 FLL→DFW (6:58am-9:14am), AA2548 DFW→PSP (10:57am-11:59am)
+	- **Return Sept 12-13:** AA2548 PSP→DFW (12:49pm-5:49pm), AA1847 DFW→FLL (7:33pm-11:20pm)
+	- [View full details on Tripit](https://www.tripit.com/trip/show?id=369697408)
+	- Booked with American Airlines
 - [x] Accommodation arranged (staying at Julian's house)
 - [x] Transportation arranged (using Julian's car)
 - [ ] Research restaurants
@@ -61,7 +64,7 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 
 ## Budget Breakdown
 
-- **Flights:** $300 (solo travel)
+- **Flights:** ✅ BOOKED with American Airlines
 - **Accommodation:** $0 (staying at Julian's)
 - **Car/Transport:** $0 (using Julian's car)
 - **Food/Dining:** $300
@@ -92,10 +95,7 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - Vince Gartland confirmed to housesit Sept 3-13 (covers trip plus buffer)
 - Will care for Buster and manage Airbnb rooms
 - Confirmed: Going to Palm Springs, traveling alone
-- URGENT: Book flight TODAY/TOMORROW (Aug 15 deadline for best rates)!
-- **Virgin Red Points Issue:** Unable to access Virgin Atlantic account to use points for booking
-  - Account linking attempt in July corrupted Virgin Atlantic login
-  - Password resets accepted but login still fails at identity.virginatlantic.com
-  - Virgin Red support (Ticket #267315) says they can't help - separate company
-  - Need to contact Virgin Atlantic directly: customer.care@fly.virgin.com or call their support
-  - Two "account updated" emails received today (Aug 13) from password reset attempts
+- ✅ **FLIGHTS BOOKED!** Trip is officially confirmed!
+  - Successfully booked flights despite Virgin Red points issue
+  - All trip details now available on Tripit
+  - Next steps: Prepare house instructions for Vince, research restaurants
