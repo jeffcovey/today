@@ -1,6 +1,7 @@
 # Daily Review Session
 
 ## How This Works
+
 This file starts an interactive Claude session for your daily review. The `bin/today` script:
 1. Checks Claude authentication
 2. Syncs all data sources
@@ -14,6 +15,7 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 ## Session Instructions for Claude
 
 ### Initial Tasks
+
 When this session starts, please:
 1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
 2. **⚠️ TIMEZONE CRITICAL: ALL timestamps in SUMMARY.json are in UTC (ending in Z). You MUST convert to Eastern Time (ET) unless user specifies otherwise:**
@@ -21,7 +23,7 @@ When this session starts, please:
    - **ASSUME Eastern Time Zone (New York/Florida) unless user indicates they're traveling**
    - **NEVER use UTC time when discussing the current time of day**
 3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
-   - **If today's review EXISTS**: 
+   - **If today's review EXISTS**:
      - Load the existing review file
      - Check SUMMARY.json's `meta.last_updated` timestamp
      - Only analyze changes since the review was last modified
@@ -38,6 +40,7 @@ When this session starts, please:
 4. Present your recommendations to the user
 
 ### Review File Format
+
 The review file should include:
 - Daily priorities and recommendations
 - Tasks formatted with checkboxes: `- [ ] Task description`
@@ -46,6 +49,7 @@ The review file should include:
 - Track completed tasks with ✓ marks
 
 ### Incremental Updates (Performance Optimization)
+
 When updating an existing review file:
 - Check SUMMARY.json's `changes` section for what's new
 - Look at `meta.last_updated` vs review file modification time
@@ -58,7 +62,9 @@ When updating an existing review file:
 - This keeps launch times fast for subsequent `bin/today` runs
 
 ### Commands Available
+
 The user can use these commands during the session:
+
 ```bash
 bin/mark-done "Take a 20-minute walk"  # Mark specific task as done
 bin/mark-done 1                        # Mark task #1 as done
@@ -66,6 +72,7 @@ bin/progress "Additional note"         # Add a progress note
 ```
 
 ## Review Guidelines
+
 Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and the SUMMARY.json contains comprehensive analysis.
 
 **IMPORTANT:** This is an interactive session. You can:
@@ -105,27 +112,34 @@ My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someon
 
 I like to arrange my days around three themes, "On Stage", "Back Stage", and "Off Stage". The idea is to group together similar tasks. Examples:
 
-  * Front Stage: Chores when I’m “on stage” with other people. Meetings, phone calls, customer support, email replies, etc.
-  * Back Stage: Maintenance tasks that other people don’t see. Tidying my physical and digital spaces, paying bills, fixing bugs that aren’t user-facing, etc.
-  * Off Stage: Personal time, to get a break and refresh myself before going back to work. Going out, enjoying Nature, seeing friends, catching up personal correspondence, reading a good book, etc.
+- Front Stage: Chores when I’m “on stage” with other people. Meetings, phone calls, customer support, email replies, etc.
+- Back Stage: Maintenance tasks that other people don’t see. Tidying my physical and digital spaces, paying bills, fixing bugs that aren’t user-facing, etc.
+- Off Stage: Personal time, to get a break and refresh myself before going back to work. Going out, enjoying Nature, seeing friends, catching up personal correspondence, reading a good book, etc.
 
 I try to follow this schedule:
 
-  * Front Stage: Monday, Wednesday, Saturday
-  * Back Stage: Thursday, Sunday
-  * Off Stage: Tuesday, Friday
+- Front Stage: Monday, Wednesday, Saturday
+- Back Stage: Thursday, Sunday
+- Off Stage: Tuesday, Friday
 
 **Day of Week Calculation Reminder:**
 - Monday = Front Stage
-- Tuesday = Off Stage
+- Tuesday = Off Stage  
 - Wednesday = Front Stage
 - Thursday = Back Stage
 - Friday = Off Stage
 - Saturday = Front Stage
 - Sunday = Back Stage
- 
+
+**VALIDATION CHECKLIST:**
+☐ Did you show the date calculation FIRST before any analysis?
+☐ Did you calculate from January 1, 2025 (Wednesday)?
+☐ Did you verify with a second method?
+☐ Does your day match the calculated result (not a guess)?
+☐ If the review file says a different day, FIX IT IMMEDIATELY
+
 We shouldn't neglect things that *have* to be done today, but **as much as possible, we should PRIORITIZE WORK/PLAY THAT MATCHES THE DAY'S THEME**.
- 
+
 
 ### Data Inputs
 
@@ -164,36 +178,59 @@ The SUMMARY.json file contains all relevant data already extracted from:
 Based on the SUMMARY.json data below, please provide:
 
 ### 1. Current Status Assessment
+
 - What looks most urgent based on the summary data?
 - What patterns do you see in the content?
 - What might be falling through the cracks?
 
 ### 2. Today's Top 3-5 Priorities
+
 Based on the summary's urgent_tasks, overdue_tasks, and concerns
 
 ### 3. Quick Wins (under 15 minutes)
+
 From the tasks and emails in the summary
 
 ### 4. Deep Work Recommendation (1-2 hours)
+
 What complex work needs focused attention?
 
 ### 5. Communications to Address
+
 Based on important_emails and people_to_contact in the summary
 
 ### 6. Evening Planning
+
 What to review and prepare based on the data
 
 ### 7. Self-Care Check
+
 Address any wellbeing concerns from the summary
 
 ---
 
 ## Your First Steps
 
+### 🔴 CRITICAL: Calculate Day of Week First 🔴
+
+**Before doing ANYTHING else, silently calculate the day:**
+
+1. **Calculate the day of week internally:**
+   - January 1, 2025 was Wednesday
+   - Days from Jan 1 to current date (not counting Jan 1 itself)
+   - Remember: Jan has 31 days, so Jan 1-31 = 30 days after Jan 1
+   - Divide total days by 7 for weeks + remainder
+   - Wednesday + remainder = actual day of week
+   - **COMMON ERROR**: Don't count both start and end date
+
+2. **Verify your calculation:**
+   - For Aug 13, 2025: It's exactly 224 days after Jan 1
+   - 224 ÷ 7 = 32 weeks exactly, so it's WEDNESDAY
+   - Double-check before proceeding
+
 1. **Read SUMMARY.json** to get all the synchronized data
-2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** The `meta.last_updated` field shows when data was synced in UTC
-3. **Calculate Day of Week** - ALWAYS determine the actual day from the date, never from activities
-4. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with correct day name
+2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** The `meta.last_updated` field shows when data was synced in UTC  
+3. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with CORRECT day name from calculation above
 4. **Analyze and Recommend** based on:
    - Current concerns from notes
    - Urgent and overdue tasks

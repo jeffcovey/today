@@ -5,12 +5,14 @@ This directory contains notes captured via Drafts and synced through GitHub.
 ## Setup Instructions
 
 ### 1. GitHub Personal Access Token
+
 1. Go to https://github.com/settings/tokens (your personal settings, not the organization)
 2. Create a new token with `repo` scope
 3. Copy the token for use in Drafts
    - Note: Use your personal token even for organization repos - as long as you have write access to the repo, it will work
 
 ### 2. Drafts Action Setup
+
 1. Open Drafts on iOS/Mac
 2. Create a new Action
 3. Add a "Script" step
@@ -20,6 +22,7 @@ This directory contains notes captured via Drafts and synced through GitHub.
    - Replace `YOUR_GITHUB_TOKEN` with your personal access token (or use Drafts Credentials for secure storage)
 
 ### 3. Usage
+
 - Write your note in Drafts
 - First line becomes the title (use # for markdown heading)
 - Run the action to upload to GitHub
@@ -31,11 +34,13 @@ This directory contains notes captured via Drafts and synced through GitHub.
   - OlderGay.Men work summaries → `/ogm-work/`
 
 ### 4. Syncing Locally
+
 Run `./scripts/sync-notes.sh` to pull latest notes from GitHub.
 
 ## Note Format Examples
 
 ### Daily Note
+
 ```markdown
 # Daily Note 2024-01-15
 
@@ -43,6 +48,7 @@ Today's thoughts and activities...
 ```
 
 ### Task List (TaskPaper format)
+
 ```markdown
 # Project Tasks
 
@@ -53,6 +59,7 @@ Project A:
 ```
 
 ### Idea Note
+
 ```markdown
 # App Feature Idea
 #idea
@@ -61,6 +68,7 @@ Description of the new feature...
 ```
 
 ### OlderGay.Men Work Summary
+
 ```markdown
 # OGM: Feature Implementation Plan
 #ogm-work
@@ -72,6 +80,7 @@ Claude-generated summary of work to be done...
 ```
 
 ## Tips
+
 - Use markdown for formatting
 - First line becomes the filename (sanitized)
 - Tags help with automatic organization
