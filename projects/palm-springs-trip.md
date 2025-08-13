@@ -8,7 +8,12 @@
 
 ## Overview
 
-Annual escape to Palm Springs with Lou. Focus on relaxation, pool time, and exploring new restaurants.
+Lou Sanfelice will be housesitting for his friend Julian DiCiurcio and his husband  at:
+
+38341 Bogert Trail
+Palm Springs CA 92264
+
+I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
 
 ## Key Dates
 
@@ -23,6 +28,7 @@ Annual escape to Palm Springs with Lou. Focus on relaxation, pool time, and expl
 ### Planning Phase
 
 - [ ] Book flights (FLL to PSP)
+	- [ ] Try to use my Virgin Red points is possible, or book through Chase
 - [x] Reserve hotel/Airbnb (prefer pool access)
 - [x] Rent car or arrange transport
 - [ ] Research restaurants
@@ -32,7 +38,7 @@ Annual escape to Palm Springs with Lou. Focus on relaxation, pool time, and expl
 ### Pre-Trip (1 week before)
 
 - [ ] Arrange house/room coverage
-- [ ] Stop mail delivery
+- [x] Stop mail delivery
 - [ ] Prep guest rooms for any bookings
 - [ ] Pack summer clothes (hot in September!)
 - [ ] Refill prescriptions
