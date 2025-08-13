@@ -13,15 +13,17 @@ Lou Sanfelice will be housesitting for his friend Julian DiCiurcio and his husba
 38341 Bogert Trail
 Palm Springs CA 92264
 
-I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
+I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. Lou will be there before and after my visit. I'll be traveling alone but staying with him at Julian's house. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
+
+Vince Gartland will be housesitting for me September 3-13 (covering the trip dates plus a buffer day on each end). He will look after my cat Buster and manage my two Airbnb guest rooms.
 
 ## Key Dates
 
 - **Book by:** August 15 (for best rates)
 - **Departure:** September 4, 2025 (morning flight preferred)
 - **Return:** September 12, 2025 (evening flight)
-- **Hotel check-in:** September 4, 3:00 PM PST
-- **Hotel check-out:** September 12, 11:00 AM PST
+- **Arrival at Julian's:** September 4
+- **Departure from Julian's:** September 12
 
 ## Tasks
 
@@ -29,20 +31,24 @@ I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I
 
 - [ ] Book flights (FLL to PSP)
 	- [ ] Try to use my Virgin Red points is possible, or book through Chase
-- [x] Reserve hotel/Airbnb (prefer pool access)
-- [x] Rent car or arrange transport
+- [x] Accommodation arranged (staying at Julian's house)
+- [x] Transportation arranged (using Julian's car)
 - [ ] Research restaurants
 - [ ] Check event calendar for September
-- [x] Coordinate with Lou on preferences
+- [x] Decided to go (traveling alone, staying with Lou at Julian's)
 
 ### Pre-Trip (1 week before)
 
-- [ ] Arrange house/room coverage
-- [x] Stop mail delivery
+- [x] Arrange house/room coverage (Vince Gartland confirmed)
+- [ ] Prepare instructions for Vince about:
+  - [ ] Buster's care and feeding
+  - [ ] Airbnb guest room management
+  - [ ] Emergency contacts
+- [ ] Stop mail delivery
 - [ ] Prep guest rooms for any bookings
 - [ ] Pack summer clothes (hot in September!)
 - [ ] Refill prescriptions
-- [x] Download offline maps
+- [ ] Download offline maps
 
 ### During Trip
 
@@ -54,9 +60,9 @@ I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I
 
 ## Budget Breakdown
 
-- **Flights:** $600 (both people)
-- **Accommodation:** $1,200 (8 nights)
-- **Car/Transport:** $300
+- **Flights:** $300 (solo travel)
+- **Accommodation:** $0 (staying at Julian's)
+- **Car/Transport:** $0 (using Julian's car)
 - **Food/Dining:** $300
 - **Activities:** $100
 
@@ -79,3 +85,10 @@ I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I
 - Created project file
 - Decided on dates: Sept 4-12
 - Next: Book flights this week
+
+### 2025-08-13
+
+- Vince Gartland confirmed to housesit Sept 3-13 (covers trip plus buffer)
+- Will care for Buster and manage Airbnb rooms
+- Confirmed: Going to Palm Springs, traveling alone
+- URGENT: Book flight TODAY/TOMORROW (Aug 15 deadline for best rates)!
