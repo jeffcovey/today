@@ -4,7 +4,7 @@
 import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
-import fs from 'fs/promises';
+import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createDAVClient } from 'tsdav';
@@ -12,52 +12,220 @@ import { createDAVClient } from 'tsdav';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CACHE_DIR = path.join(__dirname, '..', '.contacts-cache');
-const CACHE_FILE = path.join(CACHE_DIR, 'contacts.json');
+const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
 const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
-
-// Ensure cache directory exists
-await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 
 class ContactsSync {
   constructor() {
     this.contacts = [];
     this.client = null;
+    this.db = new Database(DB_PATH);
+    this.initDatabase();
+  }
+
+  initDatabase() {
+    // Tables are already created from migration, but ensure they exist
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id TEXT PRIMARY KEY,
+        first_name TEXT,
+        last_name TEXT,
+        full_name TEXT,
+        organization TEXT,
+        birthday TEXT,
+        url TEXT,
+        etag TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS contact_emails (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        contact_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        is_primary BOOLEAN DEFAULT 0,
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS contact_phones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        contact_id TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        is_primary BOOLEAN DEFAULT 0,
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS contact_addresses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        contact_id TEXT NOT NULL,
+        po_box TEXT,
+        extended TEXT,
+        street TEXT,
+        city TEXT,
+        region TEXT,
+        postal_code TEXT,
+        country TEXT,
+        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON contacts(full_name);
+      CREATE INDEX IF NOT EXISTS idx_contact_emails_email ON contact_emails(email);
+    `);
   }
 
   // Check if cache is valid
   async isCacheValid() {
     try {
-      const stats = await fs.stat(CACHE_FILE);
+      // Check when contacts were last updated
+      const result = this.db.prepare(
+        'SELECT MAX(updated_at) as last_update FROM contacts'
+      ).get();
+      
+      if (!result.last_update) return false;
+      
+      const lastUpdate = new Date(result.last_update).getTime();
       const now = Date.now();
-      const cacheAge = now - stats.mtime.getTime();
+      const cacheAge = now - lastUpdate;
+      
       return cacheAge < CACHE_DURATION;
     } catch {
       return false;
     }
   }
 
-  // Load contacts from cache
+  // Load contacts from database
   async loadCache() {
     try {
-      if (await this.isCacheValid()) {
-        const data = await fs.readFile(CACHE_FILE, 'utf-8');
-        this.contacts = JSON.parse(data);
-        return true;
+      const contacts = this.db.prepare(`
+        SELECT 
+          c.*,
+          GROUP_CONCAT(DISTINCT e.email) as emails,
+          GROUP_CONCAT(DISTINCT p.phone) as phones
+        FROM contacts c
+        LEFT JOIN contact_emails e ON c.id = e.contact_id
+        LEFT JOIN contact_phones p ON c.id = p.contact_id
+        GROUP BY c.id
+      `).all();
+
+      this.contacts = contacts.map(contact => ({
+        id: contact.id,
+        name: contact.full_name,
+        firstName: contact.first_name,
+        lastName: contact.last_name,
+        organization: contact.organization,
+        birthday: contact.birthday,
+        url: contact.url,
+        etag: contact.etag,
+        emails: contact.emails ? contact.emails.split(',') : [],
+        phones: contact.phones ? contact.phones.split(',') : []
+      }));
+
+      // Also load addresses
+      for (const contact of this.contacts) {
+        const addresses = this.db.prepare(`
+          SELECT po_box, extended, street, city, region, postal_code, country
+          FROM contact_addresses
+          WHERE contact_id = ?
+        `).all(contact.id);
+        
+        if (addresses.length > 0) {
+          contact.addresses = addresses.map(addr => ({
+            poBox: addr.po_box,
+            extended: addr.extended,
+            street: addr.street,
+            city: addr.city,
+            region: addr.region,
+            postalCode: addr.postal_code,
+            country: addr.country
+          }));
+        }
       }
+
+      return this.contacts.length > 0;
     } catch (error) {
-      console.error('Error loading cache:', error.message);
+      console.error('Error loading from database:', error.message);
+      return false;
     }
-    return false;
   }
 
-  // Save contacts to cache
-  async saveCache() {
-    try {
-      await fs.writeFile(CACHE_FILE, JSON.stringify(this.contacts, null, 2));
-    } catch (error) {
-      console.error('Error saving cache:', error.message);
-    }
+  // Save contacts to database
+  async saveToDatabase() {
+    const insertContact = this.db.prepare(`
+      INSERT OR REPLACE INTO contacts (
+        id, first_name, last_name, full_name, organization, birthday, url, etag, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `);
+
+    const deleteEmails = this.db.prepare('DELETE FROM contact_emails WHERE contact_id = ?');
+    const deletePhones = this.db.prepare('DELETE FROM contact_phones WHERE contact_id = ?');
+    const deleteAddresses = this.db.prepare('DELETE FROM contact_addresses WHERE contact_id = ?');
+
+    const insertEmail = this.db.prepare(`
+      INSERT INTO contact_emails (contact_id, email, is_primary) VALUES (?, ?, ?)
+    `);
+
+    const insertPhone = this.db.prepare(`
+      INSERT INTO contact_phones (contact_id, phone, is_primary) VALUES (?, ?, ?)
+    `);
+
+    const insertAddress = this.db.prepare(`
+      INSERT INTO contact_addresses (
+        contact_id, po_box, extended, street, city, region, postal_code, country
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const saveAll = this.db.transaction(() => {
+      for (const contact of this.contacts) {
+        // Update main contact
+        insertContact.run(
+          contact.id,
+          contact.firstName || null,
+          contact.lastName || null,
+          contact.name || null,
+          contact.organization || null,
+          contact.birthday || null,
+          contact.url || null,
+          contact.etag || null
+        );
+
+        // Clear and re-insert related data
+        deleteEmails.run(contact.id);
+        deletePhones.run(contact.id);
+        deleteAddresses.run(contact.id);
+
+        // Insert emails
+        if (contact.emails?.length > 0) {
+          contact.emails.forEach((email, index) => {
+            insertEmail.run(contact.id, email, index === 0 ? 1 : 0);
+          });
+        }
+
+        // Insert phones
+        if (contact.phones?.length > 0) {
+          contact.phones.forEach((phone, index) => {
+            insertPhone.run(contact.id, phone, index === 0 ? 1 : 0);
+          });
+        }
+
+        // Insert addresses
+        if (contact.addresses?.length > 0) {
+          contact.addresses.forEach(addr => {
+            insertAddress.run(
+              contact.id,
+              addr.poBox || null,
+              addr.extended || null,
+              addr.street || null,
+              addr.city || null,
+              addr.region || null,
+              addr.postalCode || null,
+              addr.country || null
+            );
+          });
+        }
+      }
+    });
+
+    saveAll();
   }
 
   // Parse vCard format
@@ -211,25 +379,64 @@ class ContactsSync {
   // Search contacts
   search(query) {
     const searchTerm = query.toLowerCase();
-    return this.contacts.filter(contact => {
-      const searchableText = [
-        contact.name,
-        contact.firstName,
-        contact.lastName,
-        contact.organization,
-        ...(contact.emails || []),
-        ...(contact.phones || [])
-      ].filter(Boolean).join(' ').toLowerCase();
-      
-      return searchableText.includes(searchTerm);
-    });
+    
+    // Use SQL for searching
+    const results = this.db.prepare(`
+      SELECT DISTINCT c.*
+      FROM contacts c
+      LEFT JOIN contact_emails e ON c.id = e.contact_id
+      LEFT JOIN contact_phones p ON c.id = p.contact_id
+      WHERE 
+        LOWER(c.full_name) LIKE ? OR
+        LOWER(c.first_name) LIKE ? OR
+        LOWER(c.last_name) LIKE ? OR
+        LOWER(c.organization) LIKE ? OR
+        LOWER(e.email) LIKE ? OR
+        p.phone LIKE ?
+    `).all(
+      `%${searchTerm}%`,
+      `%${searchTerm}%`,
+      `%${searchTerm}%`,
+      `%${searchTerm}%`,
+      `%${searchTerm}%`,
+      `%${searchTerm}%`
+    );
+
+    // Convert to contact format
+    return results.map(row => ({
+      id: row.id,
+      name: row.full_name,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      organization: row.organization,
+      birthday: row.birthday,
+      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(row.id).map(e => e.email),
+      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(row.id).map(p => p.phone)
+    }));
   }
 
   // Get contact by email
   findByEmail(email) {
-    return this.contacts.find(contact => 
-      contact.emails?.some(e => e.toLowerCase() === email.toLowerCase())
-    );
+    const result = this.db.prepare(`
+      SELECT c.*
+      FROM contacts c
+      JOIN contact_emails e ON c.id = e.contact_id
+      WHERE LOWER(e.email) = LOWER(?)
+      LIMIT 1
+    `).get(email);
+
+    if (!result) return null;
+
+    return {
+      id: result.id,
+      name: result.full_name,
+      firstName: result.first_name,
+      lastName: result.last_name,
+      organization: result.organization,
+      birthday: result.birthday,
+      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
+      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
+    };
   }
 
   // Get contact by phone
@@ -237,20 +444,34 @@ class ContactsSync {
     // Normalize phone number (remove common formatting)
     const normalizedPhone = phone.replace(/[\s\-\(\)\.]/g, '');
     
-    return this.contacts.find(contact => 
-      contact.phones?.some(p => {
-        const normalizedContactPhone = p.replace(/[\s\-\(\)\.]/g, '');
-        return normalizedContactPhone.includes(normalizedPhone) || 
-               normalizedPhone.includes(normalizedContactPhone);
-      })
-    );
+    const result = this.db.prepare(`
+      SELECT c.*
+      FROM contacts c
+      JOIN contact_phones p ON c.id = p.contact_id
+      WHERE REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '-', ''), '(', ''), ')', '') LIKE ?
+      LIMIT 1
+    `).get(`%${normalizedPhone}%`);
+
+    if (!result) return null;
+
+    return {
+      id: result.id,
+      name: result.full_name,
+      firstName: result.first_name,
+      lastName: result.last_name,
+      organization: result.organization,
+      birthday: result.birthday,
+      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
+      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
+    };
   }
 
   // Main sync method
   async sync(forceRefresh = false) {
     // Check cache first unless forced refresh
-    if (!forceRefresh && await this.loadCache()) {
-      console.log(`✅ Loaded ${this.contacts.length} contacts from cache`);
+    if (!forceRefresh && await this.isCacheValid()) {
+      await this.loadCache();
+      console.log(`✅ Loaded ${this.contacts.length} contacts from database cache`);
       return this.contacts;
     }
 
@@ -258,10 +479,10 @@ class ContactsSync {
     const iCloudContacts = await this.synciCloudContacts();
     this.contacts = iCloudContacts;
 
-    // Save to cache
+    // Save to database
     if (this.contacts.length > 0) {
-      await this.saveCache();
-      console.log(`✅ Synced ${this.contacts.length} contacts`);
+      await this.saveToDatabase();
+      console.log(`✅ Synced ${this.contacts.length} contacts to database`);
     }
 
     return this.contacts;
@@ -296,21 +517,41 @@ class ContactsSync {
 
   // Export contacts as JSON
   async exportJSON(filename = 'contacts-export.json') {
+    const fs = await import('fs/promises');
     const exportPath = path.join(process.cwd(), filename);
+    await this.loadCache();
     await fs.writeFile(exportPath, JSON.stringify(this.contacts, null, 2));
     console.log(`✅ Exported ${this.contacts.length} contacts to ${filename}`);
   }
 
   // Get statistics
   getStats() {
+    const stats = this.db.prepare(`
+      SELECT 
+        COUNT(DISTINCT c.id) as total,
+        COUNT(DISTINCT CASE WHEN e.email IS NOT NULL THEN c.id END) as with_email,
+        COUNT(DISTINCT CASE WHEN p.phone IS NOT NULL THEN c.id END) as with_phone,
+        COUNT(DISTINCT CASE WHEN c.organization IS NOT NULL THEN c.id END) as with_organization,
+        COUNT(DISTINCT CASE WHEN c.birthday IS NOT NULL THEN c.id END) as with_birthday,
+        COUNT(DISTINCT CASE WHEN a.contact_id IS NOT NULL THEN c.id END) as with_address
+      FROM contacts c
+      LEFT JOIN contact_emails e ON c.id = e.contact_id
+      LEFT JOIN contact_phones p ON c.id = p.contact_id
+      LEFT JOIN contact_addresses a ON c.id = a.contact_id
+    `).get();
+
     return {
-      total: this.contacts.length,
-      withEmail: this.contacts.filter(c => c.emails?.length > 0).length,
-      withPhone: this.contacts.filter(c => c.phones?.length > 0).length,
-      withOrganization: this.contacts.filter(c => c.organization).length,
-      withBirthday: this.contacts.filter(c => c.birthday).length,
-      withAddress: this.contacts.filter(c => c.addresses?.length > 0).length
+      total: stats.total,
+      withEmail: stats.with_email,
+      withPhone: stats.with_phone,
+      withOrganization: stats.with_organization,
+      withBirthday: stats.with_birthday,
+      withAddress: stats.with_address
     };
+  }
+
+  close() {
+    this.db.close();
   }
 }
 
@@ -321,91 +562,92 @@ async function main() {
   
   const contactsSync = new ContactsSync();
 
-  switch (command) {
-    case 'sync':
-      await contactsSync.sync(args.includes('--force'));
-      break;
+  try {
+    switch (command) {
+      case 'sync':
+        await contactsSync.sync(args.includes('--force'));
+        break;
 
-    case 'search':
-      const query = args.slice(1).join(' ');
-      if (!query) {
-        console.log('Usage: contacts search <query>');
+      case 'search':
+        const query = args.slice(1).join(' ');
+        if (!query) {
+          console.log('Usage: contacts search <query>');
+          process.exit(1);
+        }
+        const results = contactsSync.search(query);
+        contactsSync.displayContacts(results);
+        break;
+
+      case 'list':
+        await contactsSync.loadCache();
+        contactsSync.displayContacts();
+        break;
+
+      case 'stats':
+        const stats = contactsSync.getStats();
+        console.log('\n📊 Contact Statistics:');
+        console.log(`   Total contacts: ${stats.total}`);
+        console.log(`   With email: ${stats.withEmail}`);
+        console.log(`   With phone: ${stats.withPhone}`);
+        console.log(`   With organization: ${stats.withOrganization}`);
+        console.log(`   With birthday: ${stats.withBirthday}`);
+        console.log(`   With address: ${stats.withAddress}`);
+        break;
+
+      case 'export':
+        const filename = args[1] || 'contacts-export.json';
+        await contactsSync.exportJSON(filename);
+        break;
+
+      case 'cache':
+        const cacheValid = await contactsSync.isCacheValid();
+        if (cacheValid) {
+          const result = contactsSync.db.prepare(
+            'SELECT MAX(updated_at) as last_update FROM contacts'
+          ).get();
+          const lastUpdate = new Date(result.last_update);
+          const age = Date.now() - lastUpdate.getTime();
+          const hours = Math.floor(age / (60 * 60 * 1000));
+          const minutes = Math.floor((age % (60 * 60 * 1000)) / (60 * 1000));
+          console.log(`✅ Cache is valid (${hours}h ${minutes}m old)`);
+        } else {
+          console.log('❌ Cache is expired or needs refresh');
+        }
+        break;
+
+      case 'clear-cache':
+        // Just mark all contacts as old to force refresh on next sync
+        contactsSync.db.prepare("UPDATE contacts SET updated_at = datetime('now', '-1 day')").run();
+        console.log('✅ Cache marked for refresh');
+        break;
+
+      case '--help':
+      case 'help':
+        console.log('Usage: contacts [command] [options]');
+        console.log('');
+        console.log('Commands:');
+        console.log('  sync [--force]     Sync contacts from iCloud (default)');
+        console.log('  search <query>     Search contacts by name, email, or phone');
+        console.log('  list               List all contacts');
+        console.log('  stats              Show contact statistics');
+        console.log('  export [filename]  Export contacts to JSON file');
+        console.log('  cache              Check cache status');
+        console.log('  clear-cache        Mark cache for refresh');
+        console.log('  help               Show this help message');
+        console.log('');
+        console.log('Configuration:');
+        console.log('  Set these in your .env file:');
+        console.log('  ICLOUD_USERNAME    Your iCloud email address');
+        console.log('  ICLOUD_APP_PASSWORD App-specific password from appleid.apple.com');
+        break;
+
+      default:
+        console.log(`Unknown command: ${command}`);
+        console.log('Run "contacts help" for usage information');
         process.exit(1);
-      }
-      await contactsSync.sync();
-      const results = contactsSync.search(query);
-      contactsSync.displayContacts(results);
-      break;
-
-    case 'list':
-      await contactsSync.sync();
-      contactsSync.displayContacts();
-      break;
-
-    case 'stats':
-      await contactsSync.sync();
-      const stats = contactsSync.getStats();
-      console.log('\n📊 Contact Statistics:');
-      console.log(`   Total contacts: ${stats.total}`);
-      console.log(`   With email: ${stats.withEmail}`);
-      console.log(`   With phone: ${stats.withPhone}`);
-      console.log(`   With organization: ${stats.withOrganization}`);
-      console.log(`   With birthday: ${stats.withBirthday}`);
-      console.log(`   With address: ${stats.withAddress}`);
-      break;
-
-    case 'export':
-      const filename = args[1] || 'contacts-export.json';
-      await contactsSync.sync();
-      await contactsSync.exportJSON(filename);
-      break;
-
-    case 'cache':
-      const cacheValid = await contactsSync.isCacheValid();
-      if (cacheValid) {
-        const stats = await fs.stat(CACHE_FILE);
-        const age = Date.now() - stats.mtime.getTime();
-        const hours = Math.floor(age / (60 * 60 * 1000));
-        const minutes = Math.floor((age % (60 * 60 * 1000)) / (60 * 1000));
-        console.log(`✅ Cache is valid (${hours}h ${minutes}m old)`);
-      } else {
-        console.log('❌ Cache is expired or missing');
-      }
-      break;
-
-    case 'clear-cache':
-      try {
-        await fs.unlink(CACHE_FILE);
-        console.log('✅ Cache cleared');
-      } catch {
-        console.log('No cache to clear');
-      }
-      break;
-
-    case '--help':
-    case 'help':
-      console.log('Usage: contacts [command] [options]');
-      console.log('');
-      console.log('Commands:');
-      console.log('  sync [--force]     Sync contacts from iCloud (default)');
-      console.log('  search <query>     Search contacts by name, email, or phone');
-      console.log('  list               List all contacts');
-      console.log('  stats              Show contact statistics');
-      console.log('  export [filename]  Export contacts to JSON file');
-      console.log('  cache              Check cache status');
-      console.log('  clear-cache        Clear the cache');
-      console.log('  help               Show this help message');
-      console.log('');
-      console.log('Configuration:');
-      console.log('  Set these in your .env file:');
-      console.log('  ICLOUD_USERNAME    Your iCloud email address');
-      console.log('  ICLOUD_APP_PASSWORD App-specific password from appleid.apple.com');
-      break;
-
-    default:
-      console.log(`Unknown command: ${command}`);
-      console.log('Run "contacts help" for usage information');
-      process.exit(1);
+    }
+  } finally {
+    contactsSync.close();
   }
 }
 

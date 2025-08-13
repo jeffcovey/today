@@ -4,8 +4,8 @@ import fs from 'fs';
 
 export class SQLiteCache {
   constructor() {
-    this.cacheDir = path.join(process.cwd(), '.notion-cache');
-    this.dbPath = path.join(this.cacheDir, 'notion-cache.db');
+    this.cacheDir = path.join(process.cwd(), '.data');
+    this.dbPath = path.join(this.cacheDir, 'today.db');
     this.db = null;
     this.ensureCacheDir();
     this.initDatabase();

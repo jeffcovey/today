@@ -113,7 +113,7 @@ The docker-compose.yml mounts:
 
 These directories persist between container runs:
 - `notes/` - Your notes and reviews
-- `.notion-cache/` - Notion data cache
+- `.data/` - SQLite database
 - `.calendar-cache/` - Calendar data cache
 - `.sync-config.json` - Sync configuration
 - `.sync-log.json` - Sync history

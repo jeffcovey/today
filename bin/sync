@@ -221,7 +221,7 @@ sync_notion() {
     fi
     
     # Set up cache database
-    CACHE_DB=".notion-cache/notion-cache.db"
+    CACHE_DB=".data/today.db"
     
     # Ensure sync_metadata table exists
     if [[ -f "$CACHE_DB" ]]; then
@@ -391,9 +391,9 @@ sync_email() {
     fi
     
     # Incremental email sync - fetch emails newer than what we have
-    if [[ -f .notion-cache/notion-cache.db ]]; then
+    if [[ -f .data/today.db ]]; then
         # Get the timestamp of the most recent email
-        EMAIL_INFO=$(sqlite3 .notion-cache/notion-cache.db "SELECT MAX(date), COUNT(*) FROM emails" 2>/dev/null || echo "||0")
+        EMAIL_INFO=$(sqlite3 .data/today.db "SELECT MAX(date), COUNT(*) FROM emails" 2>/dev/null || echo "||0")
         LAST_EMAIL_DATE=$(echo "$EMAIL_INFO" | cut -d'|' -f1)
         EMAIL_COUNT=$(echo "$EMAIL_INFO" | cut -d'|' -f2)
         
@@ -502,17 +502,20 @@ sync_contacts() {
     sync_output=$(bin/contacts sync 2>&1)
     if [[ $? -eq 0 ]]; then
         # Extract contact count from output
-        contact_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ contacts" | grep -oE "[0-9]+" || echo "0")
-        if [[ "$contact_count" == "0" ]]; then
-            # Check if loaded from cache
-            if echo "$sync_output" | grep -q "Loaded [0-9]+ contacts from cache"; then
-                contact_count=$(echo "$sync_output" | grep -oE "Loaded [0-9]+ contacts" | grep -oE "[0-9]+")
-                print_info "Loaded $contact_count contacts from cache"
-            else
-                print_info "No contacts found"
-            fi
-        else
+        # Check for database cache message first (new SQLite version)
+        if echo "$sync_output" | grep -q "Loaded [0-9]* contacts from database cache"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from database cache" | grep -oE "[0-9]+" | head -1)
+            print_info "Loaded $contact_count contacts from cache"
+        # Check for synced to database message
+        elif echo "$sync_output" | grep -q "Synced [0-9]* contacts to database"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts to database" | grep -oE "[0-9]+" | head -1)
             print_info "Synced $contact_count contacts"
+        # Fallback for old cache message
+        elif echo "$sync_output" | grep -q "Loaded [0-9]* contacts from cache"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from cache" | grep -oE "[0-9]+" | head -1)
+            print_info "Loaded $contact_count contacts from cache"
+        else
+            print_info "No contacts found"
         fi
         
         # Show stats
@@ -790,10 +793,10 @@ update_cache_stats() {
     cd "$(dirname "$0")/.." || return 1
     
     # Check if cache database exists
-    CACHE_DB=".notion-cache/notion-cache.db"
+    CACHE_DB=".data/today.db"
     if [[ ! -f "$CACHE_DB" ]]; then
         print_info "Cache database not found, initializing..."
-        mkdir -p .notion-cache
+        mkdir -p .data
         # Create an empty database with the required tables
         sqlite3 "$CACHE_DB" <<EOF
 CREATE TABLE IF NOT EXISTS emails (

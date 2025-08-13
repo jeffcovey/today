@@ -6,7 +6,7 @@ node_modules/
 *.log
 .DS_Store
 dist/
-.notion-cache/
+.data/
 .vscode-cli/
 
 # Google Calendar Service Account Key

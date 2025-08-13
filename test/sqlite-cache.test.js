@@ -6,8 +6,8 @@ import path from 'path';
 describe('SQLiteCache', () => {
   let cache;
   const testDatabaseId = 'test-db-123';
-  const cacheDir = path.join(process.cwd(), '.notion-cache');
-  const testDbPath = path.join(cacheDir, 'notion-cache.db');
+  const cacheDir = path.join(process.cwd(), '.data');
+  const testDbPath = path.join(cacheDir, 'today.db');
 
   beforeEach(() => {
     // Clean up any existing test database

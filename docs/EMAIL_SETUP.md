@@ -68,7 +68,7 @@ email setup
 
 ## Database Storage
 
-Emails are stored in the SQLite database at `.notion-cache/notion-cache.db` in the `emails` table with the following structure:
+Emails are stored in the SQLite database at `.data/today.db` in the `emails` table with the following structure:
 
 - `uid`: Unique identifier from IMAP
 - `message_id`: Email message ID
