@@ -372,12 +372,30 @@ function pushToGitHub() {
     for (const draft of trashedDrafts) {
         const { metadata } = extractMetadata(draft.content);
         if (metadata.today_path && metadata.today_sha) {
-            // This draft was synced before and is now trashed
-            toDeleteFromGitHub.push({ 
-                path: metadata.today_path, 
-                sha: metadata.today_sha,
-                draft: draft 
+            // Check if file actually exists on GitHub before prompting
+            const checkResponse = http.request({
+                "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${metadata.today_path}`,
+                "method": "GET",
+                "headers": {
+                    "Authorization": `Bearer ${CONFIG.token}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "User-Agent": "Drafts-Today-Sync"
+                }
             });
+            
+            if (checkResponse.success) {
+                // File exists on GitHub, add to deletion list
+                toDeleteFromGitHub.push({ 
+                    path: metadata.today_path, 
+                    sha: metadata.today_sha,
+                    draft: draft 
+                });
+            } else if (checkResponse.statusCode === 404) {
+                // File already deleted from GitHub, just remove sync tags
+                console.log(`File already deleted from GitHub: ${metadata.today_path}, removing sync tags`);
+                draft.removeTag("today-sync");
+                draft.update();
+            }
         }
     }
     
@@ -415,6 +433,10 @@ function pushToGitHub() {
                         console.log(`Deleted from GitHub: ${path}`);
                         successfullyDeleted.push(draft);
                         stats.deleted++;
+                    } else if (deleteResponse.statusCode === 404) {
+                        // File doesn't exist on GitHub, treat as successful deletion
+                        console.log(`File already gone from GitHub: ${path}`);
+                        successfullyDeleted.push(draft);
                     } else {
                         console.log(`Failed to delete ${path}: ${deleteResponse.statusCode}`);
                         stats.errors++;
