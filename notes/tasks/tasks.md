@@ -24,3 +24,4 @@
 - [x] try second fix.
 - [x] fix UTC Drafts filename problem
 - [x] test tasks.md
+- [ ] Add pre-commit linting to both repositories (see Instapaper)

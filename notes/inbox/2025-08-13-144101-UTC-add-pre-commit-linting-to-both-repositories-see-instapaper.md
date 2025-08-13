@@ -1,1 +1,0 @@
-- [ ] Add pre-commit linting to both repositories (see Instapaper)
