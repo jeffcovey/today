@@ -30,18 +30,8 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 ### Planning Phase
 
 - [ ] Book flights (FLL to PSP)
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-	- [ ] Try to use my Virgin Red points is possible, or book through Chase
-=======
-=======
->>>>>>> GITHUB
 	- [ ] ⚠️ **Virgin Red points issue:** Cannot log into Virgin Atlantic account to use points (login broken since July account linking attempt - see below)
 	- [ ] Alternative: Book through Chase if Virgin issue not resolved
-<<<<<<< LOCAL
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 - [x] Accommodation arranged (staying at Julian's house)
 - [x] Transportation arranged (using Julian's car)
 - [ ] Research restaurants
