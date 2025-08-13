@@ -122,6 +122,7 @@ function pathToTags(path) {
 
 // Find draft by GitHub path
 function findDraftByPath(todayPath) {
+    // Don't use cache - it causes issues with newly created drafts
     const drafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
     
     for (const draft of drafts) {
@@ -209,7 +210,8 @@ function fetchGitHubFile(path) {
 // Pull from GitHub to Drafts
 function pullFromGitHub() {
     console.log("Starting pull from GitHub...");
-    const stats = { created: 0, updated: 0, skipped: 0, errors: 0 };
+    const startTime = Date.now();
+    const stats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
     
     // Fetch repository tree
     const http = HTTP.create();
@@ -239,10 +241,28 @@ function pullFromGitHub() {
     
     console.log(`Found ${noteFiles.length} files to sync`);
     
+    // Build set of paths that exist on GitHub and map of SHAs
+    const githubPaths = new Set(noteFiles.map(f => f.path));
+    const githubSHAs = {};
+    noteFiles.forEach(f => { githubSHAs[f.path] = f.sha; });
+    
     // Process each file
     for (const file of noteFiles) {
         try {
-            // Fetch file content
+            // First check if draft exists and if it needs updating
+            let draft = findDraftByPath(file.path);
+            
+            if (draft) {
+                // Check if update needed by comparing SHA
+                const { metadata } = extractMetadata(draft.content);
+                if (metadata.today_sha === githubSHAs[file.path]) {
+                    // SHA matches, no need to fetch content
+                    stats.skipped++;
+                    continue;
+                }
+            }
+            
+            // Only fetch content if we need to create or update
             const fileData = fetchGitHubFile(file.path);
             if (!fileData || !fileData.exists) {
                 stats.errors++;
@@ -255,17 +275,7 @@ function pullFromGitHub() {
                 console.log(`SHA: ${fileData.sha}`);
             }
             
-            // Check if draft exists
-            let draft = findDraftByPath(file.path);
-            
             if (draft) {
-                // Check if update needed
-                const { metadata } = extractMetadata(draft.content);
-                if (metadata.today_sha === fileData.sha) {
-                    stats.skipped++;
-                    continue;
-                }
-                
                 // Update existing draft
                 draft.content = updateMetadata(fileData.content, {
                     today_path: file.path,
@@ -303,19 +313,129 @@ function pullFromGitHub() {
         }
     }
     
+    // Check for drafts that should be deleted (exist locally but not on GitHub)
+    console.log("Checking for deleted files...");
+    const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+    const toDelete = [];
+    
+    for (const draft of syncDrafts) {
+        const { metadata } = extractMetadata(draft.content);
+        if (metadata.today_path && !githubPaths.has(metadata.today_path)) {
+            // This file no longer exists on GitHub
+            toDelete.push({ draft, path: metadata.today_path });
+        }
+    }
+    
+    if (toDelete.length > 0) {
+        // Ask for confirmation
+        const prompt = Prompt.create();
+        prompt.title = "Files Deleted from GitHub";
+        prompt.message = `${toDelete.length} file(s) were deleted from GitHub.\n\nDelete the corresponding drafts?\n\nFiles:\n${toDelete.slice(0, 5).map(d => d.path).join('\n')}${toDelete.length > 5 ? `\n...and ${toDelete.length - 5} more` : ''}`;
+        prompt.addButton("Delete Drafts");
+        prompt.addButton("Keep Drafts");
+        
+        if (prompt.show() && prompt.buttonPressed === "Delete Drafts") {
+            for (const { draft, path } of toDelete) {
+                console.log(`Deleting draft for removed file: ${path}`);
+                draft.isTrashed = true;
+                draft.update();
+                stats.deleted++;
+            }
+            console.log(`Deleted ${stats.deleted} drafts for removed files`);
+        } else {
+            console.log(`Kept ${toDelete.length} drafts for deleted files`);
+        }
+    }
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`Pull completed in ${elapsed}ms`);
+    
     return stats;
 }
 
 // Push from Drafts to GitHub
 function pushToGitHub() {
     console.log("Starting push to GitHub...");
-    const stats = { created: 0, updated: 0, skipped: 0, errors: 0 };
+    const startTime = Date.now();
+    const stats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
     
-    // Get all drafts with today-sync tag
-    const drafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
-    console.log(`Found ${drafts.length} drafts to process`);
+    // Get all drafts with today-sync tag (including trashed ones for deletion detection)
+    const activeDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+    const trashedDrafts = Draft.query("", "trash", ["today-sync"], [], "modified", false, false);
+    
+    console.log(`Found ${activeDrafts.length} active drafts and ${trashedDrafts.length} trashed drafts`);
     
     const http = HTTP.create();
+    
+    // First, handle deletions - check trashed drafts that have GitHub paths
+    const toDeleteFromGitHub = [];
+    for (const draft of trashedDrafts) {
+        const { metadata } = extractMetadata(draft.content);
+        if (metadata.today_path && metadata.today_sha) {
+            // This draft was synced before and is now trashed
+            toDeleteFromGitHub.push({ 
+                path: metadata.today_path, 
+                sha: metadata.today_sha,
+                draft: draft 
+            });
+        }
+    }
+    
+    if (toDeleteFromGitHub.length > 0) {
+        // Ask for confirmation to delete from GitHub
+        const prompt = Prompt.create();
+        prompt.title = "Delete Files from GitHub";
+        prompt.message = `${toDeleteFromGitHub.length} trashed draft(s) have corresponding files on GitHub.\n\nDelete these files from GitHub?\n\nFiles:\n${toDeleteFromGitHub.slice(0, 5).map(d => d.path).join('\n')}${toDeleteFromGitHub.length > 5 ? `\n...and ${toDeleteFromGitHub.length - 5} more` : ''}`;
+        prompt.addButton("Delete from GitHub");
+        prompt.addButton("Keep on GitHub");
+        
+        if (prompt.show() && prompt.buttonPressed === "Delete from GitHub") {
+            for (const { path, sha, draft } of toDeleteFromGitHub) {
+                try {
+                    // Delete file from GitHub
+                    const deleteResponse = http.request({
+                        "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${path}`,
+                        "method": "DELETE",
+                        "data": {
+                            "message": `Delete ${path} (draft was trashed)`,
+                            "sha": sha,
+                            "branch": CONFIG.branch
+                        },
+                        "headers": {
+                            "Authorization": `Bearer ${CONFIG.token}`,
+                            "Accept": "application/vnd.github.v3+json",
+                            "Content-Type": "application/json",
+                            "User-Agent": "Drafts-Today-Sync"
+                        }
+                    });
+                    
+                    if (deleteResponse.success) {
+                        console.log(`Deleted from GitHub: ${path}`);
+                        // Remove sync metadata from trashed draft
+                        draft.removeTag("today-sync");
+                        draft.update();
+                        stats.deleted++;
+                    } else {
+                        console.log(`Failed to delete ${path}: ${deleteResponse.statusCode}`);
+                        stats.errors++;
+                    }
+                } catch (error) {
+                    console.log(`Error deleting ${path}: ${error}`);
+                    stats.errors++;
+                }
+            }
+        } else if (prompt.buttonPressed === "Keep on GitHub") {
+            // Remove sync tags from trashed drafts so they won't be prompted again
+            for (const { draft } of toDeleteFromGitHub) {
+                draft.removeTag("today-sync");
+                draft.update();
+            }
+            console.log(`Kept files on GitHub, removed sync tags from ${toDeleteFromGitHub.length} trashed drafts`);
+        }
+    }
+    
+    // Now process active drafts for create/update
+    const drafts = activeDrafts;
     
     for (const draft of drafts) {
         try {
@@ -351,7 +471,9 @@ function pushToGitHub() {
                 existingFile = JSON.parse(checkResponse.responseText);
                 
                 // Check if content changed
-                const remoteContent = decodeBase64(existingFile.content);
+                // GitHub returns base64 with newlines, need to clean it
+                const cleanBase64 = existingFile.content.replace(/\n/g, '');
+                const remoteContent = decodeBase64(cleanBase64);
                 if (remoteContent.trim() === rawContent.trim()) {
                     // Update SHA if different
                     if (metadata.today_sha !== existingFile.sha) {
@@ -418,6 +540,9 @@ function pushToGitHub() {
             stats.errors++;
         }
     }
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`Push completed in ${elapsed}ms`);
     
     return stats;
 }
@@ -635,14 +760,14 @@ function main() {
                 
             case "pull":
                 result = pullFromGitHub();
-                message = `Pull Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
-                app.displaySuccessMessage(`Pulled ${result.created + result.updated} changes`);
+                message = `Pull Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                app.displaySuccessMessage(`Pulled ${result.created + result.updated} changes, deleted ${result.deleted}`);
                 break;
                 
             case "push":
                 result = pushToGitHub();
-                message = `Push Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
-                app.displaySuccessMessage(`Pushed ${result.created + result.updated} changes`);
+                message = `Push Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                app.displaySuccessMessage(`Pushed ${result.created + result.updated} changes, deleted ${result.deleted}`);
                 break;
                 
             case "diagnose":
