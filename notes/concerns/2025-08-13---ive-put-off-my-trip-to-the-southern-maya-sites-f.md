@@ -1,0 +1,1 @@
+- I've put off my trip to the southern Maya sites for too many years. COVID is no longer an excuse. I should make the trip next winter, when the weather is best.
