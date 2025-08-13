@@ -13,20 +13,17 @@ Each file is named `YYYY-MM-DD.md` and contains:
 ## Workflow
 
 ### Morning
-
 ```bash
 bin/today  # Creates initial review with priorities
 ```
 
 ### Throughout the Day
-
 ```bash
 bin/progress "Completed expense tracker setup"  # Add quick progress note
 bin/progress  # Opens review file in editor for detailed updates
 ```
 
 ### Evening
-
 ```bash
 bin/today  # Generates updated analysis based on changes during the day
 ```
