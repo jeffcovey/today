@@ -938,6 +938,8 @@ function quickSync() {
                 manualConflicts.push({
                     draft: conflict.draft,
                     path: conflict.path,
+                    localContent: conflict.localContent,
+                    remoteContent: conflict.remoteContent,
                     mergedContent: mergeResult.content,
                     conflictCount: mergeResult.conflictCount,
                     remoteSHA: conflict.remoteSHA
