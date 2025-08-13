@@ -38,13 +38,60 @@ function encodeBase64(str) {
     return Base64.encode(str);
 }
 
-// Extract metadata from draft content (supports top and bottom placement)
+// Extract metadata from draft content and auto-fix format if needed
 function extractMetadata(content) {
-    if (!content) return { metadata: {}, content: '' };
+    if (!content) return { metadata: {}, content: '', needsFormatFix: false };
     
-    // Check for metadata at the bottom with clear separator
-    const bottomMetadataRegex = /\n\n<!-- sync-metadata -->\n---\n([\s\S]*?)\n---$/;
-    let match = content.match(bottomMetadataRegex);
+    // Check for new markdown comment format (invisible in preview)
+    // Format: [//]: # (key: value)
+    const markdownCommentRegex = /\n\n\[\/\/\]: # \(sync-metadata-start\)\n([\s\S]*?)\[\/\/\]: # \(sync-metadata-end\)$/;
+    let match = content.match(markdownCommentRegex);
+    
+    if (match) {
+        const metadata = {};
+        const metadataLines = match[1].split('\n');
+        
+        for (const line of metadataLines) {
+            // Extract from [//]: # (key: value) format
+            const lineMatch = line.match(/\[\/\/\]: # \(([^:]+): (.+)\)/);
+            if (lineMatch) {
+                const key = lineMatch[1].trim();
+                // Unescape parentheses
+                const value = lineMatch[2].replace(/\\([()])/g, '$1').trim();
+                metadata[key] = value;
+            }
+        }
+        
+        const contentWithoutMetadata = content.replace(markdownCommentRegex, '');
+        return { metadata, content: contentWithoutMetadata, needsFormatFix: false };
+    }
+    
+    // Check for HTML comment format (old format that shows in preview)
+    const htmlCommentRegex = /\n\n<!-- sync-metadata[\s\S]*?-->$/;
+    match = content.match(htmlCommentRegex);
+    
+    if (match) {
+        const metadata = {};
+        // Try to extract YAML-style metadata from HTML comment
+        const yamlMatch = match[0].match(/---\n([\s\S]*?)\n---/);
+        if (yamlMatch) {
+            const lines = yamlMatch[1].split('\n');
+            for (const line of lines) {
+                const [key, ...valueParts] = line.split(':');
+                if (key && valueParts.length > 0) {
+                    metadata[key.trim()] = valueParts.join(':').trim();
+                }
+            }
+        }
+        
+        const contentWithoutMetadata = content.replace(htmlCommentRegex, '');
+        // Mark for format update
+        return { metadata, content: contentWithoutMetadata, needsFormatFix: true };
+    }
+    
+    // Legacy: old incomplete HTML comment format
+    const oldBottomMetadataRegex = /\n\n<!-- sync-metadata -->\n---\n([\s\S]*?)\n---$/;
+    match = content.match(oldBottomMetadataRegex);
     
     if (match) {
         const metadata = {};
@@ -58,8 +105,8 @@ function extractMetadata(content) {
             }
         }
         
-        const contentWithoutMetadata = content.replace(bottomMetadataRegex, '');
-        return { metadata, content: contentWithoutMetadata };
+        const contentWithoutMetadata = content.replace(oldBottomMetadataRegex, '');
+        return { metadata, content: contentWithoutMetadata, needsFormatFix: true };
     }
     
     // Legacy: Check for metadata at top
@@ -79,10 +126,10 @@ function extractMetadata(content) {
         }
         
         const contentWithoutMetadata = content.replace(topMetadataRegex, '');
-        return { metadata, content: contentWithoutMetadata };
+        return { metadata, content: contentWithoutMetadata, needsFormatFix: true };
     }
     
-    return { metadata: {}, content: content };
+    return { metadata: {}, content: content, needsFormatFix: false };
 }
 
 // Update or add metadata to draft content (at bottom)
@@ -90,13 +137,18 @@ function updateMetadata(content, updates) {
     const { metadata: existingMeta, content: contentWithoutMeta } = extractMetadata(content);
     const newMetadata = { ...existingMeta, ...updates };
     
-    let metadataSection = "\n\n<!-- sync-metadata -->\n---\n";
+    // Use markdown link reference syntax which is invisible in preview
+    // Format: [//]: # (metadata-key: value)
+    let metadataSection = "\n\n";
+    metadataSection += "[//]: # (sync-metadata-start)\n";
     for (const [key, value] of Object.entries(newMetadata)) {
         if (value !== null && value !== undefined) {
-            metadataSection += `${key}: ${value}\n`;
+            // Escape parentheses in values to avoid breaking the comment syntax
+            const escapedValue = value.replace(/[()]/g, '\\$&');
+            metadataSection += `[//]: # (${key}: ${escapedValue})\n`;
         }
     }
-    metadataSection += "---";
+    metadataSection += "[//]: # (sync-metadata-end)";
     
     return contentWithoutMeta.trim() + metadataSection;
 }
@@ -126,8 +178,16 @@ function findDraftByPath(todayPath) {
     const drafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
     
     for (const draft of drafts) {
-        const { metadata } = extractMetadata(draft.content);
-        if (metadata.today_path === todayPath) {
+        const extracted = extractMetadata(draft.content);
+        
+        // Auto-fix old metadata format if needed
+        if (extracted.needsFormatFix && extracted.metadata.today_path) {
+            console.log(`Auto-fixing metadata format for: ${extracted.metadata.today_path}`);
+            draft.content = updateMetadata(extracted.content, extracted.metadata);
+            draft.update();
+        }
+        
+        if (extracted.metadata.today_path === todayPath) {
             return draft;
         }
     }
