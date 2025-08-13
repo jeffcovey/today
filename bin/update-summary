@@ -97,7 +97,9 @@ async function loadSummary() {
         top_email_senders: {},
         calendar_today: [],
         calendar_week: [],
-        ogm_work: []
+        ogm_work: [],
+        contacts_stats: {},
+        contacts_birthdays_upcoming: []
       },
       active_context: {
         projects: {},
@@ -553,6 +555,92 @@ async function extractTaskContent(tasks) {
   return content;
 }
 
+async function extractContactsContent() {
+  const content = {
+    contacts_stats: {},
+    contacts_birthdays_upcoming: []
+  };
+  
+  try {
+    // Check if contacts cache exists
+    const cacheFile = path.join(__dirname, '..', '.contacts-cache', 'contacts.json');
+    const cacheData = await fs.readFile(cacheFile, 'utf-8')
+      .then(JSON.parse)
+      .catch(() => null);
+    
+    if (!cacheData || !Array.isArray(cacheData)) {
+      return content;
+    }
+    
+    // Calculate statistics
+    content.contacts_stats = {
+      total: cacheData.length,
+      with_email: cacheData.filter(c => c.emails?.length > 0).length,
+      with_phone: cacheData.filter(c => c.phones?.length > 0).length,
+      with_birthday: cacheData.filter(c => c.birthday).length,
+      with_organization: cacheData.filter(c => c.organization).length
+    };
+    
+    // Find upcoming birthdays (next 30 days)
+    const today = new Date();
+    const thirtyDaysFromNow = new Date(today);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    
+    content.contacts_birthdays_upcoming = cacheData
+      .filter(c => c.birthday)
+      .map(c => {
+        // Parse birthday (format can vary: YYYY-MM-DD or MM-DD or other)
+        const bday = c.birthday;
+        let birthdayThisYear;
+        
+        try {
+          // Try to parse the birthday
+          if (bday.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            // Full date format
+            const parts = bday.split('-');
+            birthdayThisYear = new Date(today.getFullYear(), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          } else if (bday.match(/^\d{2}-\d{2}$/)) {
+            // Month-day format
+            const parts = bday.split('-');
+            birthdayThisYear = new Date(today.getFullYear(), parseInt(parts[0]) - 1, parseInt(parts[1]));
+          } else {
+            // Try to parse as-is
+            birthdayThisYear = new Date(bday);
+            if (isNaN(birthdayThisYear)) return null;
+            birthdayThisYear.setFullYear(today.getFullYear());
+          }
+          
+          // If birthday already passed this year, consider next year
+          if (birthdayThisYear < today) {
+            birthdayThisYear.setFullYear(today.getFullYear() + 1);
+          }
+          
+          // Check if within next 30 days
+          if (birthdayThisYear <= thirtyDaysFromNow) {
+            const daysUntil = Math.ceil((birthdayThisYear - today) / (1000 * 60 * 60 * 24));
+            return {
+              name: c.name,
+              birthday: bday,
+              days_until: daysUntil,
+              date: birthdayThisYear.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            };
+          }
+        } catch (e) {
+          // Skip if we can't parse the birthday
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.days_until - b.days_until)
+      .slice(0, 10); // Limit to 10 upcoming birthdays
+    
+  } catch (error) {
+    console.error('Error extracting contacts content:', error.message);
+  }
+  
+  return content;
+}
+
 async function extractCalendarContent() {
   const content = {
     calendar_today: [],
@@ -722,7 +810,9 @@ async function generateAIInsights(summary) {
     events_today: summary.content.calendar_today.length,
     events_week: summary.content.calendar_week.length,
     ogm_tasks: ogmTotalTasks,
-    ogm_critical: ogmCriticalTasks
+    ogm_critical: ogmCriticalTasks,
+    upcoming_birthdays: summary.content.contacts_birthdays_upcoming?.length || 0,
+    next_birthday: summary.content.contacts_birthdays_upcoming?.[0] || null
   };
   
   // Try local LLM first (Ollama)
@@ -800,6 +890,17 @@ function generateSmartRecommendations(summary, data) {
   // OGM critical work takes precedence
   if (data.ogm_critical > 0) {
     recommendations.push(`Focus on ${data.ogm_critical} critical OGM production issues`);
+  }
+  
+  // Check for birthdays in next few days
+  if (data.next_birthday && data.next_birthday.days_until <= 3) {
+    if (data.next_birthday.days_until === 0) {
+      recommendations.push(`🎂 Today is ${data.next_birthday.name}'s birthday - send wishes!`);
+    } else if (data.next_birthday.days_until === 1) {
+      recommendations.push(`🎂 Tomorrow is ${data.next_birthday.name}'s birthday - prepare a message`);
+    } else {
+      recommendations.push(`🎂 ${data.next_birthday.name}'s birthday in ${data.next_birthday.days_until} days (${data.next_birthday.date})`);
+    }
   }
   
   // Priority-based recommendations
@@ -927,6 +1028,11 @@ async function updateSummary(useAI = true) {
   summary.content.calendar_today = calendarContent.calendar_today;
   summary.content.calendar_week = calendarContent.calendar_week;
 
+  // Extract contacts content
+  const contactsContent = await extractContactsContent();
+  summary.content.contacts_stats = contactsContent.contacts_stats;
+  summary.content.contacts_birthdays_upcoming = contactsContent.contacts_birthdays_upcoming;
+
   if (dbExists) {
     // Get recent data from database for analysis
     const recentEmails = await getRecentEmails(summary);
@@ -1033,6 +1139,14 @@ async function updateSummary(useAI = true) {
   console.log(`  - ${Object.keys(summary.content.top_email_senders).length} email senders`);
   console.log(`  - ${summary.content.calendar_today.length} events today`);
   console.log(`  - ${summary.content.calendar_week.length} events this week`);
+  
+  // Show contacts if present
+  if (summary.content.contacts_stats && summary.content.contacts_stats.total) {
+    console.log(`  - ${summary.content.contacts_stats.total} contacts (${summary.content.contacts_stats.with_email} with email)`);
+    if (summary.content.contacts_birthdays_upcoming && summary.content.contacts_birthdays_upcoming.length > 0) {
+      console.log(`  - ${summary.content.contacts_birthdays_upcoming.length} upcoming birthdays`);
+    }
+  }
   
   // Show OGM work if present
   if (summary.content.ogm_work && summary.content.ogm_work.length > 0) {

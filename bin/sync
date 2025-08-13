@@ -80,6 +80,7 @@ main() {
     
     run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
     run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
+    run_sync_step "📇 Contacts" sync_contacts "Contacts synced" "Contacts"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
     run_sync_step "💾 Cache Update" update_cache_stats "Cache updated" "Cache updated"
@@ -436,6 +437,61 @@ sync_calendar() {
         return 0
     else
         print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
+        return 1
+    fi
+}
+
+# Sync contacts
+sync_contacts() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if contacts binary exists
+    if [[ ! -f bin/contacts ]]; then
+        print_error "Contacts CLI not available"
+        return 1
+    fi
+    
+    # Check if iCloud credentials are configured
+    if ! grep -q "ICLOUD_USERNAME=" .env 2>/dev/null || ! grep -q "ICLOUD_APP_PASSWORD=" .env 2>/dev/null; then
+        print_info "iCloud contacts not configured (need ICLOUD_USERNAME and ICLOUD_APP_PASSWORD)"
+        return 1
+    fi
+    
+    # Run contacts sync
+    print_info "Syncing iCloud contacts..."
+    
+    sync_output=$(bin/contacts sync 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract contact count from output
+        contact_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ contacts" | grep -oE "[0-9]+" || echo "0")
+        if [[ "$contact_count" == "0" ]]; then
+            # Check if loaded from cache
+            if echo "$sync_output" | grep -q "Loaded [0-9]+ contacts from cache"; then
+                contact_count=$(echo "$sync_output" | grep -oE "Loaded [0-9]+ contacts" | grep -oE "[0-9]+")
+                print_info "Loaded $contact_count contacts from cache"
+            else
+                print_info "No contacts found"
+            fi
+        else
+            print_info "Synced $contact_count contacts"
+        fi
+        
+        # Show stats
+        stats_output=$(bin/contacts stats 2>&1 | grep -E "Total|With email" | head -2)
+        if [[ -n "$stats_output" ]]; then
+            echo "$stats_output" | while IFS= read -r line; do
+                print_info "  $line"
+            done
+        fi
+        
+        return 0
+    else
+        print_error "Contacts sync failed"
+        if echo "$sync_output" | grep -q "Authentication failed"; then
+            print_info "Check your iCloud app-specific password"
+        else
+            print_info "Error: $sync_output"
+        fi
         return 1
     fi
 }
@@ -845,6 +901,7 @@ case "${1:-}" in
         echo "  • Todoist tasks (via Notion)"
         echo "  • Email inbox (cached for 4 hours)"
         echo "  • Calendar events"
+        echo "  • iCloud contacts (cached for 4 hours)"
         echo "  • Inbox processing (files from Drafts)"
         echo "  • Local cache"
         ;;

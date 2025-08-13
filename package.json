@@ -33,7 +33,9 @@
     "imapflow": "^1.0.193",
     "inquirer": "^12.9.1",
     "mailparser": "^3.7.4",
-    "open": "^10.2.0"
+    "open": "^10.2.0",
+    "tsdav": "^2.1.5",
+    "xml2js": "^0.6.2"
   },
   "type": "module",
   "engines": {

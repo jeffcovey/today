@@ -1,0 +1,421 @@
+#!/usr/bin/env node
+
+// Contacts integration script for iCloud contacts
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createDAVClient } from 'tsdav';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const CACHE_DIR = path.join(__dirname, '..', '.contacts-cache');
+const CACHE_FILE = path.join(CACHE_DIR, 'contacts.json');
+const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
+
+// Ensure cache directory exists
+await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
+
+class ContactsSync {
+  constructor() {
+    this.contacts = [];
+    this.client = null;
+  }
+
+  // Check if cache is valid
+  async isCacheValid() {
+    try {
+      const stats = await fs.stat(CACHE_FILE);
+      const now = Date.now();
+      const cacheAge = now - stats.mtime.getTime();
+      return cacheAge < CACHE_DURATION;
+    } catch {
+      return false;
+    }
+  }
+
+  // Load contacts from cache
+  async loadCache() {
+    try {
+      if (await this.isCacheValid()) {
+        const data = await fs.readFile(CACHE_FILE, 'utf-8');
+        this.contacts = JSON.parse(data);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error loading cache:', error.message);
+    }
+    return false;
+  }
+
+  // Save contacts to cache
+  async saveCache() {
+    try {
+      await fs.writeFile(CACHE_FILE, JSON.stringify(this.contacts, null, 2));
+    } catch (error) {
+      console.error('Error saving cache:', error.message);
+    }
+  }
+
+  // Parse vCard format
+  parseVCard(vCardText) {
+    const contact = {};
+    const lines = vCardText.split(/\r?\n/);
+    
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+      
+      // Handle line continuations
+      while (i + 1 < lines.length && (lines[i + 1].startsWith(' ') || lines[i + 1].startsWith('\t'))) {
+        line += lines[i + 1].substring(1);
+        i++;
+      }
+      
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const key = line.substring(0, colonIndex);
+        const value = line.substring(colonIndex + 1);
+        
+        // Parse common vCard fields
+        if (key.startsWith('FN')) {
+          contact.name = value.trim();
+        } else if (key.startsWith('N')) {
+          // N format: LastName;FirstName;MiddleName;Prefix;Suffix
+          const parts = value.split(';');
+          contact.lastName = parts[0]?.trim() || '';
+          contact.firstName = parts[1]?.trim() || '';
+        } else if (key.startsWith('EMAIL')) {
+          if (!contact.emails) contact.emails = [];
+          contact.emails.push(value.trim());
+        } else if (key.startsWith('TEL')) {
+          if (!contact.phones) contact.phones = [];
+          contact.phones.push(value.trim());
+        } else if (key.startsWith('ORG')) {
+          contact.organization = value.trim();
+        } else if (key.startsWith('NOTE')) {
+          contact.notes = value.trim().replace(/\\n/g, '\n');
+        } else if (key.startsWith('BDAY')) {
+          contact.birthday = value.trim();
+        } else if (key.startsWith('ADR')) {
+          // Parse address
+          const parts = value.split(';');
+          if (!contact.addresses) contact.addresses = [];
+          contact.addresses.push({
+            poBox: parts[0]?.trim() || '',
+            extended: parts[1]?.trim() || '',
+            street: parts[2]?.trim() || '',
+            city: parts[3]?.trim() || '',
+            region: parts[4]?.trim() || '',
+            postalCode: parts[5]?.trim() || '',
+            country: parts[6]?.trim() || ''
+          });
+        } else if (key === 'UID') {
+          contact.id = value.trim();
+        }
+      }
+    }
+    
+    return contact;
+  }
+
+  // iCloud Contacts via CardDAV using tsdav
+  async synciCloudContacts() {
+    try {
+      if (!process.env.ICLOUD_USERNAME || !process.env.ICLOUD_APP_PASSWORD) {
+        console.log('⚠️  iCloud not configured');
+        console.log('   Need ICLOUD_USERNAME and ICLOUD_APP_PASSWORD in .env');
+        console.log('   Get app-specific password at: https://appleid.apple.com/account/manage');
+        return [];
+      }
+
+      console.log('📇 Fetching iCloud Contacts...');
+      
+      const username = process.env.ICLOUD_USERNAME;
+      const password = process.env.ICLOUD_APP_PASSWORD;
+      
+      try {
+        // Create DAV client
+        console.log('   Connecting to iCloud...');
+        this.client = await createDAVClient({
+          serverUrl: 'https://contacts.icloud.com',
+          credentials: {
+            username: username,
+            password: password,
+          },
+          authMethod: 'Basic',
+          defaultAccountType: 'carddav',
+        });
+
+        // Fetch address books
+        console.log('   Fetching address books...');
+        const addressBooks = await this.client.fetchAddressBooks();
+        
+        if (!addressBooks || addressBooks.length === 0) {
+          console.log('   ⚠️  No address books found');
+          return [];
+        }
+
+        console.log(`   Found ${addressBooks.length} address book(s)`);
+        
+        // Fetch vCards from the first (default) address book
+        console.log('   Fetching contacts...');
+        const vcards = await this.client.fetchVCards({
+          addressBook: addressBooks[0],
+        });
+
+        if (!vcards || vcards.length === 0) {
+          console.log('   ⚠️  No contacts found in address book');
+          return [];
+        }
+
+        // Parse vCards
+        const contacts = [];
+        for (const vcard of vcards) {
+          if (vcard.data) {
+            const contact = this.parseVCard(vcard.data);
+            if (contact && contact.name) {
+              // Add the URL for potential updates
+              contact.url = vcard.url;
+              contact.etag = vcard.etag;
+              contacts.push(contact);
+            }
+          }
+        }
+
+        console.log(`   ✓ Found ${contacts.length} contacts`);
+        return contacts;
+
+      } catch (error) {
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+          console.error('   ❌ Authentication failed. Check your iCloud credentials.');
+          console.log('   Make sure you\'re using an app-specific password, not your regular password.');
+        } else if (error.message?.includes('ENOTFOUND') || error.message?.includes('network')) {
+          console.error('   ❌ Network error. Check your internet connection.');
+        } else {
+          console.error('   ❌ Error fetching contacts:', error.message);
+          if (process.env.DEBUG) {
+            console.error('Full error:', error);
+          }
+        }
+        return [];
+      }
+    } catch (error) {
+      console.error('Error syncing iCloud contacts:', error.message);
+      return [];
+    }
+  }
+
+  // Search contacts
+  search(query) {
+    const searchTerm = query.toLowerCase();
+    return this.contacts.filter(contact => {
+      const searchableText = [
+        contact.name,
+        contact.firstName,
+        contact.lastName,
+        contact.organization,
+        ...(contact.emails || []),
+        ...(contact.phones || [])
+      ].filter(Boolean).join(' ').toLowerCase();
+      
+      return searchableText.includes(searchTerm);
+    });
+  }
+
+  // Get contact by email
+  findByEmail(email) {
+    return this.contacts.find(contact => 
+      contact.emails?.some(e => e.toLowerCase() === email.toLowerCase())
+    );
+  }
+
+  // Get contact by phone
+  findByPhone(phone) {
+    // Normalize phone number (remove common formatting)
+    const normalizedPhone = phone.replace(/[\s\-\(\)\.]/g, '');
+    
+    return this.contacts.find(contact => 
+      contact.phones?.some(p => {
+        const normalizedContactPhone = p.replace(/[\s\-\(\)\.]/g, '');
+        return normalizedContactPhone.includes(normalizedPhone) || 
+               normalizedPhone.includes(normalizedContactPhone);
+      })
+    );
+  }
+
+  // Main sync method
+  async sync(forceRefresh = false) {
+    // Check cache first unless forced refresh
+    if (!forceRefresh && await this.loadCache()) {
+      console.log(`✅ Loaded ${this.contacts.length} contacts from cache`);
+      return this.contacts;
+    }
+
+    // Fetch from iCloud
+    const iCloudContacts = await this.synciCloudContacts();
+    this.contacts = iCloudContacts;
+
+    // Save to cache
+    if (this.contacts.length > 0) {
+      await this.saveCache();
+      console.log(`✅ Synced ${this.contacts.length} contacts`);
+    }
+
+    return this.contacts;
+  }
+
+  // Display contacts in a formatted way
+  displayContacts(contacts = this.contacts) {
+    if (contacts.length === 0) {
+      console.log('No contacts found');
+      return;
+    }
+
+    console.log(`\nFound ${contacts.length} contact(s):\n`);
+    
+    contacts.forEach((contact, index) => {
+      console.log(`${index + 1}. ${contact.name || 'Unknown'}`);
+      if (contact.organization) {
+        console.log(`   Organization: ${contact.organization}`);
+      }
+      if (contact.emails?.length > 0) {
+        console.log(`   Email: ${contact.emails.join(', ')}`);
+      }
+      if (contact.phones?.length > 0) {
+        console.log(`   Phone: ${contact.phones.join(', ')}`);
+      }
+      if (contact.birthday) {
+        console.log(`   Birthday: ${contact.birthday}`);
+      }
+      console.log('');
+    });
+  }
+
+  // Export contacts as JSON
+  async exportJSON(filename = 'contacts-export.json') {
+    const exportPath = path.join(process.cwd(), filename);
+    await fs.writeFile(exportPath, JSON.stringify(this.contacts, null, 2));
+    console.log(`✅ Exported ${this.contacts.length} contacts to ${filename}`);
+  }
+
+  // Get statistics
+  getStats() {
+    return {
+      total: this.contacts.length,
+      withEmail: this.contacts.filter(c => c.emails?.length > 0).length,
+      withPhone: this.contacts.filter(c => c.phones?.length > 0).length,
+      withOrganization: this.contacts.filter(c => c.organization).length,
+      withBirthday: this.contacts.filter(c => c.birthday).length,
+      withAddress: this.contacts.filter(c => c.addresses?.length > 0).length
+    };
+  }
+}
+
+// CLI interface
+async function main() {
+  const args = process.argv.slice(2);
+  const command = args[0] || 'sync';
+  
+  const contactsSync = new ContactsSync();
+
+  switch (command) {
+    case 'sync':
+      await contactsSync.sync(args.includes('--force'));
+      break;
+
+    case 'search':
+      const query = args.slice(1).join(' ');
+      if (!query) {
+        console.log('Usage: contacts search <query>');
+        process.exit(1);
+      }
+      await contactsSync.sync();
+      const results = contactsSync.search(query);
+      contactsSync.displayContacts(results);
+      break;
+
+    case 'list':
+      await contactsSync.sync();
+      contactsSync.displayContacts();
+      break;
+
+    case 'stats':
+      await contactsSync.sync();
+      const stats = contactsSync.getStats();
+      console.log('\n📊 Contact Statistics:');
+      console.log(`   Total contacts: ${stats.total}`);
+      console.log(`   With email: ${stats.withEmail}`);
+      console.log(`   With phone: ${stats.withPhone}`);
+      console.log(`   With organization: ${stats.withOrganization}`);
+      console.log(`   With birthday: ${stats.withBirthday}`);
+      console.log(`   With address: ${stats.withAddress}`);
+      break;
+
+    case 'export':
+      const filename = args[1] || 'contacts-export.json';
+      await contactsSync.sync();
+      await contactsSync.exportJSON(filename);
+      break;
+
+    case 'cache':
+      const cacheValid = await contactsSync.isCacheValid();
+      if (cacheValid) {
+        const stats = await fs.stat(CACHE_FILE);
+        const age = Date.now() - stats.mtime.getTime();
+        const hours = Math.floor(age / (60 * 60 * 1000));
+        const minutes = Math.floor((age % (60 * 60 * 1000)) / (60 * 1000));
+        console.log(`✅ Cache is valid (${hours}h ${minutes}m old)`);
+      } else {
+        console.log('❌ Cache is expired or missing');
+      }
+      break;
+
+    case 'clear-cache':
+      try {
+        await fs.unlink(CACHE_FILE);
+        console.log('✅ Cache cleared');
+      } catch {
+        console.log('No cache to clear');
+      }
+      break;
+
+    case '--help':
+    case 'help':
+      console.log('Usage: contacts [command] [options]');
+      console.log('');
+      console.log('Commands:');
+      console.log('  sync [--force]     Sync contacts from iCloud (default)');
+      console.log('  search <query>     Search contacts by name, email, or phone');
+      console.log('  list               List all contacts');
+      console.log('  stats              Show contact statistics');
+      console.log('  export [filename]  Export contacts to JSON file');
+      console.log('  cache              Check cache status');
+      console.log('  clear-cache        Clear the cache');
+      console.log('  help               Show this help message');
+      console.log('');
+      console.log('Configuration:');
+      console.log('  Set these in your .env file:');
+      console.log('  ICLOUD_USERNAME    Your iCloud email address');
+      console.log('  ICLOUD_APP_PASSWORD App-specific password from appleid.apple.com');
+      break;
+
+    default:
+      console.log(`Unknown command: ${command}`);
+      console.log('Run "contacts help" for usage information');
+      process.exit(1);
+  }
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(error => {
+    console.error('Error:', error.message);
+    process.exit(1);
+  });
+}
+
+// Export for use in other scripts
+export { ContactsSync };
