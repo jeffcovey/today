@@ -1,11 +1,13 @@
 # Daily Review: Monday, August 11, 2025
 
 ## 🎯 Today's Theme: **Front Stage**
+
 *On Stage with others: meetings, calls, customer support, email replies*
 
 ## 📊 Current Status Assessment
 
 ### Top Concerns Requiring Immediate Attention
+
 1. **Financial Management Crisis** - Not tracking income/expenses, withdrawing from Roth 401k
 2. **Overdue Communications** - Melv, David Edwards, Rosemary waiting for replies
 3. **Health Alert** - High resting heart rate, insufficient cardio exercise
@@ -13,6 +15,7 @@
 5. **Administrative Backlog** - Paperwork piled up and undone
 
 ### Pattern Recognition
+
 - **Communication debt** accumulating with personal contacts and OGM members
 - **Health habits** slipping (daily alcohol, lack of cardio, weight management)
 - **Financial anxiety** building due to lack of tracking system
@@ -21,6 +24,7 @@
 ## ✅ Today’s Top Priorities (Front Stage Focus)
 
 ### 1. **Critical Communications** (9:00-10:30 AM) - FRONT STAGE PRIORITY
+
 - [ ] Reply to Melv
 - [ ] Reply to David Edwards  
 - [ ] Reply to Rosemary
@@ -29,6 +33,7 @@
 - [ ] Respond to OGM bug reports
 
 ### 2. **Customer Support & Engagement** (10:30 AM-12:00 PM)
+
 - [ ] Reply to “gator” on OGM
 - [ ] Address member help requests
 - [x] Write Airbnb review for Ashley
@@ -37,16 +42,19 @@
 - [ ] Reply to Heroku notification
 
 ### 3. **Quick Financial Check** (Save detailed work for Back Stage)
+
 - [ ] 15-minute expense review (save detailed tracking for Thursday)
 - [ ] Note critical bills needing immediate attention
 - [x] Rate Amazon transaction
 
 ### 4. **Health & Wellness** (2:00-3:00 PM)
+
 - [x] 30-minute cardio session (walk/bike/swim)
 - [ ] Plan alcohol-free evening
 - [ ] Mindful lunch without distractions
 
 ### 5. **Email & Digital Communications** (3:00-4:00 PM) - FRONT STAGE
+
 - [x] Process SaneBox digest (37 messages)
 - [x] Clear email inbox to zero
 - [ ] Respond to any urgent member emails
@@ -55,21 +63,25 @@
 ## ⚡ Quick Wins (Under 15 Minutes Each)
 
 ### Morning (Before 10 AM)
+
 - [x] Complete Streaks reading (2m 30s)
 - [x] Review bulk trash items for tomorrow’s pickup
 - [x] Quick tidy of workspace
 
 ### Afternoon (2-4 PM)
+
 - [x] Rate Amazon transaction
 - [ ] Reply to “gator” on OGM
 - [ ] Check if OGM newsletter went out
 
 ### Evening (After 5 PM)
+
 - [ ] Send any follow-up messages from today’s conversations
 - [x] Prep for tomorrow’s Pride Center social (Off Stage)
 - [ ] Set up coffee for morning
 
 ## 🔄 Habit Streaks to Maintain
+
 - [x] Read Saved Articles (2m 30s) - **Do this first!**
 - [ ] Avoid alcohol today for health recovery
 - [ ] Practice mindful eating at each meal
@@ -77,14 +89,17 @@
 ## 📅 Week Ahead Preparation
 
 ### Tomorrow - Tuesday (Off Stage Day)
+
 - Coffee and Conversation at Pride Center (2:00 PM)
 - Prime Gentlemen Mixer at Tropics (9:00 PM)
 - Palm Springs trip with Lou (decided: going!)
 
 ### Thursday (Back Stage Day)
+
 - Diner Run: Bagel Snack (5:00 PM)
 
 ## 🌙 Evening Planning (7:00-8:00 PM)
+
 1. Review today’s communications and responses
 2. Note any conversations needing follow-up
 3. Set three priorities for tomorrow (Off Stage - personal time)
@@ -92,6 +107,7 @@
 5. Wind down without alcohol - try herbal tea or sparkling water
 
 ## 💡 Self-Care Reminders
+
 - **Movement**: Your body needs cardio today - even a brisk 20-minute walk helps
 - **Mindfulness**: Eat at least one meal without screens or distractions
 - **Connection**: Those overdue replies are weighing on you - clearing them will feel liberating
@@ -99,12 +115,14 @@
 - **Progress**: You’re steadily losing weight - celebrate the wins while maintaining momentum
 
 ## 📝 Notes & Observations
+
 - Bulk trash pickup tomorrow - gather items tonight
 - Multiple Notion edit notifications suggest active database management
 - Consider batching similar tasks (all reviews together, all replies together)
 - Back Stage day perfect for catching up on administrative debt
 
 ## ⏰ Time Blocks
+
 - **9:00-10:00 AM**: Financial setup
 - **10:00-11:00 AM**: Personal communications
 - **11:00 AM-12:00 PM**: Administrative tasks
@@ -118,18 +136,23 @@
 
 —
 *Review created: 6:24 AM | Theme: Front Stage (Monday) | Weather: Check before outdoor exercise*
+
 ### Progress Update (12:13)
+
 I reviewed all the Airbnb guests.
 
 ### Progress Update (14:28)
+
 I don’t have anything that needs to go out for bulk pickup.
 
 ### Progress Update (14:30)
+
 I’ve decided I feel good about going to Palm Springs with Lou.
 
 ### Progress Update (13:47 - Current Session)
 
 #### ✅ Completed Today
+
 - Reviewed all Airbnb guests (Ashley, Anthony, Serge) ✓
 - Decided about Palm Springs trip with Lou ✓
 - Bulk trash pickup reviewed (nothing needed) ✓
@@ -152,6 +175,7 @@ I’ve decided I feel good about going to Palm Springs with Lou.
 - Streaks: Read Saved Articles (2m 30s) - quick win!
 
 #### 📧 New Email Activity (Since Morning)
+
 - 3 Notion task notifications (Cut hair, Update “today” readme, Fix OGM text searches)
 - Chase credit card statement available
 - Citizens Pay iPhone loan payment reminder
@@ -189,12 +213,14 @@ I’ve decided I feel good about going to Palm Springs with Lou.
 - Offline relaxation
 
 #### 💭 Reflection Notes
+
 - Financial tracking started well with YNAB session - $30/month saved!
 - Decluttering bringing positive mental benefits - continue this momentum
 - Guest room prep is revenue-critical - prioritize over other tasks
 - Communication debt needs addressing but after guest rooms
 
 ### Progress Update (22:49)
+
 I replied to two of Nelson Minar’s email messages
 
 ### Evening Session Update (22:53)
@@ -237,7 +263,7 @@ Since it’s late (10:53 PM), here are 5-minute tasks you could still do:
 1. **Streaks Minimum** (5 min)
    - Even 1 minute of Tai Chi counts for the streak
    - A brief walk around the house for some steps
-   
+
 2. **Send Quick “Tomorrow” Messages** (5 min)
    - “Hi Melv, apologies for the delay. Can we catch up tomorrow?”
    - Similar quick notes to David and Rosemary
