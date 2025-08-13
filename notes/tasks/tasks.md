@@ -1,7 +1,7 @@
-- [ ] Add a new todo in tasks.md
+- [x] Add a new todo in tasks.md
 - [ ] start adding OGM daily notes to Today
 - [ ] check that zazen calendar entries are appearing in today
-- [ ] Order a copy of "In the Closet of the Vatican" @today
+- [x] Order a copy of "In the Closet of the Vatican" @today
 - [ ] Add pre-commit linting to both repositories (see Instapaper)
 
 # Archive
