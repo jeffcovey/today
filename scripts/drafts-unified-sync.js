@@ -390,6 +390,8 @@ function pushToGitHub() {
         prompt.addButton("Keep on GitHub");
         
         if (prompt.show() && prompt.buttonPressed === "Delete from GitHub") {
+            const successfullyDeleted = [];
+            
             for (const { path, sha, draft } of toDeleteFromGitHub) {
                 try {
                     // Delete file from GitHub
@@ -411,9 +413,7 @@ function pushToGitHub() {
                     
                     if (deleteResponse.success) {
                         console.log(`Deleted from GitHub: ${path}`);
-                        // Remove sync metadata from trashed draft
-                        draft.removeTag("today-sync");
-                        draft.update();
+                        successfullyDeleted.push(draft);
                         stats.deleted++;
                     } else {
                         console.log(`Failed to delete ${path}: ${deleteResponse.statusCode}`);
@@ -424,6 +424,13 @@ function pushToGitHub() {
                     stats.errors++;
                 }
             }
+            
+            // Remove sync tags from successfully deleted drafts
+            for (const draft of successfullyDeleted) {
+                draft.removeTag("today-sync");
+                draft.update();
+            }
+            console.log(`Removed sync tags from ${successfullyDeleted.length} deleted drafts`);
         } else if (prompt.buttonPressed === "Keep on GitHub") {
             // Remove sync tags from trashed drafts so they won't be prompted again
             for (const { draft } of toDeleteFromGitHub) {
@@ -782,6 +789,38 @@ function main() {
                 report += `Missing path: ${issues.noPath.length}\n`;
                 report += `Missing SHA: ${issues.noSha.length}\n\n`;
                 
+                // Show drafts with no metadata at all
+                if (issues.noMetadata.length > 0) {
+                    report += `## Drafts with no metadata (${issues.noMetadata.length}):\n\n`;
+                    report += `These drafts have the today-sync tag but no sync metadata - they shouldn't be synced:\n\n`;
+                    for (const draft of issues.noMetadata.slice(0, 5)) {
+                        report += `- **${draft.title}**\n`;
+                        report += `  - Tags: ${draft.tags}\n`;
+                    }
+                    if (issues.noMetadata.length > 5) {
+                        report += `- ...and ${issues.noMetadata.length - 5} more\n`;
+                    }
+                    
+                    // Offer to remove sync tags
+                    const cleanupPrompt = Prompt.create();
+                    cleanupPrompt.title = "Invalid Sync Drafts";
+                    cleanupPrompt.message = `Found ${issues.noMetadata.length} drafts with today-sync tag but no metadata.\n\nRemove the sync tag from these drafts?`;
+                    cleanupPrompt.addButton("Remove sync tags");
+                    cleanupPrompt.addButton("Keep as-is");
+                    
+                    if (cleanupPrompt.show() && cleanupPrompt.buttonPressed === "Remove sync tags") {
+                        let cleaned = 0;
+                        for (const draftInfo of issues.noMetadata) {
+                            draftInfo.draft.removeTag("today-sync");
+                            draftInfo.draft.update();
+                            cleaned++;
+                        }
+                        report += `\n### Action taken: Removed sync tags from ${cleaned} drafts\n`;
+                        app.displaySuccessMessage(`Removed sync tags from ${cleaned} drafts`);
+                    }
+                    report += `\n`;
+                }
+                
                 // Show details of error drafts
                 if (issues.hasError.length > 0) {
                     report += `## Drafts with sync-error tag:\n\n`;
@@ -791,6 +830,56 @@ function main() {
                         report += `  - SHA: ${draft.metadata.today_sha ? "present" : "missing"}\n`;
                         report += `  - Tags: ${draft.tags}\n\n`;
                     }
+                }
+                
+                // Show drafts missing path with cleanup option
+                if (issues.noPath.length > 0) {
+                    report += `## Drafts missing today_path (${issues.noPath.length}):\n\n`;
+                    report += `These drafts have metadata but no path - likely old drafts from before sync was working:\n\n`;
+                    for (const draft of issues.noPath) {
+                        report += `- **${draft.title}**\n`;
+                        report += `  - UUID: ${draft.uuid.substring(0, 8)}...\n`;
+                        report += `  - Tags: ${draft.tags}\n`;
+                        report += `  - Created: ${draft.draft.createdAt.toISOString().split('T')[0]}\n`;
+                        report += `  - Modified: ${draft.draft.modifiedAt.toISOString().split('T')[0]}\n`;
+                        if (draft.metadata.today_sha) {
+                            report += `  - Has SHA (strange!): ${draft.metadata.today_sha.substring(0, 8)}...\n`;
+                        }
+                        report += `\n`;
+                    }
+                    
+                    // Offer to clean up these orphaned drafts
+                    const cleanupPrompt = Prompt.create();
+                    cleanupPrompt.title = "Orphaned Drafts Found";
+                    cleanupPrompt.message = `Found ${issues.noPath.length} drafts with metadata but no today_path.\n\nThese appear to be old drafts from before the sync system was fully working.\n\nWhat would you like to do?`;
+                    cleanupPrompt.addButton("Remove sync tags", "remove-tags");
+                    cleanupPrompt.addButton("Move to trash", "trash");
+                    cleanupPrompt.addButton("Keep as-is", "keep");
+                    
+                    if (cleanupPrompt.show()) {
+                        if (cleanupPrompt.buttonPressed === "remove-tags") {
+                            let cleaned = 0;
+                            for (const draftInfo of issues.noPath) {
+                                draftInfo.draft.removeTag("today-sync");
+                                draftInfo.draft.update();
+                                cleaned++;
+                            }
+                            report += `\n### Action taken: Removed sync tags from ${cleaned} orphaned drafts\n`;
+                            app.displaySuccessMessage(`Removed sync tags from ${cleaned} drafts`);
+                        } else if (cleanupPrompt.buttonPressed === "trash") {
+                            let trashed = 0;
+                            for (const draftInfo of issues.noPath) {
+                                draftInfo.draft.isTrashed = true;
+                                draftInfo.draft.update();
+                                trashed++;
+                            }
+                            report += `\n### Action taken: Moved ${trashed} orphaned drafts to trash\n`;
+                            app.displaySuccessMessage(`Moved ${trashed} drafts to trash`);
+                        } else {
+                            report += `\n### Action taken: Kept orphaned drafts as-is\n`;
+                        }
+                    }
+                    report += `\n`;
                 }
                 
                 // Show healthy drafts
