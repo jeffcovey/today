@@ -13,7 +13,7 @@ Lou Sanfelice will be housesitting for his friend Julian DiCiurcio and his husba
 38341 Bogert Trail
 Palm Springs CA 92264
 
-I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. Lou will be there before and after my visit. I'll be traveling alone but staying with him at Julian's house. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
+I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I’m going for 9/4-12 instead. Lou will be there before and after my visit. I’ll be traveling alone but staying with him at Julian’s house. We will have use of Julian’s car, so we don’t need to arrange for housing or transportation.
 
 Vince Gartland will be housesitting for me September 3-13 (covering the trip dates plus a buffer day on each end). He will look after my cat Buster and manage my two Airbnb guest rooms.
 
@@ -22,8 +22,8 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - **Book by:** August 15 (for best rates)
 - **Departure:** September 4, 2025 (morning flight preferred)
 - **Return:** September 12, 2025 (evening flight)
-- **Arrival at Julian's:** September 4
-- **Departure from Julian's:** September 12
+- **Arrival at Julian’s:** September 4
+- **Departure from Julian’s:** September 12
 
 ## Tasks
 
@@ -32,21 +32,21 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - [ ] Book flights (FLL to PSP)
 	- [ ] ⚠️ **Virgin Red points issue:** Cannot log into Virgin Atlantic account to use points (login broken since July account linking attempt - see below)
 	- [ ] Alternative: Book through Chase if Virgin issue not resolved
-- [x] Accommodation arranged (staying at Julian's house)
-- [x] Transportation arranged (using Julian's car)
+- [x] Accommodation arranged (staying at Julian’s house)
+- [x] Transportation arranged (using Julian’s car)
 - [ ] Research restaurants
 - [ ] Check event calendar for September
-- [x] Decided to go (traveling alone, staying with Lou at Julian's)
+- [x] Decided to go (traveling alone, staying with Lou at Julian’s)
 
 ### Pre-Trip (1 week before)
 
 - [x] Arrange house/room coverage (Vince Gartland confirmed)
 - [ ] Prepare instructions for Vince about:
-  - [ ] Buster's care and feeding
+  - [x] Buster’s care and feeding
   - [ ] Airbnb guest room management
-  - [ ] Emergency contacts
-- [ ] Stop mail delivery
-- [ ] Prep guest rooms for any bookings
+  - [x] Emergency contacts
+- [x] Stop mail delivery
+- [x] Prep guest rooms for any bookings
 - [ ] Pack summer clothes (hot in September!)
 - [ ] Refill prescriptions
 - [ ] Download offline maps
