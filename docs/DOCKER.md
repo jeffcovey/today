@@ -5,12 +5,14 @@
 ### Initial Setup (Linux Server)
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/OlderGay-Men/today.git
 cd today
 ```
 
 2. Run the setup script:
+
 ```bash
 bin/docker-setup
 ```
@@ -24,11 +26,13 @@ This will:
 ### Daily Usage
 
 Enter the container:
+
 ```bash
 bin/docker-run exec
 ```
 
 Inside the container, run your commands:
+
 ```bash
 bin/sync       # Sync all data sources
 bin/today      # Run daily review with Claude
@@ -39,12 +43,14 @@ bin/mark-done  # Mark tasks as complete
 ### Updating
 
 From your host machine:
+
 ```bash
 git pull
 bin/docker-run restart
 ```
 
 Or from inside the container:
+
 ```bash
 git pull
 exit
@@ -73,6 +79,7 @@ Manage local AI models (runs in separate container):
 - `bin/ollama-manage test [model]` - Test a model
 
 Recommended model for quick start:
+
 ```bash
 bin/ollama-manage pull tinyllama  # Small, fast model (638MB)
 ```
@@ -82,11 +89,13 @@ bin/ollama-manage pull tinyllama  # Small, fast model (638MB)
 ### Required: DOTENV_PRIVATE_KEY
 
 Create `.env.local` with your decryption key:
+
 ```bash
 echo 'DOTENV_PRIVATE_KEY=your-key-here' > .env.local
 ```
 
 Get your key from your local machine:
+
 ```bash
 echo $DOTENV_PRIVATE_KEY
 ```
@@ -115,13 +124,16 @@ These directories persist between container runs:
 The Docker setup includes Ollama as a separate service for local AI processing. This reduces Claude API usage for simple tasks.
 
 ### Benefits
+
 - **Architecture Independence**: Ollama runs in its own container with the correct binary
 - **Persistent Models**: Models are stored in Docker volume, survive container rebuilds
 - **Automatic Discovery**: Today CLI automatically detects and uses Ollama service
 - **Resource Isolation**: Ollama runs independently, won't affect main container
 
 ### Setup Ollama
+
 After running `bin/docker-setup`, pull a model:
+
 ```bash
 # Pull a lightweight model (recommended for start)
 bin/ollama-manage pull tinyllama
@@ -131,6 +143,7 @@ bin/ollama-manage test
 ```
 
 ### How It Works
+
 - Ollama runs on port 11434 (exposed to host)
 - Today CLI connects via `OLLAMA_HOST=http://ollama:11434`
 - Used automatically for:
@@ -141,36 +154,46 @@ bin/ollama-manage test
 ## Troubleshooting
 
 ### Git SSH Issues
+
 If you get "Permission denied (publickey)" errors:
 1. Ensure your SSH key is added to GitHub
 2. Check that your SSH key exists: `ls ~/.ssh/id_*`
 3. Test SSH connection: `ssh -T git@github.com`
 4. If using a non-standard key name, configure git:
+
    ```bash
    git config core.sshCommand "ssh -i ~/.ssh/your_key"
    ```
 
 ### Permission Issues
+
 If you get permission errors, ensure your user owns the files:
+
 ```bash
 sudo chown -R $USER:$USER .
 ```
 
 ### Container Won't Start
+
 Check logs:
+
 ```bash
 bin/docker-run logs
 ```
 
 ### Can't Access Git
+
 The entire project directory is mounted, so git should work. If not:
+
 ```bash
 # Restart the container
 bin/docker-run restart
 ```
 
 ### Missing Dependencies
+
 Rebuild the container:
+
 ```bash
 bin/docker-run build
 bin/docker-run restart

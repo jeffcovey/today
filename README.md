@@ -5,6 +5,7 @@ A personal command center for reviewing everything coming in, managing plans and
 ## Features
 
 ### 🎯 **Productivity Management**
+
 - 🌅 **Morning Routine Management** - Track and complete daily morning tasks
 - 📋 **Today's Plan** - Manage daily planning items  
 - ⚡ **Quick Tasks** - Handle "Now & Then" items efficiently
@@ -13,12 +14,14 @@ A personal command center for reviewing everything coming in, managing plans and
 - 📥 **Inbox Processing** - Manage items that need processing
 
 ### 🤖 **Daily Automation**
+
 - 📅 **Temporal Management** - Automatically create missing Day and Week entries with proper relationships
 - 🔄 **Routine Reset** - Reset routine checkboxes daily for recurring tasks
 - ♻️ **Repeating Tasks** - Automatically handle completed repeating tasks
 - 🗓️ **Relationship Mapping** - Link Days to Weeks and previous Days ("Yesterday" relationships)
 
 ### ⚡ **Batch Editing**
+
 - 🗄️ Browse and select from your Notion databases
 - 📝 Select multiple database items for batch editing
 - 🏷️ Assign tags to multiple tasks at once
@@ -27,6 +30,7 @@ A personal command center for reviewing everything coming in, managing plans and
 - 🔄 Interactive CLI with confirmation steps
 
 ### 🔍 **Natural Language Search**
+
 - 🤖 AI-powered search across any Notion database
 - 💬 Ask questions like "what should I work on?" or "I'm bored"
 - 🎯 Handles direct searches, complex queries, and mood-based requests
@@ -34,6 +38,7 @@ A personal command center for reviewing everything coming in, managing plans and
 - 🔐 Privacy-conscious with automatic fallback
 
 ### 🏗️ **Technical Features**
+
 - 💾 **SQLite Caching** - High-performance local caching with incremental sync
 - 🐳 **Docker Support** - Easy deployment and automation
 - 🛡️ **Error Handling** - Comprehensive validation and error recovery
@@ -212,6 +217,7 @@ The CLI includes comprehensive error handling:
 ### Daily Productivity Workflow
 
 **Morning:**
+
 ```bash
 # Reset routines for the day and create any missing temporal entries
 notion daily --all
@@ -222,6 +228,7 @@ npm start
 ```
 
 **Throughout the Day:**
+
 ```bash
 # Interactive management
 npm start
@@ -231,6 +238,7 @@ npm start
 ```
 
 **Evening:**
+
 ```bash
 # Complete evening routines
 npm start  
@@ -259,12 +267,14 @@ npm start
 ### Automation Examples
 
 **Daily Cron Job:**
+
 ```bash
 # Add to your cron (runs daily at 6 AM)
 0 6 * * * docker run --env-file /path/to/.env notion daily --all
 ```
 
 **Weekly Temporal Sync:**
+
 ```bash
 # Ensure Days and Weeks are created for the next week
 notion temporal --create-missing-days --start-date $(date +%Y-%m-%d) --end-date $(date -d '+7 days' +%Y-%m-%d)

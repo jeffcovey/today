@@ -15,12 +15,14 @@ Using Tailscale, you can securely access your home development container from an
 ## Initial Setup (One Time)
 
 ### 1. Install Tailscale on Mac Mini
+
 - Download from https://tailscale.com/download/mac
 - Or install from Mac App Store
 - Sign in with your Google/GitHub/Microsoft account
 - Leave running in background
 
 ### 2. Set Up Container with Tailscale
+
 ```bash
 # In your local VS Code terminal
 cd /path/to/notion-cli
@@ -30,6 +32,7 @@ cd /path/to/notion-cli
 ```
 
 ### 3. Authenticate Tailscale in Container
+
 ```bash
 # After rebuild, in container terminal
 bin/setup --tailscale
@@ -39,6 +42,7 @@ bin/setup --tailscale
 ```
 
 ### 4. Install Apps on iPad
+
 - **Tailscale** - From App Store (free)
 - **Termius** or **Prompt 3** - SSH client (optional)
 - **Safari** - For VS Code web access
@@ -46,6 +50,7 @@ bin/setup --tailscale
 ## Connecting from iPad
 
 ### Option 1: VS Code for Web (Recommended)
+
 **Note: This method requires VS Code Desktop to be running on your Mac Mini.**
 
 1. Open Tailscale app on iPad
@@ -61,6 +66,7 @@ If you have VS Code open on your Mac Mini, you can access it via:
 `http://100.x.x.x:PORT` where PORT is the forwarded port from your VS Code tunnel.
 
 ### Option 2: SSH Client
+
 1. Open Tailscale app on iPad
 2. Open SSH client (Termius/Prompt)
 3. Create new connection:
@@ -70,7 +76,9 @@ If you have VS Code open on your Mac Mini, you can access it via:
    - Key: Copy from container's `/home/node/.ssh/id_rsa`
 
 ### Option 3: Code Server (Web IDE)
+
 If you prefer a full web-based IDE:
+
 ```bash
 # Code-server is already installed in the container
 
@@ -93,35 +101,42 @@ ps aux | grep code-server
 ## Finding Your Container's IP
 
 ### From Container
+
 ```bash
 tailscale ip -4
 ```
 
 ### From Tailscale Admin
+
 1. Go to https://login.tailscale.com/admin/machines
 2. Find your container in the list
 3. Copy the IP address
 
 ### Using MagicDNS
+
 - Enable MagicDNS in Tailscale admin
 - Access by hostname: `notion-cli-container.tail-scale.ts.net`
 
 ## Tips for iPad Development
 
 ### Keyboard Shortcuts
+
 - External keyboard recommended
 - Cmd+K opens VS Code command palette
 - Esc key might need remapping in SSH clients
 
 ### File Management
+
 - Use VS Code's file explorer
 - Or install file manager in container
 
 ### Terminal Usage
+
 - VS Code terminal works well
 - Consider tmux for persistent sessions
 
 ### Battery & Connection
+
 - Tailscale maintains connection through network changes
 - Works on cellular and WiFi
 - Minimal battery impact
@@ -129,17 +144,20 @@ tailscale ip -4
 ## Troubleshooting
 
 ### Can't connect from iPad
+
 1. Check Tailscale is running on both devices
 2. Verify both logged into same account
 3. Check container is running on Mac Mini
 4. Try: `tailscale ping 100.x.x.x` from iPad
 
 ### Connection drops
+
 - Tailscale auto-reconnects
 - Check Mac Mini hasn't gone to sleep
 - Ensure "Prevent Sleep" is enabled
 
 ### Slow performance
+
 - Check internet connection quality
 - Consider using mosh instead of SSH
 - Reduce VS Code extensions
@@ -156,6 +174,7 @@ tailscale ip -4
 To ensure your container stays available:
 
 ### On Mac Mini
+
 ```bash
 # Prevent Mac from sleeping
 caffeinate -d
@@ -165,6 +184,7 @@ caffeinate -d
 ```
 
 ### Container Auto-Start
+
 ```bash
 # Add to Mac's login items
 # Or use Docker Desktop's auto-start feature

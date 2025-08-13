@@ -1,6 +1,7 @@
 # Email CLI Setup Guide
 
 ## Overview
+
 The email tool allows you to download and manage emails from your iCloud account locally.
 
 ## Setup Instructions
@@ -11,7 +12,7 @@ Since you're using jeff.covey@icloud.com, you'll need to create an app-specific 
 
 1. Go to https://appleid.apple.com
 2. Sign in with your Apple ID
-3. Navigate to "Sign-In and Security" 
+3. Navigate to "Sign-In and Security"
 4. Click on "App-Specific Passwords"
 5. Click the "+" button to generate a new password
 6. Name it something like "notion-cli-email"
@@ -31,6 +32,7 @@ Replace `xxxx-xxxx-xxxx-xxxx` with your actual app-specific password.
 ### 3. Install the CLI
 
 If you haven't already, run:
+
 ```bash
 npm install
 npm link  # This makes email available globally
@@ -41,21 +43,25 @@ npm link  # This makes email available globally
 ### Download Emails
 
 Download last 30 days (default):
+
 ```bash
 email download
 ```
 
 Download last 7 days:
+
 ```bash
 email download --days 7
 ```
 
 Download from a specific account:
+
 ```bash
 email download --account another@icloud.com
 ```
 
 ### View Setup Instructions
+
 ```bash
 email setup
 ```
@@ -80,16 +86,19 @@ Emails are stored in the SQLite database at `.notion-cache/notion-cache.db` in t
 ## Troubleshooting
 
 ### Authentication Failed
+
 - Ensure you're using an app-specific password, not your regular Apple ID password
 - Check that the password is entered correctly in the .env file
 - Make sure 2-factor authentication is enabled on your Apple ID
 
 ### Connection Issues
+
 - iCloud IMAP server: imap.mail.me.com
 - Port: 993 (SSL/TLS)
 - Requires secure connection
 
 ### Rate Limiting
+
 - Apple may rate limit IMAP connections
 - If you get errors, wait a few minutes and try again
 - Consider downloading in smaller batches using the --days option

@@ -1,22 +1,26 @@
 # Legacy Script Analysis & Integration Plan (Updated)
 
 ## Overview
+
 The legacy Ruby script (`notion_daily_logging`) is a comprehensive automation system for managing Notion databases with daily operations, task management, and data synchronization. Below is a detailed analysis of its features and a plan for integration into the current Node.js application with SQLite storage.
 
 ## Features Provided by Legacy Script
 
 ### 1. **Data Management & Processing** ✅ **Updated for SQLite**
+
 - **SQLite Storage**: Migrate all JSON file caching to SQLite database tables
 - **Data Synchronization**: Track modification times and sync states in SQLite
 - **Cache Management**: Use existing unified caching system for all database operations
 
 ### 2. **Time & Calendar Management** ⏸️ **Deferred for Future**
+
 - **Task Time Scheduling**: Sets specific times for tasks based on estimates and availability
 - **Calendar Generation**: Creates ICS calendar files *(May revisit later)*
 - **External Calendar Integration**: Google Calendar sync *(May revisit later)*
 - **Calendar Upload**: Remote deployment *(May revisit later)*
 
 ### 3. **Day & Week Management** ✅ **High Priority**
+
 - **Automatic Day/Week Creation**: Creates missing Day and Week entries in Notion with full relationship mapping:
   - Creates Week entries for date ranges (Sunday to Saturday)  
   - Creates Day entries linked to appropriate Week
@@ -25,6 +29,7 @@ The legacy Ruby script (`notion_daily_logging`) is a comprehensive automation sy
 - **Temporal Data Structure**: Maintains proper hierarchical Day→Week relationships
 
 ### 4. **Task & Routine Management** ✅ **Core Feature**
+
 - **Repeating Task Reset**: Marks completed repeating tasks as "♻️ Repeating" status
 - **Routine Reset**: Unchecks "Done" properties in routine databases:
   - Morning Routine
@@ -35,10 +40,12 @@ The legacy Ruby script (`notion_daily_logging`) is a comprehensive automation sy
 - **Stage Task Scheduling**: Handles special "🎭 Stage" tasks for upcoming week
 
 ### 5. **Streaks Tracking** ✅ **Simplified Implementation**
+
 - **Streaks Page Updates**: Updates a Notion page with streak data
 - **SQLite-Based Tracking**: Store streak data and change detection in SQLite instead of file hashes
 
 ### 6. **Time Tracking Integration** ✅ **Docker-Ready Redesign**
+
 - **Toggl Integration**: Syncs time entries from Toggl to Notion Pillars database
 - **Focus App Processing**: Converts Focus app time entries to Toggl entries
 - **Project Mapping**: Maps Toggl projects to Notion pillars for time allocation tracking
@@ -48,7 +55,8 @@ The legacy Ruby script (`notion_daily_logging`) is a comprehensive automation sy
 
 The legacy script uses these Notion databases that are **NOT** currently accessible in our application:
 
-### **Required Access**:
+### **Required Access**
+
 1. **`days_database_id`** - Daily tracking entries
 2. **`weeks_database_id`** - Weekly planning entries  
 3. **`todays_plan_database_id`** - Daily planning items
@@ -56,7 +64,8 @@ The legacy script uses these Notion databases that are **NOT** currently accessi
 5. **`inboxes_database_id`** - Inbox items to process
 6. **`pillars_database_id`** - Life areas for time tracking
 
-### **Currently Accessible**:
+### **Currently Accessible**
+
 - `action_items_database_id` - Main tasks (our current tasks database)
 - `morning_routine_database_id` - Morning routine items
 - `evening_tasks_database_id` - Evening tasks  
@@ -65,6 +74,7 @@ The legacy script uses these Notion databases that are **NOT** currently accessi
 ## Integration Plan (Updated for SQLite & Docker)
 
 ### **Phase 1: Core Database Access & SQLite Migration** ✅ **In Progress**
+
 1. **Add missing database configurations** to our current config system
 2. **Request Notion access** to the 6 missing databases listed above
 3. **Add database detection methods** similar to existing routine database methods
@@ -72,6 +82,7 @@ The legacy script uses these Notion databases that are **NOT** currently accessi
 5. **Test connectivity** to all required databases
 
 ### **Phase 2: Day/Week Management** ✅ **High Priority**
+
 Implement the sophisticated Day/Week creation system:
 
 ```bash
@@ -88,6 +99,7 @@ notion-cli temporal --sync-weeks           # Sync week data and relationships
 - Store temporal data in SQLite for faster lookups
 
 ### **Phase 3: Time Tracking & Docker Integration** ✅ **Core Feature**
+
 Redesign file-based processing for Docker environment:
 
 ```bash
@@ -104,6 +116,7 @@ notion-cli time --update-pillars            # Update time allocation in Notion
 4. **State Tracking**: Use SQLite to track processed entries instead of file modification times
 
 ### **Phase 4: Routine Management & Automation** ✅ **Essential**
+
 Add command-line options for automated operations (suitable for Docker/cron):
 
 ```bash
@@ -119,6 +132,7 @@ notion-cli                                  # Main interactive interface
 ```
 
 ### **Phase 5: Interactive Features**
+
 Add interactive options to the main CLI interface:
 
 ```
@@ -139,14 +153,16 @@ Add interactive options to the main CLI interface:
 
 ## Technical Implementation Notes (Updated)
 
-### **Architecture Changes Needed**:
+### **Architecture Changes Needed**
+
 1. **Add new database managers** for Days, Weeks, Today's Plan, Now & Then, Inboxes, Pillars
 2. **Create time tracking module** for Toggl integration using SQLite storage
 3. **Extend SQLite schema** for time tracking, streaks, and sync state data
 4. **Add temporal management utilities** for Day/Week creation and relationship handling
 5. **Add command-line argument parsing** for non-interactive operations
 
-### **SQLite Schema Extensions Needed**:
+### **SQLite Schema Extensions Needed**
+
 ```sql
 -- Time tracking and sync state
 CREATE TABLE time_entries_sync (
@@ -175,21 +191,25 @@ CREATE TABLE temporal_sync (
 );
 ```
 
-### **Dependencies to Add**:
+### **Dependencies to Add**
+
 - Toggl API client library (e.g., `toggl-api`)
 - `node-cron` for scheduled operations (if needed)
 - Focus app integration (API or volume mount processing)
 
-### **Configuration Extensions**:
+### **Configuration Extensions**
+
 - Add missing database IDs to environment/config
 - Add Toggl API credentials
 - Add Notion page IDs for streaks tracking
 - Add Focus app data source configuration
 
-### **Docker Integration Strategy**:
+### **Docker Integration Strategy**
+
 For file-based processing (Focus app, time tracking data):
 
-1. **Volume Mounts**: 
+1. **Volume Mounts**:
+
    ```yaml
    volumes:
      - ./data/focus:/app/data/focus:ro
@@ -202,21 +222,24 @@ For file-based processing (Focus app, time tracking data):
 
 ## Current Status & Next Steps
 
-### **Immediate Actions Required**:
+### **Immediate Actions Required**
+
 1. ✅ **Database Access**: Request access to the 6 missing Notion databases
 2. ✅ **Config Update**: Add missing database IDs to configuration  
 3. ✅ **SQLite Schema**: Extend schema for time tracking and temporal data
 4. ✅ **Day/Week Creation**: Implement sophisticated temporal management
 5. ✅ **Testing**: Verify database access and temporal relationship creation
 
-### **Priority Implementation Order**:
+### **Priority Implementation Order**
+
 1. **Day/Week Management** - Critical for productivity workflow
 2. **Routine Reset Automation** - Daily automation essential  
 3. **Time Tracking Integration** - Toggl sync for accurate time allocation
 4. **Streaks Management** - Motivation and tracking
 5. **Interactive Interface** - Enhanced CLI options
 
-### **Deferred Features**:
+### **Deferred Features**
+
 - ❌ **Daily tracking log parsing** - No longer using daily_tracking.txt
 - ⏸️ **Calendar generation** - Complex feature, may revisit later
 - ⏸️ **External calendar integration** - Future enhancement

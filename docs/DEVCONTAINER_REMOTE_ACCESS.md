@@ -66,6 +66,7 @@ To run multiple projects simultaneously, modify the port in the project's devcon
 ## Troubleshooting
 
 ### Code-server Won't Start
+
 ```bash
 # Check the logs
 cat ~/.config/code-server/code-server.log
@@ -75,11 +76,13 @@ bin/start-code-server
 ```
 
 ### Can't Connect from iPad
+
 1. Verify Tailscale is connected on both devices
 2. Check the container is running
 3. Confirm the IP address: `tailscale ip -4`
 
 ### Performance Issues
+
 - Ensure good internet connection
 - Consider reducing VS Code extensions
 - Check that unnecessary services aren't running

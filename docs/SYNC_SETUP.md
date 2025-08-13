@@ -1,6 +1,7 @@
 # Notion-Todoist Sync Setup Guide
 
 ## Overview
+
 This sync system provides two-way synchronization between your Notion Action Items database and Todoist, allowing you to:
 - Work offline with Todoist's fast native apps
 - Keep tasks synchronized between both platforms
@@ -20,11 +21,13 @@ This sync system provides two-way synchronization between your Notion Action Ite
 ## Setup Instructions
 
 ### 1. Add Todoist Token to Environment
+
 ```bash
 echo "TODOIST_TOKEN=your_todoist_token_here" >> .env
 ```
 
 ### 2. Test the Sync
+
 ```bash
 # Preview what would be synced (dry run)
 bin/notion-sync --dry-run
@@ -45,6 +48,7 @@ bin/notion-sync --project "Work Tasks"
 ## Automated Sync Setup
 
 ### Option 1: Run as Background Service
+
 ```bash
 # Start the sync scheduler (runs every 15 minutes by default)
 bin/sync-scheduler
@@ -57,7 +61,9 @@ bin/sync-scheduler --config
 ```
 
 ### Option 2: Configure Sync Settings
+
 Create or edit `.sync-config.json`:
+
 ```json
 {
   "intervalMinutes": 15,
@@ -73,14 +79,18 @@ Sync directions:
 - `"todoist-to-notion"` - One-way from Todoist to Notion
 
 ### Option 3: System Cron Job
+
 Add to your crontab (`crontab -e`):
+
 ```bash
 # Sync every 15 minutes
 */15 * * * * cd /path/to/notion && bin/sync-scheduler --once >> .sync.log 2>&1
 ```
 
 ### Option 4: macOS LaunchAgent
+
 Create `~/Library/LaunchAgents/com.user.notion-todoist-sync.plist`:
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -106,6 +116,7 @@ Create `~/Library/LaunchAgents/com.user.notion-todoist-sync.plist`:
 ```
 
 Then load it:
+
 ```bash
 launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
 ```
@@ -113,11 +124,13 @@ launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
 ## How It Works
 
 ### Sync Mapping
+
 - The system maintains a mapping between Notion and Todoist task IDs
 - Mappings are stored in SQLite cache for persistence
 - Tasks are matched by ID, preventing duplicates
 
 ### Field Mapping
+
 | Notion Field | Todoist Field |
 |-------------|---------------|
 | Name/Title | Task Content |
@@ -128,17 +141,20 @@ launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
 | Project | Description (reference) |
 
 ### Priority Mapping
+
 - 🔴 Critical → Priority 4 (Red)
 - 🟠 High → Priority 3 (Orange)
 - 🟡 Medium → Priority 2 (Blue)
 - ⚪ Low → Priority 1 (Gray)
 
 ### Change Detection
+
 - Uses MD5 hash of task properties to detect changes
 - Only syncs tasks that have actually changed
 - Prevents unnecessary API calls
 
 ### Conflict Resolution
+
 - Last-write-wins strategy
 - Most recently edited task overwrites older version
 - Manual conflict resolution can be added if needed
@@ -146,6 +162,7 @@ launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
 ## Monitoring
 
 ### Check Sync Logs
+
 ```bash
 # View recent sync results
 cat .sync-log.json | jq '.'
@@ -155,7 +172,9 @@ cat .sync-config.json | jq '.lastSync'
 ```
 
 ### Clear Sync Cache
+
 If you need to reset the sync mappings:
+
 ```bash
 bin/notion clear-cache
 ```
@@ -163,16 +182,19 @@ bin/notion clear-cache
 ## Troubleshooting
 
 ### Tasks Not Syncing
+
 1. Ensure both tokens are valid
 2. Check that tasks have "Do Date" set in Notion
 3. Verify the Todoist project exists
 4. Check `.sync-log.json` for errors
 
 ### Duplicate Tasks
+
 - This usually means the sync mapping was lost
 - Clear cache and re-sync: `bin/notion clear-cache && bin/notion-sync`
 
 ### Performance Issues
+
 - Reduce sync frequency in `.sync-config.json`
 - Use one-way sync if bidirectional isn't needed
 - Check API rate limits (Todoist: 450 requests/15 min)

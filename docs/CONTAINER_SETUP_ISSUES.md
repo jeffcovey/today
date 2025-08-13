@@ -1,6 +1,7 @@
 # Container Setup Issues - MOSTLY RESOLVED
 
 ## Summary
+
 Most issues have been resolved, with one known limitation:
 1. ✅ `claude` CLI will be available when the container starts (after rebuild)
 2. ✅ `bin/tunnel` downloads correct CLI architecture and works on x64 systems
@@ -9,11 +10,13 @@ Most issues have been resolved, with one known limitation:
 ## Issues and Solutions
 
 ### 1. Claude CLI Installation
+
 - **Problem**: `claude` command not found when container starts
 - **Solution Applied**: Added `npm install -g @anthropic-ai/claude-code` to postCreateCommand in `.devcontainer/devcontainer.json`
 - **Status**: Should work after container rebuild
 
 ### 2. VS Code Tunnel Script
+
 - **Problem**: Running `bin/tunnel` opens the file for editing instead of executing it
 - **Root Cause**: In devcontainer environments, the `code` command is the VS Code remote CLI which opens files by default
 - **Solution Applied**: Modified `bin/tunnel` to download and use standalone VS Code CLI
@@ -23,9 +26,10 @@ Most issues have been resolved, with one known limitation:
   - Added `.vscode-cli/` to `.gitignore`
 
 ### 3. Architecture Compatibility Issue
+
 - **Problem**: VS Code CLI and server were downloading x64 versions on ARM64 systems, causing Rosetta errors
 - **Root Cause**: Script was hardcoded to download `cli-alpine-x64` and VS Code server has limited ARM64 support
-- **Solution Applied**: 
+- **Solution Applied**:
   - Added architecture and OS detection to download correct VS Code CLI variant
   - Clear cached x64 servers that were causing conflicts
 - **Status**: PARTIALLY FIXED
@@ -39,11 +43,12 @@ Most issues have been resolved, with one known limitation:
   - **macOS x64**: `cli-darwin-x64` CLI
 
 ### 4. VS Code Tunnel ARM64 Server Limitation
+
 - **Problem**: Even with ARM64 CLI, VS Code tunnel server downloads x64 version causing Rosetta errors
 - **Root Cause**: VS Code tunnel has limited ARM64 server support - server component defaults to x64
 - **Current Status**: KNOWN LIMITATION - Cannot be fixed at script level
 - **Impact**: Tunnels may not work properly on ARM64 systems until Microsoft resolves server architecture detection
-- **Workarounds**: 
+- **Workarounds**:
   - ✅ **Use VS Code Remote SSH** (recommended) - see SSH Setup section below
   - Run tunnel on x64 host and connect from ARM64 client
   - Wait for Microsoft to improve ARM64 tunnel server support
@@ -51,10 +56,12 @@ Most issues have been resolved, with one known limitation:
 ## Current Solutions
 
 ### Claude CLI Installation
+
 - **Solution**: Added `npm install -g @anthropic-ai/claude-code` to postCreateCommand in `.devcontainer/devcontainer.json`
 - **Status**: Will work after container rebuild
 
 ### VS Code Tunnel Script
+
 - **Solution**: Modified `bin/tunnel` to download correct CLI and server architectures
 - **How it works**:
   1. Detects system OS and architecture using `uname`
@@ -108,6 +115,7 @@ For secure remote access from anywhere (like your iPad), use Tailscale:
 For reliable local network access on all architectures, use VS Code Remote SSH:
 
 ### Automatic Setup
+
 The devcontainer is configured to automatically set up SSH during container creation. After rebuilding:
 
 1. **SSH server** runs on port 2222
@@ -115,23 +123,28 @@ The devcontainer is configured to automatically set up SSH during container crea
 3. **Port forwarding** is configured in devcontainer.json
 
 ### Manual Connection Steps
+
 1. Install the **Remote - SSH** extension in VS Code
 2. Open Command Palette (`Cmd/Ctrl+Shift+P`)
 3. Run **"Remote-SSH: Connect to Host..."**
 4. Use connection string: `node@localhost:2222`
 5. When prompted for SSH key, copy the private key from:
+
    ```bash
    cat /home/node/.ssh/id_rsa
    ```
 
 ### Benefits over Tunnels
+
 - ✅ **Full ARM64 support** - no architecture limitations
 - ✅ **More reliable** - SSH is a mature protocol
 - ✅ **Better performance** - direct connection vs tunnel relay
 - ✅ **Works offline** - no internet dependency after setup
 
 ### Manual SSH Setup
+
 If needed, run: `bin/setup --ssh`
 
 ## Important Note
+
 The Dockerfile in the root directory is NOT being used by VS Code devcontainers. The devcontainer uses the configuration in `.devcontainer/devcontainer.json` instead.

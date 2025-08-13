@@ -1,0 +1,20 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run markdownlint on staged markdown files
+STAGED_MD=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+
+if [ -n "$STAGED_MD" ]; then
+  echo "Running markdownlint on staged markdown files..."
+  npx markdownlint-cli2 $STAGED_MD
+  
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Markdown linting failed. Fix the issues above or run:"
+    echo "   npm run lint:md:fix"
+    echo ""
+    exit 1
+  fi
+fi
+
+exit 0

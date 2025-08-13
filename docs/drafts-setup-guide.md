@@ -149,19 +149,23 @@ Trigger this:
 ## Troubleshooting
 
 ### "GitHub credentials required"
+
 - Token may have expired
 - Delete stored credential and re-enter token
 
 ### "Sync failed: 404"
+
 - Check repository name and owner in script config
 - Ensure token has `repo` scope
 
 ### Drafts not appearing after sync
+
 - Check workspace tag filter
 - Ensure drafts have `github-sync` tag
 - Run "Sync Status" to see what happened
 
 ### Merge conflicts
+
 - Check "Sync Status" for conflicts
 - Drafts with conflicts are tagged `sync-conflict`
 - Manually resolve and remove tag

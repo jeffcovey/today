@@ -1,11 +1,13 @@
 # Notion Database Properties Analysis
 
 ## Overview
+
 This analysis examines the properties structure for 6 Notion databases used in the CLI application, identifying their filtering requirements and key properties.
 
 ## Database Analysis
 
 ### 1. Action Items (394 items)
+
 **Database ID:** `de1740b0-2421-43a1-8bda-f177cec69e11`
 
 **Key Properties:**
@@ -21,6 +23,7 @@ This analysis examines the properties structure for 6 Notion databases used in t
 - **Created At**: Task creation date
 
 **Filtering for Current Items:**
+
 ```javascript
 // Filter out completed items
 items.filter(item => {
@@ -45,6 +48,7 @@ items.filter(item => {
 ---
 
 ### 2. Morning Routine (9 items)
+
 **Database ID:** `1a177c23-91aa-44a5-b6aa-c1bcb728a537`
 
 **Key Properties:**
@@ -58,6 +62,7 @@ items.filter(item => {
 - Overdue Minutes, Remaining Minutes: Time tracking
 
 **Filtering for Current Items:**
+
 ```javascript
 // Simple checkbox filter
 items.filter(item => !item.properties?.Done?.checkbox)
@@ -66,6 +71,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 ---
 
 ### 3. Today's Plan (12 items)
+
 **Database ID:** `880f6cce-d710-4940-9328-cdbad5c6c259`
 
 **Key Properties:**
@@ -75,6 +81,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 - **Duration**: Task duration
 
 **Filtering for Current Items:**
+
 ```javascript
 // Simple checkbox filter
 items.filter(item => !item.properties?.Done?.checkbox)
@@ -83,6 +90,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 ---
 
 ### 4. Evening Tasks (10 items)
+
 **Database ID:** `1fe466a5-f5de-497a-80c5-ca1f19f03dbc`
 
 **Key Properties:**
@@ -97,6 +105,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 - Sunset: Reference time
 
 **Filtering for Current Items:**
+
 ```javascript
 // Simple checkbox filter
 items.filter(item => !item.properties?.Done?.checkbox)
@@ -105,6 +114,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 ---
 
 ### 5. Day-End Chores (17 items)
+
 **Database ID:** `b524932a-3ab7-42bd-8a28-6e7cbe0f3e29`
 
 **Key Properties:**
@@ -113,6 +123,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 - **Minutes**: Time estimate
 
 **Filtering for Current Items:**
+
 ```javascript
 // Simple checkbox filter
 items.filter(item => !item.properties?.Done?.checkbox)
@@ -121,6 +132,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 ---
 
 ### 6. Inboxes (13 items)
+
 **Database ID:** `4083409c-ead3-4544-89e0-b4b3c91c7c80`
 
 **Key Properties:**
@@ -129,6 +141,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 - **URL**: Link to inbox
 
 **Filtering for Current Items:**
+
 ```javascript
 // Simple checkbox filter
 items.filter(item => !item.properties?.Done?.checkbox)
@@ -139,6 +152,7 @@ items.filter(item => !item.properties?.Done?.checkbox)
 ## Common Patterns
 
 ### 1. Completion Tracking
+
 All databases use a **Done** checkbox as the primary completion indicator:
 - Property name: "Done"
 - Type: `checkbox`

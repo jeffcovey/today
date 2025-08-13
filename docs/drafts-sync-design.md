@@ -1,11 +1,13 @@
 # Drafts ↔ GitHub Notes Bidirectional Sync Design
 
 ## Overview
+
 Create a two-way sync between Drafts app and the `notes/` directory in GitHub, allowing you to work seamlessly across platforms.
 
 ## Drafts Organization Strategy
 
 ### Using Tags to Represent Folders
+
 Since Drafts doesn't have traditional folders, we'll use tags to mirror the directory structure:
 
 ```
@@ -16,6 +18,7 @@ notes/reviews/2025-08-12.md        →  Tags: ["notes", "notes/reviews"]
 ```
 
 ### Draft Metadata Storage
+
 Each draft will store GitHub metadata in its content using a YAML-like header:
 
 ```markdown
@@ -33,6 +36,7 @@ The actual content starts here...
 ## Sync Architecture
 
 ### 1. GitHub → Drafts Sync Script
+
 **Location:** `scripts/sync-github-to-drafts.js`
 
 ```javascript
@@ -46,6 +50,7 @@ The actual content starts here...
 ```
 
 ### 2. Drafts → GitHub Sync Action
+
 **Location:** `scripts/sync-drafts-to-github.js`
 
 ```javascript
@@ -71,18 +76,21 @@ The actual content starts here...
 ## Implementation Plan
 
 ### Phase 1: GitHub → Drafts (Read-Only)
+
 1. Create Drafts action to pull all notes from GitHub
 2. Use workspace "GitHub Notes" to isolate synced content
 3. Apply tags based on directory structure
 4. Store GitHub metadata in draft content
 
 ### Phase 2: Drafts → GitHub (Write)
+
 1. Extend existing upload action to handle sync metadata
 2. Detect changes since last sync
 3. Batch upload modified drafts
 4. Update sync timestamps
 
 ### Phase 3: Bidirectional Sync
+
 1. Implement conflict detection
 2. Add sync status indicators (tags: "needs-sync", "synced", "conflict")
 3. Create sync dashboard draft showing status
@@ -91,21 +99,25 @@ The actual content starts here...
 ## Special Handling
 
 ### Tasks.md
+
 - Append new tasks rather than overwrite
 - Archive completed tasks during sync
 - Preserve task ordering
 
 ### Streaks-today.md
+
 - Always overwrite (it's regenerated daily)
 - Convert between Drafts checklist format and markdown
 
 ### Inbox Processing
+
 - Drafts tagged "inbox" upload to notes/inbox/
 - After GitHub processes (via bin/sync), update draft tags to reflect new location
 
 ## Drafts Actions Required
 
 ### 1. "Sync from GitHub" Action
+
 ```javascript
 // Pulls latest from GitHub
 // Updates/creates drafts
@@ -113,6 +125,7 @@ The actual content starts here...
 ```
 
 ### 2. "Sync to GitHub" Action
+
 ```javascript
 // Pushes changes to GitHub
 // Updates sync metadata
@@ -120,12 +133,14 @@ The actual content starts here...
 ```
 
 ### 3. "Quick Note to Inbox" Action
+
 ```javascript
 // Simplified version of current action
 // Just adds to inbox for processing
 ```
 
 ### 4. "Sync Status" Action
+
 ```javascript
 // Shows sync dashboard
 // Lists conflicts, pending syncs
