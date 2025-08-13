@@ -1,5 +1,7 @@
 # Palm Springs Trip
 
+<img src="https://drupal-prod.visitcalifornia.com/sites/default/files/styles/opengraph_1200x630/public/palmsprings_1280x642.jpg.webp?itok=EdRS2Zil" width="400">
+
 **Dates:** September 4-12, 2025  
 **Status:** Planning  
 **Budget:** $2,500  
