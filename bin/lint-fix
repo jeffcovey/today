@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Fix markdown linting issues
+
+echo "🔧 Fixing markdown linting issues..."
+
+# Run markdownlint fix
+npx markdownlint-cli2 --fix '**/*.md' '!node_modules/**'
+
+echo ""
+echo "✅ Markdown files have been fixed!"
+echo ""
+echo "Common fixes applied:"
+echo "  • Added newlines at end of files"
+echo "  • Fixed heading spacing"
+echo "  • Removed trailing spaces"
+echo "  • Fixed line lengths where possible"
+echo ""
+echo "Some issues may need manual fixes:"
+echo "  • Long lines that can't be auto-wrapped"
+echo "  • Complex formatting issues"
+echo ""
+echo "Run 'npm run lint:md' to see remaining issues"

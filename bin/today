@@ -49,6 +49,14 @@ fi
 echo "🔄 Syncing data sources..."
 bin/sync
 
+# Quick markdown lint check (non-blocking)
+if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
+    echo "📝 Checking markdown formatting..."
+    # Run lint but don't block on errors, just show warnings
+    npx markdownlint-cli2 'notes/reviews/*.md' 2>&1 | head -10 || true
+    echo ""
+fi
+
 # Update the comprehensive summary with content and changes
 echo "📝 Updating summary with content and changes..."
 bin/update-summary
