@@ -1,12 +1,21 @@
 #!/bin/bash
 
 # Quick review script that syncs, updates summary, and starts interactive Claude session
+# Usage: bin/today [optional direct request]
+# Example: bin/today "Let's work on the PS trip project"
 
 # Load common dotenvx handler
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-echo "📊 Starting daily review process..."
+# Capture any direct request passed as argument
+DIRECT_REQUEST="$1"
+
+if [ -n "$DIRECT_REQUEST" ]; then
+    echo "📊 Starting focused session: $DIRECT_REQUEST"
+else
+    echo "📊 Starting daily review process..."
+fi
 
 # Check if Claude CLI is authenticated by testing actual functionality
 echo "🔐 Checking Claude authentication..."
@@ -68,25 +77,74 @@ if [ -f SUMMARY.json ]; then
     
     # Show the user what will happen
     REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📝 Review file: $REVIEW_FILE"
-    echo ""
-    echo "Starting interactive Claude session..."
-    echo "Claude will:"
-    echo "  • Analyze your SUMMARY.json data"
-    echo "  • Create or update today's review file"
-    echo "  • Provide recommendations"
-    echo "  • Continue working with you as needed"
-    echo ""
-    echo "💡 Useful commands during the session:"
-    echo "  bin/mark-done 'task'  # Mark task complete"
-    echo "  bin/progress 'note'   # Add progress note"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
     
-    # Start interactive Claude session with TODAY.md
-    echo "🤖 Starting Claude interactive session..."
-    cat TODAY.md | claude
+    if [ -n "$DIRECT_REQUEST" ]; then
+        # Direct request mode - skip the full review
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Review file: $REVIEW_FILE"
+        echo ""
+        echo "Starting focused Claude session..."
+        echo "Request: $DIRECT_REQUEST"
+        echo ""
+        echo "Claude will:"
+        echo "  • Load today's context from SUMMARY.json"
+        echo "  • Check today's review if it exists"
+        echo "  • Focus on your specific request"
+        echo ""
+        echo "💡 Useful commands during the session:"
+        echo "  bin/mark-done 'task'  # Mark task complete"
+        echo "  bin/progress 'note'   # Add progress note"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Start interactive Claude session with direct request
+        echo "🤖 Starting Claude focused session..."
+        
+        # Create a prompt that includes context but focuses on the request
+        cat <<EOF | claude
+# Focused Work Session
+
+You have access to today's synchronized data in SUMMARY.json and can check the review file at notes/reviews/${TODAY_DATE}.md if it exists.
+
+## Context Available
+- SUMMARY.json has been updated with all current data
+- Today's date: ${TODAY_DATE}
+- Review file location: notes/reviews/${TODAY_DATE}.md
+
+## Direct Request from User
+"${DIRECT_REQUEST}"
+
+Please:
+1. Quickly load SUMMARY.json to understand current context
+2. Check if today's review exists to understand what's been done
+3. Focus on helping with the specific request above
+4. You can reference relevant tasks, projects, or information from the summary
+5. This is an interactive session - continue helping as needed
+
+Let's get started with the request!
+EOF
+    else
+        # Normal review mode
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Review file: $REVIEW_FILE"
+        echo ""
+        echo "Starting interactive Claude session..."
+        echo "Claude will:"
+        echo "  • Analyze your SUMMARY.json data"
+        echo "  • Create or update today's review file"
+        echo "  • Provide recommendations"
+        echo "  • Continue working with you as needed"
+        echo ""
+        echo "💡 Useful commands during the session:"
+        echo "  bin/mark-done 'task'  # Mark task complete"
+        echo "  bin/progress 'note'   # Add progress note"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Start interactive Claude session with TODAY.md
+        echo "🤖 Starting Claude interactive session..."
+        cat TODAY.md | claude
+    fi
     
     # After Claude session ends
     echo ""

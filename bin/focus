@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Convenience wrapper for focused Claude sessions
+# This is an alias for `bin/today "request"`
+
+if [ $# -eq 0 ]; then
+    echo "Usage: bin/focus \"your request\""
+    echo ""
+    echo "Examples:"
+    echo "  bin/focus \"Let's work on the PS trip project\""
+    echo "  bin/focus \"What's a good excuse to get outside today?\""
+    echo "  bin/focus \"Help me clear my overdue tasks\""
+    echo "  bin/focus \"Review and respond to important emails\""
+    echo ""
+    echo "This will:"
+    echo "  • Sync all data sources"
+    echo "  • Update the summary"
+    echo "  • Start Claude with your specific request"
+    echo "  • Skip the full daily review process"
+    exit 1
+fi
+
+# Pass the request to bin/today
+exec "$(dirname "$0")/today" "$@"
