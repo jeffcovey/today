@@ -458,8 +458,11 @@ function pushToGitHub() {
             // Determine path
             let todayPath = metadata.today_path;
             if (!todayPath) {
-                todayPath = generatePathFromTags(draft);
-                console.log(`Generated path: ${todayPath}`);
+                // Skip drafts without a today_path - these are orphaned drafts
+                // that shouldn't create new files on GitHub
+                console.log(`Skipping draft without today_path: ${draft.title || "Untitled"}`);
+                stats.skipped++;
+                continue;
             }
             
             // Check if file exists on GitHub
