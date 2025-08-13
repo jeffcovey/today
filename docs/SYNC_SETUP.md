@@ -164,8 +164,8 @@ launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
 ### Check Sync Logs
 
 ```bash
-# View recent sync results
-cat .sync-log.json | jq '.'
+# View recent sync results from SQLite
+sqlite3 .data/today.db "SELECT * FROM sync_log ORDER BY timestamp DESC LIMIT 10"
 
 # View last sync time
 cat .sync-config.json | jq '.lastSync'
@@ -186,7 +186,7 @@ bin/notion clear-cache
 1. Ensure both tokens are valid
 2. Check that tasks have "Do Date" set in Notion
 3. Verify the Todoist project exists
-4. Check `.sync-log.json` for errors
+4. Check sync_log table in SQLite for errors
 
 ### Duplicate Tasks
 

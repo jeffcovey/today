@@ -154,5 +154,4 @@ TODOIST_TOKEN=your_todoist_token_here  # Only for sync features
 
 - `.env` - API tokens and environment settings
 - `.sync-config.json` - Sync scheduler configuration
-- `.sync-log.json` - Sync operation logs
-- `.data/` - SQLite database directory
+- `.data/` - SQLite database directory (contains all operational data)

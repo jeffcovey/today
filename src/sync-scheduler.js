@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import Database from 'better-sqlite3';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 import { NotionAPI } from './notion-api.js';
@@ -12,9 +13,33 @@ dotenv.config();
 class SyncScheduler {
   constructor() {
     this.configPath = path.join(process.cwd(), '.sync-config.json');
-    this.logPath = path.join(process.cwd(), '.sync-log.json');
+    this.dbPath = path.join(process.cwd(), '.data', 'today.db');
+    this.db = new Database(this.dbPath);
+    this.initDatabase();
     this.config = this.loadConfig();
     this.isRunning = false;
+  }
+  
+  initDatabase() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME NOT NULL,
+        sync_type TEXT,
+        success BOOLEAN DEFAULT 0,
+        source_system TEXT,
+        target_system TEXT,
+        created_count INTEGER DEFAULT 0,
+        updated_count INTEGER DEFAULT 0,
+        deleted_count INTEGER DEFAULT 0,
+        skipped_count INTEGER DEFAULT 0,
+        error_count INTEGER DEFAULT 0,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_sync_log_timestamp ON sync_log(timestamp);
+    `);
   }
 
   loadConfig() {
@@ -48,21 +73,51 @@ class SyncScheduler {
 
   logSyncResult(result) {
     try {
-      let logs = [];
-      if (fs.existsSync(this.logPath)) {
-        logs = JSON.parse(fs.readFileSync(this.logPath, 'utf8'));
+      const insertSync = this.db.prepare(`
+        INSERT INTO sync_log (
+          timestamp, success, source_system, target_system,
+          created_count, updated_count, deleted_count, skipped_count, error_count,
+          details
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      // Handle Notion-Todoist sync format
+      if (result.result) {
+        const n2t = result.result.notionToTodoist || {};
+        const t2n = result.result.todoistToNotion || {};
+        
+        // Log Notion to Todoist
+        if (n2t.created !== undefined) {
+          insertSync.run(
+            new Date().toISOString(),
+            result.success ? 1 : 0,
+            'notion',
+            'todoist',
+            n2t.created || 0,
+            n2t.updated || 0,
+            n2t.deleted || 0,
+            n2t.skipped || 0,
+            n2t.errors || 0,
+            JSON.stringify(n2t)
+          );
+        }
+        
+        // Log Todoist to Notion
+        if (t2n.created !== undefined) {
+          insertSync.run(
+            new Date().toISOString(),
+            result.success ? 1 : 0,
+            'todoist',
+            'notion',
+            t2n.created || 0,
+            t2n.updated || 0,
+            0,
+            t2n.skipped || 0,
+            t2n.errors || 0,
+            JSON.stringify(t2n)
+          );
+        }
       }
-
-      logs.push({
-        timestamp: new Date().toISOString(),
-        ...result
-      });
-
-      if (logs.length > 100) {
-        logs = logs.slice(-100);
-      }
-
-      fs.writeFileSync(this.logPath, JSON.stringify(logs, null, 2));
     } catch (error) {
       console.error(chalk.red('Failed to log sync result:'), error.message);
     }

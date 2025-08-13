@@ -107,7 +107,11 @@
       "Bash(time:*)",
       "Bash(od:*)",
       "Bash(awk:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(for file in \".calendar-cache/events.json\" \"SUMMARY.json\" \".sync-log.json\")",
+      "Bash(do)",
+      "Bash(rg:*)",
+      "Bash(done)"
     ],
     "deny": []
   }

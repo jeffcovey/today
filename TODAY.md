@@ -5,7 +5,7 @@
 This file starts an interactive Claude session for your daily review. The `bin/today` script:
 1. Checks Claude authentication
 2. Syncs all data sources
-3. Updates the SUMMARY.json with comprehensive content
+3. Updates the SQLite database with comprehensive content
 4. Starts this interactive session where Claude will:
    - Review all your data
    - Create or update today's review file in `notes/reviews/YYYY-MM-DD.md`
@@ -18,25 +18,25 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 
 When this session starts, please:
 1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
-2. **⚠️ TIMEZONE CRITICAL: ALL timestamps in SUMMARY.json are in UTC (ending in Z). You MUST convert to Eastern Time (ET) unless user specifies otherwise:**
+2. **⚠️ TIMEZONE CRITICAL: Database timestamps may be in UTC. You MUST convert to Eastern Time (ET) unless user specifies otherwise:**
    - **UTC timestamps like "12:13:44.577Z" = 8:13 AM Eastern (subtract 4 hours during EDT, 5 hours during EST)**
    - **ASSUME Eastern Time Zone (New York/Florida) unless user indicates they're traveling**
    - **NEVER use UTC time when discussing the current time of day**
 3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
    - **If today's review EXISTS**:
      - Load the existing review file
-     - Check SUMMARY.json's `meta.last_updated` timestamp
+     - Query the database for recent changes (using SQL queries)
      - Only analyze changes since the review was last modified
      - Update the review with new information only
      - This significantly reduces launch time!
    - **If today's review DOESN'T exist**:
-     - Load and fully analyze the SUMMARY.json file
+     - Query the SQLite database at `.data/today.db` for comprehensive data
      - Check yesterday's review to see what was completed
      - Create a new review file with comprehensive analysis
-3. **CRITICAL: Calendar events in SUMMARY.json now include timezone information**
-   - Events show both time and timezone (e.g., "10:00 AM America/New_York")
-   - The originalTime and originalTimezone fields preserve the source data
-   - No manual timezone conversion needed - we preserve what the calendar provides
+4. **CRITICAL: Calendar events in the database include timezone information**
+   - Events have start_timezone and end_timezone fields
+   - Convert UTC timestamps to local time when displaying
+   - The database preserves original timezone data from calendars
 4. Present your recommendations to the user
 
 ### Review File Format
@@ -51,13 +51,13 @@ The review file should include:
 ### Incremental Updates (Performance Optimization)
 
 When updating an existing review file:
-- Check SUMMARY.json's `changes` section for what's new
-- Look at `meta.last_updated` vs review file modification time
+- Query the database for recent changes using SQL
+- Look at database update timestamps vs review file modification time
 - Only process and mention significant changes:
-  - New urgent emails (`changes.new_emails`)
-  - New or modified tasks (`changes.new_tasks`, `changes.modified_tasks`)
-  - Updated calendar events
-  - New concerns or notes
+  - New urgent emails (query emails table for recent entries)
+  - New or modified tasks (query task_cache table)
+  - Updated calendar events (query calendar_events table)
+  - New concerns or notes (check file_tracking table)
 - Append updates with timestamp like: `### Update (2:30 PM)`
 - This keeps launch times fast for subsequent `bin/today` runs
 
@@ -73,7 +73,7 @@ bin/progress "Additional note"         # Add a progress note
 
 ## Review Guidelines
 
-Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and the SUMMARY.json contains comprehensive analysis.
+Please help me review my current situation and decide what to do today to be happy and productive. All my data sources have been synchronized and stored in the SQLite database at `.data/today.db`.
 
 **IMPORTANT:** This is an interactive session. You can:
 - Take as long as needed to analyze the data
@@ -88,7 +88,7 @@ Please help me review my current situation and decide what to do today to be hap
 **🚨 TIMEZONE REMINDER: Unless I specify otherwise, assume Eastern Time (ET)!**
 - During Daylight Saving (March-November): Eastern Daylight Time (EDT) = UTC-4
 - During Standard Time (November-March): Eastern Standard Time (EST) = UTC-5
-- **ALL timestamps in SUMMARY.json are UTC - you MUST convert them!**
+- **Database timestamps may be in UTC - you MUST convert them when needed!**
 - My home is in Oakland Park, Florida (Eastern Time Zone)
 - If I'm traveling, I'll let you know the local timezone
 
@@ -143,53 +143,78 @@ We shouldn't neglect things that *have* to be done today, but **as much as possi
 
 ### Data Inputs
 
-**IMPORTANT: All data has already been extracted and analyzed in the SUMMARY.json below. DO NOT query databases or files directly - everything you need is in the summary:**
+**IMPORTANT: Query the SQLite database at `.data/today.db` directly for all data. Use SQL queries to extract:**
 
-The SUMMARY.json contains:
-- **content.concerns**: My current worries and issues from notes
-- **content.urgent_tasks**: Tasks due today/tomorrow with titles
-- **content.overdue_tasks**: Tasks past their due date
-- **content.task_categories**: Breakdown of tasks by category
-- **content.important_emails**: Emails needing attention
-- **content.people_to_contact**: People mentioned in notes as needing contact
-- **content.active_projects**: Active projects with progress and next milestones
-- **content.ogm_work**: OlderGay.Men work items and priorities
-- **changes**: New/modified items since last review
-- **recommendations.daily_focus**: Time-based suggestions
+The database contains these key tables:
+- **task_cache**: Tasks with titles, stages, due dates, categories
+- **emails**: Recent emails with subjects, senders, reply status
+- **calendar_events**: Upcoming events with times, locations, descriptions
+- **contacts**: Contact information with emails, phones, addresses
+- **sync_log**: Synchronization history and status
+- **file_tracking**: Recently modified files and notes
+- **people_to_contact**: People needing follow-up
+- **notion_pages**: Notes and project information
 
-Please use ONLY the summary data below to provide your analysis. Focus on:
-1. Address the concerns listed
-2. Prioritize the urgent/overdue tasks
-3. Suggest which emails need responses
-4. Recommend a schedule for today
+Use SQL queries to:
+1. Find urgent/overdue tasks (query task_cache WHERE due_date <= DATE('now'))
+2. Get important emails (query emails WHERE has_been_replied_to = 0)
+3. Check calendar events (query calendar_events WHERE start_date >= DATE('now'))
+4. Find people to contact (query people_to_contact WHERE completed = 0)
+5. Review recent file activity (query file_tracking ORDER BY last_modified DESC)
 
 ## Data Sources
 
-The SUMMARY.json file contains all relevant data already extracted from:
-- 📝 Local notes (concerns, recent files)
-- ✅ Notion databases (tasks categorized by status and category)
-- 📧 Email database (recent messages analyzed)
-- 🔄 Incremental changes since last review
+The SQLite database at `.data/today.db` contains all relevant data from:
+- 📝 Local notes (in file_tracking and notion_pages tables)
+- ✅ Notion databases (in task_cache and notion_pages tables)
+- 📧 Email database (in emails table with contact relationships)
+- 📅 Calendar events (in calendar_events table)
+- 👥 Contacts (in contacts table with normalized emails/phones)
+- 🔄 Sync history (in sync_log table)
 
-**First Action:** Read the SUMMARY.json file to get all the synchronized data, then create or update today's review file in `notes/reviews/`.
+**First Action:** Query the SQLite database to get all the synchronized data, then create or update today's review file in `notes/reviews/`.
+
+### Example Queries to Get Started:
+
+```sql
+-- Get today's urgent tasks
+SELECT title, stage, due_date, category 
+FROM task_cache 
+WHERE stage IN ('🔥 Immediate', '🚀 1st Priority') 
+   OR due_date <= DATE('now', '+1 day')
+ORDER BY due_date;
+
+-- Get unread emails from important people
+SELECT e.subject, e.from_address, e.date
+FROM emails e
+WHERE e.has_been_replied_to = 0
+  AND e.date > datetime('now', '-3 days')
+ORDER BY e.date DESC;
+
+-- Get today's calendar events
+SELECT title, start_date, end_date, location
+FROM calendar_events
+WHERE DATE(start_date) = DATE('now')
+ORDER BY start_date;
+```
 
 ## What I Need From You
 
-Based on the SUMMARY.json data below, please provide:
+Based on queries to the SQLite database, please provide:
 
 ### 1. Current Status Assessment
 
-- What looks most urgent based on the summary data?
-- What patterns do you see in the content?
+- What looks most urgent based on database queries?
+- What patterns do you see in the data?
 - What might be falling through the cracks?
 
 ### 2. Today's Top 3-5 Priorities
 
-Based on the summary's urgent_tasks, overdue_tasks, and concerns
+Based on queries for urgent_tasks, overdue_tasks, and recent notes
 
 ### 3. Quick Wins (under 15 minutes)
 
-From the tasks and emails in the summary
+From the tasks and emails in the database
 
 ### 4. Deep Work Recommendation (1-2 hours)
 
@@ -197,15 +222,15 @@ What complex work needs focused attention?
 
 ### 5. Communications to Address
 
-Based on important_emails and people_to_contact in the summary
+Based on emails and people_to_contact tables
 
 ### 6. Evening Planning
 
-What to review and prepare based on the data
+What to review and prepare based on the database
 
 ### 7. Self-Care Check
 
-Address any wellbeing concerns from the summary
+Address any wellbeing concerns from recent notes and tasks
 
 ---
 
@@ -228,17 +253,17 @@ Address any wellbeing concerns from the summary
    - 224 ÷ 7 = 32 weeks exactly, so it's WEDNESDAY
    - Double-check before proceeding
 
-1. **Read SUMMARY.json** to get all the synchronized data
-2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** The `meta.last_updated` field shows when data was synced in UTC  
+1. **Query the SQLite database** at `.data/today.db` to get all synchronized data
+2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** Database timestamps may be in UTC  
 3. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with CORRECT day name from calculation above
 4. **Analyze and Recommend** based on:
-   - Current concerns from notes
-   - Urgent and overdue tasks
-   - Important emails needing responses
+   - Recent notes and concerns (query file_tracking and notion_pages)
+   - Urgent and overdue tasks (query task_cache)
+   - Important emails needing responses (query emails)
    - Today's theme (Front/Back/Off Stage) based on the CALCULATED day
    - Daily habits from Streaks
 5. **Continue Supporting** - This is an interactive session, stay engaged and help throughout
 
-Please analyze the SUMMARY.json and provide specific, actionable recommendations for today.
+Please query the database and provide specific, actionable recommendations for today.
 
 Let's begin the daily review!

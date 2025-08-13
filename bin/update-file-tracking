@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+
+// Update file tracking in SQLite database
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs/promises';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import Database from 'better-sqlite3';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
+const NOTES_DIR = path.join(__dirname, '..', 'notes');
+
+class FileTracker {
+  constructor() {
+    this.db = new Database(DB_PATH);
+    this.initDatabase();
+  }
+  
+  initDatabase() {
+    // Table already exists with this schema, just ensure indexes exist
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_file_tracking_path ON file_tracking(file_path);
+      CREATE INDEX IF NOT EXISTS idx_file_tracking_last_modified ON file_tracking(last_modified);
+      CREATE INDEX IF NOT EXISTS idx_file_tracking_category ON file_tracking(category);
+      CREATE INDEX IF NOT EXISTS idx_file_tracking_file_type ON file_tracking(file_type);
+    `);
+  }
+  
+  async scanNotes() {
+    console.log('📂 Scanning notes directory for changes...');
+    
+    // Find all markdown files
+    const files = execSync(
+      `find "${NOTES_DIR}" -name "*.md" -type f 2>/dev/null`,
+      { encoding: 'utf-8' }
+    ).trim().split('\n').filter(Boolean);
+    
+    const upsertFile = this.db.prepare(`
+      INSERT OR REPLACE INTO file_tracking (
+        file_path, file_type, category, 
+        last_modified, size_bytes, updated_at
+      ) VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `);
+    
+    let updated = 0;
+    let errors = 0;
+    
+    for (const filePath of files) {
+      try {
+        const stats = await fs.stat(filePath);
+        const relPath = path.relative(process.cwd(), filePath);
+        const fileName = path.basename(filePath);
+        
+        // Determine category from path
+        const category = this.getCategory(relPath);
+        
+        // Get content preview (first non-header line)
+        let preview = '';
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
+          const lines = content.split('\n');
+          preview = lines.find(l => l.trim() && !l.startsWith('#')) || '';
+          preview = preview.slice(0, 200); // Limit preview length
+        } catch (e) {
+          // Ignore read errors
+        }
+        
+        upsertFile.run(
+          relPath,
+          'markdown',
+          category,
+          stats.mtime.toISOString(),
+          stats.size
+        );
+        
+        updated++;
+      } catch (error) {
+        console.error(`  ❌ Error processing ${filePath}: ${error.message}`);
+        errors++;
+      }
+    }
+    
+    console.log(`✅ Updated ${updated} files in database`);
+    if (errors > 0) {
+      console.log(`⚠️  ${errors} files had errors`);
+    }
+    
+    // Clean up deleted files
+    const allTrackedFiles = this.db.prepare('SELECT file_path FROM file_tracking').all();
+    const currentFiles = new Set(files.map(f => path.relative(process.cwd(), f)));
+    
+    let deleted = 0;
+    const deleteStmt = this.db.prepare('DELETE FROM file_tracking WHERE file_path = ?');
+    
+    for (const tracked of allTrackedFiles) {
+      if (!currentFiles.has(tracked.file_path)) {
+        deleteStmt.run(tracked.file_path);
+        deleted++;
+      }
+    }
+    
+    if (deleted > 0) {
+      console.log(`🗑️  Removed ${deleted} deleted files from tracking`);
+    }
+  }
+  
+  getCategory(filePath) {
+    if (filePath.includes('concerns')) return 'concerns';
+    if (filePath.includes('reviews')) return 'reviews';
+    if (filePath.includes('tasks')) return 'tasks';
+    if (filePath.includes('projects')) return 'projects';
+    if (filePath.includes('ogm-work')) return 'ogm-work';
+    if (filePath.includes('ideas')) return 'ideas';
+    if (filePath.includes('journal')) return 'journal';
+    return 'notes';
+  }
+  
+  async updateFileDates() {
+    // Check if .file-dates.json exists (created by Drafts)
+    const fileDatesPath = path.join(__dirname, '..', '.file-dates.json');
+    
+    try {
+      const content = await fs.readFile(fileDatesPath, 'utf-8');
+      const fileDates = JSON.parse(content);
+      
+      console.log('📱 Importing file dates from Drafts sync...');
+      
+      const upsertFile = this.db.prepare(`
+        INSERT OR REPLACE INTO file_tracking (
+          file_path, file_type, category, 
+          last_modified, updated_at
+        ) VALUES (?, ?, ?, ?, datetime('now'))
+      `);
+      
+      let imported = 0;
+      for (const [filePath, dateStr] of Object.entries(fileDates)) {
+        const category = this.getCategory(filePath);
+        
+        upsertFile.run(
+          filePath,
+          'markdown',
+          category,
+          dateStr
+        );
+        imported++;
+      }
+      
+      console.log(`✅ Imported ${imported} file dates from Drafts`);
+    } catch (error) {
+      // File doesn't exist or is invalid - that's OK
+      if (error.code !== 'ENOENT') {
+        console.log('ℹ️  No Drafts sync data found');
+      }
+    }
+  }
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const tracker = new FileTracker();
+  
+  try {
+    await tracker.scanNotes();
+    await tracker.updateFileDates();
+    
+    // Show summary
+    const stats = tracker.db.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN last_modified > datetime('now', '-1 day') THEN 1 END) as today,
+        COUNT(CASE WHEN last_modified > datetime('now', '-7 days') THEN 1 END) as week
+      FROM file_tracking
+    `).get();
+    
+    console.log('\n📊 File tracking summary:');
+    console.log(`  Total files: ${stats.total}`);
+    console.log(`  Modified today: ${stats.today}`);
+    console.log(`  Modified this week: ${stats.week}`);
+    
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+}
+
+export { FileTracker };

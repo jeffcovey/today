@@ -66,13 +66,18 @@ if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
     echo ""
 fi
 
-# Update the comprehensive summary with content and changes
-echo "📝 Updating summary with content and changes..."
-bin/update-summary
+# Check if database exists and has data
+DB_PATH=".data/today.db"
+if [ ! -f "$DB_PATH" ]; then
+    echo "❌ Database not found at $DB_PATH"
+    echo "Please run bin/sync to create and populate the database"
+    exit 1
+fi
 
-# Check if we successfully created the summary
-if [ -f SUMMARY.json ]; then
-    echo "✅ Summary updated successfully"
+# Quick check that database has recent data
+LAST_SYNC=$(sqlite3 "$DB_PATH" "SELECT MAX(created_at) FROM sync_log" 2>/dev/null || echo "")
+if [ -n "$LAST_SYNC" ]; then
+    echo "✅ Database ready (last sync: $LAST_SYNC)"
     echo ""
     
     # Show the user what will happen
@@ -87,7 +92,7 @@ if [ -f SUMMARY.json ]; then
         echo "Request: $DIRECT_REQUEST"
         echo ""
         echo "Claude will:"
-        echo "  • Load today's context from SUMMARY.json"
+        echo "  • Query the SQLite database for context"
         echo "  • Check today's review if it exists"
         echo "  • Focus on your specific request"
         echo ""
@@ -104,21 +109,29 @@ if [ -f SUMMARY.json ]; then
         cat <<EOF | claude
 # Focused Work Session
 
-You have access to today's synchronized data in SUMMARY.json and can check the review file at notes/reviews/${TODAY_DATE}.md if it exists.
+You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at notes/reviews/${TODAY_DATE}.md if it exists.
 
 ## Context Available
-- SUMMARY.json has been updated with all current data
+- SQLite database at .data/today.db with all current data
 - Today's date: ${TODAY_DATE}
 - Review file location: notes/reviews/${TODAY_DATE}.md
+
+## Database Tables Available:
+- task_cache: Tasks with titles, stages, due dates
+- emails: Recent emails with subjects, senders, reply status
+- calendar_events: Upcoming events with times, locations
+- contacts: Contact information
+- file_tracking: Recently modified files
+- people_to_contact: People needing follow-up
 
 ## Direct Request from User
 "${DIRECT_REQUEST}"
 
 Please:
-1. Quickly load SUMMARY.json to understand current context
+1. Query the database to understand current context
 2. Check if today's review exists to understand what's been done
 3. Focus on helping with the specific request above
-4. You can reference relevant tasks, projects, or information from the summary
+4. You can reference relevant tasks, projects, or information from the database
 5. This is an interactive session - continue helping as needed
 
 Let's get started with the request!
@@ -130,7 +143,7 @@ EOF
         echo ""
         echo "Starting interactive Claude session..."
         echo "Claude will:"
-        echo "  • Analyze your SUMMARY.json data"
+        echo "  • Query the SQLite database for all data"
         echo "  • Create or update today's review file"
         echo "  • Provide recommendations"
         echo "  • Continue working with you as needed"
@@ -159,7 +172,7 @@ EOF
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 else
-    echo "❌ Failed to create summary file"
-    echo "Please check bin/sync and bin/update-summary for errors"
+    echo "❌ Database check failed"
+    echo "Please check bin/sync for errors"
     exit 1
 fi

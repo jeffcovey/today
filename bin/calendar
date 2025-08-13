@@ -11,19 +11,42 @@ import { execSync } from 'child_process';
 import https from 'https';
 import http from 'http';
 import { google } from 'googleapis';
+import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CACHE_DIR = path.join(__dirname, '..', '.calendar-cache');
-const CACHE_FILE = path.join(CACHE_DIR, 'events.json');
-
-// Ensure cache directory exists
-await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
+const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
 
 class CalendarSync {
   constructor() {
     this.events = [];
+    this.db = new Database(DB_PATH);
+    this.initDatabase();
+  }
+  
+  initDatabase() {
+    // Ensure calendar_events table exists
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        calendar_name TEXT,
+        title TEXT NOT NULL,
+        start_date DATETIME NOT NULL,
+        end_date DATETIME NOT NULL,
+        start_timezone TEXT,
+        end_timezone TEXT,
+        location TEXT,
+        description TEXT,
+        all_day BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_calendar_events_start_date ON calendar_events(start_date);
+      CREATE INDEX IF NOT EXISTS idx_calendar_events_end_date ON calendar_events(end_date);
+    `);
   }
 
   // Google Calendar integration
@@ -458,14 +481,42 @@ class CalendarSync {
       return dateA - dateB;
     });
     
-    // Save to cache
-    const cacheData = {
-      last_sync: new Date().toISOString(),
-      total_events: allEvents.length,
-      events: allEvents
-    };
+    // Save to database
+    const insertEvent = this.db.prepare(`
+      INSERT OR REPLACE INTO calendar_events (
+        id, source, calendar_name, title, start_date, end_date,
+        start_timezone, end_timezone, location, description, all_day, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `);
     
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
+    // Clear old events and insert new ones in a transaction
+    const syncEvents = this.db.transaction(() => {
+      // Delete events older than 1 year or future events beyond 1 year
+      this.db.prepare(`
+        DELETE FROM calendar_events 
+        WHERE start_date < datetime('now', '-1 year')
+           OR start_date > datetime('now', '+1 year')
+      `).run();
+      
+      // Insert all events
+      for (const event of allEvents) {
+        insertEvent.run(
+          event.id || `${event.source}-${event.title}-${event.start}`,
+          event.source || 'unknown',
+          event.calendar || null,
+          event.title,
+          event.start,
+          event.end || event.start,
+          event.startTimeZone || null,
+          event.endTimeZone || null,
+          event.location || null,
+          event.description || null,
+          event.allDay ? 1 : 0
+        );
+      }
+    });
+    
+    syncEvents();
     
     if (allEvents.length > 0) {
       console.log(`✅ Synced ${allEvents.length} calendar events`);
@@ -501,28 +552,29 @@ class CalendarSync {
     return allEvents;
   }
 
-  // Get events for analysis
+  // Get events from database
   async getEventsForSummary() {
     try {
-      // Read from cache if recent
-      const cacheData = await fs.readFile(CACHE_FILE, 'utf-8')
-        .then(JSON.parse)
-        .catch(() => null);
-      
-      if (cacheData && cacheData.last_sync) {
-        const lastSync = new Date(cacheData.last_sync);
-        const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
-        
-        if (hoursSince < 1) {
-          // Use cache if less than 1 hour old
-          return cacheData.events || [];
-        }
-      }
-      
-      // Otherwise sync fresh
-      return await this.sync();
+      return this.db.prepare(`
+        SELECT * FROM calendar_events 
+        WHERE start_date >= datetime('now', '-1 month')
+          AND start_date <= datetime('now', '+6 months')
+        ORDER BY start_date
+      `).all().map(event => ({
+        id: event.id,
+        source: event.source,
+        calendar: event.calendar_name,
+        title: event.title,
+        start: event.start_date,
+        end: event.end_date,
+        startTimeZone: event.start_timezone,
+        endTimeZone: event.end_timezone,
+        location: event.location,
+        description: event.description,
+        allDay: event.all_day === 1
+      }));
     } catch (error) {
-      console.error('Error getting calendar events:', error.message);
+      console.error('Error getting calendar events from database:', error.message);
       return [];
     }
   }
@@ -610,7 +662,7 @@ Commands:
   week    - Show this week's events
   setup   - Show setup instructions
 
-Calendar data is cached in .calendar-cache/events.json
+Calendar data is stored in SQLite database (.data/today.db)
       `);
   }
 }
