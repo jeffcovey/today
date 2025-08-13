@@ -10,7 +10,7 @@
 
 Lou Sanfelice will be housesitting for his friend Julian DiCiurcio and his husband  at:
 
-38341 Bogert Trail
+38341 Bogert Trail  
 Palm Springs CA 92264
 
 I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. Lou will be there before and after my visit. I'll be traveling alone but staying with him at Julian's house. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
