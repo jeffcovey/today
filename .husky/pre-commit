@@ -1,6 +1,9 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
+# Update file dates index for new markdown files
+bin/update-file-dates-index
+
 # Run markdownlint on staged markdown files
 STAGED_MD=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
 

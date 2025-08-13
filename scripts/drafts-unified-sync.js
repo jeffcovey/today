@@ -208,10 +208,42 @@ function fetchGitHubFile(path) {
 // ============ SYNC OPERATIONS ============
 
 // Pull from GitHub to Drafts
+// Fetch the file dates index from GitHub
+function fetchFileDatesIndex() {
+    const http = HTTP.create();
+    try {
+        const response = http.request({
+            "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/.file-dates.json`,
+            "method": "GET",
+            "headers": {
+                "Authorization": `Bearer ${CONFIG.token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Drafts-Today-Sync"
+            }
+        });
+        
+        if (response.success) {
+            const data = JSON.parse(response.responseText);
+            const cleanBase64 = data.content.replace(/\n/g, '');
+            const jsonContent = decodeBase64(cleanBase64);
+            return JSON.parse(jsonContent);
+        }
+    } catch (error) {
+        console.log(`Could not fetch file dates index: ${error}`);
+    }
+    return null;
+}
+
 function pullFromGitHub() {
     console.log("Starting pull from GitHub...");
     const startTime = Date.now();
     const stats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
+    
+    // Fetch the file dates index
+    const fileDatesIndex = fetchFileDatesIndex();
+    if (!fileDatesIndex) {
+        console.log("Warning: Could not fetch file dates index");
+    }
     
     // Fetch repository tree
     const http = HTTP.create();
@@ -301,6 +333,47 @@ function pullFromGitHub() {
                 const tags = pathToTags(file.path);
                 for (const tag of tags) {
                     draft.addTag(tag);
+                }
+                
+                // Try to set draft date from the file dates index
+                if (fileDatesIndex && fileDatesIndex[file.path]) {
+                    try {
+                        const createdDate = new Date(fileDatesIndex[file.path]);
+                        if (!isNaN(createdDate.getTime())) {
+                            draft.createdAt = createdDate;
+                            // Keep modifiedAt as current for new drafts
+                            draft.modifiedAt = new Date();
+                            console.log(`Set draft creation date from index: ${createdDate.toISOString()}`);
+                        }
+                    } catch (e) {
+                        console.log(`Could not parse date from index for ${file.path}: ${e}`);
+                    }
+                } else {
+                    // Fallback: Try to parse date from filename
+                    // Common patterns: 2025-08-13, 2025-08-13-14:30:00-UTC
+                    const dateMatch = file.path.match(/(\d{4}-\d{2}-\d{2})(?:[-_](\d{2})[:\-]?(\d{2})[:\-]?(\d{2}))?/);
+                    if (dateMatch) {
+                        let dateStr = dateMatch[1]; // YYYY-MM-DD
+                        if (dateMatch[2]) {
+                            // Has time component
+                            dateStr += `T${dateMatch[2]}:${dateMatch[3] || '00'}:${dateMatch[4] || '00'}`;
+                        } else {
+                            dateStr += 'T12:00:00'; // Default to noon if no time
+                        }
+                        
+                        try {
+                            const parsedDate = new Date(dateStr);
+                            if (!isNaN(parsedDate.getTime())) {
+                                // Set both created and modified to the parsed date
+                                // This helps maintain chronological order in Drafts
+                                draft.createdAt = parsedDate;
+                                draft.modifiedAt = parsedDate;
+                                console.log(`Set draft date to ${parsedDate.toISOString()} from filename`);
+                            }
+                        } catch (e) {
+                            console.log(`Could not parse date from ${file.path}: ${e}`);
+                        }
+                    }
                 }
                 
                 draft.update();
@@ -803,7 +876,29 @@ function main() {
                 break;
                 
             case "diagnose":
+                // First, fetch the file dates index for fixing dates
+                const datesIndex = fetchFileDatesIndex();
+                
                 const issues = diagnoseSyncIssues();
+                
+                // Check for drafts with missing creation dates
+                let draftsNeedingDates = [];
+                if (datesIndex) {
+                    const allSyncedDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+                    for (const draft of allSyncedDrafts) {
+                        const { metadata } = extractMetadata(draft.content);
+                        if (metadata.today_path && !metadata.created_at) {
+                            // Check if we have a date for this file
+                            if (datesIndex[metadata.today_path]) {
+                                draftsNeedingDates.push({
+                                    draft: draft,
+                                    path: metadata.today_path,
+                                    indexDate: datesIndex[metadata.today_path]
+                                });
+                            }
+                        }
+                    }
+                }
                 
                 // Create diagnostic report
                 let report = `# Sync Diagnostics\n\n`;
@@ -812,7 +907,8 @@ function main() {
                 report += `With sync-error tag: ${issues.hasError.length}\n`;
                 report += `Missing metadata: ${issues.noMetadata.length}\n`;
                 report += `Missing path: ${issues.noPath.length}\n`;
-                report += `Missing SHA: ${issues.noSha.length}\n\n`;
+                report += `Missing SHA: ${issues.noSha.length}\n`;
+                report += `Missing creation dates: ${draftsNeedingDates.length}\n\n`;
                 
                 // Show drafts with no metadata at all
                 if (issues.noMetadata.length > 0) {
@@ -907,6 +1003,57 @@ function main() {
                     report += `\n`;
                 }
                 
+                // Handle drafts missing creation dates
+                if (draftsNeedingDates.length > 0) {
+                    report += `## Drafts missing creation dates (${draftsNeedingDates.length}):\n\n`;
+                    report += `These drafts can have their creation dates fixed from the file index:\n\n`;
+                    
+                    for (const item of draftsNeedingDates.slice(0, 10)) {
+                        const title = item.draft.title || "Untitled";
+                        report += `- **${title}**\n`;
+                        report += `  - Path: ${item.path}\n`;
+                        report += `  - Index date: ${item.indexDate}\n`;
+                    }
+                    
+                    if (draftsNeedingDates.length > 10) {
+                        report += `- ...and ${draftsNeedingDates.length - 10} more\n`;
+                    }
+                    
+                    // Offer to fix dates
+                    const fixPrompt = Prompt.create();
+                    fixPrompt.title = "Fix Creation Dates";
+                    fixPrompt.message = `Found ${draftsNeedingDates.length} drafts missing creation dates.\n\nWould you like to:\n- Update their metadata with creation dates\n- Set their draft.createdAt timestamps`;
+                    fixPrompt.addButton("Fix dates", "fix");
+                    fixPrompt.addButton("Skip", "skip");
+                    
+                    if (fixPrompt.show() && fixPrompt.buttonPressed === "fix") {
+                        let fixed = 0;
+                        for (const item of draftsNeedingDates) {
+                            try {
+                                // Parse the date from index
+                                const createdDate = new Date(item.indexDate);
+                                if (!isNaN(createdDate.getTime())) {
+                                    // Update the draft's createdAt timestamp
+                                    item.draft.createdAt = createdDate;
+                                    
+                                    // Update metadata to include created_at
+                                    const { metadata, content } = extractMetadata(item.draft.content);
+                                    metadata.created_at = item.indexDate;
+                                    item.draft.content = updateMetadata(content, metadata);
+                                    
+                                    item.draft.update();
+                                    fixed++;
+                                }
+                            } catch (error) {
+                                console.log(`Error fixing date for ${item.path}: ${error}`);
+                            }
+                        }
+                        report += `\n### Action taken: Fixed creation dates for ${fixed} drafts\n`;
+                        app.displaySuccessMessage(`Fixed creation dates for ${fixed} drafts`);
+                    }
+                    report += `\n`;
+                }
+                
                 // Show healthy drafts
                 if (issues.healthy.length > 0) {
                     report += `## Healthy drafts:\n\n`;
@@ -963,7 +1110,7 @@ function main() {
             case "cleanup":
                 const diagnostics = diagnoseSyncIssues();
                 let dupCount = 0;
-                for (const [path, drafts] of Object.entries(diagnostics.duplicates)) {
+                for (const drafts of Object.values(diagnostics.duplicates)) {
                     if (drafts.length > 1) dupCount++;
                 }
                 
