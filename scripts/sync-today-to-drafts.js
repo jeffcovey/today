@@ -32,7 +32,8 @@ function pathToTags(path) {
     
     // Add hierarchical tags for the path
     // e.g., "notes/daily/file.md" → ["today-sync", "notes", "notes/daily"]
-    if (path.startsWith("notes/")) {
+    // e.g., "projects/file.md" → ["today-sync", "projects"]
+    if (path.startsWith("notes/") || path.startsWith("projects/")) {
         const parts = path.split('/');
         let tagPath = "";
         for (let i = 0; i < parts.length - 1; i++) {
@@ -175,7 +176,7 @@ function syncFromToday() {
         const tree = JSON.parse(treeResponse.responseText);
         const noteFiles = tree.tree.filter(item => 
             item.type === "blob" && 
-            item.path.startsWith("notes/") && 
+            (item.path.startsWith("notes/") || item.path.startsWith("projects/")) && 
             item.path.endsWith(".md")
         );
         
@@ -256,6 +257,9 @@ function syncFromToday() {
                     
                     // Add tags
                     const tags = pathToTags(file.path);
+                    if (file.path.startsWith("projects/")) {
+                        app.displayInfoMessage(`Project file: ${file.path}, tags: ${tags.join(", ")}`);
+                    }
                     for (const tag of tags) {
                         draft.addTag(tag);
                     }
