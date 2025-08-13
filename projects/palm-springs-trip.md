@@ -13,17 +13,7 @@ Lou Sanfelice will be housesitting for his friend Julian DiCiurcio and his husba
 38341 Bogert Trail
 Palm Springs CA 92264
 
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
-I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I’m going for 9/4-12 instead. Lou will be there before and after my visit. I’ll be traveling alone but staying with him at Julian’s house. We will have use of Julian’s car, so we don’t need to arrange for housing or transportation.
-<<<<<<< LOCAL
-=======
 I hoped to join him 8/29-9/12, but I have an orthopedic appointment on 9/3, so I'm going for 9/4-12 instead. Lou will be there before and after my visit. I'll be traveling alone but staying with him at Julian's house. We will have use of Julian's car, so we don't need to arrange for housing or transportation.
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 
 Vince Gartland will be housesitting for me September 3-13 (covering the trip dates plus a buffer day on each end). He will look after my cat Buster and manage my two Airbnb guest rooms.
 
@@ -32,19 +22,8 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - **Book by:** August 15 (for best rates)
 - **Departure:** September 4, 2025 (morning flight preferred)
 - **Return:** September 12, 2025 (evening flight)
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
-- **Arrival at Julian’s:** September 4
-- **Departure from Julian’s:** September 12
-<<<<<<< LOCAL
-=======
 - **Arrival at Julian's:** September 4
 - **Departure from Julian's:** September 12
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 
 ## Tasks
 
@@ -53,64 +32,21 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - [ ] Book flights (FLL to PSP)
 	- [ ] ⚠️ **Virgin Red points issue:** Cannot log into Virgin Atlantic account to use points (login broken since July account linking attempt - see below)
 	- [ ] Alternative: Book through Chase if Virgin issue not resolved
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
-- [x] Accommodation arranged (staying at Julian’s house)
-- [x] Transportation arranged (using Julian’s car)
-<<<<<<< LOCAL
-=======
 - [x] Accommodation arranged (staying at Julian's house)
 - [x] Transportation arranged (using Julian's car)
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 - [ ] Research restaurants
 - [ ] Check event calendar for September
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
-- [x] Decided to go (traveling alone, staying with Lou at Julian’s)
-<<<<<<< LOCAL
-=======
 - [x] Decided to go (traveling alone, staying with Lou at Julian's)
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 
 ### Pre-Trip (1 week before)
 
 - [x] Arrange house/room coverage (Vince Gartland confirmed)
 - [ ] Prepare instructions for Vince about:
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
-  - [x] Buster’s care and feeding
-<<<<<<< LOCAL
-=======
-  - [ ] Buster's care and feeding
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
+  - [x] Buster's care and feeding
   - [ ] Airbnb guest room management
-<<<<<<< LOCAL
-<<<<<<< LOCAL
-=======
->>>>>>> GITHUB
   - [x] Emergency contacts
 - [x] Stop mail delivery
 - [x] Prep guest rooms for any bookings
-<<<<<<< LOCAL
-=======
-  - [ ] Emergency contacts
-- [ ] Stop mail delivery
-- [ ] Prep guest rooms for any bookings
->>>>>>> GITHUB
-=======
->>>>>>> GITHUB
 - [ ] Pack summer clothes (hot in September!)
 - [ ] Refill prescriptions
 - [ ] Download offline maps
