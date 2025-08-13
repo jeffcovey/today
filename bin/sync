@@ -273,6 +273,23 @@ sync_todoist() {
         FORCE_MODE=true
     fi
     
+    # Check if we've synced recently (within last hour)
+    TODOIST_SYNC_FILE=".last-todoist-sync"
+    SHOULD_SYNC=true
+    
+    if [[ -f "$TODOIST_SYNC_FILE" ]] && [[ "$FORCE_MODE" != "true" ]]; then
+        LAST_SYNC=$(cat "$TODOIST_SYNC_FILE" 2>/dev/null || echo "0")
+        CURRENT_TIME=$(date +%s)
+        TIME_DIFF=$((CURRENT_TIME - LAST_SYNC))
+        
+        # Skip if synced within last hour (3600 seconds)
+        if [[ $TIME_DIFF -lt 3600 ]]; then
+            print_info "Todoist synced recently ($(($TIME_DIFF / 60)) minutes ago), skipping"
+            print_info "Use --force to sync anyway"
+            return 0
+        fi
+    fi
+    
     # Run incremental two-way sync directly using Node
     print_info "Syncing with Todoist..."
     
@@ -283,16 +300,36 @@ sync_todoist() {
             const notionAPI = new NotionAPI(process.env.NOTION_TOKEN);
             const sync = new TodoistSync(process.env.TODOIST_TOKEN, notionAPI);
             
-            // Get Action Items database
-            const dbs = await notionAPI.getDatabases();
-            const actionDB = dbs.find(db => db.title.toLowerCase().includes('action items'));
-            if (!actionDB) {
-                console.error('Action Items database not found');
-                process.exit(1);
+            // Use cached database ID if available
+            const {SQLiteCache} = await import('./src/sqlite-cache.js');
+            const cache = new SQLiteCache();
+            
+            let actionDBId = null;
+            
+            // Try to get cached database ID first
+            const cachedDbs = await cache.getCachedDatabases();
+            if (cachedDbs && cachedDbs.length > 0) {
+                const actionDB = cachedDbs.find(db => db.title.toLowerCase().includes('action items'));
+                if (actionDB) {
+                    actionDBId = actionDB.id;
+                    console.log('Using cached Action Items database ID');
+                }
+            }
+            
+            // Fall back to API if not in cache
+            if (!actionDBId) {
+                console.log('Fetching databases from Notion API...');
+                const dbs = await notionAPI.getDatabases();
+                const actionDB = dbs.find(db => db.title.toLowerCase().includes('action items'));
+                if (!actionDB) {
+                    console.error('Action Items database not found');
+                    process.exit(1);
+                }
+                actionDBId = actionDB.id;
             }
             
             // Perform incremental sync (using cached Notion data)
-            const result = await sync.performTwoWaySync(actionDB.id, 'Notion Tasks', false);
+            const result = await sync.performTwoWaySync(actionDBId, 'Notion Tasks', false);
             
             // Show summary
             const n2t = result.notionToTodoist;
@@ -319,6 +356,8 @@ sync_todoist() {
         echo "$sync_output" | while IFS= read -r line; do
             print_info "$line"
         done
+        # Update last sync timestamp
+        date +%s > "$TODOIST_SYNC_FILE"
         return 0
     else
         print_error "Todoist sync failed"

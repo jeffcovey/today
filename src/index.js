@@ -140,6 +140,7 @@ program
   .command('fetch-tasks')
   .description('Fetch and cache all tasks from Notion')
   .option('--verbose', 'Show detailed output')
+  .option('--force', 'Force refresh cache even if valid')
   .action(async (options) => {
     try {
       const token = process.env.NOTION_TOKEN;
@@ -151,6 +152,46 @@ program
       const notionAPI = new NotionAPI(token);
       const { SQLiteCache } = await import('./sqlite-cache.js');
       const cache = new SQLiteCache();
+      
+      // Check if we have valid cached data first (unless forced)
+      if (!options.force) {
+        try {
+          // Get cached task count
+          const taskCount = cache.db.prepare('SELECT COUNT(*) as count FROM task_cache').get();
+          if (taskCount && taskCount.count > 0) {
+            // Check if cache is recent (within last hour)
+            const oldestCache = cache.db.prepare('SELECT MIN(cached_at) as oldest FROM task_cache').get();
+            const cacheAge = Date.now() - (oldestCache?.oldest || 0);
+            const oneHour = 60 * 60 * 1000;
+            
+            if (cacheAge < oneHour) {
+              console.log(chalk.green(`✅ Using cached ${taskCount.count} tasks (cached ${Math.round(cacheAge / 60000)} minutes ago)`));
+              
+              // Show stats from cache
+              const stats = cache.db.prepare(`
+                SELECT 
+                  COUNT(*) as total,
+                  COUNT(CASE WHEN json_extract(properties, '$.due_date') IS NOT NULL THEN 1 END) as with_due_dates,
+                  COUNT(CASE WHEN date(json_extract(properties, '$.due_date')) = date('now') THEN 1 END) as due_today
+                FROM task_cache
+              `).get();
+              
+              if (stats) {
+                console.log(chalk.gray(`  ${stats.with_due_dates} have due dates`));
+                console.log(chalk.gray(`  ${stats.due_today} are due today`));
+              }
+              
+              cache.close();
+              return;
+            }
+          }
+        } catch (error) {
+          // Cache check failed, proceed with fetch
+          if (options.verbose) {
+            console.log(chalk.gray('Cache check failed:', error.message));
+          }
+        }
+      }
       
       // Get all databases
       const databases = await notionAPI.getDatabases();
