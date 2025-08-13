@@ -21,7 +21,10 @@
 
 
 
+<<<<<<< LOCAL
+=======
 
+>>>>>>> GITHUB
 ## 2025-08-13
 - [x] remove tmp/groups_page_backup.html
 - [x] make up the guest rooms today
