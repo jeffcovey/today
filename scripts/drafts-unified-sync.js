@@ -205,6 +205,164 @@ function fetchGitHubFile(path) {
     };
 }
 
+// ============ MERGE FUNCTIONS ============
+
+// Attempt to merge two versions with a common base
+function attemptThreeWayMerge(baseContent, localContent, remoteContent) {
+    // If either side hasn't changed, take the changed one
+    if (baseContent === localContent) {
+        return { merged: true, content: remoteContent };
+    }
+    if (baseContent === remoteContent) {
+        return { merged: true, content: localContent };
+    }
+    
+    // Both changed - try line-by-line merge
+    const baseLines = baseContent.split('\n');
+    const localLines = localContent.split('\n');
+    const remoteLines = remoteContent.split('\n');
+    
+    const mergedLines = [];
+    let conflicts = [];
+    let i = 0, j = 0, k = 0;
+    
+    while (i < baseLines.length || j < localLines.length || k < remoteLines.length) {
+        const baseLine = i < baseLines.length ? baseLines[i] : null;
+        const localLine = j < localLines.length ? localLines[j] : null;
+        const remoteLine = k < remoteLines.length ? remoteLines[k] : null;
+        
+        // All three are the same or only formatting differs
+        if (localLine === remoteLine) {
+            if (localLine !== null) mergedLines.push(localLine);
+            i++; j++; k++;
+        }
+        // Local changed, remote didn't
+        else if (baseLine === remoteLine && baseLine !== localLine) {
+            if (localLine !== null) mergedLines.push(localLine);
+            i++; j++; k++;
+        }
+        // Remote changed, local didn't
+        else if (baseLine === localLine && baseLine !== remoteLine) {
+            if (remoteLine !== null) mergedLines.push(remoteLine);
+            i++; j++; k++;
+        }
+        // Both changed differently - conflict
+        else {
+            // Collect the conflict region
+            const conflictStart = mergedLines.length;
+            const localConflict = [];
+            const remoteConflict = [];
+            
+            // Find the extent of the conflict
+            while ((j < localLines.length || k < remoteLines.length) &&
+                   (j >= localLines.length || k >= remoteLines.length || 
+                    localLines[j] !== remoteLines[k])) {
+                if (j < localLines.length) localConflict.push(localLines[j++]);
+                if (k < remoteLines.length) remoteConflict.push(remoteLines[k++]);
+                i++;
+            }
+            
+            conflicts.push({
+                start: conflictStart,
+                local: localConflict,
+                remote: remoteConflict
+            });
+            
+            // Add conflict markers
+            mergedLines.push('<<<<<<< LOCAL');
+            mergedLines.push(...localConflict);
+            mergedLines.push('=======');
+            mergedLines.push(...remoteConflict);
+            mergedLines.push('>>>>>>> GITHUB');
+        }
+    }
+    
+    if (conflicts.length > 0) {
+        return { 
+            merged: false, 
+            content: mergedLines.join('\n'),
+            conflictCount: conflicts.length 
+        };
+    }
+    
+    return { merged: true, content: mergedLines.join('\n') };
+}
+
+// Simpler two-way merge when we don't have a base
+function attemptTwoWayMerge(localContent, remoteContent) {
+    const localLines = localContent.split('\n');
+    const remoteLines = remoteContent.split('\n');
+    
+    // Simple heuristic: if the files are mostly the same with small differences,
+    // try to preserve both changes
+    const mergedLines = [];
+    let conflicts = [];
+    let i = 0, j = 0;
+    
+    // Use a simplified diff algorithm
+    while (i < localLines.length || j < remoteLines.length) {
+        if (i >= localLines.length) {
+            // Rest of remote
+            mergedLines.push(...remoteLines.slice(j));
+            break;
+        }
+        if (j >= remoteLines.length) {
+            // Rest of local
+            mergedLines.push(...localLines.slice(i));
+            break;
+        }
+        
+        if (localLines[i] === remoteLines[j]) {
+            mergedLines.push(localLines[i]);
+            i++; j++;
+        } else {
+            // Try to find where they sync up again
+            let syncI = -1, syncJ = -1;
+            
+            // Look ahead for matching lines
+            for (let di = 0; di < 10 && i + di < localLines.length; di++) {
+                for (let dj = 0; dj < 10 && j + dj < remoteLines.length; dj++) {
+                    if (localLines[i + di] === remoteLines[j + dj]) {
+                        syncI = di;
+                        syncJ = dj;
+                        break;
+                    }
+                }
+                if (syncI >= 0) break;
+            }
+            
+            if (syncI >= 0) {
+                // Found sync point - this is a conflict region
+                if (syncI > 0 || syncJ > 0) {
+                    mergedLines.push('<<<<<<< LOCAL');
+                    mergedLines.push(...localLines.slice(i, i + syncI));
+                    mergedLines.push('=======');
+                    mergedLines.push(...remoteLines.slice(j, j + syncJ));
+                    mergedLines.push('>>>>>>> GITHUB');
+                    conflicts.push({ local: syncI, remote: syncJ });
+                }
+                i += syncI;
+                j += syncJ;
+            } else {
+                // No sync found in lookahead - treat rest as conflict
+                mergedLines.push('<<<<<<< LOCAL');
+                mergedLines.push(...localLines.slice(i));
+                mergedLines.push('=======');
+                mergedLines.push(...remoteLines.slice(j));
+                mergedLines.push('>>>>>>> GITHUB');
+                conflicts.push({ local: localLines.length - i, remote: remoteLines.length - j });
+                break;
+            }
+        }
+    }
+    
+    return {
+        merged: conflicts.length === 0,
+        content: mergedLines.join('\n'),
+        conflictCount: conflicts.length
+    };
+}
+
 // ============ SYNC OPERATIONS ============
 
 // Pull from GitHub to Drafts
@@ -656,10 +814,204 @@ function pushToGitHub() {
 function quickSync() {
     console.log("Starting quick sync...");
     
-    // Pull first
-    const pullStats = pullFromGitHub();
+    // First, get the current state of GitHub files (just metadata, not content)
+    const http = HTTP.create();
+    const treeResponse = http.request({
+        "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/git/trees/${CONFIG.branch}?recursive=1`,
+        "method": "GET",
+        "headers": {
+            "Authorization": `Bearer ${CONFIG.token}`,
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Drafts-Today-Sync"
+        }
+    });
     
-    // Then push
+    if (!treeResponse.success) {
+        throw new Error(`Failed to fetch repository: ${treeResponse.statusCode}`);
+    }
+    
+    const tree = JSON.parse(treeResponse.responseText);
+    const githubSHAs = {};
+    tree.tree.filter(item => 
+        item.type === "blob" && 
+        (item.path.startsWith("notes/") || item.path.startsWith("projects/")) && 
+        item.path.endsWith(".md")
+    ).forEach(item => {
+        githubSHAs[item.path] = item.sha;
+    });
+    
+    // Now check each draft to categorize sync needs
+    const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+    const conflicts = [];
+    const needsPush = [];
+    const needsPull = [];
+    
+    for (const draft of syncDrafts) {
+        const { metadata, content: localContent } = extractMetadata(draft.content);
+        
+        if (!metadata.today_path) continue;
+        
+        const githubSHA = githubSHAs[metadata.today_path];
+        const storedSHA = metadata.today_sha;
+        
+        if (!githubSHA) {
+            // File doesn't exist on GitHub - needs push if not empty
+            if (localContent.trim().length > 0) {
+                needsPush.push(draft);
+            }
+        } else if (githubSHA === storedSHA) {
+            // GitHub hasn't changed - safe to push any local changes
+            // Check if we have local changes by comparing content
+            // (We'd need to fetch to compare, so just mark for push check)
+            needsPush.push(draft);
+        } else {
+            // GitHub has changed (githubSHA !== storedSHA)
+            // Need to check if we also have local changes
+            // For now, we'll need to fetch the content to determine
+            const githubFile = fetchGitHubFile(metadata.today_path);
+            if (githubFile && githubFile.exists) {
+                const remoteContent = githubFile.content.trim();
+                const localContentTrimmed = localContent.trim();
+                
+                if (localContentTrimmed !== remoteContent) {
+                    // Both sides have changes - conflict!
+                    conflicts.push({
+                        draft: draft,
+                        path: metadata.today_path,
+                        localContent: localContentTrimmed,
+                        remoteContent: remoteContent,
+                        remoteSHA: githubSHA
+                    });
+                } else {
+                    // Only GitHub changed, we can safely pull
+                    needsPull.push({
+                        draft: draft,
+                        path: metadata.today_path,
+                        content: remoteContent,
+                        sha: githubSHA
+                    });
+                }
+            }
+        }
+    }
+    
+    // Handle conflicts with automatic merging
+    if (conflicts.length > 0) {
+        console.log(`Found ${conflicts.length} conflicts to resolve`);
+        
+        let autoMerged = 0;
+        let manualConflicts = [];
+        
+        for (const conflict of conflicts) {
+            // Try to fetch the base version (what we last synced)
+            // We can use the stored SHA to get the base version
+            let baseContent = null;
+            if (conflict.draft.metadata && conflict.draft.metadata.today_sha) {
+                // We don't have easy access to the base, so use two-way merge
+                baseContent = null;
+            }
+            
+            // Attempt merge
+            const mergeResult = baseContent ? 
+                attemptThreeWayMerge(baseContent, conflict.localContent, conflict.remoteContent) :
+                attemptTwoWayMerge(conflict.localContent, conflict.remoteContent);
+            
+            if (mergeResult.merged) {
+                // Successful automatic merge
+                console.log(`Auto-merged: ${conflict.path}`);
+                conflict.draft.content = updateMetadata(mergeResult.content, {
+                    today_path: conflict.path,
+                    today_sha: conflict.remoteSHA,
+                    last_sync: new Date().toISOString(),
+                    sync_status: "auto-merged"
+                });
+                conflict.draft.update();
+                autoMerged++;
+                
+                // Mark for push to save the merged version
+                needsPush.push(conflict.draft);
+            } else {
+                // Merge conflict - save with conflict markers
+                console.log(`Merge conflict in: ${conflict.path} (${mergeResult.conflictCount} conflicts)`);
+                
+                // Add to manual conflicts list
+                manualConflicts.push({
+                    draft: conflict.draft,
+                    path: conflict.path,
+                    mergedContent: mergeResult.content,
+                    conflictCount: mergeResult.conflictCount,
+                    remoteSHA: conflict.remoteSHA
+                });
+            }
+        }
+        
+        // Handle manual conflicts
+        if (manualConflicts.length > 0) {
+            const prompt = Prompt.create();
+            prompt.title = "Merge Conflicts";
+            prompt.message = `Auto-merged ${autoMerged} file(s) successfully.\n\n${manualConflicts.length} file(s) have conflicts that need manual resolution.\n\nConflict markers (<<<<<<< LOCAL / ======= / >>>>>>> GITHUB) have been added.\n\nWhat would you like to do?`;
+            prompt.addButton("Save with Conflicts", "save");
+            prompt.addButton("Keep Local Only", "local");
+            prompt.addButton("Keep GitHub Only", "remote");
+            prompt.addButton("Cancel", "cancel");
+            
+            if (!prompt.show() || prompt.buttonPressed === "cancel") {
+                return { cancelled: true };
+            }
+            
+            if (prompt.buttonPressed === "save") {
+                // Save with conflict markers for manual resolution
+                for (const conflict of manualConflicts) {
+                    conflict.draft.content = updateMetadata(conflict.mergedContent, {
+                        today_path: conflict.path,
+                        today_sha: conflict.remoteSHA,
+                        last_sync: new Date().toISOString(),
+                        sync_status: "has-conflicts"
+                    });
+                    conflict.draft.addTag("has-conflicts");
+                    conflict.draft.update();
+                    console.log(`Saved with conflicts: ${conflict.path}`);
+                }
+            } else if (prompt.buttonPressed === "local") {
+                // Keep local changes
+                for (const conflict of manualConflicts) {
+                    needsPush.push(conflict.draft);
+                }
+            } else if (prompt.buttonPressed === "remote") {
+                // Keep remote changes
+                for (const conflict of manualConflicts) {
+                    needsPull.push({
+                        draft: conflict.draft,
+                        path: conflict.path,
+                        content: conflict.remoteContent,
+                        sha: conflict.remoteSHA
+                    });
+                }
+            }
+        }
+    }
+    
+    // Apply pull changes first (update from GitHub)
+    let pullStats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
+    for (const item of needsPull) {
+        item.draft.content = updateMetadata(item.content, {
+            today_path: item.path,
+            today_sha: item.sha,
+            last_sync: new Date().toISOString(),
+            sync_status: "synced"
+        });
+        item.draft.update();
+        pullStats.updated++;
+        console.log(`Updated from GitHub: ${item.path}`);
+    }
+    
+    // Then do a normal pull for any new files
+    const fullPullStats = pullFromGitHub();
+    pullStats.created += fullPullStats.created;
+    pullStats.deleted += fullPullStats.deleted;
+    pullStats.errors += fullPullStats.errors;
+    
+    // Finally push any local changes
     const pushStats = pushToGitHub();
     
     return { pull: pullStats, push: pushStats };
