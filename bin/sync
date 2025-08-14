@@ -642,10 +642,42 @@ process_inbox() {
                 TASKS_FILE="notes/tasks/tasks.md"
                 mkdir -p notes/tasks 2>/dev/null
                 
-                # Simply append the tasks (no header, no timestamps)
-                echo "$CONTENT" >> "$TASKS_FILE"
+                # Insert tasks before Archive section (or at end if no Archive)
+                if [[ -f "$TASKS_FILE" ]]; then
+                    if grep -q "^# Archive" "$TASKS_FILE"; then
+                        # File has Archive section - insert before it
+                        TEMP_FILE=$(mktemp)
+                        
+                        # Get everything before Archive
+                        awk '/^# Archive/ {exit} {print}' "$TASKS_FILE" > "$TEMP_FILE"
+                        
+                        # Remove trailing blank lines from active section
+                        sed -i '' -e :a -e '/^\s*$/d;N;ba' "$TEMP_FILE" 2>/dev/null || \
+                        sed -i -e :a -e '/^\s*$/d;N;ba' "$TEMP_FILE" 2>/dev/null || true
+                        
+                        # Add the new tasks
+                        echo "" >> "$TEMP_FILE"
+                        echo "$CONTENT" >> "$TEMP_FILE"
+                        
+                        # Add Archive section back
+                        echo "" >> "$TEMP_FILE"
+                        awk '/^# Archive/,EOF {print}' "$TASKS_FILE" >> "$TEMP_FILE"
+                        
+                        # Replace original file
+                        mv "$TEMP_FILE" "$TASKS_FILE"
+                    else
+                        # No Archive section - just append at end
+                        if [[ -n "$(tail -c 1 "$TASKS_FILE")" ]]; then
+                            echo "" >> "$TASKS_FILE"
+                        fi
+                        echo "$CONTENT" >> "$TASKS_FILE"
+                    fi
+                else
+                    # File doesn't exist - create it
+                    echo "$CONTENT" > "$TASKS_FILE"
+                fi
                 
-                print_info "  • Task-only file → Appended to tasks/tasks.md"
+                print_info "  • Task-only file → Added to tasks/tasks.md"
                 print_info "    Added $(echo "$CONTENT" | grep -c "^-\s*\[[ x]\]") task(s)"
                 
                 # Delete the original file from inbox
@@ -706,67 +738,99 @@ archive_completed_tasks() {
         return 0
     fi
     
-    # Check if there are any completed tasks
-    if ! grep -q "^\- \[x\]" "$TASKS_FILE" 2>/dev/null; then
-        print_info "No completed tasks to archive"
-        return 0
-    fi
-    
-    # Count completed tasks
-    COMPLETED_COUNT=$(grep -c "^\- \[x\]" "$TASKS_FILE")
-    
-    # Create temporary files
-    ACTIVE_TASKS=$(mktemp)
-    COMPLETED_TASKS=$(mktemp)
-    
-    # Separate active and completed tasks
-    grep -v "^\- \[x\]" "$TASKS_FILE" > "$ACTIVE_TASKS" || true
-    grep "^\- \[x\]" "$TASKS_FILE" > "$COMPLETED_TASKS" || true
-    
     # Get today's date
     TODAY=$(date +%Y-%m-%d)
     
-    # Rebuild the file
-    {
-        # Active tasks first (excluding Archive section and completed tasks)
-        awk '/^# Archive/ {exit} {print}' "$TASKS_FILE" | grep -v "^\- \[x\]" | sed '/^$/d'
+    # Create temporary files
+    ACTIVE_TASKS=$(mktemp)
+    COMPLETED_NEW=$(mktemp)
+    ARCHIVE_CONTENT=$(mktemp)
+    
+    # Extract sections from the file
+    # 1. Active tasks (before Archive section, excluding completed tasks)
+    awk '/^# Archive/ {exit} /^- \[ \]/ {print}' "$TASKS_FILE" > "$ACTIVE_TASKS" || true
+    
+    # 2. NEW completed tasks from active section (to be archived)
+    awk '/^# Archive/ {exit} /^- \[x\]/ {print}' "$TASKS_FILE" > "$COMPLETED_NEW" || true
+    
+    # 3. Existing archive content (deduplicated)
+    if grep -q "^# Archive" "$TASKS_FILE"; then
+        awk '
+            /^# Archive/ {in_archive=1; next}
+            in_archive && /^## [0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+                current_date = substr($0, 4)
+                print
+                next
+            }
+            in_archive && /^- \[x\]/ {
+                # Store task to check for duplicates
+                task = $0
+                if (!(task in seen)) {
+                    seen[task] = 1
+                    print
+                }
+                next
+            }
+            in_archive && /^- \[ \]/ {
+                # Move incomplete tasks back to active
+                next
+            }
+            in_archive {print}
+        ' "$TASKS_FILE" > "$ARCHIVE_CONTENT" || true
+    fi
+    
+    # Check if there are any new completed tasks to archive
+    NEW_COUNT=$(wc -l < "$COMPLETED_NEW" | tr -d ' ')
+    if [[ "$NEW_COUNT" -eq 0 ]]; then
+        # No new completed tasks, but still rebuild to clean duplicates
+        {
+            # Active tasks
+            if [[ -s "$ACTIVE_TASKS" ]]; then
+                cat "$ACTIVE_TASKS"
+            fi
+            
+            # Archive section
+            if [[ -s "$ARCHIVE_CONTENT" ]] || grep -q "^# Archive" "$TASKS_FILE"; then
+                echo ""
+                echo "# Archive"
+                echo ""
+                if [[ -s "$ARCHIVE_CONTENT" ]]; then
+                    cat "$ARCHIVE_CONTENT"
+                fi
+            fi
+        } > "${TASKS_FILE}.tmp"
         
-        # Also extract any incomplete tasks that were mistakenly in the archive
-        if grep -q "^# Archive" "$TASKS_FILE"; then
-            awk '/^# Archive/ {in_archive=1} in_archive && /^- \[ \]/ {print}' "$TASKS_FILE" || true
+        mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
+        rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
+        
+        print_info "No new completed tasks to archive, cleaned duplicates"
+        return 0
+    fi
+    
+    # Deduplicate new completed tasks
+    sort -u "$COMPLETED_NEW" > "${COMPLETED_NEW}.dedup"
+    mv "${COMPLETED_NEW}.dedup" "$COMPLETED_NEW"
+    
+    # Build the new file
+    {
+        # Active tasks first
+        if [[ -s "$ACTIVE_TASKS" ]]; then
+            cat "$ACTIVE_TASKS"
         fi
         
-        # Add Archive section
+        # Archive section
         echo ""
         echo "# Archive"
+        echo ""
         
-        # Keep existing archive content (but remove today's section if it exists - we'll rebuild it)
-        # Also move any incomplete tasks back to active section
-        if grep -q "^# Archive" "$TASKS_FILE"; then
-            awk -v today="$TODAY" '
-                /^# Archive/ {in_archive=1; next}  # Skip the Archive header line
-                in_archive && /^## / {
-                    # Check if this is today'"'"'s section
-                    if ($0 == "## " today) {
-                        skip=1
-                        next
-                    } else {
-                        skip=0
-                        print
-                        next
-                    }
-                }
-                in_archive && skip {next}  # Skip lines in today'"'"'s section
-                in_archive && /^- \[ \]/ {next}  # Skip incomplete tasks in archive
-                in_archive {print}  # Print other archive content
-            ' "$TASKS_FILE" || true
-        fi
+        # Add today's section with new completed tasks
+        echo "## $TODAY"
+        cat "$COMPLETED_NEW"
         
-        # Add today's completed tasks (only if there are new ones)
-        if [[ -s "$COMPLETED_TASKS" ]]; then
+        # Add existing archive content (if any)
+        if [[ -s "$ARCHIVE_CONTENT" ]]; then
             echo ""
-            echo "## $TODAY"
-            cat "$COMPLETED_TASKS"
+            cat "$ARCHIVE_CONTENT"
         fi
     } > "${TASKS_FILE}.tmp"
     
@@ -774,16 +838,11 @@ archive_completed_tasks() {
     mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
     
     # Clean up temp files
-    rm -f "$ACTIVE_TASKS" "$COMPLETED_TASKS"
+    rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
     
-    # Clean up old archived tasks (older than 30 days)
-    THIRTY_DAYS_AGO=$(date -d "30 days ago" +%Y-%m-%d 2>/dev/null || date -v -30d +%Y-%m-%d 2>/dev/null || echo "")
-    if [[ -n "$THIRTY_DAYS_AGO" ]]; then
-        # This is complex to do in bash, so we'll keep it simple for now
-        print_info "Archived $COMPLETED_COUNT completed task(s) to $TODAY section"
-    else
-        print_info "Archived $COMPLETED_COUNT completed task(s)"
-    fi
+    # Count unique completed tasks archived
+    UNIQUE_COUNT=$(wc -l < "$COMPLETED_NEW" 2>/dev/null | tr -d ' ' || echo 0)
+    print_info "Archived $UNIQUE_COUNT completed task(s) to $TODAY section"
     
     return 0
 }
