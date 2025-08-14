@@ -111,7 +111,8 @@
       "Bash(for file in \".calendar-cache/events.json\" \"SUMMARY.json\" \".sync-log.json\")",
       "Bash(do)",
       "Bash(rg:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(TZ='America/New_York' date)"
     ],
     "deny": []
   }

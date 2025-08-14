@@ -18,7 +18,9 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 
 When this session starts, please:
 1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
-2. **⚠️ TIMEZONE CRITICAL: Database timestamps may be in UTC. You MUST convert to Eastern Time (ET) unless user specifies otherwise:**
+2. **⚠️ GET ACTUAL CURRENT TIME: Use `TZ='America/New_York' date` command to get the real Eastern time**
+   - **NEVER guess or calculate the current time - always use the date command**
+   - **Database timestamps may be in UTC. You MUST convert to Eastern Time (ET):**
    - **UTC timestamps like "12:13:44.577Z" = 8:13 AM Eastern (subtract 4 hours during EDT, 5 hours during EST)**
    - **ASSUME Eastern Time Zone (New York/Florida) unless user indicates they're traveling**
    - **NEVER use UTC time when discussing the current time of day**
