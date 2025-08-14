@@ -2,6 +2,7 @@
 - [ ] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
 - [x] check that we have good indexes in our today.db <!-- task-id: 08bd7c03b09e5a385efbdcb39a589894 -->
+- [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 
