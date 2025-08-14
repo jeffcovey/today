@@ -144,12 +144,12 @@ Respond with a JSON array containing the classification for each task.`;
         SELECT * FROM tasks 
         WHERE stage IS NULL 
           AND status != '✅ Done'
-        ORDER BY priority DESC, do_date ASC
+        ORDER BY do_date ASC, status ASC
       `).all() :
       this.tm.db.prepare(`
         SELECT * FROM tasks 
         WHERE status != '✅ Done'
-        ORDER BY priority DESC, do_date ASC
+        ORDER BY do_date ASC, status ASC
       `).all();
 
     if (tasks.length === 0) {

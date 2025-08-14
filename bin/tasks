@@ -406,6 +406,113 @@ program
     }
   });
 
+// Search command
+program
+  .command('search <query>')
+  .description('Search for tasks and show detailed information')
+  .option('-a, --all', 'Include completed/archived tasks')
+  .option('-v, --verbose', 'Show all available fields')
+  .action((query, options) => {
+    const tm = new TaskManager();
+    
+    try {
+      // Search in all tasks if --all, otherwise just active
+      let sql = options.all ? 
+        'SELECT * FROM tasks WHERE title LIKE ? OR description LIKE ? OR content LIKE ?' :
+        "SELECT * FROM tasks WHERE (title LIKE ? OR description LIKE ? OR content LIKE ?) AND status != '✅ Done'";
+      
+      const searchPattern = `%${query}%`;
+      const tasks = tm.db.prepare(sql).all(searchPattern, searchPattern, searchPattern);
+      
+      if (tasks.length === 0) {
+        console.log(chalk.yellow(`No tasks found matching "${query}"`));
+        return;
+      }
+      
+      console.log(chalk.blue(`\nFound ${tasks.length} task(s) matching "${query}":\n`));
+      
+      for (const task of tasks) {
+        console.log(chalk.bold('═'.repeat(60)));
+        console.log(chalk.bold.cyan(`📋 ${task.title}`));
+        console.log(chalk.gray('─'.repeat(60)));
+        
+        // Basic info
+        console.log(`ID:              ${chalk.yellow(task.id)}`);
+        console.log(`Status:          ${task.status || chalk.gray('Not set')}`);
+        console.log(`Stage:           ${task.stage || chalk.gray('Not set')}`);
+        console.log(`Do Date:         ${task.do_date || chalk.gray('Not set')}`);
+        console.log(`Created:         ${new Date(task.created_at).toLocaleString()}`);
+        console.log(`Updated:         ${new Date(task.updated_at).toLocaleString()}`);
+        
+        if (task.completed_at) {
+          console.log(`Completed:       ${new Date(task.completed_at).toLocaleString()}`);
+        }
+        
+        // Project info
+        if (task.project_id) {
+          const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
+          console.log(`Project:         ${project ? project.name : task.project_id}`);
+        }
+        
+        // Repeat info
+        if (task.repeat_interval) {
+          console.log(`Repeat:          Every ${task.repeat_interval} days`);
+          if (task.repeat_next_date) {
+            console.log(`Next Due:        ${task.repeat_next_date}`);
+          }
+        }
+        
+        // Notion info
+        if (task.notion_id) {
+          console.log(`Notion ID:       ${task.notion_id}`);
+          if (task.notion_url) {
+            console.log(`Notion URL:      ${task.notion_url}`);
+          }
+        }
+        
+        // Topics
+        const topics = tm.db.prepare(`
+          SELECT t.name FROM topics t
+          JOIN task_topics tt ON t.id = tt.topic_id
+          WHERE tt.task_id = ?
+        `).all(task.id);
+        
+        if (topics.length > 0) {
+          console.log(`Topics:          ${topics.map(t => t.name).join(', ')}`);
+        }
+        
+        // Description/Content
+        if (task.description) {
+          console.log(`\nDescription:`);
+          console.log(chalk.gray(task.description));
+        }
+        
+        if (task.content) {
+          console.log(`\nContent:`);
+          console.log(chalk.gray(task.content));
+        }
+        
+        // Verbose mode - show ALL fields
+        if (options.verbose) {
+          console.log(chalk.gray('\n' + '─'.repeat(60)));
+          console.log(chalk.gray('All fields:'));
+          for (const [key, value] of Object.entries(task)) {
+            if (value !== null && value !== undefined && value !== '') {
+              console.log(chalk.gray(`  ${key}: ${value}`));
+            }
+          }
+        }
+        
+        console.log('');
+      }
+    } catch (error) {
+      console.error(chalk.red('Error searching tasks:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
 // Projects command
 program
   .command('projects')

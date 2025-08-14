@@ -73,7 +73,7 @@ main() {
     
     # Run all sync steps
     run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
-    run_sync_step "📊 Notion Database" sync_notion "Notion database synced" "Notion database"
+    # Notion sync removed - moving away from Notion
     run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
     run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
@@ -870,9 +870,9 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - GitHub and Notion only"
+        print_info "Quick sync mode - GitHub and tasks only"
         sync_github_notes
-        sync_notion
+        sync_tasks
         ;;
     --force)
         # Force full sync - bypasses smart caching
@@ -916,8 +916,7 @@ case "${1:-}" in
         echo ""
         echo "Data sources synced:"
         echo "  • GitHub notes"
-        echo "  • Notion database (cached for 4 hours)"
-        echo "  • Todoist tasks (via Notion)"
+        echo "  • Local task manager"
         echo "  • Email inbox (cached for 4 hours)"
         echo "  • Calendar events"
         echo "  • iCloud contacts (cached for 4 hours)"

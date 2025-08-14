@@ -113,41 +113,61 @@ export class NotionAPI extends NotionAPIBase {
         page_size: pageSize
       };
 
+      // Build filters array
+      const filters = [];
+      
       // Add filtering for actionable statuses if specified
       if (options.filterActionableItems) {
         try {
           const completeStatuses = await this.statusCache.getCompleteGroupStatuses(databaseId, this);
           
-          if (completeStatuses.length === 0) {
-            // Fallback - no Complete group found, don't filter
-          } else if (completeStatuses.length === 1) {
-            // Single status to exclude
-            queryParams.filter = {
-              property: 'Status',
-              status: { 
-                does_not_equal: completeStatuses[0]
-              }
-            };
-          } else {
-            // Multiple statuses to exclude - use compound filter
-            queryParams.filter = {
-              and: completeStatuses.map(status => ({
+          if (completeStatuses.length > 0) {
+            completeStatuses.forEach(status => {
+              filters.push({
                 property: 'Status',
                 status: { 
                   does_not_equal: status
                 }
-              }))
-            };
+              });
+            });
           }
         } catch (error) {
           // Fallback to hardcoded exclusion for this database
-          queryParams.filter = {
+          filters.push({
             property: 'Status',
             status: { 
               does_not_equal: '✅ Done'
             }
-          };
+          });
         }
+      }
+      
+      // Add filter for tasks assigned only to Jeffrey Covey
+      // This is important for importing only personal tasks, not delegated ones
+      if (options.filterForJeffrey !== false) { // Default to true for Action Items
+        // Check if this is the Action Items database
+        const databases = await this.getDatabases();
+        const actionItemsDB = databases.find(db => 
+          db.id === databaseId && db.title.toLowerCase().includes('action items')
+        );
+        
+        if (actionItemsDB) {
+          // For Action Items, we want to exclude tasks that are assigned to someone else
+          // Since we can't directly filter for "Jeffrey Covey" without the user ID,
+          // we'll filter for tasks that either:
+          // 1. Have no one assigned (personal tasks without assignment)
+          // 2. Are not assigned to Mehul Trivedi (the main person tasks are delegated to)
+          // This will be refined later when we have the actual user IDs
+          
+          // For now, let's not filter by Assigned To since we don't have the user IDs
+          // We'll handle this in post-processing after fetching the tasks
+          options.filterAssignedInPost = true;
+        }
+      }
+      
+      // Apply combined filters
+      if (filters.length > 0) {
+        queryParams.filter = filters.length === 1 ? filters[0] : { and: filters };
       }
 
       // Add sorting by creation date if specified
@@ -192,7 +212,7 @@ export class NotionAPI extends NotionAPIBase {
         }
       }
 
-      const tasks = allResults.map(page => ({
+      let tasks = allResults.map(page => ({
         id: page.id,
         title: this.extractTitle(page),
         properties: page.properties,
@@ -201,6 +221,33 @@ export class NotionAPI extends NotionAPIBase {
         last_edited_time: page.last_edited_time,
         icon: page.icon  // Include individual page icon
       }));
+      
+      // Post-process to filter by Assigned To if needed
+      if (options.filterAssignedInPost) {
+        tasks = tasks.filter(task => {
+          const assignedTo = task.properties['Assigned To'];
+          
+          // Include tasks with no assignment (personal tasks)
+          if (!assignedTo || !assignedTo.people || assignedTo.people.length === 0) {
+            return true;
+          }
+          
+          // Include tasks assigned to Jeffrey Covey
+          // Look for names containing "Jeffrey" or "Covey"
+          const hasJeffrey = assignedTo.people.some(person => {
+            const name = person.name || '';
+            return name.toLowerCase().includes('jeffrey') || name.toLowerCase().includes('covey');
+          });
+          
+          if (hasJeffrey) {
+            return true;
+          }
+          
+          // Exclude tasks assigned only to others (like Mehul Trivedi)
+          // If it has people assigned but Jeffrey is not among them, exclude it
+          return false;
+        });
+      }
 
       // Fetch database to get icon and for caching
       const database = await this.notion.databases.retrieve({
@@ -391,8 +438,18 @@ export class NotionAPI extends NotionAPIBase {
 
       const filter = baseFilters.length > 1 ? { and: baseFilters } : baseFilters[0];
       
+      // Check if we need to enable post-filtering for Jeffrey
+      let shouldFilterAssigned = false;
+      if (options.filterForJeffrey !== false) {
+        const databases = await this.getDatabases();
+        const actionItemsDB = databases.find(db => 
+          db.id === databaseId && db.title.toLowerCase().includes('action items')
+        );
+        shouldFilterAssigned = !!actionItemsDB;
+      }
+      
       // Use centralized queryDatabase method
-      const newerItems = await this.queryDatabase({
+      let newerItems = await this.queryDatabase({
         databaseId,
         cacheKey: 'incrementalTasks',
         getCacheData: null, // Don't use cache for incremental
@@ -406,6 +463,31 @@ export class NotionAPI extends NotionAPIBase {
         useCache: false,
         logPrefix: options.skipCacheLogging ? null : '🔄'
       });
+      
+      // Post-process to filter by Assigned To if needed
+      if (shouldFilterAssigned) {
+        newerItems = newerItems.filter(item => {
+          const assignedTo = item.properties?.['Assigned To'];
+          
+          // Include tasks with no assignment (personal tasks)
+          if (!assignedTo || !assignedTo.people || assignedTo.people.length === 0) {
+            return true;
+          }
+          
+          // Include tasks assigned to Jeffrey Covey
+          const hasJeffrey = assignedTo.people.some(person => {
+            const name = person.name || '';
+            return name.toLowerCase().includes('jeffrey') || name.toLowerCase().includes('covey');
+          });
+          
+          if (hasJeffrey) {
+            return true;
+          }
+          
+          // Exclude tasks assigned to others
+          return false;
+        });
+      }
 
       // Merge with existing cache if we have new items
       if (newerItems.length > 0) {

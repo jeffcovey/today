@@ -15,13 +15,15 @@ export class TaskManager {
         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
         title TEXT NOT NULL,
         description TEXT,
+        content TEXT,
         do_date DATE,
         status TEXT DEFAULT '🎭 Stage',
         stage TEXT CHECK(stage IS NULL OR stage IN ('Front Stage', 'Back Stage', 'Off Stage')),
-        priority INTEGER DEFAULT 3 CHECK(priority BETWEEN 1 AND 5),
         project_id TEXT,
-        repeat_frequency TEXT,
+        repeat_interval INTEGER,
         repeat_next_date DATE,
+        notion_id TEXT UNIQUE,
+        notion_url TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
@@ -119,20 +121,22 @@ export class TaskManager {
   createTask(data) {
     const id = data.id || this.generateId();
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (id, title, description, do_date, status, stage, priority, project_id, repeat_frequency)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, title, description, content, do_date, status, stage, project_id, repeat_interval, notion_id, notion_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
       id,
       data.title,
       data.description || null,
+      data.content || null,
       data.do_date || null,
       data.status || '🎭 Stage',
       data.stage || null,
-      data.priority || 3,
       data.project_id || null,
-      data.repeat_frequency || null
+      data.repeat_interval || null,
+      data.notion_id || null,
+      data.notion_url || null
     );
 
     // Add tags if provided
@@ -169,7 +173,7 @@ export class TaskManager {
         fields.push('completed_at = CURRENT_TIMESTAMP');
         // Record completion in history for repeating tasks
         const task = this.getTask(id);
-        if (task && task.repeat_frequency) {
+        if (task && task.repeat_interval) {
           this.db.prepare('INSERT INTO task_completions (task_id) VALUES (?)').run(id);
         }
       } else if (data.status !== '✅ Done') {
@@ -180,17 +184,13 @@ export class TaskManager {
       fields.push('stage = ?');
       values.push(data.stage);
     }
-    if (data.priority !== undefined) {
-      fields.push('priority = ?');
-      values.push(data.priority);
-    }
     if (data.project_id !== undefined) {
       fields.push('project_id = ?');
       values.push(data.project_id);
     }
-    if (data.repeat_frequency !== undefined) {
-      fields.push('repeat_frequency = ?');
-      values.push(data.repeat_frequency);
+    if (data.repeat_interval !== undefined) {
+      fields.push('repeat_interval = ?');
+      values.push(data.repeat_interval);
     }
 
     if (fields.length > 0) {
@@ -211,7 +211,7 @@ export class TaskManager {
     if (task) {
       task.tags = this.getTaskTags(id);
       // Get last completion if it's a repeating task
-      if (task.repeat_frequency) {
+      if (task.repeat_interval) {
         const lastCompletion = this.db.prepare(`
           SELECT MAX(completed_at) as last_completed 
           FROM task_completions 
@@ -230,7 +230,7 @@ export class TaskManager {
       SELECT * FROM tasks 
       WHERE (do_date = ? OR do_date < ?) 
         AND status != '✅ Done'
-      ORDER BY priority DESC, do_date ASC
+      ORDER BY do_date ASC, status ASC
     `).all(today, today);
 
     return tasks.map(task => ({
@@ -244,7 +244,7 @@ export class TaskManager {
     const tasks = this.db.prepare(`
       SELECT * FROM tasks 
       WHERE status != '✅ Done'
-      ORDER BY do_date ASC, priority DESC
+      ORDER BY do_date ASC, status ASC
     `).all();
 
     return tasks.map(task => ({
@@ -270,7 +270,7 @@ export class TaskManager {
     const tasks = this.db.prepare(`
       SELECT * FROM tasks 
       WHERE project_id = ?
-      ORDER BY stage ASC, priority DESC
+      ORDER BY stage ASC, status ASC
     `).all(actualProjectId);
 
     return tasks.map(task => ({
@@ -714,7 +714,7 @@ export class TaskManager {
     const tasks = this.getTodayTasks();
     const lines = ['# Today\'s Tasks', '', `*Generated: ${new Date().toLocaleString()}*`, ''];
 
-    // Group by priority
+    // Group by status (derived priority)
     const priorities = {
       5: '🔴 Critical',
       4: '🟠 High',
@@ -724,7 +724,7 @@ export class TaskManager {
     };
 
     for (const [level, label] of Object.entries(priorities).reverse()) {
-      const priorityTasks = tasks.filter(t => t.priority == level);
+      const priorityTasks = tasks.filter(t => this.getPriorityFromStatus(t.status) == level);
       if (priorityTasks.length > 0) {
         lines.push(`## ${label}`, '');
         for (const task of priorityTasks) {
@@ -748,7 +748,7 @@ export class TaskManager {
              MAX(tc.completed_at) as last_completed
       FROM tasks t
       LEFT JOIN task_completions tc ON t.id = tc.task_id
-      WHERE t.repeat_frequency IS NOT NULL 
+      WHERE t.repeat_interval IS NOT NULL 
         AND t.status = '✅ Done'
       GROUP BY t.id
     `).all();
@@ -756,7 +756,7 @@ export class TaskManager {
     let created = 0;
     for (const task of repeatingTasks) {
       // Calculate next date based on last completion
-      const nextDate = this.calculateNextDate(task.last_completed || task.completed_at, task.repeat_frequency);
+      const nextDate = this.calculateNextDateFromInterval(task.last_completed || task.completed_at, task.repeat_interval);
       
       // Only create if the next date is today or earlier
       if (nextDate <= today) {
@@ -777,9 +777,8 @@ export class TaskManager {
             do_date: nextDate,
             status: '🎭 Stage',
             stage: null,
-            priority: task.priority,
             project_id: task.project_id,
-            repeat_frequency: task.repeat_frequency,
+            repeat_interval: task.repeat_interval,
             tags: this.getTaskTags(task.id)
           });
           created++;
@@ -816,6 +815,32 @@ export class TaskManager {
     }
     
     return date.toISOString().split('T')[0];
+  }
+
+  calculateNextDateFromInterval(completedDate, interval) {
+    const date = completedDate ? new Date(completedDate) : new Date();
+    if (interval && interval > 0) {
+      date.setDate(date.getDate() + interval);
+    } else {
+      date.setDate(date.getDate() + 1); // Default to daily
+    }
+    return date.toISOString().split('T')[0];
+  }
+
+  getPriorityFromStatus(status) {
+    // Derive priority from status
+    switch (status) {
+      case '🔥 Immediate':
+        return 1;
+      case '🎭 Stage':
+        return 3;
+      case '⏳ Waiting':
+        return 4;
+      case '✅ Done':
+        return 5;
+      default:
+        return 3;
+    }
   }
 
   close() {
