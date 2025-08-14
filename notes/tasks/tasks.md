@@ -1,5 +1,5 @@
-- [ ] Test task with Front Stage <!-- task-id: e4b9a9018d632e4772e030f6bd46df55 -->
-- [ ] Improve Images <!-- task-id: e626ce58c20aa4421bf330b19d72ecbb -->
+- [x] Test task with Front Stage <!-- task-id: e4b9a9018d632e4772e030f6bd46df55 -->
+- [x] Improve Images <!— task-id: e626ce58c20aa4421bf330b19d72ecbb —>
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
