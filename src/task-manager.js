@@ -668,6 +668,70 @@ export class TaskManager {
     return updates.length;
   }
 
+  // Generate all active tasks file (bidirectional sync)
+  // This reads the existing tasks.md first to capture any manual checkbox changes,
+  // applies them to the database, then regenerates the file with all active tasks
+  async generateAllTasksFile(outputPath = 'notes/tasks/tasks.md') {
+    // First, check if tasks.md exists and read any manual changes
+    const manualChanges = new Map();
+    
+    try {
+      const existingContent = await fs.readFile(outputPath, 'utf-8');
+      const existingLines = existingContent.split('\n');
+      
+      // Parse existing file for checkbox states
+      for (const line of existingLines) {
+        const taskMatch = line.match(/^- \[([ x])\] .+?<!-- task-id: ([a-f0-9]{32}) -->/);
+        if (taskMatch) {
+          const isChecked = taskMatch[1] === 'x';
+          const taskId = taskMatch[2];
+          manualChanges.set(taskId, isChecked);
+        }
+      }
+      
+      // Apply manual changes to database before regenerating
+      for (const [taskId, isChecked] of manualChanges) {
+        const task = this.getTask(taskId);
+        if (task) {
+          const shouldBeDone = isChecked;
+          const isDone = task.status === '✅ Done';
+          
+          if (shouldBeDone && !isDone) {
+            // User checked the box, mark as done
+            this.updateTask(taskId, { status: '✅ Done' });
+            console.log(`✓ Marked task as done: ${task.title}`);
+          } else if (!shouldBeDone && isDone) {
+            // User unchecked the box, mark as not done
+            this.updateTask(taskId, { status: '🎭 Stage' });
+            console.log(`↺ Marked task as not done: ${task.title}`);
+          }
+        }
+      }
+    } catch (err) {
+      // File doesn't exist yet, that's OK
+    }
+
+    // Get all active tasks (not Done)
+    const tasks = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE status != '✅ Done'
+      ORDER BY do_date ASC, status ASC, title ASC
+    `).all();
+    
+    const lines = [];
+    
+    // Add all active tasks
+    for (const task of tasks) {
+      const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+      const tags = this.getTaskTags(task.id);
+      const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+      lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+    }
+    
+    await fs.writeFile(outputPath, lines.join('\n'));
+    return tasks.length;
+  }
+
   // Generate today's task file (bidirectional sync)
   // This reads the existing today.md first to capture any manual checkbox changes,
   // applies them to the database, then regenerates the file with all today's tasks

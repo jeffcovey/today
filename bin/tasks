@@ -70,6 +70,10 @@ program
       const todayCount = await tm.generateTodayFile();
       console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
       
+      // Generate all tasks file
+      const allCount = await tm.generateAllTasksFile();
+      console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
+      
       // Classify stages for tasks without them
       console.log(chalk.blue('Classifying task stages...'));
       const classifier = new TaskStageClassifier();
