@@ -1,1 +1,0 @@
-- [ ] Add Ron Goodale to E6W

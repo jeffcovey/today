@@ -15,4 +15,6 @@
 - [x] Both of the guest rooms are dirty. I need to prepare them today for guests who may reserve the room.
 - [x] try second fix.
 - [x] fix UTC Drafts filename problem
-- [x] test tasks.md
+- [x] test tasks.md- [ ] check that we have good indexes in our today.db
+- [ ] Add Ron Goodale to E6W
+- [ ] schedule lunch with Ron Goodale
