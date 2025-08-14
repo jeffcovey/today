@@ -711,21 +711,62 @@ export class TaskManager {
       // File doesn't exist yet, that's OK
     }
 
-    // Get all active tasks (not Done)
+    // Get all active tasks (not Done) with project information
     const tasks = this.db.prepare(`
-      SELECT * FROM tasks 
-      WHERE status != '✅ Done'
-      ORDER BY do_date ASC, status ASC, title ASC
+      SELECT t.*, p.name as project_name 
+      FROM tasks t
+      LEFT JOIN projects p ON t.project_id = p.id
+      WHERE t.status != '✅ Done'
+      ORDER BY p.name ASC, t.do_date ASC, t.status ASC, t.title ASC
     `).all();
     
     const lines = [];
     
-    // Add all active tasks
+    // Group tasks by project
+    const tasksByProject = {};
+    const noProjectTasks = [];
+    
     for (const task of tasks) {
-      const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-      const tags = this.getTaskTags(task.id);
-      const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-      lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+      if (task.project_id && task.project_name) {
+        if (!tasksByProject[task.project_name]) {
+          tasksByProject[task.project_name] = [];
+        }
+        tasksByProject[task.project_name].push(task);
+      } else {
+        noProjectTasks.push(task);
+      }
+    }
+    
+    // Add tasks without projects first
+    if (noProjectTasks.length > 0) {
+      lines.push('## General Tasks');
+      lines.push('');
+      for (const task of noProjectTasks) {
+        const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+        const tags = this.getTaskTags(task.id);
+        const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+        lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+      }
+      lines.push('');
+    }
+    
+    // Add tasks grouped by project
+    const projectNames = Object.keys(tasksByProject).sort();
+    for (const projectName of projectNames) {
+      lines.push(`## ${projectName}`);
+      lines.push('');
+      for (const task of tasksByProject[projectName]) {
+        const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+        const tags = this.getTaskTags(task.id);
+        const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+        lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+      }
+      lines.push('');
+    }
+    
+    // Remove trailing empty lines
+    while (lines.length > 0 && lines[lines.length - 1] === '') {
+      lines.pop();
     }
     
     await fs.writeFile(outputPath, lines.join('\n'));

@@ -112,7 +112,8 @@
       "Bash(do)",
       "Bash(rg:*)",
       "Bash(done)",
-      "Bash(TZ='America/New_York' date)"
+      "Bash(TZ='America/New_York' date)",
+      "Bash(bin/tasks:*)"
     ],
     "deny": []
   }
