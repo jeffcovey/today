@@ -63,6 +63,7 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - [ ] Visit Desert Art Museum
 - [ ] Thursday Street Fair (if happening)
 - [ ] Aerial Tramway (if weather permits)
+- [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!)
 
 ## Budget Breakdown
 
@@ -107,3 +108,9 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
   - Virgin Red support (Ticket #267315) says they can't help - separate company
   - Need to contact Virgin Atlantic directly: customer.care@fly.virgin.com or call their support
   - Two "account updated" emails received today (Aug 13) from password reset attempts
+
+### 2025-08-14
+
+- **Don Schmoll connection!** Texted Don Schmoll today and told him I'm coming to PS
+- Added to trip itinerary: Plan to visit Don and Rich during the stay
+- Social connection makes the trip even better!
