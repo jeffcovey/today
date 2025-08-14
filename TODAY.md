@@ -68,9 +68,23 @@ When updating an existing review file:
 The user can use these commands during the session:
 
 ```bash
+# Task management
+bin/tasks sync                         # Sync all tasks and projects with database
+bin/tasks list                         # List all active tasks
+bin/tasks list --today                 # Show today's tasks  
+bin/tasks list --project 8cbe1026      # Show tasks for a project
+bin/tasks add "New task" --date 2025-08-14 --priority 4
+bin/tasks done <id>                    # Mark task as complete
+bin/tasks projects                     # List all projects
+bin/tasks projects --detailed          # Show detailed project info
+
+# Review tracking
 bin/mark-done "Take a 20-minute walk"  # Mark specific task as done
 bin/mark-done 1                        # Mark task #1 as done
 bin/progress "Additional note"         # Add a progress note
+
+# Data sync
+bin/sync                               # Sync all data sources
 ```
 
 ## Review Guidelines
@@ -233,6 +247,60 @@ What to review and prepare based on the database
 ### 7. Self-Care Check
 
 Address any wellbeing concerns from recent notes and tasks
+
+---
+
+## Creating Projects and Tasks
+
+**IMPORTANT:** Feel free to be creative and spontaneous! These guidelines help ensure your creations sync properly with the database, but don't let them limit your initiative. Create projects, tasks, and notes as the conversation naturally flows.
+
+### Project Files
+
+When creating project files in `projects/`:
+- Use kebab-case filenames: `palm-springs-trip.md`, `website-redesign.md`
+- Start with `# Project Name` as the first line
+- Include metadata fields when known:
+  - `**Dates:** September 4-12, 2025` (for date extraction)
+  - `**Status:** Active/On Hold/Completed/Confirmed`
+  - `**Budget:** $2,500` (for budget tracking)
+  - `**Location:** Palm Springs, CA` (if relevant)
+- Tasks in project files will be automatically associated with the project
+- Use standard markdown task format: `- [ ] Task description`
+- The system will add IDs automatically during sync: `<!-- task-id: xxx -->`
+- After first sync, a project ID will be added: `<!-- project-id: xxx -->`
+
+### Task Management
+
+When creating tasks:
+- In `notes/tasks/tasks.md` for general tasks
+- In `projects/*.md` for project-specific tasks  
+- Use checkbox format: `- [ ] Task description`
+- Mark complete with: `- [x] Task description`
+- The sync system (`bin/tasks sync`) will:
+  - Add unique IDs to prevent duplicates
+  - Associate tasks with projects automatically
+  - Track completion history for repeating tasks
+
+### Database Integration
+
+The task management system includes:
+- **tasks** table: All tasks with stages, priorities, due dates
+- **projects** table: Project metadata, dates, budgets
+- **task_completions**: History for repeating tasks
+- **markdown_sync**: Tracks which tasks are in which files
+
+You can query these tables to understand task status:
+```sql
+-- Get project status
+SELECT name, status, start_date, end_date, budget 
+FROM projects;
+
+-- Get tasks for a project
+SELECT t.title, t.stage, t.do_date 
+FROM tasks t 
+JOIN projects p ON t.project_id = p.id 
+WHERE p.name LIKE '%Palm Springs%';
+```
 
 ---
 

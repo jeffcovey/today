@@ -1,223 +1,159 @@
-# Notion-Todoist Sync Setup Guide
+# Sync Setup Guide
 
 ## Overview
 
-This sync system provides two-way synchronization between your Notion Action Items database and Todoist, allowing you to:
-- Work offline with Todoist's fast native apps
-- Keep tasks synchronized between both platforms
-- Leverage Todoist's natural language input and mobile experience
-- Maintain Notion as your central planning hub
+The Today system synchronizes multiple data sources to provide a unified view of your tasks, notes, and schedule:
 
-## Prerequisites
-
-1. **Notion Integration Token**
-   - Already configured if you're using the notion
-
-2. **Todoist API Token**
-   - Get yours from: https://todoist.com/app/settings/integrations
-   - Click "Developer" tab
-   - Copy your API token
+- **GitHub**: Sync notes and documentation
+- **Notion**: Import tasks and projects from databases
+- **Task Manager**: Local SQLite-based task management with Markdown sync
+- **Email**: Fetch and cache emails for review
+- **Calendar**: Import events from Google Calendar and iCloud
+- **Contacts**: Sync contact information
 
 ## Setup Instructions
 
-### 1. Add Todoist Token to Environment
+### 1. Configure Environment Variables
+
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```bash
-echo "TODOIST_TOKEN=your_todoist_token_here" >> .env
+cp .env.example .env
 ```
 
-### 2. Test the Sync
+### 2. Required Configurations
+
+#### Notion Integration
+```bash
+# Get from https://www.notion.so/my-integrations
+NOTION_TOKEN=your_notion_integration_token_here
+```
+
+#### Email Setup (IMAP)
+```bash
+EMAIL_ACCOUNT=your.email@gmail.com
+EMAIL_PASSWORD=your_app_password_here
+EMAIL_HOST=imap.gmail.com
+EMAIL_PORT=993
+```
+
+#### Google Calendar
+```bash
+# Create service account at https://console.cloud.google.com/
+GOOGLE_SERVICE_ACCOUNT_KEY=base64_encoded_json_key_here
+GOOGLE_CALENDAR_IDS=primary,work@group.calendar.google.com
+```
+
+#### iCloud Calendar
+```bash
+# Get app-specific password from https://appleid.apple.com
+ICLOUD_USERNAME=your@icloud.com
+ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+### 3. Run Full Sync
+
+Execute the main sync script to pull all data:
 
 ```bash
-# Preview what would be synced (dry run)
-bin/notion-sync --dry-run
-
-# Run a one-time two-way sync
-bin/notion-sync
-
-# Sync only from Notion to Todoist
-bin/notion-sync --notion-to-todoist
-
-# Sync only from Todoist to Notion  
-bin/notion-sync --todoist-to-notion
-
-# Use a custom project name
-bin/notion-sync --project "Work Tasks"
+bin/sync
 ```
 
-## Automated Sync Setup
+This will:
+1. Pull latest notes from GitHub
+2. Sync Notion databases to local cache
+3. Sync tasks between Markdown files and database
+4. Fetch new emails
+5. Import calendar events
+6. Update contact information
+7. Process inbox items
+8. Archive completed tasks
 
-### Option 1: Run as Background Service
+### 4. Automated Sync
 
+#### Using Cron
+Add to your crontab for hourly sync:
 ```bash
-# Start the sync scheduler (runs every 15 minutes by default)
-bin/sync-scheduler
-
-# Run once
-bin/sync-scheduler --once
-
-# Check current config
-bin/sync-scheduler --config
+0 * * * * cd /path/to/today && bin/sync
 ```
 
-### Option 2: Configure Sync Settings
+#### Using systemd Timer
+Create a service file for Linux systems with systemd.
 
-Create or edit `.sync-config.json`:
+#### Using launchd (macOS)
+Create a LaunchAgent for automatic syncing on macOS.
 
-```json
-{
-  "intervalMinutes": 15,
-  "projectName": "Notion Tasks",
-  "enabled": true,
-  "syncDirection": "two-way"
-}
+## Task Management
+
+The built-in task manager syncs between SQLite and Markdown files:
+
+### File Structure
+- `notes/tasks/tasks.md` - Main task list
+- `notes/tasks/today.md` - Auto-generated daily tasks
+- `projects/*.md` - Project-specific tasks
+
+### Task Format
+Tasks in Markdown include unique IDs:
+```markdown
+- [ ] Task title <!-- task-id: abc123def456 -->
 ```
 
-Sync directions:
-- `"two-way"` - Full bidirectional sync (default)
-- `"notion-to-todoist"` - One-way from Notion to Todoist
-- `"todoist-to-notion"` - One-way from Todoist to Notion
+### Sync Process
+1. Reads all task files
+2. Adds IDs to new tasks
+3. Updates database with changes
+4. Generates today.md with current tasks
+5. Processes repeating tasks
 
-### Option 3: System Cron Job
+## Performance Optimization
 
-Add to your crontab (`crontab -e`):
+### Caching Strategy
+- SQLite database stores all synced data
+- Incremental sync only fetches changes
+- Cache TTL configured per data source
 
-```bash
-# Sync every 15 minutes
-*/15 * * * * cd /path/to/notion && bin/sync-scheduler --once >> .sync.log 2>&1
-```
-
-### Option 4: macOS LaunchAgent
-
-Create `~/Library/LaunchAgents/com.user.notion-todoist-sync.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.user.notion-todoist-sync</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/path/to/notion/bin/sync-scheduler</string>
-        <string>--once</string>
-    </array>
-    <key>StartInterval</key>
-    <integer>900</integer>
-    <key>WorkingDirectory</key>
-    <string>/path/to/notion</string>
-    <key>StandardOutPath</key>
-    <string>/tmp/notion-sync.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/notion-sync.error.log</string>
-</dict>
-</plist>
-```
-
-Then load it:
-
-```bash
-launchctl load ~/Library/LaunchAgents/com.user.notion-todoist-sync.plist
-```
-
-## How It Works
-
-### Sync Mapping
-
-- The system maintains a mapping between Notion and Todoist task IDs
-- Mappings are stored in SQLite cache for persistence
-- Tasks are matched by ID, preventing duplicates
-
-### Field Mapping
-
-| Notion Field | Todoist Field |
-|-------------|---------------|
-| Name/Title | Task Content |
-| Do Date | Due Date |
-| Status | Completed State |
-| Priority | Priority (1-4) |
-| Tags | Labels |
-| Project | Description (reference) |
-
-### Priority Mapping
-
-- 🔴 Critical → Priority 4 (Red)
-- 🟠 High → Priority 3 (Orange)
-- 🟡 Medium → Priority 2 (Blue)
-- ⚪ Low → Priority 1 (Gray)
-
-### Change Detection
-
-- Uses MD5 hash of task properties to detect changes
-- Only syncs tasks that have actually changed
-- Prevents unnecessary API calls
-
-### Conflict Resolution
-
-- Last-write-wins strategy
-- Most recently edited task overwrites older version
-- Manual conflict resolution can be added if needed
-
-## Monitoring
-
-### Check Sync Logs
-
-```bash
-# View recent sync results from SQLite
-sqlite3 .data/today.db "SELECT * FROM sync_log ORDER BY timestamp DESC LIMIT 10"
-
-# View last sync time
-cat .sync-config.json | jq '.lastSync'
-```
-
-### Clear Sync Cache
-
-If you need to reset the sync mappings:
-
-```bash
-bin/notion clear-cache
-```
+### Sync Frequency
+Recommended intervals:
+- GitHub notes: Every sync (quick)
+- Notion: Every 15-30 minutes
+- Tasks: Every sync (instant)
+- Email: Every hour
+- Calendar: Every 2-4 hours
 
 ## Troubleshooting
 
-### Tasks Not Syncing
+### Common Issues
 
-1. Ensure both tokens are valid
-2. Check that tasks have "Do Date" set in Notion
-3. Verify the Todoist project exists
-4. Check sync_log table in SQLite for errors
+1. **Sync fails with permission error**
+   - Check that all tokens are valid
+   - Ensure database file has write permissions
 
-### Duplicate Tasks
+2. **Tasks not appearing in today.md**
+   - Set do_date on tasks
+   - Run `bin/tasks sync` manually
 
-- This usually means the sync mapping was lost
-- Clear cache and re-sync: `bin/notion clear-cache && bin/notion-sync`
+3. **Notion sync is slow**
+   - Use cached mode by default
+   - Force refresh only when needed
 
-### Performance Issues
+### Debug Mode
+Enable verbose logging:
+```bash
+DEBUG=1 bin/sync
+```
 
-- Reduce sync frequency in `.sync-config.json`
-- Use one-way sync if bidirectional isn't needed
-- Check API rate limits (Todoist: 450 requests/15 min)
+### Manual Sync
+Sync individual components:
+```bash
+bin/tasks sync           # Tasks only
+bin/notion fetch-tasks   # Notion only
+bin/email fetch          # Email only
+```
 
 ## Best Practices
 
-1. **Start with one-way sync** to test the system
-2. **Use descriptive project names** in Todoist
-3. **Set reasonable sync intervals** (15-30 minutes recommended)
-4. **Monitor logs** for the first few days
-5. **Backup your data** before initial setup
-
-## Limitations
-
-- Only syncs tasks with "Do Date" field set
-- Subtasks are not currently synced
-- Attachments and comments not synced
-- Rich text formatting is simplified
-
-## Future Enhancements
-
-- [ ] Webhook support for real-time sync
-- [ ] Subtask synchronization
-- [ ] Comment sync
-- [ ] Custom field mapping configuration
-- [ ] Web UI for monitoring sync status
+1. **Start with partial sync** - Configure one service at a time
+2. **Monitor first runs** - Check logs for errors
+3. **Use incremental sync** - Avoid full refreshes unless necessary
+4. **Set up automation** - Use cron or similar for regular syncs
+5. **Regular backups** - Back up `.data/today.db` periodically

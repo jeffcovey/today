@@ -1,0 +1,485 @@
+#!/usr/bin/env node
+
+import { TaskManager } from '../src/task-manager.js';
+import { TaskStageClassifier } from '../src/task-stage-classifier.js';
+import { program } from 'commander';
+import chalk from 'chalk';
+import Table from 'cli-table3';
+
+program
+  .name('tasks')
+  .description('Task management for Today system')
+  .version('1.0.0');
+
+// Sync command
+program
+  .command('sync [file]')
+  .description('Sync tasks from markdown files')
+  .action(async (file) => {
+    const tm = new TaskManager();
+    
+    try {
+      if (file) {
+        // Sync specific file
+        const updates = await tm.syncMarkdownFile(file);
+        console.log(chalk.green(`✓ Synced ${file} (${updates} updates)`));
+      } else {
+        // Sync all task files
+        const fs = await import('fs');
+        
+        // First sync project files to establish project records
+        const projectFiles = fs.readdirSync('projects')
+          .filter(f => f.endsWith('.md'))
+          .map(f => `projects/${f}`);
+        
+        console.log(chalk.blue('Syncing projects...'));
+        for (const filePath of projectFiles) {
+          if (fs.existsSync(filePath)) {
+            const result = await tm.syncProjectFile(filePath);
+            const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(result.projectId);
+            console.log(chalk.gray(`  • ${project.name}: ${result.updates ? 'updated' : 'synced'}`));
+          }
+        }
+        
+        // Then sync task files
+        const taskFiles = [
+          'notes/tasks/tasks.md',
+          'notes/tasks/streaks-today.md',
+          ...projectFiles
+        ];
+
+        console.log(chalk.blue('Syncing tasks...'));
+        let totalUpdates = 0;
+        for (const filePath of taskFiles) {
+          if (fs.existsSync(filePath)) {
+            const updates = await tm.syncMarkdownFile(filePath);
+            totalUpdates += updates;
+            console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
+          }
+        }
+        console.log(chalk.green(`✓ Synced ${taskFiles.length} files (${totalUpdates} total updates)`));
+      }
+
+      // Process repeating tasks
+      const repeated = tm.processRepeatingTasks();
+      if (repeated > 0) {
+        console.log(chalk.blue(`✓ Created ${repeated} recurring task instances`));
+      }
+
+      // Generate today file
+      const todayCount = await tm.generateTodayFile();
+      console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
+      
+      // Classify stages for tasks without them
+      console.log(chalk.blue('Classifying task stages...'));
+      const classifier = new TaskStageClassifier();
+      try {
+        const result = await classifier.classifyTasks(true);
+        if (result.classified > 0) {
+          console.log(chalk.green(`✓ Classified ${result.classified} tasks into Front/Back/Off Stage`));
+        } else {
+          console.log(chalk.gray('  • All tasks already have stages assigned'));
+        }
+      } catch (err) {
+        console.log(chalk.yellow('  • Stage classification skipped (AI not available)'));
+      } finally {
+        classifier.close();
+      }
+    } catch (error) {
+      console.error(chalk.red('Error syncing tasks:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
+// List command
+program
+  .command('list')
+  .description('List tasks')
+  .option('-t, --today', 'Show only today\'s tasks')
+  .option('-p, --project <id>', 'Show tasks for a specific project')
+  .option('-s, --status <status>', 'Filter by status')
+  .option('--stage <stage>', 'Filter by stage (Front Stage, Back Stage, Off Stage)')
+  .option('-l, --legend', 'Show legend for symbols')
+  .option('-c, --compact', 'Ultra-compact display (no table borders)')
+  .action((options) => {
+    if (options.legend) {
+      console.log(chalk.bold('\nTask List Legend:'));
+      console.log(chalk.gray('─────────────────'));
+      console.log('Stage symbols:');
+      console.log('  📥 = inbox    ⏭️ = next     🔵 = active');
+      console.log('  ⏸️ = waiting  ✅ = done     📦 = archived');
+      console.log('\nPriority symbols:');
+      console.log('  🔴 = critical (5)  🟠 = high (4)     🟡 = medium (3)');
+      console.log('  🔵 = low (2)       ⚪ = very low (1)');
+      console.log('');
+      return;
+    }
+    const tm = new TaskManager();
+    
+    try {
+      let tasks;
+      if (options.today) {
+        tasks = tm.getTodayTasks();
+      } else if (options.project) {
+        tasks = tm.getProjectTasks(options.project);
+      } else {
+        tasks = tm.getActiveTasks();
+      }
+
+      if (options.status) {
+        tasks = tasks.filter(t => t.status === options.status);
+      }
+      if (options.stage) {
+        tasks = tasks.filter(t => t.stage === options.stage);
+      }
+
+      if (tasks.length === 0) {
+        console.log(chalk.gray('No tasks found'));
+        return;
+      }
+
+      if (options.compact) {
+        // Ultra-compact display without table
+        console.log(chalk.gray('ID       S P  Title'));
+        console.log(chalk.gray('─'.repeat(60)));
+        
+        const prioritySymbols = {
+          5: '🔴', 4: '🟠', 3: '🟡', 2: '🔵', 1: '⚪'
+        };
+        const statusDisplay = {
+          '🎭 Stage': '🎭',
+          '🔥 Immediate': '🔥',
+          '📅 Scheduled': '📅',
+          '🚀 1st Priority': '🚀1',
+          '2nd Priority': '2️⃣',
+          '3rd Priority': '3️⃣',
+          '4th Priority': '4️⃣',
+          '5th Priority': '5️⃣',
+          '💭 Remember': '💭',
+          '⚡ Quick': '⚡',
+          '🚘 Errand': '🚘',
+          'Active': '🔵',
+          'In progress': '🏃',
+          'Next Up': '⏭️',
+          'Waiting': '⏸️',
+          'Paused': '⏸️',
+          '✅ Done': '✅'
+        };
+        
+        for (const task of tasks) {
+          const id = task.id.substring(0, 8);
+          const status = statusDisplay[task.status] || task.status.substring(0, 3);
+          const priority = prioritySymbols[task.priority] || '🟡';
+          const title = task.title.length > 45 ? task.title.substring(0, 42) + '...' : task.title;
+          console.log(`${id} ${status} ${priority} ${title}`);
+        }
+        console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
+        tm.close();
+        return;
+      }
+
+      const table = new Table({
+        head: ['ID', 'Title', 'St', 'P', 'Due', 'Project'],
+        colWidths: [9, 37, 5, 4, 12, 12],
+        wordWrap: true
+      });
+
+      const prioritySymbols = {
+        5: '🔴',
+        4: '🟠',
+        3: '🟡',
+        2: '🔵',
+        1: '⚪'
+      };
+
+      // Status abbreviations for compact display
+      const statusDisplay = {
+        '🎭 Stage': '🎭',
+        '🔥 Immediate': '🔥',
+        '📅 Scheduled': '📅',
+        '🚀 1st Priority': '1️⃣',
+        '2nd Priority': '2️⃣',
+        '3rd Priority': '3️⃣',
+        '4th Priority': '4️⃣',
+        '5th Priority': '5️⃣',
+        '💭 Remember': '💭',
+        '⚡ Quick': '⚡',
+        '🚘 Errand': '🚘',
+        'Active': '🏃',
+        'In progress': '🏃',
+        'Next Up': '⏭️',
+        'Waiting': '⏸️',
+        'Paused': '⏸️',
+        '✅ Done': '✅'
+      };
+
+      for (const task of tasks) {
+        // Get project name if task has project_id
+        let projectName = '-';
+        if (task.project_id) {
+          const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
+          projectName = project ? project.name : '-';
+        }
+        
+        table.push([
+          task.id.substring(0, 8),
+          task.title,
+          statusDisplay[task.status] || (task.status ? task.status.substring(0, 3) : '?'),
+          prioritySymbols[task.priority] || '🟡',
+          task.do_date || '-',
+          projectName
+        ]);
+      }
+
+      console.log(table.toString());
+      console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
+      
+      // Show stage distribution if stages are set
+      const stageCounts = {};
+      for (const task of tasks) {
+        if (task.stage) {
+          stageCounts[task.stage] = (stageCounts[task.stage] || 0) + 1;
+        }
+      }
+      if (Object.keys(stageCounts).length > 0) {
+        console.log(chalk.gray('\nBy Stage:'));
+        for (const [stage, count] of Object.entries(stageCounts)) {
+          const emoji = stage === 'Front Stage' ? '👥' : 
+                       stage === 'Back Stage' ? '🔧' : '🌴';
+          console.log(chalk.gray(`  ${emoji} ${stage}: ${count}`));
+        }
+      }
+    } finally {
+      tm.close();
+    }
+  });
+
+// Add command
+program
+  .command('add <title>')
+  .description('Add a new task')
+  .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
+  .option('-p, --priority <1-5>', 'Set priority (1-5)', '3')
+  .option('-t, --tags <tags>', 'Add tags (comma-separated)')
+  .option('-s, --status <status>', 'Set status', '🎭 Stage')
+  .option('--stage <stage>', 'Set stage (Front Stage, Back Stage, Off Stage)')
+  .option('--project <name>', 'Assign to project')
+  .action((title, options) => {
+    const tm = new TaskManager();
+    
+    try {
+      const data = {
+        title,
+        do_date: options.date,
+        priority: parseInt(options.priority),
+        status: options.status,
+        stage: options.stage,
+        tags: options.tags ? options.tags.split(',').map(t => t.trim()) : []
+      };
+
+      if (options.project) {
+        data.project_id = tm.getOrCreateProject(options.project);
+      }
+
+      const id = tm.createTask(data);
+      console.log(chalk.green(`✓ Created task: ${id.substring(0, 8)}`));
+      console.log(chalk.gray(`  "${title}"`));
+    } catch (error) {
+      console.error(chalk.red('Error creating task:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
+// Update command
+program
+  .command('update <id>')
+  .description('Update a task')
+  .option('-t, --title <title>', 'Update title')
+  .option('-d, --date <date>', 'Update due date')
+  .option('-p, --priority <1-5>', 'Update priority')
+  .option('-s, --status <status>', 'Update status')
+  .option('--stage <stage>', 'Update stage (Front Stage, Back Stage, Off Stage)')
+  .option('--tags <tags>', 'Update tags (comma-separated)')
+  .action((id, options) => {
+    const tm = new TaskManager();
+    
+    try {
+      // Find task by partial ID
+      const tasks = tm.getActiveTasks();
+      const task = tasks.find(t => t.id.startsWith(id));
+      
+      if (!task) {
+        console.error(chalk.red(`Task not found: ${id}`));
+        process.exit(1);
+      }
+
+      const updates = {};
+      if (options.title) updates.title = options.title;
+      if (options.date) updates.do_date = options.date;
+      if (options.priority) updates.priority = parseInt(options.priority);
+      if (options.status) updates.status = options.status;
+      if (options.stage) updates.stage = options.stage;
+      if (options.tags) updates.tags = options.tags.split(',').map(t => t.trim());
+
+      tm.updateTask(task.id, updates);
+      console.log(chalk.green(`✓ Updated task: ${task.id.substring(0, 8)}`));
+    } catch (error) {
+      console.error(chalk.red('Error updating task:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
+// Done command
+program
+  .command('done <id>')
+  .description('Mark a task as done')
+  .action((id) => {
+    const tm = new TaskManager();
+    
+    try {
+      const tasks = tm.getActiveTasks();
+      const task = tasks.find(t => t.id.startsWith(id));
+      
+      if (!task) {
+        console.error(chalk.red(`Task not found: ${id}`));
+        process.exit(1);
+      }
+
+      tm.updateTask(task.id, { status: '✅ Done' });
+      console.log(chalk.green(`✓ Marked as done: ${task.title}`));
+
+      // Check for repeating task
+      if (task.repeat_frequency) {
+        const repeated = tm.processRepeatingTasks();
+        if (repeated > 0) {
+          console.log(chalk.blue(`✓ Created next recurrence`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Error marking task as done:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
+// Classify stages command
+program
+  .command('classify-stages')
+  .description('Classify tasks into Front/Back/Off Stage categories')
+  .option('--all', 'Reclassify all tasks (not just unclassified)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options) => {
+    const classifier = new TaskStageClassifier();
+    
+    try {
+      if (options.verbose) {
+        console.log(chalk.bold('🎭 Task Stage Classification'));
+        console.log(chalk.gray('───────────────────────────'));
+        console.log('Front Stage: Tasks with other people');
+        console.log('Back Stage:  Behind-the-scenes work');
+        console.log('Off Stage:   Personal time & self-care');
+        console.log('');
+      }
+      
+      const result = await classifier.classifyTasks(!options.all);
+      
+      if (result.classified === 0 && result.failed === 0) {
+        console.log(chalk.gray('All tasks already have stages assigned'));
+      } else {
+        console.log(chalk.green(`✓ Successfully classified ${result.classified} task(s)`));
+        if (result.failed > 0) {
+          console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Error classifying stages:'), error.message);
+      process.exit(1);
+    } finally {
+      classifier.close();
+    }
+  });
+
+// Projects command
+program
+  .command('projects')
+  .description('List all projects')
+  .option('-d, --detailed', 'Show detailed project information')
+  .action((options) => {
+    const tm = new TaskManager();
+    
+    try {
+      const projects = tm.db.prepare('SELECT * FROM projects ORDER BY start_date DESC, name').all();
+      
+      if (projects.length === 0) {
+        console.log(chalk.gray('No projects found'));
+        return;
+      }
+
+      if (options.detailed) {
+        for (const project of projects) {
+          const taskCount = tm.db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?')
+            .get(project.id).count;
+          const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
+            .get(project.id).count;
+          
+          console.log(chalk.bold(`\n${project.name}`));
+          console.log(chalk.gray('─'.repeat(40)));
+          console.log(`ID:       ${project.id.substring(0, 8)}`);
+          console.log(`Status:   ${project.status}`);
+          if (project.start_date || project.end_date) {
+            console.log(`Dates:    ${project.start_date || '?'} to ${project.end_date || '?'}`);
+          }
+          if (project.budget) {
+            console.log(`Budget:   $${project.budget.toLocaleString()}`);
+          }
+          console.log(`Tasks:    ${doneCount}/${taskCount} completed`);
+          if (project.file_path) {
+            console.log(`File:     ${project.file_path}`);
+          }
+          if (project.description) {
+            console.log(`\n${project.description.substring(0, 200)}${project.description.length > 200 ? '...' : ''}`);
+          }
+        }
+      } else {
+        const table = new Table({
+          head: ['ID', 'Name', 'Status', 'Dates', 'Tasks'],
+          colWidths: [10, 25, 10, 20, 10]
+        });
+
+        for (const project of projects) {
+          const taskCount = tm.db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?')
+            .get(project.id).count;
+          const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
+            .get(project.id).count;
+          
+          let dates = '-';
+          if (project.start_date && project.end_date) {
+            const start = new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const end = new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            dates = `${start} - ${end}`;
+          }
+          
+          table.push([
+            project.id.substring(0, 8),
+            project.name,
+            project.status,
+            dates,
+            `${doneCount}/${taskCount}`
+          ]);
+        }
+
+        console.log(table.toString());
+      }
+    } finally {
+      tm.close();
+    }
+  });
+
+program.parse();

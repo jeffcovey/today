@@ -21,34 +21,33 @@ bin/notion debug               # Debug database items
 # Using -- prefix for specific commands
 bin/notion --edit              # Alternative: Start interactive editor
 bin/notion --daily --all       # Alternative: Run daily automation
-bin/notion --sync              # Alternative: Sync with Todoist
 ```
 
-### Sync Commands
+### Task Management Commands
 
-#### Sync Commands
+#### `bin/tasks`
 
-Sync tasks between Notion and Todoist using the unified `notion` command.
+Manage local tasks with Markdown sync.
 
 ```bash
-bin/notion sync --dry-run          # Preview sync without making changes
-bin/notion sync                    # Perform two-way sync
-bin/notion sync --notion-to-todoist # One-way: Notion → Todoist
-bin/notion sync --todoist-to-notion # One-way: Todoist → Notion
-bin/notion sync --project "Work"   # Use custom Todoist project
-
-# Alternative syntax
-bin/notion --sync --dry-run        # Using -- prefix
+bin/tasks sync                     # Sync all markdown files with database
+bin/tasks sync notes/tasks/tasks.md # Sync specific file
+bin/tasks list                     # List all active tasks
+bin/tasks list --today             # Show today's tasks
+bin/tasks list --stage inbox      # Filter by stage
+bin/tasks add "New task" --date 2025-08-14 --priority 4
+bin/tasks update <id> --stage active
+bin/tasks done <id>               # Mark task as complete
+bin/tasks projects                # List all projects
 ```
 
-#### `bin/sync-scheduler`
+#### `bin/sync`
 
-Automated sync scheduler for background synchronization.
+Main synchronization script for all data sources.
 
 ```bash
-bin/sync-scheduler                 # Start continuous sync (every 15 min)
-bin/sync-scheduler --once          # Run single sync and exit
-bin/sync-scheduler --config        # Show current configuration
+bin/sync                           # Run full sync of all sources
+bin/sync --force                   # Force sync even if recent
 ```
 
 ### Automation Commands
@@ -69,17 +68,18 @@ bin/notion --daily --all           # Using -- prefix
 
 ## Quick Start Examples
 
-### First-Time Sync Setup
+### First-Time Setup
 
 ```bash
-# 1. Preview what will be synced
-bin/notion sync --dry-run
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your credentials
 
-# 2. If everything looks good, run the sync
-bin/notion sync
+# 2. Run initial sync
+bin/sync
 
-# 3. Set up automated sync
-bin/sync-scheduler
+# 3. Check tasks
+bin/tasks list --today
 ```
 
 ### Daily Workflow
@@ -91,8 +91,11 @@ bin/notion daily --all
 # Throughout the day: Edit tasks interactively
 bin/notion edit
 
-# Check sync status
-bin/sync-scheduler --config
+# Sync task changes
+bin/tasks sync
+
+# View today's tasks
+bin/tasks list --today
 ```
 
 ### Troubleshooting
@@ -147,7 +150,8 @@ Scripts require environment variables in `.env`:
 
 ```bash
 NOTION_TOKEN=your_notion_token_here
-TODOIST_TOKEN=your_todoist_token_here  # Only for sync features
+EMAIL_ACCOUNT=your.email@gmail.com
+EMAIL_PASSWORD=your_app_password_here
 ```
 
 ## Configuration Files

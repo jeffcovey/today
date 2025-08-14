@@ -74,10 +74,7 @@ main() {
     # Run all sync steps
     run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
     run_sync_step "📊 Notion Database" sync_notion "Notion database synced" "Notion database"
-    
-    # Run Todoist sync
-    run_sync_step "✅ Todoist Tasks" sync_todoist "Todoist tasks synced" "Todoist tasks"
-    
+    run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
     run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
     run_sync_step "📇 Contacts" sync_contacts "Contacts synced" "Contacts"
@@ -208,6 +205,38 @@ sync_github_notes() {
     return 0
 }
 
+# Sync task manager (includes stage classification)
+sync_tasks() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    print_info "Syncing task database with markdown files..."
+    
+    # Run the task sync command (now includes stage classification)
+    output=$(bin/tasks sync 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        # Show the sync output but filter for key info
+        echo "$output" | while IFS= read -r line; do
+            # Highlight stage classification results
+            if echo "$line" | grep -qE "Classified|Stage|Front|Back|Off"; then
+                print_info "$line"
+            elif echo "$line" | grep -q "✓"; then
+                print_info "$line"
+            elif echo "$line" | grep -q "Generated today.md"; then
+                print_info "$line"
+            fi
+        done
+        return 0
+    else
+        print_error "Task sync failed"
+        echo "$output" | while IFS= read -r line; do
+            print_info "$line"
+        done
+        return 1
+    fi
+}
+
+
 # Sync Notion database
 sync_notion() {
     # Use the notion CLI to refresh cache
@@ -253,117 +282,6 @@ sync_notion() {
         else
             print_info "Error: $output"
         fi
-        return 1
-    fi
-}
-
-# Sync Todoist tasks
-sync_todoist() {
-    cd "$(dirname "$0")/.." || return 1
-    
-    # Check if Todoist token is configured
-    if ! grep -q "TODOIST_TOKEN=" .env 2>/dev/null || grep -q "TODOIST_TOKEN=your_todoist" .env 2>/dev/null; then
-        print_info "Todoist not configured, skipping"
-        return 0
-    fi
-    
-    # Check for --force flag
-    FORCE_MODE=false
-    if [[ "${FORCE_SYNC:-}" == "true" ]]; then
-        FORCE_MODE=true
-    fi
-    
-    # Check if we've synced recently (within last hour)
-    TODOIST_SYNC_FILE=".last-todoist-sync"
-    SHOULD_SYNC=true
-    
-    if [[ -f "$TODOIST_SYNC_FILE" ]] && [[ "$FORCE_MODE" != "true" ]]; then
-        LAST_SYNC=$(cat "$TODOIST_SYNC_FILE" 2>/dev/null || echo "0")
-        CURRENT_TIME=$(date +%s)
-        TIME_DIFF=$((CURRENT_TIME - LAST_SYNC))
-        
-        # Skip if synced within last hour (3600 seconds)
-        if [[ $TIME_DIFF -lt 3600 ]]; then
-            print_info "Todoist synced recently ($(($TIME_DIFF / 60)) minutes ago), skipping"
-            print_info "Use --force to sync anyway"
-            return 0
-        fi
-    fi
-    
-    # Run incremental two-way sync directly using Node
-    print_info "Syncing with Todoist..."
-    
-    sync_output=$(node -e "
-        import('./src/todoist-sync.js').then(async ({TodoistSync}) => {
-            const {NotionAPI} = await import('./src/notion-api.js');
-            
-            const notionAPI = new NotionAPI(process.env.NOTION_TOKEN);
-            const sync = new TodoistSync(process.env.TODOIST_TOKEN, notionAPI);
-            
-            // Use cached database ID if available
-            const {SQLiteCache} = await import('./src/sqlite-cache.js');
-            const cache = new SQLiteCache();
-            
-            let actionDBId = null;
-            
-            // Try to get cached database ID first
-            const cachedDbs = await cache.getCachedDatabases();
-            if (cachedDbs && cachedDbs.length > 0) {
-                const actionDB = cachedDbs.find(db => db.title.toLowerCase().includes('action items'));
-                if (actionDB) {
-                    actionDBId = actionDB.id;
-                    console.log('Using cached Action Items database ID');
-                }
-            }
-            
-            // Fall back to API if not in cache
-            if (!actionDBId) {
-                console.log('Fetching databases from Notion API...');
-                const dbs = await notionAPI.getDatabases();
-                const actionDB = dbs.find(db => db.title.toLowerCase().includes('action items'));
-                if (!actionDB) {
-                    console.error('Action Items database not found');
-                    process.exit(1);
-                }
-                actionDBId = actionDB.id;
-            }
-            
-            // Perform incremental sync (using cached Notion data)
-            const result = await sync.performTwoWaySync(actionDBId, 'Notion Tasks', false);
-            
-            // Show summary
-            const n2t = result.notionToTodoist;
-            const t2n = result.todoistToNotion;
-            
-            if (n2t.created || n2t.updated || t2n.created || t2n.updated) {
-                console.log('Changes synced:');
-                if (n2t.created + n2t.updated > 0) {
-                    console.log('  Notion → Todoist: ' + n2t.created + ' new, ' + n2t.updated + ' updated');
-                }
-                if (t2n.created + t2n.updated > 0) {
-                    console.log('  Todoist → Notion: ' + t2n.created + ' new, ' + t2n.updated + ' updated');
-                }
-            } else {
-                console.log('No changes to sync (7 tasks unchanged)');
-            }
-        }).catch(err => {
-            console.error('Sync failed: ' + err.message);
-            process.exit(1);
-        });
-    " 2>&1)
-    
-    if [[ $? -eq 0 ]]; then
-        echo "$sync_output" | while IFS= read -r line; do
-            print_info "$line"
-        done
-        # Update last sync timestamp
-        date +%s > "$TODOIST_SYNC_FILE"
-        return 0
-    else
-        print_error "Todoist sync failed"
-        echo "$sync_output" | while IFS= read -r line; do
-            print_info "$line"
-        done
         return 1
     fi
 }

@@ -1,6 +1,6 @@
 # Today
 
-A personal command center for reviewing everything coming in, managing plans and dreams, and deciding what to do each day to be happy and productive. Integrates multiple data sources including Notion, Todoist, email, and more to create a unified daily workflow.
+A personal command center for reviewing everything coming in, managing plans and dreams, and deciding what to do each day to be happy and productive. Integrates multiple data sources including Notion, email, calendar, and local task management to create a unified daily workflow.
 
 ## Features
 
