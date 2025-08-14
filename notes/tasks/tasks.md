@@ -1,7 +1,7 @@
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
 - [ ] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
-- [ ] check that we have good indexes in our today.db <!-- task-id: 08bd7c03b09e5a385efbdcb39a589894 -->
+- [x] check that we have good indexes in our today.db <!-- task-id: 08bd7c03b09e5a385efbdcb39a589894 -->
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 
