@@ -281,6 +281,37 @@ When creating tasks:
   - Associate tasks with projects automatically
   - Track completion history for repeating tasks
 
+**IMPORTANT Task Creation Workflow for Daily Reviews:**
+
+When Claude needs to add urgent tasks during a daily review:
+
+1. **Create the task using bin/tasks add:**
+   ```bash
+   # For critical/immediate tasks (will appear at top of today.md):
+   bin/tasks add "Task title" --date YYYY-MM-DD --status "🔥 Immediate"
+   
+   # For high priority tasks:
+   bin/tasks add "Task title" --date YYYY-MM-DD --status "🚀 1st Priority"
+   
+   # For normal tasks:
+   bin/tasks add "Task title" --date YYYY-MM-DD --status "🎭 Stage"
+   ```
+
+2. **Run sync to update today.md:**
+   ```bash
+   bin/tasks sync
+   ```
+
+3. **Copy the task WITH its ID to the review file:**
+   After sync, copy the task from today.md (including the `<!-- task-id: xxx -->` comment) 
+   into the appropriate section of the daily review file.
+
+**Important Notes:**
+- Valid statuses: "🔥 Immediate", "🚀 1st Priority", "🎭 Stage", "3rd Priority", "Waiting", "✅ Done"
+- Status determines priority in today.md (🔥 Immediate → Critical section at top)
+- Tasks in review files are NOT auto-synced (review files are for reference only)
+- The flow is: bin/tasks → database → today.md → copy to review file
+
 ### Database Integration
 
 The task management system includes:
