@@ -5,6 +5,10 @@ WORKDIR /app
 # Install build dependencies for native modules, curl, sqlite, bash, git
 RUN apk add --no-cache python3 make g++ curl sqlite bash git
 
+# Install Turso CLI
+RUN curl -sSfL https://get.tur.so/install.sh | bash && \
+    mv /root/.turso/bin/turso /usr/local/bin/turso
+
 # Copy package files
 COPY package*.json ./
 

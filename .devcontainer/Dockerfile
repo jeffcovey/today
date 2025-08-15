@@ -1,7 +1,11 @@
 FROM mcr.microsoft.com/devcontainers/javascript-node:20
 
 # Install build dependencies for native modules (better-sqlite3) and sqlite3 CLI
-RUN apt-get update && apt-get install -y python3 make g++ sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
+
+# Install Turso CLI
+RUN curl -sSfL https://get.tur.so/install.sh | bash && \
+    mv /root/.turso/bin/turso /usr/local/bin/turso
 
 # Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless)
 RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev && rm -rf /var/lib/apt/lists/*

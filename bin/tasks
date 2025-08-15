@@ -120,7 +120,7 @@ program
       console.log('');
       return;
     }
-    const tm = new TaskManager();
+    const tm = new TaskManager('.data/today.db', { readOnly: true });
     
     try {
       let tasks;
@@ -417,7 +417,7 @@ program
   .option('-a, --all', 'Include completed/archived tasks')
   .option('-v, --verbose', 'Show all available fields')
   .action((query, options) => {
-    const tm = new TaskManager();
+    const tm = new TaskManager('.data/today.db', { readOnly: true });
     
     try {
       // Search in all tasks if --all, otherwise just active

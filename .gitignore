@@ -15,3 +15,6 @@ google-calendar-key.json
 
 # Runtime and sync files (instance-specific)
 .sync-config.json
+
+# Turso client cache
+.turso-cache/

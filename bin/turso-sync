@@ -1,0 +1,464 @@
+#!/usr/bin/env node
+
+/**
+ * Turso Sync Utility
+ * Manages sync between local SQLite and Turso cloud database
+ * 
+ * Key features:
+ * - Handles initial pull from Turso on new systems
+ * - Incremental sync to avoid timeouts
+ * - Automatic conflict resolution
+ */
+
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import chalk from 'chalk';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import dotenvx from '@dotenvx/dotenvx';
+import Database from 'better-sqlite3';
+import { createClient } from '@libsql/client';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenvx.config();
+
+const LOCAL_DB = path.join(process.cwd(), '.data', 'today.db');
+const SYNC_STATE_FILE = path.join(process.cwd(), '.data', 'turso-sync.json');
+
+class TursoSync {
+  constructor() {
+    this.localDb = null;
+    this.tursoClient = null;
+    this.syncState = this.loadSyncState();
+  }
+
+  loadSyncState() {
+    if (fs.existsSync(SYNC_STATE_FILE)) {
+      try {
+        return JSON.parse(fs.readFileSync(SYNC_STATE_FILE, 'utf8'));
+      } catch (e) {
+        return { lastSync: null, initialized: false };
+      }
+    }
+    return { lastSync: null, initialized: false };
+  }
+
+  saveSyncState() {
+    const dir = path.dirname(SYNC_STATE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(SYNC_STATE_FILE, JSON.stringify(this.syncState, null, 2));
+  }
+
+  async initClients() {
+    // Initialize Turso client
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      console.log(chalk.yellow('⚠️  Turso not configured'));
+      console.log(chalk.gray('   Run: bin/migrate-to-turso setup'));
+      process.exit(1);
+    }
+
+    this.tursoClient = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN
+    });
+
+    // Initialize local database if it exists
+    if (fs.existsSync(LOCAL_DB)) {
+      this.localDb = new Database(LOCAL_DB);
+      this.localDb.pragma('journal_mode = WAL');
+    }
+  }
+
+  async status() {
+    await this.initClients();
+
+    console.log(chalk.blue('📊 Turso Sync Status\n'));
+
+    // Local database status
+    if (this.localDb) {
+      const stats = fs.statSync(LOCAL_DB);
+      const localSize = (stats.size / 1024 / 1024).toFixed(2);
+      const localModified = new Date(stats.mtime).toLocaleString();
+      
+      console.log(chalk.cyan('Local Database:'));
+      console.log(chalk.white(`   Path: ${LOCAL_DB}`));
+      console.log(chalk.white(`   Size: ${localSize} MB`));
+      console.log(chalk.white(`   Modified: ${localModified}`));
+      
+      const localTaskCount = this.localDb.prepare('SELECT COUNT(*) as count FROM tasks').get().count;
+      console.log(chalk.white(`   Tasks: ${localTaskCount}`));
+    } else {
+      console.log(chalk.yellow('⚠️  No local database found'));
+      console.log(chalk.gray('   Run: bin/turso-sync pull'));
+    }
+
+    // Turso database status
+    console.log(chalk.cyan('\nTurso Database:'));
+    console.log(chalk.white(`   URL: ${process.env.TURSO_DATABASE_URL}`));
+    
+    try {
+      const result = await this.tursoClient.execute('SELECT COUNT(*) as count FROM tasks');
+      const tursoTaskCount = result.rows[0].count;
+      console.log(chalk.white(`   Tasks: ${tursoTaskCount}`));
+      
+      if (this.localDb) {
+        const localTaskCount = this.localDb.prepare('SELECT COUNT(*) as count FROM tasks').get().count;
+        if (localTaskCount !== tursoTaskCount) {
+          console.log(chalk.yellow('\n⚠️  Databases are out of sync'));
+          console.log(chalk.gray('   Run: bin/turso-sync pull (to get latest from Turso)'));
+          console.log(chalk.gray('   Run: bin/turso-sync push (to update Turso)'));
+        } else {
+          console.log(chalk.green('\n✅ Databases appear to be in sync'));
+        }
+      }
+    } catch (error) {
+      console.log(chalk.red(`   Error: ${error.message}`));
+    }
+
+    if (this.syncState.lastSync) {
+      console.log(chalk.gray(`\nLast sync: ${new Date(this.syncState.lastSync).toLocaleString()}`));
+    }
+  }
+
+  async pull() {
+    await this.initClients();
+
+    console.log(chalk.blue('📥 Pulling from Turso to local...\n'));
+
+    // Create local database directory if needed
+    const dir = path.dirname(LOCAL_DB);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // If no local database, this is initial setup
+    const isInitialSetup = !fs.existsSync(LOCAL_DB);
+    
+    if (isInitialSetup) {
+      console.log(chalk.yellow('🔄 Initial setup - creating local database from Turso...'));
+      console.log(chalk.gray('   This may take a moment for large databases...\n'));
+    }
+
+    // Create/open local database
+    if (!this.localDb) {
+      this.localDb = new Database(LOCAL_DB);
+      this.localDb.pragma('journal_mode = WAL');
+    }
+
+    // Create schema first (if needed)
+    if (isInitialSetup) {
+      await this.createLocalSchema();
+    }
+
+    // Pull data table by table to handle large databases
+    const tables = ['projects', 'tags', 'tasks', 'task_tags', 'task_completions', 'markdown_sync'];
+    
+    for (const table of tables) {
+      try {
+        await this.pullTable(table, isInitialSetup);
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Warning pulling ${table}: ${error.message}`));
+      }
+    }
+
+    // Also sync emails table if it exists
+    try {
+      const emailCheck = await this.tursoClient.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='emails'");
+      if (emailCheck.rows.length > 0) {
+        await this.pullTable('emails', isInitialSetup);
+      }
+    } catch (e) {
+      // Emails table doesn't exist, that's OK
+    }
+
+    this.syncState.lastSync = new Date().toISOString();
+    this.syncState.initialized = true;
+    this.saveSyncState();
+
+    console.log(chalk.green('\n✅ Successfully pulled from Turso'));
+  }
+
+  async pullTable(tableName, isInitialSetup) {
+    console.log(chalk.gray(`   Pulling ${tableName}...`));
+
+    // Get count first
+    const countResult = await this.tursoClient.execute(`SELECT COUNT(*) as count FROM ${tableName}`);
+    const totalRows = countResult.rows[0].count;
+    
+    if (totalRows === 0) {
+      console.log(chalk.gray(`     No rows in ${tableName}`));
+      return;
+    }
+
+    // For large tables, pull in batches
+    const BATCH_SIZE = 1000;
+    let offset = 0;
+
+    while (offset < totalRows) {
+      const result = await this.tursoClient.execute({
+        sql: `SELECT * FROM ${tableName} LIMIT ? OFFSET ?`,
+        args: [BATCH_SIZE, offset]
+      });
+
+      if (result.rows.length === 0) break;
+
+      // Begin transaction for batch insert
+      const transaction = this.localDb.transaction(() => {
+        for (const row of result.rows) {
+          this.upsertRow(tableName, row);
+        }
+      });
+
+      try {
+        transaction();
+        console.log(chalk.gray(`     Processed ${Math.min(offset + BATCH_SIZE, totalRows)}/${totalRows} rows`));
+      } catch (error) {
+        console.log(chalk.yellow(`     Warning: ${error.message}`));
+      }
+
+      offset += BATCH_SIZE;
+    }
+
+    console.log(chalk.green(`     ✓ ${tableName}: ${totalRows} rows`));
+  }
+
+  upsertRow(tableName, row) {
+    // Build dynamic INSERT OR REPLACE query
+    const columns = Object.keys(row);
+    const placeholders = columns.map(() => '?').join(', ');
+    const sql = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+    
+    const stmt = this.localDb.prepare(sql);
+    stmt.run(...Object.values(row));
+  }
+
+  async push() {
+    await this.initClients();
+
+    if (!this.localDb) {
+      console.log(chalk.red('❌ No local database to push'));
+      return;
+    }
+
+    console.log(chalk.blue('📤 Pushing from local to Turso...\n'));
+
+    // Push data table by table
+    const tables = ['projects', 'tags', 'tasks', 'task_tags', 'task_completions', 'markdown_sync'];
+    
+    for (const table of tables) {
+      try {
+        await this.pushTable(table);
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Warning pushing ${table}: ${error.message}`));
+      }
+    }
+
+    // Also push emails if exists
+    const emailsExist = this.localDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='emails'").get();
+    if (emailsExist) {
+      try {
+        await this.pushTable('emails');
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Warning pushing emails: ${error.message}`));
+      }
+    }
+
+    this.syncState.lastSync = new Date().toISOString();
+    this.saveSyncState();
+
+    console.log(chalk.green('\n✅ Successfully pushed to Turso'));
+  }
+
+  async pushTable(tableName) {
+    console.log(chalk.gray(`   Pushing ${tableName}...`));
+
+    const rows = this.localDb.prepare(`SELECT * FROM ${tableName}`).all();
+    
+    if (rows.length === 0) {
+      console.log(chalk.gray(`     No rows in ${tableName}`));
+      return;
+    }
+
+    // Push in batches
+    const BATCH_SIZE = 100;
+    let processed = 0;
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, Math.min(i + BATCH_SIZE, rows.length));
+      
+      for (const row of batch) {
+        const columns = Object.keys(row);
+        const placeholders = columns.map(() => '?').join(', ');
+        const sql = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+        
+        try {
+          await this.tursoClient.execute({
+            sql: sql,
+            args: Object.values(row)
+          });
+          processed++;
+        } catch (error) {
+          // Log but continue
+          console.log(chalk.yellow(`     Skipped row: ${error.message}`));
+        }
+      }
+
+      console.log(chalk.gray(`     Processed ${processed}/${rows.length} rows`));
+    }
+
+    console.log(chalk.green(`     ✓ ${tableName}: ${processed} rows`));
+  }
+
+  async createLocalSchema() {
+    console.log(chalk.gray('   Creating database schema...'));
+
+    // Read schema from task-manager.js initDatabase method
+    // For now, use a simplified version
+    this.localDb.exec(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        content TEXT,
+        do_date DATE,
+        status TEXT DEFAULT '🎭 Stage',
+        stage TEXT,
+        project_id TEXT,
+        repeat_interval INTEGER,
+        repeat_next_date DATE,
+        notion_id TEXT UNIQUE,
+        notion_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME
+      );
+
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'active',
+        start_date DATE,
+        end_date DATE,
+        budget REAL,
+        file_path TEXT UNIQUE,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS tags (
+        id TEXT PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        color TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS task_tags (
+        task_id TEXT,
+        tag_id TEXT,
+        PRIMARY KEY (task_id, tag_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS task_completions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id TEXT NOT NULL,
+        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS markdown_sync (
+        file_path TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        line_number INTEGER,
+        last_synced DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (file_path, task_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS emails (
+        id TEXT PRIMARY KEY,
+        subject TEXT,
+        from_address TEXT,
+        date TEXT,
+        has_been_replied_to INTEGER DEFAULT 0,
+        text_content TEXT
+      );
+    `);
+  }
+
+  async watch() {
+    await this.initClients();
+
+    console.log(chalk.blue('👀 Watching for changes...\n'));
+    console.log(chalk.gray('   Syncing every 60 seconds'));
+    console.log(chalk.gray('   Press Ctrl+C to stop\n'));
+
+    // Initial pull if needed
+    if (!this.syncState.initialized) {
+      await this.pull();
+    }
+
+    // Watch loop
+    const interval = setInterval(async () => {
+      try {
+        console.log(chalk.gray(`[${new Date().toLocaleTimeString()}] Syncing...`));
+        await this.push();
+      } catch (error) {
+        console.log(chalk.red(`[${new Date().toLocaleTimeString()}] Sync error: ${error.message}`));
+      }
+    }, 60000);
+
+    process.on('SIGINT', () => {
+      clearInterval(interval);
+      console.log(chalk.yellow('\n\nStopping sync...'));
+      process.exit(0);
+    });
+  }
+}
+
+async function main() {
+  const sync = new TursoSync();
+  const command = process.argv[2] || 'status';
+
+  try {
+    switch (command) {
+      case 'status':
+        await sync.status();
+        break;
+      case 'pull':
+        await sync.pull();
+        break;
+      case 'push':
+        await sync.push();
+        break;
+      case 'watch':
+        await sync.watch();
+        break;
+      case 'help':
+      default:
+        console.log(chalk.cyan('Turso Sync Utility\n'));
+        console.log('Usage: bin/turso-sync [command]');
+        console.log('\nCommands:');
+        console.log('  status    - Show sync status');
+        console.log('  pull      - Pull from Turso to local (handles initial setup)');
+        console.log('  push      - Push from local to Turso');
+        console.log('  watch     - Auto-sync every minute');
+        console.log('  help      - Show this help');
+        console.log('\nWorkflow:');
+        console.log('  1. On new system: bin/turso-sync pull');
+        console.log('  2. Work locally with instant performance');
+        console.log('  3. Periodically: bin/turso-sync push');
+        console.log('\nNote: Local SQLite for speed, Turso for backup/sync');
+        break;
+    }
+  } catch (error) {
+    console.error(chalk.red('Error:'), error.message);
+    process.exit(1);
+  }
+}
+
+main();

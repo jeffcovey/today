@@ -1,6 +1,6 @@
-import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getDatabaseSync } from './database-sync.js';
 
 export class SQLiteCache {
   constructor() {
@@ -20,13 +20,8 @@ export class SQLiteCache {
   }
 
   initDatabase() {
-    this.db = new Database(this.dbPath);
-    
-    // Enable WAL mode for better concurrent access
-    this.db.pragma('journal_mode = WAL');
-    
-    // Set busy timeout to 30 seconds - will retry if database is locked
-    this.db.pragma('busy_timeout = 30000');
+    // Use DatabaseSync wrapper for automatic Turso sync
+    this.db = getDatabaseSync(this.dbPath);
     
     // Create tables
     this.db.exec(`

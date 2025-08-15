@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import Database from 'better-sqlite3';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 import { NotionAPI } from './notion-api.js';
 import { TodoistSync } from './todoist-sync.js';
 import fs from 'fs';
 import path from 'path';
+import { getDatabaseSync } from './database-sync.js';
 
 dotenv.config();
 
@@ -14,7 +14,8 @@ class SyncScheduler {
   constructor() {
     this.configPath = path.join(process.cwd(), '.sync-config.json');
     this.dbPath = path.join(process.cwd(), '.data', 'today.db');
-    this.db = new Database(this.dbPath);
+    // Use DatabaseSync wrapper for automatic Turso sync
+    this.db = getDatabaseSync(this.dbPath);
     this.initDatabase();
     this.config = this.loadConfig();
     this.isRunning = false;

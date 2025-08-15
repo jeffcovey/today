@@ -113,7 +113,13 @@
       "Bash(rg:*)",
       "Bash(done)",
       "Bash(TZ='America/New_York' date)",
-      "Bash(bin/tasks:*)"
+      "Bash(bin/tasks:*)",
+      "Bash(/home/node/.turso/bin/turso --version)",
+      "Bash(~/.turso/turso db shell:*)",
+      "Bash(npx dotenvx run:*)",
+      "Bash(bin/turso-sync:*)",
+      "Bash(./verify-turso.sh:*)",
+      "Bash(/dev/null)"
     ],
     "deny": []
   }

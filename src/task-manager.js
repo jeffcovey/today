@@ -1,14 +1,19 @@
-import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import { getDatabaseSync } from './database-sync.js';
 
 export class TaskManager {
-  constructor(dbPath = '.data/today.db') {
-    this.db = new Database(dbPath);
+  constructor(dbPath = '.data/today.db', options = {}) {
+    // Use DatabaseSync wrapper for automatic Turso sync
+    // Pass readOnly option to skip Turso initialization for read-only operations
+    this.db = getDatabaseSync(dbPath, { readOnly: options.readOnly || false });
     this.initDatabase();
   }
 
   initDatabase() {
+    // Disable foreign keys to avoid issues during sync
+    this.db.exec('PRAGMA foreign_keys = OFF');
+    
     // Create tasks table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS tasks (
