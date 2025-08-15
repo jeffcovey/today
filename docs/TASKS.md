@@ -33,8 +33,8 @@ Tasks are stored in `.data/today.db` with the following structure:
 Tasks in Markdown files include an HTML comment with their ID:
 
 ```markdown
-- [ ] Task title here <!-- task-id: abc123def456 --> <!-- task-id: 0681152657ae1af35cf5d639e9463ec9 -->
-- [x] Completed task <!-- task-id: 789ghi012jkl --> <!-- task-id: f391a1df876391d0e374afb4e1f41059 -->
+- [ ] Task title here <!-- task-id: unique-id-here -->
+- [x] Completed task <!-- task-id: another-unique-id -->
 ```
 
 ## CLI Commands

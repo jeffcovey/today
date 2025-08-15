@@ -611,7 +611,8 @@ export class TaskManager {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<!-- task-id: ([a-f0-9]{32}) -->)?$/);
+      // Match both normal and corrupted comment formats (em-dashes from formatters)
+      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>)?$/);
       
       if (taskMatch) {
         const isCompleted = taskMatch[1] === 'x';
@@ -642,8 +643,9 @@ export class TaskManager {
             project_id: projectId
           });
           
-          // Add task ID to the line
-          lines[i] = `${line} <!-- task-id: ${taskId} -->`;
+          // Add task ID to the line (strip any corrupted comments first)
+          const cleanLine = line.replace(/<![-—]+ task-id: [a-f0-9]{32} [-—]+>/g, '');
+          lines[i] = `${cleanLine} <!-- task-id: ${taskId} -->`;
           updates.push({ line: i, content: lines[i] });
         }
 
@@ -686,10 +688,11 @@ export class TaskManager {
       
       // Parse existing file for checkbox states
       for (const line of existingLines) {
-        const taskMatch = line.match(/^- \[([ x])\] .+?<!-- task-id: ([a-f0-9]{32}) -->/);
+        // Match both normal and corrupted comment formats
+        const taskMatch = line.match(/^- \[([ x])\] .+?(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
         if (taskMatch) {
           const isChecked = taskMatch[1] === 'x';
-          const taskId = taskMatch[2];
+          const taskId = taskMatch[2] || taskMatch[3]; // Could be in either capture group
           manualChanges.set(taskId, isChecked);
         }
       }
@@ -790,10 +793,11 @@ export class TaskManager {
       
       // Parse existing file for checkbox states
       for (const line of existingLines) {
-        const taskMatch = line.match(/^- \[([ x])\] .+?<!-- task-id: ([a-f0-9]{32}) -->/);
+        // Match both normal and corrupted comment formats
+        const taskMatch = line.match(/^- \[([ x])\] .+?(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
         if (taskMatch) {
           const isChecked = taskMatch[1] === 'x';
-          const taskId = taskMatch[2];
+          const taskId = taskMatch[2] || taskMatch[3]; // Could be in either capture group
           manualChanges.set(taskId, isChecked);
         }
       }

@@ -40,7 +40,7 @@
 - [ ] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->
 - [ ] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
 - [ ] Check room is ready by 3 PM check-in time <!-- task-id: a797b4f3c2b381166d282324e1f7d753 -->
-- [ ] Check the fridge water lines <!— task-id: 197d008fdf3afdac370906200c86ed65 —> <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
+- [ ] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
 - [ ] Check tomorrow's Off Stage activities <!-- task-id: 19a6b2447b68807e6bbf4ab3d451aca9 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
@@ -120,8 +120,6 @@
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 - [ ] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
 - [ ] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
-- [ ] Task title <!-- task-id: abc123def456 --> <!-- task-id: 0d0b20c952c563b214fd39f396bf9633 -->
-- [ ] Task title here <!-- task-id: abc123def456 --> <!-- task-id: 0681152657ae1af35cf5d639e9463ec9 -->
 - [ ] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
 - [ ] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
 - [ ] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
