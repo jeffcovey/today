@@ -941,15 +941,20 @@ export class TaskManager {
     // Derive priority from status
     switch (status) {
       case '🔥 Immediate':
-        return 1;
+        return 5; // Critical priority
+      case '🚀 1st Priority':
+        return 4; // High priority
       case '🎭 Stage':
-        return 3;
+        return 3; // Medium priority
+      case '3rd Priority':
+        return 3; // Medium priority
+      case 'Waiting':
       case '⏳ Waiting':
-        return 4;
+        return 2; // Low priority
       case '✅ Done':
-        return 5;
+        return 1; // Very low (completed)
       default:
-        return 3;
+        return 3; // Default to medium
     }
   }
 

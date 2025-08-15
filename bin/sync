@@ -209,6 +209,16 @@ sync_github_notes() {
 sync_tasks() {
     cd "$(dirname "$0")/.." || return 1
     
+    # Initialize Turso if needed (for new deployments)
+    if [[ ! -f ".data/today.db" ]] && [[ -n "$TURSO_DATABASE_URL" ]] && [[ -n "$TURSO_AUTH_TOKEN" ]]; then
+        print_info "No local database found, initializing from Turso..."
+        if bin/turso-sync pull >/dev/null 2>&1; then
+            print_info "Successfully initialized database from Turso"
+        else
+            print_info "Could not pull from Turso, will create new local database"
+        fi
+    fi
+    
     print_info "Syncing task database with markdown files..."
     
     # Run the task sync command (now includes stage classification)
