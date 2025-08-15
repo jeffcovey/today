@@ -8,4 +8,4 @@ He'd really like to better filter other profiles:
 - optional height, weight, top/bottom, etc.
 - relationship interest
 
-- [ ] check Grindr and SD search options for comparable
+- [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->

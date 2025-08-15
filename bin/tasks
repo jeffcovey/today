@@ -24,40 +24,51 @@ program
         const updates = await tm.syncMarkdownFile(file);
         console.log(chalk.green(`✓ Synced ${file} (${updates} updates)`));
       } else {
-        // Sync all task files
+        // Sync all markdown files in the entire repository
         const fs = await import('fs');
+        const { execSync } = await import('child_process');
+        
+        // Use git to find all markdown files (respects .gitignore)
+        console.log(chalk.blue('Finding all markdown files...'));
+        const allMarkdownFiles = execSync('git ls-files "*.md" 2>/dev/null || find . -name "*.md" -type f', { encoding: 'utf8' })
+          .split('\n')
+          .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
+          .map(f => f.replace(/^\.\//, ''));
+        
+        console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
         
         // First sync project files to establish project records
-        const projectFiles = fs.readdirSync('projects')
-          .filter(f => f.endsWith('.md'))
-          .map(f => `projects/${f}`);
-        
-        console.log(chalk.blue('Syncing projects...'));
-        for (const filePath of projectFiles) {
-          if (fs.existsSync(filePath)) {
-            const result = await tm.syncProjectFile(filePath);
-            const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(result.projectId);
-            console.log(chalk.gray(`  • ${project.name}: ${result.updates ? 'updated' : 'synced'}`));
+        const projectFiles = allMarkdownFiles.filter(f => f.startsWith('projects/'));
+        if (projectFiles.length > 0) {
+          console.log(chalk.blue('Syncing project files...'));
+          for (const filePath of projectFiles) {
+            if (fs.existsSync(filePath)) {
+              const result = await tm.syncProjectFile(filePath);
+              const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(result.projectId);
+              if (project) {
+                console.log(chalk.gray(`  • ${project.name}: ${result.updates ? 'updated' : 'synced'}`));
+              }
+            }
           }
         }
         
-        // Then sync task files
-        const taskFiles = [
-          'notes/tasks/tasks.md',
-          'notes/tasks/streaks-today.md',
-          ...projectFiles
-        ];
-
-        console.log(chalk.blue('Syncing tasks...'));
+        // Then sync ALL markdown files for tasks
+        console.log(chalk.blue('Syncing tasks from all markdown files...'));
         let totalUpdates = 0;
-        for (const filePath of taskFiles) {
+        let filesWithUpdates = 0;
+        
+        for (const filePath of allMarkdownFiles) {
           if (fs.existsSync(filePath)) {
             const updates = await tm.syncMarkdownFile(filePath);
             totalUpdates += updates;
-            console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
+            if (updates > 0) {
+              filesWithUpdates++;
+              console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
+            }
           }
         }
-        console.log(chalk.green(`✓ Synced ${taskFiles.length} files (${totalUpdates} total updates)`));
+        
+        console.log(chalk.green(`✓ Scanned ${allMarkdownFiles.length} files, updated ${filesWithUpdates} files (${totalUpdates} total updates)`));
       }
 
       // Process repeating tasks

@@ -1,10 +1,12 @@
 # Today's Tasks
 
-*Generated: 8/15/2025, 10:32:50 PM*
+*Generated: 8/15/2025, 10:36:54 PM*
 
 ## 🟡 Medium
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
+- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
+- [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
@@ -13,8 +15,6 @@
 - [ ] Daily standup meeting <!-- task-id: 8389a12f64cc1be3efdee93fd8d76b27 -->
 - [ ] Daily standup meeting <!-- task-id: e00bdff6b3300ff3549d1f8d76bbfcb2 -->
 - [ ] Daily standup meeting <!-- task-id: 3680daa75a815d4260e332500a663f97 -->
-- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
-- [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
 - [ ] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
 - [ ] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
 - [ ] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->

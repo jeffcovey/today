@@ -2,10 +2,10 @@
 
 ## Centralized API Calling - ✅ COMPLETED
 
-- [x] Created `NotionAPIBase` class with centralized `queryDatabase()` method
-- [x] Moved pagination logic to base class
-- [x] Centralized error handling and caching patterns
-- [x] Updated `getTasksWithDoDate()` to use API filters instead of local filtering
+- [x] Created `NotionAPIBase` class with centralized `queryDatabase()` method <!-- task-id: a4b06d87a45599a181628d0bcfa7ebb4 -->
+- [x] Moved pagination logic to base class <!-- task-id: d852e3ee78ba90fa55052ea2d1080845 -->
+- [x] Centralized error handling and caching patterns <!-- task-id: bfbacebaf61687d8a0fa29abb41a9099 -->
+- [x] Updated `getTasksWithDoDate()` to use API filters instead of local filtering <!-- task-id: 3f5b379063d515cc78562ece595cd2a5 -->
 
 ## Next Performance Improvements
 
@@ -59,10 +59,10 @@ Pre-fetch common queries in background:
 ### 4. API Request Optimization Audit
 
 Review all API calls to ensure we're only requesting needed data:
-- [ ] `getDatabases()` - Could cache longer (currently 5 minutes)
-- [ ] `getAllProjects()` - Uses cache but could be optimized
-- [ ] `getAllTags()` - Uses cache but could be optimized
-- [ ] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync
+- [ ] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [ ] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [ ] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [ ] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
 
 ### 5. Property Selection Optimization
 

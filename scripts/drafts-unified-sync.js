@@ -11,7 +11,8 @@ const CONFIG = {
     owner: 'OlderGay-Men',
     repo: 'today',
     branch: 'main',
-    token: null // Will be set from credentials
+    token: null, // Will be set from credentials
+    lastSyncKey: 'today_sync_last_timestamp' // Key for storing last sync time
 };
 
 // ============ CREDENTIAL SETUP ============
@@ -28,6 +29,46 @@ function setupCredentials() {
 }
 
 // ============ COMMON HELPER FUNCTIONS ============
+
+// Get last sync timestamp from a special sync state draft
+function getLastSyncTime() {
+    // Look for a special draft that stores sync state
+    const stateDrafts = Draft.query("# Today Sync State", "all", ["sync-state"], [], "modified", true, false);
+    if (stateDrafts && stateDrafts.length > 0) {
+        const stateDraft = stateDrafts[0];
+        // Parse the timestamp from the draft content
+        const match = stateDraft.content.match(/Last Sync: (.+)/);
+        if (match) {
+            const date = new Date(match[1]);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+        }
+    }
+    return null;
+}
+
+// Update last sync timestamp in sync state draft
+function updateLastSyncTime(timestamp) {
+    const isoTime = timestamp || new Date().toISOString();
+    
+    // Look for existing sync state draft
+    let stateDrafts = Draft.query("# Today Sync State", "all", ["sync-state"], [], "modified", true, false);
+    let stateDraft;
+    
+    if (stateDrafts && stateDrafts.length > 0) {
+        stateDraft = stateDrafts[0];
+    } else {
+        // Create new sync state draft
+        stateDraft = Draft.create();
+        stateDraft.addTag("sync-state");
+        stateDraft.addTag("today-sync-meta");
+    }
+    
+    // Update content with current timestamp
+    stateDraft.content = `# Today Sync State\n\nThis draft stores metadata for the Today sync system.\n\nLast Sync: ${isoTime}\n\n---\n_Do not delete this draft - it's used for incremental sync tracking_`;
+    stateDraft.update();
+}
 
 // Base64 encoding/decoding using Drafts built-in
 function decodeBase64(str) {
@@ -267,163 +308,247 @@ function fetchGitHubFile(path) {
 
 // ============ MERGE FUNCTIONS ============
 
-// Attempt to merge two versions with a common base
-function attemptThreeWayMerge(baseContent, localContent, remoteContent) {
-    // If either side hasn't changed, take the changed one
-    if (baseContent === localContent) {
-        return { merged: true, content: remoteContent };
-    }
-    if (baseContent === remoteContent) {
-        return { merged: true, content: localContent };
-    }
-    
-    // Both changed - try line-by-line merge
-    const baseLines = baseContent.split('\n');
-    const localLines = localContent.split('\n');
-    const remoteLines = remoteContent.split('\n');
-    
-    const mergedLines = [];
-    let conflicts = [];
-    let i = 0, j = 0, k = 0;
-    
-    while (i < baseLines.length || j < localLines.length || k < remoteLines.length) {
-        const baseLine = i < baseLines.length ? baseLines[i] : null;
-        const localLine = j < localLines.length ? localLines[j] : null;
-        const remoteLine = k < remoteLines.length ? remoteLines[k] : null;
-        
-        // All three are the same or only formatting differs
-        if (localLine === remoteLine) {
-            if (localLine !== null) mergedLines.push(localLine);
-            i++; j++; k++;
-        }
-        // Local changed, remote didn't
-        else if (baseLine === remoteLine && baseLine !== localLine) {
-            if (localLine !== null) mergedLines.push(localLine);
-            i++; j++; k++;
-        }
-        // Remote changed, local didn't
-        else if (baseLine === localLine && baseLine !== remoteLine) {
-            if (remoteLine !== null) mergedLines.push(remoteLine);
-            i++; j++; k++;
-        }
-        // Both changed differently - conflict
-        else {
-            // Collect the conflict region
-            const conflictStart = mergedLines.length;
-            const localConflict = [];
-            const remoteConflict = [];
-            
-            // Find the extent of the conflict
-            while ((j < localLines.length || k < remoteLines.length) &&
-                   (j >= localLines.length || k >= remoteLines.length || 
-                    localLines[j] !== remoteLines[k])) {
-                if (j < localLines.length) localConflict.push(localLines[j++]);
-                if (k < remoteLines.length) remoteConflict.push(remoteLines[k++]);
-                i++;
-            }
-            
-            conflicts.push({
-                start: conflictStart,
-                local: localConflict,
-                remote: remoteConflict
-            });
-            
-            // Add conflict markers
-            mergedLines.push('<<<<<<< LOCAL');
-            mergedLines.push(...localConflict);
-            mergedLines.push('=======');
-            mergedLines.push(...remoteConflict);
-            mergedLines.push('>>>>>>> GITHUB');
-        }
-    }
-    
-    if (conflicts.length > 0) {
-        return { 
-            merged: false, 
-            content: mergedLines.join('\n'),
-            conflictCount: conflicts.length 
+// Smart merge that uses timestamps and proper conflict markers
+function smartMerge(localContent, remoteContent, localModified, remoteModified, lastSyncTime) {
+    // If contents are identical, no conflict
+    if (localContent.trim() === remoteContent.trim()) {
+        return {
+            merged: true,
+            content: localContent,
+            conflictCount: 0
         };
     }
     
-    return { merged: true, content: mergedLines.join('\n') };
-}
-
-// Simpler two-way merge when we don't have a base
-function attemptTwoWayMerge(localContent, remoteContent) {
-    const localLines = localContent.split('\n');
-    const remoteLines = remoteContent.split('\n');
+    // Check if only one side changed since last sync
+    const localChangedSinceSync = !lastSyncTime || localModified > lastSyncTime;
+    const remoteChangedSinceSync = !lastSyncTime || remoteModified > lastSyncTime;
     
-    // Simple heuristic: if the files are mostly the same with small differences,
-    // try to preserve both changes
-    const mergedLines = [];
-    let conflicts = [];
-    let i = 0, j = 0;
+    // If only remote changed, take remote
+    if (!localChangedSinceSync && remoteChangedSinceSync) {
+        console.log("Only GitHub changed, taking GitHub version");
+        return {
+            merged: true,
+            content: remoteContent,
+            conflictCount: 0
+        };
+    }
     
-    // Use a simplified diff algorithm
-    while (i < localLines.length || j < remoteLines.length) {
-        if (i >= localLines.length) {
-            // Rest of remote
-            mergedLines.push(...remoteLines.slice(j));
-            break;
-        }
-        if (j >= remoteLines.length) {
-            // Rest of local
-            mergedLines.push(...localLines.slice(i));
-            break;
-        }
-        
-        if (localLines[i] === remoteLines[j]) {
-            mergedLines.push(localLines[i]);
-            i++; j++;
+    // If only local changed, keep local
+    if (localChangedSinceSync && !remoteChangedSinceSync) {
+        console.log("Only local changed, keeping local version");
+        return {
+            merged: true,
+            content: localContent,
+            conflictCount: 0
+        };
+    }
+    
+    // If neither changed since sync but they differ, take the newer one
+    if (!localChangedSinceSync && !remoteChangedSinceSync) {
+        if (localModified > remoteModified) {
+            console.log("Local is newer, keeping local");
+            return {
+                merged: true,
+                content: localContent,
+                conflictCount: 0
+            };
         } else {
-            // Try to find where they sync up again
-            let syncI = -1, syncJ = -1;
-            
-            // Look ahead for matching lines
-            for (let di = 0; di < 10 && i + di < localLines.length; di++) {
-                for (let dj = 0; dj < 10 && j + dj < remoteLines.length; dj++) {
-                    if (localLines[i + di] === remoteLines[j + dj]) {
-                        syncI = di;
-                        syncJ = dj;
-                        break;
-                    }
-                }
-                if (syncI >= 0) break;
-            }
-            
-            if (syncI >= 0) {
-                // Found sync point - this is a conflict region
-                if (syncI > 0 || syncJ > 0) {
-                    mergedLines.push('<<<<<<< LOCAL');
-                    mergedLines.push(...localLines.slice(i, i + syncI));
-                    mergedLines.push('=======');
-                    mergedLines.push(...remoteLines.slice(j, j + syncJ));
-                    mergedLines.push('>>>>>>> GITHUB');
-                    conflicts.push({ local: syncI, remote: syncJ });
-                }
-                i += syncI;
-                j += syncJ;
-            } else {
-                // No sync found in lookahead - treat rest as conflict
-                mergedLines.push('<<<<<<< LOCAL');
-                mergedLines.push(...localLines.slice(i));
-                mergedLines.push('=======');
-                mergedLines.push(...remoteLines.slice(j));
-                mergedLines.push('>>>>>>> GITHUB');
-                conflicts.push({ local: localLines.length - i, remote: remoteLines.length - j });
-                break;
-            }
+            console.log("GitHub is newer, taking GitHub");
+            return {
+                merged: true,
+                content: remoteContent,
+                conflictCount: 0
+            };
         }
     }
     
+    // Both changed since last sync - create proper conflict markers
+    console.log("Both sides changed, creating conflict markers");
+    return createConflictMarkers(localContent, remoteContent);
+}
+
+// Create conflict markers WITHOUT corrupting the content
+function createConflictMarkers(localContent, remoteContent) {
+    const localLines = localContent.split('\n');
+    const remoteLines = remoteContent.split('\n');
+    const result = [];
+    
+    // Simple approach: if files are very different, show whole file conflict
+    // This avoids the line-by-line corruption we were seeing
+    
+    // Calculate similarity
+    let matchingLines = 0;
+    const maxLines = Math.max(localLines.length, remoteLines.length);
+    const minLines = Math.min(localLines.length, remoteLines.length);
+    
+    for (let i = 0; i < minLines; i++) {
+        if (localLines[i] === remoteLines[i]) {
+            matchingLines++;
+        }
+    }
+    
+    const similarity = matchingLines / maxLines;
+    
+    // If files are >70% similar, try to show specific conflicts
+    if (similarity > 0.7) {
+        let i = 0, j = 0;
+        let inConflict = false;
+        let conflictCount = 0;
+        
+        while (i < localLines.length || j < remoteLines.length) {
+            const localLine = i < localLines.length ? localLines[i] : null;
+            const remoteLine = j < remoteLines.length ? remoteLines[j] : null;
+            
+            // Lines match
+            if (localLine === remoteLine) {
+                if (inConflict) {
+                    result.push('>>>>>>> GITHUB');
+                    inConflict = false;
+                }
+                if (localLine !== null) {
+                    result.push(localLine);
+                }
+                i++;
+                j++;
+            }
+            // Start of conflict
+            else {
+                if (!inConflict) {
+                    result.push('<<<<<<< LOCAL');
+                    conflictCount++;
+                    inConflict = true;
+                }
+                
+                // Add both versions
+                if (localLine !== null) {
+                    result.push(localLine);
+                    i++;
+                }
+                if (remoteLine !== null && i >= localLines.length) {
+                    result.push('======= GITHUB');
+                    while (j < remoteLines.length) {
+                        result.push(remoteLines[j++]);
+                    }
+                }
+            }
+        }
+        
+        if (inConflict) {
+            result.push('>>>>>>> GITHUB');
+        }
+        
+        return {
+            merged: false,
+            content: result.join('\n'),
+            conflictCount: conflictCount
+        };
+    }
+    
+    // Files are very different, show as one big conflict
+    result.push('<<<<<<< LOCAL');
+    result.push(...localLines);
+    result.push('=======');
+    result.push(...remoteLines);
+    result.push('>>>>>>> GITHUB');
+    
     return {
-        merged: conflicts.length === 0,
-        content: mergedLines.join('\n'),
-        conflictCount: conflicts.length
+        merged: false,
+        content: result.join('\n'),
+        conflictCount: 1
     };
 }
 
 // ============ SYNC OPERATIONS ============
+
+// Fetch files modified since a specific date using GitHub API
+function fetchModifiedFilesSince(sinceDate) {
+    if (!sinceDate) return null;
+    
+    const http = HTTP.create();
+    
+    // Use commits API to find files changed since date
+    const sinceISO = sinceDate.toISOString();
+    
+    try {
+        const commitsResponse = http.request({
+            "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/commits?since=${sinceISO}&per_page=100`,
+            "method": "GET",
+            "headers": {
+                "Authorization": `Bearer ${CONFIG.token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Drafts-Today-Sync"
+            }
+        });
+        
+        if (!commitsResponse.success) {
+            console.log(`Could not fetch commits since ${sinceISO}, falling back to full sync`);
+            return null;
+        }
+        
+        const commits = JSON.parse(commitsResponse.responseText);
+        
+        if (!commits || commits.length === 0) {
+            console.log("No commits found since last sync");
+            return { modified: [], deleted: [] };
+        }
+        
+        const modifiedPaths = new Set();
+        const deletedPaths = new Set();
+        
+        // Limit to checking first 10 commits to avoid too many API calls
+        const commitsToCheck = commits.slice(0, 10);
+        
+        for (const commit of commitsToCheck) {
+            // Skip merge commits
+            if (commit.commit && commit.commit.message && commit.commit.message.startsWith("Merge")) {
+                continue;
+            }
+            
+            // Use the commit comparison API instead to get files in one call
+            const compareResponse = http.request({
+                "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/compare/${commit.sha}~1...${commit.sha}`,
+                "method": "GET",
+                "headers": {
+                    "Authorization": `Bearer ${CONFIG.token}`,
+                    "Accept": "application/vnd.github.v3+json",
+                    "User-Agent": "Drafts-Today-Sync"
+                }
+            });
+            
+            if (compareResponse.success) {
+                const compareData = JSON.parse(compareResponse.responseText);
+                if (compareData.files) {
+                    for (const file of compareData.files) {
+                        if ((file.filename.startsWith("notes/") || file.filename.startsWith("projects/")) && 
+                            file.filename.endsWith(".md")) {
+                            // Check if file was deleted
+                            if (file.status === "removed") {
+                                deletedPaths.add(file.filename);
+                                modifiedPaths.delete(file.filename); // Remove from modified if it was there
+                            } else {
+                                // Only add to modified if not deleted
+                                if (!deletedPaths.has(file.filename)) {
+                                    modifiedPaths.add(file.filename);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        const result = {
+            modified: Array.from(modifiedPaths),
+            deleted: Array.from(deletedPaths)
+        };
+        console.log(`Found ${result.modified.length} modified and ${result.deleted.length} deleted files from recent commits`);
+        return result;
+        
+    } catch (error) {
+        console.log(`Error fetching modified files: ${error}, falling back to full sync`);
+        return null;
+    }
+}
 
 // Pull from GitHub to Drafts
 // Fetch the file dates index from GitHub
@@ -452,10 +577,27 @@ function fetchFileDatesIndex() {
     return null;
 }
 
-function pullFromGitHub() {
-    console.log("Starting pull from GitHub...");
+function pullFromGitHub(incrementalSync = true) {
+    console.log(incrementalSync ? "Starting incremental pull from GitHub..." : "Starting full pull from GitHub...");
     const startTime = Date.now();
     const stats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
+    
+    // Check for incremental sync opportunity
+    const lastSyncTime = incrementalSync ? getLastSyncTime() : null;
+    let changesSinceSync = null;
+    
+    if (lastSyncTime) {
+        console.log(`Last sync was at ${lastSyncTime.toISOString()}`);
+        changesSinceSync = fetchModifiedFilesSince(lastSyncTime);
+        if (changesSinceSync && changesSinceSync.modified.length === 0 && changesSinceSync.deleted.length === 0) {
+            console.log("No files modified or deleted since last sync");
+            updateLastSyncTime();
+            return stats;
+        }
+        if (changesSinceSync) {
+            console.log(`Found ${changesSinceSync.modified.length} modified and ${changesSinceSync.deleted.length} deleted files since last sync`);
+        }
+    }
     
     // Fetch the file dates index
     const fileDatesIndex = fetchFileDatesIndex();
@@ -482,12 +624,19 @@ function pullFromGitHub() {
     const tree = JSON.parse(treeResponse.responseText);
     
     // Filter for notes and projects markdown files
-    const noteFiles = tree.tree.filter(item => 
+    let noteFiles = tree.tree.filter(item => 
         item.type === "blob" && 
         (item.path.startsWith("notes/") || item.path.startsWith("projects/")) && 
         item.path.endsWith(".md") &&
         !item.path.includes("/inbox/") // Skip inbox files
     );
+    
+    // If we have a list of modified files, filter to only those
+    if (changesSinceSync && changesSinceSync.modified.length > 0) {
+        const modifiedSet = new Set(changesSinceSync.modified);
+        noteFiles = noteFiles.filter(item => modifiedSet.has(item.path));
+        console.log(`Filtered to ${noteFiles.length} modified files for incremental sync`);
+    }
     
     console.log(`Found ${noteFiles.length} files to sync`);
     
@@ -506,9 +655,13 @@ function pullFromGitHub() {
                 // Check if update needed by comparing SHA
                 const { metadata } = extractMetadata(draft.content);
                 if (metadata.today_sha === githubSHAs[file.path]) {
-                    // SHA matches, no need to fetch content
-                    stats.skipped++;
-                    continue;
+                    // SHA matches, check if local draft was modified more recently
+                    const lastSync = metadata.last_sync ? new Date(metadata.last_sync) : null;
+                    if (lastSync && draft.modifiedAt <= lastSync) {
+                        // No local changes since last sync, skip
+                        stats.skipped++;
+                        continue;
+                    }
                 }
             }
             
@@ -605,16 +758,35 @@ function pullFromGitHub() {
     }
     
     // Check for drafts that should be deleted (exist locally but not on GitHub)
-    console.log("Checking for deleted files...");
-    const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
     const toDelete = [];
     
-    for (const draft of syncDrafts) {
-        const { metadata } = extractMetadata(draft.content);
-        if (metadata.today_path && !githubPaths.has(metadata.today_path)) {
-            // This file no longer exists on GitHub
-            toDelete.push({ draft, path: metadata.today_path });
+    if (!incrementalSync) {
+        // During full sync, check all drafts against the complete GitHub file list
+        console.log("Checking for deleted files (full sync)...");
+        const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+        
+        for (const draft of syncDrafts) {
+            const { metadata } = extractMetadata(draft.content);
+            if (metadata.today_path && !githubPaths.has(metadata.today_path)) {
+                // This file no longer exists on GitHub
+                toDelete.push({ draft, path: metadata.today_path });
+            }
         }
+    } else if (changesSinceSync && changesSinceSync.deleted.length > 0) {
+        // During incremental sync, only check files that were explicitly deleted
+        console.log(`Checking ${changesSinceSync.deleted.length} deleted files from recent commits...`);
+        const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+        const deletedSet = new Set(changesSinceSync.deleted);
+        
+        for (const draft of syncDrafts) {
+            const { metadata } = extractMetadata(draft.content);
+            if (metadata.today_path && deletedSet.has(metadata.today_path)) {
+                // This file was deleted in a recent commit
+                toDelete.push({ draft, path: metadata.today_path });
+            }
+        }
+    } else {
+        console.log("No deletion check needed for this incremental sync");
     }
     
     if (toDelete.length > 0) {
@@ -641,17 +813,42 @@ function pullFromGitHub() {
     const elapsed = Date.now() - startTime;
     console.log(`Pull completed in ${elapsed}ms`);
     
+    // Update last sync time on successful pull
+    if (stats.errors === 0) {
+        updateLastSyncTime();
+    }
+    
     return stats;
 }
 
 // Push from Drafts to GitHub
-function pushToGitHub() {
-    console.log("Starting push to GitHub...");
+function pushToGitHub(onlyModified = true) {
+    console.log(onlyModified ? "Starting push to GitHub (modified only)..." : "Starting full push to GitHub...");
     const startTime = Date.now();
     const stats = { created: 0, updated: 0, skipped: 0, deleted: 0, errors: 0 };
     
     // Get all drafts with today-sync tag (including trashed ones for deletion detection)
-    const activeDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+    let activeDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
+    
+    // If onlyModified, filter to drafts modified since last sync
+    if (onlyModified) {
+        const lastSyncTime = getLastSyncTime();
+        if (lastSyncTime) {
+            const originalCount = activeDrafts.length;
+            activeDrafts = activeDrafts.filter(draft => {
+                // Check if draft was modified after last sync
+                if (draft.modifiedAt > lastSyncTime) {
+                    return true;
+                }
+                
+                // Also check if metadata indicates it needs sync
+                const { metadata } = extractMetadata(draft.content);
+                const draftLastSync = metadata.last_sync ? new Date(metadata.last_sync) : null;
+                return !draftLastSync || draft.modifiedAt > draftLastSync;
+            });
+            console.log(`Filtered from ${originalCount} to ${activeDrafts.length} modified drafts`);
+        }
+    }
     const trashedDrafts = Draft.query("", "trash", ["today-sync"], [], "modified", false, false);
     
     console.log(`Found ${activeDrafts.length} active drafts and ${trashedDrafts.length} trashed drafts`);
@@ -793,18 +990,24 @@ function pushToGitHub() {
             if (checkResponse.success) {
                 existingFile = JSON.parse(checkResponse.responseText);
                 
-                // Check if content changed
+                // First check SHA to avoid unnecessary content comparison
+                if (metadata.today_sha === existingFile.sha) {
+                    // SHA matches, content hasn't changed on GitHub
+                    stats.skipped++;
+                    continue;
+                }
+                
+                // SHA different, check if content actually changed
                 // GitHub returns base64 with newlines, need to clean it
                 const cleanBase64 = existingFile.content.replace(/\n/g, '');
                 const remoteContent = decodeBase64(cleanBase64);
                 if (remoteContent.trim() === rawContent.trim()) {
-                    // Update SHA if different
-                    if (metadata.today_sha !== existingFile.sha) {
-                        draft.content = updateMetadata(draft.content, {
-                            today_sha: existingFile.sha
-                        });
-                        draft.update();
-                    }
+                    // Content same, just update SHA
+                    draft.content = updateMetadata(draft.content, {
+                        today_sha: existingFile.sha,
+                        last_sync: new Date().toISOString()
+                    });
+                    draft.update();
                     stats.skipped++;
                     continue;
                 }
@@ -867,12 +1070,17 @@ function pushToGitHub() {
     const elapsed = Date.now() - startTime;
     console.log(`Push completed in ${elapsed}ms`);
     
+    // Update last sync time on successful push
+    if (stats.errors === 0) {
+        updateLastSyncTime();
+    }
+    
     return stats;
 }
 
 // Quick sync (both directions)
-function quickSync() {
-    console.log("Starting quick sync...");
+function quickSync(forceFullSync = false) {
+    console.log(forceFullSync ? "Starting full sync..." : "Starting quick incremental sync...");
     
     // First, get the current state of GitHub files (just metadata, not content)
     const http = HTTP.create();
@@ -934,14 +1142,46 @@ function quickSync() {
                 const localContentTrimmed = localContent.trim();
                 
                 if (localContentTrimmed !== remoteContent) {
-                    // Both sides have changes - conflict!
-                    conflicts.push({
-                        draft: draft,
-                        path: metadata.today_path,
-                        localContent: localContentTrimmed,
-                        remoteContent: remoteContent,
-                        remoteSHA: githubSHA
-                    });
+                    // Use smart merge to decide what to do
+                    const lastSyncTime = getLastSyncTime();
+                    const localModified = draft.modifiedAt;
+                    // We don't have remote modified time easily, so estimate it
+                    const remoteModified = new Date(); // Assume recently modified
+                    
+                    const mergeResult = smartMerge(
+                        localContentTrimmed,
+                        remoteContent,
+                        localModified,
+                        remoteModified,
+                        lastSyncTime
+                    );
+                    
+                    if (mergeResult.merged) {
+                        // Automatic resolution succeeded
+                        if (mergeResult.content === localContentTrimmed) {
+                            // Keep local version
+                            needsPush.push(draft);
+                        } else {
+                            // Take remote version
+                            needsPull.push({
+                                draft: draft,
+                                path: metadata.today_path,
+                                content: mergeResult.content,
+                                sha: githubSHA
+                            });
+                        }
+                    } else {
+                        // Conflict that needs manual resolution
+                        conflicts.push({
+                            draft: draft,
+                            path: metadata.today_path,
+                            localContent: localContentTrimmed,
+                            remoteContent: remoteContent,
+                            mergedContent: mergeResult.content,
+                            conflictCount: mergeResult.conflictCount,
+                            remoteSHA: githubSHA
+                        });
+                    }
                 } else {
                     // Only GitHub changed, we can safely pull
                     needsPull.push({
@@ -955,100 +1195,59 @@ function quickSync() {
         }
     }
     
-    // Handle conflicts with automatic merging
+    // Handle conflicts with proper markers
     if (conflicts.length > 0) {
-        console.log(`Found ${conflicts.length} conflicts to resolve`);
+        console.log(`Found ${conflicts.length} conflicts that couldn't be auto-resolved`);
         
-        let autoMerged = 0;
-        let manualConflicts = [];
-        
-        for (const conflict of conflicts) {
-            // Try to fetch the base version (what we last synced)
-            // We can use the stored SHA to get the base version
-            let baseContent = null;
-            if (conflict.draft.metadata && conflict.draft.metadata.today_sha) {
-                // We don't have easy access to the base, so use two-way merge
-                baseContent = null;
-            }
-            
-            // Attempt merge
-            const mergeResult = baseContent ? 
-                attemptThreeWayMerge(baseContent, conflict.localContent, conflict.remoteContent) :
-                attemptTwoWayMerge(conflict.localContent, conflict.remoteContent);
-            
-            if (mergeResult.merged) {
-                // Successful automatic merge
-                console.log(`Auto-merged: ${conflict.path}`);
-                conflict.draft.content = updateMetadata(mergeResult.content, {
-                    today_path: conflict.path,
-                    today_sha: conflict.remoteSHA,
-                    last_sync: new Date().toISOString(),
-                    sync_status: "auto-merged"
-                });
-                conflict.draft.update();
-                autoMerged++;
-                
-                // Mark for push to save the merged version
-                needsPush.push(conflict.draft);
-            } else {
-                // Merge conflict - save with conflict markers
-                console.log(`Merge conflict in: ${conflict.path} (${mergeResult.conflictCount} conflicts)`);
-                
-                // Add to manual conflicts list
-                manualConflicts.push({
-                    draft: conflict.draft,
-                    path: conflict.path,
-                    localContent: conflict.localContent,
-                    remoteContent: conflict.remoteContent,
-                    mergedContent: mergeResult.content,
-                    conflictCount: mergeResult.conflictCount,
-                    remoteSHA: conflict.remoteSHA
-                });
-            }
-        }
-        
-        // Handle manual conflicts
-        if (manualConflicts.length > 0) {
-            const prompt = Prompt.create();
-            prompt.title = "Merge Conflicts";
-            prompt.message = `Auto-merged ${autoMerged} file(s) successfully.\n\n${manualConflicts.length} file(s) have conflicts that need manual resolution.\n\nConflict markers (<<<<<<< LOCAL / ======= / >>>>>>> GITHUB) have been added.\n\nWhat would you like to do?`;
-            prompt.addButton("Save with Conflicts", "save");
-            prompt.addButton("Keep Local Only", "local");
-            prompt.addButton("Keep GitHub Only", "remote");
-            prompt.addButton("Cancel", "cancel");
+        // Show conflicts to user
+        const prompt = Prompt.create();
+        prompt.title = "Merge Conflicts";
+        prompt.message = `${conflicts.length} file(s) have conflicts that need resolution.\n\nConflict markers have been added to help you resolve them:\n<<<<<<< LOCAL (your version)\n=======\n>>>>>>> GITHUB (remote version)\n\nFiles with conflicts:\n${conflicts.slice(0, 5).map(c => `${c.path} (${c.conflictCount} conflicts)`).join('\n')}${conflicts.length > 5 ? `\n...and ${conflicts.length - 5} more` : ''}\n\nWhat would you like to do?`;
+        prompt.addButton("Save with Conflict Markers", "markers");
+        prompt.addButton("Keep All Local", "local");
+        prompt.addButton("Take All GitHub", "remote");
+        prompt.addButton("Cancel", "cancel");
             
             if (!prompt.show() || prompt.buttonPressed === "cancel") {
                 return { cancelled: true };
             }
             
-            if (prompt.buttonPressed === "save") {
-                // Save with conflict markers for manual resolution
-                for (const conflict of manualConflicts) {
-                    conflict.draft.content = updateMetadata(conflict.mergedContent, {
-                        today_path: conflict.path,
-                        today_sha: conflict.remoteSHA,
-                        last_sync: new Date().toISOString(),
-                        sync_status: "has-conflicts"
-                    });
-                    conflict.draft.addTag("has-conflicts");
-                    conflict.draft.update();
-                    console.log(`Saved with conflicts: ${conflict.path}`);
-                }
-            } else if (prompt.buttonPressed === "local") {
-                // Keep local changes
-                for (const conflict of manualConflicts) {
-                    needsPush.push(conflict.draft);
-                }
-            } else if (prompt.buttonPressed === "remote") {
-                // Keep remote changes
-                for (const conflict of manualConflicts) {
-                    needsPull.push({
-                        draft: conflict.draft,
-                        path: conflict.path,
-                        content: conflict.remoteContent,
-                        sha: conflict.remoteSHA
-                    });
-                }
+        if (!prompt.show() || prompt.buttonPressed === "cancel") {
+            console.log("Sync cancelled by user");
+            return { cancelled: true };
+        }
+        
+        if (prompt.buttonPressed === "markers") {
+            // Save with conflict markers for manual resolution
+            for (const conflict of conflicts) {
+                conflict.draft.content = updateMetadata(conflict.mergedContent, {
+                    today_path: conflict.path,
+                    today_sha: conflict.remoteSHA,
+                    last_sync: new Date().toISOString(),
+                    sync_status: "has-conflicts"
+                });
+                conflict.draft.addTag("has-conflicts");
+                conflict.draft.update();
+                console.log(`Saved with conflict markers: ${conflict.path}`);
+            }
+            app.displayInfoMessage(`Saved ${conflicts.length} files with conflict markers for manual resolution`);
+        } else if (prompt.buttonPressed === "local") {
+            // Keep all local changes
+            for (const conflict of conflicts) {
+                needsPush.push(conflict.draft);
+            }
+            console.log("Keeping all local versions");
+        } else if (prompt.buttonPressed === "remote") {
+            // Take all remote changes
+            for (const conflict of conflicts) {
+                conflict.draft.content = updateMetadata(conflict.remoteContent, {
+                    today_path: conflict.path,
+                    today_sha: conflict.remoteSHA,
+                    last_sync: new Date().toISOString(),
+                    sync_status: "synced"
+                });
+                conflict.draft.update();
+                console.log(`Updated with GitHub version: ${conflict.path}`);
             }
         }
     }
@@ -1067,14 +1266,14 @@ function quickSync() {
         console.log(`Updated from GitHub: ${item.path}`);
     }
     
-    // Then do a normal pull for any new files
-    const fullPullStats = pullFromGitHub();
+    // Then do a pull for any new/modified files
+    const fullPullStats = pullFromGitHub(!forceFullSync);
     pullStats.created += fullPullStats.created;
     pullStats.deleted += fullPullStats.deleted;
     pullStats.errors += fullPullStats.errors;
     
     // Finally push any local changes
-    const pushStats = pushToGitHub();
+    const pushStats = pushToGitHub(!forceFullSync);
     
     return { pull: pullStats, push: pushStats };
 }
@@ -1276,8 +1475,11 @@ function main() {
     prompt.message = "Choose an operation to perform:";
     
     prompt.addButton("🔄 Quick Sync", "quick");
+    prompt.addButton("🔄 Full Sync", "full-sync");
     prompt.addButton("⬇️ Pull from GitHub", "pull");
+    prompt.addButton("⬇️ Full Pull", "full-pull");
     prompt.addButton("⬆️ Push to GitHub", "push");
+    prompt.addButton("⬆️ Full Push", "full-push");
     prompt.addButton("🔍 Diagnose Issues", "diagnose");
     prompt.addButton("🧹 Clean Duplicates", "cleanup");
     prompt.addButton("❌ Clear Sync Errors", "clear-errors");
@@ -1296,20 +1498,38 @@ function main() {
         
         switch (operation) {
             case "quick":
-                result = quickSync();
-                message = `Quick Sync Complete\n\nPull: ${result.pull.created} new, ${result.pull.updated} updated\nPush: ${result.push.created} new, ${result.push.updated} updated`;
+                result = quickSync(false);
+                message = `Quick Incremental Sync Complete\n\nPull: ${result.pull.created} new, ${result.pull.updated} updated\nPush: ${result.push.created} new, ${result.push.updated} updated`;
                 app.displaySuccessMessage("Quick sync complete!");
                 break;
                 
+            case "full-sync":
+                result = quickSync(true);
+                message = `Full Sync Complete\n\nPull: ${result.pull.created} new, ${result.pull.updated} updated\nPush: ${result.push.created} new, ${result.push.updated} updated`;
+                app.displaySuccessMessage("Full sync complete!");
+                break;
+                
             case "pull":
-                result = pullFromGitHub();
-                message = `Pull Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                result = pullFromGitHub(true);
+                message = `Incremental Pull Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                app.displaySuccessMessage(`Pulled ${result.created + result.updated} changes, deleted ${result.deleted}`);
+                break;
+                
+            case "full-pull":
+                result = pullFromGitHub(false);
+                message = `Full Pull Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
                 app.displaySuccessMessage(`Pulled ${result.created + result.updated} changes, deleted ${result.deleted}`);
                 break;
                 
             case "push":
-                result = pushToGitHub();
-                message = `Push Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                result = pushToGitHub(true);
+                message = `Incremental Push Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
+                app.displaySuccessMessage(`Pushed ${result.created + result.updated} changes, deleted ${result.deleted}`);
+                break;
+            
+            case "full-push":
+                result = pushToGitHub(false);
+                message = `Full Push Complete\n\nCreated: ${result.created}\nUpdated: ${result.updated}\nDeleted: ${result.deleted}\nSkipped: ${result.skipped}\nErrors: ${result.errors}`;
                 app.displaySuccessMessage(`Pushed ${result.created + result.updated} changes, deleted ${result.deleted}`);
                 break;
                 

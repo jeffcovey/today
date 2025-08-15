@@ -45,19 +45,19 @@
 ## Migration Path
 
 ### Phase 1: Update Core Modules (Current)
-- [ ] Update `task-manager.js` to use `database.js`
-- [ ] Update `sync-scheduler.js` to use `database.js`
-- [ ] Update `sqlite-cache.js` to use `database.js`
+- [ ] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [ ] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [ ] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
 
 ### Phase 2: Test
-- [ ] Test all bin scripts with Turso
-- [ ] Verify multi-deployment scenarios
-- [ ] Check performance
+- [ ] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
+- [ ] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
 
 ### Phase 3: Cleanup
-- [ ] Remove `.data/` directory from deployments with Turso
-- [ ] Update `.gitignore` if needed
-- [ ] Document new deployment process
+- [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
+- [ ] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 
 ## After Migration
 

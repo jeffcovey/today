@@ -95,7 +95,7 @@ The built-in task manager syncs between SQLite and Markdown files:
 ### Task Format
 Tasks in Markdown include unique IDs:
 ```markdown
-- [ ] Task title <!-- task-id: abc123def456 -->
+- [ ] Task title <!-- task-id: abc123def456 --> <!-- task-id: 0d0b20c952c563b214fd39f396bf9633 -->
 ```
 
 ### Sync Process
