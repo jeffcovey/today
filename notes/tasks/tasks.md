@@ -6,6 +6,9 @@
 - [ ] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
 - [ ] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
+- [ ] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
+- [ ] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
+- [ ] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
 - [ ] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
 - [ ] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
@@ -22,9 +25,9 @@
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
-- [ ] Daily standup meeting <!-- task-id: 2ce9d53d0c574a1521a648202f05b93d -->
-- [ ] Daily standup meeting <!-- task-id: b2f71cc1e6f35c7eab6756fec1ae12af -->
-- [ ] Daily standup meeting <!-- task-id: bb038a392652b98018cbabe4d1800414 -->
+- [ ] Daily standup meeting <!-- task-id: 8389a12f64cc1be3efdee93fd8d76b27 -->
+- [ ] Daily standup meeting <!-- task-id: e00bdff6b3300ff3549d1f8d76bbfcb2 -->
+- [ ] Daily standup meeting <!-- task-id: 3680daa75a815d4260e332500a663f97 -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
