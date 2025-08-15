@@ -4,9 +4,9 @@
 
 ## 🔴 Critical
 
-- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
-- [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
-- [ ] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
 - [ ] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
 - [ ] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
 - [ ] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
@@ -20,8 +20,8 @@
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Daily standup meeting <!-- task-id: 8389a12f64cc1be3efdee93fd8d76b27 -->
-- [ ] Daily standup meeting <!-- task-id: e00bdff6b3300ff3549d1f8d76bbfcb2 -->
-- [ ] Daily standup meeting <!-- task-id: 3680daa75a815d4260e332500a663f97 -->
+- [x] Daily standup meeting <!-- task-id: e00bdff6b3300ff3549d1f8d76bbfcb2 -->
+- [x] Daily standup meeting <!-- task-id: 3680daa75a815d4260e332500a663f97 -->
 
 ## 🔵 Low
 
