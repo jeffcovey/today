@@ -31,6 +31,7 @@
 ### Today - Saturday, Aug 16
 
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
+- [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 
 ### No Date Set
 
@@ -82,3 +83,4 @@
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
+- [ ] get coffee @today <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
