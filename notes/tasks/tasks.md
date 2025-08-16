@@ -2,7 +2,7 @@
 
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
 - [ ] **Broken Carousel Images** (Issue #5239) <!-- task-id: a6673df7901bca14a76b5961ffecbfc7 -->
-- [ ] **Buy Palm Springs tickets for Sept 4-12** (fun Off Stage priority!) <!-- task-id: c8cc3da7fc54a2ea895a6a1353275327 -->
+- [x] **Buy Palm Springs tickets for Sept 4-12** (fun Off Stage priority!) <!-- task-id: c8cc3da7fc54a2ea895a6a1353275327 -->
 - [ ] **Database Query Performance** <!-- task-id: 7efaeed13cda3bb140fd4919868900a8 -->
 - [ ] **Email Confirmation Error Messages** (Issue #4304) <!-- task-id: c1d9c674577a92cad5552cf14a0df0db -->
 - [ ] **Email Subscription Preferences Not Saving** (Issue #4604) <!-- task-id: 0c415a7b9063b485fe786e5fc6fe269a -->
@@ -12,68 +12,68 @@
 - [ ] **Memory Exhaustion Crisis** (Issue #5222, HoneyBadger R14) <!-- task-id: aa210d6636e7e7eecaabfd636168c913 -->
 - [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] **Pagy Pagination Errors** (HoneyBadger, 19,948+ occurrences) <!-- task-id: 1fc3ab8ca6b14ea33de7d8f692cf9df7 -->
-- [ ] **Prime Gentlemen Mixer** at Tropics Grille <!-- task-id: 7fc16237369f3c065d9fb49a7221bb86 -->
+- [x] **Prime Gentlemen Mixer** at Tropics Grille <!-- task-id: 7fc16237369f3c065d9fb49a7221bb86 -->
 - [ ] **UI/UX Issues** <!-- task-id: 7455af017e1ad8869f2f01ba077390d4 -->
 - [ ] **Users Can't Empty Message Trash** (Issue #4628) <!-- task-id: a3803baa5c18e9f2d0634bb2a8f47652 -->
 - [ ] **Video Editing Authorization Failure** (Issue #4893) <!-- task-id: 002844fe8f38a953ee17ea6a0e30eba8 -->
 - [ ] **Video Index Parameter Errors** (#121769633, #121725644) <!-- task-id: 9d683157bfe39901effcbc82ec63cd5a -->
-- [ ] 15-minute expense review (save detailed tracking for Thursday) <!-- task-id: 26d6369f7ed04022042123c0e3de9c42 -->
-- [ ] 30-minute exercise (if not already met today) <!-- task-id: 8d66a7f3248729aa8b9cba459d05f07e -->
-- [ ] 30-minute walk <!-- task-id: ae77c784b8871a10ccd4032c67bc6513 -->
+- [x] 15-minute expense review (save detailed tracking for Thursday) <!-- task-id: 26d6369f7ed04022042123c0e3de9c42 -->
+- [x] 30-minute exercise (if not already met today) <!-- task-id: 8d66a7f3248729aa8b9cba459d05f07e -->
+- [x] 30-minute walk <!-- task-id: ae77c784b8871a10ccd4032c67bc6513 -->
 - [ ] Account Creation Issues (Front Conversations) <!-- task-id: 4ba8709eee19dd6f331f6473e6915cce -->
-- [ ] Acknowledge dependabot PRs on GitHub <!-- task-id: 94cfacabfef98cc14a2a3d1c76a1f646 -->
-- [ ] Acknowledge today's wins <!-- task-id: b99852893c88973492be0bf348fe3dad -->
+- [x] Acknowledge dependabot PRs on GitHub <!-- task-id: 94cfacabfef98cc14a2a3d1c76a1f646 -->
+- [x] Acknowledge today's wins <!-- task-id: b99852893c88973492be0bf348fe3dad -->
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
 - [ ] Address any OGM user support requests <!-- task-id: c9f4524f4f60fec693c992de5483ba05 -->
 - [ ] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
 - [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
-- [ ] Airbnb reviews <!-- task-id: 6e98538527d57aa7250db0c0bca8a7ed -->
-- [ ] Avoid alcohol today for health recovery <!-- task-id: a0c5b33d7a94c1d004f2afaa51d868d6 -->
-- [ ] Book Palm Springs flight (still pending!) <!-- task-id: 139d08acab7f07ce0ef6f2bb940e11b2 -->
-- [ ] Book Palm Springs flights (Sept 4-12) <!-- task-id: 0c52aca668aca2e9410339b2e9421201 -->
+- [x] Airbnb reviews <!-- task-id: 6e98538527d57aa7250db0c0bca8a7ed -->
+- [x] Avoid alcohol today for health recovery <!-- task-id: a0c5b33d7a94c1d004f2afaa51d868d6 -->
+- [x] Book Palm Springs flight (still pending!) <!-- task-id: 139d08acab7f07ce0ef6f2bb940e11b2 -->
+- [x] Book Palm Springs flights (Sept 4-12) <!-- task-id: 0c52aca668aca2e9410339b2e9421201 -->
 - [ ] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: beb15708ff7ace6a53090ae2614f8d07 -->
 - [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
-- [ ] Check if OGM newsletter went out <!-- task-id: ac09c8a80b00c4a645794af484876db8 -->
+- [x] Check if OGM newsletter went out <!-- task-id: ac09c8a80b00c4a645794af484876db8 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [ ] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->
+- [x] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->
 - [ ] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
-- [ ] Check room is ready by 3 PM check-in time <!-- task-id: a797b4f3c2b381166d282324e1f7d753 -->
-- [ ] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
+- [x] Check room is ready by 3 PM check-in time <!-- task-id: a797b4f3c2b381166d282324e1f7d753 -->
+- [x] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
 - [ ] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
-- [ ] Check tomorrow's Off Stage activities <!-- task-id: 19a6b2447b68807e6bbf4ab3d451aca9 -->
-- [ ] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
+- [x] Check tomorrow's Off Stage activities <!-- task-id: 19a6b2447b68807e6bbf4ab3d451aca9 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
 - [ ] Complete other Streaks app habits for exercise and wellness <!-- task-id: e8187734bdcc43e42a669e21b6fd8128 -->
-- [ ] Confirm arrangements for Buster's care <!-- task-id: 2ea9bbc372e5f87278676329b1868c7f -->
-- [ ] Consider non-alcoholic options (cutting back goal) <!-- task-id: c82838a3a0bb843decaa6b3744984841 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 4637ee946d018c6ec8e66aa003239b54 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 3bb904b2fdfa575bb5cab2cb9db50815 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
-- [ ] Do Apple Fitness+ Workouts (address cardio concern) <!-- task-id: 486290ddaabeabfa4004910d65adc4c0 -->
-- [ ] Do Tai Chi Standing (4m) <!-- task-id: 163a7431a8f22b75d33e0571cb592bc2 -->
-- [ ] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
-- [ ] Do Tai Chi Standing, 4m <!-- task-id: 1463608fac24f1c9d837a50ca9ba8288 -->
-- [ ] Do Tai Chi Standing, 4m <!-- task-id: 42eb2098e674be403e753281b001ead0 -->
-- [ ] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
+- [x] Confirm arrangements for Buster's care <!-- task-id: 2ea9bbc372e5f87278676329b1868c7f -->
+- [x] Consider non-alcoholic options (cutting back goal) <!-- task-id: c82838a3a0bb843decaa6b3744984841 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 4637ee946d018c6ec8e66aa003239b54 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 3bb904b2fdfa575bb5cab2cb9db50815 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
+- [x] Do Apple Fitness+ Workouts (address cardio concern) <!-- task-id: 486290ddaabeabfa4004910d65adc4c0 -->
+- [x] Do Tai Chi Standing (4m) <!-- task-id: 163a7431a8f22b75d33e0571cb592bc2 -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 1463608fac24f1c9d837a50ca9ba8288 -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 42eb2098e674be403e753281b001ead0 -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
-- [ ] Financial tracker setup <!-- task-id: 00344ce5d6cd947c485e5f323f2bbbdc -->
+- [x] Financial tracker setup <!-- task-id: 00344ce5d6cd947c485e5f323f2bbbdc -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
 - [ ] Improve Images (can be moved to tomorrow's Back Stage day) <!-- task-id: e21aaaf34492799157a11d89c6d400e7 -->
 - [ ] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
-- [ ] Light dinner (mindful eating) <!-- task-id: 76300369ed34cee16407be5ddad5f981 -->
-- [ ] Mindful lunch (weight management) <!-- task-id: 677b7bdd483ae5521d72b62aa186b6f3 -->
-- [ ] Mindful lunch (weight management) <!-- task-id: eadae6cf4d33dc98e0f8144cfbaa89eb -->
-- [ ] Mindful lunch without distractions <!-- task-id: afe46da5e62703557b2d6d235f5fa79e -->
-- [ ] Note critical bills needing immediate attention <!-- task-id: b9fba1aef7230acebe2e5da86a8a8aeb -->
+- [x] Light dinner (mindful eating) <!-- task-id: 76300369ed34cee16407be5ddad5f981 -->
+- [x] Mindful lunch (weight management) <!-- task-id: 677b7bdd483ae5521d72b62aa186b6f3 -->
+- [x] Mindful lunch (weight management) <!-- task-id: eadae6cf4d33dc98e0f8144cfbaa89eb -->
+- [x] Mindful lunch without distractions <!-- task-id: afe46da5e62703557b2d6d235f5fa79e -->
+- [x] Note critical bills needing immediate attention <!-- task-id: b9fba1aef7230acebe2e5da86a8a8aeb -->
 - [ ] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
 - [ ] Plan alcohol-free evening <!-- task-id: 5bb879221bf10b286732481f9def661c -->
 - [ ] Plan tomorrow's schedule (Thursday = Back Stage day) <!-- task-id: 7b86f1de29d287a374b0f63c48bb4746 -->
