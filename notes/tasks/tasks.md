@@ -1,5 +1,3 @@
-## General Tasks
-
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
 - [ ] **Broken Carousel Images** (Issue #5239) <!-- task-id: a6673df7901bca14a76b5961ffecbfc7 -->
 - [ ] **Buy Palm Springs tickets for Sept 4-12** (fun Off Stage priority!) <!-- task-id: c8cc3da7fc54a2ea895a6a1353275327 -->
@@ -194,9 +192,6 @@
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
-
-## Palm Springs Trip
-
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->
 - [ ] Aerial Tramway (if weather permits) <!-- task-id: 6fe51efe7e716b1e21ed9958d5227514 -->
 - [ ] Check event calendar for September <!-- task-id: ff35a029d7185347a3d378b63a07afba -->
