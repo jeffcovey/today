@@ -1,29 +1,53 @@
 import { jest } from '@jest/globals';
-import { SQLiteCache } from '../src/sqlite-cache.js';
-import fs from 'fs';
-import path from 'path';
+import Database from 'better-sqlite3';
+
+// Mock the database-sync module BEFORE importing SQLiteCache
+jest.unstable_mockModule('../src/database-sync.js', () => {
+  class MockDatabaseSync {
+    constructor(dbPath) {
+      this.localDb = new Database(':memory:');
+    }
+    
+    exec(sql) {
+      return this.localDb.exec(sql);
+    }
+    
+    prepare(sql) {
+      return this.localDb.prepare(sql);
+    }
+    
+    transaction(fn) {
+      return this.localDb.transaction(fn);
+    }
+    
+    close() {
+      if (this.localDb) {
+        this.localDb.close();
+      }
+    }
+  }
+  
+  return {
+    getDatabaseSync: jest.fn((dbPath) => {
+      return new MockDatabaseSync(dbPath);
+    })
+  };
+});
+
+// Import SQLiteCache after mocking
+const { SQLiteCache } = await import('../src/sqlite-cache.js');
 
 describe('SQLiteCache', () => {
   let cache;
   const testDatabaseId = 'test-db-123';
-  const cacheDir = path.join(process.cwd(), '.data');
-  const testDbPath = path.join(cacheDir, 'today.db');
 
   beforeEach(() => {
-    // Clean up any existing test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
     cache = new SQLiteCache();
   });
 
   afterEach(() => {
-    if (cache) {
+    if (cache && cache.db) {
       cache.close();
-    }
-    // Clean up test database
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
     }
   });
 

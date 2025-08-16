@@ -79,9 +79,16 @@ describe('TemporalManager', () => {
       mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
-      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
+      
+      // Mock existing weeks to prevent warnings
+      const mockWeeks = [
+        { id: 'week1', properties: { Date: { date: { start: '2025-08-10' } } } },
+        { id: 'week2', properties: { Date: { date: { start: '2025-08-17' } } } }
+      ];
+      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue(mockWeeks);
 
       const spy = jest.spyOn(console, 'log').mockImplementation();
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       
       await manager.createMissingDaysAndWeeks();
       
@@ -92,6 +99,7 @@ describe('TemporalManager', () => {
       expect(mockNotionAPI.getDatabaseItemsIncremental).toHaveBeenCalled();
       
       spy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     test('should use default date range when not specified', async () => {
@@ -100,9 +108,18 @@ describe('TemporalManager', () => {
       mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
-      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
+      
+      // Mock existing weeks for default date range
+      const mockWeeks = [
+        { id: 'week1', properties: { Date: { date: { start: '2025-08-03' } } } },
+        { id: 'week2', properties: { Date: { date: { start: '2025-08-10' } } } },
+        { id: 'week3', properties: { Date: { date: { start: '2025-08-17' } } } },
+        { id: 'week4', properties: { Date: { date: { start: '2025-08-24' } } } }
+      ];
+      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue(mockWeeks);
 
       const spy = jest.spyOn(console, 'log').mockImplementation();
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       
       await manager.createMissingDaysAndWeeks();
       
@@ -112,6 +129,7 @@ describe('TemporalManager', () => {
       expect(logCall).toMatch(/\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}/);
       
       spy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     test('should use custom date range when specified', async () => {
@@ -120,9 +138,20 @@ describe('TemporalManager', () => {
       mockNotionAPI.getMonthsDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getQuartersDatabase.mockRejectedValue(new Error('DB not found'));
       mockNotionAPI.getYearsDatabase.mockRejectedValue(new Error('DB not found'));
-      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue([]);
+      
+      // Mock existing weeks for January 2024
+      const mockWeeks = [
+        { id: 'week1', properties: { Date: { date: { start: '2023-12-31' } } } },
+        { id: 'week2', properties: { Date: { date: { start: '2024-01-07' } } } },
+        { id: 'week3', properties: { Date: { date: { start: '2024-01-14' } } } },
+        { id: 'week4', properties: { Date: { date: { start: '2024-01-21' } } } },
+        { id: 'week5', properties: { Date: { date: { start: '2024-01-28' } } } },
+        { id: 'week6', properties: { Date: { date: { start: '2024-02-04' } } } }
+      ];
+      mockNotionAPI.getDatabaseItemsIncremental.mockResolvedValue(mockWeeks);
 
       const spy = jest.spyOn(console, 'log').mockImplementation();
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-01-31');
@@ -135,6 +164,7 @@ describe('TemporalManager', () => {
       expect(logCall).toContain('2024-01-31');
       
       spy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 });
