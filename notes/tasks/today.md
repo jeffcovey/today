@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:36:33 PM*
+*Generated: 8/16/2025, 2:47:14 PM*
 
 ## 🟡 Medium
 
@@ -19,22 +19,31 @@
 
 ## ✅ Done
 
-- [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
+- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
+- [x] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
+- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
+- [x] Review and reply to OGM site messages <!-- task-id: 79e5857b9c59510fdf322bab1ce4d688 -->
+- [x] Check OGM discussion boards and chat room <!-- task-id: beb15708ff7ace6a53090ae2614f8d07 -->
+- [x] Write summary of recent OGM development work <!-- task-id: 6f5c18f64317e78e0852713dc6eba73f -->
+- [x] Send update notifications to OGM regular members <!-- task-id: cb4ca7ea0cc4f940698c66f599254d7d -->
+- [x] Send update notifications to OGM Patreon members <!-- task-id: 071300b7e9a7ceefaf873f049286ef09 -->
+- [x] Improve Images (can be moved to tomorrow's Back Stage day) <!-- task-id: e21aaaf34492799157a11d89c6d400e7 -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
+- [x] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
+- [x] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
+- [x] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
+- [x] Read Offline, 2m 30s <!-- task-id: c906ad494e1d03e73ccd8d3fb621541c -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
 - [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
-- [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
-- [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
-- [x] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
-- [x] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
-- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
-- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
-- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
-- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
-- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
-- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
-- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
-- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
-- [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
 - [x] Reply to Melv <!-- task-id: 8596f25c6ccb1ecd40631056ddc8333b -->
 - [x] Reply to David Edwards <!-- task-id: a243b2f8190f1276d548d593a066f4fa -->
 - [x] Reply to Rosemary <!-- task-id: 3fb5ae563f5d4866ca562fc438f386ea -->
@@ -66,21 +75,24 @@
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
 - [x] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
-- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
-- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [x] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
 - [x] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
-- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
-- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
-- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
-- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
-- [x] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
-- [x] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
-- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
-- [x] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
-- [x] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
-- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
+- [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
+- [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
+- [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
+- [x] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
+- [x] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
+- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
+- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
 - [x] Financial tracker setup <!-- task-id: 00344ce5d6cd947c485e5f323f2bbbdc -->
 - [x] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->
@@ -111,10 +123,6 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: 3bb904b2fdfa575bb5cab2cb9db50815 -->
 - [x] Check tomorrow's Off Stage activities <!-- task-id: 19a6b2447b68807e6bbf4ab3d451aca9 -->
 - [x] 30-minute exercise (if not already met today) <!-- task-id: 8d66a7f3248729aa8b9cba459d05f07e -->
-- [x] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
-- [x] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
-- [x] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
 - [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
 - [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
