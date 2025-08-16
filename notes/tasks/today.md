@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 5:57:05 PM*
+*Generated: 8/16/2025, 5:57:54 PM*
 
 ## 🟡 Medium
 
@@ -12,12 +12,8 @@
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
-- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
-- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 - [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
@@ -58,9 +54,13 @@
 
 ## ✅ Done
 
+- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [x] Reply to Melv (overdue) <!-- task-id: f06d6a42e1a60a0c6212845c733ad493 -->
 - [x] Reply to David Edwards (overdue) <!-- task-id: 71be0b7a5ec686dbbe702c521c162207 -->
 - [x] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
+- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
+- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
+- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [x] Daily standup meeting <!-- task-id: 244374d34462ddaa63c57a2c1281de23 -->
 - [x] Daily standup meeting <!-- task-id: 96547421a198b015f533e8bdff93bec9 -->
 - [x] Daily standup meeting <!-- task-id: b9355af633d415fadd980380b995d494 -->

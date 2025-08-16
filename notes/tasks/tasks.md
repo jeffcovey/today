@@ -8,10 +8,7 @@
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
-- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 
 ### Tuesday, Aug 12 (4 days ago)
@@ -21,7 +18,6 @@
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
-- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 
