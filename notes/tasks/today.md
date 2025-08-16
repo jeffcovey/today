@@ -1,13 +1,9 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 3:57:51 PM*
+*Generated: 8/16/2025, 4:00:10 PM*
 
 ## 🟡 Medium
 
-- [ ] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
-- [ ] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
-- [ ] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
-- [ ] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
 - [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
 - [ ] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
 - [ ] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
@@ -71,6 +67,10 @@
 
 ## ✅ Done
 
+- [x] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
+- [x] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
+- [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
+- [x] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
 - [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
 - [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
