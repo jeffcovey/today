@@ -1,16 +1,10 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:06:57 PM*
+*Generated: 8/16/2025, 2:07:29 PM*
 
 ## 🟡 Medium
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [ ] Daily standup meeting <!-- task-id: 244374d34462ddaa63c57a2c1281de23 -->
-- [ ] Daily standup meeting <!-- task-id: 96547421a198b015f533e8bdff93bec9 -->
-- [ ] Daily standup meeting <!-- task-id: b9355af633d415fadd980380b995d494 -->
-- [ ] Daily standup meeting <!-- task-id: 2ce9d53d0c574a1521a648202f05b93d -->
-- [ ] Daily standup meeting <!-- task-id: b2f71cc1e6f35c7eab6756fec1ae12af -->
-- [ ] Daily standup meeting <!-- task-id: bb038a392652b98018cbabe4d1800414 -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
@@ -25,6 +19,7 @@
 
 ## ✅ Done
 
+- [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
 - [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
 - [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
