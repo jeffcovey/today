@@ -2,11 +2,9 @@
 
 ### Monday, Aug 11 (5 days ago)
 
-- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
@@ -19,14 +17,10 @@
 ### Thursday, Aug 14 (2 days ago)
 
 - [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
-- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 
 ### Yesterday - Friday, Aug 15
 
-- [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
-- [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
-- [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 
 ### Today - Saturday, Aug 16
 
@@ -87,6 +81,37 @@
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
 - [ ] Fix Chronological Sorting Of The Events Index <!-- task-id: 1cbf93ccd5c10219136f15d0cc307463 -->
+
+## Notion to Today Migration Project
+
+### No Date Set
+
+- [ ] Add cross-links between related plans <!-- task-id: 24628bc21f83b3cb6ec717adfdaec85b -->
+- [ ] Archive original Notion exports <!-- task-id: 68aeaef4c17c6ded82088c1a87d6a18a -->
+- [ ] Build conversion scripts for each plan level <!-- task-id: 797b3634044f342ea4e7d91cce20d086 -->
+- [ ] Clean up formatting issues <!-- task-id: a7683b498547c2b1d8979896aef7382e -->
+- [ ] Create backup of Notion workspace before migration <!-- task-id: f6b824cbd0fb78d8c6aed9954ffc7f2a -->
+- [ ] Create month files as needed <!-- task-id: 9b40a3e0afe0fc38ecbe4e7ca37b06c3 -->
+- [ ] Create quarter files for each year <!-- task-id: 83de8368ccdb0df812bbf0cb5dcf8c44 -->
+- [ ] Create templates for different plan levels <!-- task-id: 168145bbf22ccf043f582222177b70b3 -->
+- [ ] Create week files where valuable <!-- task-id: fd637eddbce6550ab527d6978a7a8369 -->
+- [ ] Create year files (2022.md, 2023.md, 2024.md) <!-- task-id: 38a9146aa919c6e70c649adb6fdad5f2 -->
+- [ ] Cross-reference important dates and milestones <!-- task-id: a47680e77275a1f76a562360e6cbc80e -->
+- [ ] Decide on incremental vs. bulk migration approach <!-- task-id: f5d39a27fcf9cddb46c3b9215e659915 -->
+- [ ] Define how to handle Notion-specific features (databases, relations, etc.) <!-- task-id: 200ffc2eb29ce206742243918b0a1d65 -->
+- [ ] Design migration scripts/tools <!-- task-id: 1b62c0cc1cefb4c13e9bf485e8cfff08 -->
+- [ ] Determine what historical data is worth preserving <!-- task-id: 2c39a0d9303c7f4da92e566cadb82b0c -->
+- [ ] Document field mappings (Notion → Today format) <!-- task-id: 68fb34306f98f023a2ae40576d90d887 -->
+- [ ] Estimate volume of content to migrate <!-- task-id: d00e324d8748256117c7d455b6dddb9f -->
+- [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
+- [ ] Identify data export options from Notion <!-- task-id: 22c67a98c8c8917d9e949ce79744f3cf -->
+- [ ] Import daily reviews/plans <!-- task-id: 8dc6cb8490ef76a5ab950914cf68704b -->
+- [ ] Inventory Notion databases and their structures <!-- task-id: 22c5543e2523ea87140aa22b1561194d -->
+- [ ] Notion API documentation <!-- task-id: 4529d1b7a2012f2504d1af5aa8a35ef0 -->
+- [ ] Notion export guide <!-- task-id: 0e136c0b1afc7ce37137ffbad1a368df -->
+- [ ] Plan for handling attachments/images <!-- task-id: 1cf79f50867acfda7e5edf7838528eb8 -->
+- [ ] Test migration with small dataset first <!-- task-id: 0712d4597f7b9b44b7b0dd785a55d49c -->
+- [ ] Verify data integrity after migration <!-- task-id: 56312a1927113a48a3b8177c9a2345c7 -->
 
 ## Palm Springs Trip
 
