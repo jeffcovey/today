@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:31:48 PM*
+*Generated: 8/16/2025, 2:35:08 PM*
 
 ## 🟡 Medium
 
@@ -19,6 +19,33 @@
 
 ## ✅ Done
 
+- [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
+- [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
+- [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
+- [x] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
+- [x] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
+- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
+- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
+- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
+- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
+- [x] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
+- [x] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
+- [x] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
 - [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
 - [x] Financial tracker setup <!-- task-id: 00344ce5d6cd947c485e5f323f2bbbdc -->
 - [x] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->

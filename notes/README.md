@@ -54,7 +54,7 @@ Today's thoughts and activities...
 
 Project A:
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
-- [ ] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
+- [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
 - [x] Fix bug #123 <!-- task-id: 3f23ceadc45bb601e595b14939c8e18f -->
 ```
 
