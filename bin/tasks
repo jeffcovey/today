@@ -149,10 +149,6 @@ program
           let filesWithUpdates = 0;
           
           for (const filePath of allMarkdownFiles) {
-            // Skip auto-generated files - they shouldn't be synced back
-            if (filePath === 'notes/tasks/today.md' || filePath === 'notes/tasks/tasks.md') {
-              continue;
-            }
             if (fs.existsSync(filePath)) {
               const updates = await tm.syncMarkdownFile(filePath);
               totalUpdates += updates;
