@@ -7,7 +7,6 @@ Dockerfile
 .dockerignore
 .data/
 .sync-config.json
-notes/reviews/*
 .env.local
 .DS_Store
 *.log

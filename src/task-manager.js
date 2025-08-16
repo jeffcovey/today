@@ -616,8 +616,8 @@ export class TaskManager {
 
     // Check if this is a review file and extract the date
     let reviewDate = null;
-    if (filePath.startsWith('notes/reviews/')) {
-      const dateMatch = filePath.match(/(\d{4}-\d{2}-\d{2})\.md$/);
+    if (filePath.startsWith('plans/')) {
+      const dateMatch = filePath.match(/(\d{4}-Q\d+-\d{2}-\d{2})\.md$/);  
       if (dateMatch) {
         reviewDate = dateMatch[1];
       }

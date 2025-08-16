@@ -8,7 +8,7 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 3. Updates the SQLite database with comprehensive content
 4. Starts this interactive session where Claude will:
    - Review all your data
-   - Create or update today's review file in `notes/reviews/YYYY-MM-DD.md`
+   - Create or update today's plan file in `plans/YYYY-QQ-MM-DD.md`
    - Provide recommendations based on your schedule and priorities
    - Continue working with you as long as needed
 
@@ -29,7 +29,7 @@ When this session starts, please:
    - **Look for reservation confirmations, guest messages, check-in/out times**
    - **Two guest rooms need tracking - check BOTH rooms' status**
    - **Guest transitions require room preparation between checkout (12 PM) and check-in (3 PM)**
-4. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+4. Check if a plan file exists for today in `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`)
    - **If today's review EXISTS**:
      - Load the existing review file
      - Query the database for recent changes (using SQL queries)
@@ -45,6 +45,20 @@ When this session starts, please:
    - Convert UTC timestamps to local time when displaying
    - The database preserves original timezone data from calendars
 6. Present your recommendations to the user
+
+### Plan Files Structure
+
+Plans are organized in a flat structure in the `plans/` directory with the naming scheme:
+- **Daily plans**: `YYYY-QQ-MM-DD.md` (e.g., `2025-Q3-08-16.md`)
+- **Weekly plans**: `YYYY-QQ-MM-W##.md` (e.g., `2025-Q3-08-W03.md`)
+- **Monthly plans**: `YYYY-QQ-MM.md` (e.g., `2025-Q3-08.md`)
+- **Quarterly plans**: `YYYY-QQ.md` (e.g., `2025-Q3.md`)
+- **Yearly plans**: `YYYY.md` (e.g., `2025.md`)
+
+This naming ensures files sort alphabetically with higher-level plans appearing before their sub-plans. When creating new plan files:
+1. Check if higher-level plans exist (year, quarter, month)
+2. Reference objectives from higher-level plans in lower-level ones
+3. Roll up completed items from daily plans to weekly/monthly summaries
 
 ### Review File Format
 
@@ -103,6 +117,10 @@ Please help me review my current situation and decide what to do today to be hap
 - Continue working with me throughout the day
 
 ### Guidelines
+
+#### About Me
+
+My name is Jeffrey Covey (I go by "Jeff"). You can find my information in the contacts database.
 
 #### Schedule
 
@@ -193,7 +211,7 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 - 👥 Contacts (in contacts table with normalized emails/phones)
 - 🔄 Sync history (in sync_log table)
 
-**First Action:** Query the SQLite database to get all the synchronized data, then create or update today's review file in `notes/reviews/`.
+**First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
 
 ### Example Queries to Get Started:
 
@@ -370,7 +388,7 @@ WHERE p.name LIKE '%Palm Springs%';
 
 1. **Query the SQLite database** at `.data/today.db` to get all synchronized data
 2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** Database timestamps may be in UTC  
-3. **Check/Create Review File** at `notes/reviews/YYYY-MM-DD.md` with CORRECT day name from calculation above
+3. **Check/Create Plan File** at `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`) with CORRECT day name from calculation above
 4. **Analyze and Recommend** based on:
    - Recent notes and concerns (query file_tracking and notion_pages)
    - Urgent and overdue tasks (query task_cache)

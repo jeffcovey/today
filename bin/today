@@ -62,7 +62,7 @@ bin/sync
 if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
     echo "📝 Checking markdown formatting..."
     # Run lint but don't block on errors, just show warnings
-    npx markdownlint-cli2 'notes/reviews/*.md' 2>&1 | head -10 || true
+    npx markdownlint-cli2 'plans/*.md' 2>&1 | head -10 || true
     echo ""
 fi
 
@@ -81,7 +81,17 @@ if [ -n "$LAST_SYNC" ]; then
     echo ""
     
     # Show the user what will happen
-    REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+    # Get date components for new naming scheme
+    YEAR=$(date +%Y)
+    MONTH=$(date +%m)  
+    DAY=$(date +%d)
+    # Determine quarter from month
+    if [ $MONTH -le 3 ]; then Q="Q1"
+    elif [ $MONTH -le 6 ]; then Q="Q2"
+    elif [ $MONTH -le 9 ]; then Q="Q3"
+    else Q="Q4"
+    fi
+    REVIEW_FILE="plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review
@@ -109,12 +119,12 @@ if [ -n "$LAST_SYNC" ]; then
         cat <<EOF | claude
 # Focused Work Session
 
-You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at notes/reviews/${TODAY_DATE}.md if it exists.
+You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
 
 ## Context Available
 - SQLite database at .data/today.db with all current data
 - Today's date: ${TODAY_DATE}
-- Review file location: notes/reviews/${TODAY_DATE}.md
+- Review file location: ${REVIEW_FILE}
 
 ## Database Tables Available:
 - task_cache: Tasks with titles, stages, due dates

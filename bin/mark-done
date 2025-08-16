@@ -6,8 +6,17 @@
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-TODAY_DATE=$(date +%Y-%m-%d)
-REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
+# Get date components for new naming scheme
+YEAR=$(date +%Y)
+MONTH=$(date +%m)
+DAY=$(date +%d)
+# Determine quarter from month
+if [ $MONTH -le 3 ]; then Q="Q1"
+elif [ $MONTH -le 6 ]; then Q="Q2"
+elif [ $MONTH -le 9 ]; then Q="Q3"
+else Q="Q4"
+fi
+REVIEW_FILE="plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
 TIMESTAMP=$(date +"%H:%M")
 
 # Check if review file exists
