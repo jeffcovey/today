@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 4:58:17 PM*
+*Generated: 8/16/2025, 4:59:59 PM*
 
 ## 🟡 Medium
 
@@ -60,6 +60,8 @@
 
 ## ✅ Done
 
+- [x] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
+- [x] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
 - [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
 - [x] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
