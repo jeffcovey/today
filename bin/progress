@@ -6,9 +6,10 @@
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-TODAY_DATE=$(date +%Y-%m-%d)
+# Use Eastern timezone as specified in TODAY.md
+TODAY_DATE=$(TZ='America/New_York' date +%Y-%m-%d)
 REVIEW_FILE="notes/reviews/${TODAY_DATE}.md"
-TIMESTAMP=$(date +"%H:%M")
+TIMESTAMP=$(TZ='America/New_York' date +"%H:%M %Z")
 
 # Check if review file exists
 if [ ! -f "$REVIEW_FILE" ]; then

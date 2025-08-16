@@ -120,7 +120,8 @@
       "Bash(bin/turso-sync:*)",
       "Bash(./verify-turso.sh:*)",
       "Bash(/dev/null)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "Bash(bin/progress:*)"
     ],
     "deny": []
   }
