@@ -120,8 +120,6 @@
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 - [ ] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
 - [ ] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
-- [ ] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6797d60cf6488d14bba9ffc9999850fe -->
-- [ ] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b4dfa336415d201c0cd51464ac1969ee -->
 - [ ] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
 - [ ] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
 - [ ] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
