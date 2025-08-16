@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:47:14 PM*
+*Generated: 8/16/2025, 2:54:03 PM*
 
 ## 🟡 Medium
 
@@ -11,6 +11,13 @@
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
+- [ ] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
+- [ ] Clean bathroom thoroughly <!-- task-id: 48c5c4e1d28f0c356f977d630a979367 -->
+- [ ] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
+- [ ] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
+- [ ] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
+- [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
+- [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
 
 ## 🔵 Low
 
@@ -19,18 +26,20 @@
 
 ## ✅ Done
 
-- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
-- [x] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
-- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
-- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
-- [x] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
-- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
 - [x] Review and reply to OGM site messages <!-- task-id: 79e5857b9c59510fdf322bab1ce4d688 -->
 - [x] Check OGM discussion boards and chat room <!-- task-id: beb15708ff7ace6a53090ae2614f8d07 -->
 - [x] Write summary of recent OGM development work <!-- task-id: 6f5c18f64317e78e0852713dc6eba73f -->
 - [x] Send update notifications to OGM regular members <!-- task-id: cb4ca7ea0cc4f940698c66f599254d7d -->
 - [x] Send update notifications to OGM Patreon members <!-- task-id: 071300b7e9a7ceefaf873f049286ef09 -->
 - [x] Improve Images (can be moved to tomorrow's Back Stage day) <!-- task-id: e21aaaf34492799157a11d89c6d400e7 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
+- [x] Read Offline, 2m 30s <!-- task-id: c906ad494e1d03e73ccd8d3fb621541c -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
+- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
+- [x] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
+- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
 - [x] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
 - [x] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
 - [x] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
@@ -39,8 +48,6 @@
 - [x] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
 - [x] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
-- [x] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
-- [x] Read Offline, 2m 30s <!-- task-id: c906ad494e1d03e73ccd8d3fb621541c -->
 - [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
 - [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
