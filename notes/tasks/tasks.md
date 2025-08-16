@@ -18,6 +18,7 @@
 - [ ] **Video Editing Authorization Failure** (Issue #4893) <!-- task-id: 002844fe8f38a953ee17ea6a0e30eba8 -->
 - [ ] **Video Index Parameter Errors** (#121769633, #121725644) <!-- task-id: 9d683157bfe39901effcbc82ec63cd5a -->
 - [ ] 15-minute expense review (save detailed tracking for Thursday) <!-- task-id: 26d6369f7ed04022042123c0e3de9c42 -->
+- [ ] 30-minute exercise (if not already met today) <!-- task-id: 8d66a7f3248729aa8b9cba459d05f07e -->
 - [ ] 30-minute walk <!-- task-id: ae77c784b8871a10ccd4032c67bc6513 -->
 - [ ] Account Creation Issues (Front Conversations) <!-- task-id: 4ba8709eee19dd6f331f6473e6915cce -->
 - [ ] Acknowledge dependabot PRs on GitHub <!-- task-id: 94cfacabfef98cc14a2a3d1c76a1f646 -->
@@ -118,6 +119,8 @@
 - [ ] Set up coffee for morning <!-- task-id: 64e5bfa1249068c8349450e25b8e20f4 -->
 - [ ] Sort paperwork pile <!-- task-id: 900a9d3bacf56d9c60444a77233f854f -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
+- [ ] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
+- [ ] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
 - [ ] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
 - [ ] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
 - [ ] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
