@@ -69,6 +69,10 @@
 - [ ] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
 - [ ] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
 
+### Saturday, Aug 30
+
+- [ ] Schedule dentist appointment <!-- task-id: 273a8d6199683851ebfac6d5205f89b2 -->
+
 ### No Date Set
 
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
@@ -90,11 +94,15 @@
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
+- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
+- [ ] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
+- [ ] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
 - [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
@@ -102,6 +110,11 @@
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
+- [ ] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
+- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
+- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
 - [ ] Fix Chronological Sorting Of The Events Index <!-- task-id: 1cbf93ccd5c10219136f15d0cc307463 -->
 
 ## Palm Springs Trip
@@ -119,7 +132,3 @@
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
-- [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
-- [x] Make sure data isn't siloed in one deployment <!-- task-id: 8f36bf8dda9024890733c10aca537191 -->
-- [ ] add setting dates to tasks @2025-08-16 <!-- task-id: 7df4ea14fa53ed885b7a2dd9a0f6845c -->
-- [ ] remove .data/ from all deployments <!-- task-id: 1d76745789447c029247e8af2e0ee0d0 -->

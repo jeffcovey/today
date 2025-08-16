@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 5:09:33 PM*
+*Generated: 8/16/2025, 5:17:02 PM*
 
 ## 🟡 Medium
 
@@ -61,6 +61,18 @@
 
 ## ✅ Done
 
+- [x] Make sure data isn't siloed in one deployment <!-- task-id: 8f36bf8dda9024890733c10aca537191 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
+- [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
+- [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [x] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
 - [x] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
 - [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
@@ -77,17 +89,6 @@
 - [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
 - [x] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
 - [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
-- [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
-- [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
-- [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
-- [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
-- [x] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
-- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
-- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
-- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
 - [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
 - [x] Test automatic Turso sync <!-- task-id: f1e82f6a8cf37cd7678a7e9aa2a88061 -->
