@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 4:16:48 PM*
+*Generated: 8/16/2025, 4:54:23 PM*
 
 ## 🟡 Medium
 
@@ -52,6 +52,8 @@
 - [ ] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
 - [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
 - [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
+- [ ] Review code @2025-08-16 before lunch <!-- task-id: 6efe1b963d9885a6f97d826ac22fc87d -->
+- [ ] add setting dates to tasks @2025-08-16 <!-- task-id: 7df4ea14fa53ed885b7a2dd9a0f6845c -->
 
 ## 🔵 Low
 
@@ -60,6 +62,10 @@
 
 ## ✅ Done
 
+- [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 --> @2025-08-16 <!-- task-id: 8bc2a5d9e21a5a92a70d5c0b24563227 -->
+- [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 --> @2025-08-16 <!-- task-id: 95ef12a97c21b9be316271386835c0dc -->
+- [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
+- [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
 - [x] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
 - [x] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
 - [x] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->

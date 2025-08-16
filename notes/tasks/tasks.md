@@ -63,10 +63,52 @@
 - [ ] Clean bathroom thoroughly <!-- task-id: 48c5c4e1d28f0c356f977d630a979367 -->
 - [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
+- [ ] Review code @2025-08-16 before lunch <!-- task-id: 6efe1b963d9885a6f97d826ac22fc87d -->
 - [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
 - [ ] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
 - [ ] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
 - [ ] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
+- [ ] add setting dates to tasks @2025-08-16 <!-- task-id: 7df4ea14fa53ed885b7a2dd9a0f6845c -->
+
+### Tomorrow - Sunday, Aug 17
+
+- [ ] Call dentist @2025-08-17 <!-- task-id: 66618f3576f10de326e627c47fc9c01a -->
+
+### Monday, Aug 18 (in 2 days)
+
+- [ ] Quick task @2025-08-18 <!-- task-id: 20ddd61d72e15ae98ccc832c22b2583f -->
+
+### Friday, Aug 22 (in 6 days)
+
+- [ ] Submit report @2025-08-22 <!-- task-id: e0d8123f149e70e8e2dde40a8e58f0e4 -->
+
+### Saturday, Aug 23 (in 7 days)
+
+- [ ] Weekend project @2025-08-23 <!-- task-id: 0288efcba9119808fd6c0fa6a89ee388 -->
+
+### Monday, Aug 25
+
+- [ ] Birthday party @2025-08-25 <!-- task-id: 06f8a24e71d64a1c3db5a7d215049180 -->
+
+### Tuesday, Aug 26
+
+- [ ] Meeting @2025-08-26 at 3pm <!-- task-id: 6c57e3093ba5364ee3ffa997d2d48d51 -->
+
+### Saturday, Sep 6
+
+- [ ] Plan vacation @2025-09-06 <!-- task-id: b9ad5e4f33e73844ef81a5017ea9e4d3 -->
+
+### Tuesday, Sep 16
+
+- [ ] Send invoice @2025-09-16 <!-- task-id: f37f548859e4d075a7d545a0ac1ee2c9 -->
+
+### Wednesday, Dec 31
+
+- [ ] Year-end review @2025-12-31 <!-- task-id: cb0114282b5dd51d469be3894f7020f4 -->
+
+### Thursday, Jan 1
+
+- [ ] New year planning @2026-01-01 <!-- task-id: b1813b06d79a11ba231e089cd6200a13 -->
 
 ### No Date Set
 
@@ -88,7 +130,7 @@
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
 - [ ] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
-- [ ] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 --> @today
+- [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 --> @today <!-- task-id: 6430f287e7dbd12076829c0cc7000026 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
@@ -99,8 +141,10 @@
 - [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
+- [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
-- [ ] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 --> @today
+- [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 --> @today <!-- task-id: 0b848becb966e8eb4f79c07943fa7993 -->
+- [ ] remove .data/ from all deployments <!-- task-id: 1d76745789447c029247e8af2e0ee0d0 -->
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
