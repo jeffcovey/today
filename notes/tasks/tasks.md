@@ -1,5 +1,3 @@
-## General Tasks
-
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
 - [ ] **Broken Carousel Images** (Issue #5239) <!-- task-id: a6673df7901bca14a76b5961ffecbfc7 -->
 - [ ] **Buy Palm Springs tickets for Sept 4-12** (fun Off Stage priority!) <!-- task-id: c8cc3da7fc54a2ea895a6a1353275327 -->
@@ -33,6 +31,7 @@
 - [ ] Book Palm Springs flight (still pending!) <!-- task-id: 139d08acab7f07ce0ef6f2bb940e11b2 -->
 - [ ] Book Palm Springs flights (Sept 4-12) <!-- task-id: 0c52aca668aca2e9410339b2e9421201 -->
 - [ ] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
+- [ ] Check OGM discussion boards and chat room <!-- task-id: beb15708ff7ace6a53090ae2614f8d07 -->
 - [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
@@ -41,8 +40,10 @@
 - [ ] Check newsletter status <!-- task-id: 79091082dda19654350bb172a803a361 -->
 - [ ] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
 - [ ] Check room is ready by 3 PM check-in time <!-- task-id: a797b4f3c2b381166d282324e1f7d753 -->
+- [ ] Check room temperature and lighting <!-- task-id: abb9cefe073235855918ea110a2fbb74 -->
 - [ ] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
 - [ ] Check tomorrow's Off Stage activities <!-- task-id: 19a6b2447b68807e6bbf4ab3d451aca9 -->
+- [ ] Clean bathroom for Logan's arrival <!-- task-id: 52cde33315e263caea89c4f8fd8f3755 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
@@ -52,17 +53,20 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 4637ee946d018c6ec8e66aa003239b54 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 3bb904b2fdfa575bb5cab2cb9db50815 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
 - [ ] Do Apple Fitness+ Workouts (address cardio concern) <!-- task-id: 486290ddaabeabfa4004910d65adc4c0 -->
 - [ ] Do Tai Chi Standing (4m) <!-- task-id: 163a7431a8f22b75d33e0571cb592bc2 -->
 - [ ] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
 - [ ] Do Tai Chi Standing, 4m <!-- task-id: 1463608fac24f1c9d837a50ca9ba8288 -->
 - [ ] Do Tai Chi Standing, 4m <!-- task-id: 42eb2098e674be403e753281b001ead0 -->
+- [ ] Do Tai Chi Standing, 4m <!-- task-id: 3d587cacc6420c15c2eeb4863894a3d8 -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
 - [ ] Financial tracker setup <!-- task-id: 00344ce5d6cd947c485e5f323f2bbbdc -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
+- [ ] Improve Images (can be moved to tomorrow's Back Stage day) <!-- task-id: e21aaaf34492799157a11d89c6d400e7 -->
 - [ ] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
 - [ ] Light dinner (mindful eating) <!-- task-id: 76300369ed34cee16407be5ddad5f981 -->
 - [ ] Mindful lunch (weight management) <!-- task-id: 677b7bdd483ae5521d72b62aa186b6f3 -->
@@ -85,9 +89,11 @@
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
 - [ ] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
+- [ ] Read Offline, 2m 30s <!-- task-id: c906ad494e1d03e73ccd8d3fb621541c -->
 - [ ] Read Saved Articles (2m 30s) <!-- task-id: 549074e3403115eedb6e8d53d3aaa34b -->
 - [ ] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
+- [ ] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
 - [ ] Reply to David Edwards <!-- task-id: a243b2f8190f1276d548d593a066f4fa -->
@@ -110,15 +116,20 @@
 - [ ] Review Amazon Subscribe & Save changes <!-- task-id: 46041887481b91f2edc912bf2ac88a47 -->
 - [ ] Review GitHub PRs and merge if tests pass <!-- task-id: 20b3489b0dc7aa4f2077d2709baa7237 -->
 - [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
+- [ ] Review and reply to OGM site messages <!-- task-id: 79e5857b9c59510fdf322bab1ce4d688 -->
 - [ ] Review and respond to **2 SaneBox digests** (115 + 69 messages to review) <!-- task-id: e1bb1b2dba792d28f398e01e6f74bbd4 -->
 - [ ] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [ ] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
 - [ ] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
 - [ ] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
+- [ ] Send update notifications to OGM Patreon members <!-- task-id: 071300b7e9a7ceefaf873f049286ef09 -->
+- [ ] Send update notifications to OGM regular members <!-- task-id: cb4ca7ea0cc4f940698c66f599254d7d -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
+- [ ] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
 - [ ] Set up coffee for morning <!-- task-id: 64e5bfa1249068c8349450e25b8e20f4 -->
 - [ ] Sort paperwork pile <!-- task-id: 900a9d3bacf56d9c60444a77233f854f -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
+- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
 - [ ] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
 - [ ] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
 - [ ] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
@@ -139,8 +150,12 @@
 - [ ] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
 - [ ] Use The Inversion Table <!-- task-id: 47b496cc26c07eeef616e1389aab659a -->
 - [ ] Use The Inversion Table <!-- task-id: 3fd38bf38de6c64c2dea8435c5a1d953 -->
+- [ ] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
 - [ ] Use The Inversion Table (for hip pain) <!-- task-id: e502e82a2035d442fa1eee473532315f -->
+- [ ] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
+- [ ] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
+- [ ] Write summary of recent OGM development work <!-- task-id: 6f5c18f64317e78e0852713dc6eba73f -->
 - [ ] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
 - [ ] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
 - [ ] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
@@ -153,21 +168,27 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: e60a42b17ca46a862140640bc6e872e4 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 8479a4711b840b864433241aab517c0d -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: 8cd4f6c213cfa5e09269c68550501333 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
 - [ ] ♥︎ Burn More Energy (Activity goal) <!-- task-id: 00adada2b671029b4a858a717cb093d6 -->
 - [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
+- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
 - [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: 20c85910f36c2d2459761b4fbf58033d -->
 - [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
+- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
 - [ ] ♥︎ Tai Chi (1m) <!-- task-id: 4577a7388ac772aa08eed4ba60c57d47 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2c1243b8b17fa3acba4bfb23d7defceb -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 5f35c5f3447efe2310fb54cff4288f70 -->
+- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: f2730ae1eee54c85d06385887b3a71ab -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 25f804d99290ecd81ddf98fd331bff08 -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
 - [ ] ♥︎ Walk to complete 5,500 steps <!-- task-id: 5ddee2a5ef1f2bc8606ed196820bda70 -->
 - [ ] Fix Chronological Sorting Of The Events Index <!-- task-id: 1cbf93ccd5c10219136f15d0cc307463 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
@@ -191,9 +212,6 @@
 - [ ] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
-
-## Palm Springs Trip
-
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->
 - [ ] Aerial Tramway (if weather permits) <!-- task-id: 6fe51efe7e716b1e21ed9958d5227514 -->
 - [ ] Check event calendar for September <!-- task-id: ff35a029d7185347a3d378b63a07afba -->
