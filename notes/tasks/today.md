@@ -1,12 +1,10 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 12:14:57 AM*
+*Generated: 8/16/2025, 12:16:13 AM*
 
 ## 🟡 Medium
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
-- [x] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
 - [ ] Daily standup meeting <!-- task-id: 244374d34462ddaa63c57a2c1281de23 -->
 - [ ] Daily standup meeting <!-- task-id: 96547421a198b015f533e8bdff93bec9 -->
 - [ ] Daily standup meeting <!-- task-id: b9355af633d415fadd980380b995d494 -->
@@ -18,10 +16,6 @@
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
-- [x] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
-- [x] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
-- [x] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
-- [x] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 
 ## 🔵 Low
