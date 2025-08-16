@@ -98,6 +98,35 @@ program
           console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
         }
         
+        // Always include review files (even if not modified recently)
+        // This ensures tasks in review files get their do_date set properly
+        try {
+          const reviewFiles = execSync('find notes/reviews -name "*.md" -type f 2>/dev/null || echo ""', { encoding: 'utf8' })
+            .split('\n')
+            .filter(f => f)
+            .map(f => f.replace(/^\.\//, ''));
+          
+          let addedReviewFiles = 0;
+          for (const reviewFile of reviewFiles) {
+            if (!allMarkdownFiles.includes(reviewFile)) {
+              allMarkdownFiles.push(reviewFile);
+              addedReviewFiles++;
+            }
+          }
+          
+          if (addedReviewFiles > 0) {
+            console.log(chalk.gray(`  Added ${addedReviewFiles} review file(s) to ensure proper date assignment`));
+          }
+        } catch (e) {
+          // If finding review files fails, at least add today's
+          const today = new Date().toISOString().split('T')[0];
+          const todayReviewFile = `notes/reviews/${today}.md`;
+          if (fs.existsSync(todayReviewFile) && !allMarkdownFiles.includes(todayReviewFile)) {
+            allMarkdownFiles.push(todayReviewFile);
+            console.log(chalk.gray(`  Added today's review file: ${todayReviewFile}`));
+          }
+        }
+        
         // First sync project files to establish project records
         const projectFiles = allMarkdownFiles.filter(f => f.startsWith('projects/'));
         if (projectFiles.length > 0) {

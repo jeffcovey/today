@@ -597,6 +597,15 @@ export class TaskManager {
     const updates = [];
     const seenTaskIds = new Set();
 
+    // Check if this is a review file and extract the date
+    let reviewDate = null;
+    if (filePath.startsWith('notes/reviews/')) {
+      const dateMatch = filePath.match(/(\d{4}-\d{2}-\d{2})\.md$/);
+      if (dateMatch) {
+        reviewDate = dateMatch[1];
+      }
+    }
+
     // Sync project file first if it's a project
     let projectId = null;
     if (filePath.startsWith('projects/')) {
@@ -631,17 +640,29 @@ export class TaskManager {
             if (task.status !== newStatus) updates.status = newStatus;
             if (projectId && task.project_id !== projectId) updates.project_id = projectId;
             
+            // For review files, set do_date for uncompleted tasks if not already set
+            if (reviewDate && !isCompleted && !task.do_date) {
+              updates.do_date = reviewDate;
+            }
+            
             if (Object.keys(updates).length > 0) {
               this.updateTask(taskId, updates);
             }
           }
         } else {
           // Create new task
-          taskId = this.createTask({
+          const taskData = {
             title,
             status: isCompleted ? '✅ Done' : '🎭 Stage',
             project_id: projectId
-          });
+          };
+          
+          // For review files, set do_date for uncompleted tasks
+          if (reviewDate && !isCompleted) {
+            taskData.do_date = reviewDate;
+          }
+          
+          taskId = this.createTask(taskData);
           
           // Add task ID to the line (strip any corrupted comments first)
           const cleanLine = line.replace(/<![-—]+ task-id: [a-f0-9]{32} [-—]+>/g, '');
@@ -745,17 +766,77 @@ export class TaskManager {
       }
     }
     
+    // Helper function to group tasks by date
+    const groupTasksByDate = (tasks) => {
+      const tasksByDate = {};
+      const noDateTasks = [];
+      
+      for (const task of tasks) {
+        if (task.do_date) {
+          if (!tasksByDate[task.do_date]) {
+            tasksByDate[task.do_date] = [];
+          }
+          tasksByDate[task.do_date].push(task);
+        } else {
+          noDateTasks.push(task);
+        }
+      }
+      
+      return { tasksByDate, noDateTasks };
+    };
+    
+    // Helper function to format date header
+    const formatDateHeader = (dateStr) => {
+      const date = new Date(dateStr + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+      
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+      const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      if (diffDays === 0) return `### Today - ${dayName}, ${monthDay}`;
+      if (diffDays === -1) return `### Yesterday - ${dayName}, ${monthDay}`;
+      if (diffDays === 1) return `### Tomorrow - ${dayName}, ${monthDay}`;
+      if (diffDays < -1 && diffDays >= -7) return `### ${dayName}, ${monthDay} (${Math.abs(diffDays)} days ago)`;
+      if (diffDays < -7) return `### ${dayName}, ${monthDay} (overdue)`;
+      if (diffDays > 1 && diffDays <= 7) return `### ${dayName}, ${monthDay} (in ${diffDays} days)`;
+      return `### ${dayName}, ${monthDay}`;
+    };
+    
     // Add tasks without projects first
     if (noProjectTasks.length > 0) {
       lines.push('## General Tasks');
       lines.push('');
-      for (const task of noProjectTasks) {
-        const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-        const tags = this.getTaskTags(task.id);
-        const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-        lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+      
+      const { tasksByDate, noDateTasks } = groupTasksByDate(noProjectTasks);
+      
+      // Sort dates and add tasks for each date
+      const sortedDates = Object.keys(tasksByDate).sort();
+      for (const date of sortedDates) {
+        lines.push(formatDateHeader(date));
+        lines.push('');
+        for (const task of tasksByDate[date]) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          const tags = this.getTaskTags(task.id);
+          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
       }
-      lines.push('');
+      
+      // Add tasks with no date
+      if (noDateTasks.length > 0) {
+        lines.push('### No Date Set');
+        lines.push('');
+        for (const task of noDateTasks) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          const tags = this.getTaskTags(task.id);
+          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
     }
     
     // Add tasks grouped by project
@@ -763,13 +844,35 @@ export class TaskManager {
     for (const projectName of projectNames) {
       lines.push(`## ${projectName}`);
       lines.push('');
-      for (const task of tasksByProject[projectName]) {
-        const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-        const tags = this.getTaskTags(task.id);
-        const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-        lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+      
+      const { tasksByDate, noDateTasks } = groupTasksByDate(tasksByProject[projectName]);
+      
+      // Sort dates and add tasks for each date
+      const sortedDates = Object.keys(tasksByDate).sort();
+      for (const date of sortedDates) {
+        lines.push(formatDateHeader(date));
+        lines.push('');
+        for (const task of tasksByDate[date]) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          const tags = this.getTaskTags(task.id);
+          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
       }
-      lines.push('');
+      
+      // Add tasks with no date
+      if (noDateTasks.length > 0) {
+        lines.push('### No Date Set');
+        lines.push('');
+        for (const task of noDateTasks) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          const tags = this.getTaskTags(task.id);
+          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
     }
     
     // Remove trailing empty lines
