@@ -2,37 +2,37 @@
 
 ### Monday, Aug 11 (5 days ago)
 
-- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-- [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
-- [ ] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
-- [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
-- [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [ ] Plan alcohol-free evening <!-- task-id: 5bb879221bf10b286732481f9def661c -->
-- [ ] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
-- [ ] Post update to members about recent work <!-- task-id: a10a170ffc5c4694983e7b5373162098 -->
-- [ ] Practice mindful eating at each meal <!-- task-id: 3898f1eb296015003b5e510e20cd15bf -->
-- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
-- [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
-- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
-- [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [ ] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
-- [ ] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
-- [ ] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
+- [ ] Check OGM newsletter status <!— task-id: 86fba922c9ad1b986295cd7dbfd854cf —>
+- [ ] Sell the exercise bike <!— task-id: 66f5be4259e24e3521f1c207fe71535b —>
+- [ ] Use the Virgin Red points <!— task-id: ee90848cb53900dff2ec05c6e4c51662 —>
+- [x] Address member help requests <!— task-id: 46db79f58fc47ba8ed639583fb707e77 —>
+- [ ] Check OGM newsletter status <!— task-id: e2539e73f379e58452a9c1011a91346d —>
+- [ ] Check the fridge water lines <!— task-id: 197d008fdf3afdac370906200c86ed65 —>
+- [ ] Pla  alcohol-free evening <!— task-id: 5bb879221bf10b286732481f9def661c —>
+- [ ] Post upda e to OGM members about recent work <!— task-id: d7ff371280629daf1e12325d75690d16 —>
+- [ ] Post updatexto members about recent work <!— task-id: a10a170ffc5c4694983e7b5373162098 —>
+- [ ] Practice mind ul eating at each meal <!— task-id: 3898f1eb296015003b5e510e20cd15bf —>
+- [ ] Quick social media check for OGM mentions <!— task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 —>
+- [ ] Remove tmp/grou s_page_backup.html <!— task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac —>
+- [ ] Reply to Heroku notification <!— task-id: d42f6aded0ffc524fd28dc2a0937096b —>
+- [ ] Reply to “gator” on OGM <!— task-id: 663651fef31af42bd2899851e321ee99 —>
+- [ ] Respond to OGM bug  eports <!— task-id: 27730eaf9a4273b68e679d066671f7a1 —>
+- [ ] Respond to any urgent mem er emails <!— task-id: 95c46448238fc301001d562364119fe4 —>
+- [ ] Review bug reports and resp nd to at least 2 <!— task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 —>
+- [ ] Send any follow-up messages f om today’s conversations <!— task-id: 40dbc547c400f517c1fc75862d15f498 —>
 
 ### Tuesday, Aug 12 (4 days ago)
 
-- [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
-- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
-- [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-- [ ] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
-- [ ] Reply to David Edwards (overdue) <!-- task-id: 71be0b7a5ec686dbbe702c521c162207 -->
-- [ ] Reply to Melv (overdue) <!-- task-id: f06d6a42e1a60a0c6212845c733ad493 -->
-- [ ] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
-- [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
-- [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
+- [ ] Address memory exhaustion (Issu  #5222) <!— task-id: 3658b296e14495d436d4ca786ecb18c9 —>
+- [ ] Check if OGM newsletter went out <!— task-id: 17bdebde612a855c1d8e83a62299a8b5 —>
+- [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!— task-id: e5b1b114f14b8bb385b226e8f962a45e —>
+- [ ] Fix message trash emptying (Issue #4628) <!— task-id: 76ad5c89bc7b0fc629aab307d708266b —>
+- [ ] Prepare for Coffee and Conversati n <!-- task-id: b09690d37a99d18ff4f9a46b641404ff —>
+- [ ] Reply to David Edwards (overdue) <!— task-id: 71be0b7a5ec686dbbe702c521c162207 —>
+- [ ] Reply to Melv (overdue) <!— task-id: f06d6a42e1a60a0c6212845c733ad493 —>
+- [ ] Reply to Rosemary (overdue) <!— task-id: 436a54f406b68e7995c9a1734e93192b —>
+- [ ] Review SaneBox digest (69 messages) - quick triage <!— task-id: bfa5ecb34dd09979378b62861b027ee0 —>
+- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 
 ### Wednesday, Aug 13 (3 days ago)
