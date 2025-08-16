@@ -1,12 +1,14 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { getDatabaseSync, forcePushToTurso } from './database-sync.js';
+import { DateParser } from './date-parser.js';
 
 export class TaskManager {
   constructor(dbPath = '.data/today.db', options = {}) {
     // Use DatabaseSync wrapper for automatic Turso sync
     // Pass readOnly option to skip Turso initialization for read-only operations
     this.db = getDatabaseSync(dbPath, { readOnly: options.readOnly || false });
+    this.dateParser = new DateParser();
     this.initDatabase();
   }
 
@@ -625,8 +627,18 @@ export class TaskManager {
       
       if (taskMatch) {
         const isCompleted = taskMatch[1] === 'x';
-        const title = taskMatch[2].trim();
+        let title = taskMatch[2].trim();
         const existingId = taskMatch[3];
+
+        // Parse date tags from title
+        let extractedDate = null;
+        const dateTags = this.dateParser.extractDateTags(title);
+        if (dateTags.length > 0) {
+          // Use the first date tag found
+          extractedDate = dateTags[0].parsed;
+          // Remove all date tags from the title
+          title = this.dateParser.removeTagsFromText(title, dateTags);
+        }
 
         let taskId;
         if (existingId) {
@@ -636,7 +648,16 @@ export class TaskManager {
           if (task) {
             const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
             const updates = {};
-            if (task.title !== title) updates.title = title;
+            
+            // Only update title and do_date if title has changed
+            if (task.title !== title) {
+              updates.title = title;
+              // If title changed and has date tag, update do_date
+              if (extractedDate && !reviewDate) {
+                updates.do_date = extractedDate;
+              }
+            }
+            
             if (task.status !== newStatus) updates.status = newStatus;
             if (projectId && task.project_id !== projectId) updates.project_id = projectId;
             
@@ -657,8 +678,10 @@ export class TaskManager {
             project_id: projectId
           };
           
-          // For review files, set do_date for uncompleted tasks
-          if (reviewDate && !isCompleted) {
+          // Set do_date from extracted date tag, review date, or neither
+          if (extractedDate && !reviewDate) {
+            taskData.do_date = extractedDate;
+          } else if (reviewDate && !isCompleted) {
             taskData.do_date = reviewDate;
           }
           
