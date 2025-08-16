@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:04:28 PM*
+*Generated: 8/16/2025, 2:04:44 PM*
 
 ## 🟡 Medium
 
@@ -22,3 +22,16 @@
 
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+
+## ✅ Done
+
+- [x] Daily standup meeting <!-- task-id: f99a4888bdf1f7a2688bd3edc0e8cf0a -->
+- [x] Daily standup meeting <!-- task-id: f0179d94008ed11cd83892b332cfa6ae -->
+- [x] Daily standup meeting <!-- task-id: f50b3327cb62f6d9209ec6d090ee320a -->
+- [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
+- [x] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
+- [x] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
+- [x] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
