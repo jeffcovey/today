@@ -824,11 +824,34 @@ export class TaskManager {
       // File doesn't exist yet, that's OK
     }
 
-    // Now generate the file with updated data
-    const tasks = this.getTodayTasks();
+    // Get today's date
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get active tasks for today (not done)
+    const activeTasks = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE (do_date = ? OR do_date < ?)
+        AND status != '✅ Done'
+      ORDER BY do_date ASC, status ASC
+    `).all(today, today).map(task => ({
+      ...task,
+      tags: this.getTaskTags(task.id)
+    }));
+    
+    // Get tasks completed TODAY (regardless of their do_date)
+    const completedTasks = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE status = '✅ Done'
+        AND date(completed_at) = date(?)
+      ORDER BY completed_at DESC
+    `).all(today).map(task => ({
+      ...task,
+      tags: this.getTaskTags(task.id)
+    }));
+    
     const lines = ['# Today\'s Tasks', '', `*Generated: ${new Date().toLocaleString()}*`, ''];
 
-    // Group by status (derived priority)
+    // Group active tasks by priority
     const priorities = {
       5: '🔴 Critical',
       4: '🟠 High',
@@ -838,20 +861,29 @@ export class TaskManager {
     };
 
     for (const [level, label] of Object.entries(priorities).reverse()) {
-      const priorityTasks = tasks.filter(t => this.getPriorityFromStatus(t.status) == level);
+      const priorityTasks = activeTasks.filter(t => this.getPriorityFromStatus(t.status) == level);
       if (priorityTasks.length > 0) {
         lines.push(`## ${label}`, '');
         for (const task of priorityTasks) {
-          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const tags = task.tags.length > 0 ? ` [${task.tags.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${tags} <!-- task-id: ${task.id} -->`);
+          lines.push(`- [ ] ${task.title}${tags} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
     }
+    
+    // Add completed tasks in a Done section
+    if (completedTasks.length > 0) {
+      lines.push('## ✅ Done', '');
+      for (const task of completedTasks) {
+        const tags = task.tags.length > 0 ? ` [${task.tags.join(', ')}]` : '';
+        lines.push(`- [x] ${task.title}${tags} <!-- task-id: ${task.id} -->`);
+      }
+      lines.push('');
+    }
 
     await fs.writeFile(outputPath, lines.join('\n'));
-    return tasks.length;
+    return activeTasks.length + completedTasks.length;
   }
 
   // Handle repeating tasks

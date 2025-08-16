@@ -50,15 +50,14 @@ run_sync_step() {
     if $func; then
         print_status "$success_msg"
         SYNC_SUMMARY="${SYNC_SUMMARY}✓ $summary_name\n"
-        local result=0
     else
         print_error "$summary_name sync failed"
         SYNC_SUMMARY="${SYNC_SUMMARY}✗ $summary_name\n"
-        local result=1
     fi
     END_TIME=$(date +%s)
     print_info "⏱️  Took $((END_TIME - START_TIME)) seconds"
-    return $result
+    # Always return 0 to prevent script exit with set -e
+    return 0
 }
 
 # Main sync function
@@ -76,6 +75,7 @@ main() {
     run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
     # Notion sync removed - moving away from Notion
     run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
+    run_sync_step "🔍 Task Consistency" check_task_consistency "Task consistency checked" "Task consistency"
     run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
     run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
     run_sync_step "📇 Contacts" sync_contacts "Contacts synced" "Contacts"
@@ -209,6 +209,29 @@ sync_github_notes() {
     fi
     
     return 0
+}
+
+# Check task consistency across all markdown files
+check_task_consistency() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    print_info "Checking task consistency across markdown files..."
+    
+    # Run the consistency check with auto-fix
+    output=$(bin/tasks check-consistency --fix 2>&1)
+    
+    if echo "$output" | grep -q "All tasks are consistent"; then
+        print_info "All tasks are consistent"
+        return 0
+    elif echo "$output" | grep -q "Fixed.*inconsistent task"; then
+        # Extract the number of fixed tasks
+        fixed_count=$(echo "$output" | grep -oE "Fixed [0-9]+ inconsistent" | grep -oE "[0-9]+")
+        print_info "Fixed $fixed_count inconsistent task(s)"
+        return 0
+    else
+        print_error "Task consistency check failed"
+        return 1
+    fi
 }
 
 # Sync task manager (includes stage classification)
@@ -391,19 +414,68 @@ sync_email() {
         DAYS_TO_SYNC=7
     fi
     
-    # Use shorter timeout for efficiency
-    TIMEOUT=$((10 + $DAYS_TO_SYNC * 5))  # 10s base + 5s per day
+    # Use timeout based on days with 30 second base
+    TIMEOUT=$((30 + $DAYS_TO_SYNC * 5))  # 30s base + 5s per day
     print_info "Fetching new emails (timeout: ${TIMEOUT}s)..."
     
-    output=$(timeout $TIMEOUT $EMAIL_BIN download --days $DAYS_TO_SYNC 2>&1) || {
-        if [[ $? -eq 124 ]]; then
-            print_error "Email download timed out after $TIMEOUT seconds"
-            print_info "Try running 'email download --days 1' for a quicker sync"
-        else
-            print_error "Email download failed"
+    # Create a temp file for output
+    EMAIL_OUTPUT=$(mktemp)
+    
+    # Run email download in background with timeout, showing progress
+    timeout $TIMEOUT $EMAIL_BIN download --days $DAYS_TO_SYNC > "$EMAIL_OUTPUT" 2>&1 &
+    EMAIL_PID=$!
+    
+    # Monitor the output file for "already in progress" or transaction error messages
+    WAIT_COUNT=0
+    while kill -0 $EMAIL_PID 2>/dev/null; do
+        if grep -q "Another download is already in progress" "$EMAIL_OUTPUT" 2>/dev/null; then
+            print_info "Another email download is already in progress, skipping..."
+            kill $EMAIL_PID 2>/dev/null || true
+            wait $EMAIL_PID 2>/dev/null || true
+            rm -f "$EMAIL_OUTPUT"
+            return 0
         fi
+        
+        # Check for database transaction errors
+        if grep -q "this.cache.db.transaction is not a function" "$EMAIL_OUTPUT" 2>/dev/null; then
+            print_error "Email database error detected"
+            print_info "Try running 'bin/email repair' to fix the database"
+            kill $EMAIL_PID 2>/dev/null || true
+            wait $EMAIL_PID 2>/dev/null || true
+            rm -f "$EMAIL_OUTPUT"
+            return 1
+        fi
+        
+        # Show any new output lines (for progress)
+        if [[ -f "$EMAIL_OUTPUT" ]] && [[ -s "$EMAIL_OUTPUT" ]]; then
+            tail -n +$((WAIT_COUNT + 1)) "$EMAIL_OUTPUT" 2>/dev/null | while IFS= read -r line; do
+                if [[ -n "$line" ]]; then
+                    echo "  $line"
+                fi
+            done
+            WAIT_COUNT=$(wc -l < "$EMAIL_OUTPUT" 2>/dev/null || echo 0)
+        fi
+        
+        sleep 0.5
+    done
+    
+    # Get exit code
+    wait $EMAIL_PID
+    email_exit_code=$?
+    
+    # Read final output
+    output=$(cat "$EMAIL_OUTPUT" 2>/dev/null || echo "")
+    rm -f "$EMAIL_OUTPUT"
+    
+    # Check for timeout
+    if [[ $email_exit_code -eq 124 ]]; then
+        print_error "Email download timed out after $TIMEOUT seconds"
+        print_info "Try running 'email download --days 1' for a quicker sync"
         return 1
-    }
+    elif [[ $email_exit_code -ne 0 ]]; then
+        print_error "Email download failed"
+        return 1
+    fi
     
     # Show download results
     if echo "$output" | grep -q "Downloaded"; then
@@ -430,15 +502,25 @@ sync_calendar() {
     cd "$(dirname "$0")/.." || return 1
     
     # Run calendar sync
+    print_info "Syncing calendar events..."
     SYNC_OUTPUT=$(bin/calendar sync 2>&1)
-    if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [1-9]"; then
-        # Actually synced some events (not 0)
-        # Show quick summary of today's events
-        TODAY_COUNT=$(bin/calendar today 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
-        if [[ "$TODAY_COUNT" -gt 0 ]]; then
-            print_info "$TODAY_COUNT events scheduled for today"
+    
+    # Check if sync was successful
+    if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [0-9]"; then
+        # Extract event count
+        EVENT_COUNT=$(echo "$SYNC_OUTPUT" | grep -oE "✅ Synced [0-9]+ calendar" | grep -oE "[0-9]+" || echo 0)
+        if [[ "$EVENT_COUNT" -gt 0 ]]; then
+            print_info "Synced $EVENT_COUNT calendar events"
+            # Show quick summary of today's events
+            TODAY_COUNT=$(bin/calendar today 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
+            if [[ "$TODAY_COUNT" -gt 0 ]]; then
+                print_info "$TODAY_COUNT events scheduled for today"
+            fi
+            return 0
+        else
+            print_info "No calendar events found"
+            return 0
         fi
-        return 0
     else
         print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
         return 1
@@ -467,14 +549,14 @@ sync_contacts() {
     sync_output=$(bin/contacts sync 2>&1)
     if [[ $? -eq 0 ]]; then
         # Extract contact count from output
-        # Check for database cache message first (new SQLite version)
-        if echo "$sync_output" | grep -q "Loaded [0-9]* contacts from database cache"; then
+        # Check for synced to database message
+        if echo "$sync_output" | grep -q "✅ Synced [0-9]* contacts to database"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts to database" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $contact_count contacts to database"
+        # Check for database cache message (new SQLite version)
+        elif echo "$sync_output" | grep -q "Loaded [0-9]* contacts from database cache"; then
             contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from database cache" | grep -oE "[0-9]+" | head -1)
             print_info "Loaded $contact_count contacts from cache"
-        # Check for synced to database message
-        elif echo "$sync_output" | grep -q "Synced [0-9]* contacts to database"; then
-            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts to database" | grep -oE "[0-9]+" | head -1)
-            print_info "Synced $contact_count contacts"
         # Fallback for old cache message
         elif echo "$sync_output" | grep -q "Loaded [0-9]* contacts from cache"; then
             contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from cache" | grep -oE "[0-9]+" | head -1)
@@ -917,9 +999,10 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - GitHub and tasks only"
+        print_info "Quick sync mode - GitHub, tasks, and consistency check"
         sync_github_notes
         sync_tasks
+        check_task_consistency
         ;;
     --force)
         # Force full sync - bypasses smart caching

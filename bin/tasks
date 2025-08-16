@@ -684,4 +684,171 @@ program
     }
   });
 
+// Check consistency command
+program
+  .command('check-consistency')
+  .description('Check and fix task completion consistency across all markdown files')
+  .option('--fix', 'Automatically fix inconsistencies')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options) => {
+    const { execSync } = await import('child_process');
+    const { promises: fs } = await import('fs');
+    const tm = new TaskManager();
+    
+    try {
+      if (options.verbose) {
+        console.log(chalk.blue('Checking task consistency across all markdown files...'));
+      }
+      
+      // Find all markdown files
+      const markdownFiles = execSync('find notes -name "*.md" -type f 2>/dev/null || find . -name "*.md" -type f', { encoding: 'utf8' })
+        .split('\n')
+        .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
+        .map(f => f.replace(/^\.\//, ''));
+      
+      if (options.verbose) {
+        console.log(chalk.gray(`Scanning ${markdownFiles.length} markdown files...`));
+      }
+      
+      // Collect all task statuses from all files
+      const taskStatuses = new Map(); // taskId -> { completed: boolean, files: Set }
+      const taskTitles = new Map(); // taskId -> title
+      
+      for (const filePath of markdownFiles) {
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
+          const lines = content.split('\n');
+          
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Match task lines with IDs - handle both normal and corrupted formats
+            const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
+            
+            if (taskMatch) {
+              const isCompleted = taskMatch[1] === 'x';
+              const title = taskMatch[2].trim();
+              const taskId = taskMatch[3] || taskMatch[4];
+              
+              if (!taskStatuses.has(taskId)) {
+                taskStatuses.set(taskId, { 
+                  completed: isCompleted, 
+                  files: new Set([filePath]),
+                  completedIn: isCompleted ? new Set([filePath]) : new Set(),
+                  notCompletedIn: isCompleted ? new Set() : new Set([filePath])
+                });
+                taskTitles.set(taskId, title);
+              } else {
+                const status = taskStatuses.get(taskId);
+                status.files.add(filePath);
+                
+                if (isCompleted) {
+                  status.completedIn.add(filePath);
+                  // If ANY file has it completed, mark as completed
+                  status.completed = true;
+                } else {
+                  status.notCompletedIn.add(filePath);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // File doesn't exist or can't be read
+        }
+      }
+      
+      // Find inconsistent tasks
+      const inconsistentTasks = [];
+      for (const [taskId, status] of taskStatuses) {
+        if (status.completedIn.size > 0 && status.notCompletedIn.size > 0) {
+          inconsistentTasks.push({
+            id: taskId,
+            title: taskTitles.get(taskId),
+            completedIn: Array.from(status.completedIn),
+            notCompletedIn: Array.from(status.notCompletedIn),
+            shouldBeCompleted: status.completed
+          });
+        }
+      }
+      
+      if (inconsistentTasks.length === 0) {
+        console.log(chalk.green('✓ All tasks are consistent across files!'));
+        return;
+      }
+      
+      console.log(chalk.yellow(`Found ${inconsistentTasks.length} inconsistent task(s):\n`));
+      
+      // Display inconsistencies
+      const table = new Table({
+        head: ['Task', 'Status', 'Files'],
+        colWidths: [40, 15, 40],
+        wordWrap: true
+      });
+      
+      for (const task of inconsistentTasks) {
+        const taskTitle = task.title.length > 37 ? task.title.substring(0, 34) + '...' : task.title;
+        const status = task.shouldBeCompleted ? '→ Done' : '→ Not Done';
+        const fileInfo = `✓ in: ${task.completedIn.length} file(s)\n✗ in: ${task.notCompletedIn.length} file(s)`;
+        table.push([taskTitle, status, fileInfo]);
+      }
+      
+      console.log(table.toString());
+      
+      if (!options.fix) {
+        console.log(chalk.yellow('\nRun with --fix to automatically resolve these inconsistencies'));
+        return;
+      }
+      
+      // Fix inconsistencies
+      console.log(chalk.blue('\nFixing inconsistencies...'));
+      
+      // Update database
+      for (const task of inconsistentTasks) {
+        const newStatus = task.shouldBeCompleted ? '✅ Done' : '🎭 Stage';
+        tm.updateTask(task.id, { status: newStatus });
+        if (options.verbose) {
+          console.log(chalk.green(`  ✓ Updated ${task.title.substring(0, 50)}... to ${newStatus}`));
+        }
+      }
+      
+      // Update markdown files
+      for (const task of inconsistentTasks) {
+        const filesToUpdate = task.shouldBeCompleted ? task.notCompletedIn : task.completedIn;
+        
+        for (const filePath of filesToUpdate) {
+          const content = await fs.readFile(filePath, 'utf-8');
+          const lines = content.split('\n');
+          let updated = false;
+          
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes(`task-id: ${task.id}`)) {
+              // Update the checkbox
+              if (task.shouldBeCompleted) {
+                lines[i] = lines[i].replace(/^- \[ \]/, '- [x]');
+              } else {
+                lines[i] = lines[i].replace(/^- \[x\]/, '- [ ]');
+              }
+              updated = true;
+            }
+          }
+          
+          if (updated) {
+            await fs.writeFile(filePath, lines.join('\n'));
+            if (options.verbose) {
+              console.log(chalk.green(`  ✓ Updated ${filePath}`));
+            }
+          }
+        }
+      }
+      
+      console.log(chalk.green(`\n✓ Fixed ${inconsistentTasks.length} inconsistent task(s)`));
+      console.log(chalk.gray('Run "bin/sync" to regenerate task files with consistent data'));
+      
+    } catch (error) {
+      console.error(chalk.red('Error checking consistency:'), error.message);
+      process.exit(1);
+    } finally {
+      tm.close();
+    }
+  });
+
 program.parse();

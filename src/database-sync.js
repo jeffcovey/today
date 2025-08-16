@@ -432,6 +432,13 @@ export class DatabaseSync {
   }
 
   /**
+   * Create a transaction
+   */
+  transaction(fn) {
+    return this.localDb.transaction(fn);
+  }
+
+  /**
    * Close database connections
    */
   close() {
