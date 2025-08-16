@@ -2,10 +2,10 @@
 
 ### Sunday, Aug 10 (6 days ago)
 
-- [ ] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
-- [ ] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
-- [ ] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
-- [ ] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
+- [x] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
+- [x] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
+- [x] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
+- [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
 
 ### Monday, Aug 11 (5 days ago)
 
