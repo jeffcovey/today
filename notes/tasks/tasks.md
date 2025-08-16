@@ -64,7 +64,7 @@
 - [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 - [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
-- [ ] Send update to OGM members about fixes @today <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
+- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
 - [ ] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
 - [ ] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
 - [ ] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
@@ -119,3 +119,7 @@
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
+- [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
+- [x] Make sure data isn't siloed in one deployment <!-- task-id: 8f36bf8dda9024890733c10aca537191 -->
+- [ ] add setting dates to tasks @2025-08-16 <!-- task-id: 7df4ea14fa53ed885b7a2dd9a0f6845c -->
+- [ ] remove .data/ from all deployments <!-- task-id: 1d76745789447c029247e8af2e0ee0d0 -->

@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 5:01:48 PM*
+*Generated: 8/16/2025, 5:09:33 PM*
 
 ## 🟡 Medium
 
@@ -52,7 +52,7 @@
 - [ ] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
 - [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
 - [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
-- [ ] Send update to OGM members about fixes @today <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
+- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
 
 ## 🔵 Low
 

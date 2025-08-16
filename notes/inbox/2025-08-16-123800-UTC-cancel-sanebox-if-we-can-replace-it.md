@@ -1,4 +1,0 @@
-- [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
-- [x] Make sure data isn't siloed in one deployment <!-- task-id: 8f36bf8dda9024890733c10aca537191 -->
-- [ ] add setting dates to tasks @2025-08-16 <!-- task-id: 7df4ea14fa53ed885b7a2dd9a0f6845c -->
-- [ ] remove .data/ from all deployments <!-- task-id: 1d76745789447c029247e8af2e0ee0d0 -->
