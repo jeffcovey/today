@@ -50,7 +50,7 @@
 - [ ] Complete other Streaks app habits for exercise and wellness <!-- task-id: e8187734bdcc43e42a669e21b6fd8128 -->
 - [ ] Confirm arrangements for Buster's care <!-- task-id: 2ea9bbc372e5f87278676329b1868c7f -->
 - [ ] Consider non-alcoholic options (cutting back goal) <!-- task-id: c82838a3a0bb843decaa6b3744984841 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 4637ee946d018c6ec8e66aa003239b54 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 3bb904b2fdfa575bb5cab2cb9db50815 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 828d4cfcea765b1d79e853a537c0b9bf -->
@@ -88,11 +88,11 @@
 - [ ] Quick review of SaneBox digest (157 messages) <!-- task-id: 7d1784b4eb8343fbf7b937163d6433a6 -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
-- [ ] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
+- [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
 - [ ] Read Offline, 2m 30s <!-- task-id: c906ad494e1d03e73ccd8d3fb621541c -->
 - [ ] Read Saved Articles (2m 30s) <!-- task-id: 549074e3403115eedb6e8d53d3aaa34b -->
 - [ ] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
-- [ ] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
@@ -147,7 +147,7 @@
 - [ ] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
 - [ ] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
 - [ ] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
-- [ ] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
+- [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
 - [ ] Use The Inversion Table <!-- task-id: 47b496cc26c07eeef616e1389aab659a -->
 - [ ] Use The Inversion Table <!-- task-id: 3fd38bf38de6c64c2dea8435c5a1d953 -->
 - [ ] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
@@ -164,12 +164,12 @@
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: e60a42b17ca46a862140640bc6e872e4 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 8479a4711b840b864433241aab517c0d -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: 8cd4f6c213cfa5e09269c68550501333 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
@@ -178,14 +178,14 @@
 - [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
 - [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
 - [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: 20c85910f36c2d2459761b4fbf58033d -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
 - [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
 - [ ] ♥︎ Tai Chi (1m) <!-- task-id: 4577a7388ac772aa08eed4ba60c57d47 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2c1243b8b17fa3acba4bfb23d7defceb -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 5f35c5f3447efe2310fb54cff4288f70 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: f2730ae1eee54c85d06385887b3a71ab -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 25f804d99290ecd81ddf98fd331bff08 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
@@ -195,8 +195,8 @@
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
-- [ ] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
-- [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
+- [x] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
 - [ ] Daily standup meeting <!-- task-id: 244374d34462ddaa63c57a2c1281de23 -->
 - [ ] Daily standup meeting <!-- task-id: 96547421a198b015f533e8bdff93bec9 -->
 - [ ] Daily standup meeting <!-- task-id: b9355af633d415fadd980380b995d494 -->
@@ -206,10 +206,10 @@
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
-- [ ] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
-- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
-- [ ] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
-- [ ] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
+- [x] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
+- [x] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->

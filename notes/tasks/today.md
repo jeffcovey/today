@@ -16,12 +16,12 @@
 - [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
-- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
-- [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
-- [ ] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
-- [ ] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
-- [ ] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
-- [ ] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 30484c0d05841f4332fee7bc2e4513e0 -->
+- [x] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: b5d1e6d81bef6b4032bbb9e808d80e6c -->
+- [x] Set out fresh towels and amenities <!-- task-id: 918e9c4f59c452c6a8daef3e4fc1e43e -->
+- [x] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
+- [x] Write review for Shwet on Airbnb <!-- task-id: 70b4f93531e41035f20cd3020b6d7d05 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 
 ## 🔵 Low
