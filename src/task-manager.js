@@ -696,58 +696,16 @@ export class TaskManager {
     return updates.length;
   }
 
-  // Generate all active tasks file (bidirectional sync)
-  // This reads the existing tasks.md first to capture any manual checkbox changes,
-  // applies them to the database, then regenerates the file with all active tasks
+  // Generate all active tasks file
+  // Note: Checkbox syncing is handled separately, not during generation
   async generateAllTasksFile(outputPath = 'notes/tasks/tasks.md') {
-    // First, check if tasks.md exists and read any manual changes
-    const manualChanges = new Map();
-    
-    try {
-      const existingContent = await fs.readFile(outputPath, 'utf-8');
-      const existingLines = existingContent.split('\n');
-      
-      // Parse existing file for checkbox states
-      for (const line of existingLines) {
-        // Match both normal and corrupted comment formats
-        const taskMatch = line.match(/^- \[([ x])\] .+?(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
-        if (taskMatch) {
-          const isChecked = taskMatch[1] === 'x';
-          const taskId = taskMatch[2] || taskMatch[3]; // Could be in either capture group
-          manualChanges.set(taskId, isChecked);
-        }
-      }
-      
-      // Apply manual changes to database before regenerating
-      for (const [taskId, isChecked] of manualChanges) {
-        const task = this.getTask(taskId);
-        if (task) {
-          const shouldBeDone = isChecked;
-          const isDone = task.status === '✅ Done';
-          
-          if (shouldBeDone && !isDone) {
-            // User checked the box, mark as done
-            this.updateTask(taskId, { status: '✅ Done', completed_at: new Date().toISOString() });
-            console.log(`✓ Marked task as done: ${task.title}`);
-          } else if (!shouldBeDone && isDone) {
-            // User unchecked the box, mark as not done  
-            this.updateTask(taskId, { status: '🎭 Stage', completed_at: null });
-            console.log(`↺ Marked task as not done: ${task.title}`);
-          }
-        }
-      }
-    } catch (err) {
-      // File doesn't exist yet, that's OK
-    }
 
     // Get all active tasks (not Done) with project information
-    // Also include recently completed tasks (last 24 hours) so they can be unchecked if needed
     const tasks = this.db.prepare(`
       SELECT t.*, p.name as project_name 
       FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.status != '✅ Done'
-         OR (t.status = '✅ Done' AND datetime(t.completed_at) > datetime('now', '-24 hours'))
       ORDER BY p.name ASC, t.do_date ASC, t.status ASC, t.title ASC
     `).all();
     
@@ -886,48 +844,9 @@ export class TaskManager {
     return tasks.length;
   }
 
-  // Generate today's task file (bidirectional sync)
-  // This reads the existing today.md first to capture any manual checkbox changes,
-  // applies them to the database, then regenerates the file with all today's tasks
+  // Generate today's task file
+  // Note: Checkbox syncing is handled separately, not during generation
   async generateTodayFile(outputPath = 'notes/tasks/today.md') {
-    // First, check if today.md exists and read any manual changes
-    const manualChanges = new Map();
-    try {
-      const existingContent = await fs.readFile(outputPath, 'utf-8');
-      const existingLines = existingContent.split('\n');
-      
-      // Parse existing file for checkbox states
-      for (const line of existingLines) {
-        // Match both normal and corrupted comment formats
-        const taskMatch = line.match(/^- \[([ x])\] .+?(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
-        if (taskMatch) {
-          const isChecked = taskMatch[1] === 'x';
-          const taskId = taskMatch[2] || taskMatch[3]; // Could be in either capture group
-          manualChanges.set(taskId, isChecked);
-        }
-      }
-      
-      // Apply manual changes to database before regenerating
-      for (const [taskId, isChecked] of manualChanges) {
-        const task = this.getTask(taskId);
-        if (task) {
-          const shouldBeDone = isChecked;
-          const isDone = task.status === '✅ Done';
-          
-          if (shouldBeDone && !isDone) {
-            // User checked the box, mark as done
-            this.updateTask(taskId, { status: '✅ Done', completed_at: new Date().toISOString() });
-            console.log(`✓ Marked task as done: ${task.title}`);
-          } else if (!shouldBeDone && isDone) {
-            // User unchecked the box, mark as not done  
-            this.updateTask(taskId, { status: '🎭 Stage', completed_at: null });
-            console.log(`↺ Marked task as not done: ${task.title}`);
-          }
-        }
-      }
-    } catch (err) {
-      // File doesn't exist yet, that's OK
-    }
 
     // Get today's date
     const today = new Date().toISOString().split('T')[0];

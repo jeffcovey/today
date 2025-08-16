@@ -6,6 +6,7 @@ import { forcePushToTurso } from '../src/database-sync.js';
 import { program } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
+import fs from 'fs';
 
 program
   .name('tasks')
@@ -149,6 +150,10 @@ program
           let filesWithUpdates = 0;
           
           for (const filePath of allMarkdownFiles) {
+            // Skip auto-generated files - they have their own checkbox sync logic
+            if (filePath === 'notes/tasks/today.md' || filePath === 'notes/tasks/tasks.md') {
+              continue;
+            }
             if (fs.existsSync(filePath)) {
               const updates = await tm.syncMarkdownFile(filePath);
               totalUpdates += updates;
@@ -184,11 +189,21 @@ program
         console.log(chalk.blue(`✓ Created ${repeated} recurring task instances`));
       }
 
-      // Generate today file
+      // First, sync checkbox states from today.md and tasks.md BEFORE regenerating
+      // This captures any manual edits users made
+      for (const taskFile of ['notes/tasks/today.md', 'notes/tasks/tasks.md']) {
+        if (fs.existsSync(taskFile)) {
+          const updates = await tm.syncMarkdownFile(taskFile);
+          if (updates > 0) {
+            console.log(chalk.gray(`  • Synced ${updates} checkbox changes from ${taskFile}`));
+          }
+        }
+      }
+      
+      // Now generate the files with the updated task states
       const todayCount = await tm.generateTodayFile();
       console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
       
-      // Generate all tasks file
       const allCount = await tm.generateAllTasksFile();
       console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
       
