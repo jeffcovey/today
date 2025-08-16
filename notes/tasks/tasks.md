@@ -2,13 +2,14 @@
 
 ### Sunday, Aug 10 (6 days ago)
 
-- [ ] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
-- [ ] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
-- [ ] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
-- [ ] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
+- [x] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
+- [x] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
+- [x] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
+- [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
 
 ### Monday, Aug 11 (5 days ago)
 
+- [ ] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
@@ -35,9 +36,6 @@
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
-- [ ] Reply to David Edwards (overdue) <!-- task-id: 71be0b7a5ec686dbbe702c521c162207 -->
-- [ ] Reply to Melv (overdue) <!-- task-id: f06d6a42e1a60a0c6212845c733ad493 -->
-- [ ] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
 - [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 
