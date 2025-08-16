@@ -1,17 +1,10 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 4:06:06 PM*
+*Generated: 8/16/2025, 4:06:48 PM*
 
 ## 🟡 Medium
 
-- [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
-- [ ] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
-- [ ] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
-- [ ] Plan alcohol-free evening <!-- task-id: 5bb879221bf10b286732481f9def661c -->
-- [ ] Practice mindful eating at each meal <!-- task-id: 3898f1eb296015003b5e510e20cd15bf -->
-- [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Post update to members about recent work <!-- task-id: a10a170ffc5c4694983e7b5373162098 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
@@ -67,6 +60,13 @@
 
 ## ✅ Done
 
+- [x] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
+- [x] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
+- [x] Address member help requests <!-- task-id: 46db79f58fc47ba8ed639583fb707e77 -->
+- [x] Plan alcohol-free evening <!-- task-id: 5bb879221bf10b286732481f9def661c -->
+- [x] Practice mindful eating at each meal <!-- task-id: 3898f1eb296015003b5e510e20cd15bf -->
+- [x] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
+- [x] Post update to members about recent work <!-- task-id: a10a170ffc5c4694983e7b5373162098 -->
 - [x] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
 - [x] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
 - [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
