@@ -83,6 +83,9 @@ main() {
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
     run_sync_step "💾 Cache Update" update_cache_stats "Cache updated" "Cache updated"
     
+    # Push changes to Turso at the end
+    run_sync_step "☁️ Push to Turso" push_to_turso "Changes pushed to Turso" "Turso push"
+    
     # Print summary
     print_header "📋 Sync Summary"
     echo -e "$SYNC_SUMMARY"
@@ -306,6 +309,42 @@ sync_turso() {
     return $?
 }
 
+# Push changes to Turso cloud database (no pull)
+push_to_turso() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if Turso is configured
+    if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
+        print_info "Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)"
+        return 1
+    fi
+    
+    # Use the optimized smart sync in push-only mode
+    print_info "Pushing changes to Turso..."
+    
+    node -e "
+        import('./src/turso-sync-optimized.js').then(({smartTursoSync}) => {
+            smartTursoSync('push')
+                .then(result => {
+                    if (result.pushed > 0) {
+                        console.log(\`  ⬆️  Pushed \${result.pushed} changes to Turso\`);
+                    } else {
+                        console.log('  ✅ No changes to push');
+                    }
+                    process.exit(0);
+                })
+                .catch(err => {
+                    console.error('✗ Turso push failed:', err.message);
+                    process.exit(1);
+                });
+        }).catch(err => {
+            console.error('✗ Failed to load sync module:', err.message);
+            process.exit(1);
+        });
+    " 2>&1
+    
+    return $?
+}
 
 # Sync Notion database
 sync_notion() {
@@ -794,8 +833,13 @@ archive_completed_tasks() {
     ARCHIVE_CONTENT=$(mktemp)
     
     # Extract sections from the file
-    # 1. Active tasks (before Archive section, excluding completed tasks)
-    awk '/^# Archive/ {exit} /^- \[ \]/ {print}' "$TASKS_FILE" > "$ACTIVE_TASKS" || true
+    # 1. Active section - preserve ALL structure (headers, tasks, blank lines) except completed tasks
+    # This keeps project headers (## Project Name) intact
+    awk '
+        /^# Archive/ {exit}
+        /^- \[x\]/ {next}  # Skip completed tasks
+        {print}            # Keep everything else (headers, uncompleted tasks, blank lines)
+    ' "$TASKS_FILE" | sed '/^$/N;/^\n$/d' > "$ACTIVE_TASKS" || true
     
     # 2. NEW completed tasks from active section (to be archived)
     awk '/^# Archive/ {exit} /^- \[x\]/ {print}' "$TASKS_FILE" > "$COMPLETED_NEW" || true
