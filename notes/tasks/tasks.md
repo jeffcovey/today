@@ -1,42 +1,58 @@
 ## General Tasks
 
+### Sunday, Aug 10 (6 days ago)
+
+- [ ] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
+- [ ] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
+- [ ] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
+- [ ] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
+
 ### Monday, Aug 11 (5 days ago)
 
-- [ ] Check OGM newsletter status <!— task-id: 86fba922c9ad1b986295cd7dbfd854cf —>
-- [ ] Sell the exercise bike <!— task-id: 66f5be4259e24e3521f1c207fe71535b —>
-- [ ] Use the Virgin Red points <!— task-id: ee90848cb53900dff2ec05c6e4c51662 —>
-- [x] Address member help requests <!— task-id: 46db79f58fc47ba8ed639583fb707e77 —>
-- [ ] Check OGM newsletter status <!— task-id: e2539e73f379e58452a9c1011a91346d —>
-- [ ] Check the fridge water lines <!— task-id: 197d008fdf3afdac370906200c86ed65 —>
-- [ ] Pla  alcohol-free evening <!— task-id: 5bb879221bf10b286732481f9def661c —>
-- [ ] Post upda e to OGM members about recent work <!— task-id: d7ff371280629daf1e12325d75690d16 —>
-- [ ] Post updatexto members about recent work <!— task-id: a10a170ffc5c4694983e7b5373162098 —>
-- [ ] Practice mind ul eating at each meal <!— task-id: 3898f1eb296015003b5e510e20cd15bf —>
-- [ ] Quick social media check for OGM mentions <!— task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 —>
-- [ ] Remove tmp/grou s_page_backup.html <!— task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac —>
-- [ ] Reply to Heroku notification <!— task-id: d42f6aded0ffc524fd28dc2a0937096b —>
-- [ ] Reply to “gator” on OGM <!— task-id: 663651fef31af42bd2899851e321ee99 —>
-- [ ] Respond to OGM bug  eports <!— task-id: 27730eaf9a4273b68e679d066671f7a1 —>
-- [ ] Respond to any urgent mem er emails <!— task-id: 95c46448238fc301001d562364119fe4 —>
-- [ ] Review bug reports and resp nd to at least 2 <!— task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 —>
-- [ ] Send any follow-up messages f om today’s conversations <!— task-id: 40dbc547c400f517c1fc75862d15f498 —>
+- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
+- [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+- [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
+- [ ] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
+- [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
+- [ ] Plan alcohol-free evening <!-- task-id: 5bb879221bf10b286732481f9def661c -->
+- [ ] Post update to OGM members about recent work <!-- task-id: d7ff371280629daf1e12325d75690d16 -->
+- [ ] Post update to members about recent work <!-- task-id: a10a170ffc5c4694983e7b5373162098 -->
+- [ ] Practice mindful eating at each meal <!-- task-id: 3898f1eb296015003b5e510e20cd15bf -->
+- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
+- [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
+- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
+- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
+- [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
+- [ ] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
+- [ ] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
+- [ ] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
 
 ### Tuesday, Aug 12 (4 days ago)
 
-- [ ] Address memory exhaustion (Issu  #5222) <!— task-id: 3658b296e14495d436d4ca786ecb18c9 —>
-- [ ] Check if OGM newsletter went out <!— task-id: 17bdebde612a855c1d8e83a62299a8b5 —>
-- [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!— task-id: e5b1b114f14b8bb385b226e8f962a45e —>
-- [ ] Fix message trash emptying (Issue #4628) <!— task-id: 76ad5c89bc7b0fc629aab307d708266b —>
-- [ ] Prepare for Coffee and Conversati n <!-- task-id: b09690d37a99d18ff4f9a46b641404ff —>
-- [ ] Reply to David Edwards (overdue) <!— task-id: 71be0b7a5ec686dbbe702c521c162207 —>
-- [ ] Reply to Melv (overdue) <!— task-id: f06d6a42e1a60a0c6212845c733ad493 —>
-- [ ] Reply to Rosemary (overdue) <!— task-id: 436a54f406b68e7995c9a1734e93192b —>
-- [ ] Review SaneBox digest (69 messages) - quick triage <!— task-id: bfa5ecb34dd09979378b62861b027ee0 —>
-- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 -->
+- [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
+- [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
+- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
+- [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
+- [ ] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
+- [ ] Reply to David Edwards (overdue) <!-- task-id: 71be0b7a5ec686dbbe702c521c162207 -->
+- [ ] Reply to Melv (overdue) <!-- task-id: f06d6a42e1a60a0c6212845c733ad493 -->
+- [ ] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
+- [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 
 ### Wednesday, Aug 13 (3 days ago)
 
+- [ ] Address any OGM user support requests <!-- task-id: c9f4524f4f60fec693c992de5483ba05 -->
+- [ ] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
+- [ ] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
+- [ ] Complete other Streaks app habits for exercise and wellness <!-- task-id: e8187734bdcc43e42a669e21b6fd8128 -->
+- [ ] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
+- [ ] Plan tomorrow's schedule (Thursday = Back Stage day) <!-- task-id: 7b86f1de29d287a374b0f63c48bb4746 -->
+- [ ] Prepare room for Shwet Shah (arriving Aug 14) <!-- task-id: abe925fb875e3693d26f39832bcbeeef -->
+- [ ] Read Saved Articles (2m 30s) <!-- task-id: 549074e3403115eedb6e8d53d3aaa34b -->
+- [ ] Review GitHub PRs and merge if tests pass <!-- task-id: 20b3489b0dc7aa4f2077d2709baa7237 -->
+- [ ] Review and respond to **2 SaneBox digests** (115 + 69 messages to review) <!-- task-id: e1bb1b2dba792d28f398e01e6f74bbd4 -->
 - [ ] Prepare Airbnb room management instructions <!-- task-id: 97b68fa62c93c6ea5d000915fe457da2 -->
 
 ### Thursday, Aug 14 (2 days ago)
@@ -96,6 +112,7 @@
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
+- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
