@@ -1,12 +1,5 @@
 ## General Tasks
 
-### Sunday, Aug 10 (6 days ago)
-
-- [x] OGM update post <!-- task-id: 8d92ae2a444bfb6eece476da15d795ec -->
-- [x] Prepare tomorrow's list <!-- task-id: 110240d1df1c5aab6fb0a2f0d096c4d2 -->
-- [x] Process SaneBox digest <!-- task-id: c8aa5a6d7ac373adbcd04fa4d1ce1c0c -->
-- [x] Review expense entries <!-- task-id: 9436f776dab1669e05dda5956f3c3b3b -->
-
 ### Monday, Aug 11 (5 days ago)
 
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
@@ -44,16 +37,6 @@
 
 ### Wednesday, Aug 13 (3 days ago)
 
-- [x] Address any OGM user support requests <!-- task-id: c9f4524f4f60fec693c992de5483ba05 -->
-- [x] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
-- [x] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
-- [x] Complete other Streaks app habits for exercise and wellness <!-- task-id: e8187734bdcc43e42a669e21b6fd8128 -->
-- [x] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
-- [x] Plan tomorrow's schedule (Thursday = Back Stage day) <!-- task-id: 7b86f1de29d287a374b0f63c48bb4746 -->
-- [x] Prepare room for Shwet Shah (arriving Aug 14) <!-- task-id: abe925fb875e3693d26f39832bcbeeef -->
-- [x] Read Saved Articles (2m 30s) <!-- task-id: 549074e3403115eedb6e8d53d3aaa34b -->
-- [x] Review GitHub PRs and merge if tests pass <!-- task-id: 20b3489b0dc7aa4f2077d2709baa7237 -->
-- [x] Review and respond to **2 SaneBox digests** (115 + 69 messages to review) <!-- task-id: e1bb1b2dba792d28f398e01e6f74bbd4 -->
 - [ ] Prepare Airbnb room management instructions <!-- task-id: 97b68fa62c93c6ea5d000915fe457da2 -->
 
 ### Thursday, Aug 14 (2 days ago)
