@@ -1,23 +1,23 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 5:28:42 PM*
+*Generated: 8/16/2025, 5:31:47 PM*
 
 ## 🟡 Medium
 
+- [ ] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
+- [ ] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
+- [ ] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
-- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
-- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
+- [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
+- [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
-- [x] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
