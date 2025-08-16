@@ -1,13 +1,10 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 5:31:47 PM*
+*Generated: 8/16/2025, 5:32:52 PM*
 
 ## 🟡 Medium
 
-- [ ] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
-- [ ] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
@@ -15,7 +12,6 @@
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
-- [ ] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
@@ -61,6 +57,10 @@
 
 ## ✅ Done
 
+- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
+- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
+- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
+- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [x] Make sure data isn't siloed in one deployment <!-- task-id: 8f36bf8dda9024890733c10aca537191 -->
 - [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->

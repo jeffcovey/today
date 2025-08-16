@@ -3,9 +3,6 @@
 ### Monday, Aug 11 (5 days ago)
 
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
-- [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
-- [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
@@ -17,7 +14,6 @@
 ### Tuesday, Aug 12 (4 days ago)
 
 - [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
-- [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
