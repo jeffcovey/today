@@ -727,11 +727,11 @@ export class TaskManager {
           
           if (shouldBeDone && !isDone) {
             // User checked the box, mark as done
-            this.updateTask(taskId, { status: '✅ Done' });
+            this.updateTask(taskId, { status: '✅ Done', completed_at: new Date().toISOString() });
             console.log(`✓ Marked task as done: ${task.title}`);
           } else if (!shouldBeDone && isDone) {
-            // User unchecked the box, mark as not done
-            this.updateTask(taskId, { status: '🎭 Stage' });
+            // User unchecked the box, mark as not done  
+            this.updateTask(taskId, { status: '🎭 Stage', completed_at: null });
             console.log(`↺ Marked task as not done: ${task.title}`);
           }
         }
@@ -741,11 +741,13 @@ export class TaskManager {
     }
 
     // Get all active tasks (not Done) with project information
+    // Also include recently completed tasks (last 24 hours) so they can be unchecked if needed
     const tasks = this.db.prepare(`
       SELECT t.*, p.name as project_name 
       FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.status != '✅ Done'
+         OR (t.status = '✅ Done' AND datetime(t.completed_at) > datetime('now', '-24 hours'))
       ORDER BY p.name ASC, t.do_date ASC, t.status ASC, t.title ASC
     `).all();
     
@@ -914,11 +916,11 @@ export class TaskManager {
           
           if (shouldBeDone && !isDone) {
             // User checked the box, mark as done
-            this.updateTask(taskId, { status: '✅ Done' });
+            this.updateTask(taskId, { status: '✅ Done', completed_at: new Date().toISOString() });
             console.log(`✓ Marked task as done: ${task.title}`);
           } else if (!shouldBeDone && isDone) {
-            // User unchecked the box, mark as not done
-            this.updateTask(taskId, { status: '🎭 Stage' });
+            // User unchecked the box, mark as not done  
+            this.updateTask(taskId, { status: '🎭 Stage', completed_at: null });
             console.log(`↺ Marked task as not done: ${task.title}`);
           }
         }
