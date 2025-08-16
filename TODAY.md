@@ -24,7 +24,12 @@ When this session starts, please:
    - **UTC timestamps like "12:13:44.577Z" = 8:13 AM Eastern (subtract 4 hours during EDT, 5 hours during EST)**
    - **ASSUME Eastern Time Zone (New York/Florida) unless user indicates they're traveling**
    - **NEVER use UTC time when discussing the current time of day**
-3. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
+3. **🏠 CRITICAL: Check Guest Room Status**
+   - **ALWAYS query Airbnb & MisterB&B emails AND calendar_events table**
+   - **Look for reservation confirmations, guest messages, check-in/out times**
+   - **Two guest rooms need tracking - check BOTH rooms' status**
+   - **Guest transitions require room preparation between checkout (12 PM) and check-in (3 PM)**
+4. Check if a review file exists for today in `notes/reviews/YYYY-MM-DD.md`
    - **If today's review EXISTS**:
      - Load the existing review file
      - Query the database for recent changes (using SQL queries)
@@ -35,11 +40,11 @@ When this session starts, please:
      - Query the SQLite database at `.data/today.db` for comprehensive data
      - Check yesterday's review to see what was completed
      - Create a new review file with comprehensive analysis
-4. **CRITICAL: Calendar events in the database include timezone information**
+5. **CRITICAL: Calendar events in the database include timezone information**
    - Events have start_timezone and end_timezone fields
    - Convert UTC timestamps to local time when displaying
    - The database preserves original timezone data from calendars
-4. Present your recommendations to the user
+6. Present your recommendations to the user
 
 ### Review File Format
 
@@ -247,6 +252,15 @@ What to review and prepare based on the database
 ### 7. Self-Care Check
 
 Address any wellbeing concerns from recent notes and tasks
+
+### 8. Day-End Review (Evening Task)
+
+**⚠️ IMPORTANT: During evening reviews, ALWAYS:**
+- Query the tasks table for today's completed tasks
+- Review what was accomplished vs. what was planned
+- Update the review file with completion status
+- Note any tasks that need to carry over to tomorrow
+- Summarize the day's achievements and learnings
 
 ---
 
