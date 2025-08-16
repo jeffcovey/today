@@ -61,20 +61,20 @@
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: b10f65486ce6a69c5f845e3526b33be4 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] Remove tmp/groups_page_backup.html <!-- task-id: 69ba7358c0c5ef872eebaebbd0d6b6ac -->
-- [ ] Reply to David Edwards <!-- task-id: a243b2f8190f1276d548d593a066f4fa -->
-- [ ] Reply to David Edwards <!-- task-id: a1c9c044fe709a3530b18df461e345ed -->
-- [ ] Reply to David Edwards <!-- task-id: 60d53f5b59075d59992e0a8921ed7521 -->
+- [x] Reply to David Edwards <!-- task-id: a243b2f8190f1276d548d593a066f4fa -->
+- [x] Reply to David Edwards <!-- task-id: a1c9c044fe709a3530b18df461e345ed -->
+- [x] Reply to David Edwards <!-- task-id: 60d53f5b59075d59992e0a8921ed7521 -->
 - [ ] Reply to David Edwards (overdue) <!-- task-id: 71be0b7a5ec686dbbe702c521c162207 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [ ] Reply to Melv <!-- task-id: 8596f25c6ccb1ecd40631056ddc8333b -->
-- [ ] Reply to Melv <!-- task-id: f8f6a8613715716f2561c1c6d7bd1d30 -->
-- [ ] Reply to Melv <!-- task-id: cc643c2b93581c998b332700dbb58301 -->
+- [x] Reply to Melv <!-- task-id: 8596f25c6ccb1ecd40631056ddc8333b -->
+- [x] Reply to Melv <!-- task-id: f8f6a8613715716f2561c1c6d7bd1d30 -->
+- [x] Reply to Melv <!-- task-id: cc643c2b93581c998b332700dbb58301 -->
 - [ ] Reply to Melv (overdue) <!-- task-id: f06d6a42e1a60a0c6212845c733ad493 -->
-- [ ] Reply to Rosemary <!-- task-id: 3fb5ae563f5d4866ca562fc438f386ea -->
-- [ ] Reply to Rosemary <!-- task-id: 9429d5ead4d4eb5e69c083039dc852bd -->
-- [ ] Reply to Rosemary <!-- task-id: 22d493be70ef284ec5d6890d40e1679b -->
+- [x] Reply to Rosemary <!-- task-id: 3fb5ae563f5d4866ca562fc438f386ea -->
+- [x] Reply to Rosemary <!-- task-id: 9429d5ead4d4eb5e69c083039dc852bd -->
+- [x] Reply to Rosemary <!-- task-id: 22d493be70ef284ec5d6890d40e1679b -->
 - [ ] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
-- [ ] Reply to “gator” on OGM <!-- task-id: 4de4d3fc61774dd23e54f96bd349e640 -->
+- [x] Reply to “gator” on OGM <!-- task-id: 4de4d3fc61774dd23e54f96bd349e640 -->
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
@@ -90,66 +90,66 @@
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: 071300b7e9a7ceefaf873f049286ef09 -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: cb4ca7ea0cc4f940698c66f599254d7d -->
 - [ ] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
-- [ ] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
-- [ ] Set up coffee for morning <!-- task-id: 64e5bfa1249068c8349450e25b8e20f4 -->
-- [ ] Sort paperwork pile <!-- task-id: 900a9d3bacf56d9c60444a77233f854f -->
+- [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
+- [x] Set up coffee for morning <!-- task-id: 64e5bfa1249068c8349450e25b8e20f4 -->
+- [x] Sort paperwork pile <!-- task-id: 900a9d3bacf56d9c60444a77233f854f -->
 - [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
-- [ ] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
-- [ ] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
-- [ ] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
-- [ ] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
-- [ ] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
-- [ ] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
-- [ ] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
-- [ ] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
-- [ ] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
-- [ ] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
-- [ ] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
-- [ ] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
+- [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
+- [x] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
+- [x] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
+- [x] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
+- [x] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [x] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
+- [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
+- [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
+- [x] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
-- [ ] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
-- [ ] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
-- [ ] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
-- [ ] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
-- [ ] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
-- [ ] Use The Inversion Table <!-- task-id: 47b496cc26c07eeef616e1389aab659a -->
-- [ ] Use The Inversion Table <!-- task-id: 3fd38bf38de6c64c2dea8435c5a1d953 -->
-- [ ] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
-- [ ] Use The Inversion Table (for hip pain) <!-- task-id: e502e82a2035d442fa1eee473532315f -->
-- [ ] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
+- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
+- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
+- [x] Use The Inversion Table <!-- task-id: 47b496cc26c07eeef616e1389aab659a -->
+- [x] Use The Inversion Table <!-- task-id: 3fd38bf38de6c64c2dea8435c5a1d953 -->
+- [x] Use The Inversion Table <!-- task-id: 5c90d47d44095ef6993d422308bef4c5 -->
+- [x] Use The Inversion Table (for hip pain) <!-- task-id: e502e82a2035d442fa1eee473532315f -->
+- [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
-- [ ] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
+- [x] Write review for Shwet on Airbnb (guest who recently left) <!-- task-id: c9f052ad0be20e8ef773b55ce1fcee03 -->
 - [ ] Write summary of recent OGM development work <!-- task-id: 6f5c18f64317e78e0852713dc6eba73f -->
-- [ ] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
-- [ ] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
-- [ ] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
-- [ ] ♥︎ Activity Rings <!-- task-id: e60a42b17ca46a862140640bc6e872e4 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 8479a4711b840b864433241aab517c0d -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: 8cd4f6c213cfa5e09269c68550501333 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
-- [ ] ♥︎ Burn More Energy (Activity goal) <!-- task-id: 00adada2b671029b4a858a717cb093d6 -->
-- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
-- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
-- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
-- [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: 20c85910f36c2d2459761b4fbf58033d -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
-- [ ] ♥︎ Tai Chi (1m) <!-- task-id: 4577a7388ac772aa08eed4ba60c57d47 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2c1243b8b17fa3acba4bfb23d7defceb -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 5f35c5f3447efe2310fb54cff4288f70 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: f2730ae1eee54c85d06385887b3a71ab -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 25f804d99290ecd81ddf98fd331bff08 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
-- [ ] ♥︎ Walk to complete 5,500 steps <!-- task-id: 5ddee2a5ef1f2bc8606ed196820bda70 -->
+- [x] ♥︎ Activity Rings <!-- task-id: e60a42b17ca46a862140640bc6e872e4 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 8479a4711b840b864433241aab517c0d -->
+- [x] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
+- [x] ♥︎ Activity Rings <!-- task-id: f67bf154c1377fc84ee7ebe54b08f5ae -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 8cd4f6c213cfa5e09269c68550501333 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: e213a744c4b83a91754e5ccb3ba2e7c1 -->
+- [x] ♥︎ Burn More Energy (Activity goal) <!-- task-id: 00adada2b671029b4a858a717cb093d6 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 3d3c296b086ba1300b490ddcd568365a -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: 20c85910f36c2d2459761b4fbf58033d -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 545c82142f150c9c07d892c3215d1362 -->
+- [x] ♥︎ Tai Chi (1m) <!-- task-id: 4577a7388ac772aa08eed4ba60c57d47 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2c1243b8b17fa3acba4bfb23d7defceb -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 5f35c5f3447efe2310fb54cff4288f70 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 64f6682fa639ad48b814738460acaa31 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: f2730ae1eee54c85d06385887b3a71ab -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 25f804d99290ecd81ddf98fd331bff08 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: ff0f2486ae0e0f221290749101506f8e -->
+- [x] ♥︎ Walk to complete 5,500 steps <!-- task-id: 5ddee2a5ef1f2bc8606ed196820bda70 -->
 - [ ] Fix Chronological Sorting Of The Events Index <!-- task-id: 1cbf93ccd5c10219136f15d0cc307463 -->
 - [ ] Sell the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
@@ -168,7 +168,7 @@
 - [ ] Check event calendar for September <!-- task-id: ff35a029d7185347a3d378b63a07afba -->
 - [ ] Daily pool time (mornings before heat) <!-- task-id: de937b2c2b61229a7dab5c8a5b88c038 -->
 - [ ] Download offline maps <!-- task-id: 45af7e529d292d1616103a6d3c236c12 -->
-- [ ] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
+- [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
 - [ ] Prepare instructions for Vince about: <!-- task-id: 0b9b8ff9e2265fb16fd5b3dcee788868 -->
 - [ ] Refill prescriptions <!-- task-id: 981fd050eca3144eaa22d1331e051aa6 -->
 - [ ] Research restaurants <!-- task-id: 1463d4f4dd402ebbf1ea9d15b37823c3 -->
