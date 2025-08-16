@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 4:55:37 PM*
+*Generated: 8/16/2025, 4:55:59 PM*
 
 ## 🟡 Medium
 
@@ -60,8 +60,6 @@
 
 ## ✅ Done
 
-- [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 --> @today <!-- task-id: 6430f287e7dbd12076829c0cc7000026 -->
-- [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 --> @today <!-- task-id: 0b848becb966e8eb4f79c07943fa7993 -->
 - [x] check that zazen calendar entries are appearing in today <!-- task-id: e4360fb66d9e8710ad206f836cfa4f51 -->
 - [x] Check the fridge water lines <!-- task-id: 84ab448770f63031e14f3f6111fbe816 -->
 - [x] Check OGM newsletter status <!-- task-id: e2539e73f379e58452a9c1011a91346d -->
