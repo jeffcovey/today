@@ -117,6 +117,17 @@ export class TaskManager {
         UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
       END;
     `);
+
+    // Create sync_log table for bin/today script
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sync_type TEXT,
+        status TEXT,
+        details TEXT
+      );
+    `);
   }
 
   // Generate a unique ID for a task
