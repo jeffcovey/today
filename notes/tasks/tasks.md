@@ -124,6 +124,7 @@
 - [ ] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b4dfa336415d201c0cd51464ac1969ee -->
 - [ ] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
 - [ ] Test fast read operations <!-- task-id: 9547ff8f4e9d84f452e9573b78fb5205 -->
+- [ ] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
 - [ ] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
 - [ ] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
@@ -172,6 +173,12 @@
 - [ ] Clean bathroom for Logan's arrival <!-- task-id: 93f57afd533521ae84225b9ef174ca68 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
 - [ ] Check room temperature and lighting <!-- task-id: 82dccda2a5c1943aaa18555ad87ca408 -->
+- [ ] Daily standup meeting <!-- task-id: 2ce9d53d0c574a1521a648202f05b93d -->
+- [ ] Daily standup meeting <!-- task-id: b2f71cc1e6f35c7eab6756fec1ae12af -->
+- [ ] Daily standup meeting <!-- task-id: bb038a392652b98018cbabe4d1800414 -->
+- [ ] Daily standup meeting <!-- task-id: 244374d34462ddaa63c57a2c1281de23 -->
+- [ ] Daily standup meeting <!-- task-id: 96547421a198b015f533e8bdff93bec9 -->
+- [ ] Daily standup meeting <!-- task-id: b9355af633d415fadd980380b995d494 -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
