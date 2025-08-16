@@ -1,0 +1,4 @@
+- [ ] cancel sanebox if we can replace it
+- [x] Make sure data isn't siloed in one deployment 
+- [ ] add setting dates to tasks @today
+- [ ] remove .data/ from all deployments
