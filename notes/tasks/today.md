@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 2:35:08 PM*
+*Generated: 8/16/2025, 2:36:33 PM*
 
 ## 🟡 Medium
 
@@ -20,6 +20,8 @@
 ## ✅ Done
 
 - [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
 - [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
 - [x] Testing Turso sync 1755282631 <!-- task-id: 54285b7de4314f415a3085ec136ae93f -->
@@ -33,8 +35,41 @@
 - [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
 - [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
 - [x] Update documentation <!-- task-id: 1e7a38f7a08073ce8f3ec82bdcc5bd03 -->
+- [x] Reply to Melv <!-- task-id: 8596f25c6ccb1ecd40631056ddc8333b -->
+- [x] Reply to David Edwards <!-- task-id: a243b2f8190f1276d548d593a066f4fa -->
+- [x] Reply to Rosemary <!-- task-id: 3fb5ae563f5d4866ca562fc438f386ea -->
+- [x] Sort paperwork pile <!-- task-id: 900a9d3bacf56d9c60444a77233f854f -->
+- [x] Reply to Melv <!-- task-id: f8f6a8613715716f2561c1c6d7bd1d30 -->
+- [x] Reply to David Edwards <!-- task-id: a1c9c044fe709a3530b18df461e345ed -->
+- [x] Reply to Rosemary <!-- task-id: 9429d5ead4d4eb5e69c083039dc852bd -->
+- [x] Reply to “gator” on OGM <!-- task-id: 4de4d3fc61774dd23e54f96bd349e640 -->
+- [x] Set up coffee for morning <!-- task-id: 64e5bfa1249068c8349450e25b8e20f4 -->
+- [x] Reply to Melv <!-- task-id: cc643c2b93581c998b332700dbb58301 -->
+- [x] Reply to David Edwards <!-- task-id: 60d53f5b59075d59992e0a8921ed7521 -->
+- [x] Reply to Rosemary <!-- task-id: 22d493be70ef284ec5d6890d40e1679b -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2c1243b8b17fa3acba4bfb23d7defceb -->
+- [x] ♥︎ Activity Rings <!-- task-id: e60a42b17ca46a862140640bc6e872e4 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: f2730ae1eee54c85d06385887b3a71ab -->
+- [x] Use The Inversion Table <!-- task-id: 47b496cc26c07eeef616e1389aab659a -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 8cd4f6c213cfa5e09269c68550501333 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 5f35c5f3447efe2310fb54cff4288f70 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 8479a4711b840b864433241aab517c0d -->
+- [x] Use The Inversion Table (for hip pain) <!-- task-id: e502e82a2035d442fa1eee473532315f -->
+- [x] Take a walk for steps goal <!-- task-id: 9e0b7227d165a8039ae79f9f7322559e -->
+- [x] Take a walk for steps goal <!-- task-id: 886df91bb0fb8470bf595a0082d8cd60 -->
+- [x] ♥︎ Walk to complete 5,500 steps <!-- task-id: 5ddee2a5ef1f2bc8606ed196820bda70 -->
+- [x] ♥︎ Burn More Energy (Activity goal) <!-- task-id: 00adada2b671029b4a858a717cb093d6 -->
+- [x] Use The Inversion Table <!-- task-id: 3fd38bf38de6c64c2dea8435c5a1d953 -->
+- [x] ♥︎ Tai Chi (1m) <!-- task-id: 4577a7388ac772aa08eed4ba60c57d47 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: 20c85910f36c2d2459761b4fbf58033d -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 25f804d99290ecd81ddf98fd331bff08 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 8c1924dc38a075c89ea760fc21936195 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 9b971d7227d03b172656673a0a8d9b49 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: fa239bc0611c3a92362ef54f63d9bfd2 -->
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
+- [x] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
 - [x] Strip bed and wash linens for Logan's arrival (8 PM) <!-- task-id: 0d42fb5a7299df9dfa2c85ddc73056f7 -->
 - [x] Vacuum/sweep private suite floors <!-- task-id: f9c3d4661beb6eeb63259f7b59a28f05 -->
 - [x] Set out fresh towels and amenities <!-- task-id: 3ef96d15524c7ce7fb42da8208f89b9a -->
