@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/16/2025, 8:18:09 PM*
+*Generated: 8/16/2025, 8:19:36 PM*
 
 ## 🟡 Medium
 
@@ -12,40 +12,34 @@
 - [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [ ] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [ ] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
-- [ ] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
-- [ ] Review Amazon Subscribe & Save changes <!-- task-id: 46041887481b91f2edc912bf2ac88a47 -->
-- [ ] Quick check of SilverDaddies message <!-- task-id: e5998c94cc95ee98dc6d632b4de1708a -->
-- [ ] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
-- [ ] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
-- [ ] Quick review of SaneBox digest (157 messages) <!-- task-id: 7d1784b4eb8343fbf7b937163d6433a6 -->
 - [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
-- [ ] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
-- [ ] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
-- [ ] Clean bathroom thoroughly <!-- task-id: 48c5c4e1d28f0c356f977d630a979367 -->
-- [ ] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
-- [ ] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
-- [ ] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
-- [ ] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
-- [ ] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
-- [ ] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
 
 ## ✅ Done
 
-- [x] Prepare Airbnb room management instructions <!-- task-id: 97b68fa62c93c6ea5d000915fe457da2 -->
-- [x] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
-- [x] Review and respond to **2 SaneBox digests** (115 + 69 messages to review) <!-- task-id: e1bb1b2dba792d28f398e01e6f74bbd4 -->
-- [x] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
-- [x] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
+- [x] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
+- [x] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
+- [x] Clean bathroom thoroughly <!-- task-id: 48c5c4e1d28f0c356f977d630a979367 -->
+- [x] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
+- [x] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
+- [x] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
+- [x] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
+- [x] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
+- [x] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
+- [x] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
+- [x] Review Amazon Subscribe & Save changes <!-- task-id: 46041887481b91f2edc912bf2ac88a47 -->
+- [x] Quick check of SilverDaddies message <!-- task-id: e5998c94cc95ee98dc6d632b4de1708a -->
+- [x] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
+- [x] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
+- [x] Quick review of SaneBox digest (157 messages) <!-- task-id: 7d1784b4eb8343fbf7b937163d6433a6 -->
+- [x] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [x] Address any OGM user support requests <!-- task-id: c9f4524f4f60fec693c992de5483ba05 -->
 - [x] Read Saved Articles (2m 30s) <!-- task-id: 549074e3403115eedb6e8d53d3aaa34b -->
 - [x] Complete other Streaks app habits for exercise and wellness <!-- task-id: e8187734bdcc43e42a669e21b6fd8128 -->
@@ -53,6 +47,12 @@
 - [x] Review GitHub PRs and merge if tests pass <!-- task-id: 20b3489b0dc7aa4f2077d2709baa7237 -->
 - [x] Complete Streaks habits if not done <!-- task-id: 9de6b5f28bb2b8c3ca50e3498297ac60 -->
 - [x] Plan tomorrow's schedule (Thursday = Back Stage day) <!-- task-id: 7b86f1de29d287a374b0f63c48bb4746 -->
+- [x] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
+- [x] Prepare Airbnb room management instructions <!-- task-id: 97b68fa62c93c6ea5d000915fe457da2 -->
+- [x] Prepare for Coffee and Conversation <!-- task-id: b09690d37a99d18ff4f9a46b641404ff -->
+- [x] Review and respond to **2 SaneBox digests** (115 + 69 messages to review) <!-- task-id: e1bb1b2dba792d28f398e01e6f74bbd4 -->
+- [x] Check GitHub dependabot PR #5282 <!-- task-id: 65baeb0577a3c56e929fda60e9b2ba6e -->
+- [x] Investigate Honeybadger error from 6:48 AM ET this morning <!-- task-id: 7b9a496c96f07cd8b43e65b253170a9e -->
 - [x] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
 - [x] Review SaneBox digest (69 messages) - quick triage <!-- task-id: bfa5ecb34dd09979378b62861b027ee0 -->
 - [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->

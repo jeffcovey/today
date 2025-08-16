@@ -13,21 +13,13 @@
 
 ### Tuesday, Aug 12 (4 days ago)
 
-- [x] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [x] Fix ActiveStorage timeout crisis (Issues #5231, #5232) <!-- task-id: e5b1b114f14b8bb385b226e8f962a45e -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-- [x] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 
 ### Thursday, Aug 14 (2 days ago)
 
 - [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
-- [x] Quick check of SilverDaddies message <!-- task-id: e5998c94cc95ee98dc6d632b4de1708a -->
-- [x] Quick review of SaneBox digest (157 messages) <!-- task-id: 7d1784b4eb8343fbf7b937163d6433a6 -->
-- [x] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
-- [x] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
-- [x] Review Amazon Subscribe & Save changes <!-- task-id: 46041887481b91f2edc912bf2ac88a47 -->
 
 ### Yesterday - Friday, Aug 15
 
@@ -35,19 +27,10 @@
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Send update notifications to OGM Patreon members <!-- task-id: ec674c830c1521b734ef63279e272956 -->
 - [ ] Send update notifications to OGM regular members <!-- task-id: 9efce98186ea20a3d560b0d2809607e2 -->
-- [x] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
 
 ### Today - Saturday, Aug 16
 
-- [x] Check room temperature and lighting <!-- task-id: 5f2533ac31aedfbb6da539dfdb568456 -->
-- [x] Clean bathroom thoroughly <!-- task-id: 48c5c4e1d28f0c356f977d630a979367 -->
-- [x] Confirm check-in time with Treasure <!-- task-id: f9b87a797da6c89d7b0886227a529921 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
-- [x] Send door code to Treasure before 3 PM <!-- task-id: cc0377dbc086661205861dd79ea6af07 -->
-- [x] Send update to OGM members about fixes <! - task-id: a2648e894fce71f652471b27663fbab0 --> <!-- task-id: 5e099a7c918f5754540574ee5a12f193 -->
-- [x] Set out fresh towels and amenities <!-- task-id: 6430a0fdebe696f292a36c508b055b25 -->
-- [x] Strip bed and wash linens <!-- task-id: 477beec2bcb8f1c6e1c02f2410a10e03 -->
-- [x] Vacuum/sweep floors <!-- task-id: 0020f0ac48b097d41a01de1c0adeb904 -->
 
 ### No Date Set
 

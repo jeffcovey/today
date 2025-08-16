@@ -609,6 +609,10 @@ export class TaskManager {
     const lines = content.split('\n');
     const updates = [];
     const seenTaskIds = new Set();
+    
+    // Get file modification time
+    const stats = await fs.stat(filePath);
+    const fileModTime = stats.mtime;
 
     // Check if this is a review file and extract the date
     let reviewDate = null;
@@ -657,28 +661,35 @@ export class TaskManager {
           taskId = existingId;
           const task = this.getTask(taskId);
           if (task) {
-            const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
-            const updates = {};
+            // Check if markdown file is newer than database update
+            const taskUpdateTime = task.updated_at ? new Date(task.updated_at) : new Date(0);
+            const markdownIsNewer = fileModTime > taskUpdateTime;
             
-            // Only update title and do_date if title has changed
-            if (task.title !== title) {
-              updates.title = title;
-              // If title changed and has date tag, update do_date
-              if (extractedDate && !reviewDate) {
-                updates.do_date = extractedDate;
+            // Only sync from markdown if the file is newer than the database
+            if (markdownIsNewer) {
+              const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
+              const updates = {};
+              
+              // Only update title and do_date if title has changed
+              if (task.title !== title) {
+                updates.title = title;
+                // If title changed and has date tag, update do_date
+                if (extractedDate && !reviewDate) {
+                  updates.do_date = extractedDate;
+                }
               }
-            }
-            
-            if (task.status !== newStatus) updates.status = newStatus;
-            if (projectId && task.project_id !== projectId) updates.project_id = projectId;
-            
-            // For review files, set do_date for uncompleted tasks if not already set
-            if (reviewDate && !isCompleted && !task.do_date) {
-              updates.do_date = reviewDate;
-            }
-            
-            if (Object.keys(updates).length > 0) {
-              this.updateTask(taskId, updates);
+              
+              if (task.status !== newStatus) updates.status = newStatus;
+              if (projectId && task.project_id !== projectId) updates.project_id = projectId;
+              
+              // For review files, set do_date for uncompleted tasks if not already set
+              if (reviewDate && !isCompleted && !task.do_date) {
+                updates.do_date = reviewDate;
+              }
+              
+              if (Object.keys(updates).length > 0) {
+                this.updateTask(taskId, updates);
+              }
             }
           }
         } else {
@@ -881,6 +892,19 @@ export class TaskManager {
   // Generate today's task file
   // Note: Checkbox syncing is handled separately, not during generation
   async generateTodayFile(outputPath = 'notes/tasks/today.md') {
+    // Check if file was recently modified (within last 5 seconds)
+    // This prevents overwriting manual edits that just happened
+    try {
+      const stats = await fs.stat(outputPath);
+      const timeSinceModified = Date.now() - stats.mtime.getTime();
+      if (timeSinceModified < 5000) {
+        // File was just edited, skip regeneration to preserve manual changes
+        console.log('  • Skipping today.md regeneration (file was just edited)');
+        return 0;
+      }
+    } catch (err) {
+      // File doesn't exist yet, continue with generation
+    }
 
     // Get today's date
     const today = new Date().toISOString().split('T')[0];
