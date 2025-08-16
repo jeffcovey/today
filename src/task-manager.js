@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import { getDatabaseSync } from './database-sync.js';
+import { getDatabaseSync, forcePushToTurso } from './database-sync.js';
 
 export class TaskManager {
   constructor(dbPath = '.data/today.db', options = {}) {

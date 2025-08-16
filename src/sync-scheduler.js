@@ -6,7 +6,7 @@ import { NotionAPI } from './notion-api.js';
 import { TodoistSync } from './todoist-sync.js';
 import fs from 'fs';
 import path from 'path';
-import { getDatabaseSync } from './database-sync.js';
+import { getDatabaseSync, forcePullFromTurso } from './database-sync.js';
 
 dotenv.config();
 
@@ -14,11 +14,26 @@ class SyncScheduler {
   constructor() {
     this.configPath = path.join(process.cwd(), '.sync-config.json');
     this.dbPath = path.join(process.cwd(), '.data', 'today.db');
+    // Pull from Turso at startup
+    this.initializeTurso();
     // Use DatabaseSync wrapper for automatic Turso sync
     this.db = getDatabaseSync(this.dbPath);
     this.initDatabase();
     this.config = this.loadConfig();
     this.isRunning = false;
+  }
+  
+  async initializeTurso() {
+    try {
+      // Pull latest data from Turso at startup
+      await forcePullFromTurso(this.dbPath);
+      console.log(chalk.green('✅ Pulled latest data from Turso'));
+    } catch (error) {
+      // Turso might not be configured, that's OK
+      if (process.env.TURSO_DATABASE_URL) {
+        console.log(chalk.yellow('⚠️  Could not pull from Turso:', error.message));
+      }
+    }
   }
   
   initDatabase() {

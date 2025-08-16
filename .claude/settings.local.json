@@ -119,7 +119,8 @@
       "Bash(npx dotenvx run:*)",
       "Bash(bin/turso-sync:*)",
       "Bash(./verify-turso.sh:*)",
-      "Bash(/dev/null)"
+      "Bash(/dev/null)",
+      "Bash(jq:*)"
     ],
     "deny": []
   }

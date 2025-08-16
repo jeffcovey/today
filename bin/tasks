@@ -2,6 +2,7 @@
 
 import { TaskManager } from '../src/task-manager.js';
 import { TaskStageClassifier } from '../src/task-stage-classifier.js';
+import { forcePushToTurso } from '../src/database-sync.js';
 import { program } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -15,7 +16,8 @@ program
 program
   .command('sync [file]')
   .description('Sync tasks from markdown files')
-  .action(async (file) => {
+  .option('-f, --full', 'Force full scan of all files')
+  .action(async (file, options) => {
     const tm = new TaskManager();
     
     try {
@@ -28,14 +30,73 @@ program
         const fs = await import('fs');
         const { execSync } = await import('child_process');
         
-        // Use git to find all markdown files (respects .gitignore)
-        console.log(chalk.blue('Finding all markdown files...'));
-        const allMarkdownFiles = execSync('git ls-files "*.md" 2>/dev/null || find . -name "*.md" -type f', { encoding: 'utf8' })
-          .split('\n')
-          .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
-          .map(f => f.replace(/^\.\//, ''));
+        // Load last sync state and file dates (unless --full flag is used)
+        const syncStateFile = '.data/task-sync-state.json';
+        const fileDatesFile = '.file-dates.json';
+        let lastSyncTime = null;
+        let fileDates = {};
         
-        console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
+        if (!options.full) {
+          try {
+            if (fs.existsSync(syncStateFile)) {
+              const state = JSON.parse(fs.readFileSync(syncStateFile, 'utf8'));
+              lastSyncTime = state.lastSyncTime;
+            }
+            if (fs.existsSync(fileDatesFile)) {
+              fileDates = JSON.parse(fs.readFileSync(fileDatesFile, 'utf8'));
+            }
+          } catch (e) {
+            // No previous state
+          }
+        } else {
+          console.log(chalk.yellow('Full scan requested (--full flag)'));
+        }
+        
+        // Find markdown files
+        let allMarkdownFiles;
+        let onlyChangedFiles = false;
+        
+        if (lastSyncTime) {
+          // Try to get only changed files since last sync
+          const minutesAgo = Math.ceil((Date.now() - new Date(lastSyncTime).getTime()) / 60000);
+          console.log(chalk.blue(`Finding markdown files changed in last ${minutesAgo} minutes...`));
+          
+          try {
+            // Use find command to get recently modified files
+            const changedFiles = execSync(
+              `find . -name "*.md" -type f -mmin -${minutesAgo + 1} 2>/dev/null | grep -v node_modules | grep -v .git`, 
+              { encoding: 'utf8' }
+            ).split('\n')
+              .filter(f => f)
+              .map(f => f.replace(/^\.\//, ''));
+            
+            if (changedFiles.length > 0) {
+              allMarkdownFiles = changedFiles;
+              onlyChangedFiles = true;
+              console.log(chalk.gray(`  Found ${changedFiles.length} recently modified files`));
+            } else {
+              console.log(chalk.gray(`  No files modified since last sync`));
+              // Still scan project files in case they need initial setup
+              allMarkdownFiles = execSync('find projects -name "*.md" -type f 2>/dev/null || echo ""', { encoding: 'utf8' })
+                .split('\n')
+                .filter(f => f)
+                .map(f => f.replace(/^\.\//, ''));
+            }
+          } catch (e) {
+            // Find command failed, fall back to full scan
+            onlyChangedFiles = false;
+          }
+        }
+        
+        // If we don't have changed files or no last sync time, do full scan
+        if (!onlyChangedFiles && !lastSyncTime) {
+          console.log(chalk.blue('Finding all markdown files (first sync)...'));
+          allMarkdownFiles = execSync('git ls-files "*.md" 2>/dev/null || find . -name "*.md" -type f', { encoding: 'utf8' })
+            .split('\n')
+            .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
+            .map(f => f.replace(/^\.\//, ''));
+          console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
+        }
         
         // First sync project files to establish project records
         const projectFiles = allMarkdownFiles.filter(f => f.startsWith('projects/'));
@@ -52,23 +113,40 @@ program
           }
         }
         
-        // Then sync ALL markdown files for tasks
-        console.log(chalk.blue('Syncing tasks from all markdown files...'));
-        let totalUpdates = 0;
-        let filesWithUpdates = 0;
-        
-        for (const filePath of allMarkdownFiles) {
-          if (fs.existsSync(filePath)) {
-            const updates = await tm.syncMarkdownFile(filePath);
-            totalUpdates += updates;
-            if (updates > 0) {
-              filesWithUpdates++;
-              console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
+        // Then sync markdown files for tasks
+        if (allMarkdownFiles.length > 0) {
+          console.log(chalk.blue(`Syncing tasks from ${onlyChangedFiles ? 'changed' : 'all'} markdown files...`));
+          let totalUpdates = 0;
+          let filesWithUpdates = 0;
+          
+          for (const filePath of allMarkdownFiles) {
+            if (fs.existsSync(filePath)) {
+              const updates = await tm.syncMarkdownFile(filePath);
+              totalUpdates += updates;
+              if (updates > 0) {
+                filesWithUpdates++;
+                console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
+              }
             }
           }
+          
+          console.log(chalk.green(`✓ Scanned ${allMarkdownFiles.length} files, updated ${filesWithUpdates} files (${totalUpdates} total updates)`));
+        } else {
+          console.log(chalk.gray('✓ No files to sync'));
         }
         
-        console.log(chalk.green(`✓ Scanned ${allMarkdownFiles.length} files, updated ${filesWithUpdates} files (${totalUpdates} total updates)`));
+        // Save sync state
+        const newState = { lastSyncTime: new Date().toISOString() };
+        try {
+          const path = await import('path');
+          const dir = path.dirname(syncStateFile);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(syncStateFile, JSON.stringify(newState, null, 2));
+        } catch (e) {
+          console.error('Failed to save sync state:', e.message);
+        }
       }
 
       // Process repeating tasks
@@ -104,6 +182,8 @@ program
       console.error(chalk.red('Error syncing tasks:'), error.message);
       process.exit(1);
     } finally {
+      // Push any pending changes to Turso before closing
+      await forcePushToTurso('.data/today.db');
       tm.close();
     }
   });

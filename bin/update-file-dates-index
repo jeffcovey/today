@@ -48,11 +48,13 @@ if [ ! -f "$INDEX_FILE" ]; then
     echo "}" >> "$INDEX_FILE"
     echo "Created index with $(find . -name "*.md" -type f -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | wc -l) files"
 else
-    # Index exists, only add new files from git staged changes
+    # Index exists, update with any new files not already tracked
     echo "Updating file dates index with new files..."
     
-    # Get list of staged markdown files (any .md file being added)
-    new_files=$(git diff --cached --name-only --diff-filter=A | grep -E '\.md$')
+    # Get list of all markdown files not in the index
+    existing_files=$(jq -r 'keys[]' "$INDEX_FILE" | sort)
+    all_files=$(find . -name "*.md" -type f -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sed 's|^\./||' | sort)
+    new_files=$(comm -13 <(echo "$existing_files") <(echo "$all_files"))
     
     if [ -n "$new_files" ]; then
         # Read existing index
@@ -100,8 +102,7 @@ else
         echo "" >> "$INDEX_FILE"
         echo "}" >> "$INDEX_FILE"
         
-        # Stage the updated index
-        git add "$INDEX_FILE"
+        echo "Updated index with $(echo "$new_files" | wc -l) new files"
     else
         echo "No new markdown files to add"
     fi

@@ -207,37 +207,99 @@ export class DatabaseSync {
       `);
       
       let totalRows = 0;
+      const LARGE_TABLES = ['emails', 'calendar_events', 'contact_addresses', 'contacts'];
       
       for (const table of tablesResult.rows) {
         const tableName = table.name;
         
         try {
-          // Get all data from this table in Turso
-          const dataResult = await this.tursoClient.execute(`SELECT * FROM ${tableName}`);
-          
-          if (dataResult.rows.length > 0) {
-            // Get column names from the first row
-            const columns = Object.keys(dataResult.rows[0]);
-            const placeholders = columns.map(() => '?').join(', ');
+          // For large tables, pull in batches to avoid 502 errors
+          if (LARGE_TABLES.includes(tableName)) {
+            // Get count first
+            const countResult = await this.tursoClient.execute(`SELECT COUNT(*) as count FROM ${tableName}`);
+            const tableRowCount = countResult.rows[0]?.count || 0;
             
-            // Prepare upsert statement
-            const upsertSQL = `
-              INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')})
-              VALUES (${placeholders})
-            `;
+            if (tableRowCount === 0) continue;
             
-            const stmt = this.localDb.prepare(upsertSQL);
+            // Pull in smaller batches
+            const BATCH_SIZE = 500;
+            let offset = 0;
+            let tableData = [];
             
-            // Insert all rows in a transaction
-            const transaction = this.localDb.transaction(() => {
-              for (const row of dataResult.rows) {
-                const values = columns.map(col => row[col]);
-                stmt.run(...values);
+            while (offset < tableRowCount) {
+              try {
+                const batchResult = await this.tursoClient.execute({
+                  sql: `SELECT * FROM ${tableName} LIMIT ? OFFSET ?`,
+                  args: [BATCH_SIZE, offset]
+                });
+                
+                if (batchResult.rows.length === 0) break;
+                tableData.push(...batchResult.rows);
+                offset += BATCH_SIZE;
+                
+                // Small delay to avoid rate limiting
+                if (offset < tableRowCount) {
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+              } catch (batchError) {
+                if (process.stderr.isTTY) {
+                  console.error(`⚠️  Error pulling batch from ${tableName}: ${batchError.message.substring(0, 50)}`);
+                }
+                break;
               }
-            });
+            }
             
-            transaction();
-            totalRows += dataResult.rows.length;
+            // Process the collected data
+            if (tableData.length > 0) {
+              const columns = Object.keys(tableData[0]);
+              const placeholders = columns.map(() => '?').join(', ');
+              
+              const upsertSQL = `
+                INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')})
+                VALUES (${placeholders})
+              `;
+              
+              const stmt = this.localDb.prepare(upsertSQL);
+              
+              // Insert in transaction
+              const transaction = this.localDb.transaction(() => {
+                for (const row of tableData) {
+                  const values = columns.map(col => row[col]);
+                  stmt.run(...values);
+                }
+              });
+              
+              transaction();
+              totalRows += tableData.length;
+            }
+          } else {
+            // For small tables, pull all at once
+            const dataResult = await this.tursoClient.execute(`SELECT * FROM ${tableName}`);
+            
+            if (dataResult.rows.length > 0) {
+              // Get column names from the first row
+              const columns = Object.keys(dataResult.rows[0]);
+              const placeholders = columns.map(() => '?').join(', ');
+              
+              // Prepare upsert statement
+              const upsertSQL = `
+                INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')})
+                VALUES (${placeholders})
+              `;
+              
+              const stmt = this.localDb.prepare(upsertSQL);
+              
+              // Insert all rows in a transaction
+              const transaction = this.localDb.transaction(() => {
+                for (const row of dataResult.rows) {
+                  const values = columns.map(col => row[col]);
+                  stmt.run(...values);
+                }
+              });
+              
+              transaction();
+              totalRows += dataResult.rows.length;
+            }
           }
         } catch (e) {
           // Skip tables that might have issues
@@ -407,4 +469,46 @@ export function getDatabaseSync(localPath, options = {}) {
     }
     return rwInstance;
   }
+}
+
+/**
+ * Force push any pending changes to Turso and wait for completion
+ * Used by CLI tools before they exit
+ */
+export async function forcePushToTurso(dbPath = '.data/today.db') {
+  const db = getDatabaseSync(dbPath);
+  
+  if (!db.tursoClient) {
+    // No Turso configured
+    return;
+  }
+  
+  // Process any pending pushes immediately if they exist
+  if (db.pushQueue && db.pushQueue.length > 0) {
+    console.log(`📤 Pushing ${db.pushQueue.length} pending changes to Turso...`);
+    try {
+      await db.processPushQueue();
+    } catch (error) {
+      // Log but don't fail - these are likely duplicate key errors
+      if (!error.message.includes('UNIQUE constraint')) {
+        console.warn('⚠️  Some changes could not be pushed:', error.message);
+      }
+    }
+  }
+}
+
+/**
+ * Force pull from Turso to ensure we have latest data
+ * Used at the start of sync operations
+ */
+export async function forcePullFromTurso(dbPath = '.data/today.db') {
+  const db = getDatabaseSync(dbPath);
+  
+  if (!db.tursoClient) {
+    // No Turso configured
+    return;
+  }
+  
+  console.log('🔄 Checking Turso for updates...');
+  await db.checkAndPull();
 }

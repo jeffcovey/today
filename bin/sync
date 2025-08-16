@@ -72,6 +72,7 @@ main() {
     echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
     
     # Run all sync steps
+    run_sync_step "☁️ Turso Cloud Sync" sync_turso "Turso synced" "Turso cloud"  # Pull from Turso first
     run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
     # Notion sync removed - moving away from Notion
     run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
@@ -105,6 +106,11 @@ main() {
 sync_github_notes() {
     # Change to project directory
     cd "$(dirname "$0")/.." || return 1
+    
+    # Update file dates index first
+    if [[ -x bin/update-file-dates-index ]]; then
+        bin/update-file-dates-index > /dev/null 2>&1
+    fi
     
     # First, check if we can pull cleanly (no uncommitted changes in repo)
     if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
@@ -209,16 +215,6 @@ sync_github_notes() {
 sync_tasks() {
     cd "$(dirname "$0")/.." || return 1
     
-    # Initialize Turso if needed (for new deployments)
-    if [[ ! -f ".data/today.db" ]] && [[ -n "$TURSO_DATABASE_URL" ]] && [[ -n "$TURSO_AUTH_TOKEN" ]]; then
-        print_info "No local database found, initializing from Turso..."
-        if bin/turso-sync pull >/dev/null 2>&1; then
-            print_info "Successfully initialized database from Turso"
-        else
-            print_info "Could not pull from Turso, will create new local database"
-        fi
-    fi
-    
     print_info "Syncing task database with markdown files..."
     
     # Run the task sync command (now includes stage classification)
@@ -244,6 +240,47 @@ sync_tasks() {
         done
         return 1
     fi
+}
+
+# Sync with Turso cloud database
+sync_turso() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if Turso is configured
+    if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
+        print_info "Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)"
+        return 1
+    fi
+    
+    # Use the optimized smart sync
+    print_info "Smart syncing with Turso (only changes)..."
+    
+    node -e "
+        import('./src/turso-sync-optimized.js').then(({smartTursoSync}) => {
+            smartTursoSync('both')
+                .then(result => {
+                    if (result.pulled > 0) {
+                        console.log(\`  ⬇️  Pulled \${result.pulled} changes from Turso\`);
+                    }
+                    if (result.pushed > 0) {
+                        console.log(\`  ⬆️  Pushed \${result.pushed} changes to Turso\`);
+                    }
+                    if (result.pulled === 0 && result.pushed === 0) {
+                        console.log('  ✅ Already in sync');
+                    }
+                    process.exit(0);
+                })
+                .catch(err => {
+                    console.error('✗ Turso sync failed:', err.message);
+                    process.exit(1);
+                });
+        }).catch(err => {
+            console.error('✗ Failed to load sync module:', err.message);
+            process.exit(1);
+        });
+    " 2>&1
+    
+    return $?
 }
 
 
