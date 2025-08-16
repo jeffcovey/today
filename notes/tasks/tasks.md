@@ -52,14 +52,34 @@
 - [ ] Account Creation Issues (Front Conversations) <!-- task-id: 4ba8709eee19dd6f331f6473e6915cce -->
 - [ ] Add Ron Goodale to E6W <!-- task-id: daabda5f0c6b468e6da561edebf277fc -->
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
+- [ ] Adjust plans based on progress <!-- task-id: 8e7d8f9dbbd20177dbe8dbcd27b6c3a7 -->
+- [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
+- [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
+- [ ] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
+- [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
+- [ ] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
+- [ ] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
+- [ ] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
+- [ ] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
+- [ ] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
+- [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
+- [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
+- [ ] Maintain daily habits and streaks <!-- task-id: 896d841cab6070a727edb061cbc3a5de -->
+- [ ] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
+- [ ] Maintain financial stability in retirement <!-- task-id: 54a7f949710fa8de52d787c273729703 -->
+- [ ] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
+- [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
+- [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
+- [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
+- [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] remove .data/ from all deployments <!-- task-id: 1d76745789447c029247e8af2e0ee0d0 -->
@@ -83,4 +103,3 @@
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
-- [ ] get coffee @today <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
