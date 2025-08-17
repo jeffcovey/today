@@ -1,6 +1,6 @@
 ## General Tasks
 
-### Monday, Aug 11 (5 days ago)
+### Monday, Aug 11 (6 days ago)
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
@@ -9,16 +9,16 @@
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 
-### Tuesday, Aug 12 (4 days ago)
+### Tuesday, Aug 12 (5 days ago)
 
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 
-### Yesterday - Friday, Aug 15
+### Friday, Aug 15 (2 days ago)
 
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 
-### Today - Saturday, Aug 16
+### Yesterday - Saturday, Aug 16
 
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
@@ -26,15 +26,35 @@
 ### No Date Set
 
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
+- [ ] **Add JSON error handling and recovery** <!-- task-id: dff7f2ad88a62aa388baa99dcfc73ca1 -->
 - [ ] **Broken Carousel Images** (Issue #5239) <!-- task-id: a6673df7901bca14a76b5961ffecbfc7 -->
 - [ ] **Database Query Performance** <!-- task-id: 7efaeed13cda3bb140fd4919868900a8 -->
 - [ ] **Email Confirmation Error Messages** (Issue #4304) <!-- task-id: c1d9c674577a92cad5552cf14a0df0db -->
 - [ ] **Email Subscription Preferences Not Saving** (Issue #4604) <!-- task-id: 0c415a7b9063b485fe786e5fc6fe269a -->
+- [ ] **Fix "Backend action does not exist" errors** - API communication failures <!-- task-id: 5f97d954a632b05d75f008b5d76da2bc -->
+- [ ] **Fix "Cannot eagerly load polymorphic :receiver"** - 800+ occurrences <!-- task-id: 6288c0089dc96ce82c11ba21c10332a2 -->
+- [ ] **Fix "Unexpected end of input" parser errors** (#4437, #4570) <!-- task-id: 89c3cd70ec6c26fd47327dbc31ee1576 -->
+- [ ] **Fix "no implicit conversion of Symbol into Integer"** - Video index crashes <!-- task-id: 44702486b897e57e429226497a580dd3 -->
+- [ ] **Fix 30-second timeouts on image processing** (#5211) - Synchronous variant generation <!-- task-id: 0a739968081e77c545d89f5d6c03111a -->
+- [ ] **Fix N+1 queries in attachment loading** - 6+ second load times <!-- task-id: 231592e4e9282a7ae3d2533f3341fe3a -->
+- [ ] **Fix S3 redirect URLs returning 403 Forbidden** (#5233) - Permission issues blocking images <!-- task-id: 5c4172b29f9182af4ffcba0d1dc6810f -->
+- [ ] **Fix action buttons layout** (#4514) - Should be side-by-side <!-- task-id: 24b14394cadad367ddd81aa27e41f25a -->
+- [ ] **Fix broken carousel images on group pages** (#5239) - Empty content responses <!-- task-id: b544a777d2ab5b07f910e35139fe0178 -->
+- [ ] **Fix email subscription preferences** (#4604) - Not updating <!-- task-id: 1da9034991196482900e30f9e83b47b2 -->
+- [ ] **Fix groups sorting** (#4593) - Incorrect order <!-- task-id: 648c3f569f9cbe7c79e3c5d262a3d96b -->
+- [ ] **Fix mailbox/inbox action failures** - Breaking messaging system <!-- task-id: 380400757fdb9a7c7dd6880857072f3b -->
+- [ ] **Fix missing file_attached flags** - Database records not properly flagged <!-- task-id: 646b6c7c8fead6bcbcd7d734a1ba899d -->
+- [ ] **Fix params[:q]&.[](:s) parameter handling** <!-- task-id: 5ec6bcc3e357acc9b4baa664e3beac1b -->
+- [ ] **Fix past events user options** (#4515) - Showing incorrect options <!-- task-id: 006b494b94e4c2ce5d6689b5c6ac5074 -->
 - [ ] **Front Conversations** <!-- task-id: 35e8cb19db57a8372337164bf491dbbc -->
 - [ ] **Images Missing File Attachment Flag** (Issue #5233) <!-- task-id: 9890eb7ce246e6998083133e7351d228 -->
+- [ ] **Implement async variant generation** (#5171) - Move to background jobs <!-- task-id: 7243577da864f8165c92a3796f3a0d98 -->
 - [ ] **Mailboxer Polymorphic Association Errors** (#121835041) <!-- task-id: 2e64d4c42389110b8868e9191631ea21 -->
 - [ ] **Memory Exhaustion Crisis** (Issue #5222, HoneyBadger R14) <!-- task-id: aa210d6636e7e7eecaabfd636168c913 -->
+- [ ] **Optimize Users index queries** - Severe performance degradation <!-- task-id: 66ae3253e85a0b2b23d240ff7313de4b -->
 - [ ] **Pagy Pagination Errors** (HoneyBadger, 19,948+ occurrences) <!-- task-id: 1fc3ab8ca6b14ea33de7d8f692cf9df7 -->
+- [ ] **Process unassigned support conversations** - Multiple pending <!-- task-id: c2ea6faf829d7e428433d54375fb2a0b -->
+- [ ] **Resolve profile picture change issue** - User can't add new picture after deletion <!-- task-id: 564631eef91c168208bfe0c482650d37 -->
 - [ ] **UI/UX Issues** <!-- task-id: 7455af017e1ad8869f2f01ba077390d4 -->
 - [ ] **Users Can't Empty Message Trash** (Issue #4628) <!-- task-id: a3803baa5c18e9f2d0634bb2a8f47652 -->
 - [ ] **Video Editing Authorization Failure** (Issue #4893) <!-- task-id: 002844fe8f38a953ee17ea6a0e30eba8 -->
@@ -52,7 +72,9 @@
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
 - [ ] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
+- [ ] Fix message trash emptying (#4628) <!-- task-id: eeeb1bb05d4ba01c15c8e560ce750415 -->
 - [ ] Geographic Address Resolution (Issue #4659) <!-- task-id: b9246e3898fe3cf0f976275fd86d3126 -->
+- [ ] Geographic resolution for Sint Maarten (#4659) <!-- task-id: f3a6089bd1bca5e7dc7b47b4aac896ae -->
 - [ ] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
 - [ ] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
 - [ ] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
@@ -66,8 +88,10 @@
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
+- [ ] Remove "No trips found" messages (#4594) <!-- task-id: dc7547edb6e939563f8c121b3c83ec35 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
+- [ ] User validation errors (#4625, #4626, #4629) <!-- task-id: 7cfaaa6e5b5a8ab5472812df51700dd9 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
