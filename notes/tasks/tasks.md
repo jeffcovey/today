@@ -4,9 +4,8 @@
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-- [ ] Quick social media check for OGM mentions @nextweek <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
-- [ ] Reply to Heroku notification @nextweek <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [x] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
+- [x] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
+- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 
 ### Tuesday, Aug 12 (5 days ago)
 
@@ -35,13 +34,12 @@
 - [ ] Clean Quiet Oasis after Treasure leaves <!-- task-id: pending-17-4 --> <!-- task-id: d4df804661058520e269e18f4a8d8cd1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
-- [ ] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
-- [ ] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
-- [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
+- [x] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
+- [x] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
+- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 
 ### No Date Set
 
-- [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] **ActiveStorage Image Timeout Crisis** (Issues #5231, #5232, #5211, #5222) <!-- task-id: ba244e4b39748414cd6499129e2c435b -->
 - [ ] **Add JSON error handling and recovery** <!-- task-id: dff7f2ad88a62aa388baa99dcfc73ca1 -->
 - [ ] **Broken Carousel Images** (Issue #5239) <!-- task-id: a6673df7901bca14a76b5961ffecbfc7 -->
@@ -236,7 +234,6 @@
 
 ### No Date Set
 
-- [ ] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->
 - [ ] Aerial Tramway (if weather permits) <!-- task-id: 6fe51efe7e716b1e21ed9958d5227514 -->
 - [ ] Check event calendar for September <!-- task-id: ff35a029d7185347a3d378b63a07afba -->
