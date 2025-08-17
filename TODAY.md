@@ -213,7 +213,7 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 
 **First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
 
-### Example Queries to Get Started:
+### Example Queries to Get Started
 
 ```sql
 -- Get today's urgent tasks
@@ -318,6 +318,7 @@ When creating tasks:
 When Claude needs to add urgent tasks during a daily review:
 
 1. **Create the task using bin/tasks add:**
+
    ```bash
    # For critical/immediate tasks (will appear at top of today.md):
    bin/tasks add "Task title" --date YYYY-MM-DD --status "🔥 Immediate"
@@ -330,12 +331,13 @@ When Claude needs to add urgent tasks during a daily review:
    ```
 
 2. **Run sync to update today.md:**
+
    ```bash
    bin/tasks sync
    ```
 
 3. **Copy the task WITH its ID to the review file:**
-   After sync, copy the task from today.md (including the `<!-- task-id: xxx -->` comment) 
+   After sync, copy the task from today.md (including the `<!-- task-id: xxx -->` comment)
    into the appropriate section of the daily review file.
 
 **Important Notes:**
@@ -353,6 +355,7 @@ The task management system includes:
 - **markdown_sync**: Tracks which tasks are in which files
 
 You can query these tables to understand task status:
+
 ```sql
 -- Get project status
 SELECT name, status, start_date, end_date, budget 

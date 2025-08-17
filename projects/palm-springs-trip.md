@@ -32,12 +32,12 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 ### Planning Phase
 
 - [x] ✅ **BOOKED FLIGHTS** (FLL to PSP) - August 13, 2025 <!-- task-id: b60412ae622141e8f76c521b316200f8 -->
-	- **Outbound Sept 4:** AA638 FLL→DFW (6:58am-9:14am), AA2548 DFW→PSP (10:57am-11:59am)
-	- **Return Sept 12-13:** AA2548 PSP→DFW (12:49pm-5:49pm), AA1847 DFW→FLL (7:33pm-11:20pm)
-	- [View full details on Tripit](https://www.tripit.com/trip/show?id=369697408)
-	- Booked with American Airlines
-	- ⚠️ **Note:** Virgin Red points issue persisted - Could not log into Virgin Atlantic account to use points (login broken since July account linking attempt)
-	- Alternative used: Booked through Chase instead
+ 	- **Outbound Sept 4:** AA638 FLL→DFW (6:58am-9:14am), AA2548 DFW→PSP (10:57am-11:59am)
+ 	- **Return Sept 12-13:** AA2548 PSP→DFW (12:49pm-5:49pm), AA1847 DFW→FLL (7:33pm-11:20pm)
+ 	- [View full details on Tripit](https://www.tripit.com/trip/show?id=369697408)
+ 	- Booked with American Airlines
+ 	- ⚠️ **Note:** Virgin Red points issue persisted - Could not log into Virgin Atlantic account to use points (login broken since July account linking attempt)
+ 	- Alternative used: Booked through Chase instead
 - [x] Accommodation arranged (staying at Julian's house) <!-- task-id: 02c8711be62680e7074d32cd0a4f38a3 -->
 - [x] Transportation arranged (using Julian's car) <!-- task-id: 04ea5b9514a05407a45f65732bcc6cdd -->
 - [ ] Research restaurants <!-- task-id: 1463d4f4dd402ebbf1ea9d15b37823c3 -->
