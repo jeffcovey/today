@@ -73,6 +73,7 @@ main() {
     # Run all sync steps
     run_sync_step "☁️ Turso Cloud Sync" sync_turso "Turso synced" "Turso cloud"  # Pull from Turso first
     run_sync_step "📝 GitHub Notes" sync_github_notes "GitHub notes synced" "GitHub notes"
+    run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     # Notion sync removed - moving away from Notion
     run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "🔍 Task Consistency" check_task_consistency "Task consistency checked" "Task consistency"
@@ -216,6 +217,45 @@ sync_github_notes() {
             xargs ls -t 2>/dev/null | head -5 | while read -r file; do
             echo "  • $(basename "$file") ($(dirname "$file"))"
         done
+    fi
+    
+    return 0
+}
+
+# Clean markdown files with markdownlint
+clean_markdown_files() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    print_info "Cleaning markdown files with markdownlint..."
+    
+    # Count markdown files to process
+    MD_COUNT=$(find notes plans projects -type f -name "*.md" 2>/dev/null | wc -l)
+    
+    if [[ $MD_COUNT -eq 0 ]]; then
+        print_info "No markdown files found to clean"
+        return 0
+    fi
+    
+    print_info "Processing $MD_COUNT markdown files..."
+    
+    # Run markdownlint-cli2 with fix option
+    # Using a glob pattern to process all markdown files in our content directories
+    output=$(npx markdownlint-cli2 --fix "notes/**/*.md" "plans/**/*.md" "projects/**/*.md" 2>&1) || true
+    
+    # Check if any files were fixed
+    if echo "$output" | grep -q "Fixing:"; then
+        fixed_count=$(echo "$output" | grep -c "Fixing:" || echo 0)
+        print_info "Fixed formatting in $fixed_count file(s)"
+        
+        # Commit the cleaned files
+        if [[ -n $(git status --porcelain notes/ plans/ projects/ 2>/dev/null) ]]; then
+            print_info "Committing markdown formatting fixes..."
+            git add notes/ plans/ projects/ 2>/dev/null
+            git commit -m "Clean up markdown formatting with markdownlint" --quiet 2>/dev/null
+            git push origin main --quiet 2>/dev/null
+        fi
+    else
+        print_info "All markdown files are already clean"
     fi
     
     return 0
@@ -1043,6 +1083,14 @@ case "${1:-}" in
             print_error "Notes sync failed"
         fi
         
+        # Clean markdown files after syncing
+        print_header "🧹 Clean Markdown"
+        if clean_markdown_files; then
+            print_status "Markdown cleaned successfully!"
+        else
+            print_error "Markdown cleaning failed"
+        fi
+        
         # Also process inbox when syncing notes
         print_header "📥 Process Inbox"
         if process_inbox; then
@@ -1106,6 +1154,7 @@ case "${1:-}" in
         echo ""
         echo "Data sources synced:"
         echo "  • GitHub notes"
+        echo "  • Markdown formatting cleanup (via markdownlint)"
         echo "  • Local task manager"
         echo "  • Email inbox (cached for 4 hours)"
         echo "  • Calendar events"
