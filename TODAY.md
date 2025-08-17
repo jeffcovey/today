@@ -12,9 +12,15 @@ This file starts an interactive Claude session for your daily review. The `bin/t
    - Provide recommendations based on your schedule and priorities
    - Continue working with you as long as needed
 
+<details>
+<summary>
 ## Session Instructions for Claude
+</summary>
 
+<details>
+<summary>
 ### Initial Tasks
+</summary>
 
 When this session starts, please:
 1. **CRITICAL: Calculate the day of the week from today's date (DO NOT infer from activities)**
@@ -51,6 +57,7 @@ When this session starts, please:
    - Convert UTC timestamps to local time when displaying
    - The database preserves original timezone data from calendars
 6. Present your recommendations to the user
+</details>
 
 ### Plan Files Structure
 
@@ -121,6 +128,7 @@ Please help me review my current situation and decide what to do today to be hap
 - Create and update files
 - Run commands to help with the review
 - Continue working with me throughout the day
+</details>
 
 ### Guidelines
 
