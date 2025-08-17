@@ -9,7 +9,7 @@
 
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+- [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
@@ -18,7 +18,7 @@
 
 ### Monday, Dec 1
 
-- [ ] +Trip Prep [Travel] <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
+- [ ] +Trip Prep [Travel] [Travel] [Travel] <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
 
 ### Invalid Date, Invalid Date
 
@@ -31,30 +31,30 @@
 
 ### No Date Set
 
-- [ ] Add a suggestion in the newsletter to set up video chat times [ OlderGay.Men Chat Room] <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
-- [ ] Check that comment cards don't overflow <!-- task-id: dabc427c34b0ca9ce75992f46a3b6fed -->
-- [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
+- [ ] Add a suggestion in the newsletter to set up video chat times [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
+- [ ] Check that comment cards don't overflow [OlderGay.Men UI] <!-- task-id: dabc427c34b0ca9ce75992f46a3b6fed -->
+- [ ] Do profit & loss statements [Personal Finance] <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Link to page numbers, not friendly IDs, and fix ones that are already broken. <!-- task-id: 41446da729b37ea9846a00a807cbe02d -->
 - [ ] Try newsletter sending ideas from ChatGPT <!-- task-id: bbd632c3da776de874ae29b3e79e29bb -->
 - [ ] add back door to HomeKit <!-- task-id: b0281248092fdc9fb67fd5a68112ea7a -->
 - [ ] add regular chat meetup times for guys to join <!-- task-id: 496d66e28884696753d748fef06319cc -->
 - [ ] add upcoming chats to the newsletter <!-- task-id: 0a2e03958bf442040587609ee48fcb46 -->
-- [ ] Email participants to remind them of chats <!-- task-id: 609834e53d5dee7ec696bab191fc8ed8 -->
+- [ ] Email participants to remind them of chats [ OlderGay.Men Chat Room] <!-- task-id: 609834e53d5dee7ec696bab191fc8ed8 -->
 - [ ] Improve User Restrictions <!-- task-id: e0aec3d9c0742822a8bb1eeb1f698346 -->
 - [ ] Limit access to videos <!-- task-id: 0697b5dbc5767257a11ff1dfd04210d4 -->
 - [ ] Make notes from Chase conversation <!-- task-id: df4e5fa380e7f8577743f121d61a12f5 -->
 - [ ] Move monthly charges back onto the Sapphire card <!-- task-id: 9381ea6ac40e18bef5d2d57b125db432 -->
 - [ ] check for deleted posts on Discourse <!-- task-id: f6b0ec594e39d56e881b7e6820b7c438 -->
 - [ ] look for remaining FIXME images <!-- task-id: 1512278a054d5e011466a07e2dc74ab1 -->
-- [ ] Add chat visit times and public broadcasts to public activity [ OlderGay.Men Chat Room] <!-- task-id: fe04a1d2f6a84d00f469bcd8447ebf90 -->
-- [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
-- [ ] Check MiniMagick mail <!-- task-id: 6172d3a7aeb2f087a8daf7ea051f9574 -->
+- [ ] Add chat visit times and public broadcasts to public activity [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] <!-- task-id: fe04a1d2f6a84d00f469bcd8447ebf90 -->
+- [ ] Announce in the chat room 30 minutes before a group or public video chat begins [ OlderGay.Men Chat Room] <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
+- [ ] Check MiniMagick mail [OlderGay.Men Sysadmin] <!-- task-id: 6172d3a7aeb2f087a8daf7ea051f9574 -->
 - [ ] Migrate GetDiscourseTopics to the Discourse service <!-- task-id: 26a5cd109e65949ff2801b5ed2b7ce41 -->
 - [ ] Share links to profiles of guys who shared a video chat to each other <!-- task-id: e29c0021b176566e66fc99c6efa8ab86 -->
 - [ ] fix filtering in user pages <!-- task-id: 20d79fc249b634f87714b9c47726bf69 -->
 - [ ] use user session location everywhere IP address is used <!-- task-id: c5f2db6cd221af4f9bc495dcc4a018f7 -->
-- [ ] Add a photo of the laundry room to all four listings [Hosting] <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
-- [ ] Check that page comments show in public activity <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
+- [ ] Add a photo of the laundry room to all four listings [Hosting] [Hosting] [Hosting] <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
+- [ ] Check that page comments show in public activity [OlderGay.Men Content] <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
 - [ ] Invite Groups and Places to update their listings <!-- task-id: bdbf374af68820dc7b929ae2613b549e -->
 - [ ] Limit private video chats, add to benefits list <!-- task-id: 75cddd921c44710e68d335a83c9679c1 -->
 - [ ] Plant lights around the driveway's edge <!-- task-id: 03d3e9aafaf7c4084dcc5cb5a18cfd52 -->
@@ -63,8 +63,8 @@
 - [ ] check that our Patreon web hook has up-to-date secrets always <!-- task-id: 17f1886619cd6fc68f9290e971e8924b -->
 - [ ] do eager loading for chats <!-- task-id: 4960720119a4cd2d12daeca7fcfb198c -->
 - [ ] move uncategorized conversations into a category with security settings <!-- task-id: 726e583e1496f4426cb79959f7ee4a94 -->
-- [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Home/Household] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
-- [ ] Check that one-action Drafts are going to Notion <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
+- [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Home/Household] [Home/Household] [Home/Household] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
+- [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] Link Github and Notion <!-- task-id: 7de274ec06176ffca743af691b9e9193 -->
 - [ ] Order more towels <!-- task-id: f4dd14462efbc59b41500e4eee10a20f -->
 - [ ] Put the back door key in the box out back <!-- task-id: e441104695bb8781bc8ab03827c704c2 -->
@@ -148,16 +148,16 @@
 - [ ] remove Notion fields from our tasks database when we're through with them <!-- task-id: 5f754a1d827657061295727031997a41 -->
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
-- [ ] Add AI photo gallery [OlderGay.Men Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
-- [ ] Add Zazen, steps, and drinks to Health logging [Health] <!-- task-id: 176f048f22826f4345cc9634b0e2c10c -->
-- [ ] Add an "invited" NewsletterLog status [OlderGay.Men Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
-- [ ] Add comments from people joining events and meetups [OlderGay.Men Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
-- [ ] Add notes from 2023-08-02 Dr. check-up <!-- task-id: 12ffb1cfece67efa7b496d4440710f10 -->
-- [ ] Block more all-time Discourse users <!-- task-id: 774c93bdb46dc5205018a7c528a321f9 -->
+- [ ] Add AI photo gallery [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
+- [ ] Add Zazen, steps, and drinks to Health logging [Health] [Health] [Health] <!-- task-id: 176f048f22826f4345cc9634b0e2c10c -->
+- [ ] Add an "invited" NewsletterLog status [OlderGay.Men Newsletter] [OlderGay.Men Newsletter] [OlderGay.Men Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
+- [ ] Add comments from people joining events and meetups [OlderGay.Men Events] [OlderGay.Men Events] [OlderGay.Men Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
+- [ ] Add notes from 2023-08-02 Dr. check-up [Health] <!-- task-id: 12ffb1cfece67efa7b496d4440710f10 -->
+- [ ] Block more all-time Discourse users [OlderGay.Men Patreon] <!-- task-id: 774c93bdb46dc5205018a7c528a321f9 -->
 - [ ] Clean up the temporary posts that I made <!-- task-id: bbf102e26ebb3ffacc17d661b8a0ce15 -->
-- [ ] Close old credit cards <!-- task-id: 760731c4e9d46b922da93c1a310eec93 -->
-- [ ] Delete UpdateTopicIdJob <!-- task-id: bfb83950b6cd39558170de4bf654bc46 -->
-- [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
+- [ ] Close old credit cards [Home/Household] <!-- task-id: 760731c4e9d46b922da93c1a310eec93 -->
+- [ ] Delete UpdateTopicIdJob [OlderGay.Men Sysadmin] <!-- task-id: bfb83950b6cd39558170de4bf654bc46 -->
+- [ ] Enable action buttons on User show when not logged in [Marketing] <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Fix Places with 'Story:' titles <!-- task-id: 68e1acd366c2af7bd48155eac443dfbe -->
 - [ ] Fix deprecations in Staging <!-- task-id: 49164fd10ece1a827b03fb23a4411328 -->
 - [ ] Fix front porch light <!-- task-id: 6fffae51d1316f0ca55c13e51eb4c983 -->
@@ -186,174 +186,174 @@
 - [ ] see why I can't use camera-web <!-- task-id: 07138716ea333191ceab975fead31b64 -->
 - [ ] ✉️ Add a backup payment method to prevent interruptions to your Cloudflare services <!-- task-id: 85fd9500c278ca15f94ef9d79c74e5d3 -->
 - [ ] Get cash from IRA <!-- task-id: 367d996af0335eb66cb733b8f0377aa6 -->
-- [ ] A Guide to Finding an LGBTQ+ Inclusive Long-Term Care Community – SAGE [OlderGay.Men Content] <!-- task-id: 1b82a9fa1f8bef0b2a9fcab414e8feb9 -->
-- [ ] AD 1-300 - Google Drive [Arts, music, and entertainment ] <!-- task-id: 429d6d395c97503a87e24188201c053e -->
-- [ ] AI images [OlderGay.Men Content] <!-- task-id: 95b911487eb1d3629d87cd21af3e836e -->
-- [ ] Add "Papa Fred" part 2 [OlderGay.Men Content] <!-- task-id: b7e89b3a23f5e4a217a2abb6ddb7896f -->
-- [ ] Add :history to some slugs [OlderGay.Men Sysadmin] <!-- task-id: bb82cf6a9ff1183a83381863a75bbfb3 -->
-- [ ] Add ChatsControllerTest, ChatVisitTimesControllerTest to tests to restore [OlderGay.Men Testing] <!-- task-id: 0565044c1ac3b2cc02f0c3f6d0bdec72 -->
-- [ ] Add Citizens to Notion, including policy number [Personal Admin] <!-- task-id: 91f00a72fe5f3d22d81189aa785c48ed -->
-- [ ] Add Eddy's tasks to Notion [Yard/Pool/Landscaping] <!-- task-id: 609324b6436d1257f1de7efb4a2bd37b -->
-- [ ] Add FPL pool note to project (Notion bug) [Yard/Pool/Landscaping] <!-- task-id: 2197888d27a274a874c347d1dd9e16ad -->
-- [ ] Add Minilik to contacts and photos [Friends/Socializing] <!-- task-id: ab0ce52c30c406d5bd36a9a1b8d9bb12 -->
-- [ ] Add Patreon promotions — email? Pledge drive message? [OlderGay.Men Patreon] <!-- task-id: c0b83ddb84fa0bddf89c34ac5008252d -->
-- [ ] Add Ramesh to "Keep in touch" [Friends/Socializing] <!-- task-id: 965a4030df344d03f981b57f83649474 -->
-- [ ] Add Reek to extensions, look at other auditing tools [OlderGay.Men Sysadmin] <!-- task-id: daff57950135102b14fdfe0927e7bc22 -->
-- [ ] Add SAGE advice about retirement communities? [OlderGay.Men Content] <!-- task-id: b7d8c741dc55c19986bdb0ac1852301b -->
-- [ ] Add Site Updates to the sidebar and newsletter [OlderGay.Men Content] <!-- task-id: c79c56ea74c30bf76cfd39e8e7b32d4f -->
-- [ ] Add Story Ratings [OlderGay.Men Stories] <!-- task-id: 132588b19623509a261e023d06155c32 -->
-- [ ] Add TripIt calendar to Echos [Travel] <!-- task-id: 3c8e2a531b5446e859243867c8d5e29c -->
-- [ ] Add Virgin card to 1password [Personal Finance] <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
+- [ ] A Guide to Finding an LGBTQ+ Inclusive Long-Term Care Community – SAGE [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: 1b82a9fa1f8bef0b2a9fcab414e8feb9 -->
+- [ ] AD 1-300 - Google Drive [Arts, music, and entertainment ] [Arts, music, and entertainment ] [Arts, music, and entertainment ] <!-- task-id: 429d6d395c97503a87e24188201c053e -->
+- [ ] AI images [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: 95b911487eb1d3629d87cd21af3e836e -->
+- [ ] Add "Papa Fred" part 2 [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: b7e89b3a23f5e4a217a2abb6ddb7896f -->
+- [ ] Add :history to some slugs [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] <!-- task-id: bb82cf6a9ff1183a83381863a75bbfb3 -->
+- [ ] Add ChatsControllerTest, ChatVisitTimesControllerTest to tests to restore [OlderGay.Men Testing] [OlderGay.Men Testing] [OlderGay.Men Testing] <!-- task-id: 0565044c1ac3b2cc02f0c3f6d0bdec72 -->
+- [ ] Add Citizens to Notion, including policy number [Personal Admin] [Personal Admin] [Personal Admin] <!-- task-id: 91f00a72fe5f3d22d81189aa785c48ed -->
+- [ ] Add Eddy's tasks to Notion [Yard/Pool/Landscaping] [Yard/Pool/Landscaping] [Yard/Pool/Landscaping] <!-- task-id: 609324b6436d1257f1de7efb4a2bd37b -->
+- [ ] Add FPL pool note to project (Notion bug) [Yard/Pool/Landscaping] [Yard/Pool/Landscaping] [Yard/Pool/Landscaping] <!-- task-id: 2197888d27a274a874c347d1dd9e16ad -->
+- [ ] Add Minilik to contacts and photos [Friends/Socializing] [Friends/Socializing] [Friends/Socializing] <!-- task-id: ab0ce52c30c406d5bd36a9a1b8d9bb12 -->
+- [ ] Add Patreon promotions — email? Pledge drive message? [OlderGay.Men Patreon] [OlderGay.Men Patreon] [OlderGay.Men Patreon] <!-- task-id: c0b83ddb84fa0bddf89c34ac5008252d -->
+- [ ] Add Ramesh to "Keep in touch" [Friends/Socializing] [Friends/Socializing] [Friends/Socializing] <!-- task-id: 965a4030df344d03f981b57f83649474 -->
+- [ ] Add Reek to extensions, look at other auditing tools [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] <!-- task-id: daff57950135102b14fdfe0927e7bc22 -->
+- [ ] Add SAGE advice about retirement communities? [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: b7d8c741dc55c19986bdb0ac1852301b -->
+- [ ] Add Site Updates to the sidebar and newsletter [OlderGay.Men Content] [OlderGay.Men Content] [OlderGay.Men Content] <!-- task-id: c79c56ea74c30bf76cfd39e8e7b32d4f -->
+- [ ] Add Story Ratings [OlderGay.Men Stories] [OlderGay.Men Stories] [OlderGay.Men Stories] <!-- task-id: 132588b19623509a261e023d06155c32 -->
+- [ ] Add TripIt calendar to Echos [Travel] [Travel] [Travel] <!-- task-id: 3c8e2a531b5446e859243867c8d5e29c -->
+- [ ] Add Virgin card to 1password [Personal Finance] [Personal Finance] [Personal Finance] <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
 - [ ] Add When we rise to watch list <!-- task-id: 340d0ea6ba0c5883f74e009e7f20ff7f -->
 - [ ] Add `clean` to checkout <!-- task-id: 0afcce799b46e74e14b02d3bf89f82e0 -->
 - [ ] Add a light to the Curry tree <!-- task-id: 7173ecb30ade9b8e68713d54dd02fe60 -->
 - [ ] Add a link on photos to “my favorites“ <!-- task-id: d748c731852041ecd0292d1b6a66ba21 -->
-- [ ] Add a newsletter archive [OlderGay.Men Newsletter] <!-- task-id: b53c8a58824cbe12cc7f28f1b8b86abd -->
-- [ ] Add a recurring event to pull the Patreon members for next plans. [OlderGay.Men Sysadmin] <!-- task-id: f275094d26f2980e1a2370a3fcd3151f -->
-- [ ] Add an option to hide cruises in Events [Programming] <!-- task-id: 8e43a23ea05e7f3bba1a0012c5608917 -->
-- [ ] Add back lock to HomeKit [Hosting] <!-- task-id: 0175c54afe479e71c35e9a73a2b6aadd -->
-- [ ] Add casino to Timery, set trigger in geo fence [Personal Admin] <!-- task-id: 1e0e6e4797a22cfd70ac944e4bebf3a1 -->
-- [ ] Add chatgpt suggestions to bin/check [OlderGay.Men Sysadmin] <!-- task-id: 4b3af0153a7d29586d88f6f47c70287d -->
-- [ ] Add current calendar event to menu bar and widget [Personal Admin] <!-- task-id: 763142fd5bd5563e87cf16d597b37578 -->
-- [ ] Add device notifications to OGM [OlderGay.Men UI] <!-- task-id: f1f72ebbb5461f3f87a82a27855d8b21 -->
-- [ ] Add evening routines and daily plan clearing to Notion logging script [Personal Admin] <!-- task-id: f182987b6c83ec1c38b2c7b5fe0a3b26 -->
-- [ ] Add favorite profiles to /users and favorite photos to /images [OlderGay.Men UI] <!-- task-id: 0d624815a36292ddf67b88c6cf6048d1 -->
-- [ ] Add flashcards to Streaks [Clubs & Memberships, Friends/Socializing] <!-- task-id: 41512b86d4f63268bbabb19053c1b5aa -->
-- [ ] Add friend requests to Oldergay men? [OlderGay.Men Members] <!-- task-id: 038b183de6e921b86482e1c8bd6ae723 -->
-- [ ] Add instructions for the robot vacuum to the housesitters guide [Travel, Home/Household] <!-- task-id: 34f23018302dbf50d3cfba518b9f384f -->
-- [ ] Add lgbt caregiver group [OlderGay.Men Groups] <!-- task-id: f21c3bce12aef99ff8ad419dfb275b0a -->
-- [ ] Add locations to usernames in chat, in sidebar and in messages [ OlderGay.Men Chat Room] <!-- task-id: 70ea93a9e8554f11ddbe18209f090cd4 -->
-- [ ] Add logging health stats to medical notes (BP, weight at office, etc.) [Health] <!-- task-id: f5c01c9f9991ea1eb2f975090fe165ae -->
-- [ ] Add members immediately to a Discourse group that can see everything [OlderGay.Men Patreon] <!-- task-id: 5f77a2bb08e8fe2674e8b78eb36ebcb6 -->
-- [ ] Add more to the house guide on Trusted Housesitters <!-- task-id: bf678c47f00af2652d1ae64cc7892bea -->
-- [ ] Add people I follow and people who follow me as filters on the people index <!-- task-id: 11918a0c2996317400d85145c851d0ef -->
-- [ ] Add people who have visited the members profile to the side profiles <!-- task-id: b907d49bd2cc1a204d6bdf35eca64c84 -->
-- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
-- [ ] Add property taxes to the budget <!-- task-id: 0c7356e5b1787028f80ca443d64fa210 -->
-- [ ] Add rbs files for OGM <!-- task-id: 39ad1df2200ec1d82d10b773ec89f17f -->
-- [ ] Add sauna David to places <!-- task-id: 95f0405fa489fe033e610246f0c9ae8d -->
-- [ ] Add small avatars of the favorite profiles and profiles who follow you in the newsletter <!-- task-id: 409445e05f8d856a6c0bfa380586cee7 -->
-- [ ] Add space before “Upcoming chats” <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
-- [ ] Add splitting costs on all 4 room rentals <!-- task-id: 1f40b34e488b31d469ce5ab84da63903 -->
-- [ ] Add story? <!-- task-id: 859515aedf53ab33f7a71a3795fa4e54 -->
-- [ ] Add test: "destroying user also destroys associated images and records" <!-- task-id: e3ead79e45e3786ce6146fc5fd448a90 -->
-- [ ] Add the Prague bar to Places <!-- task-id: abb72b53e454da3e72c7a07bda60ca71 -->
-- [ ] Add the lights to the small fountain <!-- task-id: 474916adcc597fb07adb33e6f846ab9d -->
-- [ ] Add the other sitting weekend times <!-- task-id: 5e85d3be804d7cf445f53e4bcd579c5e -->
-- [ ] Add the two house projects to the projects page <!-- task-id: 24ff5418368c2a95bd2971ab1af39e3c -->
-- [ ] Add to Events: "Add to my calendar" links <!-- task-id: 59c92352d64eea2ca851f756fbc7a699 -->
-- [ ] Add to Notion Prime Gentlemen Membership Directory <!-- task-id: 13f9943a1befac78912501aa60505e78 -->
-- [ ] Add to contacts and Notion: Eddy says to call Davilus  at 954-822-2906 for sprinkler work. <!-- task-id: 576f02a12000cd91efc81c46f11bbae0 -->
-- [ ] Add to flash cards: Harry, hairy pickleball player <!-- task-id: 35bd66dc737fe719ec8caa763e4da6da -->
-- [ ] Add to photos: James Gleason - IMDb <!-- task-id: 9d1ae46a8d69ba64fa30b1c7028c52b5 -->
-- [ ] Add to scripts: https://www.flickr.com/photos/74107050@N00/ <!-- task-id: c98929a45f76a29bed66b45a7aee4713 -->
-- [ ] Add to services: Educational Travel & Learning Adventures | Road Scholar <!-- task-id: 92767f936df810bbc3ea9d70de3b5548 -->
-- [ ] Add tools to bin/check <!-- task-id: a3a9595c1509a3c939d27461fbbd5b79 -->
-- [ ] Add unread messages to "What's New" <!-- task-id: 9dc67841a01987e788de5c44e26dfca7 -->
+- [ ] Add a newsletter archive [OlderGay.Men Newsletter] [OlderGay.Men Newsletter] [OlderGay.Men Newsletter] <!-- task-id: b53c8a58824cbe12cc7f28f1b8b86abd -->
+- [ ] Add a recurring event to pull the Patreon members for next plans. [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] <!-- task-id: f275094d26f2980e1a2370a3fcd3151f -->
+- [ ] Add an option to hide cruises in Events [Programming] [Programming] [Programming] <!-- task-id: 8e43a23ea05e7f3bba1a0012c5608917 -->
+- [ ] Add back lock to HomeKit [Hosting] [Hosting] [Hosting] <!-- task-id: 0175c54afe479e71c35e9a73a2b6aadd -->
+- [ ] Add casino to Timery, set trigger in geo fence [Personal Admin] [Personal Admin] [Personal Admin] <!-- task-id: 1e0e6e4797a22cfd70ac944e4bebf3a1 -->
+- [ ] Add chatgpt suggestions to bin/check [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] [OlderGay.Men Sysadmin] <!-- task-id: 4b3af0153a7d29586d88f6f47c70287d -->
+- [ ] Add current calendar event to menu bar and widget [Personal Admin] [Personal Admin] [Personal Admin] <!-- task-id: 763142fd5bd5563e87cf16d597b37578 -->
+- [ ] Add device notifications to OGM [OlderGay.Men UI] [OlderGay.Men UI] [OlderGay.Men UI] <!-- task-id: f1f72ebbb5461f3f87a82a27855d8b21 -->
+- [ ] Add evening routines and daily plan clearing to Notion logging script [Personal Admin] [Personal Admin] [Personal Admin] <!-- task-id: f182987b6c83ec1c38b2c7b5fe0a3b26 -->
+- [ ] Add favorite profiles to /users and favorite photos to /images [OlderGay.Men UI] [OlderGay.Men UI] [OlderGay.Men UI] <!-- task-id: 0d624815a36292ddf67b88c6cf6048d1 -->
+- [ ] Add flashcards to Streaks [Clubs & Memberships, Friends/Socializing] [Clubs & Memberships, Friends/Socializing] [Clubs & Memberships, Friends/Socializing] <!-- task-id: 41512b86d4f63268bbabb19053c1b5aa -->
+- [ ] Add friend requests to Oldergay men? [OlderGay.Men Members] [OlderGay.Men Members] [OlderGay.Men Members] <!-- task-id: 038b183de6e921b86482e1c8bd6ae723 -->
+- [ ] Add instructions for the robot vacuum to the housesitters guide [Travel, Home/Household] [Travel, Home/Household] [Travel, Home/Household] <!-- task-id: 34f23018302dbf50d3cfba518b9f384f -->
+- [ ] Add lgbt caregiver group [OlderGay.Men Groups] [OlderGay.Men Groups] [OlderGay.Men Groups] <!-- task-id: f21c3bce12aef99ff8ad419dfb275b0a -->
+- [ ] Add locations to usernames in chat, in sidebar and in messages [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] [ OlderGay.Men Chat Room] <!-- task-id: 70ea93a9e8554f11ddbe18209f090cd4 -->
+- [ ] Add logging health stats to medical notes (BP, weight at office, etc.) [Health] [Health] [Health] <!-- task-id: f5c01c9f9991ea1eb2f975090fe165ae -->
+- [ ] Add members immediately to a Discourse group that can see everything [OlderGay.Men Patreon] [OlderGay.Men Patreon] [OlderGay.Men Patreon] <!-- task-id: 5f77a2bb08e8fe2674e8b78eb36ebcb6 -->
+- [ ] Add more to the house guide on Trusted Housesitters [Travel] <!-- task-id: bf678c47f00af2652d1ae64cc7892bea -->
+- [ ] Add people I follow and people who follow me as filters on the people index [OlderGay.Men UI] <!-- task-id: 11918a0c2996317400d85145c851d0ef -->
+- [ ] Add people who have visited the members profile to the side profiles [OlderGay.Men UI] <!-- task-id: b907d49bd2cc1a204d6bdf35eca64c84 -->
+- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) [Home/Household] <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
+- [ ] Add property taxes to the budget [Personal Finance] <!-- task-id: 0c7356e5b1787028f80ca443d64fa210 -->
+- [ ] Add rbs files for OGM [OlderGay.Men Sysadmin] <!-- task-id: 39ad1df2200ec1d82d10b773ec89f17f -->
+- [ ] Add sauna David to places [OlderGay.Men Places] <!-- task-id: 95f0405fa489fe033e610246f0c9ae8d -->
+- [ ] Add small avatars of the favorite profiles and profiles who follow you in the newsletter [OlderGay.Men Newsletter] <!-- task-id: 409445e05f8d856a6c0bfa380586cee7 -->
+- [ ] Add space before “Upcoming chats” [OlderGay.Men UI] <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
+- [ ] Add splitting costs on all 4 room rentals [Hosting] <!-- task-id: 1f40b34e488b31d469ce5ab84da63903 -->
+- [ ] Add story? [OlderGay.Men Stories] <!-- task-id: 859515aedf53ab33f7a71a3795fa4e54 -->
+- [ ] Add test: "destroying user also destroys associated images and records" [OlderGay.Men Testing] <!-- task-id: e3ead79e45e3786ce6146fc5fd448a90 -->
+- [ ] Add the Prague bar to Places [OlderGay.Men Places] <!-- task-id: abb72b53e454da3e72c7a07bda60ca71 -->
+- [ ] Add the lights to the small fountain [Yard/Pool/Landscaping] <!-- task-id: 474916adcc597fb07adb33e6f846ab9d -->
+- [ ] Add the other sitting weekend times [Meditation & Mindfulness] <!-- task-id: 5e85d3be804d7cf445f53e4bcd579c5e -->
+- [ ] Add the two house projects to the projects page [Home/Household] <!-- task-id: 24ff5418368c2a95bd2971ab1af39e3c -->
+- [ ] Add to Events: "Add to my calendar" links [OlderGay.Men Events] <!-- task-id: 59c92352d64eea2ca851f756fbc7a699 -->
+- [ ] Add to Notion Prime Gentlemen Membership Directory [Clubs & Memberships] <!-- task-id: 13f9943a1befac78912501aa60505e78 -->
+- [ ] Add to contacts and Notion: Eddy says to call Davilus  at 954-822-2906 for sprinkler work. [Yard/Pool/Landscaping] <!-- task-id: 576f02a12000cd91efc81c46f11bbae0 -->
+- [ ] Add to flash cards: Harry, hairy pickleball player [Friends/Socializing] <!-- task-id: 35bd66dc737fe719ec8caa763e4da6da -->
+- [ ] Add to photos: James Gleason - IMDb [OlderGay.Men Content] <!-- task-id: 9d1ae46a8d69ba64fa30b1c7028c52b5 -->
+- [ ] Add to scripts: https://www.flickr.com/photos/74107050@N00/ [OlderGay.Men Content] <!-- task-id: c98929a45f76a29bed66b45a7aee4713 -->
+- [ ] Add to services: Educational Travel & Learning Adventures | Road Scholar [Travel] <!-- task-id: 92767f936df810bbc3ea9d70de3b5548 -->
+- [ ] Add tools to bin/check [OlderGay.Men Sysadmin] <!-- task-id: a3a9595c1509a3c939d27461fbbd5b79 -->
+- [ ] Add unread messages to "What's New" [OlderGay.Men UI] <!-- task-id: 9dc67841a01987e788de5c44e26dfca7 -->
 - [ ] Add user filtering <!-- task-id: ac6e8ee397214167886831a2bf283620 -->
-- [ ] Add vacuum to Alexa <!-- task-id: d8b4dfcb281850588fad0aa78317a6ed -->
-- [ ] Add well company to notion <!-- task-id: 8e3eba548caec57cfd338be24c268c27 -->
-- [ ] Add: The Famous Professor <!-- task-id: fa2a810ca4ed25a22ef93e68159702ee -->
-- [ ] Adjust the float in the fountain <!-- task-id: 711f66d7ddeec2e6cd2ecc340e70436a -->
-- [ ] Advertise in AARP <!-- task-id: 4d6115f0bb1526d1fff090c079db8a66 -->
-- [ ] Allow Apple logins <!-- task-id: 1e155b13a3291995bbfd697d5731e22c -->
-- [ ] Ask about Airbnb mortgage or pool home equity loan <!-- task-id: b079a49e54ff6ea0d3f70899dbe2be5f -->
-- [ ] Ask for place suggestions using people’s locations <!-- task-id: 1255c39d7a15ca934bd4a50ce7c7d6b1 -->
-- [ ] Ask guests to let me know when they've left the room <!-- task-id: 3bf43f6f81abe7cc52406a93c3e35f5f -->
-- [ ] Ask: What other statistics would it be useful for us to track? Look particularly at our pledge drive plan. <!-- task-id: 1270905959b6bb8bfd8d29e1182a432e -->
-- [ ] Assign topics to owners <!-- task-id: 7e06e38fc152d6ba88b33b7bb165a0be -->
-- [ ] Automate adding meal kits to Recipe Keeper <!-- task-id: ac287a3eefef9f29c03d4f6074609df2 -->
+- [ ] Add vacuum to Alexa [Home/Household] <!-- task-id: d8b4dfcb281850588fad0aa78317a6ed -->
+- [ ] Add well company to notion [Personal Admin] <!-- task-id: 8e3eba548caec57cfd338be24c268c27 -->
+- [ ] Add: The Famous Professor [OlderGay.Men Stories] <!-- task-id: fa2a810ca4ed25a22ef93e68159702ee -->
+- [ ] Adjust the float in the fountain [Home/Household] <!-- task-id: 711f66d7ddeec2e6cd2ecc340e70436a -->
+- [ ] Advertise in AARP [Marketing] <!-- task-id: 4d6115f0bb1526d1fff090c079db8a66 -->
+- [ ] Allow Apple logins [OlderGay.Men UI] <!-- task-id: 1e155b13a3291995bbfd697d5731e22c -->
+- [ ] Ask about Airbnb mortgage or pool home equity loan [Personal Finance] <!-- task-id: b079a49e54ff6ea0d3f70899dbe2be5f -->
+- [ ] Ask for place suggestions using people’s locations [OlderGay.Men Places] <!-- task-id: 1255c39d7a15ca934bd4a50ce7c7d6b1 -->
+- [ ] Ask guests to let me know when they've left the room [Hosting] <!-- task-id: 3bf43f6f81abe7cc52406a93c3e35f5f -->
+- [ ] Ask: What other statistics would it be useful for us to track? Look particularly at our pledge drive plan. [Marketing] <!-- task-id: 1270905959b6bb8bfd8d29e1182a432e -->
+- [ ] Assign topics to owners [ OlderGay.Men Chat Room] <!-- task-id: 7e06e38fc152d6ba88b33b7bb165a0be -->
+- [ ] Automate adding meal kits to Recipe Keeper [Nutrition & Diet] <!-- task-id: ac287a3eefef9f29c03d4f6074609df2 -->
 - [ ] Automate more of task paper, including reviewing GitHub and HB comments and user input <!-- task-id: bb2ea497f597a54776e97d90b34c3a6a -->
-- [ ] Automatic fish feeder? <!-- task-id: 6eddb6b3e542e9e7a2663edc40456ccd -->
-- [ ] Ban members over 90 who haven’t logged in for over a year <!-- task-id: 529a0d0a6d921fad34b398d03081061a -->
-- [ ] Better You Strides | Rewards Program | Florida Blue <!-- task-id: 340f35e3cf024713e463206089d9f96a -->
+- [ ] Automatic fish feeder? [Yard/Pool/Landscaping] <!-- task-id: 6eddb6b3e542e9e7a2663edc40456ccd -->
+- [ ] Ban members over 90 who haven’t logged in for over a year [OlderGay.Men Members] <!-- task-id: 529a0d0a6d921fad34b398d03081061a -->
+- [ ] Better You Strides | Rewards Program | Florida Blue [Fitness] <!-- task-id: 340f35e3cf024713e463206089d9f96a -->
 - [ ] Book PTWW convention <!-- task-id: bb883837d552d19ae0e91edc390cd51b -->
-- [ ] Buy a window squeegee <!-- task-id: 7344c73fb648046272851004ca896409 -->
-- [ ] Buy chaise longe <!-- task-id: b4f32d61122fd7766241fa4a7d6551b3 -->
-- [ ] Calculate caloric density on my own <!-- task-id: 7f5dc688128aef42a4bcc0e3028b29bb -->
-- [ ] Cancel Apple Mac App Store subscriptions <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
-- [ ] Cancel Dekkoo and Paramount+ <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
+- [ ] Buy a window squeegee [Home/Household] <!-- task-id: 7344c73fb648046272851004ca896409 -->
+- [ ] Buy chaise longe [Hosting] <!-- task-id: b4f32d61122fd7766241fa4a7d6551b3 -->
+- [ ] Calculate caloric density on my own [Health] <!-- task-id: 7f5dc688128aef42a4bcc0e3028b29bb -->
+- [ ] Cancel Apple Mac App Store subscriptions [Personal Finance] <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
+- [ ] Cancel Dekkoo and Paramount+ [Personal Finance] <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
 - [ ] Celebrate new patrons <!-- task-id: 663f574bd98fb204351a9f5828b97f7a -->
-- [ ] Celebration Info - A Celebration of Friends <!-- task-id: 77f2dd463baa9d40112208c2b79add48 -->
-- [ ] Change Al's profile on OlderGay.Men <!-- task-id: a5241085d12f82ccbd96bcd83ab47f15 -->
+- [ ] Celebration Info - A Celebration of Friends [OlderGay.Men Content] <!-- task-id: 77f2dd463baa9d40112208c2b79add48 -->
+- [ ] Change Al's profile on OlderGay.Men [Relationships] <!-- task-id: a5241085d12f82ccbd96bcd83ab47f15 -->
 - [ ] Change Alexa's voice <!-- task-id: 4a5ddac5bfa06739b21923f3228670c5 -->
-- [ ] Check "away" for Users with multiple locations <!-- task-id: ba4cbb7bed4bc51e7acdb615a11b0c3e -->
-- [ ] Check /var/www/.deleted <!-- task-id: cfbcac84309367bdd81befc27c5058dd -->
-- [ ] Check Amazon for "sliding door cat" <!-- task-id: fbac4b976b4f6562392bc13e82022d74 -->
-- [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
-- [ ] Check Escapees mail regularly <!-- task-id: 9825a6a349d5ee4fe94d28d419e83e13 -->
-- [ ] Check Google Workspace account <!-- task-id: a69fc5789c5f174c3e8e0f130d53d7b0 -->
-- [ ] Check Great Grand story <!-- task-id: 7c317c6b4da4986deeb3a263eefd0fd2 -->
-- [ ] Check Public/Private Status Of “Favorite Pictures” <!-- task-id: 310cd71d1e636e7c0b1e13c0dcfee523 -->
-- [ ] Check Sanitas coverage <!-- task-id: b0df3d1db79248ba0cd8bf633561c0ff -->
-- [ ] Check Zapier <!-- task-id: 17061901a6ff474e577df57b6fbfe38e -->
-- [ ] Check all our tests for any instances of unwarranted stubbing. Are there any places in which we're failing to test the actual actions of our application? <!-- task-id: 69ef928cd4878ddc15b39b2a449ea12f -->
-- [ ] Check automations like when a workout starts <!-- task-id: a6e7d14003f1d78fe6bd048c753e36c5 -->
-- [ ] Check comments removed from ProcessImageContributionsJob <!-- task-id: 8d48b59dfd18db911889871d153d3e54 -->
-- [ ] Check database sizes <!-- task-id: 975afe4d13a3f442b55e7cd573dc8b2f -->
-- [ ] Check deleting a trip on the user show page (needs a button?) <!-- task-id: 29fd5dfcce3b269e8a88d2e571de54f0 -->
-- [ ] Check errors in web inspector <!-- task-id: 485826208bc18cf2756f2d26af65ddf8 -->
-- [ ] Check for duplicate constraints in all database tables <!-- task-id: 581368c38ff61a41de6e5dc463fe0c1e -->
-- [ ] Check for excessive "Photos of" <!-- task-id: f4e87c556f5cbaa9c28631ebbf1adb33 -->
-- [ ] Check https://x.com/charliecgood?s=11&t=ec0Et6qVODxQPvd5kBaeAw <!-- task-id: dd061c9ab83a83e90c24084ea1c299fb -->
-- [ ] Check mdb download <!-- task-id: 0e229f7b4bdb2ab7c48fe2635c8ab257 -->
-- [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
-- [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
+- [ ] Check "away" for Users with multiple locations [OlderGay.Men UI] <!-- task-id: ba4cbb7bed4bc51e7acdb615a11b0c3e -->
+- [ ] Check /var/www/.deleted [OlderGay.Men Sysadmin] <!-- task-id: cfbcac84309367bdd81befc27c5058dd -->
+- [ ] Check Amazon for "sliding door cat" [Cats] <!-- task-id: fbac4b976b4f6562392bc13e82022d74 -->
+- [ ] Check Blue365 [Health, Personal Finance] <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
+- [ ] Check Escapees mail regularly [Personal Admin] <!-- task-id: 9825a6a349d5ee4fe94d28d419e83e13 -->
+- [ ] Check Google Workspace account [OlderGay.Men Staff] <!-- task-id: a69fc5789c5f174c3e8e0f130d53d7b0 -->
+- [ ] Check Great Grand story [OlderGay.Men Content] <!-- task-id: 7c317c6b4da4986deeb3a263eefd0fd2 -->
+- [ ] Check Public/Private Status Of “Favorite Pictures” [OlderGay.Men Testing] <!-- task-id: 310cd71d1e636e7c0b1e13c0dcfee523 -->
+- [ ] Check Sanitas coverage [Health] <!-- task-id: b0df3d1db79248ba0cd8bf633561c0ff -->
+- [ ] Check Zapier [OlderGay.Men Staff] <!-- task-id: 17061901a6ff474e577df57b6fbfe38e -->
+- [ ] Check all our tests for any instances of unwarranted stubbing. Are there any places in which we're failing to test the actual actions of our application? [OlderGay.Men Testing] <!-- task-id: 69ef928cd4878ddc15b39b2a449ea12f -->
+- [ ] Check automations like when a workout starts [Personal Admin] <!-- task-id: a6e7d14003f1d78fe6bd048c753e36c5 -->
+- [ ] Check comments removed from ProcessImageContributionsJob [OlderGay.Men Sysadmin] <!-- task-id: 8d48b59dfd18db911889871d153d3e54 -->
+- [ ] Check database sizes [OlderGay.Men Sysadmin] <!-- task-id: 975afe4d13a3f442b55e7cd573dc8b2f -->
+- [ ] Check deleting a trip on the user show page (needs a button?) [OlderGay.Men UI] <!-- task-id: 29fd5dfcce3b269e8a88d2e571de54f0 -->
+- [ ] Check errors in web inspector [OlderGay.Men Bugs] <!-- task-id: 485826208bc18cf2756f2d26af65ddf8 -->
+- [ ] Check for duplicate constraints in all database tables [OlderGay.Men Sysadmin] <!-- task-id: 581368c38ff61a41de6e5dc463fe0c1e -->
+- [ ] Check for excessive "Photos of" [OlderGay.Men Members] <!-- task-id: f4e87c556f5cbaa9c28631ebbf1adb33 -->
+- [ ] Check https://x.com/charliecgood?s=11&t=ec0Et6qVODxQPvd5kBaeAw [OlderGay.Men Content] <!-- task-id: dd061c9ab83a83e90c24084ea1c299fb -->
+- [ ] Check mdb download [OlderGay.Men UI] <!-- task-id: 0e229f7b4bdb2ab7c48fe2635c8ab257 -->
+- [ ] Check site Paul recommends for OlderGay.Men [OlderGay.Men Content] <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
+- [ ] Check that I'm using the proper goal types in YNAB [Personal Finance] <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
 - [ ] Check that Meetup creators can edit them <!-- task-id: feb86df41aace3f755dc244fa7df2985 -->
 - [ ] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
-- [ ] Check that all appropriate models have `has_paper_trail` <!-- task-id: 63606b495d1e9bec55bde408f77fb237 -->
-- [ ] Check that danger, success, etc. are used appropriately <!-- task-id: ae2a4bcc37185a7f63a448fca7e5f34c -->
-- [ ] Check that failed contributions are not counted against quota <!-- task-id: 16f0210e0dc568818415dd938ec3260b -->
+- [ ] Check that all appropriate models have `has_paper_trail` [OlderGay.Men Sysadmin] <!-- task-id: 63606b495d1e9bec55bde408f77fb237 -->
+- [ ] Check that danger, success, etc. are used appropriately [OlderGay.Men UI] <!-- task-id: ae2a4bcc37185a7f63a448fca7e5f34c -->
+- [ ] Check that failed contributions are not counted against quota [OlderGay.Men Bugs] <!-- task-id: 16f0210e0dc568818415dd938ec3260b -->
 - [ ] Check that we have an issue for Pagy JavaScript and that it includes Cursor support <!-- task-id: ad9a8bf55d41e5a9dd7792e49a83b558 -->
-- [ ] Check that we still have access to GitHub security <!-- task-id: e1e10e4f9e4a3cd94a0d5e78d360f6b9 -->
-- [ ] Check that we're not using the Pagy foundation, materialize, semantic, or uikit CSS extras <!-- task-id: 014eaa6f15b09602ca7734e04853e794 -->
-- [ ] Check that we're porting comments with posted_at unless it's comment 1; run script until then <!-- task-id: fdb2da76782b569281c006f37701443e -->
-- [ ] Check that we're ready for Sidekiq 7.0 <!-- task-id: a50b00a62f1254646a21ed93fb69d8e0 -->
-- [ ] Check that we're using all GitHub security tools <!-- task-id: b69397e03654ab6944dd2e5551eab0d2 -->
-- [ ] Check the date you need to return to the veterinarian <!-- task-id: e85432d10712e07689f47391981f5123 -->
-- [ ] Check the fire extinguisher <!-- task-id: ae08045d37aaa66fcee16f8c01cb6688 -->
-- [ ] Check the fire extinguisher periodically <!-- task-id: 4ade2812e5672b4390470b93cc73fc88 -->
-- [ ] Check the text of recently updated groups And places <!-- task-id: 205802c5cae66b9d1d74032c3aa63b08 -->
-- [ ] Check tmp/ in OlderGay.Men <!-- task-id: e3fd9728b5e98ba0d9d2f7b2bdaef432 -->
-- [ ] Check your Apple ID device list to find where you're signed in - Apple Support <!-- task-id: b1e04527ba07536183efc72bfff0ae80 -->
-- [ ] Clean and close the codespace <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
-- [ ] Clean the guest room AC units <!-- task-id: dcb61b3d0ceefd5987bf63dc987feb66 -->
-- [ ] Clean the stove <!-- task-id: 5a5bffab4591ce4d430874261e20aa7f -->
-- [ ] Clean the water heater filter regularly <!-- task-id: 1ccba1f1b897b16615f975f72153112a -->
-- [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
-- [ ] Complete Community Notification Enrollment <!-- task-id: ae44b2b1339cd0d2cfeb783cb5403029 -->
-- [ ] Confirm adding photo to "I'm in" and profile image <!-- task-id: 27bc81fcfe7ec657e728bcb3cca423d8 -->
-- [ ] Connect Readwise to Notion <!-- task-id: 5fa63dd57691c2ea354c2c8d14e04a45 -->
-- [ ] Consistently format phone numbers, current and going forward <!-- task-id: a77e0d90125a38d19941d08cf1a3430a -->
-- [ ] Consolidate duplicate test code in a helper <!-- task-id: 084de14e3305642741b854ec42c6f64f -->
-- [ ] Continuous Integration | Font Awesome Docs <!-- task-id: 4c3f3c327bc633e8500c89afd04cc235 -->
-- [ ] Create QR codes, people can use to get on our Wi-Fi network <!-- task-id: 09fa472528524b2e095e7a506d769dce -->
-- [ ] Create a db of my Royal Caribbean points progress <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
-- [ ] Create an OlderGay.Men maintenance page <!-- task-id: a6bddbc864b114d540d41e4891de1eb1 -->
-- [ ] Create searchable categories for Places <!-- task-id: 41a077f040663e9cc1b2ccac0099afe2 -->
-- [ ] Credit Pewit on the "About" page <!-- task-id: 6fc53314dd9a0230bc3fd76b5d05f9ff -->
-- [ ] Dashboard | TaskRobin <!-- task-id: c86587091481d7094d15352f17606f4d -->
-- [ ] Database automations – Notion Help Center <!-- task-id: f82f050b5c7db0ec2fe72010b01108f9 -->
-- [ ] Deal with avatars that won’t upload <!-- task-id: b394666061a8b27092e41b004ba7b249 -->
-- [ ] Delete Patreon exception for happyman2u@protonmail.com on 6/28/25 <!-- task-id: 743dd484fb1d3d0660068e98498e942c -->
-- [ ] Delete old idemptokens <!-- task-id: 714c619e73247cdead9243dd8b0a09b0 -->
-- [ ] Discourse integrations | Discourse - Civilized Discussion <!-- task-id: 348b1bb7448d9a4cd8fd763d929d3897 -->
-- [ ] Do Blink Cameras Work With Apple Homekit? <!-- task-id: 9031d463908f84a95ec9abfd72b5f497 -->
-- [ ] Do Material Minimal tutorial <!-- task-id: b5b27c157a8fefe0428df5959fde7ff3 -->
-- [ ] Do monthly review <!-- task-id: a8769d91aa8e29fc174a462f4c13769f -->
+- [ ] Check that we still have access to GitHub security [OlderGay.Men Sysadmin] <!-- task-id: e1e10e4f9e4a3cd94a0d5e78d360f6b9 -->
+- [ ] Check that we're not using the Pagy foundation, materialize, semantic, or uikit CSS extras [OlderGay.Men Sysadmin] <!-- task-id: 014eaa6f15b09602ca7734e04853e794 -->
+- [ ] Check that we're porting comments with posted_at unless it's comment 1; run script until then [OlderGay.Men Content] <!-- task-id: fdb2da76782b569281c006f37701443e -->
+- [ ] Check that we're ready for Sidekiq 7.0 [OlderGay.Men Sysadmin] <!-- task-id: a50b00a62f1254646a21ed93fb69d8e0 -->
+- [ ] Check that we're using all GitHub security tools [OlderGay.Men Sysadmin] <!-- task-id: b69397e03654ab6944dd2e5551eab0d2 -->
+- [ ] Check the date you need to return to the veterinarian [Cats] <!-- task-id: e85432d10712e07689f47391981f5123 -->
+- [ ] Check the fire extinguisher [Hosting] <!-- task-id: ae08045d37aaa66fcee16f8c01cb6688 -->
+- [ ] Check the fire extinguisher periodically [Home/Household] <!-- task-id: 4ade2812e5672b4390470b93cc73fc88 -->
+- [ ] Check the text of recently updated groups And places [OlderGay.Men Content] <!-- task-id: 205802c5cae66b9d1d74032c3aa63b08 -->
+- [ ] Check tmp/ in OlderGay.Men [OlderGay.Men Sysadmin] <!-- task-id: e3fd9728b5e98ba0d9d2f7b2bdaef432 -->
+- [ ] Check your Apple ID device list to find where you're signed in - Apple Support [Personal Admin] <!-- task-id: b1e04527ba07536183efc72bfff0ae80 -->
+- [ ] Clean and close the codespace [Personal Finance] <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
+- [ ] Clean the guest room AC units [Hosting] <!-- task-id: dcb61b3d0ceefd5987bf63dc987feb66 -->
+- [ ] Clean the stove [Home/Household] <!-- task-id: 5a5bffab4591ce4d430874261e20aa7f -->
+- [ ] Clean the water heater filter regularly [Home/Household] <!-- task-id: 1ccba1f1b897b16615f975f72153112a -->
+- [ ] Compare house expenses versus house income [Personal Finance] <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
+- [ ] Complete Community Notification Enrollment [Home/Household] <!-- task-id: ae44b2b1339cd0d2cfeb783cb5403029 -->
+- [ ] Confirm adding photo to "I'm in" and profile image [OlderGay.Men UI] <!-- task-id: 27bc81fcfe7ec657e728bcb3cca423d8 -->
+- [ ] Connect Readwise to Notion [Personal Admin] <!-- task-id: 5fa63dd57691c2ea354c2c8d14e04a45 -->
+- [ ] Consistently format phone numbers, current and going forward [OlderGay.Men Content] <!-- task-id: a77e0d90125a38d19941d08cf1a3430a -->
+- [ ] Consolidate duplicate test code in a helper [OlderGay.Men Testing] <!-- task-id: 084de14e3305642741b854ec42c6f64f -->
+- [ ] Continuous Integration | Font Awesome Docs [OlderGay.Men UI, OlderGay.Men Sysadmin] <!-- task-id: 4c3f3c327bc633e8500c89afd04cc235 -->
+- [ ] Create QR codes, people can use to get on our Wi-Fi network [Hosting] <!-- task-id: 09fa472528524b2e095e7a506d769dce -->
+- [ ] Create a db of my Royal Caribbean points progress [Travel] <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
+- [ ] Create an OlderGay.Men maintenance page [Programming] <!-- task-id: a6bddbc864b114d540d41e4891de1eb1 -->
+- [ ] Create searchable categories for Places [OlderGay.Men Places] <!-- task-id: 41a077f040663e9cc1b2ccac0099afe2 -->
+- [ ] Credit Pewit on the "About" page [OlderGay.Men Content] <!-- task-id: 6fc53314dd9a0230bc3fd76b5d05f9ff -->
+- [ ] Dashboard | TaskRobin [Personal Admin] <!-- task-id: c86587091481d7094d15352f17606f4d -->
+- [ ] Database automations – Notion Help Center [Personal Admin] <!-- task-id: f82f050b5c7db0ec2fe72010b01108f9 -->
+- [ ] Deal with avatars that won’t upload [ OlderGay.Men Chat Room] <!-- task-id: b394666061a8b27092e41b004ba7b249 -->
+- [ ] Delete Patreon exception for happyman2u@protonmail.com on 6/28/25 [OlderGay.Men Patreon] <!-- task-id: 743dd484fb1d3d0660068e98498e942c -->
+- [ ] Delete old idemptokens [OlderGay.Men Sysadmin] <!-- task-id: 714c619e73247cdead9243dd8b0a09b0 -->
+- [ ] Discourse integrations | Discourse - Civilized Discussion [OlderGay.Men Content] <!-- task-id: 348b1bb7448d9a4cd8fd763d929d3897 -->
+- [ ] Do Blink Cameras Work With Apple Homekit? [Home/Household] <!-- task-id: 9031d463908f84a95ec9abfd72b5f497 -->
+- [ ] Do Material Minimal tutorial [OlderGay.Men UI] <!-- task-id: b5b27c157a8fefe0428df5959fde7ff3 -->
+- [ ] Do monthly review [Personal Admin] <!-- task-id: a8769d91aa8e29fc174a462f4c13769f -->
 - [ ] Do something for the big OlderGay.Men anniversary <!-- task-id: 881739c8b6aef723d02cd63a473ce6a7 -->
 - [ ] Do the GitHub projects <!-- task-id: c251e44d0c4a41f73e30afb86f735188 -->
-- [ ] Don't include messages from banned users in the index of conversations <!-- task-id: f4e04774d8be9e45feefa075464a6ce0 -->
-- [ ] Don't seed in the test environment <!-- task-id: ced1a117b3c3ee0b25f560b65c63ace1 -->
+- [ ] Don't include messages from banned users in the index of conversations [OlderGay.Men UI] <!-- task-id: f4e04774d8be9e45feefa075464a6ce0 -->
+- [ ] Don't seed in the test environment [OlderGay.Men Testing] <!-- task-id: ced1a117b3c3ee0b25f560b65c63ace1 -->
 - [ ] Download the PG app <!-- task-id: 4fbdc7d9da3d6bcb419b15c202c24eba -->
-- [ ] Download xHamster favorites <!-- task-id: 6a420ca7187100a1a49f5c156ca1c847 -->
-- [ ] Empty long-term/recurring <!-- task-id: d713c9bd3e4aa6cfba57c500851a4c11 -->
-- [ ] Enable drag-and-drop uploading for places, groups, and events <!-- task-id: ce76190b12d29e627c3f4daba4a23f42 -->
+- [ ] Download xHamster favorites [Arts, music, and entertainment ] <!-- task-id: 6a420ca7187100a1a49f5c156ca1c847 -->
+- [ ] Empty long-term/recurring [Personal Admin] <!-- task-id: d713c9bd3e4aa6cfba57c500851a4c11 -->
+- [ ] Enable drag-and-drop uploading for places, groups, and events [OlderGay.Men UI] <!-- task-id: ce76190b12d29e627c3f4daba4a23f42 -->
 - [ ] Exempt newest members <!-- task-id: 26d49906533fb240bc3a5d9b3fb271f5 -->
-- [ ] Expand patio after inspections <!-- task-id: ed528cc47f2be0c6b1fc6f48d896dd40 -->
-- [ ] EyeOnWater: Making Water Visible.™ <!-- task-id: 337befa6cca829eb2be4a6fdf4d930ce -->
-- [ ] FAQs – CodeSandbox <!-- task-id: 3e1bd9c0f88b8cb1ff371c1aa86420e3 -->
-- [ ] FPL | Energy Manager <!-- task-id: 3167b16426059905f08e486243b402a0 -->
+- [ ] Expand patio after inspections [Yard/Pool/Landscaping] <!-- task-id: ed528cc47f2be0c6b1fc6f48d896dd40 -->
+- [ ] EyeOnWater: Making Water Visible.™ [Home/Household] <!-- task-id: 337befa6cca829eb2be4a6fdf4d930ce -->
+- [ ] FAQs – CodeSandbox [OlderGay.Men Sysadmin] <!-- task-id: 3e1bd9c0f88b8cb1ff371c1aa86420e3 -->
+- [ ] FPL | Energy Manager [Home/Household] <!-- task-id: 3167b16426059905f08e486243b402a0 -->
 - [ ] FPL | Ways to Save | Ceiling Insulation Guide <!-- task-id: 3b264b87163438931e0db4659f272860 -->
 - [ ] Fern Forest Nature Center <!-- task-id: 0c370d51b16c20b5f6854d639404c572 -->
 - [ ] File the 4-point inspection <!-- task-id: f0af3af47482c0cd613c151fccba0a82 -->
@@ -983,7 +983,7 @@
 - [ ] ✉️ [jeffcovey-sfpix] [ACTION REQUIRED] Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 5d610192767940249e53a02143aa0218 -->
 - [ ] ✉️ ✅ Discounts, services and support –It’s all included with Florida Blue! <!-- task-id: 093a9838ce2aacdb670cbb2795b00c97 -->
 - [ ] ✉️ ✅ Live healthier and get rewarded <!-- task-id: 9f2d7092e54a39489e77a1c6e0d4931a -->
-- [ ] +Guest Preparation Template [Hosting] <!-- task-id: 61c2b44d173c6b266e7a093bcfd2e014 -->
+- [ ] +Guest Preparation Template [Hosting] [Hosting] [Hosting] <!-- task-id: 61c2b44d173c6b266e7a093bcfd2e014 -->
 - [ ] Add "Meetup here" to Places <!-- task-id: 70e1d2d24bd4938e96608936547d1043 -->
 - [ ] Add "Show my favorites" to /images <!-- task-id: 467b31702d93564fe38ba78df5e90a0f -->
 - [ ] Add (sub)collections to Image search <!-- task-id: 30ec6222181abc332816d1ab15552f43 -->
@@ -1056,7 +1056,7 @@
 - [ ] Ask Users To Check Their Place Listing <!-- task-id: 4388626678e4833d1c77b7e50cc4a608 -->
 - [ ] Ask the PT hosts how many items to make <!-- task-id: 1a98f4dbfef318ab6e2a9342ea31f204 -->
 - [ ] Assign Trip PublicActivity to Trip taker <!-- task-id: 2f06d9a6e114355f768652321ae61371 -->
-- [ ] Assign topics to photo uploaders, etc. <!-- task-id: 5ad3a0d2bd609d6ff19af13c89621239 -->
+- [ ] Assign topics to photo uploaders, etc. [OlderGay.Men Members] <!-- task-id: 5ad3a0d2bd609d6ff19af13c89621239 -->
 - [ ] Ban members over 90 who haven’t logged in for over a year <!-- task-id: b641393bf034bc4ef5eef5c70a7e917c -->
 - [ ] Block banned users from Discourse <!-- task-id: 121310567b5f0be0daf061b6c778e663 -->
 - [ ] Block messages with fastdate in the body <!-- task-id: 98da8e5273b9ee45f46b60d0a6c84219 -->
@@ -1085,7 +1085,7 @@
 - [ ] Create a personal updates Discourse forum <!-- task-id: 8b054987807e253abf70b98e0ef31dc5 -->
 - [ ] Create a second upload area for pending Images <!-- task-id: 898c06fe173a00b9438eba5ec98ce123 -->
 - [ ] Create migration for Image subjects <!-- task-id: 97cd0e12636b5f953a3dbc42a2faec41 -->
-- [ ] Create views for ChatVisits <!-- task-id: 21fe6533be215adef8b6b0ef6dd7c67d -->
+- [ ] Create views for ChatVisits [ OlderGay.Men Chat Room] <!-- task-id: 21fe6533be215adef8b6b0ef6dd7c67d -->
 - [ ] Create “What’s New” Discourse form <!-- task-id: 6eb8c896a111e5912467a336ef30073a -->
 - [ ] Deal with the latest spammers <!-- task-id: aff188bd3e7ee2aa61901117c3107ab4 -->
 - [ ] Deal with unrealistically old members <!-- task-id: cce24ae7a790215a53fb72e8a5284177 -->

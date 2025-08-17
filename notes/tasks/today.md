@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/17/2025, 7:36:54 PM EDT*
+*Generated: 8/17/2025, 7:49:29 PM EDT*
 
 ## 🟠 High
 
@@ -10,7 +10,7 @@
 
 - [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+- [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
