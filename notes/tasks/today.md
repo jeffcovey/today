@@ -1,17 +1,18 @@
 # Today's Tasks
 
-*Generated: 8/17/2025, 5:40:57 AM EDT*
+*Generated: 8/17/2025, 2:16:45 PM EDT*
 
 ## 🟡 Medium
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
-- [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
+- [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Improve Images <!-- task-id: cf1cf1357c8dcc37aca6f90db830c36d -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
@@ -37,14 +38,12 @@
 - [x] Reply to Rosemary (overdue) <!-- task-id: 436a54f406b68e7995c9a1734e93192b -->
 - [x] Start tackling paperwork pile (30 minutes max) <!-- task-id: fcb8966dfc0a251f60c2c45177fe5c6f -->
 - [x] Prepare Airbnb room management instructions <!-- task-id: 97b68fa62c93c6ea5d000915fe457da2 -->
-- [x] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 - [x] Review Amazon Subscribe & Save changes <!-- task-id: 46041887481b91f2edc912bf2ac88a47 -->
 - [x] Quick check of SilverDaddies message <!-- task-id: e5998c94cc95ee98dc6d632b4de1708a -->
 - [x] Read Saved Articles (2m 30s) <!-- task-id: 3687381d9916a7454fcb877ed9284ca5 -->
 - [x] Read Offline (2m 30s) <!-- task-id: dbabf141ae6f0aee46f79c91bf169074 -->
 - [x] Quick review of SaneBox digest (157 messages) <!-- task-id: 7d1784b4eb8343fbf7b937163d6433a6 -->
 - [x] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [x] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [x] Respond to any urgent member emails <!-- task-id: 95c46448238fc301001d562364119fe4 -->
 - [x] Address memory exhaustion (Issue #5222) <!-- task-id: 3658b296e14495d436d4ca786ecb18c9 -->
 - [x] Send update to OGM members about fixes <!-- task-id: a2648e894fce71f652471b27663fbab0 -->
@@ -73,7 +72,6 @@
 - [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
-- [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
 - [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
 - [x] Test automatic Turso sync <!-- task-id: f1e82f6a8cf37cd7678a7e9aa2a88061 -->
 - [x] Test task from CLI <!-- task-id: a03926a4e26f59526d2258be9701afe9 -->
