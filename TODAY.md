@@ -29,7 +29,13 @@ When this session starts, please:
    - **Look for reservation confirmations, guest messages, check-in/out times**
    - **Two guest rooms need tracking - check BOTH rooms' status**
    - **Guest transitions require room preparation between checkout (12 PM) and check-in (3 PM)**
-4. Check if a plan file exists for today in `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`)
+4. **📊 Check Hierarchical Plans** (BEFORE creating today's plan!)
+   - Read the year plan (`plans/YYYY.md`) to understand annual objectives
+   - Check the quarter plan (`plans/YYYY-QQ.md`) for current initiatives
+   - Review the month plan (`plans/YYYY-QQ-MM.md`) for this month's focus
+   - Look at the week plan (`plans/YYYY-QQ-MM-W##.md`) if it exists
+   - THEN create/update today's plan to align with these higher goals
+5. Check if a plan file exists for today in `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`)
    - **If today's review EXISTS**:
      - Load the existing review file
      - Query the database for recent changes (using SQL queries)
@@ -179,6 +185,48 @@ I try to follow this schedule:
 
 We shouldn't neglect things that *have* to be done today, but **as much as possible, we should PRIORITIZE WORK/PLAY THAT MATCHES THE DAY'S THEME**.
 
+#### Hierarchical Goal Alignment
+
+**🎯 CRITICAL: Ensure today's work flows from higher-level goals!**
+
+I want to minimize busy work that doesn't contribute to my life goals. Tasks should flow downward in this hierarchy:
+
+1. **Year Plan** (`plans/YYYY.md`) - Broad values, principles, and annual objectives
+   - Check this file for my current guiding word/theme
+   - Review my stated values and purpose
+   - Note the key objectives for the year
+
+2. **Quarter Plan** (`plans/YYYY-QQ.md`) - How this quarter advances yearly goals
+   - Major initiatives for the 3-month period
+   - Key milestones to hit
+
+3. **Month Plan** (`plans/YYYY-QQ-MM.md`) - Breaking quarterly goals into monthly chunks
+   - Specific projects and deliverables
+   - Progress checkpoints
+
+4. **Week Plan** (`plans/YYYY-QQ-MM-W##.md`) - Weekly execution of monthly objectives
+   - Concrete tasks and activities
+   - Time allocations
+
+5. **Today's Plan** (`plans/YYYY-QQ-MM-DD.md`) - Daily actions that ladder up
+   - Must contribute to weekly/monthly goals
+   - Should align with life purpose stated in year plan
+
+**When reviewing tasks, ALWAYS:**
+- ✅ Prioritize tasks that directly support higher-level objectives
+- ⚠️ Question tasks that don't connect to any goal - can they be delegated or eliminated?
+- 🚫 Minimize or delegate busy work that doesn't serve my purpose
+- 💡 Suggest delegation when appropriate (e.g., "This could be handled by a virtual assistant")
+
+**Remember:** My time is limited and precious. Every task should either:
+- Advance the mission and purpose stated in my year plan
+- Support my health and wellbeing goals
+- Nurture important relationships
+- Maintain necessary life infrastructure (home, finances)
+- Bring joy and fulfillment aligned with the values in my year plan
+
+If a task doesn't fit these criteria, it should be questioned, delegated, or eliminated.
+
 
 ### Data Inputs
 
@@ -239,17 +287,23 @@ ORDER BY start_date;
 
 ## What I Need From You
 
-Based on queries to the SQLite database, please provide:
+Based on queries to the SQLite database AND alignment with hierarchical plans, please provide:
 
 ### 1. Current Status Assessment
 
 - What looks most urgent based on database queries?
 - What patterns do you see in the data?
 - What might be falling through the cracks?
+- **How do urgent items align with year/quarter/month objectives?**
 
 ### 2. Today's Top 3-5 Priorities
 
 Based on queries for urgent_tasks, overdue_tasks, and recent notes
+**FILTERED through hierarchical goals** - prioritize tasks that:
+- Directly advance quarterly objectives from the quarter plan
+- Support the monthly focus areas from the month plan
+- Align with the core purpose and values stated in the year plan
+- Note any tasks that could be delegated or eliminated
 
 ### 3. Quick Wins (under 15 minutes)
 
