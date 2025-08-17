@@ -4,7 +4,6 @@
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-- [x] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 
 ### Tuesday, Aug 12 (5 days ago)
@@ -14,8 +13,8 @@
 
 ### Thursday, Aug 14 (3 days ago)
 
-- [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
-- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
+- [x] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
+- [x] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 
 ### Friday, Aug 15 (2 days ago)
 
@@ -34,9 +33,6 @@
 - [ ] Clean Quiet Oasis after Treasure leaves <!-- task-id: pending-17-4 --> <!-- task-id: d4df804661058520e269e18f4a8d8cd1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
-- [x] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
-- [x] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
-- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 
 ### No Date Set
 
@@ -229,6 +225,36 @@
 - [ ] Plan for handling attachments/images <!-- task-id: 1cf79f50867acfda7e5edf7838528eb8 -->
 - [ ] Test migration with small dataset first <!-- task-id: 0712d4597f7b9b44b7b0dd785a55d49c -->
 - [ ] Verify data integrity after migration <!-- task-id: 56312a1927113a48a3b8177c9a2345c7 -->
+
+## OGM Social Media Monitoring Project
+
+### No Date Set
+
+- [ ] Blog mentions via Google Alerts <!-- task-id: pending --> <!-- task-id: ea085b8c110e1e4e40890f35e1f214d9 -->
+- [ ] Budget: $5-10/week for 30 min work <!-- task-id: pending --> <!-- task-id: 492946811989be28d9aa0dbe522dc139 -->
+- [ ] Consider IFTTT for Reddit alerts <!-- task-id: pending --> <!-- task-id: 2a48b83a26a445eae54ebbba3e73ddc6 -->
+- [ ] Create monitoring checklist/template <!-- task-id: pending --> <!-- task-id: 151d4fa5160cece0d15194328285a26a -->
+- [ ] Create saved searches on Reddit <!-- task-id: pending --> <!-- task-id: 48a59f9bb3e3a1b46fd02868a8500a2a -->
+- [ ] Create saved searches on Twitter/X <!-- task-id: pending --> <!-- task-id: bc46a7150f0ac94ad3bf78699953dcac -->
+- [ ] Create simple monitoring script <!-- task-id: pending --> <!-- task-id: bc91c37dd0a54275e88ab79b43449fec -->
+- [ ] Create volunteer moderator role <!-- task-id: pending --> <!-- task-id: 88985d8b30fb8e71c3ddff539847f047 -->
+- [ ] Discord servers - gay community spaces <!-- task-id: pending --> <!-- task-id: 2ff771f4047146ef6a9fe383ad4784bc -->
+- [ ] Evaluate Mention.com free tier <!-- task-id: pending --> <!-- task-id: dc857d1b6fcc523d289a886111d9d880 -->
+- [ ] Explore RSS feeds for keyword monitoring <!-- task-id: pending --> <!-- task-id: cf3ad959366979265b88c2b168572df1 -->
+- [ ] Facebook Groups - LGBTQ+ communities <!-- task-id: pending --> <!-- task-id: 363084c1934a31883f35fb3d2051e5c3 -->
+- [ ] Instagram - hashtags (#oldergaymen #gaydaddy) <!-- task-id: pending --> <!-- task-id: 554546d03ca6b5df916674057bfb7804 -->
+- [ ] Mastodon - LGBTQ+ instances <!-- task-id: pending --> <!-- task-id: c1d57eb837738411748877f7721d9e2f -->
+- [ ] Offer perks (recognition, premium access) <!-- task-id: pending --> <!-- task-id: 189ee40aaccfd180bfeafa6351e5c80a -->
+- [ ] Reddit - relevant subreddits <!-- task-id: pending --> <!-- task-id: 9e64a8063b958dfc8d867cf37b7b6ed5 -->
+- [ ] Set up Google Alerts for "Older Gay Men" + website <!-- task-id: pending --> <!-- task-id: 9bc93b4b1a3c78942251d4a0070e7284 -->
+- [ ] Set up Google Alerts for "OlderGay.Men" <!-- task-id: pending --> <!-- task-id: bf7bbd382f4c0dd6dd860ee4e285efac -->
+- [ ] Set up submission form for mentions <!-- task-id: pending --> <!-- task-id: 0c3e0957e9f40c1ad498c3d098da93d2 -->
+- [ ] Set up weekly reporting format <!-- task-id: pending --> <!-- task-id: 7c80775e5b7a9424e32216c4b290ed04 -->
+- [ ] Test Hootsuite free tier <!-- task-id: pending --> <!-- task-id: 69b38a93c1c8ae4f8cebe053434767e6 -->
+- [ ] TikTok - relevant hashtags <!-- task-id: pending --> <!-- task-id: fc1aab4dfd9b6b6fe4e9bdcb346ee6b9 -->
+- [ ] Twitter/X - keywords and hashtags <!-- task-id: pending --> <!-- task-id: 5c472d5993362f16532a133be72094bb -->
+- [ ] Write guidelines for monitoring <!-- task-id: pending --> <!-- task-id: 6a32530c37f2403b8a4c25fc6321208f -->
+- [ ] Write job description for VA <!-- task-id: pending --> <!-- task-id: a2423237b865b92676b0e79697f0ca63 -->
 
 ## Palm Springs Trip
 
