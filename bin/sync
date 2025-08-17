@@ -117,30 +117,30 @@ sync_github_notes() {
     
     # First, check if we can pull cleanly (no uncommitted changes in repo)
     if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
-        # Check if there are changes ONLY in notes/ (no other staged or unstaged changes)
-        NOTES_CHANGES=$(git status notes/ --porcelain 2>/dev/null)
-        OTHER_CHANGES=$(git status --porcelain 2>/dev/null | grep -v "^.. notes/" || true)
+        # Check if there are changes ONLY in notes/, plans/, projects/ (no other staged or unstaged changes)
+        CONTENT_CHANGES=$(git status notes/ plans/ projects/ --porcelain 2>/dev/null)
+        OTHER_CHANGES=$(git status --porcelain 2>/dev/null | grep -v "^.. notes/\|^.. plans/\|^.. projects/" || true)
         
-        if [[ -n "$NOTES_CHANGES" ]] && [[ -z "$OTHER_CHANGES" ]]; then
-            # Only notes changes, safe to commit
-            print_info "Pushing local note changes..."
-            git add notes/ 2>/dev/null
-            git commit -m "Sync local notes" --quiet 2>/dev/null
+        if [[ -n "$CONTENT_CHANGES" ]] && [[ -z "$OTHER_CHANGES" ]]; then
+            # Only content changes, safe to commit
+            print_info "Pushing local content changes..."
+            git add notes/ plans/ projects/ 2>/dev/null
+            git commit -m "Sync local notes, plans, and projects" --quiet 2>/dev/null
             git push origin main --quiet 2>/dev/null
-        elif [[ -n "$NOTES_CHANGES" ]]; then
-            # We have both notes changes and other changes
-            # First, stash any staged changes outside of notes/
-            if [[ -n $(git diff --cached --name-only | grep -v "^notes/" || true) ]]; then
-                print_info "Saving staged changes outside notes/..."
+        elif [[ -n "$CONTENT_CHANGES" ]]; then
+            # We have both content changes and other changes
+            # First, stash any staged changes outside of notes/plans/projects/
+            if [[ -n $(git diff --cached --name-only | grep -v "^notes/\|^plans/\|^projects/" || true) ]]; then
+                print_info "Saving staged changes outside content directories..."
                 # Create a temporary commit to preserve staged state
-                git commit --quiet -m "temp: staged changes" -- ':!notes/' 2>/dev/null || true
+                git commit --quiet -m "temp: staged changes" -- ':!notes/' ':!plans/' ':!projects/' 2>/dev/null || true
                 TEMP_COMMIT=true
             fi
             
-            # Now commit just the notes
-            print_info "Pushing local note changes..."
-            git add notes/ 2>/dev/null
-            git commit -m "Sync local notes" --quiet 2>/dev/null
+            # Now commit just the content
+            print_info "Pushing local content changes..."
+            git add notes/ plans/ projects/ 2>/dev/null
+            git commit -m "Sync local notes, plans, and projects" --quiet 2>/dev/null
             git push origin main --quiet 2>/dev/null
             
             # Restore the temporary commit if we made one
@@ -149,9 +149,9 @@ sync_github_notes() {
                 git reset --soft HEAD~1 2>/dev/null
             fi
         else
-            # Changes in other files but not notes - stash them temporarily
-            print_info "Stashing local changes outside notes/..."
-            git stash push --quiet -m "sync-auto-stash" -- ':!notes/' 2>/dev/null
+            # Changes in other files but not content - stash them temporarily
+            print_info "Stashing local changes outside content directories..."
+            git stash push --quiet -m "sync-auto-stash" -- ':!notes/' ':!plans/' ':!projects/' 2>/dev/null
             STASHED=true
         fi
     fi
@@ -180,19 +180,21 @@ sync_github_notes() {
         git stash pop --quiet 2>/dev/null || true
     fi
     
-    # Clean up empty files
-    find notes -type f -empty -delete 2>/dev/null
-    deleted_count=$(git status --porcelain notes/ | grep -c "^ D " || true)
+    # Clean up empty files in all content directories
+    find notes plans projects -type f -empty -delete 2>/dev/null
+    deleted_count=$(git status --porcelain notes/ plans/ projects/ | grep -c "^ D " || true)
     if [[ $deleted_count -gt 0 ]]; then
         print_info "Removed $deleted_count empty file(s)"
-        git add notes/
-        git commit -m "Clean up empty note files" --quiet 2>/dev/null
+        git add notes/ plans/ projects/
+        git commit -m "Clean up empty content files" --quiet 2>/dev/null
         git push origin main --quiet 2>/dev/null
     fi
     
-    # Show note count
+    # Show content counts
     note_count=$(find notes -type f -name "*.md" 2>/dev/null | wc -l)
-    print_info "Total notes: $note_count"
+    plan_count=$(find plans -type f -name "*.md" 2>/dev/null | wc -l)
+    project_count=$(find projects -type f -name "*.md" 2>/dev/null | wc -l)
+    print_info "Total notes: $note_count, plans: $plan_count, projects: $project_count"
     
     # Count OGM work files
     ogm_count=$(find notes/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
@@ -200,14 +202,19 @@ sync_github_notes() {
         print_info "OlderGay.Men work summaries: $ogm_count"
     fi
     
-    # Show recent notes (last 7 days)
-    recent_count=$(find notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    # Show recent content (last 7 days) across all directories
+    recent_notes=$(find notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_plans=$(find plans -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_projects=$(find projects -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_count=$((recent_notes + recent_plans + recent_projects))
+    
     if [[ $recent_count -gt 0 ]]; then
-        print_info "Notes from last 7 days: $recent_count"
-        # Show up to 5 most recent notes
-        print_info "Most recent notes:"
-        find notes -type f -name "*.md" -mtime -7 2>/dev/null | head -5 | while read -r note; do
-            echo "  • $(basename "$note")"
+        print_info "Content from last 7 days: $recent_count files (notes: $recent_notes, plans: $recent_plans, projects: $recent_projects)"
+        # Show up to 5 most recent files across all directories
+        print_info "Most recent content:"
+        find notes plans projects -type f -name "*.md" -mtime -7 2>/dev/null | \
+            xargs ls -t 2>/dev/null | head -5 | while read -r file; do
+            echo "  • $(basename "$file") ($(dirname "$file"))"
         done
     fi
     

@@ -931,7 +931,24 @@ export class TaskManager {
       topics: this.getTaskTopics(task.id)
     }));
     
-    const lines = ['# Today\'s Tasks', '', `*Generated: ${new Date().toLocaleString()}*`, ''];
+    // Use Eastern timezone for timestamp
+    const now = new Date();
+    const easternTime = now.toLocaleString('en-US', { 
+      timeZone: 'America/New_York',
+      month: 'numeric',
+      day: 'numeric', 
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+    const timeZone = now.toLocaleString('en-US', { 
+      timeZone: 'America/New_York', 
+      timeZoneName: 'short' 
+    }).split(' ').pop();
+    
+    const lines = ['# Today\'s Tasks', '', `*Generated: ${easternTime} ${timeZone}*`, ''];
 
     // Group active tasks by priority
     const priorities = {
