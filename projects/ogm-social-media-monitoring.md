@@ -28,6 +28,7 @@ Set up systematic monitoring of OlderGay.Men mentions across social media and th
 ## Phase 2: Platform Coverage (1 hour)
 
 ### Platforms to Monitor
+
 - [ ] Twitter/X - keywords and hashtags <!-- task-id: pending --> <!-- task-id: 5c472d5993362f16532a133be72094bb -->
 - [ ] Reddit - relevant subreddits <!-- task-id: pending --> <!-- task-id: 9e64a8063b958dfc8d867cf37b7b6ed5 -->
 - [ ] Instagram - hashtags (#oldergaymen #gaydaddy) <!-- task-id: pending --> <!-- task-id: 554546d03ca6b5df916674057bfb7804 -->
@@ -38,8 +39,9 @@ Set up systematic monitoring of OlderGay.Men mentions across social media and th
 - [ ] Blog mentions via Google Alerts <!-- task-id: pending --> <!-- task-id: ea085b8c110e1e4e40890f35e1f214d9 -->
 
 ### Search Terms to Track
+
 - "OlderGay.Men"
-- "oldergay.men" 
+- "oldergay.men"
 - "Older Gay Men" + website/site/community
 - Site URL variations
 - Your name + OGM
@@ -55,12 +57,14 @@ Set up systematic monitoring of OlderGay.Men mentions across social media and th
 ## Phase 4: Delegation Plan
 
 ### Virtual Assistant Option
+
 - [ ] Write job description for VA <!-- task-id: pending --> <!-- task-id: a2423237b865b92676b0e79697f0ca63 -->
 - [ ] Create monitoring checklist/template <!-- task-id: pending --> <!-- task-id: 151d4fa5160cece0d15194328285a26a -->
 - [ ] Set up weekly reporting format <!-- task-id: pending --> <!-- task-id: 7c80775e5b7a9424e32216c4b290ed04 -->
 - [ ] Budget: $5-10/week for 30 min work <!-- task-id: pending --> <!-- task-id: 492946811989be28d9aa0dbe522dc139 -->
 
 ### Community Volunteer Option
+
 - [ ] Create volunteer moderator role <!-- task-id: pending --> <!-- task-id: 88985d8b30fb8e71c3ddff539847f047 -->
 - [ ] Write guidelines for monitoring <!-- task-id: pending --> <!-- task-id: 6a32530c37f2403b8a4c25fc6321208f -->
 - [ ] Set up submission form for mentions <!-- task-id: pending --> <!-- task-id: 0c3e0957e9f40c1ad498c3d098da93d2 -->
@@ -69,6 +73,7 @@ Set up systematic monitoring of OlderGay.Men mentions across social media and th
 ## Monitoring Workflow
 
 ### Weekly Tasks (30 minutes)
+
 1. Check Google Alerts digest
 2. Run saved searches on main platforms
 3. Screenshot/save important mentions
@@ -77,6 +82,7 @@ Set up systematic monitoring of OlderGay.Men mentions across social media and th
 6. Add positive mentions to testimonials
 
 ### Response Guidelines
+
 - Thank positive mentions
 - Address concerns/questions
 - Correct misinformation
