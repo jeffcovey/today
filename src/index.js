@@ -358,12 +358,12 @@ program
   });
 
 program
-  .command('tag-review')
-  .description('Review and categorize untagged action items')
+  .command('topic-review')
+  .description('Review and categorize untopiced action items')
   .action(async () => {
     try {
-      const { TagAnalyzer } = await import('./tag-analyzer.js');
-      const analyzer = new TagAnalyzer();
+      const { TopicAnalyzer } = await import('./topic-analyzer.js');
+      const analyzer = new TopicAnalyzer();
       await analyzer.run();
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);

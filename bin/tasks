@@ -405,7 +405,7 @@ program
   .description('Add a new task')
   .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
   .option('-p, --priority <1-5>', 'Set priority (1-5)', '3')
-  .option('-t, --tags <tags>', 'Add tags (comma-separated)')
+  .option('-t, --topics <topics>', 'Add topics (comma-separated)')
   .option('-s, --status <status>', 'Set status', '🎭 Stage')
   .option('--stage <stage>', 'Set stage (Front Stage, Back Stage, Off Stage)')
   .option('--project <name>', 'Assign to project')
@@ -419,7 +419,7 @@ program
         priority: parseInt(options.priority),
         status: options.status,
         stage: options.stage,
-        tags: options.tags ? options.tags.split(',').map(t => t.trim()) : []
+        topics: options.topics ? options.topics.split(',').map(t => t.trim()) : []
       };
 
       if (options.project) {
@@ -446,7 +446,7 @@ program
   .option('-p, --priority <1-5>', 'Update priority')
   .option('-s, --status <status>', 'Update status')
   .option('--stage <stage>', 'Update stage (Front Stage, Back Stage, Off Stage)')
-  .option('--tags <tags>', 'Update tags (comma-separated)')
+  .option('--topics <topics>', 'Update topics (comma-separated)')
   .action((id, options) => {
     const tm = new TaskManager();
     
@@ -466,7 +466,7 @@ program
       if (options.priority) updates.priority = parseInt(options.priority);
       if (options.status) updates.status = options.status;
       if (options.stage) updates.stage = options.stage;
-      if (options.tags) updates.tags = options.tags.split(',').map(t => t.trim());
+      if (options.topics) updates.topics = options.topics.split(',').map(t => t.trim());
 
       tm.updateTask(task.id, updates);
       console.log(chalk.green(`✓ Updated task: ${task.id.substring(0, 8)}`));
@@ -614,19 +614,24 @@ program
         }
         
         // Topics
-        const topics = tm.db.prepare(`
-          SELECT t.name FROM topics t
-          JOIN task_topics tt ON t.id = tt.topic_id
-          WHERE tt.task_id = ?
-        `).all(task.id);
-        
-        if (topics.length > 0) {
-          console.log(`Topics:          ${topics.map(t => t.name).join(', ')}`);
+        try {
+          const topics = tm.db.prepare(`
+            SELECT t.name FROM topics t
+            JOIN task_topics tt ON t.id = tt.topic_id
+            WHERE tt.task_id = ?
+          `).all(task.id);
+          
+          if (topics.length > 0) {
+            console.log(`Topics:          ${topics.map(t => t.name).join(', ')}`);
+          }
+        } catch (e) {
+          // Topics table might not exist in some databases
         }
         
-        // Description/Content
+        // Description - Always show if exists
         if (task.description) {
-          console.log(`\nDescription:`);
+          console.log('');
+          console.log(chalk.bold('Description:'));
           console.log(chalk.gray(task.description));
         }
         

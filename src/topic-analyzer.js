@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import inquirer from 'inquirer';
 
-class TagAnalyzer {
+class TopicAnalyzer {
   constructor() {
     this.notion = null;
   }
@@ -18,17 +18,17 @@ class TagAnalyzer {
     this.notion = new NotionAPI(token);
   }
 
-  async getExistingTags() {
-    // Use the cached getAllTags method
-    const tags = await this.notion.getAllTags();
+  async getExistingTopics() {
+    // Use the cached getAllTopics method
+    const topics = await this.notion.getAllTopics();
     
-    return tags.map(tag => ({
-      id: tag.id,
-      name: tag.title // getAllTags already returns formatted objects with title
+    return topics.map(topic => ({
+      id: topic.id,
+      name: topic.title // getAllTopics already returns formatted objects with title
     }));
   }
 
-  async getUntaggedActionItems(limit = 100) {
+  async getUntopicedActionItems(limit = 100) {
     const databases = await this.notion.getDatabases();
     const actionItemsDb = databases.find(db => 
       db.title.toLowerCase().includes('action items')
@@ -55,13 +55,13 @@ class TagAnalyzer {
       });
     }
     
-    // Filter for items without tags
-    const untaggedItems = allItems.filter(item => {
-      const tagProp = item.properties['Tag/Knowledge Vault'];
-      return !tagProp || !tagProp.relation || tagProp.relation.length === 0;
+    // Filter for items without topics
+    const untopicedItems = allItems.filter(item => {
+      const topicProp = item.properties['Topic/Knowledge Vault'];
+      return !topicProp || !topicProp.relation || topicProp.relation.length === 0;
     }).slice(0, limit);
 
-    return untaggedItems.map(item => ({
+    return untopicedItems.map(item => ({
       id: item.id,
       title: this.notion.extractTitle(item),
       status: item.properties['Status']?.status?.name || 'No status',
@@ -72,11 +72,11 @@ class TagAnalyzer {
     }));
   }
 
-  suggestTags(item, existingTags) {
+  suggestTopics(item, existingTopics) {
     const suggestions = [];
     const title = item.title.toLowerCase();
     
-    // Keywords mapping to tag names based on your actual tags
+    // Keywords mapping to topic names based on your actual topics
     const keywordMappings = {
       // OlderGay.Men related
       'oldergay': ['OlderGay.Men'],
@@ -191,9 +191,9 @@ class TagAnalyzer {
     for (const [keyword, tagSuggestions] of Object.entries(keywordMappings)) {
       if (title.includes(keyword)) {
         tagSuggestions.forEach(tagName => {
-          const tag = existingTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-          if (tag && !suggestions.find(s => s.id === tag.id)) {
-            suggestions.push(tag);
+          const topic = existingTopics.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+          if (topic && !suggestions.find(s => s.id === topic.id)) {
+            suggestions.push(topic);
           }
         });
       }
@@ -211,9 +211,9 @@ class TagAnalyzer {
 
     if (item.stage && stageMappings[item.stage]) {
       stageMappings[item.stage].forEach(tagName => {
-        const tag = existingTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-        if (tag && !suggestions.find(s => s.id === tag.id)) {
-          suggestions.push(tag);
+        const topic = existingTopics.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+        if (topic && !suggestions.find(s => s.id === topic.id)) {
+          suggestions.push(topic);
         }
       });
     }
@@ -225,14 +225,14 @@ class TagAnalyzer {
       const daysDiff = Math.floor((date - today) / (1000 * 60 * 60 * 24));
       
       if (daysDiff < 0) {
-        const overdueTag = existingTags.find(t => t.name.toLowerCase() === 'overdue');
-        if (overdueTag && !suggestions.find(s => s.id === overdueTag.id)) {
-          suggestions.push(overdueTag);
+        const overdueTopic = existingTopics.find(t => t.name.toLowerCase() === 'overdue');
+        if (overdueTopic && !suggestions.find(s => s.id === overdueTopic.id)) {
+          suggestions.push(overdueTopic);
         }
       } else if (daysDiff <= 7) {
-        const urgentTag = existingTags.find(t => t.name.toLowerCase() === 'urgent');
-        if (urgentTag && !suggestions.find(s => s.id === urgentTag.id)) {
-          suggestions.push(urgentTag);
+        const urgentTopic = existingTopics.find(t => t.name.toLowerCase() === 'urgent');
+        if (urgentTopic && !suggestions.find(s => s.id === urgentTopic.id)) {
+          suggestions.push(urgentTopic);
         }
       }
     }
@@ -240,17 +240,17 @@ class TagAnalyzer {
     return suggestions.slice(0, 3); // Return top 3 suggestions
   }
 
-  async presentItemsForReview(items, existingTags) {
-    console.log(chalk.blue.bold('\n📋 Untagged Action Items Review\n'));
+  async presentItemsForReview(items, existingTopics) {
+    console.log(chalk.blue.bold('\n📋 Untopiced Action Items Review\n'));
     
     const itemsWithSuggestions = items.map(item => ({
       ...item,
-      suggestedTags: this.suggestTags(item, existingTags)
+      suggestedTopics: this.suggestTopics(item, existingTopics)
     }));
 
     // Display items in a table
     const table = new Table({
-      head: ['#', 'Title', 'Status', 'Stage', 'Suggested Tags'],
+      head: ['#', 'Title', 'Status', 'Stage', 'Suggested Topics'],
       colWidths: [5, 50, 15, 15, 30],
       wordWrap: true
     });
@@ -261,7 +261,7 @@ class TagAnalyzer {
         item.title,
         item.status,
         item.stage || '-',
-        item.suggestedTags.map(t => t.name).join(', ') || 'No suggestions'
+        item.suggestedTopics.map(t => t.name).join(', ') || 'No suggestions'
       ]);
     });
 
@@ -270,7 +270,7 @@ class TagAnalyzer {
     return itemsWithSuggestions;
   }
 
-  async reviewAndApproveTags(itemsWithSuggestions, existingTags) {
+  async reviewAndApproveTopics(itemsWithSuggestions, existingTopics) {
     const choices = [
       { name: 'Approve all suggestions', value: 'approve_all' },
       { name: 'Review and modify individual items', value: 'review_individual' },
@@ -295,14 +295,14 @@ class TagAnalyzer {
     if (action === 'approve_all') {
       finalAssignments = itemsWithSuggestions.map(item => ({
         itemId: item.id,
-        tagIds: item.suggestedTags.map(t => t.id)
-      })).filter(a => a.tagIds.length > 0);
+        topicIds: item.suggestedTopics.map(t => t.id)
+      })).filter(a => a.topicIds.length > 0);
     } else {
       // Review individual items
       for (const item of itemsWithSuggestions) {
         console.log(chalk.yellow(`\nItem: ${item.title}`));
         console.log(`Status: ${item.status}, Stage: ${item.stage || 'None'}`);
-        console.log(`Suggested tags: ${item.suggestedTags.map(t => t.name).join(', ') || 'None'}`);
+        console.log(`Suggested topics: ${item.suggestedTopics.map(t => t.name).join(', ') || 'None'}`);
 
         const { reviewAction } = await inquirer.prompt([
           {
@@ -310,32 +310,32 @@ class TagAnalyzer {
             name: 'reviewAction',
             message: 'What would you like to do?',
             choices: [
-              { name: 'Accept suggested tags', value: 'accept' },
-              { name: 'Select different tags', value: 'select' },
+              { name: 'Accept suggested topics', value: 'accept' },
+              { name: 'Select different topics', value: 'select' },
               { name: 'Skip this item', value: 'skip' }
             ]
           }
         ]);
 
-        if (reviewAction === 'accept' && item.suggestedTags.length > 0) {
+        if (reviewAction === 'accept' && item.suggestedTopics.length > 0) {
           finalAssignments.push({
             itemId: item.id,
-            tagIds: item.suggestedTags.map(t => t.id)
+            topicIds: item.suggestedTopics.map(t => t.id)
           });
         } else if (reviewAction === 'select') {
-          const { selectedTags } = await inquirer.prompt([
+          const { selectedTopics } = await inquirer.prompt([
             {
               type: 'checkbox',
-              name: 'selectedTags',
-              message: 'Select tags:',
-              choices: existingTags.map(t => ({ name: t.name, value: t.id }))
+              name: 'selectedTopics',
+              message: 'Select topics:',
+              choices: existingTopics.map(t => ({ name: t.name, value: t.id }))
             }
           ]);
 
-          if (selectedTags.length > 0) {
+          if (selectedTopics.length > 0) {
             finalAssignments.push({
               itemId: item.id,
-              tagIds: selectedTags
+              topicIds: selectedTopics
             });
           }
         }
@@ -345,24 +345,24 @@ class TagAnalyzer {
     return finalAssignments;
   }
 
-  async assignTags(assignments) {
+  async assignTopics(assignments) {
     const databases = await this.notion.getDatabases();
     const actionItemsDb = databases.find(db => 
       db.title.toLowerCase().includes('action items')
     );
     
-    console.log(chalk.blue(`\nAssigning tags to ${assignments.length} items...`));
+    console.log(chalk.blue(`\nAssigning topics to ${assignments.length} items...`));
     
     for (const assignment of assignments) {
       try {
         await this.notion.updatePage(assignment.itemId, {
-          'Tag/Knowledge Vault': {
-            relation: assignment.tagIds.map(id => ({ id }))
+          'Topic/Knowledge Vault': {
+            relation: assignment.topicIds.map(id => ({ id }))
           }
         });
         console.log(chalk.green('✓ Tagged item successfully'));
       } catch (error) {
-        console.error(chalk.red(`✗ Failed to tag item: ${error.message}`));
+        console.error(chalk.red(`✗ Failed to topic item: ${error.message}`));
       }
     }
   }
@@ -371,33 +371,33 @@ class TagAnalyzer {
     try {
       await this.initialize();
       
-      // Get existing tags
-      console.log(chalk.blue('Loading existing tags...'));
-      const existingTags = await this.getExistingTags();
-      console.log(chalk.green(`✓ Found ${existingTags.length} tags`));
+      // Get existing topics
+      console.log(chalk.blue('Loading existing topics...'));
+      const existingTopics = await this.getExistingTopics();
+      console.log(chalk.green(`✓ Found ${existingTopics.length} topics`));
 
-      // Get untagged items
-      console.log(chalk.blue('Fetching untagged action items...'));
-      const untaggedItems = await this.getUntaggedActionItems(100);
-      console.log(chalk.green(`✓ Found ${untaggedItems.length} untagged items`));
+      // Get untopiced items
+      console.log(chalk.blue('Fetching untopiced action items...'));
+      const untopicedItems = await this.getUntopicedActionItems(100);
+      console.log(chalk.green(`✓ Found ${untopicedItems.length} untopiced items`));
 
-      if (untaggedItems.length === 0) {
-        console.log(chalk.yellow('No untagged items found!'));
+      if (untopicedItems.length === 0) {
+        console.log(chalk.yellow('No untopiced items found!'));
         return;
       }
 
       // Present items for review
-      const itemsWithSuggestions = await this.presentItemsForReview(untaggedItems, existingTags);
+      const itemsWithSuggestions = await this.presentItemsForReview(untopicedItems, existingTopics);
       
       // Get user approval
-      const assignments = await this.reviewAndApproveTags(itemsWithSuggestions, existingTags);
+      const assignments = await this.reviewAndApproveTopics(itemsWithSuggestions, existingTopics);
       
       if (assignments.length > 0) {
-        // Assign tags
-        await this.assignTags(assignments);
+        // Assign topics
+        await this.assignTopics(assignments);
         console.log(chalk.green.bold(`\n✓ Successfully processed ${assignments.length} items!`));
       } else {
-        console.log(chalk.yellow('\nNo tags were assigned.'));
+        console.log(chalk.yellow('\nNo topics were assigned.'));
       }
 
       // Ask if user wants to continue with next batch
@@ -423,8 +423,8 @@ class TagAnalyzer {
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const analyzer = new TagAnalyzer();
+  const analyzer = new TopicAnalyzer();
   analyzer.run();
 }
 
-export { TagAnalyzer };
+export { TopicAnalyzer };

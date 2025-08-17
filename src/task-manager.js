@@ -38,23 +38,23 @@ export class TaskManager {
       )
     `);
 
-    // Create tags table
+    // Create topics table
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tags (
+      CREATE TABLE IF NOT EXISTS topics (
         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
         name TEXT UNIQUE NOT NULL,
         color TEXT
       )
     `);
 
-    // Create task_tags junction table
+    // Create task_topics junction table
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS task_tags (
+      CREATE TABLE IF NOT EXISTS task_topics (
         task_id TEXT,
-        tag_id TEXT,
-        PRIMARY KEY (task_id, tag_id),
+        topic_id TEXT,
+        PRIMARY KEY (task_id, topic_id),
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-        FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE
       )
     `);
 
@@ -103,8 +103,8 @@ export class TaskManager {
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_stage ON tasks(stage);
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
-      CREATE INDEX IF NOT EXISTS idx_task_tags_task ON task_tags(task_id);
-      CREATE INDEX IF NOT EXISTS idx_task_tags_tag ON task_tags(tag_id);
+      CREATE INDEX IF NOT EXISTS idx_task_topics_task ON task_topics(task_id);
+      CREATE INDEX IF NOT EXISTS idx_task_topics_topic ON task_topics(topic_id);
       CREATE INDEX IF NOT EXISTS idx_completions_task ON task_completions(task_id);
       CREATE INDEX IF NOT EXISTS idx_completions_date ON task_completions(completed_at);
     `);
@@ -157,9 +157,9 @@ export class TaskManager {
       data.notion_url || null
     );
 
-    // Add tags if provided
-    if (data.tags && data.tags.length > 0) {
-      this.setTaskTags(id, data.tags);
+    // Add topics if provided
+    if (data.topics && data.topics.length > 0) {
+      this.setTaskTopics(id, data.topics);
     }
 
     return id;
@@ -217,9 +217,9 @@ export class TaskManager {
       stmt.run(...values);
     }
 
-    // Update tags if provided
-    if (data.tags !== undefined) {
-      this.setTaskTags(id, data.tags);
+    // Update topics if provided
+    if (data.topics !== undefined) {
+      this.setTaskTopics(id, data.topics);
     }
   }
 
@@ -227,7 +227,7 @@ export class TaskManager {
   getTask(id) {
     const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     if (task) {
-      task.tags = this.getTaskTags(id);
+      task.topics = this.getTaskTopics(id);
       // Get last completion if it's a repeating task
       if (task.repeat_interval) {
         const lastCompletion = this.db.prepare(`
@@ -253,7 +253,7 @@ export class TaskManager {
 
     return tasks.map(task => ({
       ...task,
-      tags: this.getTaskTags(task.id)
+      topics: this.getTaskTopics(task.id)
     }));
   }
 
@@ -267,7 +267,7 @@ export class TaskManager {
 
     return tasks.map(task => ({
       ...task,
-      tags: this.getTaskTags(task.id)
+      topics: this.getTaskTopics(task.id)
     }));
   }
 
@@ -293,44 +293,44 @@ export class TaskManager {
 
     return tasks.map(task => ({
       ...task,
-      tags: this.getTaskTags(task.id)
+      topics: this.getTaskTopics(task.id)
     }));
   }
 
-  // Tag management
-  createTag(name, color = null) {
+  // Topic management
+  createTopic(name, color = null) {
     const id = this.generateId();
-    const stmt = this.db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)');
+    const stmt = this.db.prepare('INSERT INTO topics (id, name, color) VALUES (?, ?, ?)');
     stmt.run(id, name, color);
     return id;
   }
 
-  getOrCreateTag(name) {
-    let tag = this.db.prepare('SELECT id FROM tags WHERE name = ?').get(name);
-    if (!tag) {
-      const id = this.createTag(name);
+  getOrCreateTopic(name) {
+    let topic = this.db.prepare('SELECT id FROM topics WHERE name = ?').get(name);
+    if (!topic) {
+      const id = this.createTopic(name);
       return id;
     }
-    return tag.id;
+    return topic.id;
   }
 
-  setTaskTags(taskId, tagNames) {
-    // Remove existing tags
-    this.db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(taskId);
+  setTaskTopics(taskId, topicNames) {
+    // Remove existing topics
+    this.db.prepare('DELETE FROM task_topics WHERE task_id = ?').run(taskId);
 
-    // Add new tags
-    const stmt = this.db.prepare('INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)');
-    for (const tagName of tagNames) {
-      const tagId = this.getOrCreateTag(tagName);
-      stmt.run(taskId, tagId);
+    // Add new topics
+    const stmt = this.db.prepare('INSERT INTO task_topics (task_id, topic_id) VALUES (?, ?)');
+    for (const topicName of topicNames) {
+      const topicId = this.getOrCreateTopic(topicName);
+      stmt.run(taskId, topicId);
     }
   }
 
-  getTaskTags(taskId) {
+  getTaskTopics(taskId) {
     return this.db.prepare(`
       SELECT t.name 
-      FROM tags t 
-      JOIN task_tags tt ON t.id = tt.tag_id 
+      FROM topics t 
+      JOIN task_topics tt ON t.id = tt.topic_id 
       WHERE tt.task_id = ?
     `).all(taskId).map(row => row.name);
   }
@@ -645,13 +645,13 @@ export class TaskManager {
         let title = taskMatch[2].trim();
         const existingId = taskMatch[3];
 
-        // Parse date tags from title
+        // Parse date topics from title
         let extractedDate = null;
         const dateTags = this.dateParser.extractDateTags(title);
         if (dateTags.length > 0) {
           // Use the first date tag found
           extractedDate = dateTags[0].parsed;
-          // Remove all date tags from the title
+          // Remove all date topics from the title
           title = this.dateParser.removeTagsFromText(title, dateTags);
         }
 
@@ -823,9 +823,9 @@ export class TaskManager {
         lines.push('');
         for (const task of tasksByDate[date]) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          const tags = this.getTaskTags(task.id);
-          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+          const topics = this.getTaskTopics(task.id);
+          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -836,9 +836,9 @@ export class TaskManager {
         lines.push('');
         for (const task of noDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          const tags = this.getTaskTags(task.id);
-          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+          const topics = this.getTaskTopics(task.id);
+          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -859,9 +859,9 @@ export class TaskManager {
         lines.push('');
         for (const task of tasksByDate[date]) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          const tags = this.getTaskTags(task.id);
-          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+          const topics = this.getTaskTopics(task.id);
+          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -872,9 +872,9 @@ export class TaskManager {
         lines.push('');
         for (const task of noDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          const tags = this.getTaskTags(task.id);
-          const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${tagStr} <!-- task-id: ${task.id} -->`);
+          const topics = this.getTaskTopics(task.id);
+          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -917,7 +917,7 @@ export class TaskManager {
       ORDER BY do_date ASC, status ASC
     `).all(today, today).map(task => ({
       ...task,
-      tags: this.getTaskTags(task.id)
+      topics: this.getTaskTopics(task.id)
     }));
     
     // Get tasks completed TODAY (regardless of their do_date)
@@ -928,7 +928,7 @@ export class TaskManager {
       ORDER BY completed_at DESC
     `).all(today).map(task => ({
       ...task,
-      tags: this.getTaskTags(task.id)
+      topics: this.getTaskTopics(task.id)
     }));
     
     const lines = ['# Today\'s Tasks', '', `*Generated: ${new Date().toLocaleString()}*`, ''];
@@ -947,8 +947,8 @@ export class TaskManager {
       if (priorityTasks.length > 0) {
         lines.push(`## ${label}`, '');
         for (const task of priorityTasks) {
-          const tags = task.tags.length > 0 ? ` [${task.tags.join(', ')}]` : '';
-          lines.push(`- [ ] ${task.title}${tags} <!-- task-id: ${task.id} -->`);
+          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -958,8 +958,8 @@ export class TaskManager {
     if (completedTasks.length > 0) {
       lines.push('## ✅ Done', '');
       for (const task of completedTasks) {
-        const tags = task.tags.length > 0 ? ` [${task.tags.join(', ')}]` : '';
-        lines.push(`- [x] ${task.title}${tags} <!-- task-id: ${task.id} -->`);
+        const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+        lines.push(`- [x] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
       }
       lines.push('');
     }
@@ -1007,7 +1007,7 @@ export class TaskManager {
             stage: null,
             project_id: task.project_id,
             repeat_interval: task.repeat_interval,
-            tags: this.getTaskTags(task.id)
+            topics: this.getTaskTopics(task.id)
           });
           created++;
 

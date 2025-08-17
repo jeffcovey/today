@@ -121,7 +121,9 @@
       "Bash(./verify-turso.sh:*)",
       "Bash(/dev/null)",
       "Bash(jq:*)",
-      "Bash(bin/progress:*)"
+      "Bash(bin/progress:*)",
+      "WebSearch",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

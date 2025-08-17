@@ -3,10 +3,10 @@
 ### Monday, Aug 11 (5 days ago)
 
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
+- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [ ] Donate the exercise bike @tomorrow <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 
 ### Tuesday, Aug 12 (4 days ago)
@@ -77,6 +77,88 @@
 - [ ] schedule lunch with Ron Goodale <!-- task-id: 9570de71591a9c1ecf544a873530b541 -->
 - [ ] start adding OGM daily notes to Today <!-- task-id: 1c334a399474281280b9d6063707f6da -->
 - [ ] Fix Chronological Sorting Of The Events Index <!-- task-id: 1cbf93ccd5c10219136f15d0cc307463 -->
+
+## Financial Improvement Project 2025
+
+### No Date Set
+
+- [ ] Add amenities to justify higher rates <!-- task-id: 26d8b144a133ef0765f766ef962b82c5 -->
+- [ ] Analyze Airbnb performance <!-- task-id: 45a4cebd506c388323126ad0c947a360 -->
+- [ ] Annual tax preparation checklist <!-- task-id: 2e7bc24d00e9492f1613590ac508654a -->
+- [ ] Automate weekly transfers ($500/week goal) <!-- task-id: f21a6de8feab84b3fc22cc46b272a8c3 -->
+- [ ] Backup all production data <!-- task-id: 01f63f852e54ac62353a94e6d2359dbb -->
+- [ ] Bundle policies for discounts <!-- task-id: 22d848472aaadd2a19d5c5942765f194 -->
+- [ ] Calculate actual vs. budgeted spending <!-- task-id: 1d4ea6d0084a3ca1dd44651e7503467c -->
+- [ ] Calculate month's net cash flow <!-- task-id: 029916930e547c275e25c7627c3fad5e -->
+- [ ] Calculate true hourly rate for contract work <!-- task-id: 2a5773306060bb9b208e1605c05efaca -->
+- [ ] Cancel Heroku subscriptions <!-- task-id: d29d3593a4e9072f67043e69b314440e -->
+- [ ] Cancel unused subscriptions immediately <!-- task-id: 668ce36eac168a66850683011f427eff -->
+- [ ] Categorize as Essential/Nice-to-have/Unused <!-- task-id: 1ff13e4e5427032eda2220b9278b89e9 -->
+- [ ] Celebrate wins and learn from misses <!-- task-id: f2b3308edee2219cf0749a14fad1ff42 -->
+- [ ] Check for better insurance rates <!-- task-id: 8c36efec1fb63b6235c9803e631f14a1 -->
+- [ ] Check progress on savings goals <!-- task-id: 1a4fe4d8bb5d5357cb5e3d6970c1606d -->
+- [ ] Check tax withholding adequacy <!-- task-id: 02acb36197eca6d50b1ecf05e93bbd1c -->
+- [ ] Choose tracking tool (YNAB, Mint, or custom solution) <!-- task-id: 67885c1cc0816d713e52930cfa918b59 -->
+- [ ] Configure DNS and SSL <!-- task-id: 67cc92a466d05997827f0120f619c7e4 -->
+- [ ] Consider additional rental opportunities <!-- task-id: 3bba9f1dc48de17b52d206aa0fe70c76 -->
+- [ ] Consider higher deductibles for lower premiums <!-- task-id: 4358df3c2511686afd236d0976cda468 -->
+- [ ] Consider quarterly estimated payments <!-- task-id: 413aeed2554ffecdaf766601ef78f8e5 -->
+- [ ] Consult with tax professional <!-- task-id: ed80da27a7ed4b5d0e5c8bd66685002a -->
+- [ ] Create exclusive content for Patreon <!-- task-id: 165c555a8a6157c0382d1cce3a9d7daa -->
+- [ ] Create monthly budget based on reduced expenses <!-- task-id: 8d1340cd7380d7e40760f9c58fe3cdf1 -->
+- [ ] Create passive income products <!-- task-id: dfd43d3bcf5546080b409022c8db26cd -->
+- [ ] Develop digital products/courses <!-- task-id: 289e28314a34b5b22188377f1abd4e5a -->
+- [ ] Document all income sources <!-- task-id: 523c7dd5ba969c68db5a72ca3f8c3992 -->
+- [ ] Document new infrastructure <!-- task-id: b4809f8af28eee488413df96a1d3a8a2 -->
+- [ ] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
+- [ ] Explore investment opportunities <!-- task-id: 004679a0b3daa3d17258f87688cbce9d -->
+- [ ] Export all recurring charges from bank/credit cards <!-- task-id: ac09220ad7087335e08571cb84be9022 -->
+- [ ] Fine-tune performance settings <!-- task-id: 67a807615788dadbb5a718adec8e9574 -->
+- [ ] Identify skills for consulting/freelance <!-- task-id: 4bad75b7e5cc046d0da8f599c0580a91 -->
+- [ ] Identify top 3 expense reduction opportunities <!-- task-id: 3837886a9416853050138d0f2bea033e -->
+- [ ] Implement affiliate partnerships <!-- task-id: 3e25bdafaca468138d6d34e0630cc1da -->
+- [ ] Implement caching strategies <!-- task-id: ea3fe27dbb25665e0fa4a7d233e11fac -->
+- [ ] Implement dynamic pricing <!-- task-id: c7503175ec169366aeff5add041bb234 -->
+- [ ] Import historical data from CSV <!-- task-id: b757bad02af80628e3bfc9df69ebabbc -->
+- [ ] Launch premium membership tier <!-- task-id: a6a74ea5f1adf8d4f96ed2fe3afe8ec8 -->
+- [ ] Maximize deductions <!-- task-id: 6e071a65a5c5cfb39d2c1368f4ebd749 -->
+- [ ] Migrate database with minimal downtime <!-- task-id: 373e96a1db154860ba35f1749aa1ed2e -->
+- [ ] Monitor OGM/Patreon subscriber trends <!-- task-id: 6eb895b807494a53dc3592b7f013671d -->
+- [ ] Monitor for 48 hours post-migration <!-- task-id: f7abacee3ef78cb1c4e9aabf9d321487 -->
+- [ ] Monthly financial health dashboard <!-- task-id: 09a904ceeac6ffc9b612b84705cacb4a -->
+- [ ] Negotiate or downgrade nice-to-haves <!-- task-id: cbc2d7b1ac4cd7c0425191cc86e9356c -->
+- [ ] Open high-yield savings account <!-- task-id: 983a79e220267106d579b154c0df5116 -->
+- [ ] Optimize listing descriptions for SEO <!-- task-id: cab6640aa204eff29b2c619ddaa2f826 -->
+- [ ] Optimize member retention <!-- task-id: 0d6b4aecbc099899e90e895b5deb8451 -->
+- [ ] Prepare for upcoming large expenses <!-- task-id: 0c3c8539eb46b5644cb31cd65d93ca7d -->
+- [ ] Professional photos of rental spaces <!-- task-id: 20c65d8d837a48e2b3f5051ba4c2956d -->
+- [ ] Quarterly trend analysis <!-- task-id: a74f63e6a0a71f0356505c082b840d8a -->
+- [ ] Resist non-emergency withdrawals <!-- task-id: f321a2dee235538ca7fd386082817487 -->
+- [ ] Review and adjust next month's budget <!-- task-id: 9442038c69701ce5c12840004748531a -->
+- [ ] Review and cancel unused software subscriptions <!-- task-id: 2ceaf50e43429c26fd30f4eeb17d30f2 -->
+- [ ] Review and optimize subscriptions <!-- task-id: 8f4a169f4b6fab0c19bdd4bd480fe74c -->
+- [ ] Review and pay credit card balances <!-- task-id: a7f552ed61b46eaf81246fc1812e0d44 -->
+- [ ] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
+- [ ] Review investment account balances <!-- task-id: 5523faf71672c321af8ee595b06181f0 -->
+- [ ] Review previous month's expenses <!-- task-id: bf99947d52794d9ff22829ce7c8b85b0 -->
+- [ ] Set calendar reminders for annual reviews <!-- task-id: 60006753693bf21080427c6fcbaed903 -->
+- [ ] Set up alerts for unusual spending <!-- task-id: d04f39619ecc4e9687037193c1f0d0ac -->
+- [ ] Set up categories aligned with tax needs <!-- task-id: d469efee132a9ed8f7dd633dac954d78 -->
+- [ ] Set up monitoring and alerts <!-- task-id: ecc14a678db74549b3097d4d6749c84d -->
+- [ ] Set up production environment <!-- task-id: 6e1e61265f55d18a9b9ad330703fc143 -->
+- [ ] Shop homeowners insurance (annual) <!-- task-id: d672f92612d28ca6306fe250c492bf44 -->
+- [ ] Switch SendGrid Gold to Starter (save $60/mo) <!-- task-id: 4357f8c535b156ab7fc2b9054d98e160 -->
+- [ ] Target longer-term stays (less turnover) <!-- task-id: 9d9fd5437259ba803742b6f4474e62fe -->
+- [ ] Test all critical paths <!-- task-id: 3ae7ea424e1cff4b60773715c262b28b -->
+- [ ] Track Airbnb income and occupancy <!-- task-id: 05bd086049a01590fa36383e55b00a1f -->
+- [ ] Track all business expenses <!-- task-id: 9da966ed1cccc9c1f5a82455ee0bb9aa -->
+- [ ] Track progress visually <!-- task-id: 4ded23085efd52b027c3149c33f35d66 -->
+- [ ] Train on new deployment process <!-- task-id: 55403da490a9f7bd70bb0b9cf5b46eab -->
+- [ ] Transfer savings to emergency fund <!-- task-id: ae3747aac7c63521f2ad24bdf018768c -->
+- [ ] Update environment variables <!-- task-id: 987530f27439a3c8aea48625636e3f0f -->
+- [ ] Update financial tracking systems <!-- task-id: 96fd13e2144876709787d6746becc429 -->
+- [ ] Update income projections <!-- task-id: 92bf3129792a08f38a2f53ffa9e3c6ac -->
+- [ ] Weekly expense summary email <!-- task-id: 54ed2820920872f79b98f85792f71a24 -->
 
 ## Notion to Today Migration Project
 
