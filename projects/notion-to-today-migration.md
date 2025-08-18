@@ -34,6 +34,8 @@ Migrate historical planning and review data from Notion databases to the new Tod
 
 ## Phase 3: Implementation
 
+> **⚠️ REMINDER**: Notion sync has been temporarily restored in `bin/sync` (line 78) to support importing Action Items. Remove this line after all Action Items have been imported to complete the migration away from Notion.
+
 - [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
 - [ ] Build conversion scripts for each plan level <!-- task-id: 797b3634044f342ea4e7d91cce20d086 -->
 - [ ] Create year files (2022.md, 2023.md, 2024.md) <!-- task-id: 38a9146aa919c6e70c649adb6fdad5f2 -->
