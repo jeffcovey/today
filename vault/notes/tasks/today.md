@@ -14,14 +14,14 @@
 
 ## 2nd Priority
 
-- [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
+- [x] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 
 ## 3rd Priority
 
 - [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
-- [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
+- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 
 ## 4th Priority
 
