@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 7:02:11 AM EDT*
+*Generated: 8/18/2025, 7:02:58 AM EDT*
 
 ## 🟠 High
 
@@ -24,9 +24,9 @@
 
 - [x] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
 - [x] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
-- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [x] Clean Private Suite after Logan leaves <!-- task-id: pending-17-3 --> <!-- task-id: 92b053f4372f914b4aa775df749b0b32 -->
 - [x] Clean Quiet Oasis after Treasure leaves <!-- task-id: pending-17-4 --> <!-- task-id: d4df804661058520e269e18f4a8d8cd1 -->
+- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [x] Use the Virgin Red points <!-- task-id: ee90848cb53900dff2ec05c6e4c51662 -->
 - [x] Check OGM discussion boards and chat room <!-- task-id: 0f6c1dcd050b103ef5bf11b7474a2c5c -->
 - [x] Write summary of recent OGM development work <!-- task-id: 3205534528fe6cf61b0a9ce9816d2cee -->
