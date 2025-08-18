@@ -233,7 +233,8 @@ program
         const dbId = db.id;
         try {
           console.log(chalk.gray(`  Fetching from ${dbName}...`));
-          const items = await notionAPI.getDatabaseItems(dbId);
+          // Fetch ALL items from the database, not just first 100
+          const items = await notionAPI.getDatabaseItems(dbId, 10000, { fetchAll: true });
           
           // Extract task info from each item
           const tasks = items.map(item => ({

@@ -993,26 +993,6 @@ export class TaskManager {
     
     const lines = ['# Today\'s Tasks', '', `*Generated: ${easternTime} ${timeZone}*`, ''];
 
-    // Group active tasks by their actual status
-    const statusOrder = [
-      '🔥 Immediate',
-      '🔥 Today',
-      '🚀 1st Priority',
-      '2nd Priority',
-      '3rd Priority',
-      '4th Priority', 
-      '5th Priority',
-      '🎯 Doing',
-      '➡️ Next',
-      '📅 This Week',
-      '📦 Later',
-      '🎭 Stage',
-      '⚡ Quick',
-      '💭 Remember',
-      '🗂️ To File',
-      '♻️ Repeating'
-    ];
-
     // Group tasks by status
     const tasksByStatus = {};
     for (const task of activeTasks) {
@@ -1023,28 +1003,33 @@ export class TaskManager {
       tasksByStatus[status].push(task);
     }
 
-    // Output tasks in status order
-    for (const status of statusOrder) {
-      if (tasksByStatus[status] && tasksByStatus[status].length > 0) {
-        lines.push(`## ${status}`, '');
-        for (const task of tasksByStatus[status]) {
-          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
-          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
-        }
-        lines.push('');
+    // Define priority order for known statuses (those we want at the top)
+    const priorityStatuses = ['🔥 Immediate', '🔥 Today', '🚀 1st Priority', '2nd Priority', '3rd Priority', '4th Priority', '5th Priority'];
+    
+    // Get all unique statuses from the tasks, sorted
+    const allStatuses = Object.keys(tasksByStatus).sort((a, b) => {
+      // First sort by priority order if defined
+      const aPriority = priorityStatuses.indexOf(a);
+      const bPriority = priorityStatuses.indexOf(b);
+      
+      if (aPriority !== -1 && bPriority !== -1) {
+        return aPriority - bPriority;
       }
-    }
+      if (aPriority !== -1) return -1;
+      if (bPriority !== -1) return 1;
+      
+      // Then sort alphabetically for other statuses
+      return a.localeCompare(b);
+    });
 
-    // Add any tasks with statuses not in our order
-    for (const [status, tasks] of Object.entries(tasksByStatus)) {
-      if (!statusOrder.includes(status)) {
-        lines.push(`## ${status}`, '');
-        for (const task of tasks) {
-          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
-          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
-        }
-        lines.push('');
+    // Output tasks grouped by status
+    for (const status of allStatuses) {
+      lines.push(`## ${status}`, '');
+      for (const task of tasksByStatus[status]) {
+        const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+        lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
       }
+      lines.push('');
     }
     
     // Add completed tasks in a collapsible Done section
