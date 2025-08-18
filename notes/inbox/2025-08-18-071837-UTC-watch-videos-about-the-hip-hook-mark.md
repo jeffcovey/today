@@ -1,0 +1,1 @@
+- [ ] Watch videos about the Hip Hook/Mark
