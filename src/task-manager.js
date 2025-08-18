@@ -326,6 +326,21 @@ export class TaskManager {
     }
   }
 
+  addTopicToTask(taskId, topicName) {
+    // Add a single topic to a task without removing existing ones
+    const topicId = this.getOrCreateTopic(topicName);
+    
+    // Check if this topic is already assigned to the task
+    const existing = this.db.prepare(
+      'SELECT 1 FROM task_topics WHERE task_id = ? AND topic_id = ?'
+    ).get(taskId, topicId);
+    
+    if (!existing) {
+      this.db.prepare('INSERT INTO task_topics (task_id, topic_id) VALUES (?, ?)')
+        .run(taskId, topicId);
+    }
+  }
+
   getTaskTopics(taskId) {
     return this.db.prepare(`
       SELECT t.name 
@@ -622,6 +637,16 @@ export class TaskManager {
         reviewDate = dateMatch[1];
       }
     }
+    
+    // Check if this is a topic file and extract the topic
+    let topicName = null;
+    if (filePath.startsWith('topics/')) {
+      // Read the first line to get the topic name
+      const firstLine = lines.find(line => line.startsWith('# '));
+      if (firstLine) {
+        topicName = firstLine.replace(/^#\s+/, '').trim();
+      }
+    }
 
     // Sync project file first if it's a project
     let projectId = null;
@@ -644,6 +669,10 @@ export class TaskManager {
         const isCompleted = taskMatch[1] === 'x';
         let title = taskMatch[2].trim();
         const existingId = taskMatch[3];
+
+        // Remove any topic tags from the title (e.g., [Health], [Programming])
+        // These are stored separately in the database and shouldn't be in the title
+        title = title.replace(/\s*\[[^\]]+\]/g, '').trim();
 
         // Parse date topics from title
         let extractedDate = null;
@@ -708,6 +737,11 @@ export class TaskManager {
           }
           
           taskId = this.createTask(taskData);
+          
+          // If this is a topic file, automatically assign the topic to the new task
+          if (topicName) {
+            this.addTopicToTask(taskId, topicName);
+          }
           
           // Add task ID to the line (strip any corrupted comments first)
           const cleanLine = line.replace(/<![-—]+ task-id: [a-f0-9]{32} [-—]+>/g, '');
@@ -1036,6 +1070,156 @@ export class TaskManager {
     }
 
     return created;
+  }
+
+  // Generate topic files with their associated tasks
+  async generateTopicFiles() {
+    const fs = await import('fs').then(m => m.promises);
+    const path = await import('path');
+    
+    // Get all topics with active tasks
+    const topicsWithTasks = this.db.prepare(`
+      SELECT DISTINCT t.id, t.name
+      FROM topics t
+      JOIN task_topics tt ON t.id = tt.topic_id
+      JOIN tasks tk ON tt.task_id = tk.id
+      WHERE tk.status != '✅ Done'
+      ORDER BY t.name
+    `).all();
+    
+    if (topicsWithTasks.length === 0) {
+      return 0;
+    }
+    
+    // Ensure topics directory exists
+    const topicsDir = 'topics';
+    try {
+      await fs.mkdir(topicsDir, { recursive: true });
+    } catch (e) {
+      // Directory may already exist
+    }
+    
+    let generatedCount = 0;
+    
+    for (const topic of topicsWithTasks) {
+      // Convert topic name to filename (lowercase, replace spaces with hyphens)
+      const filename = topic.name.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-')          // Replace spaces with hyphens
+        .replace(/-+/g, '-')           // Replace multiple hyphens with single
+        .replace(/^-|-$/g, '');        // Remove leading/trailing hyphens
+      
+      const filePath = path.join(topicsDir, `${filename}.md`);
+      
+      // Get tasks for this topic
+      const tasks = this.db.prepare(`
+        SELECT tk.*
+        FROM tasks tk
+        JOIN task_topics tt ON tk.id = tt.task_id
+        WHERE tt.topic_id = ?
+          AND tk.status != '✅ Done'
+        ORDER BY tk.do_date ASC, tk.status ASC, tk.title ASC
+      `).all(topic.id);
+      
+      // Check if file exists and has custom content
+      let hasCustomContent = false;
+      let existingContent = '';
+      try {
+        existingContent = await fs.readFile(filePath, 'utf-8');
+        // Check if this is a generated file or has custom content
+        const tasksMarker = '## Tasks';
+        const markerIndex = existingContent.indexOf(tasksMarker);
+        if (markerIndex > 0) {
+          // Keep everything before the Tasks section
+          existingContent = existingContent.substring(0, markerIndex).trimEnd();
+          // Remove any trailing horizontal rules that would duplicate
+          existingContent = existingContent.replace(/(\n---\s*)+$/, '');
+          hasCustomContent = true;
+        }
+      } catch (e) {
+        // File doesn't exist, will create new one
+      }
+      
+      const lines = [];
+      
+      if (hasCustomContent) {
+        // Use existing content
+        lines.push(existingContent);
+      } else {
+        // Create default structure
+        lines.push(`# ${topic.name}`);
+        lines.push('');
+        lines.push('## Overview');
+        lines.push('');
+        lines.push(`Tasks and projects related to ${topic.name}.`);
+        lines.push('');
+      }
+      
+      // Add the tasks section
+      lines.push('---');
+      lines.push('');
+      lines.push('## Tasks');
+      lines.push('');
+      lines.push('<!-- Tasks for this topic will be automatically populated by bin/tasks sync -->');
+      lines.push('<!-- Do not edit below this line - tasks are managed by the sync system -->');
+      lines.push('');
+      
+      // Group tasks by date
+      const tasksByDate = {};
+      const noDateTasks = [];
+      
+      for (const task of tasks) {
+        if (task.do_date) {
+          if (!tasksByDate[task.do_date]) {
+            tasksByDate[task.do_date] = [];
+          }
+          tasksByDate[task.do_date].push(task);
+        } else {
+          noDateTasks.push(task);
+        }
+      }
+      
+      // Add tasks with dates
+      const sortedDates = Object.keys(tasksByDate).sort();
+      for (const date of sortedDates) {
+        const dateObj = new Date(date + 'T00:00:00');
+        const dateStr = dateObj.toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        lines.push(`### ${dateStr}`);
+        lines.push('');
+        
+        for (const task of tasksByDate[date]) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          // Don't add topic tags in topic files - they're redundant
+          lines.push(`- [${checkbox}] ${task.title} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
+      
+      // Add tasks without dates
+      if (noDateTasks.length > 0) {
+        lines.push('### No Date Set');
+        lines.push('');
+        for (const task of noDateTasks) {
+          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
+          lines.push(`- [${checkbox}] ${task.title} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
+      
+      // Remove trailing empty lines
+      while (lines.length > 0 && lines[lines.length - 1] === '') {
+        lines.pop();
+      }
+      
+      await fs.writeFile(filePath, lines.join('\n'));
+      generatedCount++;
+    }
+    
+    return generatedCount;
   }
 
   calculateNextDate(fromDate, frequency) {

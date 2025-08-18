@@ -340,6 +340,7 @@ Address any wellbeing concerns from recent notes and tasks
 - Review what was accomplished vs. what was planned
 - Update the review file with completion status
 - Note any tasks that need to carry over to tomorrow
+- Check git logs for work done on this system itself today
 - Summarize the day's achievements and learnings
 
 ---

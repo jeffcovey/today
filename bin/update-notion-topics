@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+
+// Update already-imported Notion tasks with their topics
+// This script fetches the Tag/Knowledge Vault relations from Notion for existing tasks
+
+// Auto-use dotenvx if available
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import { Client } from '@notionhq/client';
+import { TaskManager } from '../src/task-manager.js';
+import chalk from 'chalk';
+
+const notionToken = process.env.NOTION_TOKEN;
+if (!notionToken) {
+  console.error(chalk.red('Error: NOTION_TOKEN environment variable not set'));
+  process.exit(1);
+}
+
+const notion = new Client({ auth: notionToken });
+const tm = new TaskManager();
+
+// Helper to extract title from Notion page
+function extractTitle(page) {
+  if (page.properties?.Name?.title?.length > 0) {
+    return page.properties.Name.title.map(t => t.plain_text).join('');
+  }
+  if (page.properties?.Title?.title?.length > 0) {
+    return page.properties.Title.title.map(t => t.plain_text).join('');
+  }
+  // Check for any property that looks like a title
+  for (const [key, value] of Object.entries(page.properties || {})) {
+    if (value.type === 'title' && value.title?.length > 0) {
+      return value.title.map(t => t.plain_text).join('');
+    }
+  }
+  return 'Untitled';
+}
+
+// Cache for topic names to avoid redundant API calls
+const topicCache = new Map();
+
+async function getTopicName(topicId) {
+  if (topicCache.has(topicId)) {
+    return topicCache.get(topicId);
+  }
+  
+  try {
+    const topicPage = await notion.pages.retrieve({ page_id: topicId });
+    const topicName = extractTitle(topicPage);
+    topicCache.set(topicId, topicName);
+    return topicName;
+  } catch (error) {
+    console.warn(chalk.yellow(`  Could not fetch topic ${topicId}: ${error.message}`));
+    return null;
+  }
+}
+
+async function updateTaskTopics(task) {
+  try {
+    // Fetch the task from Notion
+    const notionPage = await notion.pages.retrieve({ page_id: task.notion_id });
+    
+    // Get the Tag/Knowledge Vault relations
+    const topicRelations = notionPage.properties['Tag/Knowledge Vault']?.relation || [];
+    
+    if (topicRelations.length === 0) {
+      return { taskId: task.id, topics: [], status: 'no_topics' };
+    }
+    
+    const topicNames = [];
+    for (const topicRef of topicRelations) {
+      const topicName = await getTopicName(topicRef.id);
+      if (topicName && topicName !== 'Untitled') {
+        topicNames.push(topicName);
+        tm.addTopicToTask(task.id, topicName);
+      }
+    }
+    
+    return { taskId: task.id, topics: topicNames, status: 'updated' };
+  } catch (error) {
+    return { taskId: task.id, topics: [], status: 'error', error: error.message };
+  }
+}
+
+async function main() {
+  try {
+    console.log(chalk.bold('\n🏷️  Notion Topics Updater\n'));
+    
+    // Get all tasks with Notion IDs
+    const tasksWithNotion = tm.db.prepare(`
+      SELECT id, title, notion_id 
+      FROM tasks 
+      WHERE notion_id IS NOT NULL
+      ORDER BY title
+    `).all();
+    
+    console.log(chalk.blue(`Found ${tasksWithNotion.length} tasks with Notion IDs\n`));
+    
+    // Check how many already have topics
+    const tasksWithTopics = tm.db.prepare(`
+      SELECT COUNT(DISTINCT task_id) as count
+      FROM task_topics
+      WHERE task_id IN (SELECT id FROM tasks WHERE notion_id IS NOT NULL)
+    `).get();
+    
+    if (tasksWithTopics.count > 0) {
+      console.log(chalk.yellow(`${tasksWithTopics.count} tasks already have topics assigned`));
+      console.log(chalk.gray('These will be skipped unless topics have changed in Notion\n'));
+    }
+    
+    // Process in batches to avoid rate limiting
+    const batchSize = 10;
+    let processed = 0;
+    let updated = 0;
+    let errors = 0;
+    let noTopics = 0;
+    
+    // Collect all unique topics
+    const allTopics = new Set();
+    
+    for (let i = 0; i < tasksWithNotion.length; i += batchSize) {
+      const batch = tasksWithNotion.slice(i, Math.min(i + batchSize, tasksWithNotion.length));
+      
+      console.log(chalk.gray(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tasksWithNotion.length / batchSize)}...`));
+      
+      const promises = batch.map(task => updateTaskTopics(task));
+      const results = await Promise.all(promises);
+      
+      for (const result of results) {
+        processed++;
+        
+        if (result.status === 'updated') {
+          updated++;
+          result.topics.forEach(t => allTopics.add(t));
+          
+          const task = batch.find(t => t.id === result.taskId);
+          if (result.topics.length > 0) {
+            console.log(chalk.green(`  ✓ ${task.title}`));
+            console.log(chalk.gray(`    Topics: ${result.topics.join(', ')}`));
+          }
+        } else if (result.status === 'no_topics') {
+          noTopics++;
+        } else if (result.status === 'error') {
+          errors++;
+          const task = batch.find(t => t.id === result.taskId);
+          console.log(chalk.red(`  ✗ ${task.title}`));
+          console.log(chalk.red(`    Error: ${result.error}`));
+        }
+      }
+      
+      // Add a delay between batches to avoid rate limiting
+      if (i + batchSize < tasksWithNotion.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Summary
+    console.log(chalk.bold('\n📊 Summary:\n'));
+    console.log(`  Total processed: ${processed}`);
+    console.log(`  Updated with topics: ${updated}`);
+    console.log(`  No topics in Notion: ${noTopics}`);
+    if (errors > 0) {
+      console.log(chalk.red(`  Errors: ${errors}`));
+    }
+    
+    // Show all unique topics found
+    if (allTopics.size > 0) {
+      console.log(chalk.bold('\n🏷️  Topics found:\n'));
+      const sortedTopics = Array.from(allTopics).sort();
+      for (const topic of sortedTopics) {
+        const count = tm.db.prepare(`
+          SELECT COUNT(*) as count 
+          FROM task_topics tt 
+          JOIN topics t ON tt.topic_id = t.id 
+          WHERE t.name = ?
+        `).get(topic).count;
+        console.log(`  • ${topic} (${count} tasks)`);
+      }
+    }
+    
+    console.log(chalk.green('\n✅ Topic update complete!'));
+    
+  } catch (error) {
+    console.error(chalk.red('\n❌ Error:'), error.message);
+    process.exit(1);
+  } finally {
+    tm.close();
+  }
+}
+
+main();

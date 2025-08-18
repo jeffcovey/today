@@ -79,23 +79,50 @@ async function getActionItems(databaseId, options = {}) {
       });
     }
     
-    const queryParams = {
-      database_id: databaseId,
-      page_size: Math.min(limit, 100),
-      sorts: [
-        { property: 'Do Date', direction: 'ascending' },
-        { property: 'Status', direction: 'ascending' }
-      ]
-    };
+    // Notion API limits page_size to 100, so we need to paginate for more
+    let allResults = [];
+    let hasMore = true;
+    let startCursor = undefined;
     
-    if (filters.length > 0) {
-      queryParams.filter = filters.length === 1 ? filters[0] : { and: filters };
+    const startTime = Date.now();
+    const maxDuration = 60000; // 60 second timeout for fetching
+    
+    while (hasMore && allResults.length < limit) {
+      // Check for timeout
+      if (Date.now() - startTime > maxDuration) {
+        console.log(chalk.yellow(`\n⚠️  Fetch timeout after ${allResults.length} tasks (60s limit)`));
+        break;
+      }
+      const queryParams = {
+        database_id: databaseId,
+        page_size: Math.min(limit - allResults.length, 100),
+        sorts: [
+          { property: 'Do Date', direction: 'ascending' },
+          { property: 'Status', direction: 'ascending' }
+        ]
+      };
+      
+      if (filters.length > 0) {
+        queryParams.filter = filters.length === 1 ? filters[0] : { and: filters };
+      }
+      
+      if (startCursor) {
+        queryParams.start_cursor = startCursor;
+      }
+      
+      const response = await notion.databases.query(queryParams);
+      allResults = allResults.concat(response.results);
+      hasMore = response.has_more;
+      startCursor = response.next_cursor;
+      
+      // Show progress for large fetches
+      if (allResults.length % 100 === 0 && allResults.length > 0) {
+        console.log(chalk.gray(`  Fetched ${allResults.length} tasks so far...`));
+      }
     }
     
-    const response = await notion.databases.query(queryParams);
-    
     // Process and filter tasks
-    let tasks = response.results.map(page => ({
+    let tasks = allResults.map(page => ({
       id: page.id,
       title: extractTitle(page),
       properties: page.properties,
@@ -156,10 +183,26 @@ async function importTask(notionTask) {
   });
   
   // Handle topics/tags
-  const topics = props['Tag/Knowledge Vault']?.relation || [];
-  for (const topicRef of topics) {
-    // We'd need to fetch the topic name from Notion
-    // For now, we'll skip topics
+  const topicRelations = props['Tag/Knowledge Vault']?.relation || [];
+  const topicNames = [];
+  
+  for (const topicRef of topicRelations) {
+    try {
+      // Fetch the topic page to get its name
+      const topicPage = await notion.pages.retrieve({ page_id: topicRef.id });
+      const topicTitle = extractTitle(topicPage);
+      if (topicTitle && topicTitle !== 'Untitled') {
+        topicNames.push(topicTitle);
+        // Add topic to task
+        tm.addTopicToTask(localId, topicTitle);
+      }
+    } catch (error) {
+      console.warn(chalk.yellow(`  ⚠️  Could not fetch topic ${topicRef.id}: ${error.message}`));
+    }
+  }
+  
+  if (topicNames.length > 0) {
+    console.log(chalk.gray(`    Topics: ${topicNames.join(', ')}`));
   }
   
   return { status: 'imported', id: localId };
@@ -169,17 +212,36 @@ async function main() {
   try {
     console.log(chalk.bold('\n🚀 Notion Action Items Importer\n'));
     
-    // Check for search term argument
-    const searchTerm = process.argv[2];
+    // Parse command line arguments
+    const args = process.argv.slice(2);
+    const showHelp = args.includes('--help') || args.includes('-h');
+    const importAll = args.includes('--all');
+    const dryRun = args.includes('--dry-run');
+    const searchTerm = args.find(arg => !arg.startsWith('--'));
+    
+    // Show help if requested
+    if (showHelp) {
+      console.log('Usage: bin/import-notion-tasks [search-term] [options]\n');
+      console.log('Options:');
+      console.log('  --all        Import all available tasks without prompting');
+      console.log('  --dry-run    Show what would be imported without actually importing');
+      console.log('  --help, -h   Show this help message\n');
+      console.log('Examples:');
+      console.log('  bin/import-notion-tasks              # Interactive selection');
+      console.log('  bin/import-notion-tasks "spam"       # Search for tasks with "spam"');
+      console.log('  bin/import-notion-tasks --all        # Import all unimported tasks');
+      console.log('  bin/import-notion-tasks --all --dry-run  # Preview all imports');
+      return;
+    }
     
     // Find the Action Items database
     const databaseId = await findActionItemsDatabase();
     
-    // Get tasks
+    // Get tasks (no limit for --all, disable Jeffrey filter for --all)
     const tasks = await getActionItems(databaseId, {
-      limit: 100,
+      limit: importAll ? 10000 : 100,  // Very high limit for --all to get everything
       filterDone: true,
-      onlyJeffrey: true
+      onlyJeffrey: !importAll  // Include all users if --all flag is set
     });
     
     if (tasks.length === 0) {
@@ -232,7 +294,12 @@ async function main() {
     
     let selectedTasks = [];
     
-    if (toImport.length === 1) {
+    if (importAll) {
+      // Import all available tasks without prompting
+      console.log(chalk.yellow(`\n⚠️  Importing ALL ${toImport.length} tasks without confirmation`));
+      console.log(chalk.gray('This may take a while...'));
+      selectedTasks = toImport;
+    } else if (toImport.length === 1) {
       // Single task - show details and confirm
       const task = toImport[0];
       console.log(chalk.blue('\n📋 Task to import:'));
@@ -255,6 +322,7 @@ async function main() {
     } else {
       // Multiple tasks - let user select
       console.log(chalk.blue('\n📋 Select tasks to import:'));
+      console.log(chalk.gray(`Showing first 20 of ${toImport.length} tasks. Use --all to import all.`));
       
       const choices = toImport.slice(0, 20).map(task => {
         const doDate = task.properties['Do Date']?.date?.start;
@@ -272,7 +340,7 @@ async function main() {
       
       if (toImport.length > 20) {
         choices.push({
-          name: chalk.gray(`... and ${toImport.length - 20} more (use search to find specific tasks)`),
+          name: chalk.gray(`... and ${toImport.length - 20} more (use --all flag to import all)`),
           value: null,
           disabled: true
         });
@@ -291,6 +359,26 @@ async function main() {
     
     if (selectedTasks.length === 0) {
       console.log(chalk.yellow('No tasks selected'));
+      return;
+    }
+    
+    // Dry run mode - just show what would be imported
+    if (dryRun) {
+      console.log(chalk.yellow(`\n[DRY RUN] Would import ${selectedTasks.length} task(s):\n`));
+      
+      // Show first 50 tasks in dry run
+      const tasksToShow = selectedTasks.slice(0, 50);
+      tasksToShow.forEach((task, i) => {
+        const doDate = task.properties['Do Date']?.date?.start || '';
+        const status = task.properties.Status?.status?.name || '';
+        console.log(`  ${i + 1}. ${task.title}${doDate ? ` (${doDate})` : ''}${status && status !== '🎭 Stage' ? ` [${status}]` : ''}`);
+      });
+      
+      if (selectedTasks.length > 50) {
+        console.log(chalk.gray(`  ... and ${selectedTasks.length - 50} more tasks`));
+      }
+      
+      console.log(chalk.yellow('\nNo tasks were imported (dry run mode)'));
       return;
     }
     

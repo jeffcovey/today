@@ -131,6 +131,23 @@ npm run start edit
 
 ### Command Line Operations
 
+#### Task Management
+
+```bash
+# Sync and manage tasks
+bin/tasks sync                         # Sync all tasks from markdown files
+bin/tasks list                         # List all active tasks
+bin/tasks list --today                 # Show today's tasks
+bin/tasks list --with-notion           # Show tasks imported from Notion
+bin/tasks add "New task" --date 2025-08-14
+bin/tasks done <id>                    # Mark task as complete
+
+# Notion migration tools
+bin/notion-mark-done <task-id>         # Mark task as done in Notion
+bin/notion-mark-done --all             # Mark all tasks as done in Notion
+bin/tasks clear-notion-ids --force     # Remove Notion IDs after migration
+```
+
 #### Daily Automation (Perfect for Cron/Docker)
 
 ```bash
@@ -315,6 +332,11 @@ cd /workspaces/notion && code tunnel --accept-server-license-terms
 # Use Microsoft account instead of GitHub
 code tunnel user login --provider microsoft
 ```
+
+## Documentation
+
+- [Notion Migration Guide](docs/notion-migration.md) - Complete guide for migrating tasks from Notion to Today
+- [Notes System](notes/README.md) - GitHub-based notes synchronization
 
 ## Development
 

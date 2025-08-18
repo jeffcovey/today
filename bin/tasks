@@ -132,6 +132,28 @@ program
           }
         }
         
+        // Always include topic files to sync new tasks and checkbox changes
+        try {
+          const topicFiles = execSync('find topics -name "*.md" -type f 2>/dev/null || echo ""', { encoding: 'utf8' })
+            .split('\n')
+            .filter(f => f)
+            .map(f => f.replace(/^\.\//, ''));
+          
+          let addedTopicFiles = 0;
+          for (const topicFile of topicFiles) {
+            if (!allMarkdownFiles.includes(topicFile)) {
+              allMarkdownFiles.push(topicFile);
+              addedTopicFiles++;
+            }
+          }
+          
+          if (addedTopicFiles > 0) {
+            console.log(chalk.gray(`  Added ${addedTopicFiles} topic file(s) for task sync`));
+          }
+        } catch (e) {
+          // Topic files not found, continue without them
+        }
+        
         // First sync project files to establish project records
         const projectFiles = allMarkdownFiles.filter(f => f.startsWith('projects/'));
         if (projectFiles.length > 0) {
@@ -211,6 +233,15 @@ program
       const allCount = await tm.generateAllTasksFile();
       console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
       
+      // Generate topic files
+      console.log(chalk.blue('Generating topic files...'));
+      const topicCount = await tm.generateTopicFiles();
+      if (topicCount > 0) {
+        console.log(chalk.green(`✓ Generated ${topicCount} topic files`));
+      } else {
+        console.log(chalk.gray('  • No topics with tasks to generate'));
+      }
+      
       // Classify stages for tasks without them
       console.log(chalk.blue('Classifying task stages...'));
       const classifier = new TaskStageClassifier();
@@ -246,6 +277,7 @@ program
   .option('--stage <stage>', 'Filter by stage (Front Stage, Back Stage, Off Stage)')
   .option('-l, --legend', 'Show legend for symbols')
   .option('-c, --compact', 'Ultra-compact display (no table borders)')
+  .option('--with-notion', 'Show only tasks imported from Notion')
   .action((options) => {
     if (options.legend) {
       console.log(chalk.bold('\nTask List Legend:'));
@@ -263,7 +295,15 @@ program
     
     try {
       let tasks;
-      if (options.today) {
+      if (options.withNotion) {
+        // Get tasks with Notion IDs
+        tasks = tm.db.prepare(`
+          SELECT * FROM tasks 
+          WHERE notion_id IS NOT NULL 
+            AND status != '✅ Done'
+          ORDER BY do_date, status
+        `).all();
+      } else if (options.today) {
         tasks = tm.getTodayTasks();
       } else if (options.project) {
         tasks = tm.getProjectTasks(options.project);
@@ -276,6 +316,9 @@ program
       }
       if (options.stage) {
         tasks = tasks.filter(t => t.stage === options.stage);
+      }
+      if (options.withNotion && !options.today && !options.project) {
+        // Already filtered by notion_id in the query above
       }
 
       if (tasks.length === 0) {
@@ -732,6 +775,54 @@ program
 
         console.log(table.toString());
       }
+    } finally {
+      tm.close();
+    }
+  });
+
+// Clear Notion IDs command
+program
+  .command('clear-notion-ids')
+  .description('Remove Notion IDs from tasks after successful migration')
+  .option('--force', 'Skip confirmation prompt')
+  .action(async (options) => {
+    const tm = new TaskManager();
+    
+    try {
+      // Count tasks with Notion IDs
+      const tasksWithNotion = tm.db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM tasks 
+        WHERE notion_id IS NOT NULL
+      `).get();
+      
+      if (tasksWithNotion.count === 0) {
+        console.log(chalk.gray('No tasks with Notion IDs found'));
+        return;
+      }
+      
+      console.log(chalk.yellow(`Found ${tasksWithNotion.count} tasks with Notion IDs`));
+      
+      if (!options.force) {
+        console.log(chalk.bold('\n⚠️  This will remove all Notion IDs from the database'));
+        console.log(chalk.gray('This action cannot be undone'));
+        console.log(chalk.gray('Make sure you have marked these tasks as done in Notion first'));
+        console.log(chalk.gray('\nTo proceed, run with --force flag'));
+        process.exit(0);
+      }
+      
+      // Clear Notion IDs
+      const result = tm.db.prepare(`
+        UPDATE tasks 
+        SET notion_id = NULL, notion_url = NULL 
+        WHERE notion_id IS NOT NULL
+      `).run();
+      
+      console.log(chalk.green(`✓ Cleared Notion IDs from ${result.changes} tasks`));
+      
+    } catch (error) {
+      console.error(chalk.red('Error clearing Notion IDs:'), error.message);
+      process.exit(1);
     } finally {
       tm.close();
     }
