@@ -8,7 +8,7 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 3. Updates the SQLite database with comprehensive content
 4. Starts this interactive session where Claude will:
    - Review all your data
-   - Create or update today's plan file in `plans/YYYY-QQ-MM-DD.md`
+   - Create or update today's plan file in `vault/plans/YYYY-QQ-MM-DD.md`
    - Provide recommendations based on your schedule and priorities
    - Continue working with you as long as needed
 
@@ -36,12 +36,12 @@ When this session starts, please:
    - **Two guest rooms need tracking - check BOTH rooms' status**
    - **Guest transitions require room preparation between checkout (12 PM) and check-in (3 PM)**
 4. **📊 Check Hierarchical Plans** (BEFORE creating today's plan!)
-   - Read the year plan (`plans/YYYY.md`) to understand annual objectives
-   - Check the quarter plan (`plans/YYYY-QQ.md`) for current initiatives
-   - Review the month plan (`plans/YYYY-QQ-MM.md`) for this month's focus
-   - Look at the week plan (`plans/YYYY-QQ-MM-W##.md`) if it exists
+   - Read the year plan (`vault/plans/YYYY.md`) to understand annual objectives
+   - Check the quarter plan (`vault/plans/YYYY-QQ.md`) for current initiatives
+   - Review the month plan (`vault/plans/YYYY-QQ-MM.md`) for this month's focus
+   - Look at the week plan (`vault/plans/YYYY-QQ-MM-W##.md`) if it exists
    - THEN create/update today's plan to align with these higher goals
-5. Check if a plan file exists for today in `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`)
+5. Check if a plan file exists for today in `vault/plans/YYYY-QQ-MM-DD.md` (e.g., `vault/plans/2025-Q3-08-16.md`)
    - **If today's review EXISTS**:
      - Load the existing review file
      - Query the database for recent changes (using SQL queries)
@@ -61,7 +61,7 @@ When this session starts, please:
 
 ### Plan Files Structure
 
-Plans are organized in a flat structure in the `plans/` directory with the naming scheme:
+Plans are organized in a flat structure in the `vault/plans/` directory with the naming scheme:
 - **Daily plans**: `YYYY-QQ-MM-DD.md` (e.g., `2025-Q3-08-16.md`)
 - **Weekly plans**: `YYYY-QQ-MM-W##.md` (e.g., `2025-Q3-08-W03.md`)
 - **Monthly plans**: `YYYY-QQ-MM.md` (e.g., `2025-Q3-08.md`)
@@ -81,6 +81,7 @@ The review file should include:
 - Or numbered format: `1. **Task name** (time estimate)`
 - Group tasks by time of day or category
 - Track completed tasks with ✓ marks
+- **Keep files manageable**: Wrap outdated sections (morning tasks, completed items, old updates) in `<details><summary>` tags to collapse them, just like in `vault/notes/tasks/tasks.md`. This keeps the active content visible while preserving history.
 
 ### Incremental Updates (Performance Optimization)
 
@@ -153,7 +154,7 @@ I’m retired, and would like to remain that way if I can maintain my finances. 
 
 #### Streaks
 
-notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
+vault/notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
 
 #### Hosting
 
@@ -199,24 +200,24 @@ We shouldn't neglect things that *have* to be done today, but **as much as possi
 
 I want to minimize busy work that doesn't contribute to my life goals. Tasks should flow downward in this hierarchy:
 
-1. **Year Plan** (`plans/YYYY.md`) - Broad values, principles, and annual objectives
+1. **Year Plan** (`vault/plans/YYYY.md`) - Broad values, principles, and annual objectives
    - Check this file for my current guiding word/theme
    - Review my stated values and purpose
    - Note the key objectives for the year
 
-2. **Quarter Plan** (`plans/YYYY-QQ.md`) - How this quarter advances yearly goals
+2. **Quarter Plan** (`vault/plans/YYYY-QQ.md`) - How this quarter advances yearly goals
    - Major initiatives for the 3-month period
    - Key milestones to hit
 
-3. **Month Plan** (`plans/YYYY-QQ-MM.md`) - Breaking quarterly goals into monthly chunks
+3. **Month Plan** (`vault/plans/YYYY-QQ-MM.md`) - Breaking quarterly goals into monthly chunks
    - Specific projects and deliverables
    - Progress checkpoints
 
-4. **Week Plan** (`plans/YYYY-QQ-MM-W##.md`) - Weekly execution of monthly objectives
+4. **Week Plan** (`vault/plans/YYYY-QQ-MM-W##.md`) - Weekly execution of monthly objectives
    - Concrete tasks and activities
    - Time allocations
 
-5. **Today's Plan** (`plans/YYYY-QQ-MM-DD.md`) - Daily actions that ladder up
+5. **Today's Plan** (`vault/plans/YYYY-QQ-MM-DD.md`) - Daily actions that ladder up
    - Must contribute to weekly/monthly goals
    - Should align with life purpose stated in year plan
 
@@ -267,7 +268,7 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 - 👥 Contacts (in contacts table with normalized emails/phones)
 - 🔄 Sync history (in sync_log table)
 
-**First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
+**First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `vault/plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
 
 ### Example Queries to Get Started
 
@@ -351,7 +352,7 @@ Address any wellbeing concerns from recent notes and tasks
 
 ### Project Files
 
-When creating project files in `projects/`:
+When creating project files in `vault/projects/`:
 - Use kebab-case filenames: `palm-springs-trip.md`, `website-redesign.md`
 - Start with `# Project Name` as the first line
 - Include metadata fields when known:
@@ -367,8 +368,8 @@ When creating project files in `projects/`:
 ### Task Management
 
 When creating tasks:
-- In `notes/tasks/tasks.md` for general tasks
-- In `projects/*.md` for project-specific tasks  
+- In `vault/notes/tasks/tasks.md` for general tasks
+- In `vault/projects/*.md` for project-specific tasks  
 - Use checkbox format: `- [ ] Task description`
 - Mark complete with: `- [x] Task description`
 - The sync system (`bin/tasks sync`) will:
@@ -454,7 +455,7 @@ WHERE p.name LIKE '%Palm Springs%';
 
 1. **Query the SQLite database** at `.data/today.db` to get all synchronized data
 2. **⚠️ CONVERT ALL UTC TIMES TO EASTERN!** Database timestamps may be in UTC  
-3. **Check/Create Plan File** at `plans/YYYY-QQ-MM-DD.md` (e.g., `plans/2025-Q3-08-16.md`) with CORRECT day name from calculation above
+3. **Check/Create Plan File** at `vault/plans/YYYY-QQ-MM-DD.md` (e.g., `vault/plans/2025-Q3-08-16.md`) with CORRECT day name from calculation above
 4. **Analyze and Recommend** based on:
    - Recent notes and concerns (query file_tracking and notion_pages)
    - Urgent and overdue tasks (query task_cache)

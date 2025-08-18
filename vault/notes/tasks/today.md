@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 7:13:47 PM EDT*
+*Generated: 8/18/2025, 7:19:26 PM EDT*
 
 ## 🔥 Immediate
 
@@ -39,8 +39,8 @@
 <details>
 <summary><strong>✅ Done Today</strong> (216 tasks completed)</summary>
 
-- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
