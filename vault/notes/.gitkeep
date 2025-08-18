@@ -1,0 +1,10 @@
+# Notes Directory
+
+This directory contains notes synced from Drafts app.
+
+## Structure
+
+- `/daily/` - Daily notes and journal entries
+- `/tasks/` - TaskPaper format task lists
+- `/ideas/` - Quick ideas and thoughts
+- `/reference/` - Reference notes and documentation
