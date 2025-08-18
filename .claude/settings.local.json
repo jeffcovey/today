@@ -123,7 +123,8 @@
       "Bash(jq:*)",
       "Bash(bin/progress:*)",
       "WebSearch",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z')"
     ],
     "deny": []
   }

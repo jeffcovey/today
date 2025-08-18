@@ -76,12 +76,15 @@
 After initial sync, your drafts will have these tags:
 
 - `github-sync` - All synced drafts
-- `notes` - Root notes directory
+- `notes` - Notes category
 - `notes/daily` - Daily journal entries
 - `notes/tasks` - Task lists
 - `notes/concerns` - Concerns and worries
 - `notes/reviews` - Daily review files
 - `notes/ogm-work` - OlderGay.Men work
+- `projects` - Projects category
+- `topics` - Topics category
+- `plans` - Plans category
 
 ## Usage Workflow
 
@@ -101,7 +104,7 @@ After initial sync, your drafts will have these tags:
 ### Creating New Notes
 
 1. Create new draft in Drafts
-2. Add appropriate tag (e.g., `notes/daily`)
+2. Add appropriate tag (e.g., `notes/daily`, `projects/active`)
 3. Write your content
 4. Run "📤 Sync to GitHub" when ready
 
@@ -184,7 +187,7 @@ Each synced draft contains metadata:
 
 ```markdown
 ---
-github_path: notes/daily/2025-08-12.md
+github_path: vault/notes/daily/2025-08-12.md
 github_sha: abc123def456
 last_sync: 2025-08-12T14:30:00Z
 sync_status: synced

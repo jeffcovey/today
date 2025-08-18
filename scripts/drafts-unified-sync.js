@@ -200,13 +200,29 @@ function pathToTags(path) {
     
     // Add hierarchical tags for the path
     if (path.startsWith("vault/")) {
-        tags.push("notes"); // Always add base 'notes' tag
+        // Remove 'vault/' prefix and split the remaining path
+        const pathWithoutVault = path.substring(6); // Remove 'vault/'
+        const parts = pathWithoutVault.split('/');
         
-        const parts = path.split('/');
-        let tagPath = "";
+        // Skip the filename (last part)
         for (let i = 0; i < parts.length - 1; i++) {
-            tagPath = tagPath ? `${tagPath}/${parts[i]}` : parts[i];
-            tags.push(tagPath);
+            const part = parts[i];
+            
+            // Add the category tag (e.g., "notes", "projects", "topics", "plans")
+            if (i === 0) {
+                tags.push(part);
+            }
+            
+            // Add subcategory tags (e.g., "notes/daily", "notes/concerns")
+            if (i === 1) {
+                tags.push(`${parts[0]}/${part}`);
+            }
+            
+            // For deeper nesting, add full path tags
+            if (i > 1) {
+                const pathTag = parts.slice(0, i + 1).join('/');
+                tags.push(pathTag);
+            }
         }
     }
     
@@ -240,19 +256,34 @@ function findDraftByPath(todayPath) {
 function generatePathFromTags(draft) {
     const tags = draft.tags;
     
-    // Find the most specific tag that looks like a path
+    // Find the most specific tag that looks like a path (e.g., "notes/daily", "projects")
     let bestTag = null;
     for (const tag of tags) {
-        if (tag.startsWith("vault/")) {
+        // Look for category/subcategory tags (e.g., "notes/daily", "projects/active")
+        if (tag.includes('/') && !tag.startsWith('vault/')) {
             if (!bestTag || tag.length > bestTag.length) {
                 bestTag = tag;
             }
         }
     }
     
+    // If no subcategory tag, look for category tags
     if (!bestTag) {
-        bestTag = "vault/notes/daily";
+        for (const tag of tags) {
+            if (['notes', 'projects', 'topics', 'plans'].includes(tag)) {
+                bestTag = tag;
+                break;
+            }
+        }
     }
+    
+    // Default to notes/daily if no appropriate tag found
+    if (!bestTag) {
+        bestTag = "notes/daily";
+    }
+    
+    // Add vault/ prefix to the path
+    const basePath = bestTag.startsWith('vault/') ? bestTag : `vault/${bestTag}`;
     
     // Generate filename from title or date
     const contentWithoutMeta = (draft.content || '').replace(/^---[\s\S]*?---\n*/m, '');
@@ -270,7 +301,7 @@ function generatePathFromTags(draft) {
         filename = "untitled";
     }
     
-    return `${bestTag}/${date}-${filename}.md`;
+    return `${basePath}/${date}-${filename}.md`;
 }
 
 // Fetch file from GitHub
@@ -519,7 +550,7 @@ function fetchModifiedFilesSince(sinceDate) {
                 const compareData = JSON.parse(compareResponse.responseText);
                 if (compareData.files) {
                     for (const file of compareData.files) {
-                        if ((file.filename.startsWith("notes/") || file.filename.startsWith("projects/")) && 
+                        if (file.filename.startsWith("vault/") && 
                             file.filename.endsWith(".md")) {
                             // Check if file was deleted
                             if (file.status === "removed") {

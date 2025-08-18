@@ -2,7 +2,7 @@
 
 ## Overview
 
-Create a two-way sync between Drafts app and the `notes/` directory in GitHub, allowing you to work seamlessly across platforms.
+Create a two-way sync between Drafts app and the `vault/` directory in GitHub, allowing you to work seamlessly across platforms.
 
 ## Drafts Organization Strategy
 
@@ -11,10 +11,10 @@ Create a two-way sync between Drafts app and the `notes/` directory in GitHub, a
 Since Drafts doesn't have traditional folders, we'll use tags to mirror the directory structure:
 
 ```
-notes/daily/2025-08-12-note.md     →  Tags: ["notes", "notes/daily"]
-notes/tasks/tasks.md               →  Tags: ["notes", "notes/tasks"]
-notes/concerns/2025-08-12.md       →  Tags: ["notes", "notes/concerns"]
-notes/reviews/2025-08-12.md        →  Tags: ["notes", "notes/reviews"]
+vault/notes/daily/2025-08-12-note.md     →  Tags: ["notes", "notes/daily"]
+vault/notes/tasks/tasks.md               →  Tags: ["notes", "notes/tasks"]
+vault/notes/concerns/2025-08-12.md       →  Tags: ["notes", "notes/concerns"]
+vault/notes/reviews/2025-08-12.md        →  Tags: ["notes", "notes/reviews"]
 ```
 
 ### Draft Metadata Storage
@@ -23,7 +23,7 @@ Each draft will store GitHub metadata in its content using a YAML-like header:
 
 ```markdown
 ---
-github_path: notes/daily/2025-08-12-note.md
+github_path: vault/notes/daily/2025-08-12-note.md
 github_sha: abc123def456
 last_sync: 2025-08-12T14:30:00Z
 sync_status: synced
@@ -41,7 +41,7 @@ The actual content starts here...
 
 ```javascript
 // Core Logic:
-1. Fetch all files from notes/ directory via GitHub API
+1. Fetch all files from vault/ directory via GitHub API
 2. For each file:
    - Check if draft exists (by searching for github_path in content)
    - If exists: Update if GitHub version is newer
@@ -58,7 +58,7 @@ The actual content starts here...
 1. Query all drafts with tag "notes"
 2. For each draft:
    - Extract github_path from metadata
-   - If no path: Determine path from tags (notes/tasks → notes/tasks/untitled.md)
+   - If no path: Determine path from tags (notes/tasks → vault/notes/tasks/untitled.md)
    - Check GitHub for existing file
    - Upload/update if draft is newer
 3. Handle special files (tasks.md, streaks-today.md) with append logic
@@ -111,7 +111,7 @@ The actual content starts here...
 
 ### Inbox Processing
 
-- Drafts tagged "inbox" upload to notes/inbox/
+- Drafts tagged "inbox" upload to vault/notes/inbox/
 - After GitHub processes (via bin/sync), update draft tags to reflect new location
 
 ## Drafts Actions Required

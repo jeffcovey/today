@@ -15,8 +15,8 @@
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
     "lint:md": "markdownlint-cli2 '**/*.md' '!node_modules/**'",
     "lint:md:fix": "markdownlint-cli2 --fix '**/*.md' '!node_modules/**'",
-    "lint:notes": "markdownlint-cli2 'notes/**/*.md'",
-    "lint:notes:fix": "markdownlint-cli2 --fix 'notes/**/*.md'",
+    "lint:vault": "markdownlint-cli2 'vault/**/*.md'",
+    "lint:vault:fix": "markdownlint-cli2 --fix 'vault/**/*.md'",
     "lint": "npm run lint:md"
   },
   "dependencies": {

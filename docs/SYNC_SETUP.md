@@ -88,9 +88,9 @@ Create a LaunchAgent for automatic syncing on macOS.
 The built-in task manager syncs between SQLite and Markdown files:
 
 ### File Structure
-- `notes/tasks/tasks.md` - Main task list
-- `notes/tasks/today.md` - Auto-generated daily tasks
-- `projects/*.md` - Project-specific tasks
+- `vault/notes/tasks/tasks.md` - Main task list
+- `vault/notes/tasks/today.md` - Auto-generated daily tasks
+- `vault/projects/*.md` - Project-specific tasks
 
 ### Task Format
 Tasks in Markdown include unique IDs:

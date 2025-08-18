@@ -75,18 +75,18 @@ bin/tasks projects
 
 The task sync is automatically run when you execute `bin/sync`. It will:
 
-1. Sync all markdown files in `notes/tasks/` and `projects/`
+1. Sync all markdown files in `vault/notes/tasks/` and `vault/projects/`
 2. Add IDs to new tasks
 3. Update task states based on checkboxes
-4. Generate `notes/tasks/today.md` with tasks due today
+4. Generate `vault/notes/tasks/today.md` with tasks due today
 5. Process repeating tasks
 
 ## Files Synced
 
-- `notes/tasks/tasks.md` - General task list
-- `notes/tasks/today.md` - Auto-generated daily tasks
-- `notes/tasks/streaks-today.md` - Streak tracking
-- `projects/*.md` - Project-specific tasks
+- `vault/notes/tasks/tasks.md` - General task list
+- `vault/notes/tasks/today.md` - Auto-generated daily tasks
+- `vault/notes/tasks/streaks-today.md` - Streak tracking
+- `vault/projects/*.md` - Project-specific tasks
 
 ## Notion Integration
 

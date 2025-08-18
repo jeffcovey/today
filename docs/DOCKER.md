@@ -112,7 +112,7 @@ The docker-compose.yml mounts:
 ### Data Persistence
 
 These directories persist between container runs:
-- `notes/` - Your notes and reviews
+- `vault/` - Your notes, projects, topics, and plans
 - `.data/` - SQLite database
 - `.sync-config.json` - Sync configuration
 - `.data/today.db` - SQLite database with all synchronized data
