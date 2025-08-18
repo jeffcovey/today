@@ -1,4 +1,5 @@
-## General Tasks
+<details>
+<summary><strong>General Tasks</strong> (1319 tasks)</summary>
 
 ### Monday, Aug 11 (7 days ago)
 
@@ -1340,7 +1341,10 @@
 - [ ] write attendees when an Event changes <!-- task-id: 256866f071af6f610dc662f474196024 -->
 - [ ] “Add to my calendar”? <!-- task-id: 79007b6ff6094b4e3145c814c0e31e52 -->
 
-## Financial Improvement Project 2025
+</details>
+
+<details>
+<summary><strong>Financial Improvement Project 2025</strong> (77 tasks)</summary>
 
 ### No Date Set
 
@@ -1422,7 +1426,10 @@
 - [ ] Update income projections <!-- task-id: 92bf3129792a08f38a2f53ffa9e3c6ac -->
 - [ ] Weekly expense summary email <!-- task-id: 54ed2820920872f79b98f85792f71a24 -->
 
-## Notion to Today Migration Project
+</details>
+
+<details>
+<summary><strong>Notion to Today Migration Project</strong> (26 tasks)</summary>
 
 ### No Date Set
 
@@ -1453,7 +1460,10 @@
 - [ ] Test migration with small dataset first <!-- task-id: 0712d4597f7b9b44b7b0dd785a55d49c -->
 - [ ] Verify data integrity after migration <!-- task-id: 56312a1927113a48a3b8177c9a2345c7 -->
 
-## OGM Social Media Monitoring Project
+</details>
+
+<details>
+<summary><strong>OGM Social Media Monitoring Project</strong> (25 tasks)</summary>
 
 ### No Date Set
 
@@ -1483,7 +1493,10 @@
 - [ ] Write guidelines for monitoring <!-- task-id: pending --> <!-- task-id: 6a32530c37f2403b8a4c25fc6321208f -->
 - [ ] Write job description for VA <!-- task-id: pending --> <!-- task-id: a2423237b865b92676b0e79697f0ca63 -->
 
-## Palm Springs Trip
+</details>
+
+<details>
+<summary><strong>Palm Springs Trip</strong> (11 tasks)</summary>
 
 ### No Date Set
 
@@ -1499,9 +1512,14 @@
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
 
-## Treat Arthritis
+</details>
+
+<details>
+<summary><strong>Treat Arthritis</strong> (2 tasks)</summary>
 
 ### No Date Set
 
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
 - [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
+
+</details>
