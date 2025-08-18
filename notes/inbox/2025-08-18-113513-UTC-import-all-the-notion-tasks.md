@@ -1,0 +1,2 @@
+- [ ] Import all the Notion tasks
+- [ ] Implement the newsletter re-engagement plan
