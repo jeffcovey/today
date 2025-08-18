@@ -1,0 +1,1 @@
+- [ ] add zazen to calendar @today
