@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1335 tasks)</summary>
+<summary><strong>General Tasks</strong> (1346 tasks)</summary>
 
 ### Monday, Aug 11 (7 days ago)
 
@@ -37,22 +37,35 @@
 ### Invalid Date, Invalid Date
 
 - [ ] **Get cash from IRA** (🔥 Immediate) <!-- task-id: ira-cash --> <!-- task-id: 638ac690bdad045c93829b65b1c87f6d -->
+- [ ] **Get cash from IRA** - Still marked as immediate priority <!-- task-id: 7d1fc78623987006db6f5ff9ab0d97c5 -->
 - [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: public-activity --> <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
 - [ ] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: spammers --> <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: apple-fitness --> <!-- task-id: c89cadc6fd1012029606e935ec5d8061 -->
+- [ ] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
 - [ ] Do Tai Chi Standing (4m) <!-- task-id: tai-chi --> <!-- task-id: cd9fcd24c4303ac898d07a1df315419c -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: events-sort --> <!-- task-id: 3d73a44130c5c20465addb1755c83638 -->
 - [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: staging-tests --> <!-- task-id: b1854ccaa83729d1c14284598336911f -->
 - [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: user-quotas --> <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
+- [ ] Read Saved Articles (2m 30s) - Quick win! <!-- task-id: 90b703fc6714598ebe55089fc9c38c1d -->
 - [ ] Read Saved Articles (2m 30s) <!-- task-id: read-articles --> <!-- task-id: f376f1439a33ea98c4f3828bb7f62c61 -->
 - [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: honeybadger --> <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
+- [ ] Review the Honeybadger R12 error (memory quota exceeded) <!-- task-id: 4cf0df8852df22d97d03909a057543db -->
 - [ ] Use The Inversion Table (for hip arthritis) <!-- task-id: inversion --> <!-- task-id: 72c95778f7fd06331f00077c4bcc67d4 -->
+- [ ] Use The Inversion Table - For hip relief <!-- task-id: 5142e99a6d59508ac53640c0d748e308 -->
+- [ ] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
 - [ ] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
+- [ ] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
 - [ ] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: 030fed7a699d7dc55fe6758df0b77f07 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: activity-rings --> <!-- task-id: d051837d4106813ab7c34cface0b708d -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: 099fcabf4bc884e9298b98e0b1e931d4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: burn-energy --> <!-- task-id: 37a055048915523fabbcb7e53f7e3e91 -->
+- [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: e4ea67a1eff2105c19d2efbb67ae7093 -->
 - [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
+- [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
 - [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
 
 ### No Date Set
@@ -89,8 +102,6 @@
 - [ ] check that our Patreon web hook has up-to-date secrets always <!-- task-id: 17f1886619cd6fc68f9290e971e8924b -->
 - [ ] do eager loading for chats <!-- task-id: 4960720119a4cd2d12daeca7fcfb198c -->
 - [ ] move uncategorized conversations into a category with security settings <!-- task-id: 726e583e1496f4426cb79959f7ee4a94 -->
-- [ ] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
-- [ ] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Home/Household] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] Link Github and Notion <!-- task-id: 7de274ec06176ffca743af691b9e9193 -->

@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 6:58:16 PM EDT*
+*Generated: 8/18/2025, 7:13:47 PM EDT*
 
 ## 🔥 Immediate
 
@@ -39,6 +39,8 @@
 <details>
 <summary><strong>✅ Done Today</strong> (216 tasks completed)</summary>
 
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
@@ -105,8 +107,6 @@
 - [x] 30-minute exercise (if not already met today) <!-- task-id: 8d66a7f3248729aa8b9cba459d05f07e -->
 - [x] Tai Chi (Apple Watch) - 1 minute <!-- task-id: 10a7681a813079f682442c3e4d1d13a4 -->
 - [x] Tai Chi Standing - 4 minutes <!-- task-id: e8f47d351c69e7c9d5939cf884191494 -->
-- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
-- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Completed task <!-- task-id: another-unique-id --> <!-- task-id: 445ecf91f0e673a82c60ae0e0cdf0642 -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b4dfa336415d201c0cd51464ac1969ee -->
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6797d60cf6488d14bba9ffc9999850fe -->
