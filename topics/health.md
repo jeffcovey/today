@@ -11,10 +11,6 @@ Tasks and projects related to Health.
 <!-- Tasks for this topic will be automatically populated by bin/tasks sync -->
 <!-- Do not edit below this line - tasks are managed by the sync system -->
 
-### Sun, Aug 17
-
-- [ ] Schedule annual physical <!-- task-id: acd535d3085ff563e06edef68908d5e6 -->
-
 ### No Date Set
 
 - [ ] Review health insurance options <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->

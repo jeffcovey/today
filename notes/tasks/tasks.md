@@ -14,7 +14,6 @@
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
-- [ ] Schedule annual physical [Health] <!-- task-id: acd535d3085ff563e06edef68908d5e6 -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 
 ### Today - Monday, Aug 18
@@ -32,6 +31,27 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: fridge-water --> <!-- task-id: 05480d71693b15f02ca7261b015e80e1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
+
+### Invalid Date, Invalid Date
+
+- [ ] **Get cash from IRA** (🔥 Immediate) <!-- task-id: ira-cash --> <!-- task-id: 638ac690bdad045c93829b65b1c87f6d -->
+- [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: public-activity --> <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
+- [ ] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: spammers --> <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: apple-fitness --> <!-- task-id: c89cadc6fd1012029606e935ec5d8061 -->
+- [ ] Do Tai Chi Standing (4m) <!-- task-id: tai-chi --> <!-- task-id: cd9fcd24c4303ac898d07a1df315419c -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: events-sort --> <!-- task-id: 3d73a44130c5c20465addb1755c83638 -->
+- [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: staging-tests --> <!-- task-id: b1854ccaa83729d1c14284598336911f -->
+- [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: user-quotas --> <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
+- [ ] Read Saved Articles (2m 30s) <!-- task-id: read-articles --> <!-- task-id: f376f1439a33ea98c4f3828bb7f62c61 -->
+- [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: honeybadger --> <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
+- [ ] Use The Inversion Table (for hip arthritis) <!-- task-id: inversion --> <!-- task-id: 72c95778f7fd06331f00077c4bcc67d4 -->
+- [ ] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
+- [ ] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: activity-rings --> <!-- task-id: d051837d4106813ab7c34cface0b708d -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: burn-energy --> <!-- task-id: 37a055048915523fabbcb7e53f7e3e91 -->
+- [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
+- [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
 
 ### No Date Set
 
@@ -1493,11 +1513,3 @@
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
 - [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
-- [ ] see why notes are stuck in the inbox @today <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
-- [ ] add zazen to calendar @today <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
-- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
-
-# Archive
-
-## 2025-08-18
-- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
