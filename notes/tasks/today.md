@@ -1,19 +1,25 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 9:51:01 AM EDT*
+*Generated: 8/18/2025, 9:55:34 AM EDT*
+
+## 🔴 Critical
+
+- [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
+- [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
+
+## 🟠 High
+
+- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 
 ## 🟡 Medium
 
 - [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
-- [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
+- [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
-- [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-- [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 - [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 
