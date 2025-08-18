@@ -28,9 +28,9 @@ else
         git config user.email "scheduler@fly.io"
         git config user.name "Today Scheduler"
         
-        # Verify notes exist
-        if [[ ! -d "$GIT_DIR/notes" ]] || [[ $(find "$GIT_DIR/notes" -type f -name "*.md" | wc -l) -lt 10 ]]; then
-            echo "⚠️  WARNING: Notes directory missing or has too few files!"
+        # Verify vault exists
+        if [[ ! -d "$GIT_DIR/vault" ]] || [[ $(find "$GIT_DIR/vault" -type f -name "*.md" | wc -l) -lt 10 ]]; then
+            echo "⚠️  WARNING: Vault directory missing or has too few files!"
             echo "⚠️  Disabling sync to prevent data loss"
             touch /app/SYNC_DISABLED
         fi
@@ -41,22 +41,19 @@ else
         cd "$GIT_DIR"
         git pull origin main || echo "⚠️  Pull failed, continuing anyway"
         
-        # Verify notes still exist after pull
-        if [[ ! -d "$GIT_DIR/notes" ]] || [[ $(find "$GIT_DIR/notes" -type f -name "*.md" | wc -l) -lt 10 ]]; then
-            echo "⚠️  WARNING: Notes directory missing or has too few files after pull!"
+        # Verify vault still exists after pull
+        if [[ ! -d "$GIT_DIR/vault" ]] || [[ $(find "$GIT_DIR/vault" -type f -name "*.md" | wc -l) -lt 10 ]]; then
+            echo "⚠️  WARNING: Vault directory missing or has too few files after pull!"
             echo "⚠️  Disabling sync to prevent data loss"
             touch /app/SYNC_DISABLED
         fi
     fi
     
-    # Remove existing directories if they exist
-    rm -rf /app/notes /app/plans /app/projects /app/topics
+    # Remove existing directory if it exists
+    rm -rf /app/vault
     
-    # Symlink content directories to /app
-    ln -sfn "$GIT_DIR/notes" /app/notes
-    ln -sfn "$GIT_DIR/plans" /app/plans
-    ln -sfn "$GIT_DIR/projects" /app/projects
-    ln -sfn "$GIT_DIR/topics" /app/topics
+    # Symlink vault directory to /app
+    ln -sfn "$GIT_DIR/vault" /app/vault
     ln -sfn "$GIT_DIR/.git" /app/.git
     
     # Change to app directory for scripts
@@ -64,10 +61,11 @@ else
     
     # Show file counts
     echo "📊 Content summary:"
-    echo "  Notes: $(find notes -type f -name "*.md" 2>/dev/null | wc -l)"
-    echo "  Plans: $(find plans -type f -name "*.md" 2>/dev/null | wc -l)"
-    echo "  Projects: $(find projects -type f -name "*.md" 2>/dev/null | wc -l)"
-    echo "  Topics: $(find topics -type f -name "*.md" 2>/dev/null | wc -l)"
+    echo "  Vault files: $(find vault -type f -name "*.md" 2>/dev/null | wc -l)"
+    if [[ -d vault/notes ]]; then echo "    Notes: $(find vault/notes -type f -name "*.md" 2>/dev/null | wc -l)"; fi
+    if [[ -d vault/plans ]]; then echo "    Plans: $(find vault/plans -type f -name "*.md" 2>/dev/null | wc -l)"; fi
+    if [[ -d vault/projects ]]; then echo "    Projects: $(find vault/projects -type f -name "*.md" 2>/dev/null | wc -l)"; fi
+    if [[ -d vault/topics ]]; then echo "    Topics: $(find vault/topics -type f -name "*.md" 2>/dev/null | wc -l)"; fi
 fi
 
 echo "✅ Startup complete, starting scheduler..."

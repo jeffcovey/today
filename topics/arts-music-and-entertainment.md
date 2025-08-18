@@ -1,4 +1,4 @@
-# Arts, music, and entertainment
+# Arts, music, and entertainment 
 
 ## Overview
 

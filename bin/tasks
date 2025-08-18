@@ -177,7 +177,7 @@ program
           
           for (const filePath of allMarkdownFiles) {
             // Skip auto-generated files - they have their own checkbox sync logic
-            if (filePath === 'notes/tasks/today.md' || filePath === 'notes/tasks/tasks.md') {
+            if (filePath === 'vault/notes/tasks/today.md' || filePath === 'vault/notes/tasks/tasks.md') {
               continue;
             }
             if (fs.existsSync(filePath)) {
@@ -217,7 +217,7 @@ program
 
       // First, sync checkbox states from today.md and tasks.md BEFORE regenerating
       // This captures any manual edits users made
-      for (const taskFile of ['notes/tasks/today.md', 'notes/tasks/tasks.md']) {
+      for (const taskFile of ['vault/notes/tasks/today.md', 'vault/notes/tasks/tasks.md']) {
         if (fs.existsSync(taskFile)) {
           const updates = await tm.syncMarkdownFile(taskFile);
           if (updates > 0) {

@@ -199,7 +199,7 @@ function pathToTags(path) {
     const tags = ["today-sync"];
     
     // Add hierarchical tags for the path
-    if (path.startsWith("notes/") || path.startsWith("projects/")) {
+    if (path.startsWith("vault/")) {
         tags.push("notes"); // Always add base 'notes' tag
         
         const parts = path.split('/');
@@ -243,7 +243,7 @@ function generatePathFromTags(draft) {
     // Find the most specific tag that looks like a path
     let bestTag = null;
     for (const tag of tags) {
-        if (tag.startsWith("notes/") || tag.startsWith("projects/")) {
+        if (tag.startsWith("vault/")) {
             if (!bestTag || tag.length > bestTag.length) {
                 bestTag = tag;
             }
@@ -251,7 +251,7 @@ function generatePathFromTags(draft) {
     }
     
     if (!bestTag) {
-        bestTag = "notes/daily";
+        bestTag = "vault/notes/daily";
     }
     
     // Generate filename from title or date
@@ -623,10 +623,10 @@ function pullFromGitHub(incrementalSync = true) {
     
     const tree = JSON.parse(treeResponse.responseText);
     
-    // Filter for notes and projects markdown files
+    // Filter for vault markdown files
     let noteFiles = tree.tree.filter(item => 
         item.type === "blob" && 
-        (item.path.startsWith("notes/") || item.path.startsWith("projects/")) && 
+        item.path.startsWith("vault/") && 
         item.path.endsWith(".md") &&
         !item.path.includes("/inbox/") // Skip inbox files
     );
@@ -1102,7 +1102,7 @@ function quickSync(forceFullSync = false) {
     const githubSHAs = {};
     tree.tree.filter(item => 
         item.type === "blob" && 
-        (item.path.startsWith("notes/") || item.path.startsWith("projects/")) && 
+        item.path.startsWith("vault/") && 
         item.path.endsWith(".md")
     ).forEach(item => {
         githubSHAs[item.path] = item.sha;

@@ -629,7 +629,7 @@ export class TaskManager {
 
     // Check if this is a review file and extract the date
     let reviewDate = null;
-    if (filePath.startsWith('plans/')) {
+    if (filePath.startsWith('vault/plans/')) {
       const dateMatch = filePath.match(/(\d{4}-Q\d+-\d{2}-\d{2})\.md$/);  
       if (dateMatch) {
         reviewDate = dateMatch[1];
@@ -638,7 +638,7 @@ export class TaskManager {
     
     // Check if this is a topic file and extract the topic
     let topicName = null;
-    if (filePath.startsWith('topics/')) {
+    if (filePath.startsWith('vault/topics/')) {
       // Read the first line to get the topic name
       const firstLine = lines.find(line => line.startsWith('# '));
       if (firstLine) {
@@ -648,7 +648,7 @@ export class TaskManager {
 
     // Sync project file first if it's a project
     let projectId = null;
-    if (filePath.startsWith('projects/')) {
+    if (filePath.startsWith('vault/projects/')) {
       const projectResult = await this.syncProjectFile(filePath);
       projectId = projectResult.projectId;
       if (projectResult.updates) {
@@ -775,7 +775,7 @@ export class TaskManager {
 
   // Generate all active tasks file
   // Note: Checkbox syncing is handled separately, not during generation
-  async generateAllTasksFile(outputPath = 'notes/tasks/tasks.md') {
+  async generateAllTasksFile(outputPath = 'vault/notes/tasks/tasks.md') {
 
     // Get all active tasks (not Done) with project information
     const tasks = this.db.prepare(`
@@ -932,7 +932,7 @@ export class TaskManager {
 
   // Generate today's task file
   // Note: Checkbox syncing is handled separately, not during generation
-  async generateTodayFile(outputPath = 'notes/tasks/today.md') {
+  async generateTodayFile(outputPath = 'vault/notes/tasks/today.md') {
     // Check if file was recently modified (within last 5 seconds)
     // This prevents overwriting manual edits that just happened
     try {

@@ -23,7 +23,7 @@ COPY .env* ./
 RUN chmod +x ./bin/* ./src/scheduler.js
 
 # Create data directory and symlink cache directories to it
-RUN mkdir -p /app/data /app/config /app/notes /app/plans /app/projects /app/topics && \
+RUN mkdir -p /app/data /app/config /app/vault && \
     ln -s /app/data /app/.data && \
     ln -s /app/data /app/.notion-cache && \
     ln -s /app/data /app/.calendar-cache
