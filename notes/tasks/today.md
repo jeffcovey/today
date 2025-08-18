@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 9:59:32 AM EDT*
+*Generated: 8/18/2025, 10:07:28 AM EDT*
 
 ## 🔥 Immediate
 
@@ -32,7 +32,8 @@
 
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 
-## ✅ Done
+<details>
+<summary><strong>✅ Done Today</strong> (211 tasks completed)</summary>
 
 - [x] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 - [x] Start reading "Tight Hip, Twisted Core" book (30 min minimum) <!-- task-id: 16824d0ec12cf46cbd75cac570af07d6 -->
@@ -245,3 +246,5 @@
 - [x] Review and improve test coverage <!-- task-id: f9d875899ccb10f462d14051608ed7e1 -->
 - [x] Add instructions for the robot vacuum to the housesitters guide [Travel, Home/Household] <!-- task-id: 34f23018302dbf50d3cfba518b9f384f -->
 - [x] Add TripIt calendar to Echos [Travel] <!-- task-id: 3c8e2a531b5446e859243867c8d5e29c -->
+
+</details>
