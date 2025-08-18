@@ -1,1 +1,0 @@
-- My Duolingo time is entirely about chess now, and I'm neglecting my Duolingo language studies
