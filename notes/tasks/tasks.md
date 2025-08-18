@@ -23,6 +23,9 @@
 
 ### Invalid Date, Invalid Date
 
+- [ ] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
+- [ ] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
+- [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: newsletter-check --> <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: fridge-water --> <!-- task-id: 05480d71693b15f02ca7261b015e80e1 -->
 - [ ] Clean Private Suite after Logan leaves <!-- task-id: pending-17-3 --> <!-- task-id: 92b053f4372f914b4aa775df749b0b32 -->

@@ -14,18 +14,21 @@ Tasks related to content creation, curation, and management for the OlderGay.Men
 ## Areas of Focus
 
 ### Stories & Articles
+
 - Member-submitted stories
 - Educational articles
 - Community resources
 - Personal experiences
 
 ### Media Content
+
 - Photo galleries
 - AI-generated images
 - Video content planning
 - Podcast considerations
 
 ### Content Strategy
+
 - Newsletter content
 - Featured content rotation
 - Content moderation

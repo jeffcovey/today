@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/17/2025, 8:10:10 PM EDT*
+*Generated: 8/17/2025, 8:14:01 PM EDT*
 
 ## 🟠 High
 
@@ -216,8 +216,5 @@
 - [x] Create test data generators <!-- task-id: ddb81f7995ac04ccb58b4db0ee3ffdd6 -->
 - [x] Set up test database seeding <!-- task-id: 80b65cd38d3823df2dba561c6f0a99dd -->
 - [x] Review and improve test coverage <!-- task-id: f9d875899ccb10f462d14051608ed7e1 -->
-- [x] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
-- [x] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
-- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [x] Add instructions for the robot vacuum to the housesitters guide [Travel, Home/Household] <!-- task-id: 34f23018302dbf50d3cfba518b9f384f -->
 - [x] Add TripIt calendar to Echos [Travel] <!-- task-id: 3c8e2a531b5446e859243867c8d5e29c -->
