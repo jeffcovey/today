@@ -28,7 +28,6 @@
 
 ### Invalid Date, Invalid Date
 
-- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: newsletter-check --> <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: fridge-water --> <!-- task-id: 05480d71693b15f02ca7261b015e80e1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
@@ -1497,3 +1496,8 @@
 - [ ] see why notes are stuck in the inbox @today <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] add zazen to calendar @today <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
+
+# Archive
+
+## 2025-08-18
+- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
