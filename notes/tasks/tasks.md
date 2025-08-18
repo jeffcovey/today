@@ -1528,7 +1528,3 @@
 - [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 
 </details>
-- [ ] add Toggl to Today @today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
-- [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
-- [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
-- [ ] Create a Pool project  <!-- task-id: 76db1c791814f599494775eacee9f96a -->
