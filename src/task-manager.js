@@ -189,11 +189,9 @@ export class TaskManager {
       // Set completed_at when marking as done and record in history
       if (data.status === '✅ Done') {
         fields.push('completed_at = CURRENT_TIMESTAMP');
-        // Record completion in history for repeating tasks
-        const task = this.getTask(id);
-        if (task && task.repeat_interval) {
-          this.db.prepare('INSERT INTO task_completions (task_id) VALUES (?)').run(id);
-        }
+        // Record completion in history for ALL tasks (not just repeating)
+        // This ensures we have accurate completion tracking for the Done Today section
+        this.db.prepare('INSERT INTO task_completions (task_id) VALUES (?)').run(id);
       } else if (data.status !== '✅ Done') {
         fields.push('completed_at = NULL');
       }
@@ -845,7 +843,8 @@ export class TaskManager {
     
     // Add tasks without projects first
     if (noProjectTasks.length > 0) {
-      lines.push('## General Tasks');
+      lines.push('<details>');
+      lines.push(`<summary><strong>General Tasks</strong> (${noProjectTasks.length} tasks)</summary>`);
       lines.push('');
       
       const { tasksByDate, noDateTasks } = groupTasksByDate(noProjectTasks);
@@ -876,15 +875,20 @@ export class TaskManager {
         }
         lines.push('');
       }
+      
+      lines.push('</details>');
+      lines.push('');
     }
     
     // Add tasks grouped by project
     const projectNames = Object.keys(tasksByProject).sort();
     for (const projectName of projectNames) {
-      lines.push(`## ${projectName}`);
+      const projectTasks = tasksByProject[projectName];
+      lines.push('<details>');
+      lines.push(`<summary><strong>${projectName}</strong> (${projectTasks.length} tasks)</summary>`);
       lines.push('');
       
-      const { tasksByDate, noDateTasks } = groupTasksByDate(tasksByProject[projectName]);
+      const { tasksByDate, noDateTasks } = groupTasksByDate(projectTasks);
       
       // Sort dates and add tasks for each date
       const sortedDates = Object.keys(tasksByDate).sort();
@@ -912,6 +916,9 @@ export class TaskManager {
         }
         lines.push('');
       }
+      
+      lines.push('</details>');
+      lines.push('');
     }
     
     // Remove trailing empty lines
@@ -954,12 +961,14 @@ export class TaskManager {
       topics: this.getTaskTopics(task.id)
     }));
     
-    // Get tasks completed TODAY (regardless of their do_date)
+    // Get tasks ACTUALLY completed today using task_completions table
+    // This avoids showing tasks with bulk-updated completed_at timestamps
     const completedTasks = this.db.prepare(`
-      SELECT * FROM tasks 
-      WHERE status = '✅ Done'
-        AND date(completed_at) = date(?)
-      ORDER BY completed_at DESC
+      SELECT DISTINCT t.* 
+      FROM tasks t
+      INNER JOIN task_completions tc ON t.id = tc.task_id
+      WHERE DATE(tc.completed_at) = DATE(?)
+      ORDER BY tc.completed_at DESC
     `).all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
@@ -984,20 +993,53 @@ export class TaskManager {
     
     const lines = ['# Today\'s Tasks', '', `*Generated: ${easternTime} ${timeZone}*`, ''];
 
-    // Group active tasks by priority
-    const priorities = {
-      5: '🔴 Critical',
-      4: '🟠 High',
-      3: '🟡 Medium',
-      2: '🔵 Low',
-      1: '⚪ Very Low'
-    };
+    // Group active tasks by their actual status
+    const statusOrder = [
+      '🔥 Immediate',
+      '🔥 Today',
+      '🚀 1st Priority',
+      '2nd Priority',
+      '3rd Priority',
+      '4th Priority', 
+      '5th Priority',
+      '🎯 Doing',
+      '➡️ Next',
+      '📅 This Week',
+      '📦 Later',
+      '🎭 Stage',
+      '⚡ Quick',
+      '💭 Remember',
+      '🗂️ To File',
+      '♻️ Repeating'
+    ];
 
-    for (const [level, label] of Object.entries(priorities).reverse()) {
-      const priorityTasks = activeTasks.filter(t => this.getPriorityFromStatus(t.status) == level);
-      if (priorityTasks.length > 0) {
-        lines.push(`## ${label}`, '');
-        for (const task of priorityTasks) {
+    // Group tasks by status
+    const tasksByStatus = {};
+    for (const task of activeTasks) {
+      const status = task.status || '🎭 Stage';
+      if (!tasksByStatus[status]) {
+        tasksByStatus[status] = [];
+      }
+      tasksByStatus[status].push(task);
+    }
+
+    // Output tasks in status order
+    for (const status of statusOrder) {
+      if (tasksByStatus[status] && tasksByStatus[status].length > 0) {
+        lines.push(`## ${status}`, '');
+        for (const task of tasksByStatus[status]) {
+          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
+    }
+
+    // Add any tasks with statuses not in our order
+    for (const [status, tasks] of Object.entries(tasksByStatus)) {
+      if (!statusOrder.includes(status)) {
+        lines.push(`## ${status}`, '');
+        for (const task of tasks) {
           const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
           lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
         }
@@ -1005,13 +1047,17 @@ export class TaskManager {
       }
     }
     
-    // Add completed tasks in a Done section
+    // Add completed tasks in a collapsible Done section
     if (completedTasks.length > 0) {
-      lines.push('## ✅ Done', '');
+      lines.push('<details>');
+      lines.push(`<summary><strong>✅ Done Today</strong> (${completedTasks.length} tasks completed)</summary>`);
+      lines.push('');
       for (const task of completedTasks) {
         const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
         lines.push(`- [x] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
       }
+      lines.push('');
+      lines.push('</details>');
       lines.push('');
     }
 
