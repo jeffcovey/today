@@ -5,16 +5,18 @@
 ## 🔴 Priority Focus Areas
 
 ### Arthritis Treatment & Management
+
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
-- [ ] Start reading "Tight Hip, Twisted Core" book (30 min minimum)
-- [ ] Begin hip-focused stretching routine (morning)
-- [ ] Track pain levels and mobility
+- [ ] Start reading "Tight Hip, Twisted Core" book (30 min minimum) <!-- task-id: 16824d0ec12cf46cbd75cac570af07d6 -->
+- [ ] Begin hip-focused stretching routine (morning) <!-- task-id: bd35d7281d99f0a10e1c10ee146f8b40 -->
+- [ ] Track pain levels and mobility <!-- task-id: f0f5dddd798688a3c1a1ce54097c77ae -->
 
 ### Weekly Planning
-- [ ] Review Week 34 plan (Aug 18-24)
-- [ ] Update daily priorities based on week plan
-- [ ] Process inbox notes
-- [ ] Maintain project tracking
+
+- [ ] Review Week 34 plan (Aug 18-24) <!-- task-id: b5a8ee0e70cc86d6854a82c08fb6eb85 -->
+- [ ] Update daily priorities based on week plan <!-- task-id: c80caefac068a210c86c7c95be06b012 -->
+- [ ] Process inbox notes <!-- task-id: 471bbac7023b561976c3a2ec8f6962c8 -->
+- [ ] Maintain project tracking <!-- task-id: b0ab25bb2a30e701502f13098fa95ec6 -->
 
 ## 🟠 High
 

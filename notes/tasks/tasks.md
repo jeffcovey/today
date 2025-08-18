@@ -20,6 +20,7 @@
 ### Today - Monday, Aug 18
 
 - [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+- [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 
 ### Monday, Dec 1
 
@@ -27,6 +28,7 @@
 
 ### Invalid Date, Invalid Date
 
+- [x] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: newsletter-check --> <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: fridge-water --> <!-- task-id: 05480d71693b15f02ca7261b015e80e1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
@@ -114,11 +116,15 @@
 - [ ] Add pre-commit linting to both repositories (see Instapaper) <!-- task-id: 57008be86f11fd6debdfc95800042282 -->
 - [ ] Adjust plans based on progress <!-- task-id: 8e7d8f9dbbd20177dbe8dbcd27b6c3a7 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
+- [ ] Begin hip-focused stretching routine (morning) <!-- task-id: bd35d7281d99f0a10e1c10ee146f8b40 -->
 - [ ] Code cleanup from previous fixes <!-- task-id: 84ce8e8e17a0f5b3f07bc1380dc3703c -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete design review <!-- task-id: 5f475b1b72e3dbe7cf5ee75689bfa751 -->
 - [ ] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
+- [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
+- [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
+- [ ] Daily review and update of plans <!-- task-id: 1fbfc8acd7f100eeed0386b58251c8fe -->
 - [ ] Document new deployment process <!-- task-id: 390d6ab654179e071e712722588b176a -->
 - [ ] Documentation updates <!-- task-id: fd05496f2c1a8cd43e904f707947d326 -->
 - [ ] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
@@ -131,21 +137,38 @@
 - [ ] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
 - [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
+- [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
+- [ ] Maintain consistent sleep schedule <!-- task-id: 54a4cbad4cdc5124c3b4b1d675a67f09 -->
 - [ ] Maintain daily habits and streaks <!-- task-id: 896d841cab6070a727edb061cbc3a5de -->
 - [ ] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
 - [ ] Maintain financial stability in retirement <!-- task-id: 54a7f949710fa8de52d787c273729703 -->
+- [ ] Maintain project tracking <!-- task-id: b0ab25bb2a30e701502f13098fa95ec6 -->
+- [ ] Maintain project tracking for key initiatives <!-- task-id: 7a150b6927b8cbb32a71c915c21b941e -->
+- [ ] Morning stretching routine focusing on hip mobility <!-- task-id: fa8889de16341a9f55d9db4b18ae89c8 -->
 - [ ] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
+- [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
+- [ ] Process inbox notes <!-- task-id: 471bbac7023b561976c3a2ec8f6962c8 -->
 - [ ] Read site feedback <!-- task-id: 9d03f25f1c4759e8cb6b8f0cf7dadc19 -->
 - [ ] Remove "No trips found" messages (#4594) <!-- task-id: dc7547edb6e939563f8c121b3c83ec35 -->
 - [ ] Remove `.data/` directory from deployments with Turso <!-- task-id: bb26febc91d47cc145d40978357412c0 -->
+- [ ] Review Week 34 plan (Aug 18-24) <!-- task-id: b5a8ee0e70cc86d6854a82c08fb6eb85 -->
+- [ ] Review and address any critical system issues <!-- task-id: 085dcaee3a75e54dc845667a2a7ec853 -->
+- [ ] Review and organize inbox notes daily <!-- task-id: 951cabe9552a60e5a2944aad79e8570b -->
+- [ ] Review financial transactions and budgets <!-- task-id: 25dcb212f4952a6b7628dd726ab21b44 -->
 - [ ] Review health insurance options [Health] <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
+- [ ] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
+- [ ] Start reading "Tight Hip, Twisted Core" book (30 min minimum) <!-- task-id: 16824d0ec12cf46cbd75cac570af07d6 -->
+- [ ] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
+- [ ] Track pain levels and mobility <!-- task-id: f0f5dddd798688a3c1a1ce54097c77ae -->
+- [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
+- [ ] Update daily priorities based on week plan <!-- task-id: c80caefac068a210c86c7c95be06b012 -->
 - [ ] User validation errors (#4625, #4626, #4629) <!-- task-id: 7cfaaa6e5b5a8ab5472812df51700dd9 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
-- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
+- [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
@@ -1463,3 +1486,14 @@
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Try 3 new restaurants <!-- task-id: 3b71663d17d838c9e75b630cd2eaa9fb -->
 - [ ] Visit Desert Art Museum <!-- task-id: e4c2a3848c390a70d77c30fb8c75e1f3 -->
+
+## Treat Arthritis
+
+### No Date Set
+
+- [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
+- [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
+- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
+- [ ] see why notes are stuck in the inbox @today <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
+- [ ] add zazen to calendar @today <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
