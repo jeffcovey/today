@@ -145,6 +145,7 @@
 - [ ] UI/UX Improvements <!-- task-id: 684e7c7a2c38a285867af39b40d31b92 -->
 - [ ] User validation errors (#4625, #4626, #4629) <!-- task-id: 7cfaaa6e5b5a8ab5472812df51700dd9 -->
 - [ ] Verify multi-deployment scenarios <!-- task-id: cd1e1bb2bb7b8570beab1791e618ee8e -->
+- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] cancel sanebox if we can replace it <!-- task-id: db0ff809e5f1a690b86169604fe85549 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
