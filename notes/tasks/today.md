@@ -1,6 +1,20 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 7:27:24 AM EDT*
+*Generated: 8/18/2025, 7:28:19 AM EDT*
+
+## 🔴 Priority Focus Areas
+
+### Arthritis Treatment & Management
+- [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
+- [ ] Start reading "Tight Hip, Twisted Core" book (30 min minimum)
+- [ ] Begin hip-focused stretching routine (morning)
+- [ ] Track pain levels and mobility
+
+### Weekly Planning
+- [ ] Review Week 34 plan (Aug 18-24)
+- [ ] Update daily priorities based on week plan
+- [ ] Process inbox notes
+- [ ] Maintain project tracking
 
 ## 🟠 High
 
