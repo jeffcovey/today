@@ -1109,8 +1109,9 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - GitHub, tasks, and consistency check"
+        print_info "Quick sync mode - GitHub, tasks, inbox, and consistency check"
         sync_github_notes
+        process_inbox
         sync_tasks
         check_task_consistency
         ;;

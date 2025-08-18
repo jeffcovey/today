@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/18/2025, 4:24:04 PM EDT*
+*Generated: 8/18/2025, 5:25:16 PM EDT*
 
 ## 🔥 Immediate
 
@@ -39,6 +39,17 @@
 <details>
 <summary><strong>✅ Done Today</strong> (216 tasks completed)</summary>
 
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
+- [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
+- [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
+- [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] add weight to Today <!-- task-id: 5c45e277f285c9f2dcd00681e48cd08b -->
 - [x] Import all the Notion tasks <!-- task-id: b0ee63d46ec1e78f3d1b4d34f66d8b4d -->
 - [x] Implement the newsletter re-engagement plan <!-- task-id: d1d418612790e5ee86749d2ed022f87a -->
@@ -182,17 +193,6 @@
 - [x] Test automatic Turso sync <!-- task-id: f1e82f6a8cf37cd7678a7e9aa2a88061 -->
 - [x] Review and test new task system <!-- task-id: 5314cad36bb2942e73e17cb58367f0d0 -->
 - [x] Pack summer clothes (hot in September!) <!-- task-id: c8dd5d411e3bf4320e7759974319d203 -->
-- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: 46766dce4ea64658ee18c77447e42e94 -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a0fa700e90405a27f96c0bbe7b88f990 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ef28519d5cbe0bbc53d4cbc5b2acc82a -->
-- [x] ♥︎ Tai Chi, 1m <!-- task-id: 12dfb9b09e50ecad43c485914fd9d4b7 -->
-- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: 6971b8f62d46149eaf84210ce9393d8c -->
-- [x] ♥︎ Burn More Energy <!-- task-id: 1cdfbe413038bcf638e5da10470cd54e -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 6132b24239c128c0d675d299c0a706fe -->
-- [x] Do Tai Chi Standing, 4m <!-- task-id: 94ed4f34c6ee292cafb576544574be44 -->
-- [x] Use The Inversion Table <!-- task-id: 6afa8657ee1436273c9a98f15842208d -->
-- [x] Read Offline, 2m 30s <!-- task-id: d2bc570f29e498793c994b5684a531e4 -->
-- [x] Read Saved Articles, 2m 30s <!-- task-id: 1c4fae6322931fe4b8afaca430a31290 -->
 - [x] Test task for Turso sync <!-- task-id: 6a05bb71cbb42bf2c9d712a58eba657b -->
 - [x] Review bug reports and respond to at least 2 <!-- task-id: ebb7ba17ab5bb9f6ccad94cdfcf89386 -->
 - [x] Send any follow-up messages from today’s conversations <!-- task-id: 40dbc547c400f517c1fc75862d15f498 -->

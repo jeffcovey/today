@@ -21,5 +21,9 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 # Install mdless (Ruby gem for markdown viewing)
 RUN gem install mdless --no-document
 
+# Install Fly CLI
+RUN curl -L https://fly.io/install.sh | sh && \
+    ln -s /root/.fly/bin/flyctl /usr/local/bin/fly
+
 # Set working directory
 WORKDIR /workspaces/today

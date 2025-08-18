@@ -1,0 +1,27 @@
+# fly.toml app configuration file generated for today-scheduler on 2025-08-18T19:32:37Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'today-scheduler'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile.scheduler'
+
+[env]
+  NODE_ENV = 'production'
+  SKIP_DEP_CHECK = 'true'
+  TZ = 'America/New_York'
+
+[processes]
+  scheduler = './bin/scheduler-startup'
+
+[[mounts]]
+  source = 'today_data'
+  destination = '/app/data'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

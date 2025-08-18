@@ -1527,8 +1527,4 @@
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
 - [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 
-<<<<<<< HEAD
 </details>
-=======
-</details>
->>>>>>> parent of 029790d (Sync local notes, plans, projects, and topics)

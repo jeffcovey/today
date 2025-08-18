@@ -26,6 +26,9 @@
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
 		"DEVCONTAINER_PROJECT": "today"
 	},
+	"remoteEnv": {
+		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
+	},
 	"forwardPorts": [2222, 8081],
 	"portsAttributes": {
 		"2222": {

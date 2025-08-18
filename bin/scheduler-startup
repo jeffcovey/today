@@ -1,0 +1,76 @@
+#!/bin/bash
+# Startup script for scheduler - clones or updates GitHub repository
+
+set -e
+
+echo "🚀 Scheduler startup..."
+
+# Check if we have GitHub token
+if [[ -z "$GITHUB_TOKEN" ]]; then
+    echo "⚠️  No GITHUB_TOKEN found, skipping GitHub setup"
+else
+    echo "📦 Setting up GitHub repository..."
+    
+    # Configure git to use the token
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+    
+    # Store git repo in persistent volume
+    GIT_DIR="/app/data/git-repo"
+    
+    # Clone or update the repository content
+    if [[ ! -d "$GIT_DIR/.git" ]]; then
+        echo "📥 Cloning FULL repository to persistent storage..."
+        # Clone to persistent volume with full depth
+        git clone --depth=0 https://${GITHUB_TOKEN}@github.com/OlderGay-Men/today.git "$GIT_DIR"
+        
+        # Set up git for pushing
+        cd "$GIT_DIR"
+        git config user.email "scheduler@fly.io"
+        git config user.name "Today Scheduler"
+        
+        # Verify notes exist
+        if [[ ! -d "$GIT_DIR/notes" ]] || [[ $(find "$GIT_DIR/notes" -type f -name "*.md" | wc -l) -lt 10 ]]; then
+            echo "⚠️  WARNING: Notes directory missing or has too few files!"
+            echo "⚠️  Disabling sync to prevent data loss"
+            touch /app/SYNC_DISABLED
+        fi
+        
+        echo "✅ Repository cloned to persistent storage"
+    else
+        echo "📥 Pulling latest changes from persistent storage..."
+        cd "$GIT_DIR"
+        git pull origin main || echo "⚠️  Pull failed, continuing anyway"
+        
+        # Verify notes still exist after pull
+        if [[ ! -d "$GIT_DIR/notes" ]] || [[ $(find "$GIT_DIR/notes" -type f -name "*.md" | wc -l) -lt 10 ]]; then
+            echo "⚠️  WARNING: Notes directory missing or has too few files after pull!"
+            echo "⚠️  Disabling sync to prevent data loss"
+            touch /app/SYNC_DISABLED
+        fi
+    fi
+    
+    # Remove existing directories if they exist
+    rm -rf /app/notes /app/plans /app/projects /app/topics
+    
+    # Symlink content directories to /app
+    ln -sfn "$GIT_DIR/notes" /app/notes
+    ln -sfn "$GIT_DIR/plans" /app/plans
+    ln -sfn "$GIT_DIR/projects" /app/projects
+    ln -sfn "$GIT_DIR/topics" /app/topics
+    ln -sfn "$GIT_DIR/.git" /app/.git
+    
+    # Change to app directory for scripts
+    cd /app
+    
+    # Show file counts
+    echo "📊 Content summary:"
+    echo "  Notes: $(find notes -type f -name "*.md" 2>/dev/null | wc -l)"
+    echo "  Plans: $(find plans -type f -name "*.md" 2>/dev/null | wc -l)"
+    echo "  Projects: $(find projects -type f -name "*.md" 2>/dev/null | wc -l)"
+    echo "  Topics: $(find topics -type f -name "*.md" 2>/dev/null | wc -l)"
+fi
+
+echo "✅ Startup complete, starting scheduler..."
+
+# Start the scheduler
+exec node src/scheduler.js

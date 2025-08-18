@@ -1,0 +1,41 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies for the scripts
+RUN apk add --no-cache python3 make g++ curl sqlite bash git jq bc
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies including node-cron
+RUN npm install --build-from-source && \
+    npm install node-cron
+
+# Copy source code and config files
+COPY src/ ./src/
+COPY bin/ ./bin/
+COPY config/ ./config/
+COPY TODAY.md ./
+COPY .env* ./
+
+# Make scripts executable
+RUN chmod +x ./bin/* ./src/scheduler.js
+
+# Create data directory and symlink cache directories to it
+RUN mkdir -p /app/data /app/config /app/notes /app/plans /app/projects /app/topics && \
+    ln -s /app/data /app/.data && \
+    ln -s /app/data /app/.notion-cache && \
+    ln -s /app/data /app/.calendar-cache
+
+# Configure git
+RUN git config --global user.email "scheduler@fly.io" && \
+    git config --global user.name "Today Scheduler" && \
+    git config --global --add safe.directory /app
+
+# Set environment
+ENV NODE_ENV=production
+ENV TZ=America/New_York
+
+# Run the startup script which sets up GitHub and starts scheduler
+CMD ["./bin/scheduler-startup"]
