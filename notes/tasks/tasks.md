@@ -17,19 +17,18 @@
 - [ ] Schedule annual physical [Health] <!-- task-id: acd535d3085ff563e06edef68908d5e6 -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 
+### Today - Monday, Aug 18
+
+- [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+
 ### Monday, Dec 1
 
 - [ ] +Trip Prep [Travel] <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
 
 ### Invalid Date, Invalid Date
 
-- [ ] Monitor Logan's checkout (12 PM) <!-- task-id: pending-17-1 --> <!-- task-id: 4dd8c874bb3398c4c53e1b08fc14dcbe -->
-- [ ] Monitor Treasure's checkout (12 PM) <!-- task-id: pending-17-2 --> <!-- task-id: 29260971f90116fe4f773e1e64152312 -->
-- [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: newsletter-check --> <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: fridge-water --> <!-- task-id: 05480d71693b15f02ca7261b015e80e1 -->
-- [ ] Clean Private Suite after Logan leaves <!-- task-id: pending-17-3 --> <!-- task-id: 92b053f4372f914b4aa775df749b0b32 -->
-- [ ] Clean Quiet Oasis after Treasure leaves <!-- task-id: pending-17-4 --> <!-- task-id: d4df804661058520e269e18f4a8d8cd1 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: ogm-sort-fix --> <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
 
