@@ -52,6 +52,15 @@ Migrate historical planning and review data from Notion databases to the new Tod
 - [ ] Add cross-links between related plans <!-- task-id: 24628bc21f83b3cb6ec717adfdaec85b -->
 - [ ] Archive original Notion exports <!-- task-id: 68aeaef4c17c6ded82088c1a87d6a18a -->
 
+## Phase 5: Database Optimization
+
+- [ ] **Optimize markdown_sync table** - Currently sending 4,490 rows to Turso with duplicate paths
+  - Clean up old file paths from vault restructuring (notes/tasks/ → vault/notes/tasks/)
+  - Remove entries for files that no longer exist
+  - Batch updates instead of individual writes
+  - Only update timestamps when tasks actually change
+  - Consider implementing incremental sync strategy
+
 ## Technical Considerations
 
 ### Notion Data Structure
