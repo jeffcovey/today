@@ -1,2 +1,2 @@
-- [ ] Import all the Notion tasks
-- [ ] Implement the newsletter re-engagement plan
+- [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
+- [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
