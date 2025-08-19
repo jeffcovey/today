@@ -36,7 +36,7 @@ Migrate historical planning and review data from Notion databases to the new Tod
 ## Phase 3: Implementation
 
 > **⚠️ REMINDER**: Notion sync has been temporarily restored in `bin/sync` (line 78) to support importing Action Items. Remove this line after all Action Items have been imported to complete the migration away from Notion.
-> 
+>
 > **⚠️ REMINDER**: `bin/notion daily --all` has been added to Fly scheduler (src/scheduler.js line 70-74) to maintain Notion automation during migration. Remove this scheduled job after completing the migration away from Notion. The temporal creation (days/weeks/months/quarters/years) has been disabled in src/temporal-manager.js.
 
 - [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
