@@ -1,10 +1,14 @@
 <details>
-<summary><strong>General Tasks</strong> (1345 tasks)</summary>
+<summary><strong>General Tasks</strong> (1347 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
 - [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
+
+### Friday, Aug 15 (4 days ago)
+
+- [ ] Review and improve test coverage <!-- task-id: c2b2df1c8386f9c294ddadd7c6dad747 -->
 
 ### Sunday, Aug 17 (2 days ago)
 
@@ -12,6 +16,7 @@
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+- [ ] Review and improve test coverage <!-- task-id: 5da991a09ce9f03c4f93c0cdfd536061 -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->

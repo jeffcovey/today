@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/19/2025, 7:35:38 AM EDT*
+*Generated: 8/19/2025, 7:58:39 AM EDT*
 
 ## 🔥 Immediate
 
@@ -32,13 +32,7 @@
 
 ## 🎭 Stage
 
+- [ ] Review and improve test coverage <!-- task-id: c2b2df1c8386f9c294ddadd7c6dad747 -->
+- [ ] Review and improve test coverage <!-- task-id: 5da991a09ce9f03c4f93c0cdfd536061 -->
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 - [ ] schedule annual checkup <!-- task-id: 5522e610740029fe5230ef620720a9ef -->
-
-<details>
-<summary><strong>✅ Done Today</strong> (2 tasks completed)</summary>
-
-- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
-- [x] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
-
-</details>
