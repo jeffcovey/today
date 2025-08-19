@@ -1,27 +1,29 @@
 <details>
-<summary><strong>General Tasks</strong> (1346 tasks)</summary>
+<summary><strong>General Tasks</strong> (1345 tasks)</summary>
 
-### Monday, Aug 11 (7 days ago)
+### Monday, Aug 11 (overdue)
 
 - [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
-### Yesterday - Sunday, Aug 17
+### Sunday, Aug 17 (2 days ago)
 
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
-- [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 - [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 
-### Today - Monday, Aug 18
+### Yesterday - Monday, Aug 18
 
-- [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
+
+### Today - Tuesday, Aug 19
+
+- [ ] schedule annual checkup <!-- task-id: 5522e610740029fe5230ef620720a9ef -->
 
 ### Monday, Dec 1
 
@@ -1456,10 +1458,11 @@
 </details>
 
 <details>
-<summary><strong>Notion to Today Migration Project</strong> (26 tasks)</summary>
+<summary><strong>Notion to Today Migration Project</strong> (28 tasks)</summary>
 
 ### No Date Set
 
+- [ ] **Optimize markdown_sync table** - Currently sending 4,490 rows to Turso with duplicate paths <!-- task-id: f51819349d02c60baac25eb1d8c34787 -->
 - [ ] Add cross-links between related plans <!-- task-id: 24628bc21f83b3cb6ec717adfdaec85b -->
 - [ ] Archive original Notion exports <!-- task-id: 68aeaef4c17c6ded82088c1a87d6a18a -->
 - [ ] Build conversion scripts for each plan level <!-- task-id: 797b3634044f342ea4e7d91cce20d086 -->
@@ -1472,6 +1475,7 @@
 - [ ] Create year files (2022.md, 2023.md, 2024.md) <!-- task-id: 38a9146aa919c6e70c649adb6fdad5f2 -->
 - [ ] Cross-reference important dates and milestones <!-- task-id: a47680e77275a1f76a562360e6cbc80e -->
 - [ ] Decide on incremental vs. bulk migration approach <!-- task-id: f5d39a27fcf9cddb46c3b9215e659915 -->
+- [ ] Decide where to migrate Notion Action Items assigned to other people (probably just Mehul Trivedi now) <!-- task-id: ed0d03dc1c1e57672ebf95e470740702 -->
 - [ ] Define how to handle Notion-specific features (databases, relations, etc.) <!-- task-id: 200ffc2eb29ce206742243918b0a1d65 -->
 - [ ] Design migration scripts/tools <!-- task-id: 1b62c0cc1cefb4c13e9bf485e8cfff08 -->
 - [ ] Determine what historical data is worth preserving <!-- task-id: 2c39a0d9303c7f4da92e566cadb82b0c -->

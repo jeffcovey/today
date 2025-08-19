@@ -31,7 +31,7 @@ Migrate historical planning and review data from Notion databases to the new Tod
 - [ ] Define how to handle Notion-specific features (databases, relations, etc.) <!-- task-id: 200ffc2eb29ce206742243918b0a1d65 -->
 - [ ] Plan for handling attachments/images <!-- task-id: 1cf79f50867acfda7e5edf7838528eb8 -->
 - [ ] Decide on incremental vs. bulk migration approach <!-- task-id: f5d39a27fcf9cddb46c3b9215e659915 -->
-- [ ] Decide where to migrate Notion Action Items assigned to other people (probably just Mehul Trivedi now)
+- [ ] Decide where to migrate Notion Action Items assigned to other people (probably just Mehul Trivedi now) <!-- task-id: ed0d03dc1c1e57672ebf95e470740702 -->
 
 ## Phase 3: Implementation
 
@@ -57,7 +57,7 @@ Migrate historical planning and review data from Notion databases to the new Tod
 
 ## Phase 5: Database Optimization
 
-- [ ] **Optimize markdown_sync table** - Currently sending 4,490 rows to Turso with duplicate paths
+- [ ] **Optimize markdown_sync table** - Currently sending 4,490 rows to Turso with duplicate paths <!-- task-id: f51819349d02c60baac25eb1d8c34787 -->
   - Clean up old file paths from vault restructuring (notes/tasks/ → vault/notes/tasks/)
   - Remove entries for files that no longer exist
   - Batch updates instead of individual writes
