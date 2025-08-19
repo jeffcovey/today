@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (13 tasks)</summary>
+<summary><strong>General Tasks</strong> (11 tasks)</summary>
 
 ### Saturday, Aug 16 (3 days ago)
 
@@ -17,10 +17,5 @@
 - [ ] Daily standup meeting <!-- task-id: 2e88b8b8c2766c468a97a0682e662932 -->
 - [ ] Daily standup meeting <!-- task-id: 8efa87067ea146a316f94a685c58a277 -->
 - [ ] Daily standup meeting <!-- task-id: 635b4f0e1c9f0efe58811cc604e8b2b0 -->
-- [ ] Review and improve test coverage <!-- task-id: ef5782cd26e4c9b24e139b090f807fd4 -->
-
-### Today - Tuesday, Aug 19
-
-- [ ] schedule annual checkup <!-- task-id: a8766483d626943b22e94bc014f219a6 -->
 
 </details>
