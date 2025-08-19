@@ -1,8 +1,8 @@
 <details>
 <summary><strong>General Tasks</strong> (1 tasks)</summary>
 
-### Today - Tuesday, Aug 19
+### Sunday, Aug 17 (2 days ago)
 
-- [ ] schedule annual checkup <!-- task-id: a8766483d626943b22e94bc014f219a6 -->
+- [ ] Review and improve test coverage <!-- task-id: ef5782cd26e4c9b24e139b090f807fd4 -->
 
 </details>
