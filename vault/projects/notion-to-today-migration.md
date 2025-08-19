@@ -31,10 +31,13 @@ Migrate historical planning and review data from Notion databases to the new Tod
 - [ ] Define how to handle Notion-specific features (databases, relations, etc.) <!-- task-id: 200ffc2eb29ce206742243918b0a1d65 -->
 - [ ] Plan for handling attachments/images <!-- task-id: 1cf79f50867acfda7e5edf7838528eb8 -->
 - [ ] Decide on incremental vs. bulk migration approach <!-- task-id: f5d39a27fcf9cddb46c3b9215e659915 -->
+- [ ] Decide where to migrate Notion Action Items assigned to other people (probably just Mehul Trivedi now)
 
 ## Phase 3: Implementation
 
 > **⚠️ REMINDER**: Notion sync has been temporarily restored in `bin/sync` (line 78) to support importing Action Items. Remove this line after all Action Items have been imported to complete the migration away from Notion.
+> 
+> **⚠️ REMINDER**: `bin/notion daily --all` has been added to Fly scheduler (src/scheduler.js line 70-74) to maintain Notion automation during migration. Remove this scheduled job after completing the migration away from Notion. The temporal creation (days/weeks/months/quarters/years) has been disabled in src/temporal-manager.js.
 
 - [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
 - [ ] Build conversion scripts for each plan level <!-- task-id: 797b3634044f342ea4e7d91cce20d086 -->
