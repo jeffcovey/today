@@ -124,7 +124,8 @@
       "Bash(bin/progress:*)",
       "WebSearch",
       "Bash(sed:*)",
-      "Bash(TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z')"
+      "Bash(TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z')",
+      "Bash(fly ssh console:*)"
     ],
     "deny": []
   }

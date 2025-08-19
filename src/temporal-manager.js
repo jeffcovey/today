@@ -37,9 +37,12 @@ class TemporalManager {
         years: yearsDB.status === 'fulfilled' ? yearsDB.value : null
       };
 
-      // Create higher-level periods first (years -> quarters -> months -> weeks -> days)
+      // DISABLED: No longer creating temporal entries as we're migrating away from Notion
+      // Keeping the structure in case we need to reference existing entries
       const existingPeriods = {};
 
+      // Comment out all temporal creation - we're moving away from Notion
+      /*
       if (databases.years) {
         existingPeriods.years = await this.getExistingYears(databases.years.id);
         await this.createMissingYears(databases.years.id, existingPeriods.years, start, end);
@@ -68,8 +71,11 @@ class TemporalManager {
         existingPeriods.days = await this.getExistingDays(databases.days.id);
         await this.createMissingDays(databases.days.id, existingPeriods.days, existingPeriods.weeks, start, end);
       }
+      */
+      
+      console.log('⚠️  Temporal creation disabled - migrating away from Notion');
 
-      console.log('✅ Successfully created missing temporal entries');
+      console.log('✅ Temporal check complete (creation disabled).');
       
     } catch (error) {
       console.error('❌ Failed to create missing temporal entries:', error.message);

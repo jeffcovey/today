@@ -3,6 +3,7 @@
 import cron from 'node-cron';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -65,6 +66,12 @@ const jobs = [
         schedule: '0 */4 * * *', // Every 4 hours
         command: 'bin/calendar sync || true', // Calendar sync
         description: 'Calendar sync'
+    },
+    {
+        schedule: '0 3 * * *', // Daily at 3 AM (before full sync)
+        command: 'bin/notion daily --all || true', // Run all Notion daily automation tasks
+        description: 'Notion daily automation (temporary until migration)',
+        timezone: true
     }
 ];
 
