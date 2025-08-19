@@ -1,5 +1,10 @@
 <details>
-<summary><strong>General Tasks</strong> (14 tasks)</summary>
+<summary><strong>General Tasks</strong> (10 tasks)</summary>
+
+### Monday, Aug 11 (overdue)
+
+- [ ] Make A Budget In YNAB <!-- task-id: 8ed17744302b76474ccbef26583a9ace -->
+- [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 ### Saturday, Aug 16 (3 days ago)
 
@@ -7,21 +12,12 @@
 
 ### Sunday, Aug 17 (2 days ago)
 
-- [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
-- [ ] Daily standup meeting <!-- task-id: cc43b0e35a5127401f5d91a7ea10a0eb -->
-- [ ] Daily standup meeting <!-- task-id: 4110ea6ffe2ed5e72d512c60c1ff3572 -->
-- [ ] Daily standup meeting <!-- task-id: 5c57d6b16478e39cc3eede3ed2e49c19 -->
-- [ ] Daily standup meeting <!-- task-id: 47c59e6a1a2deb94325e65c5bea2f7b8 -->
-- [ ] Daily standup meeting <!-- task-id: 0622952b40726f0e5ba879320e0294b3 -->
-- [ ] Daily standup meeting <!-- task-id: 2e88b8b8c2766c468a97a0682e662932 -->
-- [ ] Daily standup meeting <!-- task-id: 8efa87067ea146a316f94a685c58a277 -->
-- [ ] Daily standup meeting <!-- task-id: 635b4f0e1c9f0efe58811cc604e8b2b0 -->
-- [ ] Daily standup meeting [FINAL TEST] <!-- task-id: 682600fe16344e2ffcfb9559f6c37d23 -->
-
-### No Date Set
-
-- [ ] Consider archiving old data to reduce database size (currently 254MB) <!-- task-id: ac85f819eefb88b57227cbf88a3364ba -->
-- [ ] Monitor for any remaining data issues <!-- task-id: f59b89820344da4ea330fa1ff6fa358e -->
-- [ ] Update Fly.io with new credentials (waiting for Fly.io to be back online) <!-- task-id: 0137b247beb54cd2012c62cd5c9a4ec5 -->
+- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [ ] Check the fridge water lines <!-- task-id: 197d008fdf3afdac370906200c86ed65 -->
+- [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
+- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
+- [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
+- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
+- [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 
 </details>
