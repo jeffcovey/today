@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/19/2025, 10:55:33 AM EDT*
+*Generated: 8/19/2025, 10:57:27 AM EDT*
 
 ## 🎭 Stage
 
@@ -14,7 +14,6 @@
 - [ ] Daily standup meeting <!-- task-id: 8efa87067ea146a316f94a685c58a277 -->
 - [ ] Daily standup meeting <!-- task-id: 635b4f0e1c9f0efe58811cc604e8b2b0 -->
 - [ ] Review and improve test coverage <!-- task-id: ef5782cd26e4c9b24e139b090f807fd4 -->
-- [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] schedule annual checkup <!-- task-id: a8766483d626943b22e94bc014f219a6 -->
 
 ## Next Up
