@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/19/2025, 10:57:27 AM EDT*
+*Generated: 8/19/2025, 11:01:24 AM EDT*
 
 ## 🎭 Stage
 
@@ -22,8 +22,9 @@
 - [ ] Review and reply to OGM site messages <!-- task-id: 5211d9584a15d598e7f8a67e10036657 -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (24 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (25 tasks completed)</summary>
 
+- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [x] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [x] Add Virgin card to 1password <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
 - [x] Add property taxes to the budget <!-- task-id: 0c7356e5b1787028f80ca443d64fa210 -->
