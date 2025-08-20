@@ -30,8 +30,9 @@ RUN mkdir -p /app/.notion-cache /app/config /app/notes
 # Set up environment
 ENV NODE_ENV=production
 
-# Configure git to trust the /app directory
-RUN git config --global --add safe.directory /app
+# Configure git to trust the /app directory and set pull strategy
+RUN git config --global --add safe.directory /app && \
+    git config --global pull.rebase false
 
 # Default command (can be overridden)
 CMD ["node", "src/cli.js"]

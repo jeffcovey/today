@@ -28,7 +28,8 @@ RUN mkdir -p /app/config /app/vault
 # Configure git
 RUN git config --global user.email "scheduler@fly.io" && \
     git config --global user.name "Today Scheduler" && \
-    git config --global --add safe.directory /app
+    git config --global --add safe.directory /app && \
+    git config --global pull.rebase false
 
 # Set environment
 ENV NODE_ENV=production
