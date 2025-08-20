@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 6:22:19 PM EDT*
+*Generated: 8/20/2025, 6:36:56 PM EDT*
 
 ## 🔥 Immediate
 
@@ -17,8 +17,26 @@
 - [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (86 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (104 tasks completed)</summary>
 
+- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
+- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [x] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
+- [x] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
+- [x] Set up GitHub Actions for CI/CD <!-- task-id: af645ecc1dfe3f1a4a1367985ee0f5af -->
+- [x] Add visual regression testing for UI components <!-- task-id: 2eb382043ea9051ea9ee2ea0738165fd -->
+- [x] Implement load testing for sync operations <!-- task-id: 136f7f86ca84face071a4e82331c9ff7 -->
+- [x] Add mutation testing to verify test quality <!-- task-id: b6ef433dc67e86270d152fcdfa61d50d -->
+- [x] Create test data generators <!-- task-id: ddb81f7995ac04ccb58b4db0ee3ffdd6 -->
+- [x] Set up test database seeding <!-- task-id: 80b65cd38d3823df2dba561c6f0a99dd -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e223370410282e8b89b4e77f043f43c9 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9229f3d4e9e40f05f4f0ddaaa1785749 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c38d39af99b64fe6191f3a3e0ecb9a60 -->
