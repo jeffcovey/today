@@ -42,6 +42,7 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - [x] Transportation arranged (using Julian's car) <!-- task-id: 04ea5b9514a05407a45f65732bcc6cdd -->
 - [ ] Research restaurants <!-- task-id: 1463d4f4dd402ebbf1ea9d15b37823c3 -->
 - [ ] Check event calendar for September <!-- task-id: ff35a029d7185347a3d378b63a07afba -->
+- [ ] check the Prime Timers of the Desert calendar for the times I'll be in Palm Springs
 - [x] Decided to go (traveling alone, staying with Lou at Julian's) <!-- task-id: dc01a5bb9ee245d00520187e49aa5c7e -->
 
 ### Pre-Trip (1 week before)

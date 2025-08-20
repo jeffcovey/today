@@ -64,6 +64,7 @@ Based on review of financial documents and recent analysis, this project aims to
 - Emergency fund balance
 - Expense tracking compliance rate
 - Net monthly cash flow (positive)
+- Go to Palm Springs with my accounts reconciled, and a clear view of my financial situation
 
 ## Action Plan
 
@@ -413,6 +414,10 @@ Based on review of financial documents and recent analysis, this project aims to
    - [ ] Complete full subscription audit
    - [ ] Get quotes from 3 insurance companies
    - [ ] Start Heroku to Railway migration planning
+
+## Notes/Thoughts
+
+- I can probably cancel some of my GitHub and ChatGPT services now that I'm using Claude.
 
 ---
 

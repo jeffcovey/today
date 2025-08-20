@@ -13,6 +13,12 @@ Manage and improve hip arthritis condition through targeted exercises, treatment
 - **Benefits**: Reduced inflammation, easier movement, less pain
 - **Tracking**: Weekly weight log updates in `vault/logs/weight.csv`
 
+### [Drink Less Project](./drink-less.md)
+- **Inflammation Reduction**: Alcohol increases inflammatory markers
+- **Better Sleep**: Quality sleep essential for healing
+- **Weight Loss Support**: Eliminating 650-850 calories/day from drinks
+- **Tracking**: Weekly drinks log updates in `vault/logs/drinks.csv`
+
 ## Resources
 
 ### Book

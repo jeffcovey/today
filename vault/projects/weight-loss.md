@@ -17,10 +17,14 @@
 - **Enhanced Energy**: Better overall energy levels for Front/Back/Off Stage days
 
 ### Related Projects
-- **Arthritis Management**: This project directly supports arthritis treatment goals
+- **[Arthritis Management](./treat-arthritis.md)**: This project directly supports arthritis treatment goals
   - Less weight = less joint stress
   - Easier to perform recommended exercises (Tai Chi, stretching)
   - Reduced inflammation markers
+- **[Drink Less](./drink-less.md)**: Alcohol reduction supports weight loss
+  - Eliminate 650-850 empty calories per day
+  - Improve metabolism and fat burning
+  - Better sleep and recovery
 
 ## Tracking & Metrics
 

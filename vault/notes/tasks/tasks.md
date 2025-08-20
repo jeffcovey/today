@@ -286,7 +286,8 @@
 - [ ] Sustainable lifestyle changes integrated <!-- task-id: 4366244f1314f08e09487aeda50f4cdd -->
 - [ ] Track medication effectiveness <!-- task-id: 5b76edda855c11cca0b901d7784a11f1 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
-- [ ] Update weight log (Every Sunday morning) <!-- task-id: weight-log-weekly --> <!-- task-id: c87d187f6de8c0fb18859fd1b84acc10 -->
+- [ ] Update weight log <!-- task-id: weight-log-weekly --> <!-- task-id: c87d187f6de8c0fb18859fd1b84acc10 -->
+- [ ] Update drinks log <!-- task-id: drinks-log-weekly --> <!-- task-id: f619208015b3228040eb8f955daff7fa -->
 - [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
 - [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly --> <!-- task-id: 67416207c06f8986797ad579805c2ac5 -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
