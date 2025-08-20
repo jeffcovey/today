@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (983 tasks)</summary>
+<summary><strong>General Tasks</strong> (992 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -46,6 +46,18 @@
 - [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
+
+### Invalid Date, Invalid Date
+
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: 8107719734121f764a96142dd05cf45b -->
+- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
+- [ ] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
+- [ ] Use The Inversion Table <!-- task-id: e73befc42e92c0571f2d3d80b09d1d2e -->
+- [ ] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: d1d112be50ba6e35866e98b1e763e5a6 -->
+- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: f58943b7621ba8cbc08c30bac7ca40b9 -->
+- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
 
 ### No Date Set
 
@@ -121,7 +133,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f75a54600c5182f283731f7eebd56687 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2b915f7ae6c6a400555a89be8272847e -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 65ed8d7150bb9d967ae0ff1e8c084883 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0054df8c8325c7926c335bcf2f8ae389 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 96dade19404c4cee9e659058cd7bee38 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -138,7 +150,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e635fa8a5985683b90c689b4388f8e2f -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 63a441e070c96b38e533d98d15a6620f -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7a530eb62058ab26e764626f31272982 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9022038c028f4fb65cb3314fa29aeaa3 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f3a7b0388b05c04597a6297992fe0358 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
@@ -151,7 +163,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 93293652153fc794af9dfd4568f36b1e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e3131ed3fe4eba704a3419ea04cc9e75 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 08f7f32b06b39d9ca741d4fb05135a6d -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 461ac9da2c44a3476fbbfb133a4daf39 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d764f9a691b92a9d1386a56c7fdf743 -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
@@ -189,7 +201,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2c6fe48738275d4460ddef939b13caf8 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6c15c185747f2ab05d76df9583aaa0b5 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 17b6cd1f95e509b06f567975d3651fae -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2d87c7e1b1bec0ef0f6e416139a32c56 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ef8e7dda5ff4afc3c43d3795b81d2d7c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -202,7 +214,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 041fc52038a0ca95fcc3d6e9e6d3423e -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dc1fd2dce7f234373c00e177f78f370b -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 09a41482100d67d15fd6bfe5df55841b -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 4fd5a40c86c32526c61f8fa3f949e29a -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 77bf7c14653dfde45ae5bcb55e2003c3 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
