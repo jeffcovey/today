@@ -1,2 +1,0 @@
-- [ ] Have the AI set task topics if they don't exist
-- [ ] Move house sits into Today

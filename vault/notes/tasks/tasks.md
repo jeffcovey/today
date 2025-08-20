@@ -1344,3 +1344,9 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
+- [ ] Have the AI set task topics if they don't exist
+- [ ] Move house sits into Today
+- [ ] fix Fly
+- [ ] set up Ollama on all deployments
+- [ ] sanitize Today for sharing with Nelson
+- [ ] find more accurate geocoding from addresses
