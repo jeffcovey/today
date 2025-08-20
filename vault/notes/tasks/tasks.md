@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1031 tasks)</summary>
+<summary><strong>General Tasks</strong> (1036 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -145,6 +145,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5fbaca59ab4daff64bcad34327c6881f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 08c1ff9ee6d6438a5df0d614162084ce -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a4c7bc05f267e77f03c67a7030054718 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 95eda49013b75d33bd4a62a9b4c13c9e -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -169,6 +170,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ca15cbc5fa9a2ca119e070bc5cde4cee -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 52595330df74127bd49642bfce64d3f7 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 430ccfe4b2247f7f719689f7184a6763 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66f816790c2093b75157b2c4255886b7 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
@@ -189,6 +191,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f52cee2a7653c979272fd7d257204d85 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7bbe190d956e84b4cb01c1f35c782a07 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6bb226f3e8a10434a089ef398b09d86f -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9e08db11b2222b02e8149c5d8190c8b1 -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
@@ -234,6 +237,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f4e63fec2eaef5ea4522c0915e164b33 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 094f194c0188bb44f8e1f34b4a58d348 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 30340d8955664e00f1c3800c9a37294b -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b42c956abd2ad4e3d1d5a5d07a94a00c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -254,6 +258,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fb44d1f15bf2ad7aaf8a456c38dab7d7 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ccca9270202847957f7ae0a1c595fb8a -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 37f1889b420114c76361b09017c0f02e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 16e56632427a864b439182d93ff61047 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
