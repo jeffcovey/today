@@ -1021,11 +1021,19 @@ function pushToGitHub(onlyModified = true) {
             if (checkResponse.success) {
                 existingFile = JSON.parse(checkResponse.responseText);
                 
-                // First check SHA to avoid unnecessary content comparison
+                // First check SHA to see if GitHub has changed
                 if (metadata.today_sha === existingFile.sha) {
-                    // SHA matches, content hasn't changed on GitHub
-                    stats.skipped++;
-                    continue;
+                    // SHA matches, GitHub hasn't changed since our last sync
+                    // But we might have local changes - check modification time
+                    const lastSyncTime = metadata.last_sync ? new Date(metadata.last_sync) : null;
+                    
+                    if (!lastSyncTime || draft.modifiedAt <= lastSyncTime) {
+                        // No local changes since last sync, skip
+                        stats.skipped++;
+                        continue;
+                    }
+                    // We have local changes, continue to push them
+                    console.log(`Pushing local changes for ${todayPath} (modified after last sync)`);
                 }
                 
                 // SHA different, check if content actually changed
@@ -1033,13 +1041,15 @@ function pushToGitHub(onlyModified = true) {
                 const cleanBase64 = existingFile.content.replace(/\n/g, '');
                 const remoteContent = decodeBase64(cleanBase64);
                 if (remoteContent.trim() === rawContent.trim()) {
-                    // Content same, just update SHA
+                    // Content same, just update SHA and sync time
                     draft.content = updateMetadata(draft.content, {
                         today_sha: existingFile.sha,
-                        last_sync: new Date().toISOString()
+                        last_sync: new Date().toISOString(),
+                        sync_status: "synced"
                     });
                     draft.update();
                     stats.skipped++;
+                    console.log(`Content unchanged, updated metadata for ${todayPath}`);
                     continue;
                 }
             }
@@ -1145,6 +1155,8 @@ function quickSync(forceFullSync = false) {
     const needsPush = [];
     const needsPull = [];
     
+    console.log(`Checking ${syncDrafts.length} drafts for sync status...`);
+    
     for (const draft of syncDrafts) {
         const { metadata, content: localContent } = extractMetadata(draft.content);
         
@@ -1159,10 +1171,18 @@ function quickSync(forceFullSync = false) {
                 needsPush.push(draft);
             }
         } else if (githubSHA === storedSHA) {
-            // GitHub hasn't changed - safe to push any local changes
-            // Check if we have local changes by comparing content
-            // (We'd need to fetch to compare, so just mark for push check)
-            needsPush.push(draft);
+            // GitHub hasn't changed since our last sync
+            // Check if we have local changes by looking at modification time
+            const { metadata: currentMeta } = extractMetadata(draft.content);
+            const lastSyncTime = currentMeta.last_sync ? new Date(currentMeta.last_sync) : null;
+            
+            // If draft was modified after last sync, we have local changes
+            if (!lastSyncTime || draft.modifiedAt > lastSyncTime) {
+                // We have local changes that need to be pushed
+                needsPush.push(draft);
+                console.log(`Local changes detected for ${metadata.today_path} - adding to push queue`);
+            }
+            // If no local changes, skip this file entirely
         } else {
             // GitHub has changed (githubSHA !== storedSHA)
             // Need to check if we also have local changes
@@ -1304,7 +1324,27 @@ function quickSync(forceFullSync = false) {
     pullStats.errors += fullPullStats.errors;
     
     // Finally push any local changes
+    console.log(`Pushing ${needsPush.length} drafts with local changes...`);
     const pushStats = pushToGitHub(!forceFullSync);
+    
+    // Log summary
+    const totalChanges = pullStats.created + pullStats.updated + pullStats.deleted + 
+                        pushStats.created + pushStats.updated + pushStats.deleted;
+    
+    if (totalChanges > 0) {
+        console.log(`\nSync completed with changes:`);
+        if (pullStats.created > 0) console.log(`  - Created ${pullStats.created} drafts from GitHub`);
+        if (pullStats.updated > 0) console.log(`  - Updated ${pullStats.updated} drafts from GitHub`);
+        if (pullStats.deleted > 0) console.log(`  - Deleted ${pullStats.deleted} drafts`);
+        if (pushStats.created > 0) console.log(`  - Created ${pushStats.created} files on GitHub`);
+        if (pushStats.updated > 0) console.log(`  - Updated ${pushStats.updated} files on GitHub`);
+        if (pushStats.deleted > 0) console.log(`  - Deleted ${pushStats.deleted} files from GitHub`);
+        if (pullStats.errors + pushStats.errors > 0) {
+            console.log(`  - ${pullStats.errors + pushStats.errors} errors occurred`);
+        }
+    } else {
+        console.log(`\nSync completed: Everything is already up to date`);
+    }
     
     return { pull: pullStats, push: pushStats };
 }
