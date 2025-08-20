@@ -74,7 +74,8 @@ main() {
     print_info "Running all sync operations synchronously..."
     
     # Critical path operations (fast, important)
-    run_sync_step "☁️ Turso Pull" sync_turso "Turso pulled" "Turso pull"
+    # Single bidirectional Turso sync (replaces separate pull and push)
+    run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
     run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     
@@ -111,8 +112,8 @@ main() {
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
     
-    # Push to Turso
-    run_sync_step "☁️ Turso Push" push_to_turso "Turso pushed" "Turso push"
+    # Final vault sync to push any changes made during sync operations
+    run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
     
     print_status "All sync operations completed (classification running in background)."
     
@@ -351,8 +352,8 @@ sync_tasks() {
     fi
 }
 
-# Sync with Turso cloud database
-sync_turso() {
+# Bidirectional sync with Turso cloud database
+sync_turso_bidirectional() {
     cd "$(dirname "$0")/.." || return 1
     
     # Check if Turso is configured
@@ -361,54 +362,29 @@ sync_turso() {
         return 1
     fi
     
-    # Use the simplified turso-sync script
-    print_info "Syncing with Turso cloud database..."
+    # Use the turso-sync script with sync action for bidirectional sync
+    print_info "Performing bidirectional sync with Turso..."
     
-    # Run the turso-sync script with pull action and timeout
-    if timeout 30 bin/turso-sync pull 2>&1 | while IFS= read -r line; do
-        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"⬇️"* ]] || [[ "$line" == *"Changes pulled"* ]]; then
+    # Run the turso-sync script with sync action (newest data wins)
+    if timeout 45 bin/turso-sync sync 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"✓"* ]] || [[ "$line" == *"Bidirectional sync complete"* ]]; then
             print_info "$line"
         elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
             print_error "$line"
+        elif [[ "$line" == *"Comparing timestamps"* ]] || [[ "$line" == *"Step"* ]]; then
+            print_info "$line"
         fi
     done; then
         return 0
     else
         local exit_code=$?
         if [[ $exit_code -eq 124 ]]; then
-            print_info "Turso pull timed out after 30s - continuing with local data"
+            print_info "Turso sync timed out after 45s - continuing with local data"
             return 0  # Don't fail the sync, just continue
         else
-            print_error "Turso pull failed"
+            print_error "Turso sync failed"
             return 1
         fi
-    fi
-}
-
-# Push changes to Turso cloud database (no pull)
-push_to_turso() {
-    cd "$(dirname "$0")/.." || return 1
-    
-    # Check if Turso is configured
-    if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
-        print_info "Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)"
-        return 1
-    fi
-    
-    # Use the simplified turso-sync script
-    print_info "Pushing changes to Turso..."
-    
-    # Run the turso-sync script with push action
-    if timeout 30 bin/turso-sync push 2>&1 | while IFS= read -r line; do
-        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"⬆️"* ]] || [[ "$line" == *"Changes pushed"* ]]; then
-            print_info "$line"
-        elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
-            print_error "$line"
-        fi
-    done; then
-        return 0
-    else
-        return 1
     fi
 }
 
@@ -1013,6 +989,7 @@ archive_completed_tasks() {
     return 0
 }
 
+
 # Update cache statistics
 update_cache_stats() {
     cd "$(dirname "$0")/.." || return 1
@@ -1161,8 +1138,9 @@ case "${1:-}" in
         echo "Intelligently synchronize all data sources"
         echo ""
         echo "Runs all operations synchronously for reliability:"
+        echo "  • Turso bidirectional sync (newest data wins)"
         echo "  • GitHub vault, task sync, markdown cleanup"
-        echo "  • Task classification, email, calendar, contacts, Turso push"
+        echo "  • Task classification, email, calendar, contacts"
         echo "  • Uses efficient timeouts and smart caching"
         echo ""
         echo "Options:"
