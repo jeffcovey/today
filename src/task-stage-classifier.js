@@ -76,26 +76,31 @@ Respond with ONLY one of: "Front Stage", "Back Stage", or "Off Stage"`;
   }
 
   async classifyWithClaude(tasks) {
-    // Process in smaller batches to avoid E2BIG error
-    const BATCH_SIZE = 200; // Process 200 tasks at a time
+    // Process in smaller batches to avoid timeouts - only one batch per invocation
+    const BATCH_SIZE = 40; // Process 40 tasks at a time
     const allClassifications = [];
     
-    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-      const batch = tasks.slice(i, Math.min(i + BATCH_SIZE, tasks.length));
+    // Only process the first batch per invocation
+    const batch = tasks.slice(0, Math.min(BATCH_SIZE, tasks.length));
+    
+    if (batch.length === 0) {
+      console.log('  No tasks to classify');
+      return [];
+    }
       
-      // Build a batch prompt for Claude
-      const taskList = batch.map(t => {
-        const project = t.project_id ? 
-          this.tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(t.project_id) : null;
-        return {
-          id: t.id,
-          title: t.title,
-          project: project?.name || null,
-          description: t.description
-        };
-      });
+    // Build a batch prompt for Claude
+    const taskList = batch.map(t => {
+      const project = t.project_id ? 
+        this.tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(t.project_id) : null;
+      return {
+        id: t.id,
+        title: t.title,
+        project: project?.name || null,
+        description: t.description
+      };
+    });
 
-      const prompt = `Classify each task into exactly one stage based on its nature:
+    const prompt = `Classify each task into exactly one stage based on its nature:
 - "Front Stage": Tasks involving interaction with other people (meetings, calls, emails, customer support, presentations, social activities)
 - "Back Stage": Maintenance and behind-the-scenes work (organizing, cleaning, fixing bugs, paying bills, admin, planning, setup)
 - "Off Stage": Personal time and self-care (reading, exercise, hobbies, relaxation, learning, health)
@@ -107,33 +112,27 @@ ${JSON.stringify(taskList, null, 2)}
 
 Respond with a JSON array containing the classification for each task.`;
 
-      try {
-        console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasks.length/BATCH_SIZE)} (${batch.length} tasks)...`);
-        
-        // Use claude CLI with --print flag for non-interactive mode
-        const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-          encoding: 'utf8',
-          maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-          timeout: 60000 // 60 second timeout per batch
-        });
-
-        // Extract JSON from Claude's response
-        const jsonMatch = result.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const classifications = JSON.parse(jsonMatch[0]);
-          allClassifications.push(...classifications);
-        } else {
-          console.error(`Could not parse Claude response for batch ${Math.floor(i/BATCH_SIZE) + 1}`);
-        }
-      } catch (err) {
-        console.error(`Failed to classify batch ${Math.floor(i/BATCH_SIZE) + 1} with Claude:`, err.message);
-        // Continue with next batch
-      }
+    try {
+      console.log(`  Processing batch 1/1 (${batch.length} tasks)...`);
       
-      // Show progress
-      if (i + BATCH_SIZE < tasks.length) {
-        console.log(`  Classified ${Math.min(i + BATCH_SIZE, tasks.length)}/${tasks.length} tasks...`);
+      // Use claude CLI with --print flag for non-interactive mode
+      const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+        timeout: 60000 // 60 second timeout per batch
+      });
+
+      // Extract JSON from Claude's response
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const classifications = JSON.parse(jsonMatch[0]);
+        allClassifications.push(...classifications);
+        console.log(`  Classified ${classifications.length} tasks in this batch`);
+      } else {
+        console.error(`Could not parse Claude response for batch`);
       }
+    } catch (err) {
+      console.error(`Failed to classify batch with Claude:`, err.message);
     }
     
     return allClassifications;
