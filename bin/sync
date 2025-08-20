@@ -1108,6 +1108,10 @@ case "${1:-}" in
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
         check_task_consistency
+        
+        # Final vault push to commit any changes made during sync
+        print_info "Pushing vault changes back to GitHub..."
+        sync_github_vault
         ;;
     --force)
         # Force full sync - bypasses smart caching
