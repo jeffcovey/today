@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 3:16:56 PM EDT*
+*Generated: 8/20/2025, 3:20:11 PM EDT*
 
 ## 🔥 Immediate
 
@@ -41,6 +41,11 @@
 - [x] Set up test database seeding <!-- task-id: 80b65cd38d3823df2dba561c6f0a99dd -->
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 5639f7f7a192739ea4ae9187842bf4c5 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 67fb49cd69a2e6db7cdb448cce8bd4cd -->
+- [x] Read Saved Articles, 2m 15s <!-- task-id: 6551078aadeba335c31e0ab08625a815 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 3e6a27cdf2b09916af8c90890209bf9b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: acd3aaeb90170aaa0c22bc739fff7b72 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3158a51750d170aac4d098f663320d22 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a30a57187e83bc9bef7e0d4a1c57881c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: cd8de3b7398ec35cd504da49af3d3361 -->
@@ -71,11 +76,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d3e66644d09caad9ae1c469b8a789479 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 4d9f64b2a0ecb7241d6fd6fe9e296ad6 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ffbd5e41fff216ee0be64273bf6a29da -->
-- [x] ♥︎ Activity Rings <!-- task-id: 5639f7f7a192739ea4ae9187842bf4c5 -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 67fb49cd69a2e6db7cdb448cce8bd4cd -->
-- [x] Read Saved Articles, 2m 15s <!-- task-id: 6551078aadeba335c31e0ab08625a815 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 3e6a27cdf2b09916af8c90890209bf9b -->
-- [x] ♥︎ Burn More Energy <!-- task-id: acd3aaeb90170aaa0c22bc739fff7b72 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4a9e181b5664bc35ac633118e474ef89 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f27d0e3ef7d4d744bc49e809ef2f38e9 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 8066e26c3275b8d208a5d58a4b56b4f4 -->
