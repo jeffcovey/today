@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1245 tasks)</summary>
+<summary><strong>General Tasks</strong> (1241 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -108,7 +108,6 @@
 - [ ] Choose tracking tool (YNAB, Mint, or custom solution) <!-- task-id: 67885c1cc0816d713e52930cfa918b59 -->
 - [ ] Clean up formatting issues <!-- task-id: a7683b498547c2b1d8979896aef7382e -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
-- [x] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Configure DNS and SSL <!-- task-id: 67cc92a466d05997827f0120f619c7e4 -->
 - [ ] Consider IFTTT for Reddit alerts <!-- task-id: 2a48b83a26a445eae54ebbba3e73ddc6 -->
@@ -157,18 +156,13 @@
 - [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
 - [ ] Export all recurring charges from bank/credit cards <!-- task-id: ac09220ad7087335e08571cb84be9022 -->
 - [ ] Facebook Groups - LGBTQ+ communities <!-- task-id: 363084c1934a31883f35fb3d2051e5c3 -->
-- [x] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
 - [ ] Fine-tune performance settings <!-- task-id: 67a807615788dadbb5a718adec8e9574 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: b1854ccaa83729d1c14284598336911f -->
-- [x] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
-- [x] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
 - [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
-- [x] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
-- [x] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
 - [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
 - [ ] Identify data export options from Notion <!-- task-id: 22c67a98c8c8917d9e949ce79744f3cf -->
@@ -184,7 +178,6 @@
 - [ ] Inventory Notion databases and their structures <!-- task-id: 22c5543e2523ea87140aa22b1561194d -->
 - [ ] Launch premium membership tier <!-- task-id: a6a74ea5f1adf8d4f96ed2fe3afe8ec8 -->
 - [ ] Maintain daily habits and streaks <!-- task-id: 896d841cab6070a727edb061cbc3a5de -->
-- [x] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
 - [ ] Maintain financial stability in retirement <!-- task-id: 54a7f949710fa8de52d787c273729703 -->
 - [ ] Mastodon - LGBTQ+ instances <!-- task-id: c1d57eb837738411748877f7721d9e2f -->
 - [ ] Maximize deductions <!-- task-id: 6e071a65a5c5cfb39d2c1368f4ebd749 -->
@@ -196,7 +189,6 @@
 - [ ] Notion API documentation <!-- task-id: 4529d1b7a2012f2504d1af5aa8a35ef0 -->
 - [ ] Notion export guide <!-- task-id: 0e136c0b1afc7ce37137ffbad1a368df -->
 - [ ] Offer perks (recognition, premium access) <!-- task-id: 189ee40aaccfd180bfeafa6351e5c80a -->
-- [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
 - [ ] Open high-yield savings account <!-- task-id: 983a79e220267106d579b154c0df5116 -->
 - [ ] Optimize listing descriptions for SEO <!-- task-id: cab6640aa204eff29b2c619ddaa2f826 -->
 - [ ] Optimize member retention <!-- task-id: 0d6b4aecbc099899e90e895b5deb8451 -->
@@ -222,7 +214,6 @@
 - [ ] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [ ] Review investment account balances <!-- task-id: 5523faf71672c321af8ee595b06181f0 -->
 - [ ] Review previous month's expenses <!-- task-id: bf99947d52794d9ff22829ce7c8b85b0 -->
-- [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
 - [ ] Set calendar reminders for annual reviews <!-- task-id: 60006753693bf21080427c6fcbaed903 -->
 - [ ] Set up Google Alerts for "Older Gay Men" + website <!-- task-id: 9bc93b4b1a3c78942251d4a0070e7284 -->
 - [ ] Set up Google Alerts for "OlderGay.Men" <!-- task-id: bf7bbd382f4c0dd6dd860ee4e285efac -->
@@ -302,6 +293,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 38ea2d04ae47e8cf7ba42bb078d8910a -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f2e232795ec04e913468ae9f49abc870 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4a9e181b5664bc35ac633118e474ef89 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3a05b6d80599981da99cd34e359a8ed7 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -340,6 +332,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 058f1c000ffe47cda7fbad7922ceb0f8 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2e8337838d143ef5fee9d5bcb14ccc02 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f27d0e3ef7d4d744bc49e809ef2f38e9 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8f80611217eb2a9dd4b2137f7494f623 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
@@ -372,6 +365,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 78e06f4e653b0697d24d4dc5939674fe -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a3c3d02eb8002426c6d9ed8ff73aaaa0 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 8066e26c3275b8d208a5d58a4b56b4f4 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e9045e0821f0e1276c387a7e1cac8d1c -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Healthier daily habits <!-- task-id: 0213c20318569981e6c028896117dccb -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
@@ -434,6 +428,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e56ce5d0cc8640cf5d339728c7a94300 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df690e295aae94ee6cf0e831920aacbf -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6c4e43b01afc3df91cc6f93e77cace6d -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0c80a64ea2b04c9ec714529e7392d09a -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: acd3aaeb90170aaa0c22bc739fff7b72 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
@@ -467,6 +462,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1e6a9821fb5479a42772b378e3c2496d -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e912e1bd5046500c9d51159f89bd931d -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d617404ceeff4129b7db88c8f7c19586 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e1072ffb94e4d7cd6f7ce6a59a6fe75a -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 67fb49cd69a2e6db7cdb448cce8bd4cd -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
