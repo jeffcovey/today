@@ -1,0 +1,109 @@
+// Drafts Action: Send to GitHub Notes
+// This script uploads a draft directly to your GitHub repository's inbox
+// 
+// Setup:
+// 1. Create a GitHub Personal Access Token at https://github.com/settings/tokens
+//    - Needs 'repo' scope
+// 2. In Drafts, create a new Action
+// 3. Add a "Script" step and paste this code
+// 4. Update the configuration below with your details
+
+// ============ CONFIGURATION ============
+const config = {
+    owner: 'OlderGay-Men',  // Organization name
+    repo: 'today',          // Repository name
+    branch: 'main'
+};
+
+// Use Drafts Credential for secure token storage
+const credential = Credential.create("GitHub Token", "Enter your GitHub Personal Access Token");
+credential.addPasswordField("token", "Token");
+if (!credential.authorize()) {
+    context.fail("GitHub credentials required");
+}
+config.token = credential.getValue("token");
+
+// ============ MAIN SCRIPT ============
+
+// Get draft content and metadata
+let content = editor.getText();
+const lines = content.split('\n');
+const title = lines[0].replace(/^#\s*/, '').trim() || 'Untitled';
+
+// Generate filename with UTC timestamp to avoid timezone issues
+const date = new Date();
+// Use UTC timestamp in filename for consistency
+const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+const timeStr = date.toISOString().split('T')[1].split('.')[0].replace(/:/g, ''); // HHMMSS
+const titleSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 50);
+const filename = `${dateStr}-${timeStr}-UTC-${titleSlug || 'untitled'}.md`;
+
+// FIXED: Use correct vault path for inbox
+const filepath = `vault/notes/inbox/${filename}`;
+const commitMessage = `Upload from Drafts: ${title}`;
+
+// GitHub API request
+const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filepath}`;
+
+// Check if file exists first
+let sha = null;
+const checkRequest = {
+    "url": url,
+    "method": "GET",
+    "headers": {
+        "Authorization": `Bearer ${config.token}`,
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "Drafts-Today-Inbox"
+    }
+};
+
+const checkResponse = HTTP.create().request(checkRequest);
+if (checkResponse.success) {
+    const existing = JSON.parse(checkResponse.responseText);
+    sha = existing.sha;
+}
+
+// Prepare the content (base64 encoded)
+const contentBase64 = Base64.encode(content);
+
+// Create or update file
+const requestBody = {
+    "message": commitMessage,
+    "content": contentBase64,
+    "branch": config.branch
+};
+
+if (sha) {
+    requestBody.sha = sha;
+}
+
+const request = {
+    "url": url,
+    "method": "PUT",
+    "data": requestBody,
+    "headers": {
+        "Authorization": `Bearer ${config.token}`,
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+        "User-Agent": "Drafts-Today-Inbox"
+    }
+};
+
+const http = HTTP.create();
+const response = http.request(request);
+
+if (response.success) {
+    app.displaySuccessMessage(`Note uploaded to inbox: ${filename}`);
+    
+    // Add a tag to track uploaded drafts
+    draft.addTag("uploaded-to-inbox");
+    draft.update();
+    
+    // Optional: Archive the draft after successful upload
+    // draft.isArchived = true;
+    // draft.update();
+} else {
+    app.displayErrorMessage(`Failed to upload: ${response.statusCode}`);
+    console.log(`Error: ${response.responseText}`);
+    context.fail();
+}

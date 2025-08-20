@@ -22,11 +22,8 @@ COPY .env* ./
 # Make scripts executable
 RUN chmod +x ./bin/* ./src/scheduler.js
 
-# Create data directory and symlink cache directories to it
-RUN mkdir -p /app/data /app/config /app/vault && \
-    ln -s /app/data /app/.data && \
-    ln -s /app/data /app/.notion-cache && \
-    ln -s /app/data /app/.calendar-cache
+# Create directories (but NOT data - it will be mounted)
+RUN mkdir -p /app/config /app/vault
 
 # Configure git
 RUN git config --global user.email "scheduler@fly.io" && \

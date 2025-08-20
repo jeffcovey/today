@@ -92,15 +92,7 @@ export class TaskManager {
       )
     `);
 
-    // Create task completion history for repeating tasks
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS task_completions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id TEXT NOT NULL,
-        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-      )
-    `);
+    // Task completions are now tracked in tasks.completed_at
 
     // Create indexes for performance
     this.db.exec(`
@@ -110,8 +102,7 @@ export class TaskManager {
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
       CREATE INDEX IF NOT EXISTS idx_task_topics_task ON task_topics(task_id);
       CREATE INDEX IF NOT EXISTS idx_task_topics_topic ON task_topics(topic_id);
-      CREATE INDEX IF NOT EXISTS idx_completions_task ON task_completions(task_id);
-      CREATE INDEX IF NOT EXISTS idx_completions_date ON task_completions(completed_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at);
     `);
 
     // Add trigger to update updated_at

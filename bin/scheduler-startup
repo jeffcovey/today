@@ -5,6 +5,18 @@ set -e
 
 echo "🚀 Scheduler startup..."
 
+# Create symlinks AFTER volume is mounted
+if [[ ! -L /app/.data ]]; then
+    echo "📁 Setting up data symlinks..."
+    ln -sfn /app/data /app/.data
+    ln -sfn /app/data /app/.notion-cache
+    ln -sfn /app/data /app/.calendar-cache
+fi
+
+# Ensure data directory exists and is writable
+mkdir -p /app/data
+chmod 755 /app/data
+
 # Check if we have GitHub token
 if [[ -z "$GITHUB_TOKEN" ]]; then
     echo "⚠️  No GITHUB_TOKEN found, skipping GitHub setup"
