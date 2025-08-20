@@ -46,7 +46,7 @@ async function runCommand(command, description) {
 
 const jobs = [
     {
-        schedule: '*/20 * * * *', // Every 20 minutes
+        schedule: '*/10 * * * *', // Every 10 minutes
         command: 'bin/sync --quick || true', // Quick sync (GitHub vault and tasks only)
         description: 'Quick sync'
     },
