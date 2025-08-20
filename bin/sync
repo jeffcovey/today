@@ -86,8 +86,19 @@ main() {
     # Run additional operations synchronously (no background jobs)
     print_header "⚡ Additional Sync Operations"
     
-    # Task classification
-    run_sync_step "🔍 Task Classification" "bin/tasks classify-stages" "Tasks classified" "Task classification"
+    # Task classification in background (it's slow and non-critical)
+    print_info "🔍 Starting task classification in background..."
+    {
+        bin/tasks classify-stages > /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Task classification completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Task classification failed" >> /tmp/classify-$$.log
+        fi
+    } &
+    CLASSIFY_PID=$!
+    print_info "   Classification running in background (PID: $CLASSIFY_PID)"
+    print_info "   Check progress: tail -f /tmp/classify-$$.log"
     
     # Email sync (if configured)
     if grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null && grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
@@ -103,7 +114,7 @@ main() {
     # Push to Turso
     run_sync_step "☁️ Turso Push" push_to_turso "Turso pushed" "Turso push"
     
-    print_status "All sync operations completed synchronously."
+    print_status "All sync operations completed (classification running in background)."
     
     # Print summary
     print_header "📋 Sync Summary"
@@ -120,6 +131,11 @@ main() {
         print_status "All data sources synchronized!"
     fi
     
+    echo ""
+    if [ ! -z "$CLASSIFY_PID" ]; then
+        echo "Note: Task classification is still running in background (PID: $CLASSIFY_PID)"
+        echo "      Check progress: tail -f /tmp/classify-$$.log"
+    fi
     echo ""
     echo "Next step: Run 'bin/today' to get AI suggestions on what to do today"
 }
