@@ -20,6 +20,10 @@
 
 - [ ] +Trip Prep <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
 
+### Weekly Recurring
+
+- [ ] Update weight log (Every Sunday morning) <!-- task-id: weight-log-weekly -->
+
 ### Invalid Date, Invalid Date
 
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
