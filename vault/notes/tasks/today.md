@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/19/2025, 8:01:20 PM EDT*
+*Generated: 8/19/2025, 8:21:29 PM EDT*
 
 ## 🔥 Immediate
 
@@ -9,7 +9,7 @@
 
 ## 🚀 1st Priority
 
-- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 
 ## 🎭 Stage
