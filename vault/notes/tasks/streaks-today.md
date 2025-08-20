@@ -1,0 +1,7 @@
+# Streaks
+
+- [ ] ♥︎ Activity Rings
+- [ ] ♥︎ Walk 5,500 Steps
+- [ ] Read Saved Articles, 2m 15s
+- [ ] Do Apple Fitness+ Workouts
+- [ ] ♥︎ Burn More Energy
