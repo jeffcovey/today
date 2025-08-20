@@ -1042,7 +1042,7 @@ export class TaskManager {
   processRepeatingTasks() {
     const today = new Date().toISOString().split('T')[0];
     const repeatingTasks = this.db.prepare(`
-      SELECT *
+      SELECT *, completed_at as last_completed
       FROM tasks
       WHERE repeat_interval IS NOT NULL 
         AND status = '✅ Done'
