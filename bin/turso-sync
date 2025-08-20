@@ -1004,6 +1004,11 @@ async function main() {
         console.log('\nNote: Local SQLite for speed, Turso for backup/sync');
         break;
     }
+    
+    // Exit cleanly after successful command completion (except for watch which runs indefinitely)
+    if (command !== 'watch') {
+      process.exit(0);
+    }
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
     process.exit(1);
