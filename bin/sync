@@ -70,8 +70,8 @@ main() {
     echo "Synchronizing all data sources..."
     echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
     
-    # Default: run critical ops first, slow ops in background
-    print_info "Running critical operations first, slow operations in background..."
+    # Run all operations synchronously for reliability
+    print_info "Running all sync operations synchronously..."
     
     # Critical path operations (fast, important)
     run_sync_step "☁️ Turso Pull" sync_turso "Turso pulled" "Turso pull"
@@ -83,85 +83,27 @@ main() {
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
     
-    # Start slow operations in background
-    print_header "⚡ Starting Background Jobs"
+    # Run additional operations synchronously (no background jobs)
+    print_header "⚡ Additional Sync Operations"
     
-    # Create log directory
-    BG_LOG_DIR="/tmp/sync-bg-$(date +%s)"
-    mkdir -p "$BG_LOG_DIR"
+    # Task classification
+    run_sync_step "🔍 Task Classification" "bin/tasks classify-stages" "Tasks classified" "Task classification"
     
-    # Task classification in background
-    {
-        echo "$(date): Starting task classification" > "$BG_LOG_DIR/classify.log"
-        if bin/tasks classify-stages >> "$BG_LOG_DIR/classify.log" 2>&1; then
-            echo "$(date): ✓ Task classification completed" >> "$BG_LOG_DIR/classify.log"
-        else
-            echo "$(date): ✗ Task classification failed" >> "$BG_LOG_DIR/classify.log"
-            echo "FAILED: Task classification" >> "$BG_LOG_DIR/failures"
-        fi
-    } &
-    
-    # Email sync in background (if configured)
+    # Email sync (if configured)
     if grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null && grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
-        {
-            echo "$(date): Starting email sync" > "$BG_LOG_DIR/email.log"
-            if sync_email >> "$BG_LOG_DIR/email.log" 2>&1; then
-                echo "$(date): ✓ Email sync completed" >> "$BG_LOG_DIR/email.log"
-            else
-                echo "$(date): ✗ Email sync failed" >> "$BG_LOG_DIR/email.log"
-                echo "FAILED: Email sync" >> "$BG_LOG_DIR/failures"
-            fi
-        } &
+        run_sync_step "📧 Email Sync" sync_email "Email synced" "Email sync"
     fi
     
-    # Calendar and contacts in background
-    {
-        echo "$(date): Starting calendar sync" > "$BG_LOG_DIR/calendar.log"
-        if sync_calendar >> "$BG_LOG_DIR/calendar.log" 2>&1; then
-            echo "$(date): ✓ Calendar sync completed" >> "$BG_LOG_DIR/calendar.log"
-        else
-            echo "$(date): ✗ Calendar sync failed" >> "$BG_LOG_DIR/calendar.log"
-            echo "FAILED: Calendar sync" >> "$BG_LOG_DIR/failures"
-        fi
-    } &
+    # Calendar sync
+    run_sync_step "📅 Calendar Sync" sync_calendar "Calendar synced" "Calendar sync"
     
-    {
-        echo "$(date): Starting contacts sync" > "$BG_LOG_DIR/contacts.log"
-        if sync_contacts >> "$BG_LOG_DIR/contacts.log" 2>&1; then
-            echo "$(date): ✓ Contacts sync completed" >> "$BG_LOG_DIR/contacts.log"
-        else
-            echo "$(date): ✗ Contacts sync failed" >> "$BG_LOG_DIR/contacts.log"
-            echo "FAILED: Contacts sync" >> "$BG_LOG_DIR/failures"
-        fi
-    } &
+    # Contacts sync
+    run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
     
-    # Push to Turso in background after a delay
-    {
-        sleep 5
-        echo "$(date): Starting Turso push" > "$BG_LOG_DIR/turso.log"
-        if push_to_turso >> "$BG_LOG_DIR/turso.log" 2>&1; then
-            echo "$(date): ✓ Turso push completed" >> "$BG_LOG_DIR/turso.log"
-        else
-            echo "$(date): ✗ Turso push failed" >> "$BG_LOG_DIR/turso.log"
-            echo "FAILED: Turso push" >> "$BG_LOG_DIR/failures"
-        fi
-        
-        # Check for failures and notify after all jobs
-        sleep 10  # Give other jobs time to finish
-        if [[ -f "$BG_LOG_DIR/failures" ]]; then
-            echo ""
-            echo -e "${RED}⚠️  Background job failures detected:${NC}" >&2
-            cat "$BG_LOG_DIR/failures" >&2
-            echo -e "${YELLOW}   Check logs in: $BG_LOG_DIR/${NC}" >&2
-            echo ""
-        else
-            echo -e "${GREEN}✅ All background jobs completed successfully${NC}" > "$BG_LOG_DIR/success"
-        fi
-    } &
+    # Push to Turso
+    run_sync_step "☁️ Turso Push" push_to_turso "Turso pushed" "Turso push"
     
-    print_status "Sync completed! Background jobs are running."
-    print_info "Background logs: $BG_LOG_DIR/"
-    print_info "Check job status: ps aux | grep -E '(classify|email|calendar|contacts|turso)'"
+    print_status "All sync operations completed synchronously."
     
     # Print summary
     print_header "📋 Sync Summary"
@@ -1200,11 +1142,11 @@ case "${1:-}" in
     --help|-h)
         echo "Usage: sync [OPTIONS]"
         echo ""
-        echo "Intelligently synchronize all data sources with background jobs"
+        echo "Intelligently synchronize all data sources"
         echo ""
-        echo "By default, runs critical operations first and slow operations in background:"
-        echo "  • Immediate: GitHub vault, task sync, markdown cleanup"
-        echo "  • Background: Task classification, email, calendar, contacts, Turso push"
+        echo "Runs all operations synchronously for reliability:"
+        echo "  • GitHub vault, task sync, markdown cleanup"
+        echo "  • Task classification, email, calendar, contacts, Turso push"
         echo "  • Uses efficient timeouts and smart caching"
         echo ""
         echo "Options:"
