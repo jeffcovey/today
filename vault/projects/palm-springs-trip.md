@@ -66,6 +66,9 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - [ ] Thursday Street Fair (if happening) <!-- task-id: 83b59804719f1ad209b1c084623237ef -->
 - [ ] Aerial Tramway (if weather permits) <!-- task-id: 6fe51efe7e716b1e21ed9958d5227514 -->
 - [ ] **Visit Don Schmoll and his husband Rich** (now living in Palm Springs!) <!-- task-id: b020901682ffd4f8c1cf861226340dc1 -->
+  - Donald says: "Excited to see you! We are available for visit Sept 8, 11, 12 all day other days evenings are open"
+  - Best days for full visit: Sept 8 (Sunday), Sept 11 (Thursday), or Sept 12 (Friday - my last day)
+  - Can also meet for dinner other evenings
 
 ## Budget Breakdown
 
@@ -116,3 +119,10 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 - **Don Schmoll connection!** Texted Don Schmoll today and told him I'm coming to PS
 - Added to trip itinerary: Plan to visit Don and Rich during the stay
 - Social connection makes the trip even better!
+
+### 2025-08-20
+
+- **Don Schmoll's availability confirmed!** 
+- Available all day: Sept 8 (Sunday), Sept 11 (Thursday), Sept 12 (Friday)
+- Available evenings: Sept 4-7, Sept 9-10
+- Planning to schedule a full day visit on one of the available days
