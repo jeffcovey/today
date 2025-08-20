@@ -593,8 +593,8 @@ sync_email() {
         print_info "No new emails to download"
     fi
     
-    # Show email stats
-    stats_output=$($EMAIL_BIN stats 2>&1 | grep "Total emails:" | cut -d: -f2 | xargs) || true
+    # Show email stats (with timeout to prevent hanging)
+    stats_output=$(timeout 2 $EMAIL_BIN stats 2>&1 | grep "Total emails:" | cut -d: -f2 | xargs) || true
     if [[ -n "$stats_output" ]]; then
         print_info "Total emails in database: $stats_output"
     fi
@@ -670,8 +670,8 @@ sync_contacts() {
             print_info "No contacts found"
         fi
         
-        # Show stats
-        stats_output=$(bin/contacts stats 2>&1 | grep -E "Total|With email" | head -2)
+        # Show stats (with timeout to prevent hanging)
+        stats_output=$(timeout 2 bin/contacts stats 2>&1 | grep -E "Total|With email" | head -2) || true
         if [[ -n "$stats_output" ]]; then
             echo "$stats_output" | while IFS= read -r line; do
                 print_info "  $line"
