@@ -667,4 +667,12 @@ Calendar data is stored in SQLite database (.data/today.db)
   }
 }
 
+// Run main function and handle exit
+main().then(() => {
+  process.exit(0);
+}).catch(error => {
+  console.error('Error:', error.message);
+  process.exit(1);
+});
+
 export { CalendarSync };
