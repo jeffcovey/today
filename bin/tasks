@@ -215,14 +215,14 @@ program
         console.log(chalk.blue(`✓ Created ${repeated} recurring task instances`));
       }
 
-      // First, sync checkbox states from today.md and tasks.md BEFORE regenerating
-      // This captures any manual edits users made
-      for (const taskFile of ['vault/notes/tasks/today.md', 'vault/notes/tasks/tasks.md']) {
-        if (fs.existsSync(taskFile)) {
-          const updates = await tm.syncMarkdownFile(taskFile);
-          if (updates > 0) {
-            console.log(chalk.gray(`  • Synced ${updates} checkbox changes from ${taskFile}`));
-          }
+      // First, sync checkbox states from today.md ONLY before regenerating
+      // Users primarily edit today.md, not tasks.md
+      // Syncing from both can cause conflicts where tasks.md reverts today.md changes
+      const todayFile = 'vault/notes/tasks/today.md';
+      if (fs.existsSync(todayFile)) {
+        const updates = await tm.syncMarkdownFile(todayFile);
+        if (updates > 0) {
+          console.log(chalk.gray(`  • Synced ${updates} checkbox changes from ${todayFile}`));
         }
       }
       

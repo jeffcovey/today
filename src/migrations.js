@@ -180,6 +180,123 @@ export class MigrationManager {
           
           console.log(`    Added ${addedColumns} timestamp columns`);
         }
+      },
+      {
+        version: 5,
+        description: 'Add Toggl time tracking tables',
+        fn: (db) => {
+          // Create time_entries table for Toggl data
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS toggl_time_entries (
+              id INTEGER PRIMARY KEY,
+              description TEXT,
+              wid INTEGER,
+              pid INTEGER,
+              tid INTEGER,
+              billable BOOLEAN DEFAULT 0,
+              start DATETIME NOT NULL,
+              stop DATETIME,
+              duration INTEGER,
+              created_with TEXT,
+              tags TEXT,
+              duronly BOOLEAN DEFAULT 0,
+              at DATETIME,
+              server_deleted_at DATETIME,
+              user_id INTEGER,
+              uid INTEGER,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          // Create projects table for Toggl projects
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS toggl_projects (
+              id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              wid INTEGER,
+              cid INTEGER,
+              active BOOLEAN DEFAULT 1,
+              is_private BOOLEAN DEFAULT 1,
+              template BOOLEAN DEFAULT 0,
+              template_id INTEGER,
+              billable BOOLEAN DEFAULT 0,
+              auto_estimates BOOLEAN DEFAULT 0,
+              estimated_hours INTEGER,
+              at DATETIME,
+              color TEXT,
+              rate REAL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          // Create clients table for Toggl clients
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS toggl_clients (
+              id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              wid INTEGER,
+              notes TEXT,
+              at DATETIME,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          // Create tags table for Toggl tags
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS toggl_tags (
+              id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              wid INTEGER,
+              at DATETIME,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          // Create daily summaries view for easy analysis
+          db.exec(`
+            CREATE VIEW IF NOT EXISTS toggl_daily_summary AS
+            SELECT 
+              DATE(start) as date,
+              SUM(duration) as total_seconds,
+              ROUND(SUM(duration) / 3600.0, 2) as total_hours,
+              COUNT(*) as entry_count,
+              GROUP_CONCAT(DISTINCT tags) as all_tags
+            FROM toggl_time_entries
+            WHERE stop IS NOT NULL
+            GROUP BY DATE(start)
+            ORDER BY date DESC
+          `);
+          
+          // Create project summaries view
+          db.exec(`
+            CREATE VIEW IF NOT EXISTS toggl_project_summary AS
+            SELECT 
+              p.name as project_name,
+              DATE(te.start) as date,
+              SUM(te.duration) as total_seconds,
+              ROUND(SUM(te.duration) / 3600.0, 2) as total_hours,
+              COUNT(*) as entry_count
+            FROM toggl_time_entries te
+            LEFT JOIN toggl_projects p ON te.pid = p.id
+            WHERE te.stop IS NOT NULL
+            GROUP BY p.name, DATE(te.start)
+            ORDER BY date DESC, total_seconds DESC
+          `);
+          
+          // Add indexes for performance
+          db.exec(`
+            CREATE INDEX IF NOT EXISTS idx_toggl_time_entries_start ON toggl_time_entries(start);
+            CREATE INDEX IF NOT EXISTS idx_toggl_time_entries_pid ON toggl_time_entries(pid);
+            CREATE INDEX IF NOT EXISTS idx_toggl_time_entries_user ON toggl_time_entries(user_id);
+            CREATE INDEX IF NOT EXISTS idx_toggl_projects_wid ON toggl_projects(wid);
+          `);
+          
+          console.log('    Created Toggl tracking tables and views');
+        }
       }
     ];
 

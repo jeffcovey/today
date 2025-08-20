@@ -680,8 +680,12 @@ export class TaskManager {
             const taskUpdateTime = task.updated_at ? new Date(task.updated_at) : new Date(0);
             const markdownIsNewer = fileModTime > taskUpdateTime;
             
-            // Only sync from markdown if the file is newer than the database
-            if (markdownIsNewer) {
+            // For today.md and tasks.md, always sync checkbox states regardless of timestamps
+            // These files are auto-generated but users edit checkboxes manually
+            const isAutoGenFile = filePath === 'vault/notes/tasks/today.md' || filePath === 'vault/notes/tasks/tasks.md';
+            
+            // Sync if markdown is newer OR if it's an auto-gen file with checkbox changes
+            if (markdownIsNewer || (isAutoGenFile && isCompleted !== (task.status === '✅ Done'))) {
               const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
               const updates = {};
               
@@ -704,6 +708,10 @@ export class TaskManager {
               
               if (Object.keys(updates).length > 0) {
                 this.updateTask(taskId, updates);
+                // Log checkbox state changes for debugging
+                if (updates.status) {
+                  console.log(`  • Task "${task.title.substring(0, 30)}..." status: ${task.status} → ${updates.status}`);
+                }
               }
             }
           }
@@ -922,15 +930,23 @@ export class TaskManager {
   // Generate today's task file
   // Note: Checkbox syncing is handled separately, not during generation
   async generateTodayFile(outputPath = 'vault/notes/tasks/today.md') {
-    // Check if file was recently modified (within last 5 seconds)
+    // Check if file was recently modified (within last 30 seconds)
     // This prevents overwriting manual edits that just happened
     try {
       const stats = await fs.stat(outputPath);
       const timeSinceModified = Date.now() - stats.mtime.getTime();
-      if (timeSinceModified < 5000) {
-        // File was just edited, skip regeneration to preserve manual changes
-        console.log('  • Skipping today.md regeneration (file was just edited)');
-        return 0;
+      if (timeSinceModified < 30000) {
+        // File was recently edited, check if we should skip regeneration
+        // Only skip if the file has uncaptured manual changes
+        const content = await fs.readFile(outputPath, 'utf-8');
+        const hasUncheckedTasks = content.includes('- [ ]');
+        const hasCheckedTasks = content.includes('- [x]');
+        
+        if (hasCheckedTasks && timeSinceModified < 5000) {
+          // User just checked tasks, give sync time to capture them
+          console.log('  • Delaying today.md regeneration (capturing recent checkbox changes)');
+          return 0;
+        }
       }
     } catch (err) {
       // File doesn't exist yet, continue with generation

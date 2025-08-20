@@ -112,6 +112,11 @@ main() {
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
     
+    # Toggl time tracking sync (if configured)
+    if grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null && ! grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
+        run_sync_step "⏱️ Toggl Sync" sync_toggl "Toggl synced" "Toggl sync"
+    fi
+    
     # Final vault sync to push any changes made during sync operations
     run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
     
@@ -604,6 +609,46 @@ sync_calendar() {
         fi
     else
         print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
+        return 1
+    fi
+}
+
+# Sync Toggl time tracking
+sync_toggl() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if toggl binary exists
+    if [[ ! -f bin/toggl ]]; then
+        print_error "Toggl CLI not available"
+        return 1
+    fi
+    
+    # Check if Toggl API token is configured
+    if ! grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null || grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
+        print_info "Toggl not configured (need TOGGL_API_TOKEN)"
+        return 1
+    fi
+    
+    # Run Toggl sync for last 7 days
+    print_info "Syncing Toggl time entries..."
+    
+    sync_output=$(bin/toggl sync 7 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract entry count from output
+        if echo "$sync_output" | grep -q "Synced [0-9]* time entries"; then
+            entry_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ time entries" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $entry_count time entries"
+        fi
+        
+        # Show today's total if available
+        today_total=$(sqlite3 .data/today.db "SELECT printf('%.2f', SUM(duration) / 3600.0) FROM toggl_time_entries WHERE DATE(start) = DATE('now', 'localtime') AND stop IS NOT NULL" 2>/dev/null || echo "0")
+        if [[ "$today_total" != "0" ]] && [[ -n "$today_total" ]]; then
+            print_info "Today's tracked time: ${today_total} hours"
+        fi
+        
+        return 0
+    else
+        print_error "Toggl sync failed"
         return 1
     fi
 }
