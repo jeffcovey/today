@@ -327,7 +327,7 @@ sync_tasks() {
     print_info "Syncing task database with markdown files..."
     
     # Run the task sync command (now includes stage classification)
-    output=$(bin/tasks sync 2>&1)
+    output=$(timeout 30 bin/tasks sync 2>&1)
     
     if [[ $? -eq 0 ]]; then
         # Show the sync output but filter for key info
@@ -399,7 +399,7 @@ push_to_turso() {
     print_info "Pushing changes to Turso..."
     
     # Run the turso-sync script with push action
-    if bin/turso-sync push 2>&1 | while IFS= read -r line; do
+    if timeout 30 bin/turso-sync push 2>&1 | while IFS= read -r line; do
         if [[ "$line" == *"✅"* ]] || [[ "$line" == *"⬆️"* ]] || [[ "$line" == *"Changes pushed"* ]]; then
             print_info "$line"
         elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
@@ -564,8 +564,8 @@ sync_email() {
         sleep 0.5
     done
     
-    # Get exit code
-    wait $EMAIL_PID
+    # Get exit code (don't wait forever if process was killed)
+    wait $EMAIL_PID 2>/dev/null || true
     email_exit_code=$?
     
     # Read final output

@@ -150,23 +150,41 @@ export class DatabaseService {
    */
   getLocalLastModified() {
     try {
-      const result = this.localDb.prepare(`
-        SELECT MAX(updated_at) as max_time FROM tasks
-        UNION ALL
-        SELECT MAX(created_at) FROM tasks
-        UNION ALL
-        SELECT MAX(completed_at) FROM tasks
-        UNION ALL
-        SELECT MAX(updated_at) FROM projects
+      // Get all tables with timestamps
+      const tables = this.localDb.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND name NOT LIKE 'sqlite_%'
+        AND name NOT LIKE '_litestream_%'
       `).all();
       
       let maxTimestamp = 0;
-      for (const row of result) {
-        if (row.max_time) {
-          const timestamp = new Date(row.max_time).getTime();
-          if (timestamp > maxTimestamp) {
-            maxTimestamp = timestamp;
+      
+      for (const table of tables) {
+        try {
+          // Check multiple timestamp columns
+          const queries = [
+            `SELECT MAX(updated_at) as max_time FROM ${table.name}`,
+            `SELECT MAX(created_at) as max_time FROM ${table.name}`,
+            `SELECT MAX(completed_at) as max_time FROM ${table.name}`,
+            `SELECT MAX(last_synced) as max_time FROM ${table.name}`
+          ];
+          
+          for (const query of queries) {
+            try {
+              const result = this.localDb.prepare(query).get();
+              if (result?.max_time) {
+                const timestamp = new Date(result.max_time).getTime();
+                if (timestamp > maxTimestamp) {
+                  maxTimestamp = timestamp;
+                }
+              }
+            } catch {
+              // Column doesn't exist in this table
+            }
           }
+        } catch {
+          // Table query failed
         }
       }
       
@@ -181,32 +199,69 @@ export class DatabaseService {
    */
   async getTursoLastModified() {
     try {
-      const result = await Promise.race([
-        this.tursoClient.execute(`
-          SELECT MAX(updated_at) as max_time FROM tasks
-          UNION ALL
-          SELECT MAX(created_at) FROM tasks
-          UNION ALL
-          SELECT MAX(completed_at) FROM tasks
-          UNION ALL
-          SELECT MAX(updated_at) FROM projects
-        `),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-      ]);
+      // Get list of tables from Turso
+      const tablesResult = await this.tursoClient.execute(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND name NOT LIKE 'sqlite_%'
+        AND name NOT LIKE '_litestream_%'
+      `);
       
       let maxTimestamp = 0;
-      for (const row of result.rows) {
-        if (row.max_time) {
-          const timestamp = new Date(row.max_time).getTime();
-          if (timestamp > maxTimestamp) {
-            maxTimestamp = timestamp;
+      
+      for (const table of tablesResult.rows) {
+        try {
+          // Check multiple timestamp columns
+          const result = await Promise.race([
+            this.tursoClient.execute(`
+              SELECT MAX(updated_at) as max_time FROM ${table.name}
+              UNION ALL
+              SELECT MAX(created_at) FROM ${table.name}
+              UNION ALL
+              SELECT MAX(completed_at) FROM ${table.name}
+              UNION ALL
+              SELECT MAX(last_synced) FROM ${table.name}
+            `),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
+          ]);
+          
+          for (const row of result.rows) {
+            if (row.max_time) {
+              const timestamp = new Date(row.max_time).getTime();
+              if (timestamp > maxTimestamp) {
+                maxTimestamp = timestamp;
+              }
+            }
           }
+        } catch {
+          // Table query failed or timed out
         }
       }
       
-      return maxTimestamp;
+      return maxTimestamp > 0 ? maxTimestamp : null;
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Get list of tables to sync (all user tables)
+   */
+  async getSyncTables() {
+    try {
+      // Get all tables from local database
+      const tables = this.localDb.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND name NOT LIKE 'sqlite_%'
+        AND name NOT LIKE '_litestream_%'
+        ORDER BY name
+      `).all();
+      
+      return tables.map(t => t.name);
+    } catch (error) {
+      // Fallback to essential tables if query fails
+      return ['tasks', 'projects', 'topics', 'task_topics', 'markdown_sync'];
     }
   }
 
@@ -217,13 +272,37 @@ export class DatabaseService {
     if (!this.tursoClient) return;
     
     try {
-      // Focus on key tables only
-      const SYNC_TABLES = ['tasks', 'projects', 'topics', 'task_topics', 'markdown_sync'];
+      // Get all tables dynamically
+      const tables = await this.getSyncTables();
       let totalRows = 0;
+      let syncedTables = 0;
       
-      for (const tableName of SYNC_TABLES) {
+      for (const tableName of tables) {
         try {
-          const dataResult = await this.tursoClient.execute(`SELECT * FROM ${tableName}`);
+          // Only pull tables that have recent changes in Turso
+          const tursoTimestamp = await this.getTableLastModified(tableName, true);
+          const localTimestamp = await this.getTableLastModified(tableName, false);
+          
+          if (!tursoTimestamp || (localTimestamp && localTimestamp >= tursoTimestamp)) {
+            continue; // Skip if local is already up to date
+          }
+          
+          // Pull recent changes only (last 24 hours for efficiency)
+          const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          let whereClause = '';
+          let args = [];
+          
+          // Check if table has timestamp columns
+          const hasTimestamp = await this.tableHasTimestamp(tableName);
+          if (hasTimestamp) {
+            whereClause = ` WHERE updated_at > ? OR created_at > ?`;
+            args = [cutoff, cutoff];
+          }
+          
+          const dataResult = await this.tursoClient.execute({
+            sql: `SELECT * FROM ${tableName}${whereClause}`,
+            args
+          });
           
           if (dataResult.rows.length > 0) {
             const columns = Object.keys(dataResult.rows[0]);
@@ -245,19 +324,74 @@ export class DatabaseService {
             
             transaction();
             totalRows += dataResult.rows.length;
+            syncedTables++;
           }
         } catch (e) {
-          // Skip tables that might not exist
+          // Skip tables that might not exist in Turso
         }
       }
       
       if (totalRows > 0 && process.stderr.isTTY) {
-        console.error(`✅ Pulled ${totalRows} rows from Turso`);
+        console.error(`✅ Pulled ${totalRows} rows from ${syncedTables} tables`);
       }
     } catch (error) {
       if (process.stderr.isTTY) {
         console.error('⚠️  Pull failed:', error.message);
       }
+    }
+  }
+  
+  /**
+   * Check if table has timestamp columns
+   */
+  async tableHasTimestamp(tableName) {
+    try {
+      const columns = this.localDb.prepare(`PRAGMA table_info(${tableName})`).all();
+      return columns.some(c => 
+        c.name === 'updated_at' || 
+        c.name === 'created_at' || 
+        c.name === 'last_synced'
+      );
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Get last modified timestamp for a table
+   */
+  async getTableLastModified(tableName, fromTurso = false) {
+    try {
+      const db = fromTurso ? this.tursoClient : this.localDb;
+      const query = `
+        SELECT MAX(updated_at) as max_time FROM ${tableName}
+        UNION ALL
+        SELECT MAX(created_at) FROM ${tableName}
+        UNION ALL
+        SELECT MAX(last_synced) FROM ${tableName}
+      `;
+      
+      let result;
+      if (fromTurso) {
+        const res = await db.execute(query);
+        result = res.rows;
+      } else {
+        result = db.prepare(query).all();
+      }
+      
+      let maxTimestamp = 0;
+      for (const row of result) {
+        if (row.max_time) {
+          const timestamp = new Date(row.max_time).getTime();
+          if (timestamp > maxTimestamp) {
+            maxTimestamp = timestamp;
+          }
+        }
+      }
+      
+      return maxTimestamp;
+    } catch {
+      return 0;
     }
   }
 

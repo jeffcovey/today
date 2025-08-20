@@ -2,38 +2,33 @@
 
 /**
  * Turso Sync Utility
- * Manages sync between local SQLite and Turso cloud database
+ * Uses the DatabaseService for all sync operations
  * 
- * Key features:
- * - Handles initial pull from Turso on new systems
- * - Incremental sync to avoid timeouts
- * - Automatic conflict resolution
+ * This is now a thin wrapper around DatabaseService that provides
+ * command-line interface for manual sync control
  */
 
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import dotenvx from '@dotenvx/dotenvx';
-import Database from 'better-sqlite3';
-import { createClient } from '@libsql/client';
+import { DatabaseService, getDatabase } from '../src/database-service.js';
 import { MigrationManager } from '../src/migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Load environment variables
-dotenvx.config();
 
 const LOCAL_DB = path.join(process.cwd(), '.data', 'today.db');
 const SYNC_STATE_FILE = path.join(process.cwd(), '.data', 'turso-sync.json');
 
 class TursoSync {
   constructor() {
-    this.localDb = null;
-    this.tursoClient = null;
+    // Force a new instance for manual control (don't use singleton)
+    this.db = new DatabaseService(LOCAL_DB, { 
+      forceNew: true, 
+      autoSync: false  // Manual control only
+    });
     this.syncState = this.loadSyncState();
   }
 
@@ -56,99 +51,11 @@ class TursoSync {
     fs.writeFileSync(SYNC_STATE_FILE, JSON.stringify(this.syncState, null, 2));
   }
 
-  getLocalSchemaVersion() {
-    if (!this.localDb) return 0;
-    
-    try {
-      const result = this.localDb.prepare('SELECT MAX(version) as version FROM schema_version').get();
-      return result?.version || 0;
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  async getTursoSchemaVersion() {
-    try {
-      const result = await this.tursoClient.execute('SELECT MAX(version) as version FROM schema_version');
-      return result.rows[0]?.version || 0;
-    } catch (e) {
-      // Table doesn't exist in Turso yet
-      return 0;
-    }
-  }
-
-  async applyMigrationsToTurso() {
-    // Create schema_version table in Turso if it doesn't exist
-    await this.tursoClient.execute(`
-      CREATE TABLE IF NOT EXISTS schema_version (
-        version INTEGER PRIMARY KEY,
-        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        description TEXT
-      )
-    `);
-
-    const localVersion = this.getLocalSchemaVersion();
-    const tursoVersion = await this.getTursoSchemaVersion();
-
-    // Apply migrations that Turso is missing
-    if (localVersion > tursoVersion) {
-      // Get migrations from local
-      const migrations = this.localDb.prepare(
-        'SELECT * FROM schema_version WHERE version > ? ORDER BY version'
-      ).all(tursoVersion);
-
-      for (const migration of migrations) {
-        console.log(chalk.gray(`   Applying migration ${migration.version}: ${migration.description}`));
-        
-        // Apply specific migrations
-        if (migration.version === 1) {
-          // Drop task_completions table
-          await this.tursoClient.execute('DROP TABLE IF EXISTS task_completions');
-          console.log(chalk.gray('     Dropped task_completions table from Turso'));
-        }
-        
-        // Record migration in Turso
-        await this.tursoClient.execute({
-          sql: 'INSERT INTO schema_version (version, description) VALUES (?, ?)',
-          args: [migration.version, migration.description]
-        });
-      }
-      
-      console.log(chalk.green(`   ✅ Applied ${migrations.length} migrations to Turso`));
-    }
-  }
-
-  async initClients() {
-    // Initialize Turso client
-    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-      console.log(chalk.yellow('⚠️  Turso not configured'));
-      console.log(chalk.gray('   Run: bin/migrate-to-turso setup'));
-      process.exit(1);
-    }
-
-    this.tursoClient = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN
-    });
-
-    // Initialize local database if it exists
-    if (fs.existsSync(LOCAL_DB)) {
-      this.localDb = new Database(LOCAL_DB);
-      this.localDb.pragma('journal_mode = WAL');
-      
-      // Run migrations on local database
-      const localMigrations = new MigrationManager(this.localDb);
-      await localMigrations.runMigrations();
-    }
-  }
-
   async status() {
-    await this.initClients();
-
     console.log(chalk.blue('📊 Turso Sync Status\n'));
 
     // Local database status
-    if (this.localDb) {
+    if (fs.existsSync(LOCAL_DB)) {
       const stats = fs.statSync(LOCAL_DB);
       const localSize = (stats.size / 1024 / 1024).toFixed(2);
       const localModified = new Date(stats.mtime).toLocaleString();
@@ -158,35 +65,52 @@ class TursoSync {
       console.log(chalk.white(`   Size: ${localSize} MB`));
       console.log(chalk.white(`   Modified: ${localModified}`));
       
-      const localTaskCount = this.localDb.prepare('SELECT COUNT(*) as count FROM tasks').get().count;
-      console.log(chalk.white(`   Tasks: ${localTaskCount}`));
+      try {
+        const localTaskCount = this.db.get('SELECT COUNT(*) as count FROM tasks')?.count || 0;
+        console.log(chalk.white(`   Tasks: ${localTaskCount}`));
+      } catch (e) {
+        console.log(chalk.yellow('   Unable to count tasks'));
+      }
     } else {
       console.log(chalk.yellow('⚠️  No local database found'));
       console.log(chalk.gray('   Run: bin/turso-sync pull'));
     }
 
-    // Turso database status
-    console.log(chalk.cyan('\nTurso Database:'));
-    const dbUrl = process.env.TURSO_DATABASE_URL.replace('encrypted:', '');
-    console.log(chalk.white(`   URL: ${dbUrl.substring(0, 60)}...`));
+    // Get sync status from DatabaseService
+    const syncStatus = await this.db.getSyncStatus();
     
-    try {
-      const result = await this.tursoClient.execute('SELECT COUNT(*) as count FROM tasks');
-      const tursoTaskCount = result.rows[0].count;
-      console.log(chalk.white(`   Tasks: ${tursoTaskCount}`));
+    console.log(chalk.cyan('\nTurso Database:'));
+    if (syncStatus.connected) {
+      const dbUrl = (syncStatus.syncUrl || '').replace('libsql://', '').substring(0, 60);
+      console.log(chalk.white(`   URL: ${dbUrl}...`));
+      console.log(chalk.green(`   Status: ${syncStatus.message}`));
       
-      if (this.localDb) {
-        const localTaskCount = this.localDb.prepare('SELECT COUNT(*) as count FROM tasks').get().count;
-        if (localTaskCount !== tursoTaskCount) {
-          console.log(chalk.yellow('\n⚠️  Databases are out of sync'));
-          console.log(chalk.gray('   Run: bin/turso-sync pull (to get latest from Turso)'));
-          console.log(chalk.gray('   Run: bin/turso-sync push (to update Turso)'));
-        } else {
-          console.log(chalk.green('\n✅ Databases appear to be in sync'));
+      // Try to get task count from Turso
+      if (this.db.tursoClient) {
+        try {
+          const result = await this.db.tursoClient.execute('SELECT COUNT(*) as count FROM tasks');
+          const tursoTaskCount = result.rows[0].count;
+          console.log(chalk.white(`   Tasks: ${tursoTaskCount}`));
+          
+          // Compare counts
+          if (fs.existsSync(LOCAL_DB)) {
+            const localTaskCount = this.db.get('SELECT COUNT(*) as count FROM tasks')?.count || 0;
+            if (localTaskCount !== tursoTaskCount) {
+              console.log(chalk.yellow('\n⚠️  Databases are out of sync'));
+              console.log(chalk.gray('   Run: bin/turso-sync sync (for bidirectional sync)'));
+            } else {
+              console.log(chalk.green('\n✅ Databases appear to be in sync'));
+            }
+          }
+        } catch (error) {
+          console.log(chalk.red(`   Error: ${error.message}`));
         }
       }
-    } catch (error) {
-      console.log(chalk.red(`   Error: ${error.message}`));
+    } else {
+      console.log(chalk.yellow(`   Status: ${syncStatus.message}`));
+      if (syncStatus.error) {
+        console.log(chalk.red(`   Error: ${syncStatus.error}`));
+      }
     }
 
     if (this.syncState.lastSync) {
@@ -195,757 +119,263 @@ class TursoSync {
   }
 
   async pull() {
-    await this.initClients();
-
     console.log(chalk.blue('📥 Pulling from Turso to local...\n'));
-
-    // Create local database directory if needed
-    const dir = path.dirname(LOCAL_DB);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    // If no local database, this is initial setup
-    const isInitialSetup = !fs.existsSync(LOCAL_DB);
     
-    if (isInitialSetup) {
-      console.log(chalk.yellow('🔄 Initial setup - creating local database from Turso...'));
-      console.log(chalk.gray('   This may take a moment for large databases...\n'));
+    if (!this.db.isConnectedToTurso()) {
+      console.log(chalk.red('❌ Not connected to Turso'));
+      console.log(chalk.gray('   Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN'));
+      return;
     }
 
-    // Create/open local database
-    if (!this.localDb) {
-      this.localDb = new Database(LOCAL_DB);
-      this.localDb.pragma('journal_mode = WAL');
-      
-      // Run migrations on newly created database
-      const localMigrations = new MigrationManager(this.localDb);
-      await localMigrations.runMigrations();
+    // Run migrations first
+    if (!fs.existsSync(LOCAL_DB)) {
+      console.log(chalk.yellow('🔄 Initial setup - creating local database...'));
     }
-
-    // Check schema versions
-    const localVersion = this.getLocalSchemaVersion();
-    const tursoVersion = await this.getTursoSchemaVersion();
     
-    if (tursoVersion < localVersion) {
-      console.log(chalk.yellow(`⚠️  Turso schema (v${tursoVersion}) is older than local (v${localVersion})`));
-      console.log(chalk.gray('   Applying local migrations to Turso...'));
-      await this.applyMigrationsToTurso();
-    }
-
-    // Create schema from Turso (if needed)
-    if (isInitialSetup) {
-      await this.createSchemaFromTurso();
-    }
-
-    // Pull data table by table to handle large databases
-    // Connect to Turso to get table list
-    const tursoClient = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN
-    });
+    const migrations = new MigrationManager(this.db.localDb);
+    await migrations.runMigrations();
     
-    // Get ALL tables from Turso (not just a hardcoded subset!)
-    const tablesResult = await tursoClient.execute(`
-      SELECT name FROM sqlite_master 
-      WHERE type='table' 
-      AND name NOT LIKE 'sqlite_%'
-      AND name NOT LIKE '_litestream_%'
-      ORDER BY name
-    `);
+    // Use DatabaseService's pull method
+    console.log(chalk.gray('   Checking for updates...'));
+    const startTime = Date.now();
     
-    const tables = tablesResult.rows.map(row => row.name);
-    console.log(`   Found ${tables.length} tables to sync`);
+    // Force a pull even if timestamps match
+    await this.db.pullFromTurso();
     
-    for (const table of tables) {
-      try {
-        await this.pullTable(table, isInitialSetup);
-      } catch (error) {
-        console.log(chalk.yellow(`⚠️  Warning pulling ${table}: ${error.message}`));
-      }
-    }
-
-    // Also sync emails table if it exists
-    try {
-      const emailCheck = await this.tursoClient.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='emails'");
-      if (emailCheck.rows.length > 0) {
-        await this.pullTable('emails', isInitialSetup);
-      }
-    } catch (e) {
-      // Emails table doesn't exist, that's OK
-    }
-
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(chalk.green(`\n✅ Pull completed in ${elapsed}s`));
+    
     this.syncState.lastSync = new Date().toISOString();
     this.syncState.initialized = true;
     this.saveSyncState();
-
-    console.log(chalk.green('\n✅ Successfully pulled from Turso'));
-  }
-
-  async pullTable(tableName, isInitialSetup) {
-    console.log(chalk.gray(`   Pulling ${tableName}...`));
-    
-    // Check for existing resume state
-    const resumeStateFile = `.data/pull-resume-${tableName}.json`;
-    let resumeOffset = 0;
-    try {
-      if (fs.existsSync(resumeStateFile)) {
-        const resumeData = JSON.parse(fs.readFileSync(resumeStateFile, 'utf8'));
-        resumeOffset = resumeData.offset || 0;
-        if (resumeOffset > 0) {
-          console.log(chalk.gray(`     Resuming from offset ${resumeOffset}`));
-        }
-      }
-    } catch (e) {
-      // Resume file corrupted, start from beginning
-      resumeOffset = 0;
-    }
-
-    // Special handling for emails - incremental pull
-    if (tableName === 'emails' && !isInitialSetup) {
-      await this.pullEmailsIncremental();
-      // Clean up resume file on success
-      if (fs.existsSync(resumeStateFile)) fs.unlinkSync(resumeStateFile);
-      return;
-    }
-
-    // For tables with timestamps, do incremental pull (unless initial setup)
-    let whereClause = '';
-    let args = [];
-    
-    if (!isInitialSetup) {
-      // Check if table has timestamp columns
-      try {
-        const columns = this.localDb.prepare(`PRAGMA table_info(${tableName})`).all();
-        const hasUpdatedAt = columns.some(c => c.name === 'updated_at');
-        const hasCreatedAt = columns.some(c => c.name === 'created_at');
-        const hasLastSynced = columns.some(c => c.name === 'last_synced');
-        
-        if (hasUpdatedAt || hasCreatedAt || hasLastSynced) {
-          // Get the most recent timestamp from local
-          const timestampCol = hasUpdatedAt ? 'updated_at' : (hasLastSynced ? 'last_synced' : 'created_at');
-          const localMax = this.localDb.prepare(`
-            SELECT MAX(${timestampCol}) as max_time, COUNT(*) as count
-            FROM ${tableName}
-          `).get();
-          
-          if (localMax?.max_time && localMax?.count > 0) {
-            // Pull only rows newer than what we have (with 1 minute overlap for safety)
-            const cutoff = new Date(new Date(localMax.max_time).getTime() - 60000).toISOString();
-            whereClause = ` WHERE ${timestampCol} > ?`;
-            args = [cutoff];
-            console.log(chalk.gray(`     Checking for updates since ${new Date(cutoff).toLocaleString()}`));
-          }
-        }
-      } catch (e) {
-        // Table might not exist locally yet
-      }
-    }
-
-    // Get count first
-    const countResult = await this.tursoClient.execute({
-      sql: `SELECT COUNT(*) as count FROM ${tableName}${whereClause}`,
-      args
-    });
-    const totalRows = countResult.rows[0].count;
-    
-    if (totalRows === 0) {
-      console.log(chalk.gray(`     No ${whereClause ? 'new' : ''} rows in ${tableName}`));
-      return;
-    }
-
-    // For large tables, pull in batches with resumption
-    const BATCH_SIZE = 10; // Very small batches for debugging
-    let offset = Math.max(resumeOffset, 0);
-
-    console.log(chalk.gray(`     Starting batch pull: ${totalRows} total rows, starting at offset ${offset}`));
-    
-    while (offset < totalRows) {
-      try {
-        console.log(chalk.gray(`     Fetching batch: LIMIT ${BATCH_SIZE} OFFSET ${offset}`));
-        
-        const result = await this.tursoClient.execute({
-          sql: `SELECT * FROM ${tableName}${whereClause} LIMIT ? OFFSET ?`,
-          args: [...args, BATCH_SIZE, offset]
-        });
-
-        console.log(chalk.gray(`     Received ${result.rows.length} rows from Turso`));
-
-        if (result.rows.length === 0) {
-          console.log(chalk.gray(`     No more rows, breaking`));
-          break;
-        }
-
-        // Begin transaction for batch insert
-        console.log(chalk.gray(`     Inserting ${result.rows.length} rows into local database`));
-        const transaction = this.localDb.transaction(() => {
-          for (const row of result.rows) {
-            this.upsertRow(tableName, row);
-          }
-        });
-
-        transaction();
-        console.log(chalk.gray(`     Transaction completed`));
-        
-        offset += result.rows.length;
-        
-        // Save resume progress every batch
-        fs.writeFileSync(resumeStateFile, JSON.stringify({
-          offset: offset,
-          totalRows: totalRows,
-          timestamp: new Date().toISOString()
-        }));
-
-        console.log(chalk.gray(`     Processed ${Math.min(offset, totalRows)}/${totalRows} rows (saved resume state)`));
-        
-      } catch (error) {
-        console.log(chalk.yellow(`     Error at offset ${offset}: ${error.message}`));
-        // Save current progress and exit
-        fs.writeFileSync(resumeStateFile, JSON.stringify({
-          offset: offset,
-          totalRows: totalRows,
-          timestamp: new Date().toISOString(),
-          error: error.message
-        }));
-        throw error;
-      }
-    }
-    
-    // Clean up resume file on successful completion
-    if (fs.existsSync(resumeStateFile)) {
-      fs.unlinkSync(resumeStateFile);
-    }
-
-    console.log(chalk.green(`     ✓ ${tableName}: ${totalRows} ${whereClause ? 'new/updated' : ''} rows`));
-  }
-
-  async pullEmailsIncremental() {
-    // Get the most recent email date from local
-    let localMaxDate;
-    let localCount = 0;
-    
-    try {
-      const localStats = this.localDb.prepare(`
-        SELECT MAX(date) as max_date, COUNT(*) as count 
-        FROM emails
-      `).get();
-      localMaxDate = localStats?.max_date;
-      localCount = localStats?.count || 0;
-      
-      if (localCount > 0) {
-        console.log(chalk.gray(`     Local has ${localCount} emails, checking for new...`));
-      }
-    } catch (e) {
-      // Table might not exist yet
-      console.log(chalk.gray(`     Emails table doesn't exist locally yet`));
-      return;
-    }
-    
-    // Pull only recent emails (last 30 days) to avoid huge transfers
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const cutoffDate = localMaxDate ? 
-      new Date(Math.max(
-        new Date(localMaxDate).getTime() - 24 * 60 * 60 * 1000,  // 1 day before latest
-        new Date(thirtyDaysAgo).getTime()  // But not older than 30 days
-      )).toISOString() : 
-      thirtyDaysAgo;
-    
-    // Count new emails
-    const countResult = await this.tursoClient.execute({
-      sql: `SELECT COUNT(*) as count FROM emails WHERE date > ?`,
-      args: [cutoffDate]
-    });
-    const potentialNew = countResult.rows[0].count;
-    
-    if (potentialNew === 0) {
-      console.log(chalk.gray(`     No new emails since ${new Date(cutoffDate).toLocaleDateString()}`));
-      return;
-    }
-    
-    console.log(chalk.gray(`     Checking ${potentialNew} emails from last ${localMaxDate ? 'day' : '30 days'}...`));
-    
-    // Pull in smaller batches for emails
-    const BATCH_SIZE = 200;
-    let offset = 0;
-    let actualNew = 0;
-    let skipped = 0;
-    
-    while (offset < potentialNew) {
-      const result = await this.tursoClient.execute({
-        sql: `SELECT * FROM emails WHERE date > ? ORDER BY date DESC LIMIT ? OFFSET ?`,
-        args: [cutoffDate, BATCH_SIZE, offset]
-      });
-      
-      if (result.rows.length === 0) break;
-      
-      // Use INSERT OR IGNORE for emails to skip duplicates quickly
-      const transaction = this.localDb.transaction(() => {
-        for (const email of result.rows) {
-          try {
-            const stmt = this.localDb.prepare(`
-              INSERT OR IGNORE INTO emails (id, subject, from_address, date, has_been_replied_to, text_content)
-              VALUES (?, ?, ?, ?, ?, ?)
-            `);
-            const info = stmt.run(
-              email.id,
-              email.subject,
-              email.from_address,
-              email.date,
-              email.has_been_replied_to || 0,
-              email.text_content
-            );
-            
-            if (info.changes > 0) {
-              actualNew++;
-            } else {
-              skipped++;
-            }
-          } catch (e) {
-            skipped++;
-          }
-        }
-      });
-      
-      try {
-        transaction();
-      } catch (e) {
-        console.log(chalk.yellow(`     Warning: ${e.message}`));
-      }
-      
-      offset += BATCH_SIZE;
-      
-      if (offset % 500 === 0 || offset >= potentialNew) {
-        console.log(chalk.gray(`     Processed ${offset}/${potentialNew} (${actualNew} new, ${skipped} existing)`));
-      }
-    }
-    
-    if (actualNew > 0) {
-      console.log(chalk.green(`     ✓ emails: ${actualNew} new emails pulled`));
-    } else {
-      console.log(chalk.gray(`     ✓ emails: All emails already synced`));
-    }
-  }
-
-  upsertRow(tableName, row) {
-    // For tables with timestamps, check if local is newer before overwriting
-    if (tableName === 'tasks' && row.id) {
-      const existing = this.localDb.prepare('SELECT * FROM tasks WHERE id = ?').get(row.id);
-      
-      if (existing) {
-        // Compare timestamps - keep the newer version
-        const localUpdated = new Date(existing.updated_at || existing.created_at).getTime();
-        const remoteUpdated = new Date(row.updated_at || row.created_at).getTime();
-        
-        if (localUpdated > remoteUpdated) {
-          // Local is newer, skip the update
-          return;
-        }
-        
-        // Special handling for completed_at - never overwrite with null if we have a value
-        if (existing.completed_at && !row.completed_at) {
-          row.completed_at = existing.completed_at;
-        }
-        
-        // Preserve local status if task was completed locally but not in Turso
-        if (existing.status === '✅ Done' && row.status !== '✅ Done' && existing.completed_at) {
-          // Local task is done, remote isn't - keep local version
-          return;
-        }
-      }
-    }
-    
-    // Build dynamic INSERT OR REPLACE query
-    const columns = Object.keys(row);
-    const placeholders = columns.map(() => '?').join(', ');
-    const sql = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-    
-    const stmt = this.localDb.prepare(sql);
-    stmt.run(...Object.values(row));
   }
 
   async push() {
-    await this.initClients();
+    console.log(chalk.blue('📤 Pushing from local to Turso...\n'));
+    
+    if (!this.db.isConnectedToTurso()) {
+      console.log(chalk.red('❌ Not connected to Turso'));
+      console.log(chalk.gray('   Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN'));
+      return;
+    }
 
-    if (!this.localDb) {
+    if (!fs.existsSync(LOCAL_DB)) {
       console.log(chalk.red('❌ No local database to push'));
       return;
     }
 
-    console.log(chalk.blue('📤 Pushing from local to Turso...\n'));
+    console.log(chalk.gray('   Scanning for changes...'));
+    const startTime = Date.now();
     
-    // Check and apply migrations to Turso if needed
-    const localVersion = this.getLocalSchemaVersion();
-    const tursoVersion = await this.getTursoSchemaVersion();
+    // Get tables with recent changes
+    const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    console.log(chalk.gray(`   Looking for changes since ${new Date(cutoffTime).toLocaleTimeString()}...`));
     
-    if (localVersion > tursoVersion) {
-      console.log(chalk.yellow(`⚠️  Local schema (v${localVersion}) is newer than Turso (v${tursoVersion})`));
-      await this.applyMigrationsToTurso();
-    }
+    // Manually push recent changes (since autoSync is off)
+    await this.manualPush();
     
-    // Clean up orphaned records first
-    console.log(chalk.gray('   Cleaning orphaned records...'));
-    try {
-      // Delete markdown_sync records for non-existent tasks
-      const orphanedSync = this.localDb.prepare(`
-        DELETE FROM markdown_sync 
-        WHERE task_id NOT IN (SELECT id FROM tasks)
-      `).run();
-      if (orphanedSync.changes > 0) {
-        console.log(chalk.gray(`     Removed ${orphanedSync.changes} orphaned markdown_sync records`));
-      }
-      
-      // Delete task_completions for non-existent tasks
-      const orphanedCompletions = this.localDb.prepare(`
-        DELETE FROM task_completions 
-        WHERE task_id NOT IN (SELECT id FROM tasks)
-      `).run();
-      if (orphanedCompletions.changes > 0) {
-        console.log(chalk.gray(`     Removed ${orphanedCompletions.changes} orphaned task_completions`));
-      }
-      
-      // Delete task_tags for non-existent tasks
-      const orphanedTags = this.localDb.prepare(`
-        DELETE FROM task_tags 
-        WHERE task_id NOT IN (SELECT id FROM tasks)
-      `).run();
-      if (orphanedTags.changes > 0) {
-        console.log(chalk.gray(`     Removed ${orphanedTags.changes} orphaned task_tags`));
-      }
-    } catch (error) {
-      console.log(chalk.yellow(`     Warning cleaning orphans: ${error.message}`));
-    }
-
-    // Push data table by table - IN CORRECT ORDER for foreign keys
-    // Parent tables first, then child tables
-    // Get ALL tables from local database to push
-    const tablesResult = this.localDb.prepare(`
-      SELECT name FROM sqlite_master 
-      WHERE type='table' 
-      AND name NOT LIKE 'sqlite_%'
-      AND name NOT LIKE '_litestream_%'
-      ORDER BY name
-    `).all();
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(chalk.green(`\n✅ Push completed in ${elapsed}s`));
     
-    const tables = tablesResult.map(row => row.name);
-    
-    for (const table of tables) {
-      try {
-        await this.pushTable(table);
-      } catch (error) {
-        console.log(chalk.yellow(`⚠️  Warning pushing ${table}: ${error.message}`));
-      }
-    }
-
-    // Push emails separately with special handling
-    const emailsExist = this.localDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='emails'").get();
-    if (emailsExist) {
-      try {
-        // For emails, use date column instead of updated_at
-        await this.pushEmailTable();
-      } catch (error) {
-        console.log(chalk.yellow(`⚠️  Warning pushing emails: ${error.message}`));
-      }
-    }
-
     this.syncState.lastSync = new Date().toISOString();
     this.saveSyncState();
-
-    console.log(chalk.green('\n✅ Successfully pushed to Turso'));
   }
 
-  async pushEmailTable() {
-    console.log(chalk.gray(`   Pushing emails...`));
+  async manualPush() {
+    // Since DatabaseService queues pushes automatically, we need to manually
+    // find and push recent changes
+    const tables = await this.db.getSyncTables();
+    let totalPushed = 0;
+    let tablesWithChanges = 0;
     
-    // Get emails from last 7 days only (for incremental sync)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    
-    const recentEmails = this.localDb.prepare(`
-      SELECT * FROM emails 
-      WHERE date > ?
-      ORDER BY date DESC
-    `).all(sevenDaysAgo);
-    
-    if (recentEmails.length === 0) {
-      console.log(chalk.gray(`     No recent emails to push`));
-      return;
-    }
-    
-    console.log(chalk.gray(`     Found ${recentEmails.length} emails from last 7 days`));
-    
-    // Push in batches
-    const BATCH_SIZE = 50; // Smaller batches for emails
-    let processed = 0;
-    let skipped = 0;
-
-    for (let i = 0; i < recentEmails.length; i += BATCH_SIZE) {
-      const batch = recentEmails.slice(i, Math.min(i + BATCH_SIZE, recentEmails.length));
-      
-      for (const email of batch) {
-        try {
-          await this.tursoClient.execute({
-            sql: `INSERT OR IGNORE INTO emails (id, subject, from_address, date, has_been_replied_to, text_content) 
-                  VALUES (?, ?, ?, ?, ?, ?)`,
-            args: [email.id, email.subject, email.from_address, email.date, email.has_been_replied_to, email.text_content]
-          });
-          processed++;
-        } catch (error) {
-          skipped++;
-        }
-      }
-      
-      if ((i + BATCH_SIZE) % 100 === 0 || i + BATCH_SIZE >= recentEmails.length) {
-        console.log(chalk.gray(`     Processed ${processed}/${recentEmails.length} emails (${skipped} already exist)`));
-      }
-    }
-
-    console.log(chalk.green(`     ✓ emails: ${processed} new emails pushed`));
-  }
-
-  async pushTable(tableName, onlyRecent = true) {
-    console.log(chalk.gray(`   Pushing ${tableName}...`));
-
-    let rows;
-    
-    // Special handling for markdown_sync - only push recently synced records
-    if (tableName === 'markdown_sync') {
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      
-      // Only push markdown_sync records that were recently synced AND where the task still exists
-      rows = this.localDb.prepare(`
-        SELECT ms.* FROM markdown_sync ms
-        INNER JOIN tasks t ON ms.task_id = t.id
-        WHERE ms.last_synced > ?
-      `).all(tenMinutesAgo);
-      
-      if (rows.length === 0) {
-        console.log(chalk.gray(`     No recent markdown_sync changes`));
-        return;
-      }
-      console.log(chalk.gray(`     Found ${rows.length} recent markdown_sync changes`));
-    } else if (onlyRecent) {
-      // Check if table has timestamp columns
-      const columns = this.localDb.prepare(`PRAGMA table_info(${tableName})`).all();
-      const hasUpdatedAt = columns.some(c => c.name === 'updated_at');
-      const hasCreatedAt = columns.some(c => c.name === 'created_at');
-      const hasLastSynced = columns.some(c => c.name === 'last_synced');
-      
-      if (hasUpdatedAt || hasCreatedAt || hasLastSynced) {
-        // Only push rows modified in last 10 minutes
-        const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    for (const tableName of tables) {
+      try {
+        // Skip system tables
+        if (tableName.startsWith('_') || tableName.startsWith('sqlite_')) continue;
         
-        let query;
-        if (hasUpdatedAt) {
-          query = `SELECT * FROM ${tableName} WHERE updated_at > ? OR (updated_at IS NULL AND created_at > ?)`;
-          rows = this.localDb.prepare(query).all(cutoffTime, cutoffTime);
-        } else if (hasLastSynced) {
-          query = `SELECT * FROM ${tableName} WHERE last_synced > ?`;
-          rows = this.localDb.prepare(query).all(cutoffTime);
+        // Check if table has recent changes
+        const hasTimestamp = await this.db.tableHasTimestamp(tableName);
+        let rows = [];
+        
+        if (hasTimestamp) {
+          // Use appropriate windows based on table type
+          let windowMs;
+          if (tableName === 'tasks') {
+            windowMs = 24 * 60 * 60 * 1000;  // 24 hours for tasks
+          } else if (['contacts', 'emails', 'markdown_sync', 'task_cache', 'contact_addresses', 
+                      'contact_emails', 'contact_phones'].includes(tableName)) {
+            windowMs = 30 * 1000;  // 30 seconds for bulk-updated tables
+          } else {
+            windowMs = 5 * 60 * 1000;  // 5 minutes for other tables
+          }
+          const cutoffDate = new Date(Date.now() - windowMs);
+          // Format as SQLite datetime: YYYY-MM-DD HH:MM:SS
+          const cutoff = cutoffDate.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+          
+          // Build query based on available columns
+          const columns = this.db.all(`PRAGMA table_info(${tableName})`);
+          const columnNames = columns.map(c => c.name);
+          const whereClauses = [];
+          const params = [];
+          
+          if (columnNames.includes('updated_at')) {
+            whereClauses.push('datetime(updated_at) > datetime(?)');
+            params.push(cutoff);
+          }
+          if (columnNames.includes('created_at')) {
+            whereClauses.push('datetime(created_at) > datetime(?)');
+            params.push(cutoff);
+          }
+          if (columnNames.includes('last_synced')) {
+            whereClauses.push('datetime(last_synced) > datetime(?)');
+            params.push(cutoff);
+          }
+          
+          if (whereClauses.length > 0) {
+            const query = `SELECT * FROM ${tableName} WHERE ${whereClauses.join(' OR ')}`;
+            rows = this.db.all(query, ...params);
+          }
         } else {
-          query = `SELECT * FROM ${tableName} WHERE created_at > ?`;
-          rows = this.localDb.prepare(query).all(cutoffTime);
+          // Tables without timestamps - only sync very small static tables
+          const count = this.db.get(`SELECT COUNT(*) as count FROM ${tableName}`)?.count || 0;
+          if (count < 20) {  // Only sync tiny reference tables without timestamps
+            rows = this.db.all(`SELECT * FROM ${tableName}`);
+          }
         }
         
-        if (rows.length === 0) {
-          // No recent changes, skip
-          console.log(chalk.gray(`     No recent changes in ${tableName}`));
-          return;
+        if (rows.length > 0) {
+          console.log(chalk.gray(`   ${tableName}: ${rows.length} rows to sync`));
+          
+          // For large datasets, use batch transactions
+          const batchSize = 50;
+          let processedInTable = 0;
+          
+          for (let i = 0; i < rows.length; i += batchSize) {
+            const batch = rows.slice(i, Math.min(i + batchSize, rows.length));
+            
+            // Show progress for large tables
+            if (rows.length > 100 && i > 0 && i % 100 === 0) {
+              console.log(chalk.gray(`     Progress: ${i}/${rows.length} rows...`));
+            }
+            
+            // Build batch insert statement
+            try {
+              const columns = Object.keys(batch[0]);
+              const statements = batch.map(row => ({
+                sql: `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+                args: Object.values(row)
+              }));
+              
+              // Execute as batch transaction
+              await this.db.tursoClient.batch(statements);
+              totalPushed += batch.length;
+              processedInTable += batch.length;
+            } catch (error) {
+              // Fall back to individual inserts on batch error
+              for (const row of batch) {
+                try {
+                  const columns = Object.keys(row);
+                  const sql = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`;
+                  await this.db.tursoClient.execute({ sql, args: Object.values(row) });
+                  totalPushed++;
+                  processedInTable++;
+                } catch (err) {
+                  // Ignore constraint errors
+                }
+              }
+            }
+          }
+          tablesWithChanges++;
         }
-        console.log(chalk.gray(`     Found ${rows.length} recent changes`));
-      } else {
-        // No timestamp columns, push all
-        rows = this.localDb.prepare(`SELECT * FROM ${tableName}`).all();
+      } catch (error) {
+        // Skip tables that don't exist
       }
-    } else {
-      // Push all rows
-      rows = this.localDb.prepare(`SELECT * FROM ${tableName}`).all();
     }
     
-    if (rows.length === 0) {
-      console.log(chalk.gray(`     No rows in ${tableName}`));
+    if (tablesWithChanges > 0) {
+      console.log(chalk.green(`   ✓ Pushed ${totalPushed} rows across ${tablesWithChanges} tables`));
+    } else {
+      console.log(chalk.gray('   No recent changes to push'));
+    }
+  }
+
+  async sync() {
+    console.log(chalk.cyan('🔄 Performing bidirectional sync...\n'));
+    
+    if (!this.db.isConnectedToTurso()) {
+      console.log(chalk.red('❌ Not connected to Turso'));
+      console.log(chalk.gray('   Check your TURSO_DATABASE_URL and TURSO_AUTH_TOKEN'));
       return;
     }
 
-    // Push in batches
-    const BATCH_SIZE = 100;
-    let processed = 0;
-
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, Math.min(i + BATCH_SIZE, rows.length));
-      
-      for (const row of batch) {
-        const columns = Object.keys(row);
-        const placeholders = columns.map(() => '?').join(', ');
-        const sql = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-        
-        try {
-          await this.tursoClient.execute({
-            sql: sql,
-            args: Object.values(row)
-          });
-          processed++;
-        } catch (error) {
-          // Log but continue
-          console.log(chalk.yellow(`     Skipped row: ${error.message}`));
-        }
-      }
-
-      console.log(chalk.gray(`     Processed ${processed}/${rows.length} rows`));
+    // Compare timestamps to determine sync direction
+    const localTimestamp = this.db.getLocalLastModified();
+    const tursoTimestamp = await this.db.getTursoLastModified();
+    
+    console.log(chalk.gray('   Comparing timestamps...'));
+    if (localTimestamp) {
+      console.log(chalk.gray(`   Local:  ${new Date(localTimestamp).toLocaleString()}`));
     }
-
-    console.log(chalk.green(`     ✓ ${tableName}: ${processed} rows`));
-  }
-
-  async createSchemaFromTurso() {
-    console.log(chalk.gray('   Creating database schema from Turso...'));
-    
-    // Connect to Turso
-    const tursoClient = createClient({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN
-    });
-    
-    // Get all table schemas from Turso
-    const schemasResult = await tursoClient.execute(`
-      SELECT sql FROM sqlite_master 
-      WHERE type='table' 
-      AND name NOT LIKE 'sqlite_%'
-      AND name NOT LIKE '_litestream_%'
-      AND sql IS NOT NULL
-      ORDER BY name
-    `);
-    
-    // Create each table locally
-    for (const row of schemasResult.rows) {
-      if (row.sql) {
-        try {
-          this.localDb.exec(row.sql);
-        } catch (e) {
-          // Table might already exist
-        }
-      }
+    if (tursoTimestamp) {
+      console.log(chalk.gray(`   Turso:  ${new Date(tursoTimestamp).toLocaleString()}`));
     }
     
-    // Also get and create indexes
-    const indexesResult = await tursoClient.execute(`
-      SELECT sql FROM sqlite_master 
-      WHERE type='index' 
-      AND name NOT LIKE 'sqlite_%'
-      AND sql IS NOT NULL
-    `);
-    
-    for (const row of indexesResult.rows) {
-      if (row.sql) {
-        try {
-          this.localDb.exec(row.sql);
-        } catch (e) {
-          // Index might already exist
-        }
-      }
+    // Bidirectional sync based on timestamps
+    if (tursoTimestamp && (!localTimestamp || tursoTimestamp > localTimestamp)) {
+      console.log(chalk.blue('\nStep 1: Pulling newer data from Turso...'));
+      await this.db.pullFromTurso();
+    } else {
+      console.log(chalk.gray('\nStep 1: Local is up-to-date, skipping pull'));
     }
-  }
-  
-  async createLocalSchema() {
-    console.log(chalk.gray('   Creating database schema...'));
-
-    // Read schema from task-manager.js initDatabase method
-    // For now, use a simplified version
-    this.localDb.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        content TEXT,
-        do_date DATE,
-        status TEXT DEFAULT '🎭 Stage',
-        stage TEXT,
-        project_id TEXT,
-        repeat_interval INTEGER,
-        repeat_next_date DATE,
-        notion_id TEXT UNIQUE,
-        notion_url TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        completed_at DATETIME
-      );
-
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT,
-        status TEXT DEFAULT 'active',
-        start_date DATE,
-        end_date DATE,
-        budget REAL,
-        file_path TEXT UNIQUE,
-        metadata TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS tags (
-        id TEXT PRIMARY KEY,
-        name TEXT UNIQUE NOT NULL,
-        color TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS task_tags (
-        task_id TEXT,
-        tag_id TEXT,
-        PRIMARY KEY (task_id, tag_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS task_completions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id TEXT NOT NULL,
-        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS markdown_sync (
-        file_path TEXT NOT NULL,
-        task_id TEXT NOT NULL,
-        line_number INTEGER,
-        last_synced DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (file_path, task_id)
-      );
-
-      CREATE TABLE IF NOT EXISTS emails (
-        id TEXT PRIMARY KEY,
-        subject TEXT,
-        from_address TEXT,
-        date TEXT,
-        has_been_replied_to INTEGER DEFAULT 0,
-        text_content TEXT
-      );
-    `);
+    
+    console.log(chalk.blue('\nStep 2: Pushing local changes to Turso...'));
+    await this.manualPush();
+    
+    console.log(chalk.green('\n✅ Bidirectional sync complete'));
+    
+    this.syncState.lastSync = new Date().toISOString();
+    this.syncState.initialized = true;
+    this.saveSyncState();
   }
 
   async watch() {
-    await this.initClients();
-
     console.log(chalk.blue('👀 Watching for changes...\n'));
     console.log(chalk.gray('   Syncing every 60 seconds'));
     console.log(chalk.gray('   Press Ctrl+C to stop\n'));
 
-    // Initial pull if needed
-    if (!this.syncState.initialized) {
-      await this.pull();
-    }
-
-    // Watch loop
+    // Enable auto-sync
+    this.db.autoSync = true;
+    this.db.startPullCheckInterval();
+    
+    // Also do manual pushes periodically
     const interval = setInterval(async () => {
       try {
-        console.log(chalk.gray(`[${new Date().toLocaleTimeString()}] Syncing...`));
-        await this.push();
+        console.log(chalk.gray(`[${new Date().toLocaleTimeString()}] Checking for changes...`));
+        
+        // DatabaseService handles pulls automatically
+        // We just need to handle pushes
+        await this.db.forcePush();
+        
+        // Also do a manual push for tables without individual operations
+        await this.manualPush();
+        
       } catch (error) {
         console.log(chalk.red(`[${new Date().toLocaleTimeString()}] Sync error: ${error.message}`));
       }
     }, 60000);
 
-    process.on('SIGINT', () => {
+    process.on('SIGINT', async () => {
       clearInterval(interval);
       console.log(chalk.yellow('\n\nStopping sync...'));
+      this.db.stopPullCheckInterval();
+      await this.db.forcePush();
+      await this.db.close();
       process.exit(0);
     });
+  }
+
+  async close() {
+    await this.db.close();
   }
 }
 
@@ -959,59 +389,65 @@ async function main() {
       case 'status':
         await sync.status();
         break;
+        
+      case 'sync':
+        await sync.sync();
+        break;
+        
       case 'pull':
         await sync.pull();
         break;
+        
       case 'push':
-        // Check for --all flag to push all rows instead of just recent changes
+        // Check for --all flag
         if (args.includes('--all')) {
-          console.log(chalk.yellow('📤 Pushing ALL rows (not just recent changes)...'));
-          // Override pushTable to push all rows
-          const originalPushTable = sync.pushTable.bind(sync);
-          sync.pushTable = (tableName) => originalPushTable(tableName, false);
+          console.log(chalk.yellow('📤 Note: --all flag is deprecated'));
+          console.log(chalk.gray('   Push now automatically syncs all necessary tables'));
         }
         await sync.push();
         break;
+        
       case 'watch':
         await sync.watch();
         break;
-      case 'smart-status':
-        // Import and use the optimized sync status
-        const { tursoSyncStatus } = await import('../src/turso-sync-optimized.js');
-        await tursoSyncStatus();
-        break;
+        
       case 'help':
       default:
         console.log(chalk.cyan('Turso Sync Utility\n'));
-        console.log('Usage: bin/turso-sync [command] [options]');
+        console.log('Usage: bin/turso-sync [command]');
         console.log('\nCommands:');
-        console.log('  status         - Show sync status and compare databases');
-        console.log('  smart-status   - Show detailed watermark-based sync status');
-        console.log('  pull           - Pull from Turso to local (handles initial setup)');
-        console.log('  push           - Push recent changes to Turso (last 10 minutes)');
-        console.log('  push --all     - Push ALL rows to Turso (slower but complete)');
-        console.log('  watch          - Auto-sync every 60 seconds');
-        console.log('\nOptimization:');
-        console.log('  By default, push only syncs rows modified in the last 10 minutes.');
-        console.log('  This is much faster when only a few tasks have changed.');
-        console.log('  Use --all flag to force push all rows.');
-        console.log('  watch     - Auto-sync every minute');
+        console.log('  status    - Show sync status and compare databases');
+        console.log('  sync      - Bidirectional sync (pull + push, newest wins)');
+        console.log('  pull      - Pull from Turso to local');
+        console.log('  push      - Push recent changes to Turso');
+        console.log('  watch     - Auto-sync every 60 seconds');
         console.log('  help      - Show this help');
-        console.log('\nWorkflow:');
-        console.log('  1. On new system: bin/turso-sync pull');
-        console.log('  2. Work locally with instant performance');
-        console.log('  3. Periodically: bin/turso-sync push');
-        console.log('\nNote: Local SQLite for speed, Turso for backup/sync');
+        console.log('\nNote:');
+        console.log('  This utility uses DatabaseService for all operations.');
+        console.log('  The sync is incremental and handles all tables automatically.');
+        console.log('  Timestamps are used to determine what needs syncing.');
         break;
     }
     
-    // Exit cleanly after successful command completion (except for watch which runs indefinitely)
+    // Close connections
+    await sync.close();
+    
+    // Exit cleanly (except for watch)
     if (command !== 'watch') {
-      process.exit(0);
+      // Force exit after a short delay because Turso client keeps event loop alive
+      setTimeout(() => {
+        process.exit(0);
+      }, 100);
     }
   } catch (error) {
     console.error(chalk.red('Error:'), error.message);
-    process.exit(1);
+    if (process.env.DEBUG) {
+      console.error(error.stack);
+    }
+    await sync.close();
+    setTimeout(() => {
+      process.exit(1);
+    }, 100);
   }
 }
 

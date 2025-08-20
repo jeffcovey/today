@@ -88,6 +88,98 @@ export class MigrationManager {
           // This is more of a code change marker, but we record it for consistency
           console.log('    Marked: task_completions removed from sync code');
         }
+      },
+      {
+        version: 4,
+        description: 'Add timestamp columns to tables for efficient sync',
+        fn: (db) => {
+          // List of tables and which columns they need
+          const tablesNeedingTimestamps = [
+            { name: 'cache_metadata', needsCreated: true, needsUpdated: true },
+            { name: 'contact_addresses', needsCreated: true, needsUpdated: true },
+            { name: 'contact_emails', needsCreated: true, needsUpdated: true },
+            { name: 'contact_phones', needsCreated: true, needsUpdated: true },
+            { name: 'database_cache', needsCreated: true, needsUpdated: true },
+            { name: 'email_entity_mentions', needsCreated: false, needsUpdated: true },
+            { name: 'emails', needsCreated: true, needsUpdated: true },
+            { name: 'event_attendees', needsCreated: false, needsUpdated: true },
+            { name: 'markdown_sync', needsCreated: true, needsUpdated: true },
+            { name: 'people_to_contact', needsCreated: false, needsUpdated: true },
+            { name: 'project_cache', needsCreated: true, needsUpdated: true },
+            { name: 'project_pillar_mapping', needsCreated: true, needsUpdated: false },
+            { name: 'project_topics', needsCreated: true, needsUpdated: true },
+            { name: 'schema_version', needsCreated: true, needsUpdated: true },
+            { name: 'status_groups_cache', needsCreated: true, needsUpdated: true },
+            { name: 'streaks_data', needsCreated: true, needsUpdated: true },
+            { name: 'summary_insights', needsCreated: false, needsUpdated: true },
+            { name: 'summary_meta', needsCreated: false, needsUpdated: true },
+            { name: 'summary_metrics', needsCreated: false, needsUpdated: true },
+            { name: 'summary_recommendations', needsCreated: false, needsUpdated: true },
+            { name: 'sync_log', needsCreated: false, needsUpdated: true },
+            { name: 'sync_metadata', needsCreated: true, needsUpdated: true },
+            { name: 'tag_cache', needsCreated: true, needsUpdated: true },
+            { name: 'tags', needsCreated: true, needsUpdated: true },
+            { name: 'task_cache', needsCreated: true, needsUpdated: true },
+            { name: 'task_event_links', needsCreated: false, needsUpdated: true },
+            { name: 'task_projects', needsCreated: true, needsUpdated: true },
+            { name: 'task_relationships', needsCreated: false, needsUpdated: true },
+            { name: 'task_tags', needsCreated: true, needsUpdated: true },
+            { name: 'task_topics', needsCreated: true, needsUpdated: true },
+            { name: 'temporal_sync', needsCreated: false, needsUpdated: true },
+            { name: 'time_entries_sync', needsCreated: true, needsUpdated: true },
+            { name: 'todoist_sync_mapping', needsCreated: true, needsUpdated: true }
+          ];
+          
+          let addedColumns = 0;
+          for (const table of tablesNeedingTimestamps) {
+            // Check if table exists
+            const tableExists = db.prepare(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+            ).get(table.name);
+            
+            if (!tableExists) {
+              continue;
+            }
+            
+            // Get current columns
+            const columns = db.prepare(`PRAGMA table_info(${table.name})`).all();
+            const columnNames = columns.map(c => c.name);
+            
+            // Add created_at if needed
+            if (table.needsCreated && !columnNames.includes('created_at')) {
+              try {
+                db.exec(`ALTER TABLE ${table.name} ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
+                console.log(`    Added created_at to ${table.name}`);
+                addedColumns++;
+              } catch (e) {
+                // Column might already exist
+              }
+            }
+            
+            // Add updated_at if needed
+            if (table.needsUpdated && !columnNames.includes('updated_at')) {
+              try {
+                db.exec(`ALTER TABLE ${table.name} ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
+                console.log(`    Added updated_at to ${table.name}`);
+                addedColumns++;
+                
+                // Create trigger to update the updated_at column automatically
+                db.exec(`
+                  CREATE TRIGGER IF NOT EXISTS update_${table.name}_updated_at
+                  AFTER UPDATE ON ${table.name}
+                  FOR EACH ROW
+                  BEGIN
+                    UPDATE ${table.name} SET updated_at = CURRENT_TIMESTAMP WHERE rowid = NEW.rowid;
+                  END
+                `);
+              } catch (e) {
+                // Column might already exist
+              }
+            }
+          }
+          
+          console.log(`    Added ${addedColumns} timestamp columns`);
+        }
       }
     ];
 
