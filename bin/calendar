@@ -585,10 +585,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const command = process.argv[2];
   const calSync = new CalendarSync();
   
-  switch (command) {
-    case 'sync':
-      await calSync.sync();
-      break;
+  try {
+    switch (command) {
+      case 'sync':
+        await calSync.sync();
+        break;
       
     case 'today':
       const events = await calSync.getEventsForSummary();
@@ -664,15 +665,12 @@ Commands:
 
 Calendar data is stored in SQLite database (.data/today.db)
       `);
+    }
+    process.exit(0);
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
   }
 }
-
-// Run main function and handle exit
-main().then(() => {
-  process.exit(0);
-}).catch(error => {
-  console.error('Error:', error.message);
-  process.exit(1);
-});
 
 export { CalendarSync };
