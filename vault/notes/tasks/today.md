@@ -12,9 +12,9 @@
 
 ## Next Up
 
-- [ ] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
-- [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
-- [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
+- [x] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
+- [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 
 <details>
 <summary><strong>✅ Done Today</strong> (104 tasks completed)</summary>
