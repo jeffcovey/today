@@ -1117,7 +1117,7 @@ export class TaskManager {
     }
     
     // Ensure topics directory exists
-    const topicsDir = 'topics';
+    const topicsDir = 'vault/topics';
     try {
       await fs.mkdir(topicsDir, { recursive: true });
     } catch (e) {
