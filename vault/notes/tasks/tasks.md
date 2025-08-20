@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1186 tasks)</summary>
+<summary><strong>General Tasks</strong> (1191 tasks)</summary>
 
 ### Sunday, Aug 17 (3 days ago)
 
@@ -174,6 +174,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f2e232795ec04e913468ae9f49abc870 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6b4fd7ed38e570e7b1e272ec658e9477 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c65c24dff553370cfb4d74e646fc4bd0 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: aa33fab55213261951a2a80b866a9c45 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -216,6 +217,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2e8337838d143ef5fee9d5bcb14ccc02 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: afe5f759c32fd64b6f0696cfae0e4a6c -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 551b6296844f70e54a4928234a84125c -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1978ce35007cc485d321599a34310363 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -257,6 +259,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a3c3d02eb8002426c6d9ed8ff73aaaa0 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9910ccc4132a552d7a98a0023307c50c -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 17c2a22f3b4f495f607fc54e26580a9c -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 179893ed5ffd47765154cb9c462f4784 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -379,6 +382,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df690e295aae94ee6cf0e831920aacbf -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 957bf64c80c93b78579956a5954f32c2 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8a9870a9427b46a726d09660871c37f0 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 34ae2334d48eb7e1cadb80c84346541e -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -412,6 +416,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e912e1bd5046500c9d51159f89bd931d -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bdfd49b1cb84da77eb9886a17c0983f7 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ee6ac52fb8e5d3cfe73e5c5ca77c7b56 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7dc4c382dc79192db15e7db678f5b50a -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -1397,4 +1402,3 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
-- [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
