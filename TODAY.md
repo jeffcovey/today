@@ -250,6 +250,10 @@ The database contains these key tables:
 - **file_tracking**: Recently modified files and notes
 - **people_to_contact**: People needing follow-up
 - **notion_pages**: Notes and project information
+- **toggl_time_entries**: Time tracking data from Toggl
+- **toggl_projects**: Project definitions for time tracking
+- **toggl_daily_summary**: View showing daily time totals
+- **toggl_project_summary**: View showing time by project
 
 Use SQL queries to:
 1. Find urgent/overdue tasks (query task_cache WHERE due_date <= DATE('now'))
@@ -292,6 +296,28 @@ SELECT title, start_date, end_date, location
 FROM calendar_events
 WHERE DATE(start_date) = DATE('now')
 ORDER BY start_date;
+
+-- Get today's time tracking summary
+SELECT 
+    COALESCE(p.name, 'No Project') as project,
+    printf('%.2f', SUM(te.duration) / 3600.0) as hours,
+    GROUP_CONCAT(DISTINCT te.description, ', ') as activities
+FROM toggl_time_entries te
+LEFT JOIN toggl_projects p ON te.pid = p.id
+WHERE DATE(te.start) = DATE('now', 'localtime')
+GROUP BY p.name
+ORDER BY SUM(te.duration) DESC;
+
+-- Get this week's time tracking patterns
+SELECT 
+    DATE(start) as date,
+    printf('%.2f', SUM(duration) / 3600.0) as hours,
+    COUNT(*) as entries
+FROM toggl_time_entries
+WHERE DATE(start) >= DATE('now', '-7 days', 'localtime')
+    AND stop IS NOT NULL
+GROUP BY DATE(start)
+ORDER BY date DESC;
 ```
 
 ## What I Need From You
@@ -334,7 +360,48 @@ What to review and prepare based on the database
 
 Address any wellbeing concerns from recent notes and tasks
 
-### 8. Day-End Review (Evening Task)
+### 8. Time Tracking Review
+
+**When Toggl data is available, analyze:**
+- How much time was tracked today vs. planned work
+- Which projects consumed the most time
+- Whether time spent aligns with priorities and stage themes
+- Patterns in productive vs. unproductive hours
+- Gaps in tracking (unaccounted time)
+
+Use queries like:
+```sql
+-- Compare tracked time to work categories
+SELECT 
+    strftime('%H:00', start) as hour,
+    COALESCE(p.name, 'No Project') as project,
+    printf('%.2f', SUM(duration) / 3600.0) as hours
+FROM toggl_time_entries te
+LEFT JOIN toggl_projects p ON te.pid = p.id
+WHERE DATE(start) = DATE('now', 'localtime')
+GROUP BY hour, project
+ORDER BY hour;
+
+-- Find gaps in tracking (hours without entries)
+WITH hours AS (
+    SELECT 6 as hour UNION SELECT 7 UNION SELECT 8 UNION SELECT 9 
+    UNION SELECT 10 UNION SELECT 11 UNION SELECT 12 UNION SELECT 13
+    UNION SELECT 14 UNION SELECT 15 UNION SELECT 16 UNION SELECT 17
+    UNION SELECT 18 UNION SELECT 19 UNION SELECT 20
+),
+tracked AS (
+    SELECT DISTINCT CAST(strftime('%H', start) AS INTEGER) as hour
+    FROM toggl_time_entries
+    WHERE DATE(start) = DATE('now', 'localtime')
+)
+SELECT printf('%02d:00', h.hour) as 'Untracked Hours'
+FROM hours h
+LEFT JOIN tracked t ON h.hour = t.hour
+WHERE t.hour IS NULL
+ORDER BY h.hour;
+```
+
+### 9. Day-End Review (Evening Task)
 
 **⚠️ IMPORTANT: During evening reviews, ALWAYS:**
 - Query the tasks table for today's completed tasks

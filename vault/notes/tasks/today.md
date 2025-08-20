@@ -1,21 +1,18 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 7:26:33 PM EDT*
-
-## 🔥 Immediate
-
-- [ ] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
+*Generated: 8/20/2025, 7:29:39 PM EDT*
 
 ## 🎭 Stage
 
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (107 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (108 tasks completed)</summary>
 
 - [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [x] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
+- [x] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 - [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
 - [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
 - [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->

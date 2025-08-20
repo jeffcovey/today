@@ -684,8 +684,19 @@ export class TaskManager {
             // These files are auto-generated but users edit checkboxes manually
             const isAutoGenFile = filePath === 'vault/notes/tasks/today.md' || filePath === 'vault/notes/tasks/tasks.md';
             
+            // Important: Never revert a completed task back to uncompleted unless file is MUCH newer
+            // This prevents the sync conflict where tasks.md reverts today.md changes
+            const taskIsCompleted = task.status === '✅ Done';
+            const reversingCompletion = taskIsCompleted && !isCompleted;
+            
+            // Only allow reverting completion if file is at least 60 seconds newer
+            // This prevents race conditions but allows genuine unchecking
+            const allowRevert = reversingCompletion ? 
+              (fileModTime - taskUpdateTime > 60000) : true;
+            
             // Sync if markdown is newer OR if it's an auto-gen file with checkbox changes
-            if (markdownIsNewer || (isAutoGenFile && isCompleted !== (task.status === '✅ Done'))) {
+            // BUT don't revert completions unless the file is significantly newer
+            if ((markdownIsNewer && allowRevert) || (isAutoGenFile && isCompleted !== taskIsCompleted && allowRevert)) {
               const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
               const updates = {};
               
