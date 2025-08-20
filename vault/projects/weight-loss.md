@@ -1,4 +1,5 @@
 # Weight Loss Project
+<!-- project-id: b2f25f1bdb9cda1e279357cc757e84d1 -->
 
 ## Overview
 **Goal:** Achieve sustainable weight loss to reduce joint pressure and improve arthritis symptoms  
@@ -30,9 +31,9 @@
 - **Moving Average**: 177.90 lbs
 
 ### Weekly Task
-- [ ] Update weight log every Sunday morning before breakfast
-- [ ] Calculate new moving average
-- [ ] Note any significant changes or patterns
+- [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
+- [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
+- [ ] Note any significant changes or patterns <!-- task-id: 6e39c50825b78b432d93903ee9f1fb89 -->
 
 ## Strategy
 
@@ -62,19 +63,19 @@
 ## Milestones
 
 ### Short-term (4 weeks)
-- [ ] Establish consistent weekly weighing routine
-- [ ] Lose 2-4 lbs 
-- [ ] Notice any changes in joint comfort
+- [ ] Establish consistent weekly weighing routine <!-- task-id: 6b07ea22625995e0d1ce23c4d494d19c -->
+- [ ] Lose 2-4 lbs  <!-- task-id: 366b9bd0dcdb46611fe1707cc0ebaafb -->
+- [ ] Notice any changes in joint comfort <!-- task-id: 8ebbfcbf3e77035dc2ecedea64fbf50d -->
 
 ### Medium-term (3 months)
-- [ ] Reach 170 lbs
-- [ ] Document arthritis symptom improvements
-- [ ] Establish sustainable eating patterns
+- [ ] Reach 170 lbs <!-- task-id: 1b460326e233080a8fedf3f00df9f937 -->
+- [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
+- [ ] Establish sustainable eating patterns <!-- task-id: a5bbd0c20f13df1ba37dbf861891ba4e -->
 
 ### Long-term (End of 2025)
-- [ ] Achieve target weight of 165 lbs
-- [ ] Maintain for at least 1 month
-- [ ] Reassess and set maintenance plan
+- [ ] Achieve target weight of 165 lbs <!-- task-id: 7430a6ac52bbfa2c408f4bb14fa71f81 -->
+- [ ] Maintain for at least 1 month <!-- task-id: 33f826708e0af4073867c4cb9d55a831 -->
+- [ ] Reassess and set maintenance plan <!-- task-id: 236591e8ef5bd87733aac8e3dbdb1dd4 -->
 
 ## Resources & Support
 

@@ -42,8 +42,8 @@ Manage and improve hip arthritis condition through targeted exercises, treatment
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 - [ ] Start reading "Tight Hip, Twisted Core" book (30 min daily) <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
-- [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup -->
-- [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly -->
+- [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup --> <!-- task-id: 5359f3c61cdf8801a37f7852349da73c -->
+- [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly --> <!-- task-id: 67416207c06f8986797ad579805c2ac5 -->
 
 ### Medical Appointments
 
@@ -52,9 +52,9 @@ Manage and improve hip arthritis condition through targeted exercises, treatment
 ## Tracking & Metrics
 
 ### Pain Levels
-- [ ] Implement daily pain scoring (1-10 scale)
-- [ ] Note triggers and relief factors
-- [ ] Track medication effectiveness
+- [ ] Implement daily pain scoring (1-10 scale) <!-- task-id: 2e98c4520aa5c81cfefde5187873dbc5 -->
+- [ ] Note triggers and relief factors <!-- task-id: 07e768f7fbf67941deb7408fb6608146 -->
+- [ ] Track medication effectiveness <!-- task-id: 5b76edda855c11cca0b901d7784a11f1 -->
 
 ### Mobility Metrics  
 - Range of motion assessments
@@ -88,22 +88,22 @@ Manage and improve hip arthritis condition through targeted exercises, treatment
 ## Success Metrics
 
 ### Short-term (1 month)
-- [ ] Daily pain tracking established
-- [ ] Hip Hook routine started
-- [ ] Weight loss progress (2-4 lbs)
-- [ ] Book reading habit consistent (30 min/day)
+- [ ] Daily pain tracking established <!-- task-id: 6452950ebe24ca3202bf63b2c411dec9 -->
+- [ ] Hip Hook routine started <!-- task-id: 19109831a2ef79d82f51c0f879948c68 -->
+- [ ] Weight loss progress (2-4 lbs) <!-- task-id: 550116273421a9fcff92406188259df8 -->
+- [ ] Book reading habit consistent (30 min/day) <!-- task-id: b81cfee342c5029b75336d9aa52b250a -->
 
 ### Medium-term (3 months)
-- [ ] Noticeable pain reduction
-- [ ] Improved morning flexibility  
-- [ ] 8-10 lbs weight loss achieved
-- [ ] Established exercise routine
+- [ ] Noticeable pain reduction <!-- task-id: 3927e1f72b220379e5b96732e7936ae0 -->
+- [ ] Improved morning flexibility   <!-- task-id: 0adbc3253563fe274d4848752a84cc97 -->
+- [ ] 8-10 lbs weight loss achieved <!-- task-id: 0c495168b5c5a49c3a2f3d8b52111b8e -->
+- [ ] Established exercise routine <!-- task-id: ebd9111ee978affef53d1da46eaced64 -->
 
 ### Long-term (6 months)
-- [ ] Significant mobility improvement
-- [ ] Weight at or near target (165 lbs)
-- [ ] Reduced medication needs
-- [ ] Sustainable lifestyle changes integrated
+- [ ] Significant mobility improvement <!-- task-id: 58ff397a7b2d003117681817fedd272d -->
+- [ ] Weight at or near target (165 lbs) <!-- task-id: de53fd453b094ee29ad6875bff5ece07 -->
+- [ ] Reduced medication needs <!-- task-id: 85eed556cbcff7d3db0c5a6d031ea3a0 -->
+- [ ] Sustainable lifestyle changes integrated <!-- task-id: 4366244f1314f08e09487aeda50f4cdd -->
 
 ## Progress Notes
 
