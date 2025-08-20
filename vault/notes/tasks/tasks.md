@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1071 tasks)</summary>
+<summary><strong>General Tasks</strong> (1083 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -113,6 +113,7 @@
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
+- [ ] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
 - [ ] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
@@ -125,6 +126,8 @@
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Homehousehold] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
+- [ ] Catch up OGM member requests <!-- task-id: f7807d3f715886f8b90137cccfe380d9 -->
+- [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b93063738c6f2449b19665f609c3c931 -->
@@ -153,9 +156,11 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 79f03234321d3b9912f8e78d93e2af86 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cb3a0624cb81d0091b1a7e56ae7d2668 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8828d9c0514d90766bc3a5555b211d2f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6702c79d782f05f8d250edc892113934 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
+- [ ] Create routines for dealing with chronic arthritis pain <!-- task-id: c70eb6339a3c1d0b15cdaadef6be91bd -->
 - [ ] Daily review and update of plans <!-- task-id: 1fbfc8acd7f100eeed0386b58251c8fe -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
@@ -185,6 +190,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0710c967623dea93090e25cb2811a858 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 321631cd9cd03e4e944ff3d356518b42 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3b13cafdb4d18c2bc9a7b9bd9a84b53a -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 26ee40400adf371e65155239d7daf272 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
@@ -213,9 +219,13 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: de0e206193263515766501a27464ba4b -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 49b9f9f72dadbb919b87135c8955e651 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 23c6171af2207ca47b95fcf15e40e8a0 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4c239e2a2a9a4957d067f6c43dce7777 -->
+- [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
+- [ ] Healthier daily habits <!-- task-id: 0213c20318569981e6c028896117dccb -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
+- [ ] Increase income and reduce expenses to cover long-term costs like taxes and homeowner's insurance <!-- task-id: 66fc79fd085fad2123a50831411ddc8b -->
 - [ ] Issue #5166: Remove legacy direct geocoding from User model <!-- task-id: e4cfa03982af840bde2fb733ab08d69a -->
 - [ ] Issue #5167: Migrate Event, Group, Place to Location-based geocoding <!-- task-id: 406df18eb73eb6ee00b397aec39d2695 -->
 - [ ] Issue #5171: Implement proper async ActiveStorage variant generation <!-- task-id: 0b142217eec66d0d5e899688c300edc0 -->
@@ -228,12 +238,12 @@
 - [ ] Maintain consistent sleep schedule <!-- task-id: 54a4cbad4cdc5124c3b4b1d675a67f09 -->
 - [ ] Maintain project tracking for key initiatives <!-- task-id: 7a150b6927b8cbb32a71c915c21b941e -->
 - [ ] Morning stretching routine focusing on hip mobility <!-- task-id: fa8889de16341a9f55d9db4b18ae89c8 -->
+- [ ] Moving more data into Today <!-- task-id: 44d88e8ab23c87b91b110815848932a8 -->
 - [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
 - [ ] Review and address any critical system issues <!-- task-id: 085dcaee3a75e54dc845667a2a7ec853 -->
 - [ ] Review and organize inbox notes daily <!-- task-id: 951cabe9552a60e5a2944aad79e8570b -->
 - [ ] Review financial transactions and budgets <!-- task-id: 25dcb212f4952a6b7628dd726ab21b44 -->
 - [ ] Review health insurance options [Health] <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
-- [ ] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
 - [ ] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
@@ -266,6 +276,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6a3d5e6ff7b0343efa1fcd6d32fbc881 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7c6cf211aae2d06ffd6c9bf8ae341325 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c40b6161c688d5c7b9064b48f65437de -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bc2cf2b4f6ac82c9a964f73d9869090c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -294,6 +305,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 07248d9f035a6f6567e44020626f5eda -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 94d35630bd94f6f34299b1de74fec3ed -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1148becc84826d0290f04e82b02a8cc6 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b38de9d1b4fe425c139c70dbb7f326ae -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
