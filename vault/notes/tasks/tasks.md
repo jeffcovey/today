@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1141 tasks)</summary>
+<summary><strong>General Tasks</strong> (1146 tasks)</summary>
 
 ### Sunday, Aug 17 (3 days ago)
 
@@ -22,6 +22,10 @@
 
 ### Invalid Date, Invalid Date
 
+- [ ] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
+- [ ] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
+- [ ] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
+- [ ] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: apple-fitness --> <!-- task-id: c89cadc6fd1012029606e935ec5d8061 -->
 - [ ] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
@@ -31,10 +35,6 @@
 - [ ] Review the Honeybadger R12 error (memory quota exceeded) <!-- task-id: 4cf0df8852df22d97d03909a057543db -->
 - [ ] Use The Inversion Table (for hip arthritis) <!-- task-id: inversion --> <!-- task-id: 72c95778f7fd06331f00077c4bcc67d4 -->
 - [ ] Use The Inversion Table - For hip relief <!-- task-id: 5142e99a6d59508ac53640c0d748e308 -->
-- [ ] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
-- [ ] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
-- [ ] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
-- [ ] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 030fed7a699d7dc55fe6758df0b77f07 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: activity-rings --> <!-- task-id: d051837d4106813ab7c34cface0b708d -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: 099fcabf4bc884e9298b98e0b1e931d4 -->
@@ -64,6 +64,8 @@
 
 ### Invalid Date, Invalid Date
 
+- [ ] Write Airbnb review for Logan (5-star review received!) <!-- task-id: 9001595c593549d73ac6114784b01ab6 -->
+- [ ] Write Airbnb review for Treasure <!-- task-id: 046e64589a92642364acaeb360680bf9 -->
 - [ ] Activity Rings <!-- task-id: 4298261590da695df28cb37203d98fdf -->
 - [ ] Apple Fitness+ Workouts <!-- task-id: b805e4494bb3bbe2fd929873dbdadb9c -->
 - [ ] Burn More Energy <!-- task-id: edb77d0421beff2cc32f661ed1675943 -->
@@ -76,8 +78,6 @@
 - [ ] Tai Chi (1m) <!-- task-id: 14fd4f428d9257fa2500e67287f5b030 -->
 - [ ] Use The Inversion Table <!-- task-id: 25f792a3797eefce2af7add3512a6d08 -->
 - [ ] Walk 5,500 Steps <!-- task-id: ec941c3717af8331eff7095a6d9ad897 -->
-- [ ] Write Airbnb review for Logan (5-star review received!) <!-- task-id: 9001595c593549d73ac6114784b01ab6 -->
-- [ ] Write Airbnb review for Treasure <!-- task-id: 046e64589a92642364acaeb360680bf9 -->
 
 ### No Date Set
 
@@ -182,6 +182,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: aa444404a014ea22369598379b53246d -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fe54430be174d94c8e3b60bd4f280e31 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cde377e22932bff378faed9108accb5d -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4f1f264c5be1b6c8e1a593d3aa8e8714 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -225,6 +226,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3c0349cc05ee97325063a7c564e2fece -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0ffb16d2a6de8bc281e67ff031d2a42b -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7c14758ed6ceedcc9fa8f160f8bb5cf1 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c63a166e771974e5e7e0e5f805f9eae6 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
@@ -263,6 +265,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b9d9368ebd62ada5627d948c4c0efd0e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f4255a3e40d002d62123676dc0ca8a68 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 23ff6cd7f43be6a8aff4107d31dd601b -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b58f8f149bb1f8b007ee2ab6084e024b -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Healthier daily habits <!-- task-id: 0213c20318569981e6c028896117dccb -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
@@ -329,6 +332,7 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a5c51394a23c9ac2450d83f5e95f29a9 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f4dcd30c715b8ebce304e6cb53a6e273 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 88001257f7e54164eb388a35abc97ad8 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a9f392389b3bcaf09cd928a6e47eca42 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -367,6 +371,7 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f4e42b9350488b961cd19335b291d101 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3da710191cdcb2f3c6898fdbb7aea8cc -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 80df8b19ce39c15c3aade0f7376f3a6e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fdb3b3887d3910d022392d448b1882f3 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
