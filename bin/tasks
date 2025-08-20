@@ -2,7 +2,7 @@
 
 import { TaskManager } from '../src/task-manager.js';
 import { TaskStageClassifier } from '../src/task-stage-classifier.js';
-import { forcePushToTurso } from '../src/database-sync.js';
+import { getDatabase } from '../src/database-service.js';
 import { program } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -242,27 +242,32 @@ program
         console.log(chalk.gray('  • No topics with tasks to generate'));
       }
       
-      // Classify stages for tasks without them
-      console.log(chalk.blue('Classifying task stages...'));
-      const classifier = new TaskStageClassifier();
-      try {
-        const result = await classifier.classifyTasks(true);
-        if (result.classified > 0) {
-          console.log(chalk.green(`✓ Classified ${result.classified} tasks into Front/Back/Off Stage`));
-        } else {
-          console.log(chalk.gray('  • All tasks already have stages assigned'));
+      // Classify stages for tasks without them (skip if env var set)
+      if (process.env.SKIP_CLASSIFICATION) {
+        console.log(chalk.yellow('⚡ Classification skipped (running in background)'));
+      } else {
+        console.log(chalk.blue('Classifying task stages...'));
+        const classifier = new TaskStageClassifier();
+        try {
+          const result = await classifier.classifyTasks(true);
+          if (result.classified > 0) {
+            console.log(chalk.green(`✓ Classified ${result.classified} tasks into Front/Back/Off Stage`));
+          } else {
+            console.log(chalk.gray('  • All tasks already have stages assigned'));
+          }
+        } catch (err) {
+          console.log(chalk.yellow('  • Stage classification skipped (AI not available)'));
+        } finally {
+          classifier.close();
         }
-      } catch (err) {
-        console.log(chalk.yellow('  • Stage classification skipped (AI not available)'));
-      } finally {
-        classifier.close();
       }
     } catch (error) {
       console.error(chalk.red('Error syncing tasks:'), error.message);
       process.exit(1);
     } finally {
       // Push any pending changes to Turso before closing
-      await forcePushToTurso('.data/today.db');
+      const db = getDatabase();
+      await db.forcePush();
       tm.close();
     }
   });

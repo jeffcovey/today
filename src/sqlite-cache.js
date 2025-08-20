@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { getDatabaseSync } from './database-sync.js';
+import { getDatabase } from './database-service.js';
 
 export class SQLiteCache {
   constructor() {
@@ -20,8 +20,8 @@ export class SQLiteCache {
   }
 
   initDatabase() {
-    // Use DatabaseSync wrapper for automatic Turso sync
-    this.db = getDatabaseSync(this.dbPath);
+    // Use unified database service with automatic Turso sync
+    this.db = getDatabase(this.dbPath);
     
     // Create tables
     this.db.exec(`

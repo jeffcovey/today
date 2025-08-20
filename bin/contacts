@@ -4,7 +4,7 @@
 import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
-import Database from 'better-sqlite3';
+import { getDatabase } from '../src/database-service.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createDAVClient } from 'tsdav';
@@ -19,7 +19,7 @@ class ContactsSync {
   constructor() {
     this.contacts = [];
     this.client = null;
-    this.db = new Database(DB_PATH);
+    this.db = getDatabase();
     this.initDatabase();
   }
 

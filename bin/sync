@@ -70,22 +70,98 @@ main() {
     echo "Synchronizing all data sources..."
     echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
     
-    # Run all sync steps
-    run_sync_step "☁️ Turso Cloud Sync" sync_turso "Turso synced" "Turso cloud"  # Pull from Turso first
+    # Default: run critical ops first, slow ops in background
+    print_info "Running critical operations first, slow operations in background..."
+    
+    # Critical path operations (fast, important)
+    run_sync_step "☁️ Turso Pull" sync_turso "Turso pulled" "Turso pull"
     run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
-    # Notion sync removed - moving away from Notion
-    run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
-    run_sync_step "🔍 Task Consistency" check_task_consistency "Task consistency checked" "Task consistency"
-    run_sync_step "📧 Email Inbox" sync_email "Email sync complete" "Email inbox"
-    run_sync_step "📅 Calendar Events" sync_calendar "Calendar events synced" "Calendar events"
-    run_sync_step "📇 Contacts" sync_contacts "Contacts synced" "Contacts"
+    
+    # Task sync without classification
+    SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
-    run_sync_step "💾 Cache Update" update_cache_stats "Cache updated" "Cache updated"
     
-    # Push changes to Turso at the end
-    run_sync_step "☁️ Push to Turso" push_to_turso "Changes pushed to Turso" "Turso push"
+    # Start slow operations in background
+    print_header "⚡ Starting Background Jobs"
+    
+    # Create log directory
+    BG_LOG_DIR="/tmp/sync-bg-$(date +%s)"
+    mkdir -p "$BG_LOG_DIR"
+    
+    # Task classification in background
+    {
+        echo "$(date): Starting task classification" > "$BG_LOG_DIR/classify.log"
+        if bin/tasks classify-stages >> "$BG_LOG_DIR/classify.log" 2>&1; then
+            echo "$(date): ✓ Task classification completed" >> "$BG_LOG_DIR/classify.log"
+        else
+            echo "$(date): ✗ Task classification failed" >> "$BG_LOG_DIR/classify.log"
+            echo "FAILED: Task classification" >> "$BG_LOG_DIR/failures"
+        fi
+    } &
+    
+    # Email sync in background (if configured)
+    if grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null && grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
+        {
+            echo "$(date): Starting email sync" > "$BG_LOG_DIR/email.log"
+            if sync_email >> "$BG_LOG_DIR/email.log" 2>&1; then
+                echo "$(date): ✓ Email sync completed" >> "$BG_LOG_DIR/email.log"
+            else
+                echo "$(date): ✗ Email sync failed" >> "$BG_LOG_DIR/email.log"
+                echo "FAILED: Email sync" >> "$BG_LOG_DIR/failures"
+            fi
+        } &
+    fi
+    
+    # Calendar and contacts in background
+    {
+        echo "$(date): Starting calendar sync" > "$BG_LOG_DIR/calendar.log"
+        if sync_calendar >> "$BG_LOG_DIR/calendar.log" 2>&1; then
+            echo "$(date): ✓ Calendar sync completed" >> "$BG_LOG_DIR/calendar.log"
+        else
+            echo "$(date): ✗ Calendar sync failed" >> "$BG_LOG_DIR/calendar.log"
+            echo "FAILED: Calendar sync" >> "$BG_LOG_DIR/failures"
+        fi
+    } &
+    
+    {
+        echo "$(date): Starting contacts sync" > "$BG_LOG_DIR/contacts.log"
+        if sync_contacts >> "$BG_LOG_DIR/contacts.log" 2>&1; then
+            echo "$(date): ✓ Contacts sync completed" >> "$BG_LOG_DIR/contacts.log"
+        else
+            echo "$(date): ✗ Contacts sync failed" >> "$BG_LOG_DIR/contacts.log"
+            echo "FAILED: Contacts sync" >> "$BG_LOG_DIR/failures"
+        fi
+    } &
+    
+    # Push to Turso in background after a delay
+    {
+        sleep 5
+        echo "$(date): Starting Turso push" > "$BG_LOG_DIR/turso.log"
+        if push_to_turso >> "$BG_LOG_DIR/turso.log" 2>&1; then
+            echo "$(date): ✓ Turso push completed" >> "$BG_LOG_DIR/turso.log"
+        else
+            echo "$(date): ✗ Turso push failed" >> "$BG_LOG_DIR/turso.log"
+            echo "FAILED: Turso push" >> "$BG_LOG_DIR/failures"
+        fi
+        
+        # Check for failures and notify after all jobs
+        sleep 10  # Give other jobs time to finish
+        if [[ -f "$BG_LOG_DIR/failures" ]]; then
+            echo ""
+            echo -e "${RED}⚠️  Background job failures detected:${NC}" >&2
+            cat "$BG_LOG_DIR/failures" >&2
+            echo -e "${YELLOW}   Check logs in: $BG_LOG_DIR/${NC}" >&2
+            echo ""
+        else
+            echo -e "${GREEN}✅ All background jobs completed successfully${NC}" > "$BG_LOG_DIR/success"
+        fi
+    } &
+    
+    print_status "Sync completed! Background jobs are running."
+    print_info "Background logs: $BG_LOG_DIR/"
+    print_info "Check job status: ps aux | grep -E '(classify|email|calendar|contacts|turso)'"
     
     # Print summary
     print_header "📋 Sync Summary"
@@ -327,35 +403,28 @@ sync_turso() {
         return 1
     fi
     
-    # Use the optimized smart sync
-    print_info "Smart syncing with Turso (only changes)..."
+    # Use the simplified turso-sync script
+    print_info "Syncing with Turso cloud database..."
     
-    node -e "
-        import('./src/turso-sync-optimized.js').then(({smartTursoSync}) => {
-            smartTursoSync('both')
-                .then(result => {
-                    if (result.pulled > 0) {
-                        console.log(\`  ⬇️  Pulled \${result.pulled} changes from Turso\`);
-                    }
-                    if (result.pushed > 0) {
-                        console.log(\`  ⬆️  Pushed \${result.pushed} changes to Turso\`);
-                    }
-                    if (result.pulled === 0 && result.pushed === 0) {
-                        console.log('  ✅ Already in sync');
-                    }
-                    process.exit(0);
-                })
-                .catch(err => {
-                    console.error('✗ Turso sync failed:', err.message);
-                    process.exit(1);
-                });
-        }).catch(err => {
-            console.error('✗ Failed to load sync module:', err.message);
-            process.exit(1);
-        });
-    " 2>&1
-    
-    return $?
+    # Run the turso-sync script with pull action and timeout
+    if timeout 30 bin/turso-sync pull 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"⬇️"* ]] || [[ "$line" == *"Changes pulled"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        local exit_code=$?
+        if [[ $exit_code -eq 124 ]]; then
+            print_info "Turso pull timed out after 30s - continuing with local data"
+            return 0  # Don't fail the sync, just continue
+        else
+            print_error "Turso pull failed"
+            return 1
+        fi
+    fi
 }
 
 # Push changes to Turso cloud database (no pull)
@@ -368,31 +437,21 @@ push_to_turso() {
         return 1
     fi
     
-    # Use the optimized smart sync in push-only mode
+    # Use the simplified turso-sync script
     print_info "Pushing changes to Turso..."
     
-    node -e "
-        import('./src/turso-sync-optimized.js').then(({smartTursoSync}) => {
-            smartTursoSync('push')
-                .then(result => {
-                    if (result.pushed > 0) {
-                        console.log(\`  ⬆️  Pushed \${result.pushed} changes to Turso\`);
-                    } else {
-                        console.log('  ✅ No changes to push');
-                    }
-                    process.exit(0);
-                })
-                .catch(err => {
-                    console.error('✗ Turso push failed:', err.message);
-                    process.exit(1);
-                });
-        }).catch(err => {
-            console.error('✗ Failed to load sync module:', err.message);
-            process.exit(1);
-        });
-    " 2>&1
-    
-    return $?
+    # Run the turso-sync script with push action
+    if bin/turso-sync push 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"⬆️"* ]] || [[ "$line" == *"Changes pushed"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 # Sync Notion database
@@ -1112,7 +1171,7 @@ case "${1:-}" in
         print_info "Quick sync mode - GitHub vault, tasks, inbox, and consistency check"
         sync_github_vault
         process_inbox
-        sync_tasks
+        SKIP_CLASSIFICATION=1 sync_tasks
         check_task_consistency
         ;;
     --force)
@@ -1141,16 +1200,16 @@ case "${1:-}" in
     --help|-h)
         echo "Usage: sync [OPTIONS]"
         echo ""
-        echo "Intelligently synchronize all data sources"
+        echo "Intelligently synchronize all data sources with background jobs"
         echo ""
-        echo "By default, uses smart caching:"
-        echo "  • Only syncs Notion if cache >4 hours old"
-        echo "  • Only syncs email if cache >4 hours old"
-        echo "  • Uses efficient timeouts (20s for email)"
+        echo "By default, runs critical operations first and slow operations in background:"
+        echo "  • Immediate: GitHub vault, task sync, markdown cleanup"
+        echo "  • Background: Task classification, email, calendar, contacts, Turso push"
+        echo "  • Uses efficient timeouts and smart caching"
         echo ""
         echo "Options:"
         echo "  --vault       Sync GitHub vault only"
-        echo "  --quick       Quick sync (GitHub and Notion only)"
+        echo "  --quick       Quick sync (GitHub and tasks only)"
         echo "  --force       Force full refresh (bypass cache)"
         echo "  --quick-email Download last 24 hours of email"
         echo "  --help        Show this help message"

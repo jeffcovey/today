@@ -125,7 +125,13 @@
       "WebSearch",
       "Bash(sed:*)",
       "Bash(TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z')",
-      "Bash(fly ssh console:*)"
+      "Bash(fly ssh console:*)",
+      "WebFetch(domain:docs.turso.tech)",
+      "Bash(TZ:*)",
+      "Bash(turso db show:*)",
+      "Bash(turso db create:*)",
+      "Bash(turso db shell:*)",
+      "Bash(FAST_MODE=true timeout 10 bin/sync)"
     ],
     "deny": []
   }

@@ -1,20 +1,25 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import { getDatabaseSync, forcePushToTurso } from './database-sync.js';
+import { getDatabase } from './database-service.js';
 import { DateParser } from './date-parser.js';
 
 export class TaskManager {
   constructor(dbPath = '.data/today.db', options = {}) {
-    // Use DatabaseSync wrapper for automatic Turso sync
-    // Pass readOnly option to skip Turso initialization for read-only operations
-    this.db = getDatabaseSync(dbPath, { readOnly: options.readOnly || false });
+    // Use unified DatabaseService for all database access
+    // Pass readOnly option to skip Turso sync for read-only operations
+    this.db = getDatabase(dbPath, { readOnly: options.readOnly || false });
     this.dateParser = new DateParser();
-    this.initDatabase();
+    // DO NOT recreate schema - database already exists with correct schema from Turso
+    // Schema is managed by migrations and Turso sync, not by this module
   }
 
-  initDatabase() {
+  // DEPRECATED - Do not use. Schema is managed by migrations and Turso sync
+  // This method was recreating tables with simplified schema and losing data
+  initDatabase_DEPRECATED() {
+    throw new Error('initDatabase() is deprecated. Database schema should already exist from Turso sync.');
+    // Original code kept below for reference only
     // Disable foreign keys to avoid issues during sync
-    this.db.exec('PRAGMA foreign_keys = OFF');
+    // this.db.exec('PRAGMA foreign_keys = OFF');
     
     // Create tasks table
     this.db.exec(`
@@ -119,15 +124,15 @@ export class TaskManager {
     `);
 
     // Create sync_log table for bin/today script
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS sync_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        sync_type TEXT,
-        status TEXT,
-        details TEXT
-      );
-    `);
+    // this.db.exec(`
+    //   CREATE TABLE IF NOT EXISTS sync_log (
+    //     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    //     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    //     sync_type TEXT,
+    //     status TEXT,
+    //     details TEXT
+    //   );
+    // `);
   }
 
   // Generate a unique ID for a task
@@ -186,12 +191,9 @@ export class TaskManager {
       fields.push('status = ?');
       values.push(data.status);
       
-      // Set completed_at when marking as done and record in history
+      // Set completed_at when marking as done
       if (data.status === '✅ Done') {
         fields.push('completed_at = CURRENT_TIMESTAMP');
-        // Record completion in history for ALL tasks (not just repeating)
-        // This ensures we have accurate completion tracking for the Done Today section
-        this.db.prepare('INSERT INTO task_completions (task_id) VALUES (?)').run(id);
       } else if (data.status !== '✅ Done') {
         fields.push('completed_at = NULL');
       }
@@ -226,14 +228,9 @@ export class TaskManager {
     const task = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
     if (task) {
       task.topics = this.getTaskTopics(id);
-      // Get last completion if it's a repeating task
-      if (task.repeat_interval) {
-        const lastCompletion = this.db.prepare(`
-          SELECT MAX(completed_at) as last_completed 
-          FROM task_completions 
-          WHERE task_id = ?
-        `).get(id);
-        task.last_completed = lastCompletion?.last_completed;
+      // For repeating tasks, completed_at is the last completion
+      if (task.repeat_interval && task.completed_at) {
+        task.last_completed = task.completed_at;
       }
     }
     return task;
@@ -779,9 +776,10 @@ export class TaskManager {
 
     // Get all active tasks (not Done) with project information
     const tasks = this.db.prepare(`
-      SELECT t.*, p.name as project_name 
+      SELECT t.*, p.name as project_name, tp.project_id
       FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN task_projects tp ON t.id = tp.task_id
+      LEFT JOIN projects p ON tp.project_id = p.id
       WHERE t.status != '✅ Done'
       ORDER BY p.name ASC, t.do_date ASC, t.status ASC, t.title ASC
     `).all();
@@ -961,14 +959,13 @@ export class TaskManager {
       topics: this.getTaskTopics(task.id)
     }));
     
-    // Get tasks ACTUALLY completed today using task_completions table
-    // This avoids showing tasks with bulk-updated completed_at timestamps
+    // Get tasks completed today using completed_at from tasks table
     const completedTasks = this.db.prepare(`
-      SELECT DISTINCT t.* 
-      FROM tasks t
-      INNER JOIN task_completions tc ON t.id = tc.task_id
-      WHERE DATE(tc.completed_at) = DATE(?)
-      ORDER BY tc.completed_at DESC
+      SELECT * 
+      FROM tasks
+      WHERE DATE(completed_at) = DATE(?)
+        AND status = '✅ Done'
+      ORDER BY completed_at DESC
     `).all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
@@ -1054,19 +1051,16 @@ export class TaskManager {
   processRepeatingTasks() {
     const today = new Date().toISOString().split('T')[0];
     const repeatingTasks = this.db.prepare(`
-      SELECT t.*, 
-             MAX(tc.completed_at) as last_completed
-      FROM tasks t
-      LEFT JOIN task_completions tc ON t.id = tc.task_id
-      WHERE t.repeat_interval IS NOT NULL 
-        AND t.status = '✅ Done'
-      GROUP BY t.id
+      SELECT *
+      FROM tasks
+      WHERE repeat_interval IS NOT NULL 
+        AND status = '✅ Done'
     `).all();
 
     let created = 0;
     for (const task of repeatingTasks) {
       // Calculate next date based on last completion
-      const nextDate = this.calculateNextDateFromInterval(task.last_completed || task.completed_at, task.repeat_interval);
+      const nextDate = this.calculateNextDateFromInterval(task.completed_at, task.repeat_interval);
       
       // Only create if the next date is today or earlier
       if (nextDate <= today) {

@@ -7,7 +7,7 @@ autoDotenvx();
 import { program } from 'commander';
 import chalk from 'chalk';
 import { NotionAPI } from '../src/notion-api.js';
-import Database from 'better-sqlite3';
+import { getDatabase } from '../src/database-service.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -79,8 +79,7 @@ async function main() {
   const notionApi = new NotionAPI(notionToken);
 
   // Open local database
-  const dbPath = join(__dirname, '..', '.data', 'today.db');
-  const db = new Database(dbPath, { readonly: true });
+  const db = getDatabase('.data/today.db', { readOnly: true });
 
   try {
     let tasksToProcess = [];
