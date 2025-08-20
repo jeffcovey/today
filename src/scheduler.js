@@ -46,26 +46,15 @@ async function runCommand(command, description) {
 
 const jobs = [
     {
-        schedule: '*/10 * * * *', // Every 10 minutes
-        command: 'bin/sync --notes || true', // Sync notes with safety checks
-        description: 'Quick notes sync'
-    },
-    {
-        schedule: '0 5,7,9,11,13,15,17,19,21 * * *', // Every 2 hours between 5 AM and 9 PM
-        command: 'bin/tasks sync || true', // Just sync tasks
-        description: 'Update task database',
-        timezone: true // Respect timezone for this job
+        schedule: '*/20 * * * *', // Every 20 minutes
+        command: 'bin/sync --quick || true', // Quick sync (GitHub vault and tasks only)
+        description: 'Quick sync'
     },
     {
         schedule: '0 4 * * *', // Daily at 4 AM
-        command: 'bin/sync || true', // Full sync (allow failures)
-        description: 'Full data sync attempt',
+        command: 'bin/sync || true', // Full sync (all data sources)
+        description: 'Full data sync',
         timezone: true
-    },
-    {
-        schedule: '0 */4 * * *', // Every 4 hours
-        command: 'bin/calendar sync || true', // Calendar sync
-        description: 'Calendar sync'
     },
     {
         schedule: '0 3 * * *', // Daily at 3 AM (before full sync)
