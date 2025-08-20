@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 2:46:59 PM EDT*
+*Generated: 8/20/2025, 2:51:34 PM EDT*
 
 ## 🔥 Immediate
 
@@ -11,6 +11,7 @@
 - [ ] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
+- [ ] schedule annual checkup <!-- task-id: a8766483d626943b22e94bc014f219a6 -->
 
 ## Next Up
 
