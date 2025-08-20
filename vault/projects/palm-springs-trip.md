@@ -122,7 +122,7 @@ Vince Gartland will be housesitting for me September 3-13 (covering the trip dat
 
 ### 2025-08-20
 
-- **Don Schmoll's availability confirmed!** 
+- **Don Schmoll's availability confirmed!**
 - Available all day: Sept 8 (Sunday), Sept 11 (Thursday), Sept 12 (Friday)
 - Available evenings: Sept 4-7, Sept 9-10
 - Planning to schedule a full day visit on one of the available days
