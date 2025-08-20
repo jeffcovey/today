@@ -13,7 +13,7 @@ elif [ $MONTH -le 6 ]; then Q="Q2"
 elif [ $MONTH -le 9 ]; then Q="Q3"
 else Q="Q4"
 fi
-REVIEW_FILE="plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
+REVIEW_FILE="vault/plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
 
 if [ ! -f "$REVIEW_FILE" ]; then
     echo "❌ No review file for today. Run 'bin/today' first."

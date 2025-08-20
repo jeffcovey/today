@@ -2,7 +2,7 @@
 
 # Add creation and modification dates to sync metadata in all markdown files
 
-for file in notes/**/*.md projects/**/*.md; do
+for file in vault/notes/**/*.md vault/projects/**/*.md; do
     if [ -f "$file" ]; then
         # Get creation date (first commit)
         created_at=$(git log --format="%aI" --reverse "$file" 2>/dev/null | head -1)

@@ -62,7 +62,7 @@ bin/sync
 if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
     echo "📝 Checking markdown formatting..."
     # Run lint but don't block on errors, just show warnings
-    npx markdownlint-cli2 'plans/*.md' 2>&1 | head -10 || true
+    npx markdownlint-cli2 'vault/plans/*.md' 2>&1 | head -10 || true
     echo ""
 fi
 
@@ -91,7 +91,7 @@ if [ -n "$LAST_SYNC" ]; then
     elif [ $MONTH -le 9 ]; then Q="Q3"
     else Q="Q4"
     fi
-    REVIEW_FILE="plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
+    REVIEW_FILE="vault/plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review
