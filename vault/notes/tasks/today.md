@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 6:20:28 AM EDT*
+*Generated: 8/20/2025, 10:45:18 AM EDT*
 
 ## 🔥 Immediate
 
@@ -18,8 +18,13 @@
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (1 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (6 tasks completed)</summary>
 
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 99fbddffa736933b382eed412cbc0664 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b5b76e689569ade7284c9e40e3ec87d3 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0320cea9bee9160a81cc8335be7e729d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ae563d614bb65b48ec2c64845aded22f -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 78478f3d99fe12e3eb085cead60c8d62 -->
 - [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 
 </details>
