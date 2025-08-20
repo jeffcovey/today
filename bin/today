@@ -1,20 +1,43 @@
 #!/bin/bash
 
 # Quick review script that syncs, updates summary, and starts interactive Claude session
-# Usage: bin/today [optional direct request]
-# Example: bin/today "Let's work on the PS trip project"
+# Usage: bin/today [--no-sync] [optional direct request]
+# Examples: 
+#   bin/today "Let's work on the PS trip project"
+#   bin/today --no-sync "Quick session without sync"
+#   bin/today --no-sync
 
 # Load common dotenvx handler
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-# Capture any direct request passed as argument
-DIRECT_REQUEST="$1"
+# Parse arguments
+SKIP_SYNC=false
+DIRECT_REQUEST=""
+
+# Check for --no-sync flag
+for arg in "$@"; do
+    case $arg in
+        --no-sync)
+            SKIP_SYNC=true
+            shift
+            ;;
+        *)
+            if [ -z "$DIRECT_REQUEST" ]; then
+                DIRECT_REQUEST="$arg"
+            fi
+            ;;
+    esac
+done
 
 if [ -n "$DIRECT_REQUEST" ]; then
     echo "📊 Starting focused session: $DIRECT_REQUEST"
 else
     echo "📊 Starting daily review process..."
+fi
+
+if [ "$SKIP_SYNC" = true ]; then
+    echo "⚠️  Skipping sync (--no-sync flag provided)"
 fi
 
 # Check if Claude CLI is authenticated by testing actual functionality
@@ -54,9 +77,13 @@ if [ "$SKIP_DEP_CHECK" != "true" ]; then
     fi
 fi
 
-# Run sync to update all data sources
-echo "🔄 Syncing data sources..."
-bin/sync
+# Run sync to update all data sources (unless --no-sync flag provided)
+if [ "$SKIP_SYNC" != true ]; then
+    echo "🔄 Syncing data sources..."
+    bin/sync
+else
+    echo "⏭️  Skipping sync step"
+fi
 
 # Quick markdown lint check (non-blocking)
 if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
