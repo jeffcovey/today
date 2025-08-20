@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 3:10:11 PM EDT*
+*Generated: 8/20/2025, 3:12:51 PM EDT*
 
 ## 🔥 Immediate
 
@@ -24,6 +24,14 @@
 <summary><strong>✅ Done Today</strong> (64 tasks completed)</summary>
 
 - [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
+- [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
+- [x] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
+- [x] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
+- [x] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
+- [x] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
+- [x] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
+- [x] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
+- [x] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
 - [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
 - [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
 - [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
@@ -44,14 +52,6 @@
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
 - [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
-- [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
-- [x] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
-- [x] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
-- [x] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
-- [x] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
-- [x] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
-- [x] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
-- [x] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3158a51750d170aac4d098f663320d22 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a30a57187e83bc9bef7e0d4a1c57881c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: cd8de3b7398ec35cd504da49af3d3361 -->
