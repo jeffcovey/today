@@ -11,13 +11,10 @@ Tasks and projects related to Personal Finance.
 <!-- Tasks for this topic will be automatically populated by bin/tasks sync -->
 <!-- Do not edit below this line - tasks are managed by the sync system -->
 
-### Sun, Aug 17
-
-- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
-
 ### No Date Set
 
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
+- [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Add Virgin card to 1password <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
 - [ ] Add property taxes to the budget <!-- task-id: 0c7356e5b1787028f80ca443d64fa210 -->
 - [ ] Ask about Airbnb mortgage or pool home equity loan <!-- task-id: b079a49e54ff6ea0d3f70899dbe2be5f -->

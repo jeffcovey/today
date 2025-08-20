@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/19/2025, 8:26:30 PM EDT*
+*Generated: 8/19/2025, 8:51:20 PM EDT*
 
 ## 🔥 Immediate
 
@@ -17,6 +17,9 @@
 - [ ] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 
-## Next Up
+<details>
+<summary><strong>✅ Done Today</strong> (1 tasks completed)</summary>
 
-- [ ] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+
+</details>
