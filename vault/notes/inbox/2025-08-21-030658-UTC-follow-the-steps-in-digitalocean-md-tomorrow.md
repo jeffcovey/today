@@ -1,1 +1,0 @@
-- [ ] Follow the steps in DIGITALOCEAN.md @tomorrow

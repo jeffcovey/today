@@ -1436,3 +1436,7 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
+- [ ] Follow the steps in DIGITALOCEAN.md @tomorrow
+- [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4
+- [ ] set up a DigitalOcean account @today
+- [ ] Review [Caching with Rails: An Overview — Ruby on Rails Guides](https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching)
