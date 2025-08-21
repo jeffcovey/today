@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1270 tasks)</summary>
+<summary><strong>General Tasks</strong> (1280 tasks)</summary>
 
 ### Today - Thursday, Aug 21
 
@@ -63,66 +63,95 @@
 - [ ] Add a photo of the laundry room to all four listings [Hosting] <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
 - [ ] Check that page comments show in public activity [Oldergaymen Content] <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
 - [ ] **Get cash from IRA** (🔥 Immediate) <!-- task-id: 638ac690bdad045c93829b65b1c87f6d -->
+- [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
+- [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
 - [ ] Add Zazen, steps, and drinks to Health logging [Health] <!-- task-id: 176f048f22826f4345cc9634b0e2c10c -->
 - [ ] Add notes from 2023-08-02 Dr. check-up [Health] <!-- task-id: 12ffb1cfece67efa7b496d4440710f10 -->
 - [ ] Adjust plans based on progress <!-- task-id: 8e7d8f9dbbd20177dbe8dbcd27b6c3a7 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
+- [ ] Analyze Airbnb listings with pools vs without in Oakland Park <!-- task-id: 3e7a053d0898fe1555551e95f08fca96 -->
+- [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
+- [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
+- [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
+- [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
 - [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
+- [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
 - [ ] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
 - [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
+- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 1d946a65359b396eac4b511e3e1de7c3 -->
 - [ ] Do profit & loss statements [Personal Finance] <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
 - [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: b1854ccaa83729d1c14284598336911f -->
+- [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
+- [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
 - [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
 - [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
+- [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
 - [ ] Maintain daily habits and streaks <!-- task-id: 896d841cab6070a727edb061cbc3a5de -->
 - [ ] Maintain financial stability in retirement <!-- task-id: 54a7f949710fa8de52d787c273729703 -->
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
+- [ ] Read Saved Articles, 2m 15s <!-- task-id: 6cfd07ea6e1054313ad27621d163a306 -->
 - [ ] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
+- [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
+- [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
+- [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
 - [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
+- [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
+- [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
 - [ ] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
+- [ ] Use The Inversion Table <!-- task-id: dbeb3e327f8659e60d53df35b172fc8a -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: 852c35ddcd24bdb8aa51ccd204c05b85 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
+- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: a949e8afa265b99495d821d9c0274c1e -->
 - [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
+- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: bb3916fbac505b5363f935866e51efc6 -->
 - [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
+- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 439bd0df2fb062e19c4a5a558a803f3d -->
 - [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
+- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 10a61ec80ef32067bf6c7b7492027385 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Homehousehold] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] 8-10 lbs weight loss achieved <!-- task-id: 0c495168b5c5a49c3a2f3d8b52111b8e -->
 - [ ] Achieve target weight of 165 lbs <!-- task-id: 7430a6ac52bbfa2c408f4bb14fa71f81 -->
-- [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
-- [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
 - [ ] Add to scheduler or stats:  desc "Check newsletter status and recent sends" task :status => :environment do <!-- task-id: 0a5de6210c69e476cbeec725c30de5e3 -->
-- [ ] Analyze Airbnb listings with pools vs without in Oakland Park <!-- task-id: 3e7a053d0898fe1555551e95f08fca96 -->
 - [ ] Anxiety levels <!-- task-id: 468f506d5001c0eebac8c1d87073e3c7 -->
 - [ ] Book reading habit consistent (30 min/day) <!-- task-id: b81cfee342c5029b75336d9aa52b250a -->
-- [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
 - [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
 - [ ] Calculate weekly totals <!-- task-id: 4304e6d7a493723f19e9980d05925f03 -->
 - [ ] Calculate weekly totals and trends <!-- task-id: dc04201535c487ee20e802a916405a40 -->
-- [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
 - [ ] Catch up OGM member requests <!-- task-id: f7807d3f715886f8b90137cccfe380d9 -->
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
-- [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
-- [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b93063738c6f2449b19665f609c3c931 -->
@@ -169,18 +198,16 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e8b58f80a591994e8212691e9f75f624 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 79da9588014a14ad2d366b73fc1790e1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9392dadf84bc74fde4b26b821292d460 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 36f0ad7f5b7c6a2e47480bc26843ca4b -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9e3819da22a18c6dbc64400944c2c176 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
 - [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup --> <!-- task-id: 5359f3c61cdf8801a37f7852349da73c -->
-- [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
 - [ ] Create routines for dealing with chronic arthritis pain <!-- task-id: c70eb6339a3c1d0b15cdaadef6be91bd -->
 - [ ] Daily pain tracking established <!-- task-id: 6452950ebe24ca3202bf63b2c411dec9 -->
 - [ ] Daily review and update of plans <!-- task-id: 1fbfc8acd7f100eeed0386b58251c8fe -->
-- [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
@@ -228,9 +255,8 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7af03a0a32f5bdc33f297b24511ddc9e -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 788226b10b2600e5a6bc75d64ab74e2c -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b93b3f58af2cb3471c9bdcde1b0efe88 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
-- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 1d946a65359b396eac4b511e3e1de7c3 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 37335abe6817245398061ca02f3d47cb -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 132866235d74989fa9d1f5dc0a70e2c6 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -285,12 +311,10 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d9e71270cfa522e34884760e81aa865a -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 149568daa650b176dfad859a8f7c827f -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c51b38c6384aab8b99128442b13030fd -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: dd37f15c9849eaedc838f6d36da3fefb -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 32520e53fb528c4f0dbc7858ef538adc -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
-- [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
-- [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
 - [ ] Have the AI set task topics if they don't exist <!-- task-id: e2b27da565b838831e0be7fe6f61b7a0 -->
 - [ ] Healthier daily habits <!-- task-id: 0213c20318569981e6c028896117dccb -->
@@ -300,7 +324,6 @@
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
-- [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
 - [ ] Improved morning flexibility <!-- task-id: 0adbc3253563fe274d4848752a84cc97 -->
 - [ ] Increase income and reduce expenses to cover long-term costs like taxes and homeowner's insurance <!-- task-id: 66fc79fd085fad2123a50831411ddc8b -->
 - [ ] Introduce alcohol-free days (start with 2/week) <!-- task-id: 654fa184e49e94216ac73545f3c0c2ea -->
@@ -338,24 +361,19 @@
 - [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
 - [ ] Reach 170 lbs <!-- task-id: 1b460326e233080a8fedf3f00df9f937 -->
 - [ ] Reach target consumption level <!-- task-id: 0abfe5f12947fa0667b8e3413a4be652 -->
-- [ ] Read Saved Articles, 2m 15s <!-- task-id: 6cfd07ea6e1054313ad27621d163a306 -->
 - [ ] Reassess and set maintenance plan <!-- task-id: 236591e8ef5bd87733aac8e3dbdb1dd4 -->
 - [ ] Reduce by 1 drink per day first week <!-- task-id: a4c076f9e69f58350e6034863167b18e -->
 - [ ] Reduce daily intake by 25% <!-- task-id: ec0f8b72ce23166231de4681f488c000 -->
 - [ ] Reduce daily intake by 50% <!-- task-id: e888e9662bbbed421025e029b8c98c2e -->
 - [ ] Reduced medication needs <!-- task-id: 85eed556cbcff7d3db0c5a6d031ea3a0 -->
 - [ ] Replace evening cocktails with mocktails <!-- task-id: ca7bd0947d0d80c56f61b9da9be1d7a6 -->
-- [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
 - [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4 <!-- task-id: eac32265e3f3d0c438f94cd9efb23b7d -->
-- [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
-- [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
 - [ ] Review and address any critical system issues <!-- task-id: 085dcaee3a75e54dc845667a2a7ec853 -->
 - [ ] Review and organize inbox notes daily <!-- task-id: 951cabe9552a60e5a2944aad79e8570b -->
 - [ ] Review financial transactions and budgets <!-- task-id: 25dcb212f4952a6b7628dd726ab21b44 -->
 - [ ] Review health insurance options [Health] <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
 - [ ] Review(https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching) <!-- task-id: 55acdb054a9077ac2cf3fcea61f4fcf6 -->
 - [ ] Save 5,000+ calories <!-- task-id: 23393735b2b0a5d162072b5efb6b5ed6 -->
-- [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
 - [ ] See weight loss acceleration <!-- task-id: eddda61787dae40076c7df6938c0257d -->
 - [ ] Set "no drinking before X pm" rule <!-- task-id: 2a0ea6fea1f58e59ab04e01a71494ca7 -->
 - [ ] Significant health improvements <!-- task-id: 491eb3e9e63008f956c64b7f26e6f856 -->
@@ -366,7 +384,6 @@
 - [ ] Sustainable lifestyle changes integrated <!-- task-id: 4366244f1314f08e09487aeda50f4cdd -->
 - [ ] Sustainable routine established <!-- task-id: 43f3f4879cdfbd1625c04f996e7dda98 -->
 - [ ] Target: Maximum 14 units per week <!-- task-id: b50ce20f988a36e264e0171c40da81a4 -->
-- [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
 - [ ] Track how you feel next morning <!-- task-id: 4757f1860e0ab2316ade44186bd518de -->
 - [ ] Track medication effectiveness <!-- task-id: 5b76edda855c11cca0b901d7784a11f1 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
@@ -376,7 +393,6 @@
 - [ ] Update weight log <!-- task-id: weight-log-weekly --> <!-- task-id: c87d187f6de8c0fb18859fd1b84acc10 -->
 - [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
 - [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly --> <!-- task-id: 67416207c06f8986797ad579805c2ac5 -->
-- [ ] Use The Inversion Table <!-- task-id: dbeb3e327f8659e60d53df35b172fc8a -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Weight at or near target (165 lbs) <!-- task-id: de53fd453b094ee29ad6875bff5ece07 -->
 - [ ] Weight loss progress <!-- task-id: 6c9a430dc2e3ecc3764cea32c845bd00 -->
@@ -388,7 +404,6 @@
 - [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 852c35ddcd24bdb8aa51ccd204c05b85 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: aea75da412f9483c037172db4657370d -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 878904aab1d6313dca6b340ef82f46f8 -->
@@ -435,9 +450,8 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f08077ca7e29e8788fe4e5ced194a019 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a7fd0020352b84b1cfec4dcbeb075af0 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e49839e372fbbfe18e1511bd9f28e245 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 460f5da3c276b2bca940164a6dd0235e -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5f4f1f968824cb3a40bae1842324a169 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
@@ -484,12 +498,8 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a27ca5f9067e4edc374f309aa6a41d99 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f580914a5b4c00e29ddab74b351afc24 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a80cac5fdce836e0ddbfa3b49a13b0ad -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
-- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: a949e8afa265b99495d821d9c0274c1e -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: bb3916fbac505b5363f935866e51efc6 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 439bd0df2fb062e19c4a5a558a803f3d -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 10a61ec80ef32067bf6c7b7492027385 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 31bc54ecb0c78e35646757ccda480b8a -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7f05ee1141653f6851ec1a62103c7de9 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
