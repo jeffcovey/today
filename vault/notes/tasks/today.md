@@ -4,7 +4,7 @@
 
 ## 🎭 Stage
 
-- [ ] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
+- [x] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 
 ## Next Up
 
