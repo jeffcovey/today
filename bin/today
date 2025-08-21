@@ -40,9 +40,18 @@ if [ "$SKIP_SYNC" = true ]; then
     echo "⚠️  Skipping sync (--no-sync flag provided)"
 fi
 
+# Detect if we're in a non-interactive environment
+if [ -t 0 ] && [ -t 1 ]; then
+    # Interactive terminal - use normal Claude
+    CLAUDE_CMD="claude"
+else
+    # Non-interactive (cron, CI, etc) - use print mode
+    CLAUDE_CMD="claude --print"
+fi
+
 # Check if Claude CLI is authenticated by testing actual functionality
 echo "🔐 Checking Claude authentication..."
-TEST_RESPONSE=$(claude --print "Say 'ok'" 2>&1)
+TEST_RESPONSE=$($CLAUDE_CMD "Say 'ok'" 2>&1)
 if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo ""
     echo "⚠️  Claude CLI is not authenticated!"
@@ -125,7 +134,11 @@ if [ -n "$LAST_SYNC" ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "📝 Review file: $REVIEW_FILE"
         echo ""
-        echo "Starting focused Claude session..."
+        if [ "$CLAUDE_CMD" = "claude --print" ]; then
+            echo "Starting non-interactive Claude session..."
+        else
+            echo "Starting focused Claude session..."
+        fi
         echo "Request: $DIRECT_REQUEST"
         echo ""
         echo "Claude will:"
@@ -143,7 +156,7 @@ if [ -n "$LAST_SYNC" ]; then
         echo "🤖 Starting Claude focused session..."
         
         # Create a prompt that includes context but focuses on the request
-        cat <<EOF | claude
+        cat <<EOF | $CLAUDE_CMD
 # Focused Work Session
 
 You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
@@ -178,12 +191,18 @@ EOF
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "📝 Review file: $REVIEW_FILE"
         echo ""
-        echo "Starting interactive Claude session..."
+        if [ "$CLAUDE_CMD" = "claude --print" ]; then
+            echo "Starting non-interactive Claude session..."
+        else
+            echo "Starting interactive Claude session..."
+        fi
         echo "Claude will:"
         echo "  • Query the SQLite database for all data"
         echo "  • Create or update today's review file"
         echo "  • Provide recommendations"
-        echo "  • Continue working with you as needed"
+        if [ "$CLAUDE_CMD" = "claude" ]; then
+            echo "  • Continue working with you as needed"
+        fi
         echo ""
         echo "💡 Useful commands during the session:"
         echo "  bin/mark-done 'task'  # Mark task complete"
@@ -193,7 +212,7 @@ EOF
         
         # Start interactive Claude session with TODAY.md
         echo "🤖 Starting Claude interactive session..."
-        cat TODAY.md | claude
+        cat TODAY.md | $CLAUDE_CMD
     fi
     
     # After Claude session ends
