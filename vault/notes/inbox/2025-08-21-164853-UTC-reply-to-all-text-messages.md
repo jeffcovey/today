@@ -1,0 +1,4 @@
+- [ ] Reply to all text messages
+- [ ] Get glasses
+- [ ] Improve image search and tagging
+- [ ] order toilet paper and paper towels @today 
