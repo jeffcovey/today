@@ -66,7 +66,7 @@ fly ssh console
 
 Edit `src/scheduler.js` to change the schedule. The current schedule:
 - Every 10 min: `bin/sync --quick`
-- Every 2 hours (5AM-9PM): `bin/focus "Update today's review file"`
+- Every 2 hours (5AM-9PM): `bin/today "Update today's review file"`
 - Daily at 4AM: `bin/sync` (full sync)
 - Every 4 hours: `bin/sync --quick-email`
 
