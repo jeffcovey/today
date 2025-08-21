@@ -1341,9 +1341,12 @@ export class NotionAPI extends NotionAPIBase {
     
     try {
       // Get the action items database
+      console.log('  Getting action items database...');
       const actionItemsDB = await this.getActionItemsDatabase();
+      console.log('  Got database ID:', actionItemsDB.id);
       
       // Query for tasks that are Done and have a repeat schedule
+      console.log('  Querying for completed repeating tasks...');
       const completedRepeatingTasks = await this.queryDatabase({
         databaseId: actionItemsDB.id,
         cacheKey: 'completed_repeating_tasks',

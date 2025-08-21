@@ -90,6 +90,9 @@ program
       if (!options.all && !options.resetRoutines && !options.markRepeatingTasks && !options.createTemporal) {
         console.log(chalk.yellow('No daily operation specified. Use --help for options.'));
       }
+      
+      // Exit successfully after completing all operations
+      process.exit(0);
 
     } catch (error) {
       console.error(chalk.red('Error in daily operations:'), error.message);
