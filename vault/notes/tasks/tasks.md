@@ -4,7 +4,7 @@
 ### Today - Thursday, Aug 21
 
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
-- [ ] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
+- [x] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
 
 ### Monday, Dec 1
 
@@ -12,39 +12,39 @@
 
 ### Invalid Date, Invalid Date
 
-- [ ] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
+- [x] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
 - [ ] Review the Honeybadger R12 error (memory quota exceeded) <!-- task-id: 4cf0df8852df22d97d03909a057543db -->
-- [ ] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
-- [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
-- [ ] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
 
 ### Invalid Date, Invalid Date
 
 - [ ] Check Honeybadger production error from 8:55 PM <!-- task-id: 07b30922f58a8094342b50fa01cec208 -->
-- [ ] Complete daily streaks (inversion table, Tai Chi, saved articles) <!-- task-id: fca2443263d311e03664cb86d34497c1 -->
-- [ ] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 8107719734121f764a96142dd05cf45b -->
-- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
-- [ ] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
-- [ ] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
-- [ ] Use The Inversion Table <!-- task-id: e73befc42e92c0571f2d3d80b09d1d2e -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: d1d112be50ba6e35866e98b1e763e5a6 -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: f58943b7621ba8cbc08c30bac7ca40b9 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
+- [x] Complete daily streaks (inversion table, Tai Chi, saved articles) <!-- task-id: fca2443263d311e03664cb86d34497c1 -->
+- [x] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 8107719734121f764a96142dd05cf45b -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
+- [x] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
+- [x] Use The Inversion Table <!— task-id: e73befc42e92c0571f2d3d80b09d1d2e —>
+- [x] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: d1d112be50ba6e35866e98b1e763e5a6 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: f58943b7621ba8cbc08c30bac7ca40b9 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
 
 ### Invalid Date, Invalid Date
 
-- [ ] Activity Rings <!-- task-id: 4298261590da695df28cb37203d98fdf -->
-- [ ] Apple Fitness+ Workouts <!-- task-id: b805e4494bb3bbe2fd929873dbdadb9c -->
-- [ ] Burn More Energy <!-- task-id: edb77d0421beff2cc32f661ed1675943 -->
-- [ ] Check and restart Honeybadger production errors <!-- task-id: 402b6abf2877434a17058c9ca62625de -->
-- [ ] Do Tai Chi Standing (3m 30s) <!-- task-id: 5e7c705c44706ca50f8b465444f520d6 -->
-- [ ] Mindful Minutes (40m) <!-- task-id: 910f15a7a6653f81ed1e50868be72192 -->
-- [ ] Read Saved Articles (2m 30s) <!-- task-id: 6f835adc5ee79451fab8e7f0200fbde0 -->
+- [x] Activity Rings <!-- task-id: 4298261590da695df28cb37203d98fdf -->
+- [x] Apple Fitness+ Workouts <!— task-id: b805e4494bb3bbe2fd929873dbdadb9c —>
+- [x] Burn More Energy <!-- task-id: edb77d0421beff2cc32f661ed1675943 -->
+- [ ] Check and restart Honeybadger production errors <!— task-id: 402b6abf2877434a17058c9ca62625de —>
+- [x] Do Tai Chi Standing (3m 30s) <!— task-id: 5e7c705c44706ca50f8b465444f520d6 —>
+- [x] Mindful Minutes (40m) <!— task-id: 910f15a7a6653f81ed1e50868be72192 —>
+- [x] Read Saved Articles (2m 30s) <!— task-id: 6f835adc5ee79451fab8e7f0200fbde0 —>
 - [ ] Tai Chi (1m) <!-- task-id: 14fd4f428d9257fa2500e67287f5b030 -->
 - [ ] Use The Inversion Table <!-- task-id: 25f792a3797eefce2af7add3512a6d08 -->
 - [ ] Walk 5,500 Steps <!-- task-id: ec941c3717af8331eff7095a6d9ad897 -->
