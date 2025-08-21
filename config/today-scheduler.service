@@ -1,0 +1,22 @@
+[Unit]
+Description=Today Scheduler - Automated task runner
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/today
+Environment="NODE_ENV=production"
+Environment="TZ=America/New_York"
+ExecStart=/usr/bin/node src/scheduler.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
