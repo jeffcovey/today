@@ -8,7 +8,8 @@ User=root
 WorkingDirectory=/opt/today
 Environment="NODE_ENV=production"
 Environment="TZ=America/New_York"
-ExecStart=/usr/bin/node src/scheduler.js
+EnvironmentFile=-/opt/today/.env.keys
+ExecStart=/usr/bin/npx dotenvx run -- node src/scheduler.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -70,7 +70,7 @@ test/
 - **SqliteCache** (`src/sqlite-cache.js`) - Caching layer
 
 ### Priority 2 - Data Integrity (70% coverage target)
-- **TursoSyncOptimized** (`src/turso-sync-optimized.js`) - Incremental sync
+- **TursoSync** (`src/turso-sync.js`) - Bidirectional database sync
 - **SyncScheduler** (`src/sync-scheduler.js`) - Sync coordination
 - **EmailManager** (`src/email-manager.js`) - Email parsing
 

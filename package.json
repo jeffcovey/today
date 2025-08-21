@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.60.0",
+    "@dotenvx/dotenvx": "^1.49.0",
     "@libsql/client": "^0.15.12",
     "@notionhq/client": "^4.0.2",
     "better-sqlite3": "^12.2.0",
@@ -45,7 +46,6 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@dotenvx/dotenvx": "^1.48.4",
     "@types/jest": "^30.0.0",
     "jest": "^30.0.5",
     "markdownlint-cli2": "^0.18.1"

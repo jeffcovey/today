@@ -20,7 +20,7 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install && chmod +x bin/*",
+	"postCreateCommand": "npm install && chmod +x bin/* && npx dotenvx run -- .devcontainer/setup-ssh-keys.sh",
 	"postStartCommand": "bash bin/devcontainer-startup",
 	"containerEnv": {
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",

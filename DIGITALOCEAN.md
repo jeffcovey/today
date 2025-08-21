@@ -144,7 +144,7 @@ npm install -g @anthropic-ai/claude-code@latest
    bin/deploy-do exec "apt update && apt upgrade -y"
    ```
 
-## Advantages over Fly.io
+## Advantages
 
 ✅ **Full SSH access** - Interactive Claude works perfectly
 ✅ **Standard Linux** - Everything works as expected  
@@ -152,15 +152,6 @@ npm install -g @anthropic-ai/claude-code@latest
 ✅ **Better debugging** - Full access to logs and system
 ✅ **No container overhead** - Direct Node.js execution
 ✅ **Persistent storage** - Your data stays on the droplet
-
-## Migration from Fly.io
-
-If you were using Fly.io:
-
-1. Export any data you need from Fly
-2. Delete your Fly app: `fly apps destroy today-scheduler`
-3. Follow the setup steps above
-4. Your scheduler will resume on DigitalOcean
 
 ## Support
 
