@@ -1,4 +1,5 @@
 # Backyard Pool Installation
+<!-- project-id: d65d9c3d630e629f6cc00804846c69e7 -->
 
 **Status:** Planning
 **Budget:** TBD (Need estimates)
@@ -36,16 +37,16 @@ Installing a backyard pool to address multiple life goals:
 
 ## Research & Planning Tasks
 
-- [ ] Call Pool Builders Inc for free estimate: **954.797.7700**
-- [ ] Get 2-3 additional estimates for comparison
-- [ ] Research pool maintenance costs in Oakland Park
-- [ ] Check HOA/city permit requirements
-- [ ] Calculate impact on homeowner's insurance
-- [ ] Analyze Airbnb listings with pools vs without in Oakland Park
-- [ ] Determine optimal pool size/type for lot
-- [ ] Research financing options (HELOC, pool loan, etc.)
-- [ ] Create financial plan to cover pool + taxes + insurance
-- [ ] Check references and reviews for Pool Builders Inc
+- [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
+- [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
+- [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
+- [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
+- [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
+- [ ] Analyze Airbnb listings with pools vs without in Oakland Park <!-- task-id: 3e7a053d0898fe1555551e95f08fca96 -->
+- [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
+- [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
+- [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
+- [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 
 ## Integration with Other Projects
 

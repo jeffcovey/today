@@ -123,9 +123,9 @@ plans/
 
 ## Data to incorporate in Today
 
-- [ ] Add E6W to Today
-- [ ] Add Day One to Today
-- [ ] See ramble in Concerns for things to add to Today
+- [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
+- [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
+- [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
 
 
 ---
