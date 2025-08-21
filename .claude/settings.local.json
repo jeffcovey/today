@@ -134,7 +134,8 @@
       "Bash(git ls-tree:*)",
       "Bash(npx dotenvx:*)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(fly logs:*)"
+      "Bash(fly logs:*)",
+      "WebFetch(domain:www.poolbuildersinc.com)"
     ],
     "deny": []
   }

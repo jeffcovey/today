@@ -25,7 +25,8 @@ apt-get install -y \
     python3 \
     curl \
     jq \
-    bc
+    bc \
+    tmux
 
 # Install Claude CLI globally
 echo "📦 Installing Claude CLI..."

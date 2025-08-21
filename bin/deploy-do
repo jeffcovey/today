@@ -4,10 +4,23 @@
 
 set -e
 
+# If we're not already running under dotenvx, wrap ourselves
+if [ -z "$DOTENVX_INJECTED" ]; then
+    export DOTENVX_INJECTED=1
+    exec npx dotenvx run -- "$0" "$@"
+fi
+
 # Configuration
 DROPLET_IP="${DO_DROPLET_IP:-}"
 DROPLET_USER="${DO_DROPLET_USER:-root}"
 DEPLOY_PATH="/opt/today"
+SSH_KEY="${HOME}/.ssh/do_deploy_key"
+
+# Check if deployment key exists
+if [ ! -f "$SSH_KEY" ]; then
+    echo "⚠️  Deployment key not found. Setting up..."
+    .devcontainer/setup-ssh-keys.sh
+fi
 
 # Colors
 GREEN='\033[0;32m'
@@ -42,17 +55,22 @@ case "$ACTION" in
         check_config
         
         print_info "This will install Node.js, Git, and dependencies on your droplet"
-        read -p "Continue? (y/n) " -n 1 -r
-        echo
+        # Check if running non-interactively or with --yes flag
+        if [ ! -t 0 ] || [ "$2" = "--yes" ] || [ "$2" = "-y" ]; then
+            REPLY="y"
+        else
+            read -p "Continue? (y/n) " -n 1 -r
+            echo
+        fi
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
             exit 1
         fi
         
         print_info "Copying setup script to droplet..."
-        scp bin/setup-droplet.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+        scp -i "$SSH_KEY" bin/setup-droplet.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
         
         print_info "Running setup on droplet..."
-        ssh ${DROPLET_USER}@${DROPLET_IP} "bash /tmp/setup-droplet.sh"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "bash /tmp/setup-droplet.sh"
         
         print_status "Setup complete!"
         echo "Run 'bin/deploy-do deploy' to deploy your code"
@@ -64,26 +82,47 @@ case "$ACTION" in
         
         print_info "Syncing code to ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}"
         
-        # Create deployment directory if it doesn't exist
-        ssh ${DROPLET_USER}@${DROPLET_IP} "mkdir -p ${DEPLOY_PATH}"
+        # Create deployment and data directories if they don't exist
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p ${DEPLOY_PATH} ${DEPLOY_PATH}/.data"
         
-        # Sync files (excluding .git, node_modules, and local data)
-        rsync -avz --delete \
-            --exclude='.git' \
+        # Sync files (INCLUDING .git for sync operations, but excluding node_modules and local data)
+        # IMPORTANT: --delete will remove files not in source, but excluded dirs are preserved
+        rsync -avz --delete -e "ssh -i $SSH_KEY" \
             --exclude='node_modules' \
             --exclude='.data' \
             --exclude='.notion-cache' \
             --exclude='.calendar-cache' \
             --exclude='.env.keys' \
             --exclude='.last-dep-check' \
-            --exclude='.devcontainer' \
             ./ ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/
         
+        # Ensure git is configured properly on droplet
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "git config --global --add safe.directory ${DEPLOY_PATH}" 2>/dev/null || true
+        
+        # Configure git user identity for commits
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'" 2>/dev/null || true
+        
+        # Configure git to use GitHub token for authentication (if available)
+        print_info "Configuring GitHub authentication..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npx dotenvx run -- bash -c 'if [ -n \"\$GITHUB_TOKEN\" ]; then echo \"https://\${GITHUB_TOKEN}:x-oauth-basic@github.com\" > ~/.git-credentials && git config --global credential.helper store && echo \"✓ GitHub token configured\"; fi'" 2>/dev/null || true
+        
         print_info "Installing dependencies..."
-        ssh ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npm install --production"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npm install --production"
+        
+        # Only initialize database if it doesn't exist
+        if ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ ! -f ${DEPLOY_PATH}/.data/today.db ]"; then
+            print_info "First deployment - initializing database..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js"
+            
+            print_info "Pulling all data from Turso (this may take a while)..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && rm -f .data/turso-sync.json && npx dotenvx run -- bin/turso-sync pull --full" || print_warning "Full pull may have been interrupted"
+        else
+            print_info "Database exists, running migrations..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
+        fi
         
         print_info "Restarting services..."
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         
         print_status "Deployment complete!"
         ;;
@@ -93,18 +132,20 @@ case "$ACTION" in
         check_config
         
         print_info "Copying .env file..."
-        scp .env ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/.env
+        scp -i "$SSH_KEY" .env ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/.env
         
         if [ -f .env.keys ]; then
-            print_info "Copying .env.keys file..."
-            scp .env.keys ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/.env.keys
+            print_info "Extracting and copying decryption key..."
+            # Extract just the key value, not the whole file
+            PRIVATE_KEY=$(grep '^DOTENV_PRIVATE_KEY=' .env.keys | cut -d= -f2)
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "echo 'DOTENV_PRIVATE_KEY=${PRIVATE_KEY}' > ${DEPLOY_PATH}/.env.keys"
         fi
         
         print_info "Setting proper permissions..."
-        ssh ${DROPLET_USER}@${DROPLET_IP} "chmod 600 ${DEPLOY_PATH}/.env*"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod 600 ${DEPLOY_PATH}/.env*"
         
         print_info "Restarting services..."
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         
         print_status "Secrets updated!"
         ;;
@@ -112,40 +153,123 @@ case "$ACTION" in
     ssh)
         echo "🔌 Connecting to droplet..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP}
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP}
         ;;
         
     logs)
         echo "📊 Showing scheduler logs..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP} "journalctl -u today-scheduler -f"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "journalctl -u today-scheduler -f"
         ;;
         
     status)
         echo "📈 Checking status..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl status today-scheduler"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl status today-scheduler"
         ;;
         
     restart)
         echo "🔄 Restarting scheduler..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler"
         print_status "Scheduler restarted"
         ;;
         
     stop)
         echo "⏹ Stopping scheduler..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl stop today-scheduler"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop today-scheduler"
         print_status "Scheduler stopped"
         ;;
         
     start)
         echo "▶️ Starting scheduler..."
         check_config
-        ssh ${DROPLET_USER}@${DROPLET_IP} "systemctl start today-scheduler"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl start today-scheduler"
         print_status "Scheduler started"
+        ;;
+        
+    db-init)
+        echo "🗄️ Initializing database..."
+        check_config
+        print_info "Creating .data directory..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p ${DEPLOY_PATH}/.data"
+        
+        print_info "Running database migrations..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npx dotenvx run -- node src/migrations.js"
+        
+        print_status "Database initialized!"
+        ;;
+        
+    git-setup)
+        echo "🔧 Setting up git repository on droplet..."
+        check_config
+        
+        print_info "Copying .git directory to droplet..."
+        rsync -avzh --progress -e "ssh -i $SSH_KEY" \
+            .git/ ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/.git/
+        
+        print_info "Configuring git safe directory..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "git config --global --add safe.directory ${DEPLOY_PATH}"
+        
+        print_info "Configuring git user identity..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'"
+        
+        print_info "Configuring GitHub authentication..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npx dotenvx run -- bash -c 'if [ -n \"\$GITHUB_TOKEN\" ]; then echo \"https://\${GITHUB_TOKEN}:x-oauth-basic@github.com\" > ~/.git-credentials && git config --global credential.helper store && echo \"✓ GitHub token configured\"; else echo \"⚠ No GITHUB_TOKEN found\"; fi'"
+        
+        print_info "Testing git access..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npx dotenvx run -- git fetch --dry-run" 2>/dev/null && print_status "Git fetch successful!" || print_warning "Git fetch failed - check GITHUB_TOKEN"
+        
+        print_info "Checking git status..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && git status --short"
+        
+        print_status "Git repository configured!"
+        ;;
+        
+    db-upload)
+        echo "📤 Uploading local database to droplet..."
+        check_config
+        
+        if [ ! -f ".data/today.db" ]; then
+            print_error "Local database .data/today.db not found!"
+            exit 1
+        fi
+        
+        # Allow custom target name (e.g., today.db.macbook)
+        TARGET_NAME="${2:-today.db}"
+        
+        print_info "Backing up existing database on droplet..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && [ -f .data/today.db ] && cp .data/today.db .data/today.db.backup-$(date +%Y%m%d-%H%M%S) || true"
+        
+        print_info "Uploading database ($(du -h .data/today.db | cut -f1)) using rsync..."
+        # Using -avzh as you confirmed works (z for compression, h for human-readable)
+        rsync -avzh --progress -e "ssh -i $SSH_KEY" \
+            .data/today.db ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/.data/${TARGET_NAME}
+        
+        # If uploaded with different name, move to today.db
+        if [ "$TARGET_NAME" != "today.db" ]; then
+            print_info "Moving ${TARGET_NAME} to today.db..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH}/.data && mv ${TARGET_NAME} today.db"
+        fi
+        
+        print_info "Setting permissions..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod 644 ${DEPLOY_PATH}/.data/today.db"
+        
+        print_info "Verifying upload..."
+        LOCAL_SIZE=$(du -b .data/today.db | cut -f1)
+        REMOTE_SIZE=$(ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "du -b ${DEPLOY_PATH}/.data/today.db | cut -f1")
+        if [ "$LOCAL_SIZE" != "$REMOTE_SIZE" ]; then
+            print_warning "Size mismatch: local=$LOCAL_SIZE remote=$REMOTE_SIZE"
+        else
+            print_status "Database size verified: $(du -h .data/today.db | cut -f1)"
+        fi
+        
+        # Quick data check
+        TASK_COUNT=$(ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sqlite3 ${DEPLOY_PATH}/.data/today.db 'SELECT COUNT(*) FROM tasks' 2>/dev/null || echo 0")
+        print_info "Database contains $TASK_COUNT tasks"
+        
+        print_status "Database uploaded successfully!"
         ;;
         
     exec)
@@ -156,29 +280,35 @@ case "$ACTION" in
         check_config
         shift
         echo "⚡ Executing: $*"
-        ssh ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && $*"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && $*"
         ;;
         
     *)
         echo "Usage: bin/deploy-do [command]"
         echo ""
         echo "Commands:"
-        echo "  setup    - Initial droplet setup (run once)"
-        echo "  deploy   - Deploy code to droplet (default)"
-        echo "  secrets  - Update .env files"
-        echo "  ssh      - SSH into droplet"
-        echo "  logs     - Show scheduler logs"
-        echo "  status   - Show scheduler status"
-        echo "  restart  - Restart scheduler"
-        echo "  stop     - Stop scheduler"
-        echo "  start    - Start scheduler"
-        echo "  exec CMD - Execute command in deploy directory"
+        echo "  setup     - Initial droplet setup (run once)"
+        echo "  deploy    - Deploy code to droplet (default, includes .git)"
+        echo "  secrets   - Update .env files"
+        echo "  db-init   - Initialize database"
+        echo "  db-upload - Upload local database to droplet"
+        echo "  git-setup - Manually setup git repository"
+        echo "  ssh       - SSH into droplet"
+        echo "  logs      - Show scheduler logs"
+        echo "  status    - Show scheduler status"
+        echo "  restart   - Restart scheduler"
+        echo "  stop      - Stop scheduler"
+        echo "  start     - Start scheduler"
+        echo "  exec CMD  - Execute command in deploy directory"
         echo ""
         echo "First time setup:"
         echo "  1. Create a DigitalOcean droplet (Ubuntu 24.04)"
-        echo "  2. export DO_DROPLET_IP=your.droplet.ip"
-        echo "  3. bin/deploy-do setup"
-        echo "  4. bin/deploy-do secrets"
-        echo "  5. bin/deploy-do deploy"
+        echo "  2. Add DO_DROPLET_IP to .env and encrypt with dotenvx"
+        echo "  3. bin/deploy-do setup       # Install dependencies on droplet"
+        echo "  4. bin/deploy-do secrets     # Copy encrypted secrets"
+        echo "  5. bin/deploy-do deploy      # Deploy code (includes .git)"
+        echo "  6. bin/deploy-do db-upload   # Upload your local database"
+        echo ""
+        echo "Note: deploy now includes .git for sync operations"
         ;;
 esac
