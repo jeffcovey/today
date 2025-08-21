@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 11:24:18 PM EDT*
+*Generated: 8/21/2025, 8:48:15 AM EDT*
 
 ## 🎭 Stage
 
@@ -9,12 +9,12 @@
 
 ## Next Up
 
-- [x] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (108 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (109 tasks completed)</summary>
 
+- [x] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
 - [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
 - [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
