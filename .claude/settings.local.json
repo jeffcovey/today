@@ -133,7 +133,8 @@
       "Bash(turso db shell:*)",
       "Bash(git ls-tree:*)",
       "Bash(npx dotenvx:*)",
-      "WebFetch(domain:docs.anthropic.com)"
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(fly logs:*)"
     ],
     "deny": []
   }
