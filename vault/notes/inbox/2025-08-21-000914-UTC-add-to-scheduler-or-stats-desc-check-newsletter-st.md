@@ -1,0 +1,1 @@
+- [ ] Add to scheduler or stats:  desc "Check newsletter status and recent sends" task :status => :environment do
