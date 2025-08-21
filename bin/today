@@ -40,9 +40,9 @@ if [ "$SKIP_SYNC" = true ]; then
     echo "⚠️  Skipping sync (--no-sync flag provided)"
 fi
 
-# Detect if we're in a non-interactive environment (no TTY or SSH to Fly)
-if [ ! -t 0 ] || [ ! -t 1 ] || [ "$FLY_SSH" = "1" ]; then
-    # Non-interactive (cron, scheduler, Fly SSH, etc) - use print mode
+# Detect if we're in a non-interactive environment (no TTY)
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+    # Non-interactive (cron, scheduler, etc) - use print mode
     CLAUDE_CMD="claude --print"
 else
     # Interactive terminal - use normal Claude
