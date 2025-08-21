@@ -264,7 +264,7 @@ export class MigrationManager {
               SUM(duration) as total_seconds,
               ROUND(SUM(duration) / 3600.0, 2) as total_hours,
               COUNT(*) as entry_count,
-              GROUP_CONCAT(DISTINCT tags) as all_tags
+              GROUP_CONCAT(tags) as all_tags
             FROM toggl_time_entries
             WHERE stop IS NOT NULL
             GROUP BY DATE(start)

@@ -131,7 +131,8 @@
       "Bash(turso db show:*)",
       "Bash(turso db create:*)",
       "Bash(turso db shell:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(npx dotenvx:*)"
     ],
     "deny": []
   }

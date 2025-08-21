@@ -117,6 +117,9 @@ sync_entries() {
         
         // Clean up
         fs.unlinkSync('/tmp/toggl_entries.json');
+        
+        // Force exit after completion
+        process.exit(0);
     " 2>&1 | while read line; do
         if [[ "$line" == *"Synced"* ]]; then
             print_status "$line"
@@ -193,6 +196,9 @@ sync_projects() {
         console.log(\`Synced \${count} projects\`);
         
         fs.unlinkSync('/tmp/toggl_projects.json');
+        
+        // Force exit after completion
+        process.exit(0);
     " 2>&1 | while read line; do
         if [[ "$line" == *"Synced"* ]]; then
             print_status "$line"
@@ -214,7 +220,7 @@ SELECT
     COALESCE(p.name, 'No Project') as Project,
     printf('%.2f', SUM(te.duration) / 3600.0) as Hours,
     COUNT(*) as Entries,
-    SUBSTR(GROUP_CONCAT(DISTINCT te.description, ', '), 1, 50) as Activities
+    SUBSTR(GROUP_CONCAT(te.description, ', '), 1, 50) as Activities
 FROM toggl_time_entries te
 LEFT JOIN toggl_projects p ON te.pid = p.id
 WHERE DATE(te.start) = DATE('now', 'localtime')
@@ -245,7 +251,7 @@ SELECT
     DATE(start) as Date,
     printf('%.2f', SUM(duration) / 3600.0) as Hours,
     COUNT(*) as Entries,
-    GROUP_CONCAT(DISTINCT COALESCE(p.name, 'No Project'), ', ') as Projects
+    GROUP_CONCAT(DISTINCT COALESCE(p.name, 'No Project')) as Projects
 FROM toggl_time_entries te
 LEFT JOIN toggl_projects p ON te.pid = p.id
 WHERE DATE(start) >= DATE('now', '-7 days', 'localtime')

@@ -301,10 +301,11 @@ ORDER BY start_date;
 SELECT 
     COALESCE(p.name, 'No Project') as project,
     printf('%.2f', SUM(te.duration) / 3600.0) as hours,
-    GROUP_CONCAT(DISTINCT te.description, ', ') as activities
+    GROUP_CONCAT(te.description, ', ') as activities
 FROM toggl_time_entries te
 LEFT JOIN toggl_projects p ON te.pid = p.id
 WHERE DATE(te.start) = DATE('now', 'localtime')
+    AND te.stop IS NOT NULL
 GROUP BY p.name
 ORDER BY SUM(te.duration) DESC;
 
