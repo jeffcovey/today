@@ -137,6 +137,20 @@ case "$ACTION" in
             print_info "  npx dotenvx encrypt"
         fi
         
+        # Anthropic API key for Claude CLI
+        if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+            SECRETS_CMD="$SECRETS_CMD ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\""
+            print_info "Will set: ANTHROPIC_API_KEY (for Claude CLI automation)"
+        else
+            print_warning "No ANTHROPIC_API_KEY found - Claude scheduled tasks will not work!"
+            print_info "To get an API key:"
+            print_info "  1. Go to https://console.anthropic.com/settings/keys"
+            print_info "  2. Create a new API key"
+            print_info "  3. Add to .env and encrypt:"
+            print_info "     echo 'ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY' >> .env"
+            print_info "     npx dotenvx encrypt"
+        fi
+        
         # Optional secrets - only set if they exist
         if [[ -n "$TURSO_DATABASE_URL" ]]; then
             SECRETS_CMD="$SECRETS_CMD TURSO_DATABASE_URL=\"$TURSO_DATABASE_URL\""

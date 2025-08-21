@@ -23,6 +23,14 @@ The script automatically:
 - Loads secrets from your .env file using dotenvx
 - Deploys the scheduler
 
+### Required Secrets
+
+For full functionality, add these to your `.env` file:
+- `GITHUB_TOKEN` - For GitHub sync (required)
+- `ANTHROPIC_API_KEY` - For Claude scheduled tasks (required for AI reviews)
+  - Get from: https://console.anthropic.com/settings/keys
+- Other secrets (Notion, email, etc.) as needed
+
 ## Manual Setup (if you prefer)
 
 1. **Install Fly CLI** (already in dev container):
@@ -66,9 +74,9 @@ fly ssh console
 
 Edit `src/scheduler.js` to change the schedule. The current schedule:
 - Every 10 min: `bin/sync --quick`
-- Every 2 hours (5AM-9PM): `bin/today "Update today's review file"`
+- Every 2 hours (5AM-9PM): `bin/today --no-sync "Update today's review file for the current time"`
 - Daily at 4AM: `bin/sync` (full sync)
-- Every 4 hours: `bin/sync --quick-email`
+- Daily at 3AM: `bin/notion daily --all` (temporary until migration)
 
 After changes, deploy with `fly deploy`.
 
