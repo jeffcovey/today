@@ -73,9 +73,8 @@ fly ssh console
 ## Schedule Customization
 
 Edit `src/scheduler.js` to change the schedule. The current schedule:
-- Every 10 min: `bin/sync --quick`
-- Every 2 hours (5AM-9PM): `bin/today --no-sync "Update today's review file for the current time"`
-- Daily at 4AM: `bin/sync` (full sync)
+- Every 10 min: `bin/sync --quick` - Quick sync of GitHub vault and tasks
+- Every 2 hours (5AM-9PM): `bin/today "Update today's review file"` - Full sync and Claude updates your daily review
 - Daily at 3AM: `bin/notion daily --all` (temporary until migration)
 
 After changes, deploy with `fly deploy`.

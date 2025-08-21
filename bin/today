@@ -40,13 +40,13 @@ if [ "$SKIP_SYNC" = true ]; then
     echo "⚠️  Skipping sync (--no-sync flag provided)"
 fi
 
-# Detect if we're in a non-interactive environment
-if [ -t 0 ] && [ -t 1 ]; then
+# Detect if we're in a non-interactive environment (no TTY)
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+    # Non-interactive (cron, scheduler, etc) - use print mode
+    CLAUDE_CMD="claude --print"
+else
     # Interactive terminal - use normal Claude
     CLAUDE_CMD="claude"
-else
-    # Non-interactive (cron, CI, etc) - use print mode
-    CLAUDE_CMD="claude --print"
 fi
 
 # Check if Claude CLI is authenticated by testing actual functionality

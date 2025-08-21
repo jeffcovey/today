@@ -52,18 +52,12 @@ const jobs = [
     },
     {
         schedule: '0 */2 5-21 * *', // Every 2 hours between 5AM and 9PM
-        command: 'bin/today --no-sync "Update today\'s review file for the current time" || true',
+        command: 'bin/today "Update today\'s review file for the current time" || true',
         description: 'Update daily review with Claude',
         timezone: true
     },
     {
-        schedule: '0 4 * * *', // Daily at 4 AM
-        command: 'bin/sync || true', // Full sync (all data sources)
-        description: 'Full data sync',
-        timezone: true
-    },
-    {
-        schedule: '0 3 * * *', // Daily at 3 AM (before full sync)
+        schedule: '0 3 * * *', // Daily at 3 AM
         command: 'bin/notion daily --all || true', // Run all Notion daily automation tasks
         description: 'Notion daily automation (temporary until migration)',
         timezone: true
