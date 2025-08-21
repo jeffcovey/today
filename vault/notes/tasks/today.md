@@ -1,6 +1,11 @@
 # Today's Tasks
 
-*Generated: 8/20/2025, 8:14:09 PM EDT*
+*Generated: 8/20/2025, 11:07:33 PM EDT*
+
+## 🎭 Stage
+
+- [ ] set up a DigitalOcean account <!-- task-id: ee11a5dc1c5896ad94677483e8bf7f34 -->
+- [ ] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
 
 ## Next Up
 
