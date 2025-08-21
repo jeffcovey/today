@@ -45,12 +45,12 @@
 - [x] Do Tai Chi Standing (3m 30s) <!— task-id: 5e7c705c44706ca50f8b465444f520d6 —>
 - [x] Mindful Minutes (40m) <!— task-id: 910f15a7a6653f81ed1e50868be72192 —>
 - [x] Read Saved Articles (2m 30s) <!— task-id: 6f835adc5ee79451fab8e7f0200fbde0 —>
-- [ ] Tai Chi (1m) <!-- task-id: 14fd4f428d9257fa2500e67287f5b030 -->
-- [ ] Use The Inversion Table <!-- task-id: 25f792a3797eefce2af7add3512a6d08 -->
-- [ ] Walk 5,500 Steps <!-- task-id: ec941c3717af8331eff7095a6d9ad897 -->
-- [ ] 30-minute arthritis book reading <!-- task-id: ba56e51570cfbcd6d6d9336f75e4762f -->
+- [x] Tai Chi (1m) <!-- task-id: 14fd4f428d9257fa2500e67287f5b030 -->
+- [x] Use The Inversion Table <!-- task-id: 25f792a3797eefce2af7add3512a6d08 -->
+- [x] Walk 5,500 Steps <!-- task-id: ec941c3717af8331eff7095a6d9ad897 -->
+- [x] 30-minute arthritis book reading <!-- task-id: ba56e51570cfbcd6d6d9336f75e4762f -->
 - [ ] Check Honeybadger production errors (#12285, #12286) <!-- task-id: 8082af772ca5f368963fdf3ad764290b -->
-- [ ] Daily streaks (after dinner) <!-- task-id: 3bd65e3d71ef59494fee2ffe9e90a475 -->
+- [x] Daily streaks (after dinner) <!-- task-id: 3bd65e3d71ef59494fee2ffe9e90a475 -->
 
 ### No Date Set
 
@@ -75,29 +75,29 @@
 - [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
 - [ ] Check if OGM newsletter went out <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
 - [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
-- [ ] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
 - [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
-- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
-- [ ] Do Tai Chi Standing, 3m 30s <!-- task-id: 1d946a65359b396eac4b511e3e1de7c3 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 1d946a65359b396eac4b511e3e1de7c3 -->
 - [ ] Do profit & loss statements [Personal Finance] <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
-- [ ] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
-- [ ] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: b1854ccaa83729d1c14284598336911f -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
@@ -110,8 +110,8 @@
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
-- [ ] Read Saved Articles, 2m 15s <!-- task-id: 6cfd07ea6e1054313ad27621d163a306 -->
-- [ ] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
+- [x] Read Saved Articles, 2m 15s <!-- task-id: 6cfd07ea6e1054313ad27621d163a306 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
 - [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
@@ -119,27 +119,27 @@
 - [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
 - [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
 - [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
-- [ ] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
-- [ ] Use The Inversion Table <!-- task-id: dbeb3e327f8659e60d53df35b172fc8a -->
+- [x] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
+- [x] Use The Inversion Table <!-- task-id: dbeb3e327f8659e60d53df35b172fc8a -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: 852c35ddcd24bdb8aa51ccd204c05b85 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
-- [ ] ♥︎ Exercise for 30 Minutes <!-- task-id: a949e8afa265b99495d821d9c0274c1e -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
-- [ ] ♥︎ Mindful Minutes, 40m <!-- task-id: bb3916fbac505b5363f935866e51efc6 -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
-- [ ] ♥︎ Tai Chi, 1m <!-- task-id: 439bd0df2fb062e19c4a5a558a803f3d -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
-- [ ] ♥︎ Walk 5,500 Steps <!-- task-id: 10a61ec80ef32067bf6c7b7492027385 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac -->
+- [x] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 852c35ddcd24bdb8aa51ccd204c05b85 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: a949e8afa265b99495d821d9c0274c1e -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: bb3916fbac505b5363f935866e51efc6 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 439bd0df2fb062e19c4a5a558a803f3d -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 10a61ec80ef32067bf6c7b7492027385 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Homehousehold] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] 8-10 lbs weight loss achieved <!-- task-id: 0c495168b5c5a49c3a2f3d8b52111b8e -->
@@ -1485,7 +1485,7 @@
 ### No Date Set
 
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
-- [ ] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
+- [x] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
