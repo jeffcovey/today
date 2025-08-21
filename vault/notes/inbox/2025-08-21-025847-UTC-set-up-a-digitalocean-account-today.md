@@ -1,0 +1,1 @@
+- [ ] set up a DigitalOcean account @today
