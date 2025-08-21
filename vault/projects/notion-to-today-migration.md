@@ -36,7 +36,7 @@ Migrate historical planning and review data from Notion databases to the new Tod
 
 > **⚠️ REMINDER**: Notion sync has been temporarily restored in `bin/sync` (line 78) to support importing Action Items. Remove this line after all Action Items have been imported to complete the migration away from Notion.
 
-- [ ] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
+- [x] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
 - [ ] Build conversion scripts for each plan level <!-- task-id: 797b3634044f342ea4e7d91cce20d086 -->
 - [ ] Create year files (2022.md, 2023.md, 2024.md) <!-- task-id: 38a9146aa919c6e70c649adb6fdad5f2 -->
 - [ ] Create quarter files for each year <!-- task-id: 83de8368ccdb0df812bbf0cb5dcf8c44 -->
@@ -120,6 +120,13 @@ plans/
 3. Test with Q1 2024 data
 4. Iterate and refine process
 5. Execute full migration
+
+## Data to incorporate in Today
+
+- [ ] Add E6W to Today
+- [ ] Add Day One to Today
+- [ ] See ramble in Concerns for things to add to Today
+
 
 ---
 Created: 2025-08-16
