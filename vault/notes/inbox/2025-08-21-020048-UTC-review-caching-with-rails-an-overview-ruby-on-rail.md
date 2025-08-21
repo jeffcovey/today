@@ -1,0 +1,1 @@
+- [ ] Review [Caching with Rails: An Overview — Ruby on Rails Guides](https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching)
