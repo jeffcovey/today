@@ -17,18 +17,21 @@ Installing a backyard pool to address multiple life goals:
 ## Benefits Analysis
 
 ### Health Benefits
+
 - Perfect low-impact exercise for chronic arthritis
 - Year-round availability in Florida climate
 - Supports Q3 goal: "Create routines for dealing with chronic arthritis pain"
 - Alternative to high-impact exercises that stress joints
 
 ### Financial Benefits
+
 - Increase guest room rates (estimate: $20-30/night more)
 - More attractive Airbnb listing = higher occupancy
 - Property value increase (typical: 5-8% in Florida)
 - ROI timeline: Estimate 5-7 years through increased rental income
 
 ### Financial Considerations
+
 - Initial investment: $30,000-60,000 (need actual quotes)
 - Monthly maintenance: $100-200
 - Insurance increase: TBD
@@ -51,16 +54,19 @@ Installing a backyard pool to address multiple life goals:
 ## Integration with Other Projects
 
 ### Arthritis Care Project
+
 - Pool provides daily exercise option
 - Complements "Tight Hip, Twisted Core" exercises
 - Water therapy for pain management
 
 ### Finances Project
+
 - Requires clear financial picture (Q3 goal)
 - Need to increase income/reduce expenses (Q3 goal)
 - Must maintain reserves for taxes and insurance
 
 ### Guest Room Hosting
+
 - Enhances guest experience
 - Justifies premium pricing
 - Competitive advantage in local market
