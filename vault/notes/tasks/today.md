@@ -4,7 +4,7 @@
 
 ## 🎭 Stage
 
-- [ ] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
+- [x] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
 
 ## Next Up
 
