@@ -190,7 +190,7 @@ const pageStyle = `
     max-width: 70%;
     margin-bottom: 0.5rem;
     word-wrap: break-word;
-    padding: 0.4rem 0.6rem !important;
+    padding: 0.35rem 0.5rem !important;
     border-radius: 1rem !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     border: none !important;
@@ -281,8 +281,19 @@ const pageStyle = `
     margin-bottom: 0 !important;
   }
   
+  /* Compact spacing for all content inside chat bubbles */
   .chat-bubble .markdown-content p {
-    margin: 0.3rem 0 !important;
+    margin: 0.2rem 0 !important;
+    line-height: 1.3 !important;
+  }
+  
+  .chat-bubble .markdown-content {
+    line-height: 1.3 !important;
+  }
+  
+  .chat-bubble .bubble-content {
+    padding: 0 !important;
+    margin: 0 !important;
   }
   
   /* Markdown content styling in chat */
@@ -828,10 +839,10 @@ async function renderMarkdown(filePath, urlPath) {
           
           bubble.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.7; margin-bottom: 0.2rem; font-size: 0.75rem;">
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
-              <div class="markdown-content" style="margin: 0;">\${renderedContent}</div>
+              <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
             </div>
           \`;
           
@@ -883,7 +894,7 @@ async function renderMarkdown(filePath, urlPath) {
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.7; margin-bottom: 0.2rem; font-size: 0.75rem;">AI · Typing...</small>
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Typing...</small>
               <div class="d-flex align-items-center">
                 <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
                   <span class="visually-hidden">Loading...</span>
