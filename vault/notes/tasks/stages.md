@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/22/2025, 6:20:17 PM EDT*
+*Generated: 8/22/2025, 6:30:20 PM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (51 tasks) - Tasks involving interaction with other people</summary>
@@ -358,7 +358,7 @@
 - [ ] Categorize as Essential/Nice-to-have/Unused <!-- task-id: 1ff13e4e5427032eda2220b9278b89e9 -->
 - [ ] Cancel unused subscriptions immediately <!-- task-id: 668ce36eac168a66850683011f427eff -->
 - [ ] Set calendar reminders for annual reviews <!-- task-id: 60006753693bf21080427c6fcbaed903 -->
-- [ ] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
+- [x] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
 - [ ] Switch SendGrid Gold to Starter (save $60/mo) <!-- task-id: 4357f8c535b156ab7fc2b9054d98e160 -->
 - [ ] Review and cancel unused software subscriptions <!-- task-id: 2ceaf50e43429c26fd30f4eeb17d30f2 -->
 - [ ] Choose tracking tool (YNAB, Mint, or custom solution) <!-- task-id: 67885c1cc0816d713e52930cfa918b59 -->
