@@ -82,6 +82,7 @@ The review file should include:
 - Group tasks by time of day or category
 - Track completed tasks with ✓ marks
 - **Keep files manageable**: Wrap outdated sections (morning tasks, completed items, old updates) in `<details><summary>` tags to collapse them, just like in `vault/notes/tasks/tasks.md`. This keeps the active content visible while preserving history.
+- **Include routine templates**: Insert the contents of `vault/templates/morning-routine.md` at the start of the day section and `vault/templates/evening-routine.md` in the evening section of daily plan files. These provide consistent daily habits and checklists.
 
 ### Incremental Updates (Performance Optimization)
 
