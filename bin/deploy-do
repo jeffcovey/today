@@ -171,6 +171,25 @@ case "$ACTION" in
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl status today-scheduler"
         ;;
         
+    nginx-config)
+        echo "🔧 Updating nginx configuration..."
+        check_config
+        
+        print_info "Copying nginx config to droplet..."
+        scp -i "$SSH_KEY" config/nginx-vault-web-fixed.conf ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+        
+        print_info "Installing nginx config..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp /tmp/nginx-vault-web-fixed.conf /etc/nginx/sites-available/today.jeffcovey.net"
+        
+        print_info "Testing nginx configuration..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo nginx -t"
+        
+        print_info "Reloading nginx..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl reload nginx"
+        
+        print_status "Nginx configuration updated!"
+        ;;
+        
     restart)
         echo "🔄 Restarting scheduler..."
         check_config
@@ -290,19 +309,20 @@ case "$ACTION" in
         echo "Usage: bin/deploy-do [command]"
         echo ""
         echo "Commands:"
-        echo "  setup     - Initial droplet setup (run once)"
-        echo "  deploy    - Deploy code to droplet (default, includes .git)"
-        echo "  secrets   - Update .env files"
-        echo "  db-init   - Initialize database"
-        echo "  db-upload - Upload local database to droplet"
-        echo "  git-setup - Manually setup git repository"
-        echo "  ssh       - SSH into droplet"
-        echo "  logs      - Show scheduler logs"
-        echo "  status    - Show scheduler status"
-        echo "  restart   - Restart scheduler"
-        echo "  stop      - Stop scheduler"
-        echo "  start     - Start scheduler"
-        echo "  exec CMD  - Execute command in deploy directory"
+        echo "  setup       - Initial droplet setup (run once)"
+        echo "  deploy      - Deploy code to droplet (default, includes .git)"
+        echo "  secrets     - Update .env files"
+        echo "  db-init     - Initialize database"
+        echo "  db-upload   - Upload local database to droplet"
+        echo "  git-setup   - Manually setup git repository"
+        echo "  nginx-config - Update nginx configuration"
+        echo "  ssh         - SSH into droplet"
+        echo "  logs        - Show scheduler logs"
+        echo "  status      - Show scheduler status"
+        echo "  restart     - Restart scheduler"
+        echo "  stop        - Stop scheduler"
+        echo "  start       - Start scheduler"
+        echo "  exec CMD    - Execute command in deploy directory"
         echo ""
         echo "First time setup:"
         echo "  1. Create a DigitalOcean droplet (Ubuntu 24.04)"

@@ -2,6 +2,7 @@
 
 import express from 'express';
 import session from 'express-session';
+import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
 import fs from 'fs/promises';
 import { marked } from 'marked';
@@ -20,8 +21,17 @@ const VAULT_PATH = path.join(__dirname, '..', 'vault');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Set up SQLite session store
+const SQLiteStore = connectSqlite3(session);
+
 // Session middleware - must come before auth
 app.use(session({
+  store: new SQLiteStore({
+    db: 'sessions.db',
+    dir: path.join(__dirname, '..', '.data'),
+    table: 'sessions',
+    concurrentDB: true
+  }),
   secret: process.env.SESSION_SECRET || 'vault-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,

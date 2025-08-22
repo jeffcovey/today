@@ -29,6 +29,7 @@
     "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
+    "connect-sqlite3": "^0.9.16",
     "deasync": "^0.1.30",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
