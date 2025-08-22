@@ -294,6 +294,29 @@ clean_markdown_files() {
     
     print_info "Processing $MD_COUNT markdown files..."
     
+    # First, fix corrupted HTML comments (smart dash replacements from Drafts, etc.)
+    # This fixes: <!— becomes <!-- and —> becomes -->
+    COMMENT_FIXED_COUNT=0
+    while IFS= read -r file; do
+        # Check if file has corrupted comments
+        if grep -qE '<!—|—>' "$file" 2>/dev/null; then
+            # Fix the corrupted comments
+            # Using sed with in-place editing
+            if [[ "$(uname)" == "Darwin" ]]; then
+                # macOS version
+                sed -i '' -e 's/<!—/<!--/g' -e 's/—>/-->/g' "$file"
+            else
+                # Linux version
+                sed -i -e 's/<!—/<!--/g' -e 's/—>/-->/g' "$file"
+            fi
+            COMMENT_FIXED_COUNT=$((COMMENT_FIXED_COUNT + 1))
+        fi
+    done < <(find vault -type f -name "*.md" 2>/dev/null)
+    
+    if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
+        print_info "Fixed corrupted HTML comments in $COMMENT_FIXED_COUNT file(s)"
+    fi
+    
     # Run markdownlint-cli2 with fix option
     # Using a glob pattern to process all markdown files in our content directories
     output=$(npx markdownlint-cli2 --fix "vault/**/*.md" 2>&1) || true
@@ -302,16 +325,22 @@ clean_markdown_files() {
     if echo "$output" | grep -q "Fixing:"; then
         fixed_count=$(echo "$output" | grep -c "Fixing:" || echo 0)
         print_info "Fixed formatting in $fixed_count file(s)"
-        
-        # Commit the cleaned files
-        if [[ -n $(git status --porcelain vault/ 2>/dev/null) ]]; then
-            print_info "Committing markdown formatting fixes..."
-            git add vault/ 2>/dev/null
-            git commit -m "Clean up markdown formatting with markdownlint" --quiet 2>/dev/null
-            git push origin main --quiet 2>/dev/null
-        fi
     else
         print_info "All markdown files are already clean"
+    fi
+    
+    # Commit the cleaned files if there were any changes
+    if [[ -n $(git status --porcelain vault/ 2>/dev/null) ]]; then
+        print_info "Committing markdown formatting fixes..."
+        git add vault/ 2>/dev/null
+        
+        # Create appropriate commit message based on what was fixed
+        if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
+            git commit -m "Fix corrupted HTML comments and clean markdown formatting" --quiet 2>/dev/null
+        else
+            git commit -m "Clean up markdown formatting with markdownlint" --quiet 2>/dev/null
+        fi
+        git push origin main --quiet 2>/dev/null
     fi
     
     return 0
