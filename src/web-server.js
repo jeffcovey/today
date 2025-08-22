@@ -203,40 +203,50 @@ const pageStyle = `
   }
   
   /* Override any nested card styles */
-  .chat-bubble .card {
+  /* Override ANY nested elements that might have backgrounds */
+  .chat-bubble .card,
+  .chat-bubble .card-body,
+  .chat-bubble div,
+  .chat-bubble p,
+  .chat-bubble blockquote,
+  .chat-bubble pre,
+  .chat-bubble code {
     background: transparent !important;
+    background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
   }
   
-  .chat-bubble.user .card {
-    background: transparent !important;
-    color: white !important;
-  }
-  
-  .chat-bubble .card-body {
-    padding: 0 !important;
-  }
-  
+  /* Ensure bubble content inherits color */
+  .chat-bubble.user .bubble-content,
   .chat-bubble.user .markdown-content,
-  .chat-bubble.user .markdown-content p,
-  .chat-bubble.user .markdown-content li,
-  .chat-bubble.user .markdown-content h1,
-  .chat-bubble.user .markdown-content h2,
-  .chat-bubble.user .markdown-content h3,
-  .chat-bubble.user .markdown-content h4,
-  .chat-bubble.user .markdown-content h5,
-  .chat-bubble.user .markdown-content h6 {
+  .chat-bubble.user .markdown-content * {
+    color: inherit !important;
+  }
+  
+  .chat-bubble.ai .bubble-content,
+  .chat-bubble.ai .markdown-content,
+  .chat-bubble.ai .markdown-content * {
+    color: inherit !important;
+  }
+  
+  /* Special handling for code blocks to maintain readability */
+  .chat-bubble pre code {
+    background: rgba(0,0,0,0.1) !important;
+    padding: 0.5rem !important;
+    border-radius: 0.25rem !important;
+  }
+  
+  .chat-bubble.user pre code {
+    background: rgba(255,255,255,0.2) !important;
     color: white !important;
   }
   
-  .chat-bubble.assistant {
+  /* AI assistant bubble styling */
+  .chat-bubble.assistant,
+  .chat-bubble.ai {
     background: #f8f9fa !important;
     color: #212529 !important;
-  }
-  
-  .chat-bubble.assistant .card {
-    background: transparent !important;
   }
   
   .bubble-content {
