@@ -81,6 +81,26 @@ const pageStyle = `
 <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet"/>
 <style>
   /* Custom styles to complement MDBootstrap */
+  
+  /* Fix for details/summary elements with MDB */
+  details {
+    display: block !important;
+  }
+  
+  details summary {
+    cursor: pointer !important;
+    display: list-item !important;
+    outline: none !important;
+  }
+  
+  details[open] summary {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Prevent MDB from interfering with details */
+  details summary::-webkit-details-marker {
+    display: inline !important;
+  }
   body {
     background-color: #f5f5f5;
     min-height: 100vh;
@@ -1070,8 +1090,22 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // No need to do anything special for details elements
-        // The onclick="event.stopPropagation()" on checkboxes handles it
+        // Fix for details elements - ensure they work with MDB
+        document.querySelectorAll('details').forEach(details => {
+          // Remove any event listeners that MDB might have added
+          const newDetails = details.cloneNode(true);
+          details.parentNode.replaceChild(newDetails, details);
+          
+          // Add our own click handler for the summary
+          const summary = newDetails.querySelector('summary');
+          if (summary) {
+            summary.addEventListener('click', function(e) {
+              e.preventDefault();
+              // Toggle the open attribute manually
+              newDetails.open = !newDetails.open;
+            });
+          }
+        });
         
         function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
