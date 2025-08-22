@@ -14,18 +14,24 @@ auto_dotenvx "$@"
 # Parse arguments
 SKIP_SYNC=false
 DIRECT_REQUEST=""
+NON_INTERACTIVE=false
 
-# Check for --no-sync flag
-for arg in "$@"; do
-    case $arg in
+# Check for flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
         --no-sync)
             SKIP_SYNC=true
             shift
             ;;
+        --non-interactive)
+            NON_INTERACTIVE=true
+            shift
+            ;;
         *)
             if [ -z "$DIRECT_REQUEST" ]; then
-                DIRECT_REQUEST="$arg"
+                DIRECT_REQUEST="$1"
             fi
+            shift
             ;;
     esac
 done
@@ -139,11 +145,17 @@ if [ -n "$LAST_SYNC" ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
-        # Start interactive Claude session with direct request
-        echo "🤖 Starting Claude focused session..."
+        # Start Claude session (interactive or non-interactive based on flag)
+        if [ "$NON_INTERACTIVE" = true ]; then
+            echo "🤖 Running Claude in non-interactive mode..."
+        else
+            echo "🤖 Starting Claude focused session..."
+        fi
         
         # Create a prompt that includes context but focuses on the request
-        cat <<EOF | claude
+        if [ "$NON_INTERACTIVE" = true ]; then
+            # Non-interactive mode - use --no-interactive flag
+            cat <<EOF | claude --no-interactive
 # Focused Work Session
 
 You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
@@ -173,6 +185,39 @@ Please:
 
 Let's get started with the request!
 EOF
+        else
+            # Interactive mode - normal claude command
+            cat <<EOF | claude
+# Focused Work Session
+
+You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
+
+## Context Available
+- SQLite database at .data/today.db with all current data
+- Today's date: ${TODAY_DATE}
+- Review file location: ${REVIEW_FILE}
+
+## Database Tables Available:
+- task_cache: Tasks with titles, stages, due dates
+- emails: Recent emails with subjects, senders, reply status
+- calendar_events: Upcoming events with times, locations
+- contacts: Contact information
+- file_tracking: Recently modified files
+- people_to_contact: People needing follow-up
+
+## Direct Request from User
+"${DIRECT_REQUEST}"
+
+Please:
+1. Query the database to understand current context
+2. Check if today's review exists to understand what's been done
+3. Focus on helping with the specific request above
+4. You can reference relevant tasks, projects, or information from the database
+5. This is an interactive session - continue helping as needed
+
+Let's get started with the request!
+EOF
+        fi
     else
         # Normal review mode
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -191,9 +236,14 @@ EOF
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
-        # Start interactive Claude session with TODAY.md
-        echo "🤖 Starting Claude interactive session..."
-        cat TODAY.md | claude
+        # Start Claude session with TODAY.md
+        if [ "$NON_INTERACTIVE" = true ]; then
+            echo "🤖 Running Claude in non-interactive mode..."
+            cat TODAY.md | claude --no-interactive
+        else
+            echo "🤖 Starting Claude interactive session..."
+            cat TODAY.md | claude
+        fi
     fi
     
     # After Claude session ends
