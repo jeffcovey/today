@@ -1,1 +1,0 @@
-- [ ] Tell TODAY to summarize toggl from yesterday

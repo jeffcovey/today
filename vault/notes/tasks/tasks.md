@@ -1193,3 +1193,4 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
+- [ ] Tell TODAY to summarize toggl from yesterday
