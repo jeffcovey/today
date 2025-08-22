@@ -13,8 +13,8 @@ Tasks and projects related to Oldergaymen Testing.
 
 ### No Date Set
 
-- [ ] Add ChatsControllerTest, ChatVisitTimesControllerTest to tests to restore <!-- task-id: 0565044c1ac3b2cc02f0c3f6d0bdec72 -->
 - [ ] Add test: "destroying user also destroys associated images and records" <!-- task-id: e3ead79e45e3786ce6146fc5fd448a90 -->
+- [ ] Add ChatsControllerTest, ChatVisitTimesControllerTest to tests to restore <!-- task-id: 0565044c1ac3b2cc02f0c3f6d0bdec72 -->
 - [ ] Check Public/Private Status Of “Favorite Pictures” <!-- task-id: 310cd71d1e636e7c0b1e13c0dcfee523 -->
 - [ ] Check all our tests for any instances of unwarranted stubbing. Are there any places in which we're failing to test the actual actions of our application? <!-- task-id: 69ef928cd4878ddc15b39b2a449ea12f -->
 - [ ] Consolidate duplicate test code in a helper <!-- task-id: 084de14e3305642741b854ec42c6f64f -->

@@ -13,12 +13,12 @@ Tasks and projects related to Personal Finance.
 
 ### No Date Set
 
+- [ ] Cancel Apple Mac App Store subscriptions <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Add Virgin card to 1password <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
 - [ ] Add property taxes to the budget <!-- task-id: 0c7356e5b1787028f80ca443d64fa210 -->
 - [ ] Ask about Airbnb mortgage or pool home equity loan <!-- task-id: b079a49e54ff6ea0d3f70899dbe2be5f -->
-- [ ] Cancel Apple Mac App Store subscriptions <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
 - [ ] Cancel Dekkoo and Paramount+ <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
 - [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
 - [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->

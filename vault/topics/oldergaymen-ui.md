@@ -14,11 +14,11 @@ Tasks and projects related to Oldergaymen Ui.
 ### No Date Set
 
 - [ ] Check that comment cards don't overflow <!-- task-id: dabc427c34b0ca9ce75992f46a3b6fed -->
+- [ ] Add space before “Upcoming chats” <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
 - [ ] Add device notifications to OGM <!-- task-id: f1f72ebbb5461f3f87a82a27855d8b21 -->
 - [ ] Add favorite profiles to /users and favorite photos to /images <!-- task-id: 0d624815a36292ddf67b88c6cf6048d1 -->
 - [ ] Add people I follow and people who follow me as filters on the people index <!-- task-id: 11918a0c2996317400d85145c851d0ef -->
 - [ ] Add people who have visited the members profile to the side profiles <!-- task-id: b907d49bd2cc1a204d6bdf35eca64c84 -->
-- [ ] Add space before “Upcoming chats” <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
 - [ ] Add unread messages to "What's New" <!-- task-id: 9dc67841a01987e788de5c44e26dfca7 -->
 - [ ] Allow Apple logins <!-- task-id: 1e155b13a3291995bbfd697d5731e22c -->
 - [ ] Check "away" for Users with multiple locations <!-- task-id: ba4cbb7bed4bc51e7acdb615a11b0c3e -->
