@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import express from 'express';
+import session from 'express-session';
 import path from 'path';
 import fs from 'fs/promises';
 import { marked } from 'marked';
@@ -19,15 +20,48 @@ const VAULT_PATH = path.join(__dirname, '..', 'vault');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Basic authentication
+// Session middleware - must come before auth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'vault-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production'
+  }
+}));
+
+// Basic authentication with session support
 const users = {};
 users[process.env.WEB_USER || 'admin'] = process.env.WEB_PASSWORD || 'changeme';
 
-app.use(basicAuth({
-  users,
-  challenge: true,
-  realm: 'Today Vault'
-}));
+// Custom auth middleware that checks session first
+app.use((req, res, next) => {
+  // If already authenticated in session, skip basic auth
+  if (req.session && req.session.authenticated) {
+    return next();
+  }
+  
+  // Otherwise use basic auth
+  basicAuth({
+    users,
+    challenge: true,
+    realm: 'Today Vault',
+    authorizer: (username, password) => {
+      const userMatches = basicAuth.safeCompare(username, process.env.WEB_USER || 'admin');
+      const passwordMatches = basicAuth.safeCompare(password, users[username] || '');
+      
+      if (userMatches && passwordMatches) {
+        // Store authentication in session
+        req.session.authenticated = true;
+        req.session.username = username;
+        return true;
+      }
+      return false;
+    }
+  })(req, res, next);
+});
 
 // Serve static CSS
 app.use('/static', express.static(path.join(__dirname, '..', 'public')));
@@ -404,7 +438,39 @@ async function renderEditor(filePath, urlPath) {
 // Markdown rendering
 async function renderMarkdown(filePath, urlPath) {
   const content = await fs.readFile(filePath, 'utf-8');
-  const htmlContent = marked(content);
+  const lines = content.split('\n');
+  
+  // Find all checkbox lines in the original content
+  const checkboxLines = [];
+  lines.forEach((line, index) => {
+    if (line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
+      checkboxLines.push({
+        lineNumber: index,
+        isChecked: line.match(/^(\s*)-\s*\[[xX]\]\s*/i) !== null
+      });
+    }
+  });
+  
+  // Render the markdown normally
+  let htmlContent = marked(content);
+  
+  // Replace the checkboxes that marked generated with our interactive ones
+  let replacementIndex = 0;
+  htmlContent = htmlContent.replace(
+    /<input\s+(?:checked=""\s+)?(?:disabled=""\s+)?type="checkbox"(?:\s+disabled="")?>/gi,
+    (match) => {
+      if (replacementIndex < checkboxLines.length) {
+        const checkbox = checkboxLines[replacementIndex];
+        replacementIndex++;
+        return `<input type="checkbox" class="form-check-input me-2" 
+          data-line="${checkbox.lineNumber}" 
+          ${checkbox.isChecked ? 'checked' : ''} 
+          onchange="toggleCheckbox(this, ${checkbox.lineNumber})" 
+          style="cursor: pointer;">`;
+      }
+      return match;
+    }
+  );
   
   const fileName = path.basename(urlPath);
   
@@ -462,6 +528,53 @@ async function renderMarkdown(filePath, urlPath) {
 
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      
+      <script>
+        function toggleCheckbox(checkbox, lineNumber) {
+          const isChecked = checkbox.checked;
+          
+          // Disable the checkbox while saving
+          checkbox.disabled = true;
+          
+          fetch(\`/toggle-checkbox/${urlPath}\`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              lineNumber: lineNumber,
+              checked: isChecked 
+            })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to toggle checkbox');
+            }
+            return response.json();
+          })
+          .then(data => {
+            // Re-enable the checkbox
+            checkbox.disabled = false;
+            
+            // Add a brief visual feedback
+            const label = checkbox.nextSibling;
+            if (label && label.nodeType === Node.TEXT_NODE) {
+              const originalColor = checkbox.parentElement.style.color;
+              checkbox.parentElement.style.color = '#4caf50';
+              setTimeout(() => {
+                checkbox.parentElement.style.color = originalColor;
+              }, 500);
+            }
+          })
+          .catch(error => {
+            console.error('Error toggling checkbox:', error);
+            // Revert the checkbox state on error
+            checkbox.checked = !isChecked;
+            checkbox.disabled = false;
+            alert('Failed to save checkbox state');
+          });
+        }
+      </script>
     </body>
     </html>
   `;
@@ -489,6 +602,58 @@ app.get('/edit/*', async (req, res) => {
   } catch (error) {
     console.error('Error in edit route:', error);
     res.status(404).send('File not found');
+  }
+});
+
+// Toggle checkbox route handler
+app.post('/toggle-checkbox/*', async (req, res) => {
+  try {
+    const urlPath = req.path.slice(16); // Remove '/toggle-checkbox/' prefix
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    
+    // Security: prevent directory traversal
+    if (!fullPath.startsWith(VAULT_PATH)) {
+      return res.status(403).send('Access denied');
+    }
+    
+    // Check if file exists and is a markdown file
+    const stats = await fs.stat(fullPath);
+    if (!stats.isFile() || !fullPath.endsWith('.md')) {
+      return res.status(400).send('Can only toggle checkboxes in markdown files');
+    }
+    
+    // Read the file
+    let content = await fs.readFile(fullPath, 'utf-8');
+    const { lineNumber, checked } = req.body;
+    
+    // Split into lines
+    const lines = content.split('\n');
+    
+    // Find and toggle the checkbox on the specified line
+    if (lineNumber >= 0 && lineNumber < lines.length) {
+      const line = lines[lineNumber];
+      
+      // Match checkbox patterns: - [ ] or - [x] or - [X]
+      if (checked) {
+        // Check the box
+        lines[lineNumber] = line.replace(/^(\s*)-\s*\[\s*\]\s*/, '$1- [x] ');
+      } else {
+        // Uncheck the box
+        lines[lineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
+      }
+      
+      // Write back to file
+      content = lines.join('\n');
+      await fs.writeFile(fullPath, content, 'utf-8');
+      
+      console.log(`Checkbox toggled in: ${fullPath}, line ${lineNumber}`);
+      res.json({ success: true, message: 'Checkbox toggled successfully' });
+    } else {
+      res.status(400).json({ success: false, message: 'Invalid line number' });
+    }
+  } catch (error) {
+    console.error('Error toggling checkbox:', error);
+    res.status(500).json({ success: false, message: 'Failed to toggle checkbox' });
   }
 });
 
