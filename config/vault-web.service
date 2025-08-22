@@ -6,10 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/today
-EnvironmentFile=-/opt/today/.env
-EnvironmentFile=-/opt/today/.env.keys
 Environment="NODE_ENV=production"
-Environment="WEB_PORT=3001"
 ExecStart=/usr/bin/npx dotenvx run -- node src/web-server.js
 Restart=on-failure
 RestartSec=10
