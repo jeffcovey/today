@@ -974,8 +974,32 @@ async function renderMarkdown(filePath, urlPath) {
         // Load chat history on page load
         loadChatHistory();
         
+        // Prevent details elements from closing when interacting with their content
+        document.addEventListener('DOMContentLoaded', function() {
+          // Ensure details elements work properly
+          document.querySelectorAll('details').forEach(details => {
+            // Prevent any interference with native behavior
+            details.addEventListener('click', function(e) {
+              // Only toggle if clicking on summary or details itself, not content
+              if (e.target !== this && !e.target.matches('summary')) {
+                e.stopPropagation();
+              }
+            });
+          });
+          
+          // Also handle checkboxes inside details specially
+          document.querySelectorAll('details input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('click', function(e) {
+              e.stopPropagation();
+            });
+          });
+        });
+        
         function toggleCheckbox(checkbox, lineNumber) {
           const isChecked = checkbox.checked;
+          
+          // Prevent the details element from toggling when clicking checkbox
+          event.stopPropagation();
           
           // Disable the checkbox while saving
           checkbox.disabled = true;
@@ -1001,12 +1025,13 @@ async function renderMarkdown(filePath, urlPath) {
             checkbox.disabled = false;
             
             // Add a brief visual feedback
-            const label = checkbox.nextSibling;
-            if (label && label.nodeType === Node.TEXT_NODE) {
-              const originalColor = checkbox.parentElement.style.color;
-              checkbox.parentElement.style.color = '#4caf50';
+            // Only modify the immediate parent if it's not a details element
+            const parent = checkbox.parentElement;
+            if (parent && !parent.closest('details')) {
+              const originalColor = parent.style.color;
+              parent.style.color = '#4caf50';
               setTimeout(() => {
-                checkbox.parentElement.style.color = originalColor;
+                parent.style.color = originalColor;
               }, 500);
             }
           })
