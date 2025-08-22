@@ -1,0 +1,3 @@
+- I am sitting at the computer too much, and not exercising
+- I need to catch up with my replies to requests from OlderGay.Men members and staff
+- I'm not writing in my diary at all
