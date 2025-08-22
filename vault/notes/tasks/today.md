@@ -1,17 +1,20 @@
 # Today's Tasks
 
-*Generated: 8/21/2025, 8:55:26 PM EDT*
+*Generated: 8/22/2025, 7:14:29 AM EDT*
 
 ## Next Up
 
+- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
+- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
+- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
+- [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
+- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
+- [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
 <summary><strong>✅ Done Today</strong> (446 tasks completed)</summary>
 
-- [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
-- [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
-- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [x] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
 - [x] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
 - [x] Read Saved Articles (2m 30s) <!-- task-id: read-articles --> <!-- task-id: f376f1439a33ea98c4f3828bb7f62c61 -->
@@ -19,7 +22,38 @@
 - [x] Do Tai Chi Standing (4m) <!-- task-id: tai-chi --> <!-- task-id: cd9fcd24c4303ac898d07a1df315419c -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: apple-fitness --> <!-- task-id: c89cadc6fd1012029606e935ec5d8061 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: burn-energy --> <!-- task-id: 37a055048915523fabbcb7e53f7e3e91 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
 - [x] ♥︎ Activity Rings <!-- task-id: activity-rings --> <!-- task-id: d051837d4106813ab7c34cface0b708d -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
+- [x] **Get cash from IRA** - Still marked as immediate priority <!-- task-id: 7d1fc78623987006db6f5ff9ab0d97c5 -->
+- [x] Read Saved Articles (2m 30s) - Quick win! <!-- task-id: 90b703fc6714598ebe55089fc9c38c1d -->
+- [x] Use The Inversion Table - For hip relief <!-- task-id: 5142e99a6d59508ac53640c0d748e308 -->
+- [x] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 099fcabf4bc884e9298b98e0b1e931d4 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: e4ea67a1eff2105c19d2efbb67ae7093 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 030fed7a699d7dc55fe6758df0b77f07 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
+- [x] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
+- [x] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
+- [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
+- [x] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
+- [x] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
+- [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
+- [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+- [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
+- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
 - [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
 - [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
 - [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
@@ -37,18 +71,8 @@
 - [x] Create test data generators <!-- task-id: ddb81f7995ac04ccb58b4db0ee3ffdd6 -->
 - [x] Set up test database seeding <!-- task-id: 80b65cd38d3823df2dba561c6f0a99dd -->
 - [x] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
-- [x] **Get cash from IRA** - Still marked as immediate priority <!-- task-id: 7d1fc78623987006db6f5ff9ab0d97c5 -->
-- [x] Read Saved Articles (2m 30s) - Quick win! <!-- task-id: 90b703fc6714598ebe55089fc9c38c1d -->
-- [x] Use The Inversion Table - For hip relief <!-- task-id: 5142e99a6d59508ac53640c0d748e308 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: 099fcabf4bc884e9298b98e0b1e931d4 -->
-- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: e4ea67a1eff2105c19d2efbb67ae7093 -->
-- [x] ♥︎ Activity Rings <!-- task-id: 030fed7a699d7dc55fe6758df0b77f07 -->
-- [x] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
-- [x] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 - [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
-- [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
 - [x] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
 - [x] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
 - [x] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
@@ -143,25 +167,7 @@
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 0ad428e0957933a3842d614de38d41a7 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 68229561dfd1018ae0124ee0ea4721a9 -->
-- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
-- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
-- [x] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
-- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
-- [x] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
-- [x] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
-- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
-- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
-- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
-- [x] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
-- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
 - [x] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
-- [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
-- [x] Fix message trash emptying (Issue #4628) <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
-- [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->

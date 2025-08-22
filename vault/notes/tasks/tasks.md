@@ -1,5 +1,17 @@
 <details>
-<summary><strong>General Tasks</strong> (993 tasks)</summary>
+<summary><strong>General Tasks</strong> (1005 tasks)</summary>
+
+### Monday, Aug 11 (overdue)
+
+- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
+- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
+- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
+- [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
+
+### Thursday, Aug 14 (overdue)
+
+- [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
+- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 
 ### Yesterday - Thursday, Aug 21
 
@@ -11,6 +23,21 @@
 
 ### Invalid Date, Invalid Date
 
+- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
+
+### Invalid Date, Invalid Date
+
+- [ ] Check if OGM newsletter went out <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
+- [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
+
+### Invalid Date, Invalid Date
+
+- [ ] **Get cash from IRA** (🔥 Immediate) <!-- task-id: 638ac690bdad045c93829b65b1c87f6d -->
+- [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
+- [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: b1854ccaa83729d1c14284598336911f -->
+- [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
+- [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
 - [ ] Review the Honeybadger R12 error (memory quota exceeded) <!-- task-id: 4cf0df8852df22d97d03909a057543db -->
 
 ### Invalid Date, Invalid Date
@@ -32,7 +59,6 @@
 - [ ] Check MiniMagick mail [Oldergaymen Sysadmin] <!-- task-id: 6172d3a7aeb2f087a8daf7ea051f9574 -->
 - [ ] Add a photo of the laundry room to all four listings [Hosting] <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
 - [ ] Check that page comments show in public activity [Oldergaymen Content] <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
-- [ ] **Get cash from IRA** (🔥 Immediate) <!-- task-id: 638ac690bdad045c93829b65b1c87f6d -->
 - [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
 - [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
 - [ ] Add Zazen, steps, and drinks to Health logging [Health] <!-- task-id: 176f048f22826f4345cc9634b0e2c10c -->
@@ -43,10 +69,8 @@
 - [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
 - [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
 - [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
-- [ ] Check if OGM newsletter went out <!-- task-id: 57833b40c4ce1391cab33eb5206cbf04 -->
 - [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
-- [ ] Check why new places/groups aren't appearing in public activity <!-- task-id: f0c6d9ddb5cb199b006dd046fe2ed450 -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
@@ -55,11 +79,8 @@
 - [ ] Do profit & loss statements [Personal Finance] <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
-- [ ] Fix staging API test failures (GitHub notification from 2:40 AM) <!-- task-id: b1854ccaa83729d1c14284598336911f -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
-- [ ] Handle User quotas (🚀 1st Priority) <!-- task-id: 55af621ff93138d58e33d024da0f9765 -->
 - [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
 - [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
@@ -68,11 +89,9 @@
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Plan for 2026 <!-- task-id: 145812ed3be360b11c8c741902cb42e8 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
-- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
 - [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
 - [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
-- [ ] Review Honeybadger error from this morning (10:43 AM) <!-- task-id: 1a84bb6592a80f4b7d4bfa91037ec685 -->
 - [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
 - [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
 - [ ] Year-end financial review <!-- task-id: 9b9225ded79fa50617676eda1358f2fa -->
@@ -95,6 +114,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5d1b6561a65bdcb85ba546584e78fefc -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c783f11b441302af59ba8c652ac58b2e -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5661025d2251906476935c90b8656781 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c415c77e0f590f681e266dcb83e1caa0 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -108,6 +128,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66758495cac4d3fe8345d9568d35d05f -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c48d1867d345c06316bcb276d9c85521 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 48519dcb4d233d7017ad0d135026e467 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c38bc9d7b385250935ef90f90483a732 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -119,6 +140,7 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3140381840ba215da59056259c455adf -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b735ca25d71c93caa670cbcc81f7d54e -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 931df3053dba443b9147510f76c3b395 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -214,10 +236,12 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b2cebb4840793fe288b0b959f06ca6e3 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b73a15fd84835cc115aeee50b163fac8 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 45a9780c4a403067dd3fd96e38a25939 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 30e30698b4bf4843eab6036e5a5792eb -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d45d6b29dbf24dac95e911d9107ba6c4 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 88aff73ef6f97c85595929791cf6b61a -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ccb03a2e3cf2e890f9ff45e57fe9a67d -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e7e4b4f53a292b42213d8c46167e3fdc -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
