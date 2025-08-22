@@ -3,13 +3,15 @@
 
 > *Start your day with intention and clarity*
 
-### Core Morning Practices:
+### Core Morning Practices
+
 - [ ] **🎯 Work on a project** - Start with something meaningful
 - [ ] **🙏 Record what you're grateful for** - Set a positive tone
 - [ ] **📖 Read mindset notes** - Center your thoughts
 - [ ] **✍️ Journal** - Process and reflect
 
-### 📬 Clear All Inboxes:
+### 📬 Clear All Inboxes
+
 - [ ] **Notifications** - Phone & computer
 - [ ] **App badges** - Clear all red dots
 - [ ] **[Front](https://app.frontapp.com/)** - Customer support
