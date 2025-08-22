@@ -1022,6 +1022,10 @@ async function renderMarkdown(filePath, urlPath) {
             // Get the markdown content
             const markdownContent = document.querySelector('.markdown-content').innerText || '';
             
+            // Create abort controller with 5 minute timeout (matching server)
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 300000); // 5 minutes
+            
             const response = await fetch('/ai-chat/${urlPath}', {
               method: 'POST',
               headers: {
@@ -1031,8 +1035,11 @@ async function renderMarkdown(filePath, urlPath) {
                 message: message,
                 history: chatHistory,
                 documentContent: markdownContent
-              })
+              }),
+              signal: controller.signal
             });
+            
+            clearTimeout(timeout);
             
             if (!response.ok) throw new Error('Failed to get AI response');
             
@@ -1084,8 +1091,8 @@ async function renderMarkdown(filePath, urlPath) {
               errorMessage += 'Please try again.';
             }
             
-            // Add error with timing info
-            addChatBubble(errorMessage, 'assistant', true, 'Failed after ' + timeStr);
+            // Add error with timing info (note: replyTime parameter shows as "Replied in X")
+            addChatBubble(errorMessage, 'assistant', true, timeStr + ' (failed)');
           }
         }
         
