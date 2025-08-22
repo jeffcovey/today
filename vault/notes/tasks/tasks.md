@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (993 tasks)</summary>
+<summary><strong>General Tasks</strong> (996 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -164,8 +164,9 @@
 - [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
 - [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 322d2fc245673a9047402654f40837d5 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 93358640424ec42e8aab2636dee13bbb -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8966d5147c165276520bb67fb38a2653 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2e72bd2469a67726c433eee7f9a16bae -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -178,8 +179,9 @@
 - [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b8a5acc0f21f921b2acd054b90cad911 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b7c7bcbfe7ceff1f72074139f7d2d7bb -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1202b9ba78643abafa4b9d333529e1ea -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 479a12f34f8329b4edebaf37555d7e73 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -187,7 +189,6 @@
 - [ ] Establish sustainable eating patterns <!-- task-id: a5bbd0c20f13df1ba37dbf861891ba4e -->
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e7403358d231a737227085e3c7f134da -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f1ff8b91732c29ffa881989bc40e3d85 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
@@ -277,11 +278,13 @@
 - [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df778901cf29d71a58d1146a8277e7ea -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1e3a66653801e880f7c438cf1f8c5695 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f1d95811eb14b2f78ac0329b268a3b32 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8fa9c0900e5835aa2726c4439bf1a386 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: cba3e43f2bbdbb4d65ca4077a9c27050 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 20995a8a4f72f58098c4ba4b7a8684b7 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3f9b97949abcbd48a212d52f3ab948d2 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a30c44cd4e5bad6426f158a0d5965dac -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->

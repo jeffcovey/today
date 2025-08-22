@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 5:33:41 PM EDT*
+*Generated: 8/22/2025, 5:35:08 PM EDT*
 
 ## Next Up
 
@@ -10,8 +10,13 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (227 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (232 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e7403358d231a737227085e3c7f134da -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 322d2fc245673a9047402654f40837d5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b8a5acc0f21f921b2acd054b90cad911 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df778901cf29d71a58d1146a8277e7ea -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: cba3e43f2bbdbb4d65ca4077a9c27050 -->
 - [x] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [x] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 - [x] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
