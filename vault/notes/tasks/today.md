@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 6:10:19 PM EDT*
+*Generated: 8/22/2025, 6:20:17 PM EDT*
 
 ## Next Up
 
@@ -10,12 +10,17 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (608 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (613 tasks completed)</summary>
 
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d6154a341d000bc20a9213f6e6e595e5 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0871523ac7960c18801d27ffbb97b6dd -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bc3b5f70c2757c0183f5b1ce519f8e12 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6e9f296562110299a95891f88053690e -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ba62692962e6bdf03c62f61652ea703f -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f075137314a2a0c76cdefad413156914 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 97e3b739e55640c80896dce666ee7459 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b8c68b047a3c5b57b2c5c9c5667af078 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9022beb3ba22579169c08971c75f44ac -->
 - [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 2efb9f2a6c6699a6b3ea8afb664a829d -->
 - [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 0edde96d8fae958e90824affbfe297d0 -->
 - [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: abf9e37dc4f9bfacf252dafa0c8f205e -->
