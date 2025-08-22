@@ -82,24 +82,9 @@ const pageStyle = `
 <style>
   /* Custom styles to complement MDBootstrap */
   
-  /* Fix for details/summary elements with MDB */
-  details {
-    display: block !important;
-  }
-  
-  details summary {
-    cursor: pointer !important;
-    display: list-item !important;
-    outline: none !important;
-  }
-  
-  details[open] summary {
-    margin-bottom: 0.5rem;
-  }
-  
-  /* Prevent MDB from interfering with details */
-  details summary::-webkit-details-marker {
-    display: inline !important;
+  /* Styles for collapse components that replace details elements */
+  .collapse-header {
+    transition: all 0.3s ease;
   }
   body {
     background-color: #f5f5f5;
@@ -710,6 +695,42 @@ async function renderMarkdown(filePath, urlPath) {
   // Render the markdown normally (without the title if we extracted it)
   let htmlContent = marked(contentToRender);
   
+  // Replace details/summary elements with MDBootstrap collapse components
+  let collapseId = 0;
+  htmlContent = htmlContent.replace(/<details[^>]*>([\s\S]*?)<\/details>/gi, (match, content) => {
+    collapseId++;
+    const id = `collapse-${urlPath.replace(/[^a-zA-Z0-9]/g, '-')}-${collapseId}`;
+    
+    // Extract summary and content
+    const summaryMatch = content.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i);
+    const summaryText = summaryMatch ? summaryMatch[1].trim() : 'Click to expand';
+    const detailsContent = content.replace(/<summary[^>]*>[\s\S]*?<\/summary>/i, '').trim();
+    
+    // Check if it should be open by default
+    const isOpen = match.includes('open');
+    
+    return `
+      <div class="card mb-2">
+        <div class="card-header p-2" style="background: #f8f9fa;">
+          <a class="btn btn-link btn-sm text-start w-100 text-decoration-none text-dark" 
+             data-mdb-toggle="collapse" 
+             href="#${id}" 
+             role="button" 
+             aria-expanded="${isOpen}" 
+             aria-controls="${id}">
+            <i class="fas fa-chevron-${isOpen ? 'down' : 'right'} me-2"></i>
+            ${summaryText}
+          </a>
+        </div>
+        <div class="collapse ${isOpen ? 'show' : ''}" id="${id}">
+          <div class="card-body">
+            ${detailsContent}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
   // Replace the checkboxes that marked generated with our interactive ones
   let replacementIndex = 0;
   htmlContent = htmlContent.replace(
@@ -1107,36 +1128,28 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // Fix for details elements - completely bypass any framework interference
-        // Wait a moment for any framework initialization
-        setTimeout(() => {
-          document.querySelectorAll('details').forEach(details => {
-            const summary = details.querySelector('summary');
-            if (!summary) return;
-            
-            // Remove ALL event listeners by cloning
-            const newSummary = summary.cloneNode(true);
-            summary.parentNode.replaceChild(newSummary, summary);
-            
-            // Use native click behavior - don't prevent default!
-            newSummary.style.cursor = 'pointer';
-            newSummary.onclick = function() {
-              // Use setTimeout to ensure this happens after any other handlers
-              setTimeout(() => {
-                details.open = !details.open;
-              }, 0);
-              return true; // Allow native behavior
-            };
-          });
-          
-          // Also ensure checkboxes in details don't interfere
-          document.querySelectorAll('details input[type="checkbox"]').forEach(cb => {
-            cb.onclick = function(e) {
-              e.stopPropagation();
-              return true;
-            };
-          });
-        }, 100); // Small delay to let MDB initialize first
+        // Handle collapse chevron rotation
+        document.addEventListener('shown.bs.collapse', function(e) {
+          const button = document.querySelector(\`[href="#\${e.target.id}"]\`);
+          if (button) {
+            const icon = button.querySelector('i');
+            if (icon) {
+              icon.classList.remove('fa-chevron-right');
+              icon.classList.add('fa-chevron-down');
+            }
+          }
+        });
+        
+        document.addEventListener('hidden.bs.collapse', function(e) {
+          const button = document.querySelector(\`[href="#\${e.target.id}"]\`);
+          if (button) {
+            const icon = button.querySelector('i');
+            if (icon) {
+              icon.classList.remove('fa-chevron-down');
+              icon.classList.add('fa-chevron-right');
+            }
+          }
+        });
         
         function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
