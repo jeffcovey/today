@@ -744,7 +744,7 @@ async function renderMarkdown(filePath, urlPath) {
         <div class="d-flex align-items-center p-2 bg-light rounded" 
              style="cursor: pointer; user-select: none;"
              onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); 
-                      if(content.style.display === 'none' || !content.style.display) {
+                      if(content.style.display === 'none') {
                         content.style.display = 'block'; 
                         icon.classList.remove('fa-chevron-right'); 
                         icon.classList.add('fa-chevron-down');
