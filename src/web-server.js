@@ -695,11 +695,41 @@ async function renderMarkdown(filePath, urlPath) {
   // Render the markdown normally (without the title if we extracted it)
   let htmlContent = marked(contentToRender);
   
-  // Replace details/summary elements with MDBootstrap collapse components
+  // Enhance tables with MDBootstrap styling
+  htmlContent = htmlContent.replace(/<table>/g, '<table class="table table-hover table-striped">');
+  
+  // Enhance blockquotes with MDBootstrap styling
+  htmlContent = htmlContent.replace(/<blockquote>/g, '<blockquote class="blockquote border-start border-4 border-primary ps-3 my-3">');
+  
+  // Enhance code blocks with better styling
+  htmlContent = htmlContent.replace(/<pre><code class="language-([^"]*)">([\s\S]*?)<\/code><\/pre>/g, 
+    '<div class="card bg-dark mb-3"><div class="card-body p-0"><pre class="mb-0"><code class="language-$1 text-light p-3 d-block">$2</code></pre></div></div>');
+  
+  // Add alerts for certain keywords
+  htmlContent = htmlContent.replace(/<p><strong>(NOTE|IMPORTANT|WARNING|TIP):<\/strong>([^<]*)<\/p>/g, function(match, type, content) {
+    const alertClass = {
+      'NOTE': 'alert-info',
+      'IMPORTANT': 'alert-warning', 
+      'WARNING': 'alert-danger',
+      'TIP': 'alert-success'
+    }[type] || 'alert-info';
+    const icon = {
+      'NOTE': 'info-circle',
+      'IMPORTANT': 'exclamation-triangle',
+      'WARNING': 'exclamation-circle',
+      'TIP': 'lightbulb'
+    }[type] || 'info-circle';
+    return `<div class="alert ${alertClass} d-flex align-items-center" role="alert">
+      <i class="fas fa-${icon} me-2"></i>
+      <div><strong>${type}:</strong>${content}</div>
+    </div>`;
+  });
+  
+  // Replace details/summary elements with simple collapsible sections
   let collapseId = 0;
   htmlContent = htmlContent.replace(/<details[^>]*>([\s\S]*?)<\/details>/gi, (match, content) => {
     collapseId++;
-    const id = `collapse-${urlPath.replace(/[^a-zA-Z0-9]/g, '-')}-${collapseId}`;
+    const id = `details-${Date.now()}-${collapseId}`;
     
     // Extract summary and content
     const summaryMatch = content.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i);
@@ -710,22 +740,24 @@ async function renderMarkdown(filePath, urlPath) {
     const isOpen = match.includes('open');
     
     return `
-      <div class="card mb-2">
-        <div class="card-header p-2" style="background: #f8f9fa;">
-          <a class="btn btn-link btn-sm text-start w-100 text-decoration-none text-dark" 
-             data-mdb-toggle="collapse" 
-             href="#${id}" 
-             role="button" 
-             aria-expanded="${isOpen}" 
-             aria-controls="${id}">
-            <i class="fas fa-chevron-${isOpen ? 'down' : 'right'} me-2"></i>
-            ${summaryText}
-          </a>
+      <div class="mb-3">
+        <div class="d-flex align-items-center p-2 bg-light rounded" 
+             style="cursor: pointer; user-select: none;"
+             onclick="const content = this.nextElementSibling; const icon = this.querySelector('i'); 
+                      if(content.style.display === 'none' || !content.style.display) {
+                        content.style.display = 'block'; 
+                        icon.classList.remove('fa-chevron-right'); 
+                        icon.classList.add('fa-chevron-down');
+                      } else {
+                        content.style.display = 'none';
+                        icon.classList.remove('fa-chevron-down'); 
+                        icon.classList.add('fa-chevron-right');
+                      }">
+          <i class="fas fa-chevron-${isOpen ? 'down' : 'right'} me-2 text-secondary"></i>
+          <strong>${summaryText}</strong>
         </div>
-        <div class="collapse ${isOpen ? 'show' : ''}" id="${id}">
-          <div class="card-body">
-            ${detailsContent}
-          </div>
+        <div style="display: ${isOpen ? 'block' : 'none'}; padding: 1rem; border-left: 3px solid #dee2e6; margin-left: 0.5rem;">
+          ${detailsContent}
         </div>
       </div>
     `;
@@ -1034,6 +1066,17 @@ async function renderMarkdown(filePath, urlPath) {
             clearInterval(timerInterval);
             typingIndicator.remove();
             
+            // Calculate how long it took to fail
+            const responseTime = Math.floor((Date.now() - startTime) / 1000);
+            let timeStr;
+            if (responseTime < 60) {
+              timeStr = responseTime + ' second' + (responseTime !== 1 ? 's' : '');
+            } else {
+              const minutes = Math.floor(responseTime / 60);
+              const seconds = (responseTime % 60).toString().padStart(2, '0');
+              timeStr = minutes + ':' + seconds;
+            }
+            
             let errorMessage = 'Sorry, I encountered an error. ';
             if (error.message) {
               errorMessage += error.message;
@@ -1041,7 +1084,8 @@ async function renderMarkdown(filePath, urlPath) {
               errorMessage += 'Please try again.';
             }
             
-            addChatBubble(errorMessage, 'assistant');
+            // Add error with timing info
+            addChatBubble(errorMessage, 'assistant', true, 'Failed after ' + timeStr);
           }
         }
         
@@ -1128,28 +1172,7 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // Handle collapse chevron rotation
-        document.addEventListener('shown.bs.collapse', function(e) {
-          const button = document.querySelector(\`[href="#\${e.target.id}"]\`);
-          if (button) {
-            const icon = button.querySelector('i');
-            if (icon) {
-              icon.classList.remove('fa-chevron-right');
-              icon.classList.add('fa-chevron-down');
-            }
-          }
-        });
-        
-        document.addEventListener('hidden.bs.collapse', function(e) {
-          const button = document.querySelector(\`[href="#\${e.target.id}"]\`);
-          if (button) {
-            const icon = button.querySelector('i');
-            if (icon) {
-              icon.classList.remove('fa-chevron-down');
-              icon.classList.add('fa-chevron-right');
-            }
-          }
-        });
+        // No longer needed - using inline onclick handlers
         
         function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
