@@ -1320,6 +1320,154 @@ export class TaskManager {
     }
   }
 
+  async generateStagesFile(outputPath = 'vault/notes/tasks/stages.md') {
+    // Get all active tasks (not Done) grouped by stage
+    const frontStageTasks = this.db.prepare(`
+      SELECT t.*, p.name as project_name
+      FROM tasks t
+      LEFT JOIN task_projects tp ON t.id = tp.task_id
+      LEFT JOIN projects p ON tp.project_id = p.id
+      WHERE t.stage = 'Front Stage' 
+        AND t.status != '✅ Done'
+      ORDER BY p.name, t.do_date ASC, t.status ASC
+    `).all();
+
+    const backStageTasks = this.db.prepare(`
+      SELECT t.*, p.name as project_name
+      FROM tasks t
+      LEFT JOIN task_projects tp ON t.id = tp.task_id
+      LEFT JOIN projects p ON tp.project_id = p.id
+      WHERE t.stage = 'Back Stage' 
+        AND t.status != '✅ Done'
+      ORDER BY p.name, t.do_date ASC, t.status ASC
+    `).all();
+
+    const offStageTasks = this.db.prepare(`
+      SELECT t.*, p.name as project_name
+      FROM tasks t
+      LEFT JOIN task_projects tp ON t.id = tp.task_id
+      LEFT JOIN projects p ON tp.project_id = p.id
+      WHERE t.stage = 'Off Stage' 
+        AND t.status != '✅ Done'
+      ORDER BY p.name, t.do_date ASC, t.status ASC
+    `).all();
+
+    // Generate markdown content
+    let content = '# Tasks by Stage\n\n';
+    content += '*This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*\n\n';
+    
+    // Use Eastern timezone for timestamp
+    const now = new Date();
+    const easternTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    }).format(now);
+    
+    content += `*Generated: ${easternTime}*\n\n`;
+
+    // Front Stage section
+    content += '<details>\n';
+    content += `<summary><strong>🎭 Front Stage</strong> (${frontStageTasks.length} tasks) - Tasks involving interaction with other people</summary>\n\n`;
+    content += '*Meetings, calls, emails, customer support, presentations, social activities*\n\n';
+    
+    if (frontStageTasks.length > 0) {
+      const projectGroups = {};
+      for (const task of frontStageTasks) {
+        const projectName = task.project_name || 'General Tasks';
+        if (!projectGroups[projectName]) {
+          projectGroups[projectName] = [];
+        }
+        projectGroups[projectName].push(task);
+      }
+      
+      for (const [projectName, tasks] of Object.entries(projectGroups)) {
+        content += `### ${projectName}\n\n`;
+        for (const task of tasks) {
+          const checkbox = '- [ ]';
+          const taskId = task.markdown_id || task.id;
+          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+        }
+        content += '\n';
+      }
+    } else {
+      content += '*No tasks in this stage*\n\n';
+    }
+    
+    content += '</details>\n\n';
+
+    // Back Stage section
+    content += '<details>\n';
+    content += `<summary><strong>🔧 Back Stage</strong> (${backStageTasks.length} tasks) - Maintenance and behind-the-scenes work</summary>\n\n`;
+    content += '*Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*\n\n';
+    
+    if (backStageTasks.length > 0) {
+      const projectGroups = {};
+      for (const task of backStageTasks) {
+        const projectName = task.project_name || 'General Tasks';
+        if (!projectGroups[projectName]) {
+          projectGroups[projectName] = [];
+        }
+        projectGroups[projectName].push(task);
+      }
+      
+      for (const [projectName, tasks] of Object.entries(projectGroups)) {
+        content += `### ${projectName}\n\n`;
+        for (const task of tasks) {
+          const checkbox = '- [ ]';
+          const taskId = task.markdown_id || task.id;
+          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+        }
+        content += '\n';
+      }
+    } else {
+      content += '*No tasks in this stage*\n\n';
+    }
+    
+    content += '</details>\n\n';
+
+    // Off Stage section
+    content += '<details>\n';
+    content += `<summary><strong>🌟 Off Stage</strong> (${offStageTasks.length} tasks) - Personal time and self-care</summary>\n\n`;
+    content += '*Reading, exercise, hobbies, relaxation, learning, health*\n\n';
+    
+    if (offStageTasks.length > 0) {
+      const projectGroups = {};
+      for (const task of offStageTasks) {
+        const projectName = task.project_name || 'General Tasks';
+        if (!projectGroups[projectName]) {
+          projectGroups[projectName] = [];
+        }
+        projectGroups[projectName].push(task);
+      }
+      
+      for (const [projectName, tasks] of Object.entries(projectGroups)) {
+        content += `### ${projectName}\n\n`;
+        for (const task of tasks) {
+          const checkbox = '- [ ]';
+          const taskId = task.markdown_id || task.id;
+          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+        }
+        content += '\n';
+      }
+    } else {
+      content += '*No tasks in this stage*\n\n';
+    }
+    
+    content += '</details>\n';
+
+    // Write to file
+    await fs.writeFile(outputPath, content, 'utf-8');
+    
+    return frontStageTasks.length + backStageTasks.length + offStageTasks.length;
+  }
+
   close() {
     this.db.close();
   }

@@ -245,6 +245,9 @@ program
       const allCount = await tm.generateAllTasksFile();
       console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
       
+      const stagesCount = await tm.generateStagesFile();
+      console.log(chalk.green(`✓ Generated stages.md with ${stagesCount} staged tasks`));
+      
       // Generate topic files
       console.log(chalk.blue('Generating topic files...'));
       const topicCount = await tm.generateTopicFiles();
