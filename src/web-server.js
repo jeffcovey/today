@@ -857,7 +857,7 @@ async function renderMarkdown(filePath, urlPath) {
         }
         
         // Add a chat bubble to the interface
-        function addChatBubble(message, role, save = true) {
+        function addChatBubble(message, role, save = true, replyTime = null) {
           const chatMessages = document.getElementById('chatMessages');
           const bubble = document.createElement('div');
           bubble.className = \`chat-bubble \${role}\`;
@@ -877,6 +877,7 @@ async function renderMarkdown(filePath, urlPath) {
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
               <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
+              \${replyTime ? \`<small class="d-block mt-1" style="opacity: 0.4; font-size: 0.55rem; font-style: italic;">Replied in \${replyTime}</small>\` : ''}
             </div>
           \`;
           
@@ -983,8 +984,14 @@ async function renderMarkdown(filePath, urlPath) {
             clearInterval(timerInterval);
             typingIndicator.remove();
             
-            // Add AI response
-            addChatBubble(data.response, 'assistant');
+            // Calculate response time
+            const responseTime = Math.floor((Date.now() - startTime) / 1000);
+            const timeStr = responseTime < 60 ? 
+              `${responseTime} second${responseTime !== 1 ? 's' : ''}` : 
+              `${Math.floor(responseTime / 60)}:${(responseTime % 60).toString().padStart(2, '0')}`;
+            
+            // Add AI response with time
+            addChatBubble(data.response, 'assistant', true, timeStr);
             
             // If file was modified, refresh the content area
             if (data.fileModified) {
@@ -1090,22 +1097,36 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // Fix for details elements - ensure they work with MDB
-        document.querySelectorAll('details').forEach(details => {
-          // Remove any event listeners that MDB might have added
-          const newDetails = details.cloneNode(true);
-          details.parentNode.replaceChild(newDetails, details);
+        // Fix for details elements - completely bypass any framework interference
+        // Wait a moment for any framework initialization
+        setTimeout(() => {
+          document.querySelectorAll('details').forEach(details => {
+            const summary = details.querySelector('summary');
+            if (!summary) return;
+            
+            // Remove ALL event listeners by cloning
+            const newSummary = summary.cloneNode(true);
+            summary.parentNode.replaceChild(newSummary, summary);
+            
+            // Use native click behavior - don't prevent default!
+            newSummary.style.cursor = 'pointer';
+            newSummary.onclick = function() {
+              // Use setTimeout to ensure this happens after any other handlers
+              setTimeout(() => {
+                details.open = !details.open;
+              }, 0);
+              return true; // Allow native behavior
+            };
+          });
           
-          // Add our own click handler for the summary
-          const summary = newDetails.querySelector('summary');
-          if (summary) {
-            summary.addEventListener('click', function(e) {
-              e.preventDefault();
-              // Toggle the open attribute manually
-              newDetails.open = !newDetails.open;
-            });
-          }
-        });
+          // Also ensure checkboxes in details don't interfere
+          document.querySelectorAll('details input[type="checkbox"]').forEach(cb => {
+            cb.onclick = function(e) {
+              e.stopPropagation();
+              return true;
+            };
+          });
+        }, 100); // Small delay to let MDB initialize first
         
         function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
