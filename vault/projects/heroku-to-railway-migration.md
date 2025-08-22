@@ -7,11 +7,13 @@ Est. Savings: $583/month ($6,996/year)
 # Heroku to Railway Migration
 
 ## Executive Summary
+
 This project aims to migrate all applications and services from Heroku to Railway.app, reducing hosting costs from $733/month to approximately $150/month while maintaining performance and reliability. This migration is a critical component of the broader [Financial Improvement 2025](./financial-improvement-2025.md) initiative.
 
 ## Current State Analysis
 
 ### Heroku Infrastructure (Monthly: $733)
+
 After downgrading from Performance-L to Standard-2X (completed August 2025):
 - **Standard-2X dyno**: $50/mo (reduced from $500/mo Performance-L)
 - **Standard dynos**: $237/mo (various applications)
@@ -24,6 +26,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
   - Other services
 
 ### Applications Inventory
+
 *To be completed during Week 1 analysis*
 - [ ] List all Heroku applications
 - [ ] Document dependencies between apps
@@ -33,6 +36,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Target Architecture
 
 ### Railway Setup (Estimated Monthly: $150)
+
 - **Production services**: $40/mo
 - **PostgreSQL**: $20/mo
 - **Redis**: $10/mo
@@ -44,6 +48,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - **Buffer for scaling**: $50/mo
 
 ### Cost Comparison
+
 | Service | Heroku | Railway | Savings |
 |---------|--------|---------|---------|
 | Compute | $287 | $40 | $247 |
@@ -57,9 +62,11 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Migration Plan
 
 ### Phase 1: Pre-Migration Analysis (Week 1)
+
 **Dates**: August 23-29, 2025
 
 #### Technical Inventory
+
 - [ ] Export all Heroku environment variables
 - [ ] Document all Heroku applications and their purposes
 - [ ] List all add-ons and their configurations
@@ -69,6 +76,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Identify external service dependencies
 
 #### Railway Preparation
+
 - [ ] Create Railway account
 - [ ] Set up billing and alerts
 - [ ] Review Railway documentation
@@ -77,9 +85,11 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Understand Railway's deployment process
 
 ### Phase 2: Staging Environment (Week 2)
+
 **Dates**: August 30 - September 5, 2025
 
 #### Environment Setup
+
 - [ ] Create Railway project for staging
 - [ ] Deploy first application to Railway
 - [ ] Configure PostgreSQL database
@@ -89,6 +99,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Configure SSL certificates
 
 #### Testing
+
 - [ ] Test application functionality
 - [ ] Benchmark performance vs Heroku
 - [ ] Test database connections
@@ -98,9 +109,11 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Security scanning
 
 ### Phase 3: Production Migration (Week 3-4)
+
 **Dates**: September 6-19, 2025
 
 #### Week 3: Critical Services
+
 - [ ] Backup all production data
 - [ ] Migrate primary database (with replication)
 - [ ] Deploy main application
@@ -110,6 +123,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] 48-hour monitoring period
 
 #### Week 4: Secondary Services
+
 - [ ] Migrate remaining applications
 - [ ] Move scheduled jobs
 - [ ] Configure email services
@@ -119,9 +133,11 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Team training on new platform
 
 ### Phase 4: Optimization & Cleanup (Week 5-6)
+
 **Dates**: September 20 - October 3, 2025
 
 #### Performance Optimization
+
 - [ ] Analyze Railway metrics
 - [ ] Optimize container sizing
 - [ ] Implement caching strategies
@@ -130,6 +146,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] Set up CDN if needed
 
 #### Heroku Decommissioning
+
 - [ ] Final data backup from Heroku
 - [ ] Export all logs for archival
 - [ ] Update all DNS records
@@ -141,6 +158,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Technical Requirements
 
 ### Migration Tools Needed
+
 - Database migration tools (pg_dump, pg_restore)
 - Redis data migration scripts
 - DNS management access
@@ -149,6 +167,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - Log aggregation solution
 
 ### Railway-Specific Configurations
+
 ```yaml
 # Example railway.json configuration
 {
@@ -163,6 +182,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ```
 
 ### Database Migration Strategy
+
 1. Set up read replica on Railway
 2. Sync data continuously during transition
 3. Switch writes to Railway at cutover
@@ -174,6 +194,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ### Identified Risks
 
 #### High Risk
+
 - **Data Loss During Migration**
   - Mitigation: Multiple backups, staged migration, data validation
   - Contingency: Restore from backup, stay on Heroku
@@ -183,6 +204,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
   - Contingency: Immediate rollback to Heroku
 
 #### Medium Risk
+
 - **Performance Degradation**
   - Mitigation: Load testing, performance benchmarking
   - Contingency: Scale Railway resources, optimize code
@@ -192,6 +214,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
   - Contingency: Use Railway's support, implement workarounds
 
 #### Low Risk
+
 - **Cost Overruns**
   - Mitigation: Set up billing alerts, monitor usage
   - Contingency: Optimize resources, consider alternatives
@@ -199,22 +222,26 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Success Criteria
 
 ### Week 1 Success Metrics
+
 - [ ] Complete application inventory
 - [ ] Railway account ready
 - [ ] Migration plan reviewed and approved
 
 ### Week 2 Success Metrics
+
 - [ ] Staging environment fully functional
 - [ ] Performance benchmarks documented
 - [ ] All tests passing
 
 ### Week 3-4 Success Metrics
+
 - [ ] Zero data loss
 - [ ] Downtime < 5 minutes
 - [ ] All applications running on Railway
 - [ ] Monitoring showing stable performance
 
 ### 30-Day Success Criteria
+
 - [ ] 99.9% uptime achieved
 - [ ] Monthly cost < $200
 - [ ] No critical issues
@@ -224,17 +251,20 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Budget & Resources
 
 ### Migration Costs
+
 - Railway (parallel running): $150/month
 - Heroku (during migration): $733/month
 - Additional tools/services: $50
 - **Total during migration**: $933/month
 
 ### Post-Migration Savings
+
 - Monthly savings: $583
 - Annual savings: $6,996
 - ROI period: 2 months
 
 ### Time Investment
+
 - Planning: 10 hours
 - Implementation: 40 hours
 - Testing: 20 hours
@@ -244,11 +274,13 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Alternative Options Considered
 
 ### Option B: Self-Hosted VPS
+
 - **Pros**: Maximum control, lowest cost (~$100/mo)
 - **Cons**: Requires DevOps expertise, more maintenance
 - **Decision**: Railway chosen for managed services and easier maintenance
 
 ### Option C: Other PaaS Providers
+
 - **Render.com**: Similar pricing, less mature platform
 - **Fly.io**: More complex, better for edge computing
 - **DigitalOcean App Platform**: More expensive than Railway
@@ -257,6 +289,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Monitoring & Maintenance
 
 ### Key Metrics to Track
+
 - Application response times
 - Database query performance
 - Error rates
@@ -265,6 +298,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - Uptime percentage
 
 ### Monthly Review Checklist
+
 - [ ] Review Railway invoices
 - [ ] Analyze performance metrics
 - [ ] Check for unused resources
@@ -275,6 +309,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Documentation & Training
 
 ### Documentation Needed
+
 - [ ] Railway deployment guide
 - [ ] Environment variable reference
 - [ ] Troubleshooting guide
@@ -283,6 +318,7 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 - [ ] API endpoint mappings
 
 ### Team Training Topics
+
 - Railway CLI usage
 - Deployment procedures
 - Monitoring and alerts
@@ -292,18 +328,21 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Next Actions
 
 ### Immediate (Today - August 22)
+
 - [ ] Review and refine this migration plan
 - [ ] Get stakeholder approval
 - [ ] Create Railway account
 - [ ] Schedule migration kickoff meeting
 
 ### This Week (by August 29)
+
 - [ ] Complete application inventory
 - [ ] Begin documenting current architecture
 - [ ] Start backing up all data
 - [ ] Research Railway-specific requirements
 
 ### Next Week (by September 5)
+
 - [ ] Deploy first app to Railway staging
 - [ ] Complete performance benchmarking
 - [ ] Finalize migration schedule
@@ -311,17 +350,20 @@ After downgrading from Performance-L to Standard-2X (completed August 2025):
 ## Notes & References
 
 ### Related Documentation
+
 - [Financial Improvement 2025 Project](./financial-improvement-2025.md)
 - [Heroku Invoice Analysis (July 2025)](../../documents/Heroku-Invoice-July-2025.html)
 - Railway Documentation: https://docs.railway.app
 - Railway Pricing: https://railway.app/pricing
 
 ### Key Decisions Log
+
 - **August 2025**: Chose Railway over self-hosting for easier management
 - **August 2025**: Decided on staged migration vs. big-bang approach
 - **August 2025**: Completed Heroku Performance-L to Standard-2X downgrade (saved $450/mo)
 
 ### Lessons from Financial Review
+
 - Small hosting charges add up significantly
 - Multiple hosting providers indicate lack of consolidation
 - Managed services worth it for reduced maintenance burden
