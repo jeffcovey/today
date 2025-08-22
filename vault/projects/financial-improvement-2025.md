@@ -24,8 +24,8 @@ Based on review of financial documents and recent analysis, this project aims to
 
 #### Major Categories
 
-1. **Business/OlderGay.Men:** $4,641/mo
-   - Heroku hosting: $1,183/mo
+1. **Business/OlderGay.Men:** $4,191/mo (reduced from $4,641/mo)
+   - Heroku hosting: $733/mo (reduced from $1,183/mo)
    - AWS: $192/mo
    - Other hosting: ~$50/mo
 2. **Housing:** $2,360/mo
@@ -74,7 +74,7 @@ Based on review of financial documents and recent analysis, this project aims to
 
 #### A. Hosting Consolidation (Priority 1)
 
-**Current Cost:** $1,425/mo | **Target:** $200/mo | **Savings:** $1,225/mo
+**Current Cost:** $975/mo (reduced from $1,425/mo) | **Target:** $200/mo | **Savings:** $775/mo remaining
 
 1. **Week 1: Analysis & Planning**
    - [ ] Inventory all Heroku applications and dependencies
@@ -100,7 +100,7 @@ Based on review of financial documents and recent analysis, this project aims to
 
 #### C. Quick Wins
 
-- [ ] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
+- [x] ✓ COMPLETED: Downgraded Heroku Performance-L to Standard-2X (saved $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
 - [ ] Switch SendGrid Gold to Starter (save $60/mo) <!-- task-id: 4357f8c535b156ab7fc2b9054d98e160 -->
 - [ ] Review and cancel unused software subscriptions <!-- task-id: 2ceaf50e43429c26fd30f4eeb17d30f2 -->
 
@@ -207,9 +207,9 @@ Based on review of financial documents and recent analysis, this project aims to
 
 ### Heroku to Railway Migration Plan
 
-#### Current Heroku Setup (Monthly: $1,183)
+#### Current Heroku Setup (Monthly: ~$733 after Standard-2X downgrade)
 
-- Performance-L dyno: $500/mo
+- Standard-2X dyno: $50/mo (reduced from Performance-L $500/mo)
 - Standard dynos: $237/mo
 - PostgreSQL databases: ~$200/mo
 - Redis instances: ~$100/mo
@@ -338,7 +338,7 @@ Based on review of financial documents and recent analysis, this project aims to
 1. **Monthly Burn Rate**: Current: $27,864 → Target: $20,000
 2. **Days Since 401k Withdrawal**: Current: 0 → Target: 90+
 3. **Emergency Fund Balance**: Current: $0 → Target: $60,000
-4. **Hosting Costs**: Current: $1,425 → Target: $150
+4. **Hosting Costs**: Current: $975 (reduced from $1,425) → Target: $150
 5. **Food Expenses**: Current: $758 → Target: $500
 6. **Net Monthly Cash Flow**: Current: Negative → Target: +$2,000
 
@@ -595,13 +595,13 @@ Based on my analysis of your last 6 months of expenses, here are effective ways 
 
   4. Optimize current Heroku usage:
 
-  - Downgrade Performance-L to Standard-2X ($50/mo) - save $450/mo
+  - ✓ COMPLETED: Downgraded Performance-L to Standard-2X ($50/mo) - saved $450/mo
   - Replace SendGrid Gold with Starter plan - save ~$60/mo
   - Use free Papertrail plan or self-hosted logs - save ~$50/mo
 
   Recommended Action Plan:
 
-  1. Immediate: Downgrade Heroku dynos (save $450/mo)
+  1. ✓ COMPLETED: Downgraded Heroku dynos (saved $450/mo)
   2. Week 1-2: Set up staging on Railway/Render
   3. Week 3-4: Migrate production with zero downtime
   4. Result: Reduce hosting from $1,183 to ~$150/mo
