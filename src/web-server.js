@@ -1089,7 +1089,7 @@ app.post('/ai-chat/*', async (req, res) => {
       // Use spawn to properly pipe input to claude --print
       const claude = spawn('claude', ['--print'], {
         cwd: process.cwd(),
-        timeout: 30000 // 30 second timeout
+        timeout: 300000 // 5 minute timeout for complex requests
       });
       
       let stdout = '';
@@ -1117,7 +1117,12 @@ app.post('/ai-chat/*', async (req, res) => {
           if (code !== 0) {
             console.error('[AI Chat] Claude failed with code:', code);
             console.error('[AI Chat] stderr:', stderr);
-            reject(new Error(`Claude exited with code ${code}`));
+            // Don't reject for timeout (code null) or non-zero codes, handle gracefully
+            if (code === null) {
+              reject(new Error('Request timed out after 5 minutes'));
+            } else {
+              reject(new Error(`Claude exited with code ${code}: ${stderr || 'Unknown error'}`));
+            }
           } else {
             resolve();
           }
@@ -1133,8 +1138,17 @@ app.post('/ai-chat/*', async (req, res) => {
     } catch (error) {
       console.error('[AI Chat] Error calling Claude:', error);
       
+      let errorResponse = "I'm having trouble processing your request.";
+      if (error.message && error.message.includes('timed out')) {
+        errorResponse = "The AI request took too long (over 5 minutes). Complex questions may need to be broken into smaller parts. Please try again.";
+      } else if (error.message && error.message.includes('code 124')) {
+        errorResponse = "The request timed out. Please try a shorter or simpler question.";
+      } else if (error.message && error.message.includes('code')) {
+        errorResponse = "The AI service encountered an error. Please try again in a moment.";
+      }
+      
       res.json({ 
-        response: "I'm having trouble connecting to the AI service. Please try again later." 
+        response: errorResponse
       });
     }
     
