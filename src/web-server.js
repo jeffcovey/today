@@ -376,9 +376,11 @@ const pageStyle = `
     background: white;
   }
   
-  .content-area {
+  /* Card body with markdown content has scrolling */
+  .card-body.markdown-content {
     height: calc(100vh - 200px);
     overflow-y: auto;
+    padding: 1.5rem;
   }
   
   @media (max-width: 768px) {
@@ -386,7 +388,7 @@ const pageStyle = `
       height: 40vh;
     }
     
-    .content-area {
+    .card-body.markdown-content {
       height: auto;
       max-height: 50vh;
     }
@@ -664,6 +666,16 @@ async function renderMarkdown(filePath, urlPath) {
   const content = await fs.readFile(filePath, 'utf-8');
   const lines = content.split('\n');
   
+  // Extract title from first H1 if it exists
+  let pageTitle = path.basename(urlPath, '.md');
+  let contentToRender = content;
+  const titleMatch = content.match(/^# (.+)$/m);
+  if (titleMatch) {
+    pageTitle = titleMatch[1];
+    // Remove the title from content so it's not duplicated
+    contentToRender = content.replace(/^# .+\n?/m, '');
+  }
+  
   // Find all checkbox lines in the original content
   const checkboxLines = [];
   lines.forEach((line, index) => {
@@ -675,8 +687,8 @@ async function renderMarkdown(filePath, urlPath) {
     }
   });
   
-  // Render the markdown normally
-  let htmlContent = marked(content);
+  // Render the markdown normally (without the title if we extracted it)
+  let htmlContent = marked(contentToRender);
   
   // Replace the checkboxes that marked generated with our interactive ones
   let replacementIndex = 0;
@@ -696,7 +708,7 @@ async function renderMarkdown(filePath, urlPath) {
     }
   );
   
-  const fileName = path.basename(urlPath);
+  const fileName = pageTitle || path.basename(urlPath);
   
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
@@ -746,10 +758,11 @@ async function renderMarkdown(filePath, urlPath) {
           <!-- Content column -->
           <div class="col-12 col-lg-7 mb-3">
             <div class="card shadow-sm h-100">
-              <div class="card-body content-area">
-                <div class="markdown-content">
-                  ${htmlContent}
-                </div>
+              ${pageTitle ? `<div class="card-header bg-white border-bottom">
+                <h5 class="mb-0">${pageTitle}</h5>
+              </div>` : ''}
+              <div class="card-body markdown-content">
+                ${htmlContent}
               </div>
             </div>
           </div>
