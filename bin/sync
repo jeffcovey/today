@@ -1193,6 +1193,7 @@ case "${1:-}" in
         # Quick sync - only critical sources
         print_info "Quick sync mode - GitHub vault, tasks, inbox, and consistency check"
         sync_github_vault
+        clean_markdown_files
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
         check_task_consistency
