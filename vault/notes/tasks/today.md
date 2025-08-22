@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 1:44:04 PM EDT*
+*Generated: 8/22/2025, 4:07:04 PM EDT*
 
 ## Next Up
 
@@ -12,17 +12,17 @@
 <details>
 <summary><strong>✅ Done Today</strong> (503 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2c90a17a3de5ce607110c1ff0dd09d92 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 712babcf79e2629791458a5c0c99f31b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a75c900b1372cb76d80a1811d181f14c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2a6889fce1eb6d927541261387a3afe1 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bea3fa89fe02b35dd8a5abe65a2794ee -->
 - [x] Journal <!-- task-id: 7e5a5946ab53fab5b6899ee32084ff9e -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 654213f429dfccf0ce9aa506a1f0b4df -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2ecd7f4732fcb36dbb5faa4d9f91ab1a -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 15c1919bb9f7fbf78ec698af634013b6 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1d3d2e4bbfd716a6fa0a4da2e90c7b02 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3531e99501b145d33392a4197177d1cb -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2c90a17a3de5ce607110c1ff0dd09d92 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 712babcf79e2629791458a5c0c99f31b -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a75c900b1372cb76d80a1811d181f14c -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2a6889fce1eb6d927541261387a3afe1 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bea3fa89fe02b35dd8a5abe65a2794ee -->
 - [x] **Voicemail** - Check phone messages <!-- task-id: 23bdf2efcbddc41a61c696d4c4ea66c8 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 67c0582965b8c40710831623df5d5ebd -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ae863b2996c9d0a2241d9f80c2d39d72 -->
