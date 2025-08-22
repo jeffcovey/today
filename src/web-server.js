@@ -190,7 +190,7 @@ const pageStyle = `
     max-width: 70%;
     margin-bottom: 1rem;
     word-wrap: break-word;
-    padding: 0.75rem !important;
+    padding: 0.5rem 0.75rem !important;
     border-radius: 1rem !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     border: none !important;
@@ -245,8 +245,19 @@ const pageStyle = `
   /* AI assistant bubble styling */
   .chat-bubble.assistant,
   .chat-bubble.ai {
-    background: #f8f9fa !important;
+    background: #e9ecef !important;
     color: #212529 !important;
+  }
+  
+  /* Typing indicator styling */
+  .chat-bubble.typing-indicator {
+    background: #e9ecef !important;
+  }
+  
+  .chat-bubble.typing-indicator .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
   }
   
   .bubble-content {
@@ -851,9 +862,13 @@ async function renderMarkdown(filePath, urlPath) {
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <div class="spinner-grow spinner-grow-sm me-1" role="status"></div>
-              <div class="spinner-grow spinner-grow-sm me-1" role="status"></div>
-              <div class="spinner-grow spinner-grow-sm" role="status"></div>
+              <small class="d-block mb-1" style="opacity: 0.7;">AI · Typing...</small>
+              <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="text-muted">Thinking...</span>
+              </div>
             </div>
           \`;
           document.getElementById('chatMessages').appendChild(typingIndicator);
