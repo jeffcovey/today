@@ -991,9 +991,14 @@ async function renderMarkdown(filePath, urlPath) {
             
             // Calculate response time
             const responseTime = Math.floor((Date.now() - startTime) / 1000);
-            const timeStr = responseTime < 60 ? 
-              `${responseTime} second${responseTime !== 1 ? 's' : ''}` : 
-              `${Math.floor(responseTime / 60)}:${(responseTime % 60).toString().padStart(2, '0')}`;
+            let timeStr;
+            if (responseTime < 60) {
+              timeStr = responseTime + ' second' + (responseTime !== 1 ? 's' : '');
+            } else {
+              const minutes = Math.floor(responseTime / 60);
+              const seconds = (responseTime % 60).toString().padStart(2, '0');
+              timeStr = minutes + ':' + seconds;
+            }
             
             // Add AI response with time
             addChatBubble(data.response, 'assistant', true, timeStr);
