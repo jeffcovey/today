@@ -944,6 +944,11 @@ async function renderMarkdown(filePath, urlPath) {
             // Add AI response
             addChatBubble(data.response, 'assistant');
             
+            // If file was modified, refresh the content area
+            if (data.fileModified) {
+              refreshContentArea();
+            }
+            
           } catch (error) {
             console.error('Error:', error);
             typingIndicator.remove();
@@ -973,6 +978,59 @@ async function renderMarkdown(filePath, urlPath) {
         
         // Load chat history on page load
         loadChatHistory();
+        
+        // Function to refresh just the content area
+        async function refreshContentArea() {
+          try {
+            // Fetch the current page again
+            const response = await fetch(window.location.href);
+            if (!response.ok) throw new Error('Failed to fetch updated content');
+            
+            const html = await response.text();
+            const parser = new DOMParser();
+            const newDoc = parser.parseFromString(html, 'text/html');
+            
+            // Find the new content
+            const newContent = newDoc.querySelector('.card-body.markdown-content');
+            const currentContent = document.querySelector('.card-body.markdown-content');
+            
+            if (newContent && currentContent) {
+              // Preserve scroll position
+              const scrollTop = currentContent.scrollTop;
+              
+              // Replace the content
+              currentContent.innerHTML = newContent.innerHTML;
+              
+              // Restore scroll position
+              currentContent.scrollTop = scrollTop;
+              
+              // Re-attach checkbox handlers
+              currentContent.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.onchange = function() {
+                  toggleCheckbox(this, parseInt(this.dataset.line));
+                };
+              });
+              
+              // Show notification
+              const notification = document.createElement('div');
+              notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
+              notification.style.cssText = 'top: 70px; right: 20px; z-index: 1050; max-width: 300px;';
+              notification.innerHTML = \`
+                <i class="fas fa-check-circle me-2"></i>
+                Content refreshed
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              \`;
+              document.body.appendChild(notification);
+              
+              // Auto-dismiss after 3 seconds
+              setTimeout(() => {
+                notification.remove();
+              }, 3000);
+            }
+          } catch (error) {
+            console.error('Error refreshing content:', error);
+          }
+        }
         
         // Prevent details elements from closing when interacting with their content
         document.addEventListener('DOMContentLoaded', function() {
@@ -1052,16 +1110,53 @@ async function renderMarkdown(filePath, urlPath) {
   return html;
 }
 
+// File edit endpoint for AI
+app.post('/ai-edit/*', async (req, res) => {
+  try {
+    const urlPath = req.path.slice(9); // Remove '/ai-edit/' prefix
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    const { content } = req.body;
+    
+    // Security check
+    if (!fullPath.startsWith(VAULT_PATH)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Write the file
+    await fs.writeFile(fullPath, content, 'utf-8');
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error editing file:', error);
+    res.status(500).json({ error: 'Failed to edit file' });
+  }
+});
+
 // AI Chat route handler  
 app.post('/ai-chat/*', async (req, res) => {
   try {
     const urlPath = req.path.slice(9); // Remove '/ai-chat/' prefix
     const { message, history, documentContent } = req.body;
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    
+    // Get initial file modification time
+    let initialMtime = null;
+    try {
+      const stats = await fs.stat(fullPath);
+      initialMtime = stats.mtimeMs;
+    } catch (e) {
+      // File might not exist or be accessible
+    }
     
     // Build conversation for Claude
     let conversation = "You are an AI assistant helping with a markdown document. ";
-    conversation += "The user is viewing this document:\n\n";
-    conversation += "---DOCUMENT CONTENT---\n";
+    conversation += `The user is viewing: ${urlPath}\n`;
+    conversation += `File location: vault/${urlPath}\n\n`;
+    conversation += "IMPORTANT: When the user asks you to edit or update this document:\n";
+    conversation += "- You have the ability to directly edit the file\n";
+    conversation += "- Make the requested changes to the content\n";
+    conversation += "- The interface will automatically refresh to show your changes\n\n";
+    conversation += "---CURRENT DOCUMENT CONTENT---\n";
     conversation += documentContent || "(No document content available)";
     conversation += "\n---END DOCUMENT---\n\n";
     
@@ -1134,7 +1229,21 @@ app.post('/ai-chat/*', async (req, res) => {
         });
       });
       
-      res.json({ response: stdout.trim() });
+      // Check if file was modified
+      let fileModified = false;
+      if (initialMtime !== null) {
+        try {
+          const newStats = await fs.stat(fullPath);
+          fileModified = newStats.mtimeMs !== initialMtime;
+        } catch (e) {
+          // File might have been deleted or become inaccessible
+        }
+      }
+      
+      res.json({ 
+        response: stdout.trim(),
+        fileModified: fileModified
+      });
     } catch (error) {
       console.error('[AI Chat] Error calling Claude:', error);
       
