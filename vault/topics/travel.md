@@ -17,6 +17,6 @@ Tasks and projects related to Travel.
 
 ### No Date Set
 
-- [ ] Create a db of my Royal Caribbean points progress <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
 - [ ] Add more to the house guide on Trusted Housesitters <!-- task-id: bf678c47f00af2652d1ae64cc7892bea -->
 - [ ] Add to services: Educational Travel & Learning Adventures | Road Scholar <!-- task-id: 92767f936df810bbc3ea9d70de3b5548 -->
+- [ ] Create a db of my Royal Caribbean points progress <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
