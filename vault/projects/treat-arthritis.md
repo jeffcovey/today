@@ -50,7 +50,7 @@ Manage and improve hip arthritis condition through targeted exercises, treatment
 ### Immediate Actions
 
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
-- [ ] Start reading "Tight Hip, Twisted Core" book (30 min daily) <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
+- [x] Start reading "Tight Hip, Twisted Core" book (30 min daily) <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
 - [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup --> <!-- task-id: 5359f3c61cdf8801a37f7852349da73c -->
 - [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly --> <!-- task-id: 67416207c06f8986797ad579805c2ac5 -->
