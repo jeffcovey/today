@@ -1026,7 +1026,7 @@ async function renderMarkdown(filePath, urlPath) {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 300000); // 5 minutes
             
-            const response = await fetch('/ai-chat/${urlPath}', {
+            const response = await fetch(\`/ai-chat/${urlPath}\`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1264,6 +1264,10 @@ app.post('/ai-edit/*', async (req, res) => {
 
 // AI Chat route handler  
 app.post('/ai-chat/*', async (req, res) => {
+  // Set timeout for this specific request to 5 minutes
+  req.setTimeout(300000); // 5 minutes
+  res.setTimeout(300000); // 5 minutes
+  
   try {
     const urlPath = req.path.slice(9); // Remove '/ai-chat/' prefix
     const { message, history, documentContent } = req.body;
@@ -1541,9 +1545,14 @@ app.get('*', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, '127.0.0.1', () => {
+// Start server with extended timeout
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`Web server running on http://localhost:${PORT}`);
   console.log(`Username: ${process.env.WEB_USER || 'admin'}`);
   console.log(`Password: ${process.env.WEB_PASSWORD || '(set WEB_PASSWORD in .env)'}`);
 });
+
+// Set server timeout to 5 minutes to match AI processing time
+server.timeout = 300000; // 5 minutes
+server.keepAliveTimeout = 310000; // Slightly longer than timeout
+server.headersTimeout = 320000; // Even longer to ensure cleanup
