@@ -1,0 +1,133 @@
+#!/bin/bash
+# Quick status check for OlderGay.Men monitoring data
+# Shows what data is available for bin/today to use
+
+DB_PATH=".data/today.db"
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo ""
+echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}     OlderGay.Men Monitoring Data Status${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
+echo ""
+
+# Check if database exists
+if [[ ! -f "$DB_PATH" ]]; then
+    echo -e "${RED}✗${NC} Database not found at $DB_PATH"
+    echo "  Run 'bin/sync' to create database"
+    exit 1
+fi
+
+# Check if OGM tables exist
+table_count=$(sqlite3 "$DB_PATH" ".tables" | grep -c ogm || echo 0)
+if [[ $table_count -eq 0 ]]; then
+    echo -e "${YELLOW}⚠${NC}  OGM monitoring tables not initialized"
+    echo "  Run 'bin/ogm-sync' to create tables"
+    exit 1
+fi
+
+echo -e "${GREEN}✓${NC} Database and tables ready"
+echo ""
+
+# GitHub Issues Status
+echo -e "${YELLOW}📊 GitHub Issues${NC}"
+issue_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
+if [[ $issue_count -gt 0 ]]; then
+    echo -e "  ${GREEN}✓${NC} $issue_count open issues tracked"
+    
+    # Show top 3 most recent issues
+    echo "  Most recent:"
+    sqlite3 "$DB_PATH" -column <<EOF 2>/dev/null || echo "    No data"
+SELECT 
+    '#' || number as issue,
+    SUBSTR(title, 1, 50) as title
+FROM ogm_github_issues 
+WHERE state='open' 
+ORDER BY updated_at DESC 
+LIMIT 3;
+EOF
+else
+    echo -e "  ${YELLOW}⚠${NC}  No GitHub issues data"
+    echo "     Configure GITHUB_ACCESS_TOKEN in .env"
+fi
+echo ""
+
+# HoneyBadger Errors Status
+echo -e "${YELLOW}🐝 HoneyBadger Errors${NC}"
+error_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
+if [[ $error_count -gt 0 ]]; then
+    echo -e "  ${GREEN}✓${NC} $error_count unresolved errors tracked"
+    
+    # Show top 3 most frequent errors
+    echo "  Most frequent:"
+    sqlite3 "$DB_PATH" -column <<EOF 2>/dev/null || echo "    No data"
+SELECT 
+    SUBSTR(klass, 1, 30) as error_class,
+    notices_count as count
+FROM ogm_honeybadger_faults 
+WHERE resolved=0 
+ORDER BY notices_count DESC 
+LIMIT 3;
+EOF
+else
+    echo -e "  ${YELLOW}⚠${NC}  No HoneyBadger error data"
+    echo "     Configure HONEYBADGER_AUTH_TOKEN in .env"
+fi
+echo ""
+
+# Scout Performance Status
+echo -e "${YELLOW}🔍 Scout Performance${NC}"
+metric_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_scout_metrics WHERE DATE(timestamp) = DATE('now')" 2>/dev/null || echo 0)
+if [[ $metric_count -gt 0 ]]; then
+    echo -e "  ${GREEN}✓${NC} $metric_count metrics from today"
+    
+    # Show latest metrics
+    sqlite3 "$DB_PATH" -column <<EOF 2>/dev/null || echo "    No data"
+SELECT 
+    metric_type,
+    ROUND(value, 2) || 'ms' as value
+FROM ogm_scout_metrics 
+WHERE metric_type LIKE '%response%'
+ORDER BY timestamp DESC 
+LIMIT 3;
+EOF
+else
+    echo -e "  ${YELLOW}⚠${NC}  No Scout performance data"
+    echo "     Configure SCOUT_API_KEY in .env"
+fi
+echo ""
+
+# Summary Statistics
+echo -e "${YELLOW}📈 Today's Summary${NC}"
+today=$(date +%Y-%m-%d)
+has_summary=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_summary_stats WHERE stat_date='$today'" 2>/dev/null || echo 0)
+
+if [[ $has_summary -gt 0 ]]; then
+    sqlite3 "$DB_PATH" -header -column <<EOF 2>/dev/null
+SELECT 
+    open_issues as "Open Issues",
+    active_errors as "Active Errors",
+    COALESCE(ROUND(avg_response_time, 0), 0) as "Avg Response (ms)",
+    COALESCE(ROUND(p95_response_time, 0), 0) as "P95 Response (ms)"
+FROM ogm_summary_stats 
+WHERE stat_date='$today';
+EOF
+else
+    echo -e "  ${YELLOW}⚠${NC}  No summary data for today"
+    echo "     Run 'bin/ogm-sync' to generate summary"
+fi
+
+echo ""
+echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
+echo ""
+echo "Next steps:"
+echo "  1. Configure missing API tokens in .env"
+echo "  2. Run 'bin/ogm-sync' to fetch monitoring data"
+echo "  3. Run 'bin/today' to get AI recommendations"
+echo ""

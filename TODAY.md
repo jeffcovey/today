@@ -151,7 +151,13 @@ I generally wake up around 5:30-6:00AM. It takes me an hour in the morning to st
 
 #### Vocation
 
-I’m retired, and would like to remain that way if I can maintain my finances. I devote my life to https://oldergay.men/, a website for older gay men and their admirers. Aside from personal health and wellness, Older Gay Men is my passion and vocation.
+I'm retired, and would like to remain that way if I can maintain my finances. I devote my life to https://oldergay.men/, a website for older gay men and their admirers. Aside from personal health and wellness, Older Gay Men is my passion and vocation.
+
+**OGM Technical Work:** The database now includes real-time monitoring data from OlderGay.Men:
+- GitHub issues tracking bugs and feature requests
+- HoneyBadger error monitoring (critical errors like R14 memory issues with >1M occurrences!)
+- Scout APM performance metrics (response times, throughput)
+Check the `ogm_*` tables for production issues that need attention.
 
 #### Streaks
 
@@ -255,6 +261,10 @@ The database contains these key tables:
 - **toggl_projects**: Project definitions for time tracking
 - **toggl_daily_summary**: View showing daily time totals
 - **toggl_project_summary**: View showing time by project
+- **ogm_github_issues**: OlderGay.Men GitHub issues (bugs, features)
+- **ogm_honeybadger_faults**: Production errors and their frequency
+- **ogm_scout_metrics**: Performance metrics (response times, error rates)
+- **ogm_summary_stats**: Daily aggregated OGM statistics
 
 Use SQL queries to:
 1. Find urgent/overdue tasks (query task_cache WHERE due_date <= DATE('now'))
@@ -274,6 +284,51 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 - 🔄 Sync history (in sync_log table)
 
 **First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `vault/plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
+
+### OlderGay.Men Monitoring
+
+**🚨 IMPORTANT:** Check for critical OlderGay.Men issues that need attention:
+
+```sql
+-- Check for critical production errors
+SELECT 
+    klass as error_type,
+    notices_count as occurrences,
+    last_notice_at as last_seen
+FROM ogm_honeybadger_faults 
+WHERE resolved = 0
+ORDER BY notices_count DESC
+LIMIT 5;
+
+-- Check high-priority GitHub issues
+SELECT 
+    number,
+    title,
+    comments_count,
+    updated_at
+FROM ogm_github_issues
+WHERE state = 'open'
+    AND (title LIKE '%critical%' 
+         OR title LIKE '%timeout%' 
+         OR title LIKE '%error%'
+         OR title LIKE '%down%')
+ORDER BY updated_at DESC;
+
+-- Check today's performance metrics
+SELECT 
+    metric_type,
+    ROUND(value, 2) as value,
+    timestamp
+FROM ogm_scout_metrics
+WHERE DATE(timestamp) = DATE('now')
+ORDER BY timestamp DESC;
+
+-- Get OGM summary for today
+SELECT * FROM ogm_summary_stats 
+WHERE stat_date = DATE('now');
+```
+
+If there are critical issues (>1000 error occurrences, timeouts, site down), prioritize fixing them in the morning work block.
 
 ### Example Queries to Get Started
 

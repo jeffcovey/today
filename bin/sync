@@ -117,6 +117,11 @@ main() {
         run_sync_step "⏱️ Toggl Sync" sync_toggl "Toggl synced" "Toggl sync"
     fi
     
+    # OlderGay.Men monitoring sync (if configured)
+    if grep -q "GITHUB_ACCESS_TOKEN=" .env 2>/dev/null || grep -q "HONEYBADGER_AUTH_TOKEN=" .env 2>/dev/null || grep -q "SCOUT_API_KEY=" .env 2>/dev/null; then
+        run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
+    fi
+    
     # Final vault sync to push any changes made during sync operations
     run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
     
@@ -750,6 +755,48 @@ sync_contacts() {
         else
             print_info "Error: $sync_output"
         fi
+        return 1
+    fi
+}
+
+# Sync OlderGay.Men monitoring data
+sync_ogm_monitoring() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if ogm-sync script exists
+    if [[ ! -f bin/ogm-sync ]]; then
+        print_error "OGM sync script not available"
+        return 1
+    fi
+    
+    # Run OGM sync
+    print_info "Syncing OlderGay.Men monitoring data..."
+    
+    sync_output=$(bin/ogm-sync 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract stats from output
+        if echo "$sync_output" | grep -q "Open Issues"; then
+            # Parse the summary table
+            open_issues=$(echo "$sync_output" | grep -A1 "Open Issues" | tail -1 | awk '{print $1}')
+            active_errors=$(echo "$sync_output" | grep -A1 "Open Issues" | tail -1 | awk '{print $2}')
+            
+            if [[ -n "$open_issues" ]]; then
+                print_info "GitHub open issues: $open_issues"
+            fi
+            if [[ -n "$active_errors" ]]; then
+                print_info "HoneyBadger active errors: $active_errors"
+            fi
+        fi
+        
+        # Check if performance metrics were synced
+        if echo "$sync_output" | grep -q "Scout performance metrics"; then
+            print_info "Performance metrics updated"
+        fi
+        
+        return 0
+    else
+        print_error "OGM monitoring sync failed"
+        print_info "Check API tokens in .env file"
         return 1
     fi
 }

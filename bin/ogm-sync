@@ -1,0 +1,455 @@
+#!/bin/bash
+# OlderGay.Men Data Sync Script
+# Fetches monitoring data from GitHub, HoneyBadger, and Scout APM
+# and stores it in the local SQLite database for bin/today to use
+
+set -e
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_status() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+print_header() {
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+    echo -e "${YELLOW}$1${NC}"
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+}
+
+# Database path
+DB_PATH=".data/today.db"
+
+# Initialize database tables for OGM monitoring
+init_database() {
+    print_info "Initializing OGM monitoring tables..."
+    
+    sqlite3 "$DB_PATH" <<'EOF'
+-- GitHub Issues table
+CREATE TABLE IF NOT EXISTS ogm_github_issues (
+    number INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    state TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    closed_at DATETIME,
+    body TEXT,
+    labels TEXT,
+    comments_count INTEGER DEFAULT 0,
+    url TEXT,
+    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- HoneyBadger Faults table
+CREATE TABLE IF NOT EXISTS ogm_honeybadger_faults (
+    id INTEGER PRIMARY KEY,
+    klass TEXT NOT NULL,
+    message TEXT,
+    environment TEXT,
+    resolved BOOLEAN DEFAULT 0,
+    notices_count INTEGER DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    last_notice_at DATETIME,
+    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Scout Performance Metrics table
+CREATE TABLE IF NOT EXISTS ogm_scout_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    metric_type TEXT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    value REAL NOT NULL,
+    percentile_95 REAL,
+    throughput REAL,
+    error_rate REAL,
+    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Correlations table (linking issues to errors)
+CREATE TABLE IF NOT EXISTS ogm_correlations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    github_issue INTEGER,
+    honeybadger_fault INTEGER,
+    correlation_type TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (github_issue) REFERENCES ogm_github_issues(number),
+    FOREIGN KEY (honeybadger_fault) REFERENCES ogm_honeybadger_faults(id)
+);
+
+-- Summary statistics table
+CREATE TABLE IF NOT EXISTS ogm_summary_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stat_date DATE NOT NULL,
+    open_issues INTEGER DEFAULT 0,
+    closed_issues_today INTEGER DEFAULT 0,
+    active_errors INTEGER DEFAULT 0,
+    avg_response_time REAL,
+    p95_response_time REAL,
+    error_rate REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(stat_date)
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_issues_state ON ogm_github_issues(state);
+CREATE INDEX IF NOT EXISTS idx_issues_updated ON ogm_github_issues(updated_at);
+CREATE INDEX IF NOT EXISTS idx_faults_resolved ON ogm_honeybadger_faults(resolved);
+CREATE INDEX IF NOT EXISTS idx_faults_notices ON ogm_honeybadger_faults(last_notice_at);
+CREATE INDEX IF NOT EXISTS idx_metrics_type ON ogm_scout_metrics(metric_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_summary_date ON ogm_summary_stats(stat_date);
+EOF
+    
+    print_status "Database tables initialized"
+}
+
+# Sync GitHub issues using direct API calls
+sync_github_issues() {
+    print_header "📊 Syncing GitHub Issues"
+    
+    # Check for GitHub token
+    if [[ -z "$GITHUB_ACCESS_TOKEN" ]]; then
+        print_error "GITHUB_ACCESS_TOKEN not configured"
+        print_info "Create a token at: https://github.com/settings/tokens"
+        return 1
+    fi
+    
+    print_info "Fetching open issues from GitHub..."
+    
+    # Fetch issues from GitHub API (excluding pull requests)
+    response=$(curl -s -H "Authorization: token $GITHUB_ACCESS_TOKEN" \
+                    -H "Accept: application/vnd.github.v3+json" \
+                    "https://api.github.com/repos/OlderGay-Men/OlderGay.Men/issues?state=open&per_page=100" 2>/dev/null)
+    
+    # Check if we got valid JSON
+    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+        print_error "Failed to fetch GitHub issues - invalid response"
+        return 1
+    fi
+    
+    # Check for API errors
+    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
+        error_msg=$(echo "$response" | jq -r '.message')
+        print_error "GitHub API error: $error_msg"
+        return 1
+    fi
+    
+    # Parse and insert issues into database
+    issue_count=0
+    while IFS= read -r issue; do
+        # Skip pull requests (they have a pull_request field)
+        if echo "$issue" | jq -e '.pull_request | select(. != null)' >/dev/null 2>&1; then
+            continue
+        fi
+        
+        # Extract fields
+        number=$(echo "$issue" | jq -r '.number')
+        title=$(echo "$issue" | jq -r '.title' | sed "s/'/''/g")
+        state=$(echo "$issue" | jq -r '.state')
+        created_at=$(echo "$issue" | jq -r '.created_at')
+        updated_at=$(echo "$issue" | jq -r '.updated_at')
+        closed_at=$(echo "$issue" | jq -r '.closed_at // "null"')
+        body=$(echo "$issue" | jq -r '.body // ""' | sed "s/'/''/g")
+        labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")' | sed "s/'/''/g")
+        comments_count=$(echo "$issue" | jq -r '.comments')
+        url=$(echo "$issue" | jq -r '.html_url')
+        
+        # Insert into database
+        sqlite3 "$DB_PATH" <<EOF
+INSERT OR REPLACE INTO ogm_github_issues 
+(number, title, state, created_at, updated_at, closed_at, body, labels, comments_count, url)
+VALUES (
+    $number,
+    '$title',
+    '$state',
+    '$created_at',
+    '$updated_at',
+    $([ "$closed_at" = "null" ] && echo "NULL" || echo "'$closed_at'"),
+    '$body',
+    '$labels',
+    $comments_count,
+    '$url'
+);
+EOF
+        ((issue_count++))
+    done < <(echo "$response" | jq -c '.[]')
+    
+    if [[ $issue_count -gt 0 ]]; then
+        print_status "Synced $issue_count GitHub issues"
+    else
+        print_info "No open issues found"
+    fi
+    
+    # Get issue count
+    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
+    print_info "Total open issues in database: $total_count"
+}
+
+# Sync HoneyBadger faults using direct API calls
+sync_honeybadger_faults() {
+    print_header "🐝 Syncing HoneyBadger Faults"
+    
+    # Check for HoneyBadger token
+    HONEYBADGER_TOKEN="${HONEYBADGER_AUTH_TOKEN:-$HONEYBADGER_API_KEY}"
+    if [[ -z "$HONEYBADGER_TOKEN" ]]; then
+        print_error "HONEYBADGER_AUTH_TOKEN or HONEYBADGER_API_KEY not configured"
+        print_info "Get your token at: https://app.honeybadger.io/users/sign_in"
+        return 1
+    fi
+    
+    print_info "Fetching unresolved faults from HoneyBadger..."
+    
+    # HoneyBadger API v2 endpoint
+    PROJECT_ID="76830"
+    response=$(curl -s -u "$HONEYBADGER_TOKEN:" \
+                    -H "Accept: application/json" \
+                    "https://app.honeybadger.io/v2/projects/$PROJECT_ID/faults?limit=50&resolved=false" 2>/dev/null)
+    
+    # Check if we got valid JSON
+    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+        print_error "Failed to fetch HoneyBadger faults - invalid response"
+        return 1
+    fi
+    
+    # Check for API errors
+    if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
+        error_msg=$(echo "$response" | jq -r '.error')
+        print_error "HoneyBadger API error: $error_msg"
+        return 1
+    fi
+    
+    # Parse and insert faults into database
+    fault_count=0
+    while IFS= read -r fault; do
+        # Extract fields
+        id=$(echo "$fault" | jq -r '.id')
+        klass=$(echo "$fault" | jq -r '.klass // "Unknown"' | sed "s/'/''/g")
+        message=$(echo "$fault" | jq -r '.message // ""' | sed "s/'/''/g")
+        environment=$(echo "$fault" | jq -r '.environment // "production"' | sed "s/'/''/g")
+        resolved=$(echo "$fault" | jq -r '.resolved // false' | sed 's/false/0/;s/true/1/')
+        notices_count=$(echo "$fault" | jq -r '.notices_count // 0')
+        created_at=$(echo "$fault" | jq -r '.created_at // "now()"')
+        last_notice_at=$(echo "$fault" | jq -r '.last_notice_at // .created_at // "now()"')
+        
+        # Insert into database
+        sqlite3 "$DB_PATH" <<EOF
+INSERT OR REPLACE INTO ogm_honeybadger_faults
+(id, klass, message, environment, resolved, notices_count, created_at, last_notice_at)
+VALUES (
+    $id,
+    '$klass',
+    '$message',
+    '$environment',
+    $resolved,
+    $notices_count,
+    '$created_at',
+    '$last_notice_at'
+);
+EOF
+        ((fault_count++))
+    done < <(echo "$response" | jq -c '.results[]?' 2>/dev/null)
+    
+    if [[ $fault_count -gt 0 ]]; then
+        print_status "Synced $fault_count HoneyBadger faults"
+    else
+        print_info "No unresolved faults found"
+    fi
+    
+    # Get fault count
+    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
+    print_info "Total unresolved faults in database: $total_count"
+}
+
+# Sync Scout performance metrics using direct API calls
+sync_scout_metrics() {
+    print_header "🔍 Syncing Scout Performance Metrics"
+    
+    # Check for Scout API key
+    if [[ -z "$SCOUT_API_KEY" ]]; then
+        print_error "SCOUT_API_KEY not configured"
+        print_info "Get your API key at: https://scoutapm.com/apps"
+        return 1
+    fi
+    
+    SCOUT_APP="${SCOUT_APP_ID:-390577}"
+    print_info "Fetching performance metrics from Scout (App ID: $SCOUT_APP)..."
+    
+    # Calculate time range (last 24 hours)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        START_TIME=$(date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
+        END_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    else
+        # Linux
+        START_TIME=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+        END_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    fi
+    
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    metrics_added=0
+    
+    # Fetch response time metrics
+    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+                    -H "Content-Type: application/json" \
+                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time?from=$START_TIME&to=$END_TIME" 2>/dev/null)
+    
+    if echo "$response" | jq -e '.results.series.response_time' >/dev/null 2>&1; then
+        # Calculate average from the series
+        avg_response=$(echo "$response" | jq '[.results.series.response_time[][1]] | add/length')
+        if [[ -n "$avg_response" ]] && [[ "$avg_response" != "null" ]]; then
+            sqlite3 "$DB_PATH" <<EOF
+INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
+VALUES ('avg_response_time', '$timestamp', $avg_response);
+EOF
+            ((metrics_added++))
+        fi
+    fi
+    
+    # Fetch 95th percentile response time
+    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+                    -H "Content-Type: application/json" \
+                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time_95th?from=$START_TIME&to=$END_TIME" 2>/dev/null)
+    
+    if echo "$response" | jq -e '.results.series.response_time_95th' >/dev/null 2>&1; then
+        # Calculate average from the series
+        p95_response=$(echo "$response" | jq '[.results.series.response_time_95th[][1]] | add/length')
+        if [[ -n "$p95_response" ]] && [[ "$p95_response" != "null" ]]; then
+            sqlite3 "$DB_PATH" <<EOF
+INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
+VALUES ('p95_response_time', '$timestamp', $p95_response);
+EOF
+            ((metrics_added++))
+        fi
+    fi
+    
+    # Fetch error rate
+    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+                    -H "Content-Type: application/json" \
+                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/errors?from=$START_TIME&to=$END_TIME" 2>/dev/null)
+    
+    if echo "$response" | jq -e '.results.series.errors' >/dev/null 2>&1; then
+        # Calculate average error rate
+        error_rate=$(echo "$response" | jq '[.results.series.errors[][1]] | add/length')
+        if [[ -n "$error_rate" ]] && [[ "$error_rate" != "null" ]]; then
+            sqlite3 "$DB_PATH" <<EOF
+INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
+VALUES ('error_rate', '$timestamp', $error_rate);
+EOF
+            ((metrics_added++))
+        fi
+    fi
+    
+    if [[ $metrics_added -gt 0 ]]; then
+        print_status "Synced $metrics_added Scout performance metrics"
+    else
+        print_info "No metrics found or API returned no data"
+    fi
+}
+
+# Generate summary statistics
+generate_summary() {
+    print_header "📈 Generating Summary Statistics"
+    
+    today=$(date +%Y-%m-%d)
+    
+    sqlite3 "$DB_PATH" <<EOF
+-- Insert or update today's summary statistics
+INSERT OR REPLACE INTO ogm_summary_stats (
+    stat_date,
+    open_issues,
+    closed_issues_today,
+    active_errors,
+    avg_response_time,
+    p95_response_time,
+    error_rate
+)
+SELECT 
+    '$today' as stat_date,
+    (SELECT COUNT(*) FROM ogm_github_issues WHERE state='open') as open_issues,
+    (SELECT COUNT(*) FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)='$today') as closed_issues_today,
+    (SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0) as active_errors,
+    (SELECT value FROM ogm_scout_metrics WHERE metric_type='avg_response_time' ORDER BY timestamp DESC LIMIT 1) as avg_response_time,
+    (SELECT value FROM ogm_scout_metrics WHERE metric_type='p95_response_time' ORDER BY timestamp DESC LIMIT 1) as p95_response_time,
+    (SELECT value FROM ogm_scout_metrics WHERE metric_type='error_rate' ORDER BY timestamp DESC LIMIT 1) as error_rate;
+EOF
+    
+    # Display summary
+    sqlite3 "$DB_PATH" -header -column <<EOF
+SELECT 
+    open_issues as "Open Issues",
+    active_errors as "Active Errors",
+    ROUND(COALESCE(avg_response_time, 0), 2) as "Avg Response (ms)",
+    ROUND(COALESCE(p95_response_time, 0), 2) as "95th % Response (ms)"
+FROM ogm_summary_stats 
+WHERE stat_date='$today';
+EOF
+    
+    print_status "Summary statistics generated"
+}
+
+# Main function
+main() {
+    print_header "🌐 OlderGay.Men Monitoring Data Sync"
+    echo "Syncing monitoring data for bin/today planning..."
+    
+    # Initialize database if needed
+    init_database
+    
+    # Sync each data source
+    sync_github_issues
+    sync_honeybadger_faults
+    sync_scout_metrics
+    
+    # Generate summary
+    generate_summary
+    
+    print_header "✅ OGM Data Sync Complete"
+    
+    # Show what will be available to bin/today
+    print_info "Data now available for bin/today planning:"
+    echo "  • GitHub open issues and recent activity"
+    echo "  • HoneyBadger unresolved errors and patterns"
+    echo "  • Scout performance metrics and slow endpoints"
+    echo "  • Summary statistics and trends"
+    echo ""
+    echo "Run 'bin/today' to get AI recommendations based on this data"
+}
+
+# Handle command line arguments
+case "${1:-}" in
+    issues)
+        init_database
+        sync_github_issues
+        ;;
+    errors)
+        init_database
+        sync_honeybadger_faults
+        ;;
+    performance)
+        init_database
+        sync_scout_metrics
+        ;;
+    summary)
+        generate_summary
+        ;;
+    *)
+        main
+        ;;
+esac
