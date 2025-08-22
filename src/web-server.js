@@ -702,6 +702,7 @@ async function renderMarkdown(filePath, urlPath) {
           data-line="${checkbox.lineNumber}" 
           ${checkbox.isChecked ? 'checked' : ''} 
           onchange="toggleCheckbox(this, ${checkbox.lineNumber}, event)" 
+          onclick="event.stopPropagation();" 
           style="cursor: pointer;">`;
       }
       return match;
@@ -902,21 +903,41 @@ async function renderMarkdown(filePath, urlPath) {
           addChatBubble(message, 'user');
           input.value = '';
           
-          // Show typing indicator
+          // Show typing indicator with timer
           const typingIndicator = document.createElement('div');
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
+          const startTime = Date.now();
+          
+          // Create initial HTML
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Typing...</small>
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
               <div class="d-flex align-items-center">
                 <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
-                <span class="text-muted">Thinking...</span>
+                <span class="text-muted" id="ai-timer">0 seconds</span>
               </div>
             </div>
           \`;
           document.getElementById('chatMessages').appendChild(typingIndicator);
+          
+          // Update timer every second
+          const timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const timerElement = document.getElementById('ai-timer');
+            if (timerElement) {
+              if (elapsed < 60) {
+                timerElement.textContent = \`\${elapsed} second\${elapsed !== 1 ? 's' : ''}\`;
+              } else {
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                timerElement.textContent = \`\${minutes}:\${seconds.toString().padStart(2, '0')}\`;
+              }
+            } else {
+              clearInterval(timerInterval);
+            }
+          }, 1000);
           
           try {
             // Get the markdown content
@@ -938,7 +959,8 @@ async function renderMarkdown(filePath, urlPath) {
             
             const data = await response.json();
             
-            // Remove typing indicator
+            // Remove typing indicator and clear timer
+            clearInterval(timerInterval);
             typingIndicator.remove();
             
             // Add AI response
@@ -951,6 +973,7 @@ async function renderMarkdown(filePath, urlPath) {
             
           } catch (error) {
             console.error('Error sending message:', error);
+            clearInterval(timerInterval);
             typingIndicator.remove();
             
             let errorMessage = 'Sorry, I encountered an error. ';
@@ -1047,19 +1070,8 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // Fix for details elements - run immediately, not on DOMContentLoaded
-        // since the script runs at the end of the body
-        document.querySelectorAll('details').forEach(details => {
-          // Let details work naturally, don't interfere
-          details.removeAttribute('onclick');
-        });
-        
-        // Handle checkboxes to prevent bubbling
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-          cb.addEventListener('click', function(e) {
-            e.stopPropagation();
-          });
-        });
+        // No need to do anything special for details elements
+        // The onclick="event.stopPropagation()" on checkboxes handles it
         
         function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
