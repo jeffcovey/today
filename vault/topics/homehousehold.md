@@ -13,9 +13,9 @@ Tasks and projects related to Homehousehold.
 
 ### No Date Set
 
-- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Close old credit cards <!-- task-id: 760731c4e9d46b922da93c1a310eec93 -->
+- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
 - [ ] Add the two house projects to the projects page <!-- task-id: 24ff5418368c2a95bd2971ab1af39e3c -->
 - [ ] Add vacuum to Alexa <!-- task-id: d8b4dfcb281850588fad0aa78317a6ed -->
 - [ ] Adjust the float in the fountain <!-- task-id: 711f66d7ddeec2e6cd2ecc340e70436a -->

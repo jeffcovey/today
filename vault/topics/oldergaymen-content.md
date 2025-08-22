@@ -14,7 +14,6 @@ Tasks and projects related to Oldergaymen Content.
 ### No Date Set
 
 - [ ] Check that page comments show in public activity <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
-- [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] A Guide to Finding an LGBTQ+ Inclusive Long-Term Care Community – SAGE <!-- task-id: 1b82a9fa1f8bef0b2a9fcab414e8feb9 -->
 - [ ] AI images <!-- task-id: 95b911487eb1d3629d87cd21af3e836e -->
@@ -26,6 +25,7 @@ Tasks and projects related to Oldergaymen Content.
 - [ ] Celebration Info - A Celebration of Friends <!-- task-id: 77f2dd463baa9d40112208c2b79add48 -->
 - [ ] Check Great Grand story <!-- task-id: 7c317c6b4da4986deeb3a263eefd0fd2 -->
 - [ ] Check https://x.com/charliecgood?s=11&t=ec0Et6qVODxQPvd5kBaeAw <!-- task-id: dd061c9ab83a83e90c24084ea1c299fb -->
+- [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
 - [ ] Check that we're porting comments with posted_at unless it's comment 1; run script until then <!-- task-id: fdb2da76782b569281c006f37701443e -->
 - [ ] Check the text of recently updated groups And places <!-- task-id: 205802c5cae66b9d1d74032c3aa63b08 -->
 - [ ] Consistently format phone numbers, current and going forward <!-- task-id: a77e0d90125a38d19941d08cf1a3430a -->
