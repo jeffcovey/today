@@ -871,15 +871,20 @@ async function renderMarkdown(filePath, urlPath) {
           // Render markdown using marked
           const renderedContent = marked.parse(message);
           
-          bubble.innerHTML = \`
+          let bubbleHtml = \`
             <div class="bubble-content">
               <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
               <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
-              \${replyTime ? \`<small class="d-block mt-1" style="opacity: 0.4; font-size: 0.55rem; font-style: italic;">Replied in \${replyTime}</small>\` : ''}
-            </div>
           \`;
+          
+          if (replyTime) {
+            bubbleHtml += \`<small class="d-block mt-1" style="opacity: 0.4; font-size: 0.55rem; font-style: italic;">Replied in \${replyTime}</small>\`;
+          }
+          
+          bubbleHtml += \`</div>\`;
+          bubble.innerHTML = bubbleHtml;
           
           chatMessages.appendChild(bubble);
           chatMessages.scrollTop = chatMessages.scrollHeight;
