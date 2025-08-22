@@ -607,6 +607,7 @@ async function renderEditor(filePath, urlPath) {
 
 // Markdown rendering
 async function renderMarkdown(filePath, urlPath) {
+  console.log('[DEBUG] renderMarkdown called for:', urlPath);
   const content = await fs.readFile(filePath, 'utf-8');
   const lines = content.split('\n');
   
@@ -657,7 +658,7 @@ async function renderMarkdown(filePath, urlPath) {
     }
   });
   
-  return `
+  const html = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -951,6 +952,9 @@ async function renderMarkdown(filePath, urlPath) {
     </body>
     </html>
   `;
+  
+  console.log('[DEBUG] HTML includes chatMessages:', html.includes('chatMessages'));
+  return html;
 }
 
 // AI Chat route handler  
