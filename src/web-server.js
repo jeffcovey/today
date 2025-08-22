@@ -190,15 +190,32 @@ const pageStyle = `
     max-width: 70%;
     margin-bottom: 1rem;
     word-wrap: break-word;
-    padding: 0.75rem;
-    border-radius: 1rem;
+    padding: 0.75rem !important;
+    border-radius: 1rem !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    border: none !important;
   }
   
   .chat-bubble.user {
     margin-left: auto;
-    background: #007bff;
-    color: white;
+    background: #007bff !important;
+    color: white !important;
+  }
+  
+  /* Override any nested card styles */
+  .chat-bubble .card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .chat-bubble.user .card {
+    background: transparent !important;
+    color: white !important;
+  }
+  
+  .chat-bubble .card-body {
+    padding: 0 !important;
   }
   
   .chat-bubble.user .markdown-content,
@@ -214,8 +231,12 @@ const pageStyle = `
   }
   
   .chat-bubble.assistant {
-    background: #f8f9fa;
-    color: #212529;
+    background: #f8f9fa !important;
+    color: #212529 !important;
+  }
+  
+  .chat-bubble.assistant .card {
+    background: transparent !important;
   }
   
   .bubble-content {
