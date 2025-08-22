@@ -717,17 +717,19 @@ async function renderMarkdown(filePath, urlPath) {
       
       <script>
         // Chat functionality
-        // Version 3: Simple bubbles without Bootstrap card classes
-        const CHAT_VERSION = 3;
+        // Version 4: Force clear all old chat to fix structure
+        const CHAT_VERSION = 4;
         const storedVersion = localStorage.getItem('chatVersion');
         if (storedVersion !== String(CHAT_VERSION)) {
-          // Clear old format chat history
+          // Clear ALL chat-related data
           Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('chatHistory_')) {
+            if (key.startsWith('chatHistory_') || key === 'inputHistory') {
               localStorage.removeItem(key);
             }
           });
           localStorage.setItem('chatVersion', String(CHAT_VERSION));
+          // Force page refresh to ensure clean start
+          window.location.reload();
         }
         
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory_${urlPath}') || '[]');
