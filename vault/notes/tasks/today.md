@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 6:00:20 PM EDT*
+*Generated: 8/22/2025, 6:10:19 PM EDT*
 
 ## Next Up
 
@@ -10,8 +10,34 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (604 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (608 tasks completed)</summary>
 
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d6154a341d000bc20a9213f6e6e595e5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0871523ac7960c18801d27ffbb97b6dd -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bc3b5f70c2757c0183f5b1ce519f8e12 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6e9f296562110299a95891f88053690e -->
+- [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 2efb9f2a6c6699a6b3ea8afb664a829d -->
+- [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 0edde96d8fae958e90824affbfe297d0 -->
+- [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: abf9e37dc4f9bfacf252dafa0c8f205e -->
+- [x] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 5655dbbfe1809bf071fae3f6571229ba -->
+- [x] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 58cc4c480e11e69c329218d965d697f8 -->
+- [x] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: f559a9c4752979213cad651738e6b725 -->
+- [x] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 1ee6839611ef006f19721d72707686f5 -->
+- [x] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 2fca38e41f574aed54048de7adae5b9d -->
+- [x] **🔒 Lock the doors** - Secure the house <!-- task-id: 533412471d9682f61c95ea6bba68144c -->
+- [x] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 630bee85498992cf798ffc36c1b07d9a -->
+- [x] **💊 Finish taking your pills** - Complete medications <!-- task-id: 52ed9f77622c22a2b29bc0273e2611f3 -->
+- [x] Call Pest Control (carry over from yesterday) <!-- task-id: 51f2e74086ad1ce762773461413da4df -->
+- [x] Quick OGM social media check <!-- task-id: c4ad7c3fcc81b3169e376ddf3769e8bc -->
+- [x] Review DigitalOcean welcome materials <!-- task-id: 9a58735a2ceabd7dde9551d1e3ede82e -->
+- [x] **Notifications** - Phone & computer <!-- task-id: 42439e6de9ecb74e2287648fe796cc2e -->
+- [x] **App badges** - Clear all red dots <!-- task-id: 35745496048dc01ae0cf4c6b760be30d -->
+- [x] **(https://app.frontapp.com/)** - Customer support <!-- task-id: 074efa108dc37fe99743fb7e5c6e5ec7 -->
+- [x] **(https://talk.oldergay.men)** - Community messages <!-- task-id: 5f3ac5115bda07d19c159bfbbd9f0fff -->
+- [x] **Drafts** - Process pending notes <!-- task-id: cb4bd772943843fc2cc3c82c235aa4c3 -->
+- [x] **Apple Reminders** - Review tasks <!-- task-id: 384c9af292e103d5cf105cf01b904ccd -->
+- [x] **Paper notes** - Physical inbox <!-- task-id: 6b32ce2b4055301af3ab628ad50f5276 -->
+- [x] **Calendar** - Re iew today's schedule <!-- task-id: 7cfb1eaeab70722939900953b4442041 -->
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
 - [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
@@ -314,23 +340,9 @@
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 57909f0b986a6204c989d1e94f3642da -->
 - [x] **🎯 Work on a project** - Start with something meaningful <!-- task-id: 9121a0535cd4334f6bf0ea7da1ee6fb8 -->
 - [x] **🙏 Record what you’re grateful for** - Set a positive tone <!-- task-id: 979aed47b906ba81a856c68ae1af29de -->
-- [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 2efb9f2a6c6699a6b3ea8afb664a829d -->
 - [x] **✍️ Journal** - Process and reflect <!-- task-id: 7e5a5946ab53fab5b6899ee32084ff9e -->
 - [x] Empty inboxes <!-- task-id: 465e6eb8a38b0f1e3b3f63298f6def86 -->
-- [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 0edde96d8fae958e90824affbfe297d0 -->
-- [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: abf9e37dc4f9bfacf252dafa0c8f205e -->
-- [x] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 5655dbbfe1809bf071fae3f6571229ba -->
-- [x] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 58cc4c480e11e69c329218d965d697f8 -->
-- [x] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: f559a9c4752979213cad651738e6b725 -->
-- [x] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 1ee6839611ef006f19721d72707686f5 -->
-- [x] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 2fca38e41f574aed54048de7adae5b9d -->
-- [x] **🔒 Lock the doors** - Secure the house <!-- task-id: 533412471d9682f61c95ea6bba68144c -->
-- [x] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 630bee85498992cf798ffc36c1b07d9a -->
-- [x] **💊 Finish taking your pills** - Complete medications <!-- task-id: 52ed9f77622c22a2b29bc0273e2611f3 -->
-- [x] Call Pest Control (carry over from yesterday) <!-- task-id: 51f2e74086ad1ce762773461413da4df -->
-- [x] Quick OGM social media check <!-- task-id: c4ad7c3fcc81b3169e376ddf3769e8bc -->
 - [x] Reply to "gator" on OGM <!-- task-id: 6875e66a96b0d996e807178a17ed3144 -->
-- [x] Review DigitalOcean welcome materials <!-- task-id: 9a58735a2ceabd7dde9551d1e3ede82e -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0a8edb7d3e05efc2534f51bcd007b0f2 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0225550e01fa4aebaf1ca10902454178 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 58bd8ff7edcfcd6b76dcb519fae8b707 -->
@@ -341,15 +353,7 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3e48c8cbf650908c7e63bae13f771e38 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b813ae6be02805a556564cf6d0cbce50 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6215e0ece6f8b7bb821e6398998f3b5a -->
-- [x] **Notifications** - Phone & computer <!-- task-id: 42439e6de9ecb74e2287648fe796cc2e -->
-- [x] **App badges** - Clear all red dots <!-- task-id: 35745496048dc01ae0cf4c6b760be30d -->
-- [x] **(https://app.frontapp.com/)** - Customer support <!-- task-id: 074efa108dc37fe99743fb7e5c6e5ec7 -->
-- [x] **(https://talk.oldergay.men)** - Community messages <!-- task-id: 5f3ac5115bda07d19c159bfbbd9f0fff -->
-- [x] **Drafts** - Process pending notes <!-- task-id: cb4bd772943843fc2cc3c82c235aa4c3 -->
 - [x] **Voicemail** - Check phone messages <!-- task-id: 23bdf2efcbddc41a61c696d4c4ea66c8 -->
-- [x] **Apple Reminders** - Review tasks <!-- task-id: 384c9af292e103d5cf105cf01b904ccd -->
-- [x] **Paper notes** - Physical inbox <!-- task-id: 6b32ce2b4055301af3ab628ad50f5276 -->
-- [x] **Calendar** - Re iew today's schedule <!-- task-id: 7cfb1eaeab70722939900953b4442041 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9a6e34b2da47f1cb3a90d0dadf15434c -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2515223977117aaab72bfdcb22859d5a -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 97f2e3367c0df788a44fdebc84376fea -->
