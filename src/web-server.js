@@ -37,30 +37,33 @@ const users = {};
 users[process.env.WEB_USER || 'admin'] = process.env.WEB_PASSWORD || 'changeme';
 
 // Custom auth middleware that checks session first
+const authMiddleware = basicAuth({
+  users,
+  challenge: true,
+  realm: 'Today Vault',
+  authorizeAsync: true,
+  authorizer: (username, password, callback) => {
+    const userMatches = basicAuth.safeCompare(username, process.env.WEB_USER || 'admin');
+    const passwordMatches = basicAuth.safeCompare(password, users[username] || '');
+    callback(null, userMatches && passwordMatches);
+  }
+});
+
 app.use((req, res, next) => {
   // If already authenticated in session, skip basic auth
   if (req.session && req.session.authenticated) {
     return next();
   }
   
-  // Otherwise use basic auth
-  basicAuth({
-    users,
-    challenge: true,
-    realm: 'Today Vault',
-    authorizer: (username, password) => {
-      const userMatches = basicAuth.safeCompare(username, process.env.WEB_USER || 'admin');
-      const passwordMatches = basicAuth.safeCompare(password, users[username] || '');
-      
-      if (userMatches && passwordMatches) {
-        // Store authentication in session
-        req.session.authenticated = true;
-        req.session.username = username;
-        return true;
-      }
-      return false;
+  // Otherwise use basic auth and save to session on success
+  authMiddleware(req, res, (err) => {
+    if (!err && req.auth) {
+      // Authentication successful, save to session
+      req.session.authenticated = true;
+      req.session.username = req.auth.user;
     }
-  })(req, res, next);
+    next(err);
+  });
 });
 
 // Serve static CSS
@@ -166,6 +169,152 @@ const pageStyle = `
     
     .container-fluid {
       padding: 0.5rem;
+    }
+  }
+  
+  /* Chat interface styles */
+  .chat-container {
+    height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    background: #f8f9fa;
+  }
+  
+  .chat-bubble {
+    max-width: 70%;
+    margin-bottom: 1rem;
+    word-wrap: break-word;
+    padding: 0.75rem;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  
+  .chat-bubble.user {
+    margin-left: auto;
+    background: #007bff;
+    color: white;
+  }
+  
+  .chat-bubble.user .markdown-content,
+  .chat-bubble.user .markdown-content p,
+  .chat-bubble.user .markdown-content li,
+  .chat-bubble.user .markdown-content h1,
+  .chat-bubble.user .markdown-content h2,
+  .chat-bubble.user .markdown-content h3,
+  .chat-bubble.user .markdown-content h4,
+  .chat-bubble.user .markdown-content h5,
+  .chat-bubble.user .markdown-content h6 {
+    color: white !important;
+  }
+  
+  .chat-bubble.assistant {
+    background: #f8f9fa;
+    color: #212529;
+  }
+  
+  .bubble-content {
+    /* Content styling for the bubble */
+  }
+  
+  /* Markdown content styling in chat */
+  .markdown-content {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  
+  .markdown-content p {
+    margin-bottom: 0.5rem;
+  }
+  
+  .markdown-content p:last-child {
+    margin-bottom: 0;
+  }
+  
+  .markdown-content code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+  }
+  
+  .chat-bubble.user .markdown-content code {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .markdown-content pre {
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  
+  .chat-bubble.user .markdown-content pre {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .markdown-content ul, .markdown-content ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .markdown-content li {
+    margin: 0.25rem 0;
+  }
+  
+  .markdown-content blockquote {
+    border-left: 3px solid #007bff;
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+    color: #6c757d;
+  }
+  
+  .chat-bubble.user .markdown-content blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+  }
+  
+  .markdown-content h1, .markdown-content h2, .markdown-content h3, 
+  .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  
+  .markdown-content a {
+    color: #007bff;
+    text-decoration: underline;
+  }
+  
+  .chat-bubble.user .markdown-content a {
+    color: #bbdefb;
+  }
+  
+  .chat-input-area {
+    border-top: 1px solid #dee2e6;
+    padding: 1rem;
+    background: white;
+  }
+  
+  .content-area {
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+  
+  @media (max-width: 768px) {
+    .chat-container {
+      height: 40vh;
+    }
+    
+    .content-area {
+      height: auto;
+      max-height: 50vh;
     }
   }
 </style>
@@ -509,8 +658,8 @@ async function renderMarkdown(filePath, urlPath) {
         </div>
       </nav>
 
-      <!-- Main content -->
-      <div class="container mt-4">
+      <!-- Main content with chat -->
+      <div class="container-fluid mt-3">
         <!-- Breadcrumb -->
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -518,18 +667,219 @@ async function renderMarkdown(filePath, urlPath) {
           </ol>
         </nav>
 
-        <!-- Markdown content -->
-        <div class="card shadow-sm">
-          <div class="card-body markdown-content">
-            ${htmlContent}
+        <div class="row">
+          <!-- Content column -->
+          <div class="col-12 col-lg-7 mb-3">
+            <div class="card shadow-sm h-100">
+              <div class="card-body content-area">
+                <div class="markdown-content">
+                  ${htmlContent}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Chat column -->
+          <div class="col-12 col-lg-5 mb-3">
+            <div class="card shadow-sm">
+              <div class="card-header bg-primary text-white">
+                <i class="fas fa-robot me-2"></i>AI Assistant
+              </div>
+              <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                  <div class="text-center text-muted p-3">
+                    <small>Start a conversation about this document</small>
+                  </div>
+                </div>
+                <div class="chat-input-area">
+                  <div class="input-group">
+                    <input type="text" 
+                      class="form-control" 
+                      id="chatInput" 
+                      placeholder="Type your message or /clear to reset..."
+                      onkeypress="if(event.key==='Enter')sendMessage()">
+                    <button class="btn btn-primary" onclick="sendMessage()">
+                      <i class="fas fa-paper-plane"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- Marked.js for markdown rendering -->
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
       <script>
+        // Chat functionality
+        // Version 3: Simple bubbles without Bootstrap card classes
+        const CHAT_VERSION = 3;
+        const storedVersion = localStorage.getItem('chatVersion');
+        if (storedVersion !== String(CHAT_VERSION)) {
+          // Clear old format chat history
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('chatHistory_')) {
+              localStorage.removeItem(key);
+            }
+          });
+          localStorage.setItem('chatVersion', String(CHAT_VERSION));
+        }
+        
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory_${urlPath}') || '[]');
+        let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
+        let historyIndex = -1;
+        
+        // Load existing chat messages
+        function loadChatHistory() {
+          const chatMessages = document.getElementById('chatMessages');
+          if (chatHistory.length > 0) {
+            chatMessages.innerHTML = '';
+            chatHistory.forEach(msg => {
+              addChatBubble(msg.content, msg.role, false);
+            });
+          }
+        }
+        
+        // Add a chat bubble to the interface
+        function addChatBubble(message, role, save = true) {
+          const chatMessages = document.getElementById('chatMessages');
+          const bubble = document.createElement('div');
+          bubble.className = \`chat-bubble \${role}\`;
+          
+          const timestamp = new Date().toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          
+          // Render markdown using marked
+          const renderedContent = marked.parse(message);
+          
+          bubble.innerHTML = \`
+            <div class="bubble-content">
+              <small class="d-block mb-1" style="opacity: 0.7;">
+                \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
+              </small>
+              <div class="markdown-content">\${renderedContent}</div>
+            </div>
+          \`;
+          
+          chatMessages.appendChild(bubble);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          
+          if (save) {
+            chatHistory.push({
+              role: role,
+              content: message,
+              timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('chatHistory_${urlPath}', JSON.stringify(chatHistory));
+          }
+        }
+        
+        // Send message to AI
+        async function sendMessage() {
+          const input = document.getElementById('chatInput');
+          const message = input.value.trim();
+          
+          if (!message) return;
+          
+          // Handle /clear command
+          if (message === '/clear') {
+            chatHistory = [];
+            localStorage.removeItem('chatHistory_${urlPath}');
+            document.getElementById('chatMessages').innerHTML = \`
+              <div class="text-center text-muted p-3">
+                <small>Conversation cleared. Start fresh!</small>
+              </div>
+            \`;
+            input.value = '';
+            return;
+          }
+          
+          // Add to input history
+          inputHistory.unshift(message);
+          inputHistory = inputHistory.slice(0, 50); // Keep last 50
+          localStorage.setItem('inputHistory', JSON.stringify(inputHistory));
+          historyIndex = -1;
+          
+          // Add user message
+          addChatBubble(message, 'user');
+          input.value = '';
+          
+          // Show typing indicator
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'chat-bubble assistant typing-indicator';
+          typingIndicator.innerHTML = \`
+            <div class="bubble-content">
+              <div class="spinner-grow spinner-grow-sm me-1" role="status"></div>
+              <div class="spinner-grow spinner-grow-sm me-1" role="status"></div>
+              <div class="spinner-grow spinner-grow-sm" role="status"></div>
+            </div>
+          \`;
+          document.getElementById('chatMessages').appendChild(typingIndicator);
+          
+          try {
+            // Get the markdown content
+            const markdownContent = document.querySelector('.markdown-content').innerText || '';
+            
+            const response = await fetch('/ai-chat/${urlPath}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: message,
+                history: chatHistory,
+                documentContent: markdownContent
+              })
+            });
+            
+            if (!response.ok) throw new Error('Failed to get AI response');
+            
+            const data = await response.json();
+            
+            // Remove typing indicator
+            typingIndicator.remove();
+            
+            // Add AI response
+            addChatBubble(data.response, 'assistant');
+            
+          } catch (error) {
+            console.error('Error:', error);
+            typingIndicator.remove();
+            addChatBubble('Sorry, I encountered an error. Please try again.', 'assistant');
+          }
+        }
+        
+        // Handle input history with arrow keys
+        document.getElementById('chatInput').addEventListener('keydown', function(e) {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex < inputHistory.length - 1) {
+              historyIndex++;
+              this.value = inputHistory[historyIndex];
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+              historyIndex--;
+              this.value = inputHistory[historyIndex];
+            } else if (historyIndex === 0) {
+              historyIndex = -1;
+              this.value = '';
+            }
+          }
+        });
+        
+        // Load chat history on page load
+        loadChatHistory();
+        
         function toggleCheckbox(checkbox, lineNumber) {
           const isChecked = checkbox.checked;
           
@@ -579,6 +929,101 @@ async function renderMarkdown(filePath, urlPath) {
     </html>
   `;
 }
+
+// AI Chat route handler  
+app.post('/ai-chat/*', async (req, res) => {
+  try {
+    const urlPath = req.path.slice(9); // Remove '/ai-chat/' prefix
+    const { message, history, documentContent } = req.body;
+    
+    // Build conversation for Claude
+    let conversation = "You are an AI assistant helping with a markdown document. ";
+    conversation += "The user is viewing this document:\n\n";
+    conversation += "---DOCUMENT CONTENT---\n";
+    conversation += documentContent || "(No document content available)";
+    conversation += "\n---END DOCUMENT---\n\n";
+    
+    if (history && history.length > 0) {
+      conversation += "Previous conversation:\n";
+      history.forEach(msg => {
+        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+      });
+      conversation += "\n";
+    }
+    
+    conversation += `User: ${message}\n`;
+    conversation += "Assistant: ";
+    
+    // Call Claude using the claude CLI
+    const { spawn } = await import('child_process');
+    
+    try {
+      // Debug logging
+      console.log('[AI Chat] Starting Claude execution...');
+      console.log('[AI Chat] Working directory:', process.cwd());
+      console.log('[AI Chat] Conversation length:', conversation.length);
+      console.log('[AI Chat] First 200 chars of conversation:', conversation.substring(0, 200));
+      
+      // Use spawn to properly pipe input to claude --print
+      const claude = spawn('claude', ['--print'], {
+        cwd: process.cwd(),
+        timeout: 30000 // 30 second timeout
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      claude.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      claude.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      // Write the conversation to stdin
+      claude.stdin.write(conversation);
+      claude.stdin.end();
+      
+      // Wait for the process to complete
+      await new Promise((resolve, reject) => {
+        claude.on('close', (code) => {
+          console.log('[AI Chat] Claude process exited with code:', code);
+          console.log('[AI Chat] stdout length:', stdout.length);
+          console.log('[AI Chat] stderr:', stderr || '(none)');
+          
+          if (code !== 0) {
+            console.error('[AI Chat] Claude failed with code:', code);
+            console.error('[AI Chat] stderr:', stderr);
+            reject(new Error(`Claude exited with code ${code}`));
+          } else {
+            resolve();
+          }
+        });
+        
+        claude.on('error', (err) => {
+          console.error('[AI Chat] Failed to start Claude:', err);
+          reject(err);
+        });
+      });
+      
+      res.json({ response: stdout.trim() });
+    } catch (error) {
+      console.error('[AI Chat] Error calling Claude:', error);
+      
+      res.json({ 
+        response: "I'm having trouble connecting to the AI service. Please try again later." 
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error in AI chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      response: 'An error occurred while processing your request.' 
+    });
+  }
+});
 
 // Edit route handler
 app.get('/edit/*', async (req, res) => {
