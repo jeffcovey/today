@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (991 tasks)</summary>
+<summary><strong>General Tasks</strong> (1006 tasks)</summary>
 
 ### Yesterday - Thursday, Aug 21
 
@@ -21,6 +21,19 @@
 
 - [ ] Check and restart Honeybadger production errors <!-- task-id: 402b6abf2877434a17058c9ca62625de -->
 - [ ] Check Honeybadger production errors (#12285, #12286) <!-- task-id: 8082af772ca5f368963fdf3ad764290b -->
+
+### Invalid Date, Invalid Date
+
+- [ ] Close Streaks <!-- task-id: 0a18e06f0cc3b1f580bbc7d9fe106d20 -->
+- [ ] Feed Buster <!-- task-id: 9740591730ba7220533116145ea593ab -->
+- [ ] Finish meal tracking <!-- task-id: 458975d301a51d944425d3c6e4ef3560 -->
+- [ ] Finish taking your pills <!-- task-id: c91105a52174b4cada6cf218cf623971 -->
+- [ ] Lock the doors <!-- task-id: 019a1753f566d4994f660d3f04bd733c -->
+- [ ] Prepare coffee <!-- task-id: c523c2bd44c76f50fad0939572cf7993 -->
+- [ ] Report the day's work to OGM <!-- task-id: 8b4f1a00ed54dbf594eccf83764e35bb -->
+- [ ] Set top three priorities for tomorrow <!-- task-id: 91063a1569cdf6f0c7467828fa1b7ff9 -->
+- [ ] Start the fasting timer <!-- task-id: 5747dfb09f6575412d42dc4f2804b8b5 -->
+- [ ] Tidy <!-- task-id: 6cc7078016e5a04a4c3ab0b2ee427ed2 -->
 
 ### No Date Set
 
@@ -150,6 +163,7 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2180fb5fee3e2b5d5b12b9f7077e3cd9 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: aa918b3d50c676257db07b2d2cc5624b -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ead502abf07ef5b05dbdda1f944bf951 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: be8a9eef495c5ee3af6970ef7b94011f -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -165,6 +179,7 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b41880390ce831253b481c5b1dbbb5bc -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2c74712dfe7b072183384c68c857c943 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 139834dd623a6c736cdf931473e60f3e -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: dcb1a9f7ef70425a957da4d0fa562cc4 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -243,6 +258,7 @@
 - [ ] Sustainable routine established <!-- task-id: 43f3f4879cdfbd1625c04f996e7dda98 -->
 - [ ] Target: Maximum 14 units per week <!-- task-id: b50ce20f988a36e264e0171c40da81a4 -->
 - [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
+- [ ] Tell TODAY to summarize toggl from yesterday <!-- task-id: 03a670ee2f4b3c026e8338c1eabfbf49 -->
 - [ ] Track how you feel next morning <!-- task-id: 4757f1860e0ab2316ade44186bd518de -->
 - [ ] Track medication effectiveness <!-- task-id: 5b76edda855c11cca0b901d7784a11f1 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
@@ -264,10 +280,12 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c513a337863b0d165cf7241e6be851ce -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a13a9e7fa1ac874793edb41f446318d2 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 96514b8e3366f3c3fafb48055ccd6f33 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5699824765a455ad5ba94ad4db2692b9 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8268fb866f34ed9f34a389d6f8dc46bd -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a41a7f809b34b41d13b40e41710d894c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fb7b7a9be3bff04c3549af16045d0f76 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7e9ffbde24548c6ee13948e2083c7ecd -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -1193,4 +1211,3 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
-- [ ] Tell TODAY to summarize toggl from yesterday
