@@ -135,7 +135,8 @@
       "Bash(npx dotenvx:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(fly logs:*)",
-      "WebFetch(domain:www.poolbuildersinc.com)"
+      "WebFetch(domain:www.poolbuildersinc.com)",
+      "WebFetch(domain:mdbootstrap.com)"
     ],
     "deny": []
   }
