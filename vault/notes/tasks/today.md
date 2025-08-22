@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 7:28:47 AM EDT*
+*Generated: 8/22/2025, 7:44:04 AM EDT*
 
 ## Next Up
 
@@ -13,8 +13,13 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (465 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (470 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 46dd898b9ba6f91ac2dde81e67608ed3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d37b74309c23a5ae1023f472e904ebe5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b50c624c034a42309f3d45cf58d041ac -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: de423ecde44120d4ba4307f93485d990 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1ab8006636b78a3ae666eca40e93488b -->
 - [x] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
 - [x] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
 - [x] Read Saved Articles (2m 30s) <!-- task-id: read-articles --> <!-- task-id: f376f1439a33ea98c4f3828bb7f62c61 -->

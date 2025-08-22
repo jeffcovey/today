@@ -2,10 +2,10 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/22/2025, 7:28:47 AM EDT*
+*Generated: 8/22/2025, 7:44:04 AM EDT*
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (50 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -14,6 +14,9 @@
 - [ ] Add a suggestion in the newsletter to set up video chat times <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
 - [ ] Email participants to remind them of chats <!-- task-id: 609834e53d5dee7ec696bab191fc8ed8 -->
 - [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
+- [ ] Reply to Daniel <!-- task-id: c4a0a7e06470f71c3b25aa68fa0a0bc8 -->
+- [ ] point members to forum for help <!-- task-id: ca69f11240892e620343e31eb69f5f34 -->
+- [ ] Reply to Melv <!-- task-id: ebc1246fb92978b8fe15859198ab89ab -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
 - [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
@@ -77,7 +80,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (360 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (392 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -88,6 +91,38 @@
 - [ ] Check MiniMagick mail <!-- task-id: 6172d3a7aeb2f087a8daf7ea051f9574 -->
 - [ ] Check that page comments show in public activity <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
 - [ ] Add a photo of the laundry room to all four listings <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
+- [ ] Register for the Prime Timers cruise <!-- task-id: 9db2640b1771a35e1ac39273ebe3bb9a -->
+- [ ] Fix Docker on Mac <!-- task-id: 0173622b8faf46359a4767632f3e7887 -->
+- [ ] see why some videos aren't playing <!-- task-id: 9195b78c197a55607d138540e5932347 -->
+- [ ] get Zero subscription <!-- task-id: 2f6095d940c8bbb8ad07ecdc30563d53 -->
+- [ ] stop unread notice covering up other flash messages <!-- task-id: 00ffbbe7eaef8f708d513d9b097a94b1 -->
+- [ ] On trip pages, pre-fill the topic when writing the traveler <!-- task-id: 69d338ecb6c7a955e058b9faedcd1ab5 -->
+- [ ] restore common marker and selma <!-- task-id: 086865437b9033e3d3a17ed4473e9509 -->
+- [ ] update Discourse profiles for members deleted or banned on OGM <!-- task-id: 78b0b805a46567df03a34877e653966e -->
+- [ ] Test all the possible content that can go into a newsletter <!-- task-id: a9a8dfc04413411b29177774722b04c5 -->
+- [ ] Price the cost of installing a cabana <!-- task-id: c0dd242dedf31d5cdaf19ec9ce6f9211 -->
+- [ ] Move more articles from General to In The News <!-- task-id: 9f1e5aa9b0ec9290a0cbea66e417e90c -->
+- [ ] Use more colored text in the newsletter <!-- task-id: e05e6b32f54220d5372e9537f06ddf45 -->
+- [ ] Move offline tracking to javascript, et al. <!-- task-id: da5e9a5d1f1b58914ef626e35dec75cb -->
+- [ ] Use a smaller search radius if we return many results <!-- task-id: d412411fe273e17ca08cdc5d74244d6f -->
+- [ ] fill the side bar with "add photos", "add video", etc. <!-- task-id: 5bb8e9839e1a4e75e1783bf98ee72322 -->
+- [ ] Put up a sign asking guests to use the path on the right side of the house <!-- task-id: 70b5f9c03a8055400c2828c4527e9df6 -->
+- [ ] Move the items in the closet out of view <!-- task-id: 5f60484640fab8b48f08a9bfbb2cb962 -->
+- [ ] trim the tree from the street <!-- task-id: c56f5c4afa8980d7991773f98f534940 -->
+- [ ] change the Sanitas password <!-- task-id: 44d5291600aa2fd68241e0eff09f95bb -->
+- [ ] Use JavaScript scrolling to go to the bottom of a conversation <!-- task-id: 23ba2bec32655640c3753b37e2af7922 -->
+- [ ] cache lat/long lookups? Incorporate in existing Locations model? <!-- task-id: ac4ee14751fed19bc7e9f606c9d9a08c -->
+- [ ] test location setting when you're not logged in <!-- task-id: 11e1754c8877aab251e5f978368d2c77 -->
+- [ ] Write minitest tests, stubbing and using the house sit software for button pressing <!-- task-id: 7d4445ac7f5c938f01862ef93b93056d -->
+- [ ] periodically check the links in the OlderGay.Men <head> <!-- task-id: e97ff1d879f11bb6f459cc3ba14dbdc3 -->
+- [ ] Include current location for User searches <!-- task-id: 488023f4ffe389d9b71a20f4868b74ba -->
+- [ ] upgrade the Pi <!-- task-id: 7033abb02d41fb09c11f2b198393b0a1 -->
+- [ ] See why links are still marked broken <!-- task-id: 0418c82510cdaa2b0038b7cf049f9372 -->
+- [ ] Price T-Mobile hotspot vs. iPad with cellular <!-- task-id: 497a5814b1778863060f26bebf55240a -->
+- [ ] Try remote screen with Pi <!-- task-id: 4cd5768d612a4b35dbf361dd5efd54be -->
+- [ ] Use closed and open envelopes for red and unread conversations <!-- task-id: 6344ac9637d03f2b19af65d82406e421 -->
+- [ ] Update WHOIS <!-- task-id: e0c4f76671696ee878bcac78c7af0605 -->
+- [ ] Replace the exhaust fan in the Bathroom <!-- task-id: ef4603fabffcc309de8d0a4ce8ef18df -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
@@ -459,12 +494,17 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (100 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (105 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
 ### General Tasks
 
+- [ ] log vaccines in apple health <!-- task-id: 59a6d8fec1c96ded2e349d5ed73fb1a4 -->
+- [ ] Subscribe to(https://www.starobserver.com.au/category/grey-matters) <!-- task-id: 0cf02d4c43b03d8007ab00cd63b00720 -->
+- [ ] Read the 12/24 PG newsletter <!-- task-id: e61ef456a4652f56f4dc09d5457f68cb -->
+- [ ] Listen to:(https://www.npr.org/2015/12/23/460851160/90-year-old-gay-man-recalls-long-struggle-with-his-sexuality) <!-- task-id: 9b9ed46420d442135a8b4812d8f5ee58 -->
+- [ ] cecil kellaway at DuckDuckGo <!-- task-id: 2a024ea8e060785e1bd816a5a8752c8a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
