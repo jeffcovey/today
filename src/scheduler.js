@@ -24,9 +24,13 @@ async function runCommand(command, description) {
     console.log(`\n[${timestamp}] Running: ${description}`);
     
     try {
+        // Use the correct working directory - /opt/today on DigitalOcean, /app on Fly
+        const cwd = fs.existsSync('/opt/today') ? '/opt/today' : '/app';
+        
         const { stdout, stderr } = await execAsync(command, {
-            cwd: '/app',
+            cwd: cwd,
             env: process.env,
+            shell: '/usr/bin/sh', // Explicitly use /usr/bin/sh instead of /bin/sh
             timeout: 10 * 60 * 1000 // 10 minute timeout
         });
         
