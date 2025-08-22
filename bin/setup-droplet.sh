@@ -62,6 +62,23 @@ echo "✅ Today app updated and restarted"
 EOF
 chmod +x /usr/local/bin/update-today
 
+# Setup tmux to default to /opt/today
+echo "⚙️ Configuring tmux..."
+cat > /root/.tmux.conf << 'EOF'
+# Default to /opt/today directory for new windows and panes
+set -g default-command 'cd /opt/today && exec bash'
+EOF
+
+# Setup convenient bash aliases
+echo "⚙️ Setting up bash aliases..."
+cat >> /root/.bashrc << 'EOF'
+
+# Today app aliases
+alias today='cd /opt/today'
+alias logs='journalctl -u today-scheduler -f'
+alias status='systemctl status today-scheduler'
+EOF
+
 echo "✅ Setup complete!"
 echo ""
 echo "Next steps:"

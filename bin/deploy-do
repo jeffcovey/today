@@ -102,6 +102,9 @@ case "$ACTION" in
         # Configure git user identity for commits
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'" 2>/dev/null || true
         
+        # Setup tmux config if not exists
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ ! -f ~/.tmux.conf ] && echo 'set -g default-command \"cd /opt/today && exec bash\"' > ~/.tmux.conf || true" 2>/dev/null || true
+        
         # Configure git to use GitHub token for authentication (if available)
         print_info "Configuring GitHub authentication..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npx dotenvx run -- bash -c 'if [ -n \"\$GITHUB_TOKEN\" ]; then echo \"https://\${GITHUB_TOKEN}:x-oauth-basic@github.com\" > ~/.git-credentials && git config --global credential.helper store && echo \"✓ GitHub token configured\"; fi'" 2>/dev/null || true
