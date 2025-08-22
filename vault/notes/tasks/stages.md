@@ -2,10 +2,10 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/22/2025, 9:28:35 AM EDT*
+*Generated: 8/22/2025, 1:00:15 PM EDT*
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (51 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -50,9 +50,7 @@
 - [ ] See Mr. Burton <!-- task-id: 1adceab45f7cc8955d1a9a9b77559e38 -->
 - [ ] Post a poll asking what weekday and times are good for chats <!-- task-id: 87db00c07ee06eacd7cda4225aa7a8ea -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
-- [ ] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
 - [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
-- [ ] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 
@@ -80,7 +78,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (392 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (391 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -344,7 +342,6 @@
 - [ ] Install first-party analytics <!-- task-id: adfaca2a4dcca1beb9d6aa4d953bc1ec -->
 - [ ] Look at fiber optic plans(https://www.att.com/buy/internet/plans) <!-- task-id: 84f1bfc91c630baf657eefbe07383b2e -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 - [ ] +Trip Prep <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: 86aa92c5cd90977e4ac7c3b88378d2bd -->
