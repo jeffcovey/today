@@ -701,7 +701,7 @@ async function renderMarkdown(filePath, urlPath) {
         return `<input type="checkbox" class="form-check-input me-2" 
           data-line="${checkbox.lineNumber}" 
           ${checkbox.isChecked ? 'checked' : ''} 
-          onchange="toggleCheckbox(this, ${checkbox.lineNumber})" 
+          onchange="toggleCheckbox(this, ${checkbox.lineNumber}, event)" 
           style="cursor: pointer;">`;
       }
       return match;
@@ -950,9 +950,17 @@ async function renderMarkdown(filePath, urlPath) {
             }
             
           } catch (error) {
-            console.error('Error:', error);
+            console.error('Error sending message:', error);
             typingIndicator.remove();
-            addChatBubble('Sorry, I encountered an error. Please try again.', 'assistant');
+            
+            let errorMessage = 'Sorry, I encountered an error. ';
+            if (error.message) {
+              errorMessage += error.message;
+            } else {
+              errorMessage += 'Please try again.';
+            }
+            
+            addChatBubble(errorMessage, 'assistant');
           }
         }
         
@@ -1006,9 +1014,16 @@ async function renderMarkdown(filePath, urlPath) {
               
               // Re-attach checkbox handlers
               currentContent.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-                checkbox.onchange = function() {
-                  toggleCheckbox(this, parseInt(this.dataset.line));
+                checkbox.onchange = function(e) {
+                  toggleCheckbox(this, parseInt(this.dataset.line), e);
                 };
+              });
+              
+              // Re-attach details/summary handlers
+              currentContent.querySelectorAll('details').forEach(details => {
+                details.addEventListener('toggle', function(e) {
+                  e.stopPropagation();
+                });
               });
               
               // Show notification
@@ -1032,32 +1047,27 @@ async function renderMarkdown(filePath, urlPath) {
           }
         }
         
-        // Prevent details elements from closing when interacting with their content
-        document.addEventListener('DOMContentLoaded', function() {
-          // Ensure details elements work properly
-          document.querySelectorAll('details').forEach(details => {
-            // Prevent any interference with native behavior
-            details.addEventListener('click', function(e) {
-              // Only toggle if clicking on summary or details itself, not content
-              if (e.target !== this && !e.target.matches('summary')) {
-                e.stopPropagation();
-              }
-            });
-          });
-          
-          // Also handle checkboxes inside details specially
-          document.querySelectorAll('details input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('click', function(e) {
-              e.stopPropagation();
-            });
+        // Fix for details elements - run immediately, not on DOMContentLoaded
+        // since the script runs at the end of the body
+        document.querySelectorAll('details').forEach(details => {
+          // Let details work naturally, don't interfere
+          details.removeAttribute('onclick');
+        });
+        
+        // Handle checkboxes to prevent bubbling
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+          cb.addEventListener('click', function(e) {
+            e.stopPropagation();
           });
         });
         
-        function toggleCheckbox(checkbox, lineNumber) {
+        function toggleCheckbox(checkbox, lineNumber, event) {
           const isChecked = checkbox.checked;
           
           // Prevent the details element from toggling when clicking checkbox
-          event.stopPropagation();
+          if (event) {
+            event.stopPropagation();
+          }
           
           // Disable the checkbox while saving
           checkbox.disabled = true;
