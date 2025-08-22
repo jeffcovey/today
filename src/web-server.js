@@ -188,9 +188,9 @@ const pageStyle = `
   
   .chat-bubble {
     max-width: 70%;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     word-wrap: break-word;
-    padding: 0.5rem 0.75rem !important;
+    padding: 0.4rem 0.6rem !important;
     border-radius: 1rem !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     border: none !important;
@@ -262,6 +262,27 @@ const pageStyle = `
   
   .bubble-content {
     /* Content styling for the bubble */
+  }
+  
+  /* Remove default margins from markdown elements inside bubbles */
+  .chat-bubble .markdown-content p:first-child,
+  .chat-bubble .markdown-content ul:first-child,
+  .chat-bubble .markdown-content ol:first-child,
+  .chat-bubble .markdown-content blockquote:first-child,
+  .chat-bubble .markdown-content pre:first-child {
+    margin-top: 0 !important;
+  }
+  
+  .chat-bubble .markdown-content p:last-child,
+  .chat-bubble .markdown-content ul:last-child,
+  .chat-bubble .markdown-content ol:last-child,
+  .chat-bubble .markdown-content blockquote:last-child,
+  .chat-bubble .markdown-content pre:last-child {
+    margin-bottom: 0 !important;
+  }
+  
+  .chat-bubble .markdown-content p {
+    margin: 0.3rem 0 !important;
   }
   
   /* Markdown content styling in chat */
@@ -807,10 +828,10 @@ async function renderMarkdown(filePath, urlPath) {
           
           bubble.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block mb-1" style="opacity: 0.7;">
+              <small class="d-block" style="opacity: 0.7; margin-bottom: 0.2rem; font-size: 0.75rem;">
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
-              <div class="markdown-content">\${renderedContent}</div>
+              <div class="markdown-content" style="margin: 0;">\${renderedContent}</div>
             </div>
           \`;
           
@@ -862,7 +883,7 @@ async function renderMarkdown(filePath, urlPath) {
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block mb-1" style="opacity: 0.7;">AI · Typing...</small>
+              <small class="d-block" style="opacity: 0.7; margin-bottom: 0.2rem; font-size: 0.75rem;">AI · Typing...</small>
               <div class="d-flex align-items-center">
                 <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
                   <span class="visually-hidden">Loading...</span>
