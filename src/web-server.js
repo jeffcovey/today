@@ -115,6 +115,40 @@ const pageStyle = `
 <style>
   /* Custom styles to complement MDBootstrap */
   
+  /* Table of Contents styles */
+  .table-of-contents {
+    background-color: #f0f4f8;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid #007bff;
+  }
+  
+  .table-of-contents summary {
+    cursor: pointer;
+    user-select: none;
+    color: #007bff;
+    font-weight: 500;
+  }
+  
+  .table-of-contents summary:hover {
+    color: #0056b3;
+  }
+  
+  .table-of-contents a {
+    color: #495057;
+    transition: color 0.2s;
+  }
+  
+  .table-of-contents a:hover {
+    color: #007bff;
+    text-decoration: underline;
+  }
+  
+  /* Smooth scrolling for anchor links */
+  html {
+    scroll-behavior: smooth;
+  }
+  
   /* Styles for collapse components that replace details elements */
   .collapse-header {
     transition: all 0.3s ease;
@@ -1628,6 +1662,57 @@ function createExternalLinkRenderer() {
   return renderer;
 }
 
+// Generate table of contents from markdown headings
+function generateTableOfContents(content) {
+  const headings = [];
+  const headingRegex = /^(#{2,6})\s+(.+)$/gm;
+  let match;
+  let headingId = 0;
+  
+  while ((match = headingRegex.exec(content)) !== null) {
+    const level = match[1].length;
+    const text = match[2].trim();
+    // Skip if heading is inside a details/summary block
+    const beforeMatch = content.substring(0, match.index);
+    const openDetails = (beforeMatch.match(/<details/gi) || []).length;
+    const closeDetails = (beforeMatch.match(/<\/details>/gi) || []).length;
+    if (openDetails > closeDetails) continue;
+    
+    headingId++;
+    const id = `heading-${headingId}`;
+    headings.push({ level, text, id });
+  }
+  
+  if (headings.length === 0) return { toc: '', contentWithIds: content };
+  
+  // Generate TOC HTML
+  let tocHtml = '<nav class="table-of-contents mb-4">\n';
+  tocHtml += '<details>\n';
+  tocHtml += '<summary class="h5 mb-3"><i class="fas fa-list me-2"></i>Table of Contents</summary>\n';
+  tocHtml += '<ul class="list-unstyled ms-3">\n';
+  
+  headings.forEach(heading => {
+    const indent = (heading.level - 2) * 20; // Start from h2, each level adds 20px
+    tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.5rem;">`;
+    tocHtml += `<a href="#${heading.id}" class="text-decoration-none">`;
+    tocHtml += heading.text;
+    tocHtml += '</a></li>\n';
+  });
+  
+  tocHtml += '</ul>\n';
+  tocHtml += '</details>\n';
+  tocHtml += '</nav>\n';
+  
+  // Add IDs to headings in content
+  headingId = 0;
+  const contentWithIds = content.replace(headingRegex, (match, hashes, text) => {
+    headingId++;
+    return `${hashes} <span id="heading-${headingId}"></span>${text}`;
+  });
+  
+  return { toc: tocHtml, contentWithIds };
+}
+
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
@@ -1644,9 +1729,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
     contentToRender = content.replace(/^# .+\n?/m, '');
   }
   
-  // Find all checkbox lines in the original content
+  // Generate table of contents
+  const { toc, contentWithIds } = generateTableOfContents(contentToRender);
+  contentToRender = contentWithIds;
+  
+  // Find all checkbox lines in the original content (use contentWithIds for correct line numbers)
   const checkboxLines = [];
-  lines.forEach((line, index) => {
+  const linesWithIds = contentWithIds.split('\n');
+  linesWithIds.forEach((line, index) => {
     if (line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
       checkboxLines.push({
         lineNumber: index,
@@ -1658,8 +1748,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // Use custom renderer for external links
   const renderer = createExternalLinkRenderer();
   
-  // Render the markdown with custom renderer (without the title if we extracted it)
+  // Render the markdown with custom renderer (with IDs added to headings)
   let htmlContent = marked(contentToRender, { renderer });
+  
+  // Prepend table of contents if there are headings
+  if (toc) {
+    htmlContent = toc + htmlContent;
+  }
   
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
