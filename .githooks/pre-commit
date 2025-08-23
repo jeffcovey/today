@@ -10,20 +10,19 @@ STAGED_JS=$(echo "$STAGED_FILES" | grep -E '^src/.*\.js$' || true)
 # Update file dates index for new markdown files
 bin/update-file-dates-index
 
-# Run markdownlint on staged markdown files
+# Auto-fix markdown files with markdownlint
 STAGED_MD=$(echo "$STAGED_FILES" | grep '\.md$' || true)
 
 if [ -n "$STAGED_MD" ]; then
-  echo "Running markdownlint on staged markdown files..."
-  npx markdownlint-cli2 $STAGED_MD
+  echo "Auto-fixing markdown files with markdownlint..."
+  npx markdownlint-cli2 --fix $STAGED_MD
   
-  if [ $? -ne 0 ]; then
-    echo ""
-    echo "❌ Markdown linting failed. Fix the issues above or run:"
-    echo "   npm run lint:md:fix"
-    echo ""
-    exit 1
-  fi
+  # Re-add the fixed files to the commit
+  for file in $STAGED_MD; do
+    git add "$file"
+  done
+  
+  echo "✅ Markdown files have been auto-fixed and staged"
 fi
 
 # Only run tests if source code changed
