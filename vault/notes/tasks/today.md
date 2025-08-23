@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/22/2025, 8:00:27 PM EDT*
+*Generated: 8/22/2025, 8:10:19 PM EDT*
 
 ## Next Up
 
@@ -10,12 +10,676 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (5 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (669 tasks completed)</summary>
 
+- [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
+- [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
+- [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
+- [x] Write review for Logan on Airbnb <!-- task-id: logan-review --> <!-- task-id: 8f647c392be3a23958e5f3b2ba1a7a58 -->
+- [x] Write review for Treasure on Airbnb <!-- task-id: treasure-review --> <!-- task-id: 850bff2478af974e97d1fc9ae382b7c5 -->
+- [x] Read Saved Articles (2m 30s) <!-- task-id: read-articles --> <!-- task-id: f376f1439a33ea98c4f3828bb7f62c61 -->
+- [x] Use The Inversion Table (for hip arthritis) <!-- task-id: inversion --> <!-- task-id: 72c95778f7fd06331f00077c4bcc67d4 -->
+- [x] Do Tai Chi Standing (4m) <!-- task-id: tai-chi --> <!-- task-id: cd9fcd24c4303ac898d07a1df315419c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: apple-fitness --> <!-- task-id: c89cadc6fd1012029606e935ec5d8061 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: burn-energy --> <!-- task-id: 37a055048915523fabbcb7e53f7e3e91 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: mindful --> <!-- task-id: f7503e5a4f617175bd7ba503902b9c51 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: tai-chi-watch --> <!-- task-id: 82fc51422e9875ec606f0b57f3f3b60e -->
+- [x] ♥︎ Activity Rings <!-- task-id: activity-rings --> <!-- task-id: d051837d4106813ab7c34cface0b708d -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: walk-steps --> <!-- task-id: 0be3d24c3493cc253aeab1cf462045f1 -->
+- [x] Reply to “gator” on OGM <!-- task-id: 663651fef31af42bd2899851e321ee99 -->
+- [x] Check Virgin Atlantic login issue (concern from yesterday) <!-- task-id: b30f0c860eb985e6d18c64afbd5b13fb -->
+- [x] **OGM Member Communications** - Still critical to address <!-- task-id: 82a9cd9462508262cc353c119d5e4a0a -->
+- [x] `getDatabases()` - Could cache longer (currently 5 minutes) <!-- task-id: 232074b4294eb45180106ee51dec0312 -->
+- [x] `getAllProjects()` - Uses cache but could be optimized <!-- task-id: 9e5895469b07a1383f51daf36b1806cd -->
+- [x] `getAllTags()` - Uses cache but could be optimized <!-- task-id: 31704203719975e5b87590923c1fb2da -->
+- [x] Update `task-manager.js` to use `database.js` <!-- task-id: 543f86da5b499197be8daf97cc6a6d21 -->
+- [x] Update `sync-scheduler.js` to use `database.js` <!-- task-id: 100051701a0f251eea58855638bad687 -->
+- [x] Update `sqlite-cache.js` to use `database.js` <!-- task-id: 1ee7cfac4ee063d33e384f15a62f6d2f -->
+- [x] Test all bin scripts with Turso <!-- task-id: 8df77e4b993ea351ff7938022acecd27 -->
+- [x] Update `.gitignore` if needed <!-- task-id: fc4fcdbc8082b9ca21e90140749a4097 -->
+- [x] Routine items (`getMorningRoutineItems()`, etc.) - Could use incremental sync <!-- task-id: d7daf94668c4744fab8671baa75f82e6 -->
+- [x] Check performance <!-- task-id: 4e9f4329ee463d0e2ae051966d7818af -->
+- [x] Set up GitHub Actions for CI/CD <!-- task-id: af645ecc1dfe3f1a4a1367985ee0f5af -->
+- [x] Add visual regression testing for UI components <!-- task-id: 2eb382043ea9051ea9ee2ea0738165fd -->
+- [x] Implement load testing for sync operations <!-- task-id: 136f7f86ca84face071a4e82331c9ff7 -->
+- [x] Add mutation testing to verify test quality <!-- task-id: b6ef433dc67e86270d152fcdfa61d50d -->
+- [x] Create test data generators <!-- task-id: ddb81f7995ac04ccb58b4db0ee3ffdd6 -->
+- [x] Set up test database seeding <!-- task-id: 80b65cd38d3823df2dba561c6f0a99dd -->
+- [x] add Toggl to Today <!-- task-id: f830829b6411725b72917ef2639f0a66 -->
+- [x] **Get cash from IRA** - Still marked as immediate priority <!-- task-id: 7d1fc78623987006db6f5ff9ab0d97c5 -->
+- [x] Read Saved Articles (2m 30s) - Quick win! <!-- task-id: 90b703fc6714598ebe55089fc9c38c1d -->
+- [x] Use The Inversion Table - For hip relief <!-- task-id: 5142e99a6d59508ac53640c0d748e308 -->
+- [x] Do Tai Chi Standing (3m 30s) <!-- task-id: 7d48e917f98fb61a1ce3b0c42cc455cd -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 9fab197111a7d5ba2d3ef186223c2020 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 099fcabf4bc884e9298b98e0b1e931d4 -->
+- [x] ♥︎ Mindful Minutes (40m) <!-- task-id: e4ea67a1eff2105c19d2efbb67ae7093 -->
+- [x] ♥︎ Tai Chi (1m on Apple Watch) <!-- task-id: fab56ace0aaca946e623b3fb5d36c706 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 030fed7a699d7dc55fe6758df0b77f07 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 414020d68928626eccfcf8237aa9fbd9 -->
+- [x] Write review for Logan on Airbnb <!-- task-id: 5379d12f01b9b84134ad87dbdb486e18 -->
+- [x] Write review for Treasure on Airbnb <!-- task-id: 889099d9ff9bb0a6124d49d84ac5e356 -->
+- [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
+- [x] Task title here <!-- task-id: unique-id-here --> <!-- task-id: b9cd59bfbd573c20e6b9581609ef6ab5 -->
+- [x] Check if OGM newsletter went out <!-- task-id: 17bdebde612a855c1d8e83a62299a8b5 -->
+- [x] get coffee <!-- task-id: 4273f3d69b03eedd7276613f52b66809 -->
+- [x] Do Weekly Review <!-- task-id: 6c66c75e540146c5d7cc77e6c5860730 -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: 86bc130ed21d3cfd075cc0963675743d -->
+- [x] Use The Inversion Table <!-- task-id: e24cf5ff9e4b2de04e871e324404b97b -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 527da29ecd1887acd5606aff78c24bde -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 0fcd724ae36e7b018d244927eec79ae9 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 3c8a73c59368dfbd5b102add4a6fedc3 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: e8370d3c2a9abbbd4e7204723f455483 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 2d7acf5087899b158929d37e76eb27ce -->
+- [x] ♥︎ Activity Rings <!-- task-id: 3855a279610a7f8302d00fe5f3bf1417 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
+- [x] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
+- [x] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
+- [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
+- [x] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
+- [x] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
+- [x] Financial mid-year review <!-- task-id: 1d6a988f28ba2db05d100c0fa84dcf45 -->
+- [x] Complete major OlderGay.Men features <!-- task-id: 35e9e4691939f336c7585a07a48bb83b -->
+- [x] Maintain daily routines and habits <!-- task-id: f3aa27c3ef7075563965f720622ad351 -->
+- [x] Guest room hosting and management <!-- task-id: d9a128f91451ddecafd88386c9e9f64d -->
+- [x] Health and wellness consistency <!-- task-id: cb57b9914612b984672ea1ef43b13907 -->
+- [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: spammers --> <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
+- [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
+- [x] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
+- [x] Use The Inversion Table <!-- task-id: e73befc42e92c0571f2d3d80b09d1d2e -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: 8107719734121f764a96142dd05cf45b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: d1d112be50ba6e35866e98b1e763e5a6 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: f58943b7621ba8cbc08c30bac7ca40b9 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
+- [x] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
+- [x] Complete daily streaks (inversion table, Tai Chi, saved articles) <!-- task-id: fca2443263d311e03664cb86d34497c1 -->
+- [x] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
+- [x] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 99fbddffa736933b382eed412cbc0664 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b5b76e689569ade7284c9e40e3ec87d3 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0320cea9bee9160a81cc8335be7e729d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ae563d614bb65b48ec2c64845aded22f -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 78478f3d99fe12e3eb085cead60c8d62 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 402919e7a490baaa0a6f210804b75bcc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 350d44ab3e4181ece9fb8d038101dfd4 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f2e4cc28f7233c8a192148925c1bb565 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b3e31558fcd3422206556c0b374ca88d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 68c6281181645fe83462f2aed1c47271 -->
+- [x] Review and respond to JackFrost69's messages <!-- task-id: 3fffbe8be6b563e86527ea9a49f251b5 -->
+- [x] Read Jay's Patreon message <!-- task-id: 9c6d1c3e9e0231112b4fa505fb7f624b -->
+- [x] Write Airbnb review for Logan (5-star review received!) <!-- task-id: 9001595c593549d73ac6114784b01ab6 -->
+- [x] Write Airbnb review for Treasure <!-- task-id: 046e64589a92642364acaeb360680bf9 -->
+- [x] Read Saved Articles (2m 30s) <!-- task-id: 6f835adc5ee79451fab8e7f0200fbde0 -->
+- [x] Use The Inversion Table <!-- task-id: 25f792a3797eefce2af7add3512a6d08 -->
+- [x] Do Tai Chi Standing (3m 30s) <!-- task-id: 5e7c705c44706ca50f8b465444f520d6 -->
+- [x] Apple Fitness+ Workouts <!-- task-id: b805e4494bb3bbe2fd929873dbdadb9c -->
+- [x] Burn More Energy <!-- task-id: edb77d0421beff2cc32f661ed1675943 -->
+- [x] Mindful Minutes (40m) <!-- task-id: 910f15a7a6653f81ed1e50868be72192 -->
+- [x] Tai Chi (1m) <!-- task-id: 14fd4f428d9257fa2500e67287f5b030 -->
+- [x] Activity Rings <!-- task-id: 4298261590da695df28cb37203d98fdf -->
+- [x] Walk 5,500 Steps <!-- task-id: ec941c3717af8331eff7095a6d9ad897 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6acab4e1c4075d1f6913f046b105b0d -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0bd042a60cc2175e273262851c8dca12 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 47a794846b2fbc29f006ef2df88366c5 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 309aaf9024028e34ce529b98003019b1 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: acb01e83b5b9356c2a24304a1b960960 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 635cb60a9157d059a034f0023596e5e2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a56eb05068ecaa23e6983ed066444c10 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b201253398defd07b56ee5fbe6b50593 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b183038e6f734afae7ab8e5fdd8c193d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e2420a79fc4a1908a36a291bad40b468 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3bb9ff3281010e9399e3620245950cd5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e3bbb9cc1e696836b6c6dc9e3bfbc280 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d37aa563ba9e53c0255a3a715ec0413d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1f920a3ac0c9e9b3d9229545023f4d29 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ed228a953321af6170262331e27c594d -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: aa444404a014ea22369598379b53246d -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3c0349cc05ee97325063a7c564e2fece -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b9d9368ebd62ada5627d948c4c0efd0e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a5c51394a23c9ac2450d83f5e95f29a9 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f4e42b9350488b961cd19335b291d101 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fe54430be174d94c8e3b60bd4f280e31 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0ffb16d2a6de8bc281e67ff031d2a42b -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f4255a3e40d002d62123676dc0ca8a68 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f4dcd30c715b8ebce304e6cb53a6e273 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3da710191cdcb2f3c6898fdbb7aea8cc -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cde377e22932bff378faed9108accb5d -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7c14758ed6ceedcc9fa8f160f8bb5cf1 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 23ff6cd7f43be6a8aff4107d31dd601b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 88001257f7e54164eb388a35abc97ad8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 80df8b19ce39c15c3aade0f7376f3a6e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4f1f264c5be1b6c8e1a593d3aa8e8714 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c63a166e771974e5e7e0e5f805f9eae6 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b58f8f149bb1f8b007ee2ab6084e024b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a9f392389b3bcaf09cd928a6e47eca42 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fdb3b3887d3910d022392d448b1882f3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fa5a1c1f9a1939814307e12d775e06e3 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1cd7cbdc1b0fb2683992f93943fd743f -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 366efed6257da7316ab5e00627498829 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: fa360f81d1f41a8f98872a3624d54c5b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8d0dbfc61063296bffc650be8cc533e0 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e72444ce2048259d74856e842abb33f2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 069514efe6a026763c2a5f8445f93feb -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 380c3ea61f716143325ba283ada7d8b2 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 98c55962dee42333c0f5d3f5587903f3 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: aac99212955301fa46441e14b2e04431 -->
+- [x] schedule annual checkup <!-- task-id: a8766483d626943b22e94bc014f219a6 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: abc105e3e845dc62415889e68417736c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a00fb2f688b310ee9ef0fbd1375f462c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 723c188d6121d235eac6ce9e6ed17ea7 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d93ccbb3ae8e019efb67c58ac60a9e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 17eef155047056cad4bf203868e9bf87 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9d1a719efa84a14c8e95f2a4d3503e88 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f2e20c0f7e9cdb5194e247da14b3e7fe -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 52cfd2925c0cf356805f1a8727bbaf8e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e8dbbdb8525a96eede15513d505a1ada -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 13ff8859519baa01d19266b00a9bc451 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e223370410282e8b89b4e77f043f43c9 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9229f3d4e9e40f05f4f0ddaaa1785749 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c38d39af99b64fe6191f3a3e0ecb9a60 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a5b924b2a049a4e913fed44aa6d5c76a -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 30e74d5749638cb15fa1004a07cbb605 -->
+- [x] Daily streaks (after dinner) <!-- task-id: 3bd65e3d71ef59494fee2ffe9e90a475 -->
+- [x] 30-minute arthritis book reading <!-- task-id: ba56e51570cfbcd6d6d9336f75e4762f -->
+- [x] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
+- [x] set up a DigitalOcean account <!-- task-id: ee11a5dc1c5896ad94677483e8bf7f34 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a80cac5fdce836e0ddbfa3b49a13b0ad -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
+- [x] order toilet paper and paper towels <!-- task-id: e17dc65f8b99e3fc4a2c19949d361958 -->
+- [x] ♥︎ Mindful Minutes, 40m <!-- task-id: bb3916fbac505b5363f935866e51efc6 -->
+- [x] ♥︎ Tai Chi, 1m <!-- task-id: 439bd0df2fb062e19c4a5a558a803f3d -->
+- [x] ♥︎ Activity Rings <!-- task-id: 852c35ddcd24bdb8aa51ccd204c05b85 -->
+- [x] ♥︎ Walk 5,500 Steps <!-- task-id: 10a61ec80ef32067bf6c7b7492027385 -->
+- [x] ♥︎ Exercise for 30 Minutes <!-- task-id: a949e8afa265b99495d821d9c0274c1e -->
+- [x] Read Saved Articles, 2m 15s <!-- task-id: 6cfd07ea6e1054313ad27621d163a306 -->
+- [x] Use The Inversion Table <!-- task-id: dbeb3e327f8659e60d53df35b172fc8a -->
+- [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 1d946a65359b396eac4b511e3e1de7c3 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7166f6886e4729285ef7d63b858317c8 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4908a1bae7373c457fa9fe6921894e96 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 36b9f555796ebcd80aab9e6ef8c14a54 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 14af58538d630807081042a473fc347f -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8b5a00aeae791c397dbce3d520920435 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7c2c6e1a660adb8d5d40e8a3b9ba8b7d -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a79c17547252e3a2d13e7eefcf97e71c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1bb595a9f5ce1e470e8dd05cff1d5f6d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f80c6de8075441ad52f0e989bfc425c2 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 26ea178f1c3792fbf66ab0df50c35c42 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 36f0ad7f5b7c6a2e47480bc26843ca4b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 37335abe6817245398061ca02f3d47cb -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: dd37f15c9849eaedc838f6d36da3fefb -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 460f5da3c276b2bca940164a6dd0235e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 31bc54ecb0c78e35646757ccda480b8a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9e3819da22a18c6dbc64400944c2c176 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 132866235d74989fa9d1f5dc0a70e2c6 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 32520e53fb528c4f0dbc7858ef538adc -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5f4f1f968824cb3a40bae1842324a169 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7f05ee1141653f6851ec1a62103c7de9 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ea5e20823dd52a41639d8ce0ca674e8c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 018ba54f5b92e0b48ed3556d207b475e -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: afddfeec7e230792ddc54e76a2486a2a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 3d370e3d50a990e23133c8855233a09e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 63e5f72261346c82fcd1333501978702 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5d1b6561a65bdcb85ba546584e78fefc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66758495cac4d3fe8345d9568d35d05f -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b2cebb4840793fe288b0b959f06ca6e3 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d45d6b29dbf24dac95e911d9107ba6c4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c783f11b441302af59ba8c652ac58b2e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c48d1867d345c06316bcb276d9c85521 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3140381840ba215da59056259c455adf -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b73a15fd84835cc115aeee50b163fac8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 88aff73ef6f97c85595929791cf6b61a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5661025d2251906476935c90b8656781 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 48519dcb4d233d7017ad0d135026e467 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b735ca25d71c93caa670cbcc81f7d54e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 45a9780c4a403067dd3fd96e38a25939 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ccb03a2e3cf2e890f9ff45e57fe9a67d -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c415c77e0f590f681e266dcb83e1caa0 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c38bc9d7b385250935ef90f90483a732 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 931df3053dba443b9147510f76c3b395 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 30e30698b4bf4843eab6036e5a5792eb -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e7e4b4f53a292b42213d8c46167e3fdc -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c51f65dbf44581325637e54496d338de -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9e6726ebfb8f52186cfd05bf258a939d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2b46685be9b6da82580a894f7f8b8ea9 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 111f6eebc20a31d4671469e209f45e4e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d0f2b9941b15767d16eec2a885c57707 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 997614a1743ae4ec297345ebad300c83 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e033486ff7a65e278c35e89f5bed56d7 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5b3f2e7427af02803234ff84346b992f -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 46dd898b9ba6f91ac2dde81e67608ed3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d37b74309c23a5ae1023f472e904ebe5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b50c624c034a42309f3d45cf58d041ac -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: de423ecde44120d4ba4307f93485d990 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1ab8006636b78a3ae666eca40e93488b -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7294cfa1dc9bb144224d8193f18191df -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 16d085a65e8eb427108a242bd3e182be -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 43d84151cd6beb380c30291871690f61 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1ac35004962857bf9b0ce29c86c547a6 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f2d1fc0d0f42d335ae99b9131a16b4e4 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7b966985a9928b63b6dfe213e5ebaf27 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c3b749f32420c165640fb5948add46f2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 43eedae712497845bb057b4e75036394 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e555fb842c422171a9184dd8c7853d3d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 57909f0b986a6204c989d1e94f3642da -->
+- [x] **🎯 Work on a project** - Start with something meaningful <!-- task-id: 9121a0535cd4334f6bf0ea7da1ee6fb8 -->
+- [x] **🙏 Record what you’re grateful for** - Set a positive tone <!-- task-id: 979aed47b906ba81a856c68ae1af29de -->
+- [x] **✍️ Journal** - Process and reflect <!-- task-id: 7e5a5946ab53fab5b6899ee32084ff9e -->
+- [x] Empty inboxes <!-- task-id: 465e6eb8a38b0f1e3b3f63298f6def86 -->
+- [x] Reply to "gator" on OGM <!-- task-id: 6875e66a96b0d996e807178a17ed3144 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0a8edb7d3e05efc2534f51bcd007b0f2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0225550e01fa4aebaf1ca10902454178 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 58bd8ff7edcfcd6b76dcb519fae8b707 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 3e5b2b7b17f82ac83a1abad1eab1f92d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 692fafb826e5ce0d6d59b912d6c84437 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3a51fd65d02abc76de7921140cc7f76e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 76592cbf8ece4282a9111f6de2487cc8 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3e48c8cbf650908c7e63bae13f771e38 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b813ae6be02805a556564cf6d0cbce50 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6215e0ece6f8b7bb821e6398998f3b5a -->
+- [x] **Voicemail** - Check phone messages <!-- task-id: 23bdf2efcbddc41a61c696d4c4ea66c8 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9a6e34b2da47f1cb3a90d0dadf15434c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2515223977117aaab72bfdcb22859d5a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 97f2e3367c0df788a44fdebc84376fea -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ddaaea852eb7daa4dffba39046691c3e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9b6351bdfe4039a0b05b5007db1b71d2 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9d673ebf34bceb2b7eac8696693ae8a2 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fc4303645f6cc58bbe97f3495910d2a1 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2a0105148cc8798741fa5998cfb14df0 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 34e6c456988805471bb5855006958b0a -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d03c183d71501abdf2adb7c5eab62104 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a71e034e628c63cbbccf144d96c0050b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 651366ba977b17f9f91cf04afb7eea84 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ae92f68eb0059b5eb0f2c295ff5c327d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 58fe5c736d1072883aec59a27605bded -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6cc43ae0a779b5b21f630be61bc10886 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 67c0582965b8c40710831623df5d5ebd -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ae863b2996c9d0a2241d9f80c2d39d72 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4681b7afbff5e9f3d7537e889c5becc6 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 07229bfe8b0c64f368fb3e79fe97d6b4 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c9d903b13f0a4c48b0daab891948ad92 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 62f90210c7f529a14ee8f46029984f09 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 78e0479f3fc59c908096211fad05ba2b -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1cf47e9fff8323695a4e7b5fb211f457 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a1be120ca2693def5ec9d010d1d81260 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 733a822391352f3cc287e05600de1896 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 654213f429dfccf0ce9aa506a1f0b4df -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2ecd7f4732fcb36dbb5faa4d9f91ab1a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 15c1919bb9f7fbf78ec698af634013b6 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1d3d2e4bbfd716a6fa0a4da2e90c7b02 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3531e99501b145d33392a4197177d1cb -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 20ba85815254b342c10c629b82a2dd25 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: cea7ed5095e912554c582c722c1c2103 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4cbcb55f23bfbb055def11ed967ad78c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 277e349f0af861e1b624866e4a7e312c -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e0429a1ab5dcd8a38e18d0638feec48b -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2c90a17a3de5ce607110c1ff0dd09d92 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 712babcf79e2629791458a5c0c99f31b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a75c900b1372cb76d80a1811d181f14c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2a6889fce1eb6d927541261387a3afe1 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bea3fa89fe02b35dd8a5abe65a2794ee -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2af9fe48dbefbbe8379a1dfa2cdc034f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 129e591218ab8567e9e5a314a1aad049 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: bb9b64110474f9e7899596566e2ed1cc -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 35c38baf90dae6137dc52d444f289cee -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8c2a03d9bd343431a839aad31765a145 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 00c1a2e61c19fb52a3812b01aa11eac4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 07c44dc991dfb8a163562301efe748a7 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 41c6f97450014fffc6c934177729e5f1 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1f14dc56864a0a117c890a3a5d0c385d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: eefd700ae42a7fa19963de29d2fc8f38 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e453dffc35c54bca5011ca053e0782fc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 96ee0fff4b2532653271f9497d9c4c71 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ffebdab9ff610a41ba4f67d04a68f359 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cdf83edbe9decf2b30d4f680402b2070 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 43147c1867767337f265dca23e0c7380 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 392e4ed874678cb3600d2d6f2742d07c -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d5b2e76fce432375d4295916ff8474dc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: eec779abc37cf108f329eece20ba50f1 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6d5cd32b2c1a49685fb0b4a26efd8fae -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 967ff9a075cdf8bff3dae0f400722fda -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b478d05800bbd9dee5930d91ebd282f5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 231f4f8671a9a4c9ba6f3f429f4c2f72 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 32e6d3b52a7fc3d090b6c7157a7ba7a6 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1edf269957727eae953ba7e48456d3f4 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 118ebe11542101de256ac44d6aeaffea -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5ef5d52533365383be2dad60b81464e8 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5c2980ca6d084644cc9b8dc3308a1a4c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 995fc41d352a156f75d81db835aa438b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 83d55077190961805662708ff85b213d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3d0e8502b71a3b6f5e2caa88886563a0 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71932e9c34aaf8fb6e519ef7aa7a35ab -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8dd46e4e9d75b2f4831c5207e20ac42d -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2886433894d3a9cc782a84e99649333e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: aa8216894cb53a212a0b7b1acc0e4a32 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7fded01d2792508b2aadd13e958e5531 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f568237e221901e1e587507346da886f -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71cc6a1f007c92ab2e9b5c6cb24b06ee -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7cf95338e634218cc2df047bbc7f0061 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d17fef4d6052bc274782d95958e1c95a -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e7be97dd2f13aa4aa390e27d1f9c5d56 -->
+- [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
+- [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
+- [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
+- [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 0ad428e0957933a3842d614de38d41a7 -->
+- [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 68229561dfd1018ae0124ee0ea4721a9 -->
+- [x] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
+- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: aea75da412f9483c037172db4657370d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9bfe6c216c4814f8486387bc4b8d84b4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b93063738c6f2449b19665f609c3c931 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1b37d1f64b4320e364869e9ca01a68fb -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c2c3afe1d7515008cdead5f70ffe20f7 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 878904aab1d6313dca6b340ef82f46f8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 85681c8a299b7ffbd86d85438e50f92b -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1ec0e03c41c888a27c3c30ccf663178a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ad2b7526ace19850c16c31eb741ec4cf -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9e09aa83c203300fc87178265bf2823d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9dcea85b3c331506982a299330850ff0 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9ef20620854200e271396003a95a4529 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c9b217dea1d6ca23c716686c7713180f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 37481bf1fabc9906a1b387fbaecf43eb -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ac77a4f7b5edd9b69d901531755fb167 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7d2333c189babe640e34d46aac0d0674 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: aabe2a672268c33bdce624fa79a432a4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4b6c3567b0f8676bff2ee6d54675514e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6f0a25b125c3f3727b066bd0ad2d9a30 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 772cfd58c4879df23911c0b59dbc9f54 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a8113b7caec56ef7fc111ac27c0715a8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 38c776defb1925586084d72f93dae4f3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2d8349d3a7759041688f96ebc57dfbe3 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3c8979a1f3fdccd25036af58df540d7b -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b208af6e78cf26450bf6fcb4a7ad3ece -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cf4ba11dd295136c5c24fe7009157ece -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 469e19545f501a5264562a12857f581d -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 56a2008ac500313bd0b56f8b86e83535 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 95d8733bfb5176542326aa945b7cc8c1 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b0001c00e352eeb8afbfa2cb8660c553 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b8de0a2769bdcbd05022e542e54cac21 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9c94e516637051c996fdd3ae99647602 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d768e426e51663305845ec02747c8174 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d0349abe39da6e8a59b02125b97bb9aa -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f8538667425d3c326dd13056030ad6f1 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 256f1d93b7265762a2c0299f87d12cbe -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 807ac1a27e69f3ebdcb2857efd915c67 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f75a54600c5182f283731f7eebd56687 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e635fa8a5985683b90c689b4388f8e2f -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 93293652153fc794af9dfd4568f36b1e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2c6fe48738275d4460ddef939b13caf8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 041fc52038a0ca95fcc3d6e9e6d3423e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2b915f7ae6c6a400555a89be8272847e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 63a441e070c96b38e533d98d15a6620f -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e3131ed3fe4eba704a3419ea04cc9e75 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6c15c185747f2ab05d76df9583aaa0b5 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dc1fd2dce7f234373c00e177f78f370b -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 65ed8d7150bb9d967ae0ff1e8c084883 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7a530eb62058ab26e764626f31272982 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 08f7f32b06b39d9ca741d4fb05135a6d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 17b6cd1f95e509b06f567975d3651fae -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 09a41482100d67d15fd6bfe5df55841b -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 96dade19404c4cee9e659058cd7bee38 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f3a7b0388b05c04597a6297992fe0358 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d764f9a691b92a9d1386a56c7fdf743 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ef8e7dda5ff4afc3c43d3795b81d2d7c -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 77bf7c14653dfde45ae5bcb55e2003c3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fa9114fcab2290084d5c189d0f74009f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 859490bc7fa9ab7fb7bd0357f78e1c80 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 70d3dfdde0d47f4942a85fd85b93c77c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e7fa4dc95e0bd4e0217af8645622ecc0 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b90f56df03d1c25153e33e7448f9b9e8 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 709f7e491e4b8afb021deeed89addf5e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 504d7b92bf9d87acbdeeda130be26901 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d6735c31fefae2bf652c73557231ee88 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 3b0411d2e10f496d93b623efcda2e407 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 35c8e5cc75c235edfcd32c097c18ced4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0959878d00afa7896d52a6d3e777baef -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0b88a87d2f397b6b85a5c4a538bac3b7 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d1fd0bfd5b1deccee3b3e4bf480ec59 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8351a42b97b67c800aeaaa76c75f7c5b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 69321d1b1450d5553223ade41e900c11 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d89d04ed507083ecf79fd11ca8935c3a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 26d8a3ceccddc9139412b11984c81dd6 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a43373f8f2bfadba1771532bfb9a4cdf -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8bffa4616bd141234e03f40deee4a251 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 36a96c0772ca65300fc9ff6eef31dffb -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5fbaca59ab4daff64bcad34327c6881f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ca15cbc5fa9a2ca119e070bc5cde4cee -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f52cee2a7653c979272fd7d257204d85 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f4e63fec2eaef5ea4522c0915e164b33 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fb44d1f15bf2ad7aaf8a456c38dab7d7 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 08c1ff9ee6d6438a5df0d614162084ce -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 52595330df74127bd49642bfce64d3f7 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7bbe190d956e84b4cb01c1f35c782a07 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 094f194c0188bb44f8e1f34b4a58d348 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ccca9270202847957f7ae0a1c595fb8a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a4c7bc05f267e77f03c67a7030054718 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 430ccfe4b2247f7f719689f7184a6763 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6bb226f3e8a10434a089ef398b09d86f -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 30340d8955664e00f1c3800c9a37294b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 37f1889b420114c76361b09017c0f02e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 95eda49013b75d33bd4a62a9b4c13c9e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66f816790c2093b75157b2c4255886b7 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9e08db11b2222b02e8149c5d8190c8b1 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b42c956abd2ad4e3d1d5a5d07a94a00c -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 16e56632427a864b439182d93ff61047 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 00cbb39a78fd9a2fee81578ab218d630 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7ce0f4bcca986202ad15243104c7ce2c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 21ab068fef74a9f34eddad2a5ffb9d17 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7b9930a41a988a60dd9b7dfec408d7d8 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d1b1bf42721ba4152b5e8cb94ac27fc0 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 612fa6f289e98446c240f380195dd2c0 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 56fa5f22640d40cda81ad2d41cf77a5a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ca896e1051d273827871af472326812e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 89880677775869d0ad981b78b2c46e62 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 382e00db3b1de2c52670fa3409274e59 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dcc7396e892aff6f844a7a8fa7aff9e2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ec1379696ae35299477b8195c414583a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f2e0ab418924361569ee415bfee6c8bf -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d25994e87154cbae2542a64467d141f1 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ce0c6cae12e71822806bb985012c7ac9 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 270511afe2c205dd03fd5382a33df9aa -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2e2c2008f5f22f5401d1a3fa5dc3c758 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 95981ae8b69c4924f159e86c4165cd12 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 38e48a8b4c9dff9fffe36a8800ffc20d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7b21e34672deb69e7bce593c657d054a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 79f03234321d3b9912f8e78d93e2af86 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0710c967623dea93090e25cb2811a858 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: de0e206193263515766501a27464ba4b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6a3d5e6ff7b0343efa1fcd6d32fbc881 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 07248d9f035a6f6567e44020626f5eda -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cb3a0624cb81d0091b1a7e56ae7d2668 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 321631cd9cd03e4e944ff3d356518b42 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 49b9f9f72dadbb919b87135c8955e651 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7c6cf211aae2d06ffd6c9bf8ae341325 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 94d35630bd94f6f34299b1de74fec3ed -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8828d9c0514d90766bc3a5555b211d2f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3b13cafdb4d18c2bc9a7b9bd9a84b53a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 23c6171af2207ca47b95fcf15e40e8a0 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c40b6161c688d5c7b9064b48f65437de -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1148becc84826d0290f04e82b02a8cc6 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6702c79d782f05f8d250edc892113934 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 26ee40400adf371e65155239d7daf272 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4c239e2a2a9a4957d067f6c43dce7777 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bc2cf2b4f6ac82c9a964f73d9869090c -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b38de9d1b4fe425c139c70dbb7f326ae -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 38ea2d04ae47e8cf7ba42bb078d8910a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 058f1c000ffe47cda7fbad7922ceb0f8 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 78e06f4e653b0697d24d4dc5939674fe -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e56ce5d0cc8640cf5d339728c7a94300 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1e6a9821fb5479a42772b378e3c2496d -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f2e232795ec04e913468ae9f49abc870 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2e8337838d143ef5fee9d5bcb14ccc02 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a3c3d02eb8002426c6d9ed8ff73aaaa0 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df690e295aae94ee6cf0e831920aacbf -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e912e1bd5046500c9d51159f89bd931d -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6b4fd7ed38e570e7b1e272ec658e9477 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: afe5f759c32fd64b6f0696cfae0e4a6c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9910ccc4132a552d7a98a0023307c50c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 957bf64c80c93b78579956a5954f32c2 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bdfd49b1cb84da77eb9886a17c0983f7 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c65c24dff553370cfb4d74e646fc4bd0 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 551b6296844f70e54a4928234a84125c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 17c2a22f3b4f495f607fc54e26580a9c -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8a9870a9427b46a726d09660871c37f0 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: ee6ac52fb8e5d3cfe73e5c5ca77c7b56 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: aa33fab55213261951a2a80b866a9c45 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1978ce35007cc485d321599a34310363 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 179893ed5ffd47765154cb9c462f4784 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 34ae2334d48eb7e1cadb80c84346541e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7dc4c382dc79192db15e7db678f5b50a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e8340be330411812cec45ca2b30ca820 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4e53ae6ffb3c21065877c4cf26eb202c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5290834b4e20128ba9ce6cbb2b568d80 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 45e97d16d2465fefeab364a3de0f12da -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 566c3514dcd9603e2fff84d070b17c37 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 54680a448ca2cb25732a1e9df6d37a4a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 91ea1f3bb2a61c54cdfe00adec0d5e8a -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9a82e4d2e441038bb6d9c08bc4a59f2a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b00a612d3545e63a5d5decd558c106e4 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 4e0e1a1a343dffcad1ca4a9067088e8e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d1b021ce92e233bad551916735c5a80c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c5ae3be9b3d9ca8586ed060242d3a4fe -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 64e554132530fc19ab42c6d8bcbec297 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cfdd2e45a935f14aa4cda7af0cc6c996 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 14fbd76d4980893435abf1648b95b245 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6f3212848864c1a994a2d70793c3a8c6 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1f1ce19378300a027d65ee3896a98423 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 417f4e90dfec6d351c177def2de43824 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7d72f225e4860cd5bb1c4b7a7d557226 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fffe7f74dbbf098a4edc6b4d4c914b5c -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 953ef8e2c137b05e248046a3c0887051 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 543bf47895d0509dbe9fe2780fa08d4b -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2f20f3e28c1180b3c13133b03b774e5b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: affd4e6303442283cccd5684baa8d470 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 491930e35b138490acd4ab5597e13c72 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 44cd37d12437862464109d963bc24e2a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8d83d13f978c0fa130406e7c35e242ea -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7957fb9f7dbadf3543354de74101ad36 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 310b5c2517237903ea6ac021c8384cee -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1f0c786fd8b6082ed9e55e60f202e4e4 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7ce7b2e3cb92ad45fe525f6f4a9962dd -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8797ddc41c9e796104e5f988aa4c801d -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c0fc9bbab4caef49930cd6ad8cb4eefa -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 346b75b3fb398024d9f29fcae953be61 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 02bbd73e26ffdf17a074ea8e7657baf9 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 03b8263a91f45363b8a978fcb7a93063 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 199430d406ff25fb948ebe1f775cf531 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 11c1d32fb83c518ce0508872ec2f1d45 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f21f2df27e0e8753abce6538e292ce22 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6c9890ffcc0422c85f7f4cdcb47617f6 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 168a329d74ec31fba3ad66f31dafc088 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8f7697d04cdc37248d9ab60fcb7cfb10 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ea2f827a544dff7f62061db3c141cc86 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 451ef6dc9c0ca4618d34b47453920e2a -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8bb27ebc399b5ac0a6719c37242a6df8 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e8b58f80a591994e8212691e9f75f624 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7af03a0a32f5bdc33f297b24511ddc9e -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d9e71270cfa522e34884760e81aa865a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f08077ca7e29e8788fe4e5ced194a019 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a27ca5f9067e4edc374f309aa6a41d99 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 79da9588014a14ad2d366b73fc1790e1 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 788226b10b2600e5a6bc75d64ab74e2c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 149568daa650b176dfad859a8f7c827f -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a7fd0020352b84b1cfec4dcbeb075af0 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f580914a5b4c00e29ddab74b351afc24 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9392dadf84bc74fde4b26b821292d460 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b93b3f58af2cb3471c9bdcde1b0efe88 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c51b38c6384aab8b99128442b13030fd -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e49839e372fbbfe18e1511bd9f28e245 -->
+- [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 2efb9f2a6c6699a6b3ea8afb664a829d -->
+- [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 0edde96d8fae958e90824affbfe297d0 -->
+- [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: abf9e37dc4f9bfacf252dafa0c8f205e -->
+- [x] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 5655dbbfe1809bf071fae3f6571229ba -->
+- [x] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 58cc4c480e11e69c329218d965d697f8 -->
+- [x] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: f559a9c4752979213cad651738e6b725 -->
+- [x] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 1ee6839611ef006f19721d72707686f5 -->
+- [x] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 2fca38e41f574aed54048de7adae5b9d -->
+- [x] **🔒 Lock the doors** - Secure the house <!-- task-id: 533412471d9682f61c95ea6bba68144c -->
+- [x] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 630bee85498992cf798ffc36c1b07d9a -->
+- [x] **💊 Finish taking your pills** - Complete medications <!-- task-id: 52ed9f77622c22a2b29bc0273e2611f3 -->
+- [x] Call Pest Control (carry over from yesterday) <!-- task-id: 51f2e74086ad1ce762773461413da4df -->
+- [x] Quick OGM social media check <!-- task-id: c4ad7c3fcc81b3169e376ddf3769e8bc -->
+- [x] Review DigitalOcean welcome materials <!-- task-id: 9a58735a2ceabd7dde9551d1e3ede82e -->
+- [x] **Notifications** - Phone & computer <!-- task-id: 42439e6de9ecb74e2287648fe796cc2e -->
+- [x] **App badges** - Clear all red dots <!-- task-id: 35745496048dc01ae0cf4c6b760be30d -->
+- [x] **(https://app.frontapp.com/)** - Customer support <!-- task-id: 074efa108dc37fe99743fb7e5c6e5ec7 -->
+- [x] **(https://talk.oldergay.men)** - Community messages <!-- task-id: 5f3ac5115bda07d19c159bfbbd9f0fff -->
+- [x] **Drafts** - Process pending notes <!-- task-id: cb4bd772943843fc2cc3c82c235aa4c3 -->
+- [x] **Apple Reminders** - Review tasks <!-- task-id: 384c9af292e103d5cf105cf01b904ccd -->
+- [x] **Paper notes** - Physical inbox <!-- task-id: 6b32ce2b4055301af3ab628ad50f5276 -->
+- [x] **Calendar** - Re iew today's schedule <!-- task-id: 7cfb1eaeab70722939900953b4442041 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d6154a341d000bc20a9213f6e6e595e5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0871523ac7960c18801d27ffbb97b6dd -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bc3b5f70c2757c0183f5b1ce519f8e12 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6e9f296562110299a95891f88053690e -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ba62692962e6bdf03c62f61652ea703f -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f075137314a2a0c76cdefad413156914 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 97e3b739e55640c80896dce666ee7459 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b8c68b047a3c5b57b2c5c9c5667af078 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9022beb3ba22579169c08971c75f44ac -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e024a60fc068a2cec5e4b596fcf0c825 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b0ac93ee11b113138e30e0bd38bea17b -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: bae03d34490e5785b841de461df34f24 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9449a9150885a25cf1b11c0e01e5a19a -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fac1fa73365b5cff806a9212eaf52e06 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 28851dff1a5e02bc7ccd56b5f53b96da -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 303baaaec3dc2ad049d00c17cca1cf2a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: bddae6a95e1d2313242b53a3c0cb1b6f -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7973886da4d4357b06ed0b1ea0b474ce -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 852cd0a7c062343f9c220380364c9106 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ca2d993013d1331de1f224d1a3a0115e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 449b52118ae4c340a79aecbe67418735 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b0a469d876946572fdc1b25571ef7f9b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5b73daa48c76dcb63058a56109ccb9ac -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c01a606d84f6a623bf1027fa5d07ee53 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ecc1e49e27aa0534e48abbd18c2af800 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6c8ce2b1899e067557899705579f8b92 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 681d376f716db0f57ee2ba436235a249 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cbc7eee8d9a4601c677252bf4429d600 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: cfc71fc2f374303f087036d7cf7ab5bb -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 57028f07e06bd4c9644c0e08e252dd89 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 235c61c23c857ff60b88758c20c0b095 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 234cb402fed8dc8159d8e40b0cf1a254 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 710b6a6d23b9287e1ad5c12e901c08dd -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 262b8adcbb41b3a23b96dbff4b343eb3 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0022fb320460358c6e3057212628a675 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e5b7cacadd47fc044f1384d8fa781824 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c19e09db4a85578abe949590d229bc31 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9a2c080a65eb658e82e6c5dc57d0857e -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 326e4e530421f8915aaffbf1b64ffde5 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1a77a1e0e9f76adda0be9f953c4235aa -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2a2a33af2c3649913b3b1ce4cc3e6ec2 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5a159bf4bd81fca5fa1528ba7b7b4e4a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ea7c1a096632ea192e3caba434a2e441 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9be023aafedf9ed85015235b6ac71ba8 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 06a9baf61346b07a12e458c84a8d92b8 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6697d990f2158b34dfb55ed1618058e3 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: fd87f3fffe2fac3be0bb7583b421125e -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a00733641a84d9eeb19a7e58fb7acafa -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 9419e4684df5e1064cc0fdac5acc3e61 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ba0f4dcef1c254a1a463e80e617f3dec -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5ab65c880db91d47079b4802c3dfc01d -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ccdd9c20a46803f8b9920958032446a9 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2a4011394e471e5fe119d6959dac0ada -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 98b32e1f147fab29b3f08a8405ab53da -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b71c876c160f5781a8442a00b37d3c0e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9a486b832c9e0626bcf691e1b0bf265f -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ac7cf46a50742aae2d1a1ef672e708b7 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b1418299fba5bebfe97c28c8724bab2b -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 56f04d977786bfdf3a8c3d56b493b483 -->
 
 </details>
