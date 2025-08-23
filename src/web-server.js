@@ -18,6 +18,12 @@ const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
 const VAULT_PATH = path.join(__dirname, '..', 'vault');
 
+// Cache for rendered Markdown
+const renderCache = new Map();
+const fileStatsCache = new Map();
+const CACHE_MAX_SIZE = 100; // Maximum number of cached files
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
+
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -991,8 +997,84 @@ function convertEmojisToIcons(html) {
   return convertedHtml;
 }
 
-// Markdown rendering
-async function renderMarkdown(filePath, urlPath) {
+// Cache management functions
+function cleanupCache() {
+  // Remove expired entries
+  const now = Date.now();
+  for (const [key, value] of renderCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      renderCache.delete(key);
+      fileStatsCache.delete(key);
+    }
+  }
+  
+  // If still too large, remove oldest entries
+  if (renderCache.size > CACHE_MAX_SIZE) {
+    const entries = Array.from(renderCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    const toRemove = entries.slice(0, entries.length - CACHE_MAX_SIZE);
+    for (const [key] of toRemove) {
+      renderCache.delete(key);
+      fileStatsCache.delete(key);
+    }
+  }
+}
+
+// Get cached render or generate new one
+async function getCachedRender(filePath, urlPath) {
+  try {
+    const stats = await fs.stat(filePath);
+    const mtime = stats.mtime.getTime();
+    const size = stats.size;
+    
+    // Create cache key from filepath
+    const cacheKey = filePath;
+    
+    // Check if we have a cached version
+    const cached = renderCache.get(cacheKey);
+    const cachedStats = fileStatsCache.get(cacheKey);
+    
+    // Return cached version if file hasn't changed
+    if (cached && cachedStats && 
+        cachedStats.mtime === mtime && 
+        cachedStats.size === size) {
+      cached.hits = (cached.hits || 0) + 1;
+      console.log(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
+      return cached.html;
+    }
+    
+    // Render and cache the result
+    console.log(`[CACHE MISS] ${urlPath} - rendering...`);
+    const rendered = await renderMarkdownUncached(filePath, urlPath);
+    
+    // Store in cache
+    renderCache.set(cacheKey, {
+      html: rendered,
+      timestamp: Date.now(),
+      hits: 0
+    });
+    
+    fileStatsCache.set(cacheKey, {
+      mtime: mtime,
+      size: size
+    });
+    
+    // Cleanup old entries periodically
+    if (Math.random() < 0.1) { // 10% chance to cleanup
+      cleanupCache();
+    }
+    
+    return rendered;
+  } catch (error) {
+    console.error(`Error in getCachedRender for ${filePath}:`, error);
+    // Fall back to uncached rendering
+    return renderMarkdownUncached(filePath, urlPath);
+  }
+}
+
+// Uncached Markdown rendering (original implementation)
+async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
   const content = await fs.readFile(filePath, 'utf-8');
   const lines = content.split('\n');
@@ -1571,6 +1653,49 @@ async function renderMarkdown(filePath, urlPath) {
   console.log('[DEBUG] HTML includes chatMessages:', html.includes('chatMessages'));
   return html;
 }
+
+// New cached renderMarkdown function that replaces the original
+async function renderMarkdown(filePath, urlPath) {
+  return getCachedRender(filePath, urlPath);
+}
+
+// Cache status endpoint
+app.get('/_cache/status', sessionAuth, (req, res) => {
+  const cacheStats = {
+    size: renderCache.size,
+    maxSize: CACHE_MAX_SIZE,
+    ttl: CACHE_TTL / 1000 / 60, // Convert to minutes
+    entries: []
+  };
+  
+  // Get cache entries with stats
+  for (const [key, value] of renderCache.entries()) {
+    const stats = fileStatsCache.get(key);
+    cacheStats.entries.push({
+      path: key.replace(VAULT_PATH, ''),
+      hits: value.hits || 0,
+      age: Math.floor((Date.now() - value.timestamp) / 1000), // seconds
+      size: stats ? stats.size : 0
+    });
+  }
+  
+  // Sort by hits descending
+  cacheStats.entries.sort((a, b) => b.hits - a.hits);
+  
+  res.json(cacheStats);
+});
+
+// Clear cache endpoint
+app.post('/_cache/clear', sessionAuth, (req, res) => {
+  const previousSize = renderCache.size;
+  renderCache.clear();
+  fileStatsCache.clear();
+  
+  res.json({
+    success: true,
+    message: `Cache cleared. Removed ${previousSize} entries.`
+  });
+});
 
 // File edit endpoint for AI
 app.post('/ai-edit/*', async (req, res) => {
