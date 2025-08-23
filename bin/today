@@ -172,6 +172,7 @@ You have access to today's synchronized data in the SQLite database at .data/tod
 - contacts: Contact information
 - file_tracking: Recently modified files
 - people_to_contact: People needing follow-up
+- diary: Day One journal entries with text, dates, locations
 
 ## Direct Request from User
 "${DIRECT_REQUEST}"
@@ -204,6 +205,7 @@ You have access to today's synchronized data in the SQLite database at .data/tod
 - contacts: Contact information
 - file_tracking: Recently modified files
 - people_to_contact: People needing follow-up
+- diary: Day One journal entries with text, dates, locations
 
 ## Direct Request from User
 "${DIRECT_REQUEST}"
