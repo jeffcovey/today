@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1212 tasks)</summary>
+<summary><strong>General Tasks</strong> (1216 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -70,7 +70,6 @@
 - [ ] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 8f318ce149ccd95a419cd5f838de465e -->
 - [ ] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 292ec2fb5c65ad09975ee01c2c3edc75 -->
 - [ ] **💊 Finish taking your pills** - Complete medications <!-- task-id: f563dbbf790b62da6c0a09549c001dbc -->
-- [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 191a41c1a1878d5cd62ee81226c7e59c -->
 - [ ] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: 50ad0b963ed6f95263acd0edb0122de8 -->
 - [ ] **🔒 Lock the doors** - Secure the house <!-- task-id: 7d1f9a5d177e084ce7eebd401a6ccc4e -->
 - [ ] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 4ad009ee02164da8620a8855fdcb72e2 -->
@@ -393,8 +392,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7587f877d44818ec4917bd1e47a1dfb7 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 55b05d058971af73f931f712ba1860bb -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dec29e980eed57c264a17c56e2030864 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 210831f710507bce52ebf035309ec69b -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b43f4d2095db0e40e1f114a82b8bb6fb -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7e37eb73fb864dd78db7fb07c37e6a05 -->
 - [ ] Clear all flat surfaces (coffee table, side tables) <!-- task-id: 3f53ca5e3a6bc23b5e41c16864eb5738 -->
 - [ ] Clear counter completely <!-- task-id: f5304f3aefae82c578d3a1cb6c2ab0bf -->
 - [ ] Clear countertops completely except daily essentials <!-- task-id: 6e7ced4a3ade7245a47cd8b96c41c092 -->
@@ -419,8 +419,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 710b49fc6955c1da2c12053f0c5e153f -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3f0561aa708365ed481d316bb44eb5a3 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 006045bb2757b26ffb9a5b55858be974 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5366f293f5f9715ef957569ccf62b6a9 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9cab16293ef07297c459185bf61f9740 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5ea259d780a0b41c68f0ed72818ee4dd -->
 - [ ] Document all Heroku Scheduler tasks <!-- task-id: s2-001 --> <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
 - [ ] Document all connection strings securely <!-- task-id: ns-006 --> <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
@@ -436,8 +437,9 @@
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 16b23a7ec21986a70c5c6c1e5475cdbb -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f0ddfef1a8d365c71099d592a6987250 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a668d2fc8791e9fd554399978a216aa5 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 709b56711291b6c9ea35cfaf936ba597 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f3a8e028f8008d95e397db04ff578e01 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get Railway database connection strings <!-- task-id: ns-001 --> <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
@@ -582,13 +584,15 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 90e8b1c522404630d6475c7e03718a7c -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5d6a3bc52a44a0afd7f6e09750b9e23a -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9771b1c12cac5e1e049a0121af302236 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: fd4a334e0ab3bc2afdbd9b8d19efef30 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 40dfb1b7884408c3520d8ccf096936e2 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 41a7b642e55f276f1fa304e9555d1d38 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 896291611740816c2ceae0f14a1efde6 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 177205f2a42b6f6c5e09a5f8d694feed -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d779b7da049197cfff947251631f079f -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1c98f3dc91f631e019da33b894b46cae -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d60192c325e4bbd86929a8160f0e0d8e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 24ecb20ba88d67dd2d0f24af9403a0f6 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
