@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/23/2025, 5:19:32 PM EDT*
+*Generated: 8/23/2025, 5:20:29 PM EDT*
 
 ## Next Up
 
@@ -10,8 +10,9 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (1592 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (1593 tasks completed)</summary>
 
+- [x] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 31905c2c71dade5f9a2d62e02c9d87e0 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f0e264f101ce3e8a16945687c4d28ec3 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5cffaa5efeb8e0fe44a7a6681474126b -->

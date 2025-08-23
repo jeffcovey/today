@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/23/2025, 5:19:32 PM EDT*
+*Generated: 8/23/2025, 5:20:29 PM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (52 tasks) - Tasks involving interaction with other people</summary>
@@ -528,7 +528,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (107 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (106 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -541,7 +541,6 @@
 - [ ] cecil kellaway at DuckDuckGo <!-- task-id: 2a024ea8e060785e1bd816a5a8752c8a -->
 - [ ] check protein powder recipes <!-- task-id: 883a194cc06cdde24c6c78ebd9962834 -->
 - [ ] try the eye supplement <!-- task-id: e29e2737363b0c6fb33d08c072c5e61f -->
-- [x] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->

@@ -116,24 +116,24 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 
 ##### PostgreSQL Migration
 
-- [ ] Set up Railway PostgreSQL instance <!-- task-id: p1-001 -->
-- [ ] Configure connection pooling <!-- task-id: p1-002 -->
-- [ ] Set up read replica from Heroku <!-- task-id: p1-003 -->
-- [ ] Test connection from Heroku apps <!-- task-id: p1-004 -->
-- [ ] Implement automated backups <!-- task-id: p1-005 -->
-- [ ] Switch Heroku apps to use Railway DB <!-- task-id: p1-006 -->
-- [ ] Monitor for 48 hours <!-- task-id: p1-007 -->
-- [ ] Decommission Heroku PostgreSQL <!-- task-id: p1-008 -->
+- [ ] Set up Railway PostgreSQL instance <!-- task-id: p1-001 --> <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
+- [ ] Configure connection pooling <!-- task-id: p1-002 --> <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
+- [ ] Set up read replica from Heroku <!-- task-id: p1-003 --> <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
+- [ ] Test connection from Heroku apps <!-- task-id: p1-004 --> <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
+- [ ] Implement automated backups <!-- task-id: p1-005 --> <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
+- [ ] Switch Heroku apps to use Railway DB <!-- task-id: p1-006 --> <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
+- [ ] Monitor for 48 hours <!-- task-id: p1-007 --> <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
+- [ ] Decommission Heroku PostgreSQL <!-- task-id: p1-008 --> <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
 
 ##### Redis Migration  
 
-- [ ] Create Railway Redis instance <!-- task-id: r1-001 -->
-- [ ] Export Redis data from Heroku <!-- task-id: r1-002 -->
-- [ ] Import data to Railway Redis <!-- task-id: r1-003 -->
-- [ ] Update connection strings in Heroku apps <!-- task-id: r1-004 -->
-- [ ] Test cache operations <!-- task-id: r1-005 -->
-- [ ] Monitor performance <!-- task-id: r1-006 -->
-- [ ] Cancel Heroku Redis <!-- task-id: r1-007 -->
+- [ ] Create Railway Redis instance <!-- task-id: r1-001 --> <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
+- [ ] Export Redis data from Heroku <!-- task-id: r1-002 --> <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
+- [ ] Import data to Railway Redis <!-- task-id: r1-003 --> <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
+- [ ] Update connection strings in Heroku apps <!-- task-id: r1-004 --> <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
+- [ ] Test cache operations <!-- task-id: r1-005 --> <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
+- [ ] Monitor performance <!-- task-id: r1-006 --> <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
+- [ ] Cancel Heroku Redis <!-- task-id: r1-007 --> <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
 
 #### Stage 2: Add-ons & Services Migration (Week 3)
 
@@ -142,50 +142,50 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 
 ##### Logging Migration
 
-- [ ] Evaluate Railway's built-in logging <!-- task-id: l2-001 -->
-- [ ] Set up log aggregation if needed <!-- task-id: l2-002 -->
-- [ ] Export historical logs from Papertrail <!-- task-id: l2-003 -->
-- [ ] Update log shipping configuration <!-- task-id: l2-004 -->
-- [ ] Cancel Papertrail <!-- task-id: l2-005 -->
+- [ ] Evaluate Railway's built-in logging <!-- task-id: l2-001 --> <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
+- [ ] Set up log aggregation if needed <!-- task-id: l2-002 --> <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
+- [ ] Export historical logs from Papertrail <!-- task-id: l2-003 --> <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
+- [ ] Update log shipping configuration <!-- task-id: l2-004 --> <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
+- [ ] Cancel Papertrail <!-- task-id: l2-005 --> <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
 
 ##### Email Service Migration
 
-- [ ] Set up AWS SES or Resend <!-- task-id: e2-001 -->
-- [ ] Migrate email templates <!-- task-id: e2-002 -->
-- [ ] Update SMTP settings <!-- task-id: e2-003 -->
-- [ ] Test email delivery <!-- task-id: e2-004 -->
-- [ ] Cancel SendGrid Gold <!-- task-id: e2-005 -->
+- [ ] Set up AWS SES or Resend <!-- task-id: e2-001 --> <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
+- [ ] Migrate email templates <!-- task-id: e2-002 --> <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
+- [ ] Update SMTP settings <!-- task-id: e2-003 --> <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
+- [ ] Test email delivery <!-- task-id: e2-004 --> <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
+- [ ] Cancel SendGrid Gold <!-- task-id: e2-005 --> <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
 
 ##### Scheduled Jobs
 
-- [ ] Document all Heroku Scheduler tasks <!-- task-id: s2-001 -->
-- [ ] Set up Railway cron jobs <!-- task-id: s2-002 -->
-- [ ] Test job execution <!-- task-id: s2-003 -->
-- [ ] Monitor for failures <!-- task-id: s2-004 -->
+- [ ] Document all Heroku Scheduler tasks <!-- task-id: s2-001 --> <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
+- [ ] Set up Railway cron jobs <!-- task-id: s2-002 --> <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
+- [ ] Test job execution <!-- task-id: s2-003 --> <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
+- [ ] Monitor for failures <!-- task-id: s2-004 --> <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
 
 #### Stage 3: Non-Critical Applications (Week 4-5)
 
 **Timeline:** September 13-26, 2025  
 **Potential Savings:** $100-150/month
 
-- [ ] Identify non-critical applications <!-- task-id: nc3-001 -->
-- [ ] Deploy to Railway one at a time <!-- task-id: nc3-002 -->
-- [ ] Test each application thoroughly <!-- task-id: nc3-003 -->
-- [ ] Update DNS/routing as needed <!-- task-id: nc3-004 -->
-- [ ] Monitor for issues <!-- task-id: nc3-005 -->
-- [ ] Keep Heroku as backup for 1 week <!-- task-id: nc3-006 -->
+- [ ] Identify non-critical applications <!-- task-id: nc3-001 --> <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
+- [ ] Deploy to Railway one at a time <!-- task-id: nc3-002 --> <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
+- [ ] Test each application thoroughly <!-- task-id: nc3-003 --> <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
+- [ ] Update DNS/routing as needed <!-- task-id: nc3-004 --> <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
+- [ ] Monitor for issues <!-- task-id: nc3-005 --> <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
+- [ ] Keep Heroku as backup for 1 week <!-- task-id: nc3-006 --> <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
 
 #### Stage 4: Critical Applications (Week 6-8)
 
 **Timeline:** September 27 - October 10, 2025  
 **Potential Savings:** $167/month
 
-- [ ] Create detailed migration plan <!-- task-id: c4-001 -->
-- [ ] Set up blue-green deployment <!-- task-id: c4-002 -->
-- [ ] Migrate during low-traffic window <!-- task-id: c4-003 -->
-- [ ] Implement instant rollback capability <!-- task-id: c4-004 -->
-- [ ] Monitor intensively for 2 weeks <!-- task-id: c4-005 -->
-- [ ] Gradually decommission Heroku <!-- task-id: c4-006 -->
+- [ ] Create detailed migration plan <!-- task-id: c4-001 --> <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
+- [ ] Set up blue-green deployment <!-- task-id: c4-002 --> <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
+- [ ] Migrate during low-traffic window <!-- task-id: c4-003 --> <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
+- [ ] Implement instant rollback capability <!-- task-id: c4-004 --> <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
+- [ ] Monitor intensively for 2 weeks <!-- task-id: c4-005 --> <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
+- [ ] Gradually decommission Heroku <!-- task-id: c4-006 --> <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
 
 ### Hybrid Architecture During Migration
 
@@ -231,12 +231,12 @@ Savings: $370/mo total
 
 #### Network Security & Performance
 
-- [ ] Get Railway database connection strings <!-- task-id: ns-001 -->
-- [ ] Test connection latency (expect 5-20ms between providers) <!-- task-id: ns-002 -->
-- [ ] Set up connection pooling (PgBouncer if needed) <!-- task-id: ns-003 -->
-- [ ] Configure SSL certificates <!-- task-id: ns-004 -->
-- [ ] Set up monitoring for cross-platform connections <!-- task-id: ns-005 -->
-- [ ] Document all connection strings securely <!-- task-id: ns-006 -->
+- [ ] Get Railway database connection strings <!-- task-id: ns-001 --> <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
+- [ ] Test connection latency (expect 5-20ms between providers) <!-- task-id: ns-002 --> <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
+- [ ] Set up connection pooling (PgBouncer if needed) <!-- task-id: ns-003 --> <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
+- [ ] Configure SSL certificates <!-- task-id: ns-004 --> <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
+- [ ] Set up monitoring for cross-platform connections <!-- task-id: ns-005 --> <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
+- [ ] Document all connection strings securely <!-- task-id: ns-006 --> <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
 
 ### Cost Impact Timeline
 
