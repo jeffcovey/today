@@ -1,5 +1,4 @@
 # Contact Tracking - Every 6 Weeks
-
 Format: YYYY-MM-DD Name  
 Edit dates here and run 'bin/sync' to update the database  
 Sorted by oldest date first (who to contact next)
