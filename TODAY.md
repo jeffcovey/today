@@ -273,6 +273,11 @@ The database contains these key tables:
 - **ogm_scout_metrics**: Performance metrics (response times, error rates)
 - **ogm_summary_stats**: Daily aggregated OGM statistics
 
+**diary**: Day One journal entries synced from `vault/logs/Journal.json`
+- Includes entry text, dates, locations, weather, starred status
+- Automatically synced when Journal.json is updated
+- Query with SQL for fast access to all entries
+
 Use SQL queries to:
 1. Find urgent/overdue tasks (query task_cache WHERE due_date <= DATE('now'))
 2. Get important emails (query emails WHERE has_been_replied_to = 0)
@@ -289,6 +294,7 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 - 📅 Calendar events (in calendar_events table)
 - 👥 Contacts (in contacts table with normalized emails/phones)
 - 🔄 Sync history (in sync_log table)
+- 📔 Day One journal (synced to diary table from `vault/logs/Journal.json`)
 
 **First Action:** Query the SQLite database to get all the synchronized data, then create or update today's plan file in `vault/plans/` using the naming scheme `YYYY-QQ-MM-DD.md`.
 
@@ -336,6 +342,80 @@ WHERE stat_date = DATE('now');
 ```
 
 If there are critical issues (>1000 error occurrences, timeouts, site down), prioritize fixing them in the morning work block.
+
+### Day One Journal Analysis
+
+When reviewing Day One journal during daily planning, query the `diary` table:
+
+```sql
+-- Get recent journal entries (last 7 days)
+SELECT 
+    DATE(creation_date) as date,
+    SUBSTR(text, 1, 200) as preview,
+    location_name,
+    starred
+FROM diary
+WHERE datetime(creation_date) >= datetime('now', '-7 days')
+ORDER BY creation_date DESC
+LIMIT 10;
+
+-- Find starred/important entries
+SELECT 
+    DATE(creation_date) as date,
+    SUBSTR(text, 1, 150) as preview,
+    location_name
+FROM diary
+WHERE starred = 1
+ORDER BY creation_date DESC
+LIMIT 5;
+
+-- Search for specific topics (e.g., mentions of Lou)
+SELECT 
+    DATE(creation_date) as date,
+    SUBSTR(text, 1, 200) as preview
+FROM diary
+WHERE text LIKE '%Lou%'
+ORDER BY creation_date DESC
+LIMIT 5;
+
+-- Analyze themes in recent entries
+SELECT 
+    COUNT(CASE WHEN LOWER(text) LIKE '%health%' OR LOWER(text) LIKE '%pain%' OR LOWER(text) LIKE '%sleep%' THEN 1 END) as health_mentions,
+    COUNT(CASE WHEN LOWER(text) LIKE '%work%' OR LOWER(text) LIKE '%patreon%' OR LOWER(text) LIKE '%ogm%' THEN 1 END) as work_mentions,
+    COUNT(CASE WHEN LOWER(text) LIKE '%lou%' OR LOWER(text) LIKE '%love%' OR LOWER(text) LIKE '%miss%' THEN 1 END) as relationship_mentions,
+    COUNT(CASE WHEN LOWER(text) LIKE '%event%' OR LOWER(text) LIKE '%social%' OR LOWER(text) LIKE '%friend%' THEN 1 END) as social_mentions
+FROM diary
+WHERE datetime(creation_date) >= datetime('now', '-30 days');
+
+-- Get entries by location
+SELECT 
+    location_name,
+    COUNT(*) as entry_count,
+    MAX(creation_date) as last_entry
+FROM diary
+WHERE location_name IS NOT NULL
+GROUP BY location_name
+ORDER BY entry_count DESC;
+
+-- Monthly journal activity
+SELECT 
+    strftime('%Y-%m', creation_date) as month,
+    COUNT(*) as entries,
+    COUNT(CASE WHEN starred = 1 THEN 1 END) as starred_entries
+FROM diary
+GROUP BY month
+ORDER BY month DESC
+LIMIT 12;
+```
+
+**Key things to look for in journal entries:**
+- Emotional patterns and mood trends over time
+- Health and wellness mentions (sleep quality, pain, exercise)
+- Relationship dynamics (Lou, friends, social connections)  
+- Work progress (OGM, Patreon, newsletters)
+- Recurring challenges or victories
+- Location-based patterns (home vs. travel)
+- Starred entries marking important moments
 
 ### Example Queries to Get Started
 
@@ -434,6 +514,13 @@ What to review and prepare based on the database
 ### 7. Self-Care Check
 
 Address any wellbeing concerns from recent notes and tasks
+
+**Day One Journal Review**: When analyzing wellbeing and emotional state:
+- Query recent entries from the `diary` table for reflections
+- Look for patterns in mood, energy, and life satisfaction
+- Note any recurring themes or concerns from journal entries
+- Use journal insights to inform self-care recommendations
+- Search for specific topics, people, or emotions using SQL LIKE queries
 
 ### 8. Time Tracking Review
 

@@ -115,6 +115,11 @@ main() {
     # Contact tracking sync (bidirectional between database and every_six_weeks.md)
     run_sync_step "📞 Contact Tracking" sync_contact_tracking "Contact tracking synced" "Contact tracking"
     
+    # Day One diary sync (if Journal.json exists)
+    if [[ -f vault/logs/Journal.json ]]; then
+        run_sync_step "📔 Day One Diary" sync_diary "Diary synced" "Day One diary"
+    fi
+    
     # Toggl time tracking sync (if configured)
     if grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null && ! grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
         run_sync_step "⏱️ Toggl Sync" sync_toggl "Toggl synced" "Toggl sync"
@@ -807,6 +812,54 @@ sync_contact_tracking() {
     fi
 }
 
+# Sync Day One diary entries to database
+sync_diary() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if diary-sync script exists
+    if [[ ! -f bin/diary-sync.cjs ]]; then
+        print_error "Diary sync script not available"
+        return 1
+    fi
+    
+    # Check if Journal.json exists
+    if [[ ! -f vault/logs/Journal.json ]]; then
+        print_info "No Day One journal export found"
+        return 1
+    fi
+    
+    # Run diary sync
+    print_info "Syncing Day One diary entries..."
+    
+    sync_output=$(node bin/diary-sync.cjs 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract stats from output
+        if echo "$sync_output" | grep -q "Successfully synced"; then
+            entry_count=$(echo "$sync_output" | grep -oE "synced [0-9]+ diary" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $entry_count diary entries"
+        elif echo "$sync_output" | grep -q "already up to date"; then
+            print_info "Diary already up to date"
+        fi
+        
+        # Show stats
+        if echo "$sync_output" | grep -q "Total entries:"; then
+            total=$(echo "$sync_output" | grep "Total entries:" | grep -oE "[0-9]+" | head -1)
+            recent=$(echo "$sync_output" | grep "Recent entries:" | grep -oE "[0-9]+ \(week\)" | grep -oE "[0-9]+" | head -1)
+            if [[ -n "$total" ]]; then
+                print_info "Total diary entries: $total (recent: $recent this week)"
+            fi
+        fi
+        
+        return 0
+    else
+        print_error "Diary sync failed"
+        if echo "$sync_output" | grep -q "not found"; then
+            print_info "Export your Day One journal to vault/logs/Journal.json"
+        fi
+        return 1
+    fi
+}
+
 # Sync OlderGay.Men monitoring data
 sync_ogm_monitoring() {
     cd "$(dirname "$0")/.." || return 1
@@ -894,6 +947,59 @@ process_inbox() {
             DEST_FILE="streaks-today.md"
             echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
             print_info "  • Streaks file → tasks/streaks-today.md"
+        
+        # Special case: Gratitude note - append to gratitude log
+        elif [[ "$TITLE" == "Gratitude" ]]; then
+            # Extract the gratitude line (everything after "I'm grateful for...")
+            # First find the line, then get everything after it that's not empty
+            GRATITUDE_LINE=$(echo "$CONTENT" | awk '/I.m grateful for/ {found=1; next} found && NF {print; exit}')
+            
+            if [[ -n "$GRATITUDE_LINE" ]]; then
+                # Get today's date in YYYY-MM-DD format
+                TODAY_DATE=$(date +%Y-%m-%d)
+                GRATITUDE_FILE="vault/logs/gratitude.md"
+                
+                # Create file if it doesn't exist
+                if [[ ! -f "$GRATITUDE_FILE" ]]; then
+                    echo "# Gratitude Log" > "$GRATITUDE_FILE"
+                    echo "" >> "$GRATITUDE_FILE"
+                    echo "<!-- Entries are automatically added from inbox notes -->" >> "$GRATITUDE_FILE"
+                    echo "<!-- Format: YYYY-MM-DD entry text -->" >> "$GRATITUDE_FILE"
+                    echo "" >> "$GRATITUDE_FILE"
+                fi
+                
+                # Create temp file for processing
+                TEMP_FILE=$(mktemp)
+                ENTRIES_FILE=$(mktemp)
+                
+                # Add new entry to a temp entries file
+                echo "$TODAY_DATE $GRATITUDE_LINE" > "$ENTRIES_FILE"
+                
+                # Get existing entries (skip header and blank lines)
+                tail -n +5 "$GRATITUDE_FILE" 2>/dev/null | grep -v "^$" >> "$ENTRIES_FILE" 2>/dev/null || true
+                
+                # Sort entries by date (reverse) and deduplicate
+                # The sort -r gives us newest first, and sort -u removes duplicates
+                SORTED_ENTRIES=$(sort -r -u "$ENTRIES_FILE")
+                
+                # Build the final file
+                head -4 "$GRATITUDE_FILE" > "$TEMP_FILE"  # Copy header
+                echo "" >> "$TEMP_FILE"  # Single blank line after header
+                echo "$SORTED_ENTRIES" >> "$TEMP_FILE"  # Add all entries without blank lines between them
+                
+                # Replace original file and clean up
+                mv "$TEMP_FILE" "$GRATITUDE_FILE"
+                rm -f "$ENTRIES_FILE"
+                
+                print_info "  • Gratitude note → Added to logs/gratitude.md"
+                print_info "    $TODAY_DATE: $GRATITUDE_LINE"
+            else
+                print_error "  • Gratitude note has no content after 'I'm grateful for...'"
+            fi
+            
+            # Delete the gratitude note from inbox
+            rm "$file"
+            continue  # Skip the normal file move logic
         
         # Special case: Progress note - append to today's review
         elif [[ "$TITLE" == "Progress" ]]; then
