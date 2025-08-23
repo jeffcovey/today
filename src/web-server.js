@@ -1731,7 +1731,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
           <a class="navbar-brand" href="/">
             <i class="fas fa-file-alt me-2"></i>${fileName}
           </a>
-          <form class="d-flex ms-auto me-2" onsubmit="performSearch(event)">
+          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
             <div class="input-group">
               <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
               <button class="btn btn-light btn-sm" type="submit">
@@ -1739,9 +1739,6 @@ async function renderMarkdownUncached(filePath, urlPath) {
               </button>
             </div>
           </form>
-          <a href="/edit/${urlPath}" class="btn btn-light btn-sm">
-            <i class="fas fa-edit me-1"></i>Edit
-          </a>
         </div>
       </nav>
 
@@ -1758,9 +1755,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
           <!-- Content column -->
           <div class="col-12 col-lg-7 mb-3">
             <div class="card shadow-sm h-100">
-              ${pageTitle ? `<div class="card-header bg-white border-bottom">
-                <h5 class="mb-0">${pageTitle}</h5>
-              </div>` : ''}
+              <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">${pageTitle || fileName}</h5>
+                  <a href="/edit/${urlPath}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-edit me-1"></i>Edit
+                  </a>
+                </div>
+              </div>
               <div class="card-body markdown-content">
                 ${htmlContent}
               </div>
@@ -1930,16 +1932,17 @@ async function renderMarkdownUncached(filePath, urlPath) {
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
           const startTime = Date.now();
           
-          // Create initial HTML
+          // Create initial HTML with space for thinking content
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Processing...</small>
               <div class="d-flex align-items-center">
                 <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
                 <span class="text-muted" id="ai-timer">0 seconds</span>
               </div>
+              <div class="thinking-content text-muted small mt-2" style="max-height: 100px; overflow-y: auto; font-family: monospace; display: none;"></div>
             </div>
           \`;
           document.getElementById('chatMessages').appendChild(typingIndicator);
@@ -2010,16 +2013,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
                       thinkingContent += data.content;
                       const thinkingElement = typingIndicator.querySelector('.thinking-content');
                       if (thinkingElement) {
+                        thinkingElement.style.display = 'block';
                         thinkingElement.textContent = thinkingContent.slice(-200); // Show last 200 chars
-                      } else {
-                        typingIndicator.innerHTML = \`
-                          <div class="bubble-content">
-                            <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
-                            <div class="thinking-content text-muted small" style="max-height: 100px; overflow-y: auto; font-family: monospace;">
-                              \${thinkingContent.slice(-200)}
-                            </div>
-                          </div>
-                        \`;
+                        // Update label to show we're seeing thinking
+                        const labelElement = typingIndicator.querySelector('small');
+                        if (labelElement) {
+                          labelElement.textContent = 'AI · Thinking...';
+                        }
                       }
                     } else if (data.type === 'thinking-complete') {
                       // Thinking is done, prepare to show response
@@ -2597,6 +2597,9 @@ app.post('/ai-chat-stream/*', async (req, res) => {
         try {
           const json = JSON.parse(line);
           
+          // Debug logging to see what we're getting
+          console.log('[AI Stream] Received JSON type:', json.type);
+          
           if (json.type === 'thinking') {
             isThinking = true;
             thinkingContent += json.text || '';
@@ -2604,6 +2607,13 @@ app.post('/ai-chat-stream/*', async (req, res) => {
             res.write(`data: ${JSON.stringify({
               type: 'thinking',
               content: json.text || ''
+            })}\n\n`);
+          } else if (json.type === 'message' && json.content) {
+            // Handle different message format from Claude
+            fullResponse += json.content || '';
+            res.write(`data: ${JSON.stringify({
+              type: 'text',
+              content: json.content || ''
             })}\n\n`);
           } else if (json.type === 'text') {
             if (isThinking && thinkingContent) {
