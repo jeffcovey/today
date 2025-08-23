@@ -1,11 +1,6 @@
 # Today's Tasks
 
-<<<<<<< Updated upstream
-*Generated: 8/23/2025, 6:00:24 PM EDT*
-=======
-
-*Generated: 8/23/2025, 6:00:39 PM EDT*
->>>>>>> Stashed changes
+*Generated: 8/23/2025, 6:21:16 PM EDT*
 
 ## Next Up
 
@@ -14,18 +9,163 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<<<<<<< Updated upstream
 <summary><strong>✅ Done Today</strong> (1854 tasks completed)</summary>
 
+- [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
+- [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
+- [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
+- [x] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
+- [x] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
+- [x] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
+- [x] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
+- [x] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
+- [x] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
+- [x] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
+- [x] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
+- [x] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
+- [x] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
+- [x] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
+- [x] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
+- [x] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
+- [x] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
+- [x] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
+- [x] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
+- [x] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
+- [x] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
+- [x] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
+- [x] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
+- [x] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
+- [x] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
+- [x] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
+- [x] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
+- [x] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
+- [x] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
+- [x] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
+- [x] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
+- [x] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
+- [x] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
+- [x] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
+- [x] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
+- [x] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
+- [x] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
+- [x] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
+- [x] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
+- [x] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
+- [x] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
+- [x] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
+- [x] **Notifications** - Phone & computer <!-- task-id: d7ad6d277a6adbe8f04e48ff74ccfc42 -->
+- [x] **Drafts** - Process pending notes <!-- task-id: fb5cdb5d5f063d569b5d79fb0cb328d8 -->
+- [x] **Voicemail** - Check phone messages <!-- task-id: 3912bfd95d1d584a6d749302594a1d2e -->
+- [x] **Apple Reminders** - Review tasks <!-- task-id: 3d870a2aa505420779683c8f7f400266 -->
+- [x] **Paper notes** - Physical inbox <!-- task-id: a54ef156e7e0cf2aae36c3f8b9244709 -->
+- [x] **Calendar** - Review today's schedule <!-- task-id: 1c5ecc590523098581c9e52bab7b6dbb -->
+- [x] **Read "Tight Hip, Twisted Core" book** - Minimum 30 minutes today <!-- task-id: 239fee473db21d72f846c8ef4f7264fd -->
+- [x] **Morning hip-focused stretching** - 15 minutes <!-- task-id: 0b05ba138316c43e04ad523386fb43f5 -->
+- [x] **Track pain levels and mobility** - Document progress <!-- task-id: 8bd9e6cee502ada70ddc9ecab89ef96e -->
+- [x] Create views for ChatVisits (🚀 1st Priority task) <!-- task-id: a802526f69658a7511af23dc128b9a5d -->
+- [x] Assign topics to photo uploaders (🚀 1st Priority task) <!-- task-id: 0262e2277096a696086bab5e6bf9f034 -->
+- [x] Review GitHub issue #5197 for parallel test execution <!-- task-id: 6ac94332d71771451b259f6a8d045b05 -->
+- [x] Create "+Guest Preparation Template" (🚀 1st Priority task) <!-- task-id: 6ee103cd548fd3bd2d8f3fab6eda13cd -->
+- [x] Document standard check-in/checkout procedures <!-- task-id: 3d9428960b1c208b84a8d68aaad1ed81 -->
+- [x] Set up automated responses for common guest questions <!-- task-id: 5409c5519b79b18b4786d3814d9a2f58 -->
+- [x] **Airbnb: Wae's inquiry** - MUST respond today <!-- task-id: 1e8fd0956fff1271876dd0059ccfcbe5 -->
+- [x] **OGM bug reports** - Check and respond <!-- task-id: c8ff8fa69fa6856c547c958dc2c3dcdb -->
+- [x] **Coordinate with Randy** - Arrives Friday, Aug 29 <!-- task-id: 020085787317ee9ff807c3aa2f19f35c -->
+- [x] **Contact "Older"** - Listed in people_to_contact table <!-- task-id: a5f33f8f268727a011b976e1a52930ac -->
+- [x] **Morning**: Hip-focused stretching (15 min) <!-- task-id: f8be64053f57b5f61924db6dee259fe8 -->
+- [x] **During Day**: Track pain levels and mobility <!-- task-id: 6d28cf03f53e2368fd32ede099e791ce -->
+- [x] **Evening**: Read arthritis treatment book (30 min) <!-- task-id: 3c03a9f0d62db3c8a6f36a5038a34fea -->
+- [x] **12:30 PM**: Zazen meditation <!-- task-id: f5c26873dcd6f4f03da64e841a6a2e58 -->
+- [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 6445820708408445b9515d45a41cb133 -->
+- [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: 50ad0b963ed6f95263acd0edb0122de8 -->
+- [x] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 8f318ce149ccd95a419cd5f838de465e -->
+- [x] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 292ec2fb5c65ad09975ee01c2c3edc75 -->
+- [x] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: 2cf3c350175ae847a5d23b718082e981 -->
+- [x] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 29a44f904485f1fc91bb8cdc1d5b65a8 -->
+- [x] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 4ad009ee02164da8620a8855fdcb72e2 -->
+- [x] **🔒 Lock the doors** - Secure the house <!-- task-id: 7d1f9a5d177e084ce7eebd401a6ccc4e -->
+- [x] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 1a5f94c378a6739cdc8249f22d8f9238 -->
+- [x] **💊 Finish taking your pills** - Complete medications <!-- task-id: f563dbbf790b62da6c0a09549c001dbc -->
+- [x] Airbnb inquiry responded to on time <!-- task-id: 3b253b1245ec85e66422b70bbd52a8f9 -->
+- [x] 30+ minutes reading arthritis book <!-- task-id: 47f7bbe8dc7e69e7b248cb4e7bb080de -->
+- [x] Hip stretching completed <!-- task-id: 3fc9942f00735ea3e7c3ecab9b670170 -->
+- [x] At least one OGM priority task completed <!-- task-id: cdace22af5efcd31f941f45130a333d1 -->
+- [x] Evening routine completed before 9:30 PM <!-- task-id: 1004041d0b3c514be33774c0a04c070f -->
+- [x] Set up Railway PostgreSQL instance <!-- task-id: p1-001 --> <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
+- [x] Configure connection pooling <!-- task-id: p1-002 --> <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
+- [x] Set up read replica from Heroku <!-- task-id: p1-003 --> <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
+- [x] Test connection from Heroku apps <!-- task-id: p1-004 --> <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
+- [x] Implement automated backups <!-- task-id: p1-005 --> <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
+- [x] Switch Heroku apps to use Railway DB <!-- task-id: p1-006 --> <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
+- [x] Monitor for 48 hours <!-- task-id: p1-007 --> <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
+- [x] Decommission Heroku PostgreSQL <!-- task-id: p1-008 --> <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
+- [x] Create Railway Redis instance <!-- task-id: r1-001 --> <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
+- [x] Export Redis data from Heroku <!-- task-id: r1-002 --> <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
+- [x] Import data to Railway Redis <!-- task-id: r1-003 --> <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
+- [x] Update connection strings in Heroku apps <!-- task-id: r1-004 --> <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
+- [x] Test cache operations <!-- task-id: r1-005 --> <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
+- [x] Monitor performance <!-- task-id: r1-006 --> <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
+- [x] Cancel Heroku Redis <!-- task-id: r1-007 --> <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
+- [x] Evaluate Railway's built-in logging <!-- task-id: l2-001 --> <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
+- [x] Set up log aggregation if needed <!-- task-id: l2-002 --> <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
+- [x] Export historical logs from Papertrail <!-- task-id: l2-003 --> <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
+- [x] Update log shipping configuration <!-- task-id: l2-004 --> <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
+- [x] Cancel Papertrail <!-- task-id: l2-005 --> <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
+- [x] Set up AWS SES or Resend <!-- task-id: e2-001 --> <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
+- [x] Migrate email templates <!-- task-id: e2-002 --> <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
+- [x] Update SMTP settings <!-- task-id: e2-003 --> <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
+- [x] Test email delivery <!-- task-id: e2-004 --> <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
+- [x] Cancel SendGrid Gold <!-- task-id: e2-005 --> <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
+- [x] Document all Heroku Scheduler tasks <!-- task-id: s2-001 --> <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
+- [x] Set up Railway cron jobs <!-- task-id: s2-002 --> <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
+- [x] Test job execution <!-- task-id: s2-003 --> <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
+- [x] Monitor for failures <!-- task-id: s2-004 --> <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
+- [x] Identify non-critical applications <!-- task-id: nc3-001 --> <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
+- [x] Deploy to Railway one at a time <!-- task-id: nc3-002 --> <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
+- [x] Test each application thoroughly <!-- task-id: nc3-003 --> <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
+- [x] Update DNS/routing as needed <!-- task-id: nc3-004 --> <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
+- [x] Monitor for issues <!-- task-id: nc3-005 --> <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
+- [x] Keep Heroku as backup for 1 week <!-- task-id: nc3-006 --> <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
+- [x] Create detailed migration plan <!-- task-id: c4-001 --> <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
+- [x] Set up blue-green deployment <!-- task-id: c4-002 --> <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
+- [x] Migrate during low-traffic window <!-- task-id: c4-003 --> <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
+- [x] Implement instant rollback capability <!-- task-id: c4-004 --> <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
+- [x] Monitor intensively for 2 weeks <!-- task-id: c4-005 --> <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
+- [x] Gradually decommission Heroku <!-- task-id: c4-006 --> <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
+- [x] Get Railway database connection strings <!-- task-id: ns-001 --> <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
+- [x] Test connection latency (expect 5-20ms between providers) <!-- task-id: ns-002 --> <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
+- [x] Set up connection pooling (PgBouncer if needed) <!-- task-id: ns-003 --> <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
+- [x] Configure SSL certificates <!-- task-id: ns-004 --> <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
+- [x] Set up monitoring for cross-platform connections <!-- task-id: ns-005 --> <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
+- [x] Document all connection strings securely <!-- task-id: ns-006 --> <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
+- [x] Rice cooker → drawer near cooking area <!-- task-id: 44c747923d3e47af344ed085f282a4ca -->
+- [x] Small appliances → cabinets/drawers where used <!-- task-id: f6bff7052d4c4edce663f6f3a8b92672 -->
+- [x] Clear countertops completely except daily essentials <!-- task-id: 6e7ced4a3ade7245a47cd8b96c41c092 -->
+- [x] Organize drawer near stove for cooking tools <!-- task-id: 0c1f07ebf2249051e191249f3b202f4b -->
+- [x] Hide charging cables <!-- task-id: 9018e0ca66bbe783ed1eb3a5ae6c998e -->
+- [x] Clear counter completely <!-- task-id: f5304f3aefae82c578d3a1cb6c2ab0bf -->
+- [x] Move toiletries to medicine cabinet or drawer organizers <!-- task-id: 46be7d44b5f9e9ea959b90672fb33170 -->
+- [x] Install drawer dividers for small items <!-- task-id: e7900f31b8516fc8b6bb7426de43d1eb -->
+- [x] Hide hair dryer/straightener in vanity <!-- task-id: 894a1d15897f0db9779cd09d6ddac721 -->
+- [x] Wall-mount items where possible <!-- task-id: 714765d3dcad02b47a5f7761e3a767e5 -->
+- [x] Clear dresser top <!-- task-id: 3eba7cd3040eb7a80025846d58008517 -->
+- [x] Move daily items to top drawer with organizer <!-- task-id: eec6d969a4e4a51e5b88e3e06517c230 -->
+- [x] Create charging station inside nightstand drawer <!-- task-id: 01f52ccc7458d02fe4db33d91018d8a1 -->
+- [x] Hide cables behind furniture <!-- task-id: a57d251c497cc2881ac62b3c52ab0add -->
+- [x] Clear all flat surfaces (coffee table, side tables) <!-- task-id: 3f53ca5e3a6bc23b5e41c16864eb5738 -->
+- [x] Create hidden storage for remotes, chargers <!-- task-id: b929c31edded801c25e00d670ea12433 -->
+- [x] Organize items by use location <!-- task-id: 29052d2e3fa367d3d614f12c77edd8cb -->
+- [x] Remove "just in case" items from surfaces <!-- task-id: 0257b3a7490162cbf634e3685eb6f35c -->
+- [x] Use cable management boxes for power strips <!-- task-id: 576067ab445066694c21b2961a193adb -->
+- [x] Install under-desk cable trays <!-- task-id: 8815a5785484488662e6473fde1e4d53 -->
+- [x] Use adhesive cable clips along baseboards <!-- task-id: 559ee2a07007e5d69c417da1b2b6f86c -->
+- [x] Get matching cable covers for visible wires <!-- task-id: a861067a90d076fc65439119160dbd4d -->
+- [x] Label cables at both ends for easy identification <!-- task-id: d9cbc88025a7930306aef715edd1d4f1 -->
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
 - [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 0ad428e0957933a3842d614de38d41a7 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 68229561dfd1018ae0124ee0ea4721a9 -->
-=======
-<summary><strong>✅ Done Today</strong> (263 tasks completed)</summary>
-
->>>>>>> Stashed changes
 - [x] add zazen to calendar <!-- task-id: e8406417a8d7f546954157fbe8885499 -->
 - [x] Schedule follow-up with Orthopaedic Center if needed <!-- task-id: 75be22690e57037f8c3f72993c7ab7d3 -->
 - [x] see why notes are stuck in the inbox <!-- task-id: 1b07b018f239d91635bfbed55d3ff412 -->
@@ -88,10 +228,7 @@
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: a7623cd7580b5884b184755410d9ae60 -->
 - [x] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [x] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
-<<<<<<< Updated upstream
 - [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
-=======
->>>>>>> Stashed changes
 - [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
 - [x] Guest room hosting management <!-- task-id: eb6c6e16df0747772258b3db7845727d -->
 - [x] Health and fitness consistency during summer <!-- task-id: afdfd7db172ccc5821bcffa3c4801a74 -->
@@ -103,7 +240,6 @@
 - [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: spammers --> <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
 - [x] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
 - [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-<<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
@@ -159,8 +295,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 08f7f32b06b39d9ca741d4fb05135a6d -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 17b6cd1f95e509b06f567975d3651fae -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 09a41482100d67d15fd6bfe5df55841b -->
-=======
->>>>>>> Stashed changes
 - [x] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
 - [x] Use The Inversion Table <!-- task-id: e73befc42e92c0571f2d3d80b09d1d2e -->
 - [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
@@ -170,7 +304,6 @@
 - [x] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
 - [x] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
-<<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 96dade19404c4cee9e659058cd7bee38 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f3a7b0388b05c04597a6297992fe0358 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d764f9a691b92a9d1386a56c7fdf743 -->
@@ -204,17 +337,11 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f52cee2a7653c979272fd7d257204d85 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f4e63fec2eaef5ea4522c0915e164b33 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: fb44d1f15bf2ad7aaf8a456c38dab7d7 -->
-=======
-- [x] Complete daily streaks (inversion table, Tai Chi, saved articles) <!-- task-id: fca2443263d311e03664cb86d34497c1 -->
-- [x] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
-- [x] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
->>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 99fbddffa736933b382eed412cbc0664 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b5b76e689569ade7284c9e40e3ec87d3 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0320cea9bee9160a81cc8335be7e729d -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ae563d614bb65b48ec2c64845aded22f -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 78478f3d99fe12e3eb085cead60c8d62 -->
-<<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 08c1ff9ee6d6438a5df0d614162084ce -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 52595330df74127bd49642bfce64d3f7 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7bbe190d956e84b4cb01c1f35c782a07 -->
@@ -280,8 +407,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a3c3d02eb8002426c6d9ed8ff73aaaa0 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df690e295aae94ee6cf0e831920aacbf -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e912e1bd5046500c9d51159f89bd931d -->
-=======
->>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 402919e7a490baaa0a6f210804b75bcc -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 350d44ab3e4181ece9fb8d038101dfd4 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f2e4cc28f7233c8a192148925c1bb565 -->
@@ -363,7 +488,6 @@
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 30e74d5749638cb15fa1004a07cbb605 -->
 - [x] Daily streaks (after dinner) <!-- task-id: 3bd65e3d71ef59494fee2ffe9e90a475 -->
 - [x] 30-minute arthritis book reading <!-- task-id: ba56e51570cfbcd6d6d9336f75e4762f -->
-<<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6b4fd7ed38e570e7b1e272ec658e9477 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: afe5f759c32fd64b6f0696cfae0e4a6c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9910ccc4132a552d7a98a0023307c50c -->
@@ -444,12 +568,6 @@
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
-=======
-- [x] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
-- [x] set up a DigitalOcean account <!-- task-id: ee11a5dc1c5896ad94677483e8bf7f34 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
->>>>>>> Stashed changes
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
 - [x] order toilet paper and paper towels <!-- task-id: e17dc65f8b99e3fc4a2c19949d361958 -->
@@ -464,7 +582,6 @@
 - [x] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
-<<<<<<< Updated upstream
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
@@ -766,10 +883,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d0028096404dc5ad37f48a82652fb3a -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 625984097eed05534f54eb55677ed5ad -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e630279019d7f75e1c87e39f472a8ecf -->
-- [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
-- [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
-- [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
-- [x] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
 - [x] Export all Heroku environment variables <!-- task-id: a474dc47487ef7d1e7a6e38e62a15665 -->
 - [x] Document all Heroku applications and their purposes <!-- task-id: c930bc2108bf5dc796b1be2001c615b2 -->
 - [x] List all add-ons and their configurations <!-- task-id: 376c73a6f9941a0577fea25e1261b317 -->
@@ -824,44 +937,6 @@
 - [x] Downgrade to free tier (keep for 30 days) <!-- task-id: 975a9d21f14407f74b07f53369e6ea7a -->
 - [x] Document lessons learned <!-- task-id: 8c655deb24f2e433465ca9f0f7992e6b -->
 - [x] Complete cost analysis <!-- task-id: b2c71c9660a67e7190435257d7aea9e3 -->
-- [x] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
-- [x] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
-- [x] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
-- [x] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
-- [x] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
-- [x] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
-- [x] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
-- [x] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
-- [x] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
-- [x] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
-- [x] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
-- [x] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
-- [x] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
-- [x] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
-- [x] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
-- [x] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
-- [x] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
-- [x] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
-- [x] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
-- [x] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
-- [x] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
-- [x] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
-- [x] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
-- [x] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
-- [x] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
-- [x] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
-- [x] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
-- [x] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
-- [x] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
-- [x] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
-- [x] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
-- [x] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
-- [x] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
-- [x] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
-- [x] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
-- [x] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
-- [x] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
-- [x] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f568237e221901e1e587507346da886f -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71cc6a1f007c92ab2e9b5c6cb24b06ee -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7cf95338e634218cc2df047bbc7f0061 -->
@@ -1662,47 +1737,9 @@
 - [x] **🙏 Record what you're grateful for** - Set a positive tone <!-- task-id: 1d8a740d930695a28cb4915876933ba6 -->
 - [x] **📖 Read mindset notes** - Center your thoughts <!-- task-id: 191a41c1a1878d5cd62ee81226c7e59c -->
 - [x] **✍️ Journal** - Process and reflect <!-- task-id: b47c18ec60f85861c38beba73609bd1c -->
-- [x] **Notifications** - Phone & computer <!-- task-id: d7ad6d277a6adbe8f04e48ff74ccfc42 -->
 - [x] **App badges** - Clear all red dots <!-- task-id: e2110e5272d2fbc1021a8e637e010cc5 -->
 - [x] **(https://app.frontapp.com/)** - Customer support <!-- task-id: be77923062338cbfe1ab6fb4b1eed01e -->
 - [x] **(https://talk.oldergay.men)** - Community messages <!-- task-id: 911d2e3aaf41574cfb9e77f8f7980b71 -->
-- [x] **Drafts** - Process pending notes <!-- task-id: fb5cdb5d5f063d569b5d79fb0cb328d8 -->
-- [x] **Voicemail** - Check phone messages <!-- task-id: 3912bfd95d1d584a6d749302594a1d2e -->
-- [x] **Apple Reminders** - Review tasks <!-- task-id: 3d870a2aa505420779683c8f7f400266 -->
-- [x] **Paper notes** - Physical inbox <!-- task-id: a54ef156e7e0cf2aae36c3f8b9244709 -->
-- [x] **Calendar** - Review today's schedule <!-- task-id: 1c5ecc590523098581c9e52bab7b6dbb -->
-- [x] **Read "Tight Hip, Twisted Core" book** - Minimum 30 minutes today <!-- task-id: 239fee473db21d72f846c8ef4f7264fd -->
-- [x] **Morning hip-focused stretching** - 15 minutes <!-- task-id: 0b05ba138316c43e04ad523386fb43f5 -->
-- [x] **Track pain levels and mobility** - Document progress <!-- task-id: 8bd9e6cee502ada70ddc9ecab89ef96e -->
-- [x] Create views for ChatVisits (🚀 1st Priority task) <!-- task-id: a802526f69658a7511af23dc128b9a5d -->
-- [x] Assign topics to photo uploaders (🚀 1st Priority task) <!-- task-id: 0262e2277096a696086bab5e6bf9f034 -->
-- [x] Review GitHub issue #5197 for parallel test execution <!-- task-id: 6ac94332d71771451b259f6a8d045b05 -->
-- [x] Create "+Guest Preparation Template" (🚀 1st Priority task) <!-- task-id: 6ee103cd548fd3bd2d8f3fab6eda13cd -->
-- [x] Document standard check-in/checkout procedures <!-- task-id: 3d9428960b1c208b84a8d68aaad1ed81 -->
-- [x] Set up automated responses for common guest questions <!-- task-id: 5409c5519b79b18b4786d3814d9a2f58 -->
-- [x] **Airbnb: Wae's inquiry** - MUST respond today <!-- task-id: 1e8fd0956fff1271876dd0059ccfcbe5 -->
-- [x] **OGM bug reports** - Check and respond <!-- task-id: c8ff8fa69fa6856c547c958dc2c3dcdb -->
-- [x] **Coordinate with Randy** - Arrives Friday, Aug 29 <!-- task-id: 020085787317ee9ff807c3aa2f19f35c -->
-- [x] **Contact "Older"** - Listed in people_to_contact table <!-- task-id: a5f33f8f268727a011b976e1a52930ac -->
-- [x] **Morning**: Hip-focused stretching (15 min) <!-- task-id: f8be64053f57b5f61924db6dee259fe8 -->
-- [x] **During Day**: Track pain levels and mobility <!-- task-id: 6d28cf03f53e2368fd32ede099e791ce -->
-- [x] **Evening**: Read arthritis treatment book (30 min) <!-- task-id: 3c03a9f0d62db3c8a6f36a5038a34fea -->
-- [x] **12:30 PM**: Zazen meditation <!-- task-id: f5c26873dcd6f4f03da64e841a6a2e58 -->
-- [x] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 6445820708408445b9515d45a41cb133 -->
-- [x] **📝 Report the day's work to OGM** - Share your progress <!-- task-id: 50ad0b963ed6f95263acd0edb0122de8 -->
-- [x] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 8f318ce149ccd95a419cd5f838de465e -->
-- [x] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 292ec2fb5c65ad09975ee01c2c3edc75 -->
-- [x] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: 2cf3c350175ae847a5d23b718082e981 -->
-- [x] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 29a44f904485f1fc91bb8cdc1d5b65a8 -->
-- [x] **🧹 Tidy** - Quick cleanup for peace of mind <!-- task-id: 4ad009ee02164da8620a8855fdcb72e2 -->
-- [x] **🔒 Lock the doors** - Secure the house <!-- task-id: 7d1f9a5d177e084ce7eebd401a6ccc4e -->
-- [x] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 1a5f94c378a6739cdc8249f22d8f9238 -->
-- [x] **💊 Finish taking your pills** - Complete medications <!-- task-id: f563dbbf790b62da6c0a09549c001dbc -->
-- [x] Airbnb inquiry responded to on time <!-- task-id: 3b253b1245ec85e66422b70bbd52a8f9 -->
-- [x] 30+ minutes reading arthritis book <!-- task-id: 47f7bbe8dc7e69e7b248cb4e7bb080de -->
-- [x] Hip stretching completed <!-- task-id: 3fc9942f00735ea3e7c3ecab9b670170 -->
-- [x] At least one OGM priority task completed <!-- task-id: cdace22af5efcd31f941f45130a333d1 -->
-- [x] Evening routine completed before 9:30 PM <!-- task-id: 1004041d0b3c514be33774c0a04c070f -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e862593b37ca8c296a0083f5bda0ae8b -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 205dbfb755d73f4c9a1d458ca8c0a83c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 329ec6075205b8680b4e2469fe735e8a -->
@@ -1785,76 +1822,6 @@
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 90e8b1c522404630d6475c7e03718a7c -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 896291611740816c2ceae0f14a1efde6 -->
 - [x] fix OGM task sync (GH, Front, HB, Scout) <!-- task-id: 0d57e63aae92e57d850f28d0ee52b254 -->
-- [x] Set up Railway PostgreSQL instance <!-- task-id: p1-001 --> <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
-- [x] Configure connection pooling <!-- task-id: p1-002 --> <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
-- [x] Set up read replica from Heroku <!-- task-id: p1-003 --> <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
-- [x] Test connection from Heroku apps <!-- task-id: p1-004 --> <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
-- [x] Implement automated backups <!-- task-id: p1-005 --> <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
-- [x] Switch Heroku apps to use Railway DB <!-- task-id: p1-006 --> <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
-- [x] Monitor for 48 hours <!-- task-id: p1-007 --> <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
-- [x] Decommission Heroku PostgreSQL <!-- task-id: p1-008 --> <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
-- [x] Create Railway Redis instance <!-- task-id: r1-001 --> <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
-- [x] Export Redis data from Heroku <!-- task-id: r1-002 --> <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
-- [x] Import data to Railway Redis <!-- task-id: r1-003 --> <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
-- [x] Update connection strings in Heroku apps <!-- task-id: r1-004 --> <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
-- [x] Test cache operations <!-- task-id: r1-005 --> <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
-- [x] Monitor performance <!-- task-id: r1-006 --> <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
-- [x] Cancel Heroku Redis <!-- task-id: r1-007 --> <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
-- [x] Evaluate Railway's built-in logging <!-- task-id: l2-001 --> <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
-- [x] Set up log aggregation if needed <!-- task-id: l2-002 --> <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
-- [x] Export historical logs from Papertrail <!-- task-id: l2-003 --> <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
-- [x] Update log shipping configuration <!-- task-id: l2-004 --> <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
-- [x] Cancel Papertrail <!-- task-id: l2-005 --> <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
-- [x] Set up AWS SES or Resend <!-- task-id: e2-001 --> <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
-- [x] Migrate email templates <!-- task-id: e2-002 --> <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
-- [x] Update SMTP settings <!-- task-id: e2-003 --> <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
-- [x] Test email delivery <!-- task-id: e2-004 --> <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
-- [x] Cancel SendGrid Gold <!-- task-id: e2-005 --> <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
-- [x] Document all Heroku Scheduler tasks <!-- task-id: s2-001 --> <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
-- [x] Set up Railway cron jobs <!-- task-id: s2-002 --> <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
-- [x] Test job execution <!-- task-id: s2-003 --> <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
-- [x] Monitor for failures <!-- task-id: s2-004 --> <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
-- [x] Identify non-critical applications <!-- task-id: nc3-001 --> <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
-- [x] Deploy to Railway one at a time <!-- task-id: nc3-002 --> <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
-- [x] Test each application thoroughly <!-- task-id: nc3-003 --> <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
-- [x] Update DNS/routing as needed <!-- task-id: nc3-004 --> <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
-- [x] Monitor for issues <!-- task-id: nc3-005 --> <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
-- [x] Keep Heroku as backup for 1 week <!-- task-id: nc3-006 --> <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
-- [x] Create detailed migration plan <!-- task-id: c4-001 --> <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
-- [x] Set up blue-green deployment <!-- task-id: c4-002 --> <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
-- [x] Migrate during low-traffic window <!-- task-id: c4-003 --> <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
-- [x] Implement instant rollback capability <!-- task-id: c4-004 --> <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
-- [x] Monitor intensively for 2 weeks <!-- task-id: c4-005 --> <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
-- [x] Gradually decommission Heroku <!-- task-id: c4-006 --> <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
-- [x] Get Railway database connection strings <!-- task-id: ns-001 --> <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
-- [x] Test connection latency (expect 5-20ms between providers) <!-- task-id: ns-002 --> <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
-- [x] Set up connection pooling (PgBouncer if needed) <!-- task-id: ns-003 --> <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
-- [x] Configure SSL certificates <!-- task-id: ns-004 --> <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
-- [x] Set up monitoring for cross-platform connections <!-- task-id: ns-005 --> <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
-- [x] Document all connection strings securely <!-- task-id: ns-006 --> <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
-- [x] Rice cooker → drawer near cooking area <!-- task-id: 44c747923d3e47af344ed085f282a4ca -->
-- [x] Small appliances → cabinets/drawers where used <!-- task-id: f6bff7052d4c4edce663f6f3a8b92672 -->
-- [x] Clear countertops completely except daily essentials <!-- task-id: 6e7ced4a3ade7245a47cd8b96c41c092 -->
-- [x] Organize drawer near stove for cooking tools <!-- task-id: 0c1f07ebf2249051e191249f3b202f4b -->
-- [x] Hide charging cables <!-- task-id: 9018e0ca66bbe783ed1eb3a5ae6c998e -->
-- [x] Clear counter completely <!-- task-id: f5304f3aefae82c578d3a1cb6c2ab0bf -->
-- [x] Move toiletries to medicine cabinet or drawer organizers <!-- task-id: 46be7d44b5f9e9ea959b90672fb33170 -->
-- [x] Install drawer dividers for small items <!-- task-id: e7900f31b8516fc8b6bb7426de43d1eb -->
-- [x] Hide hair dryer/straightener in vanity <!-- task-id: 894a1d15897f0db9779cd09d6ddac721 -->
-- [x] Wall-mount items where possible <!-- task-id: 714765d3dcad02b47a5f7761e3a767e5 -->
-- [x] Clear dresser top <!-- task-id: 3eba7cd3040eb7a80025846d58008517 -->
-- [x] Move daily items to top drawer with organizer <!-- task-id: eec6d969a4e4a51e5b88e3e06517c230 -->
-- [x] Create charging station inside nightstand drawer <!-- task-id: 01f52ccc7458d02fe4db33d91018d8a1 -->
-- [x] Hide cables behind furniture <!-- task-id: a57d251c497cc2881ac62b3c52ab0add -->
-- [x] Clear all flat surfaces (coffee table, side tables) <!-- task-id: 3f53ca5e3a6bc23b5e41c16864eb5738 -->
-- [x] Create hidden storage for remotes, chargers <!-- task-id: b929c31edded801c25e00d670ea12433 -->
-- [x] Organize items by use location <!-- task-id: 29052d2e3fa367d3d614f12c77edd8cb -->
-- [x] Remove "just in case" items from surfaces <!-- task-id: 0257b3a7490162cbf634e3685eb6f35c -->
-- [x] Use cable management boxes for power strips <!-- task-id: 576067ab445066694c21b2961a193adb -->
-- [x] Install under-desk cable trays <!-- task-id: 8815a5785484488662e6473fde1e4d53 -->
-- [x] Use adhesive cable clips along baseboards <!-- task-id: 559ee2a07007e5d69c417da1b2b6f86c -->
-- [x] Get matching cable covers for visible wires <!-- task-id: a861067a90d076fc65439119160dbd4d -->
-- [x] Label cables at both ends for easy identification <!-- task-id: d9cbc88025a7930306aef715edd1d4f1 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3b4582257e25656215143ad4c2986221 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6952d6f74bf0baab4af3057dbe4c9c52 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: bdc97b11f282eece3b833332cbc3bb32 -->
@@ -1895,16 +1862,6 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2494db167461d3c55f552062dc21dcd6 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d5e56bb7cc33734e167f4afa57fc8cb3 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 820e92bb882fc5a64a740a451b41a929 -->
-=======
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3f9849e11783735be0ccb63c3b9b9da2 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f1ee1546baa7a426926b0c2955cbf9d0 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d62997ba5cf263dfd4de4f083a27d279 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 68cb5a4f75e0135ff7f9d7d525555405 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f8af215c500eab0cd220e2b851f4b857 -->
-- [x] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
->>>>>>> Stashed changes
 - [x] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [x] Start reading "Tight Hip, Twisted Core" book - minimum 30 minutes daily <!-- task-id: 5a0e17f383f91952fef2d82f979580d3 -->
 - [x] Downgrade Heroku Performance-L to Standard-2X (save $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
