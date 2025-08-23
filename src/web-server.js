@@ -4,9 +4,9 @@ import express from 'express';
 import session from 'express-session';
 import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
+import crypto from "crypto";
 import fs from 'fs/promises';
 import { marked } from 'marked';
-import basicAuth from 'express-basic-auth';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -15,6 +15,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
+app.set("trust proxy", 1);
 const VAULT_PATH = path.join(__dirname, '..', 'vault');
 
 // Middleware for parsing JSON and URL-encoded bodies
@@ -32,7 +33,7 @@ app.use(session({
     table: 'sessions',
     concurrentDB: true
   }),
-  secret: process.env.SESSION_SECRET || 'vault-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -42,41 +43,57 @@ app.use(session({
   }
 }));
 
-// Basic authentication with session support
-const users = {};
-users[process.env.WEB_USER || 'admin'] = process.env.WEB_PASSWORD || 'changeme';
+// Authentication credentials
+const validUser = process.env.WEB_USER || "admin";
+const validPassword = process.env.WEB_PASSWORD || "changeme";
 
-// Custom auth middleware that checks session first
-const authMiddleware = basicAuth({
-  users,
-  challenge: true,
-  realm: 'Today Vault',
-  authorizeAsync: true,
-  authorizer: (username, password, callback) => {
-    const userMatches = basicAuth.safeCompare(username, process.env.WEB_USER || 'admin');
-    const passwordMatches = basicAuth.safeCompare(password, users[username] || '');
-    callback(null, userMatches && passwordMatches);
-  }
+function sessionAuth(req, res, next) {
+  if (req.path === "/auth/login" || req.path === "/auth/logout") return next();
+  if (req.session && req.session.authenticated) return next();
+  req.session.returnTo = req.originalUrl;
+  res.redirect("/auth/login");
+}
+
+app.get("/auth/login", (req, res) => {
+  if (req.session && req.session.authenticated) return res.redirect("/");
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Login - Today Vault</title>
+      <style>
+        body { font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+        form { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input { display: block; width: 200px; margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        button { width: 100%; padding: 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        h2 { margin: 0 0 1rem 0; color: #333; }
+      </style>
+    </head>
+    <body>
+      <form method="POST">
+        <h2>Today Vault</h2>
+        <input name="username" placeholder="Username" required autofocus>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+    </body>
+    </html>
+  `);
 });
 
-app.use((req, res, next) => {
-  // If already authenticated in session, skip basic auth
-  if (req.session && req.session.authenticated) {
-    return next();
-  }
-  
-  // Otherwise use basic auth and save to session on success
-  authMiddleware(req, res, (err) => {
-    if (!err && req.auth) {
-      // Authentication successful, save to session
-      req.session.authenticated = true;
-      req.session.username = req.auth.user;
-    }
-    next(err);
-  });
+app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
+  if (req.body.username === validUser && req.body.password === validPassword) {
+    req.session.authenticated = true;
+    req.session.save(() => res.redirect(req.session.returnTo || "/"));
+  } else res.redirect("/auth/login");
 });
 
-// Serve static CSS
+app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/auth/login")));
+
+const authMiddleware = sessionAuth;
 app.use('/static', express.static(path.join(__dirname, '..', 'public')));
 
 // MDBootstrap and custom styles
