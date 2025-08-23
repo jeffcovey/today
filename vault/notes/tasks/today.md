@@ -1,13 +1,9 @@
 # Today's Tasks
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 *Generated: 8/23/2025, 6:00:24 PM EDT*
 =======
 
-*Generated: 8/23/2025, 6:00:39 PM EDT*
->>>>>>> Stashed changes
-=======
 *Generated: 8/23/2025, 6:00:39 PM EDT*
 >>>>>>> Stashed changes
 
@@ -19,7 +15,6 @@
 
 <details>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 <summary><strong>✅ Done Today</strong> (1854 tasks completed)</summary>
 
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
@@ -27,10 +22,6 @@
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 0ad428e0957933a3842d614de38d41a7 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 68229561dfd1018ae0124ee0ea4721a9 -->
-=======
-<summary><strong>✅ Done Today</strong> (263 tasks completed)</summary>
-
->>>>>>> Stashed changes
 =======
 <summary><strong>✅ Done Today</strong> (263 tasks completed)</summary>
 
@@ -98,10 +89,7 @@
 - [x] Start reading "Tight Hip, Twisted Core" book <!-- task-id: 2816cb1d9bca66ff554cdbefae08d35f -->
 - [x] Export Notion data (CSV, Markdown, or API) <!-- task-id: 5db6a2e3df980e98f1f92dc0bceb4622 -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
-=======
->>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 - [x] OlderGay.Men summer initiatives <!-- task-id: 2106d8ee784406bc1c7974ea3ec99ba7 -->
@@ -115,7 +103,6 @@
 - [x] Deal with the latest spammers (🚀 1st Priority) <!-- task-id: spammers --> <!-- task-id: f8d298f00868fc4d85a4fcebe87d5029 -->
 - [x] Fix message trash emptying (Issue #4628) <!-- task-id: trash-fix --> <!-- task-id: eb95cb50d5e14aaaa793bc06121069b3 -->
 - [x] Fix message trash emptying (Issue #4628) <!-- task-id: 76ad5c89bc7b0fc629aab307d708266b -->
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
@@ -174,8 +161,6 @@
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 09a41482100d67d15fd6bfe5df55841b -->
 =======
 >>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 - [x] Read Saved Articles, 2m 30s <!-- task-id: c2774df72360b09cf6aa146d6e5f4eaa -->
 - [x] Use The Inversion Table <!-- task-id: e73befc42e92c0571f2d3d80b09d1d2e -->
 - [x] Do Tai Chi Standing, 3m 30s <!-- task-id: 07cc7e14fbfefb3eaaecf08ed57bbf0f -->
@@ -185,7 +170,6 @@
 - [x] ♥︎ Tai Chi, 1m <!-- task-id: 56cc75fe0d632c80e1ac762267b55884 -->
 - [x] ♥︎ Activity Rings <!-- task-id: 5c8c2d87fe69c3cedb8433bf0cb30715 -->
 - [x] ♥︎ Walk 5,500 Steps <!-- task-id: d6f40f70f8d2519af2b54926e2279883 -->
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 96dade19404c4cee9e659058cd7bee38 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f3a7b0388b05c04597a6297992fe0358 -->
@@ -225,17 +209,11 @@
 - [x] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
 - [x] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
 >>>>>>> Stashed changes
-=======
-- [x] Complete daily streaks (inversion table, Tai Chi, saved articles) <!-- task-id: fca2443263d311e03664cb86d34497c1 -->
-- [x] Continue reading "Tight Hip, Twisted Core" book (Week 34 goal) <!-- task-id: e174359176f52f50467c36e9258bfb53 -->
-- [x] Review Jay's Patreon message <!-- task-id: d27b7ccca88b7858ed32ac182425ef82 -->
->>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 99fbddffa736933b382eed412cbc0664 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b5b76e689569ade7284c9e40e3ec87d3 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0320cea9bee9160a81cc8335be7e729d -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ae563d614bb65b48ec2c64845aded22f -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 78478f3d99fe12e3eb085cead60c8d62 -->
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 08c1ff9ee6d6438a5df0d614162084ce -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 52595330df74127bd49642bfce64d3f7 -->
@@ -302,8 +280,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a3c3d02eb8002426c6d9ed8ff73aaaa0 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: df690e295aae94ee6cf0e831920aacbf -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e912e1bd5046500c9d51159f89bd931d -->
-=======
->>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 402919e7a490baaa0a6f210804b75bcc -->
@@ -388,7 +364,6 @@
 - [x] Daily streaks (after dinner) <!-- task-id: 3bd65e3d71ef59494fee2ffe9e90a475 -->
 - [x] 30-minute arthritis book reading <!-- task-id: ba56e51570cfbcd6d6d9336f75e4762f -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6b4fd7ed38e570e7b1e272ec658e9477 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: afe5f759c32fd64b6f0696cfae0e4a6c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9910ccc4132a552d7a98a0023307c50c -->
@@ -470,15 +445,10 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1f1e9c8f40471d230164108cad51d383 -->
 =======
-=======
->>>>>>> Stashed changes
 - [x] Follow the steps in DIGITALOCEAN.md <!-- task-id: 39363e5bac3da37ef3ad6f3855b53c19 -->
 - [x] set up a DigitalOcean account <!-- task-id: ee11a5dc1c5896ad94677483e8bf7f34 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 86d11c53bf3837c6feec3f860cc0c507 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8d26a96e52d37f00b7540b7176a92d4 -->
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9d0a7ad29fa467d832af5007b559cc2 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 15fb697c8e2934970c2e14db04f6b5d1 -->
@@ -494,7 +464,6 @@
 - [x] ♥︎ Burn More Energy <!-- task-id: 0aaa57aff5b844ef157338d1a417de71 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 071eddf05aa836d2162b9528fceba48b -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 02f7f6a2350181f69c77843f043532d3 -->
-<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2cd7a3541a7d52a600528d065df6726b -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
@@ -1927,8 +1896,6 @@
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d5e56bb7cc33734e167f4afa57fc8cb3 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 820e92bb882fc5a64a740a451b41a929 -->
 =======
-=======
->>>>>>> Stashed changes
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e202850a640b5a57ef19e6c1939faf93 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: dacc2fec318515785ecb80a9dc174962 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3f9849e11783735be0ccb63c3b9b9da2 -->

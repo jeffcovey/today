@@ -3,13 +3,9 @@
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 *Generated: 8/23/2025, 6:00:24 PM EDT*
 =======
 
-*Generated: 8/23/2025, 6:00:39 PM EDT*
->>>>>>> Stashed changes
-=======
 *Generated: 8/23/2025, 6:00:39 PM EDT*
 >>>>>>> Stashed changes
 

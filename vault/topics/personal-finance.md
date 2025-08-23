@@ -27,9 +27,5 @@ Tasks and projects related to Personal Finance.
 - [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
 =======
 - [ ] Clean and close the codespace <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
-<<<<<<< Updated upstream
-- [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
->>>>>>> Stashed changes
-=======
 - [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
 >>>>>>> Stashed changes

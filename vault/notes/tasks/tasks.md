@@ -1,10 +1,6 @@
 <details>
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 <summary><strong>General Tasks</strong> (989 tasks)</summary>
-=======
-<summary><strong>General Tasks</strong> (994 tasks)</summary>
->>>>>>> Stashed changes
 =======
 <summary><strong>General Tasks</strong> (994 tasks)</summary>
 >>>>>>> Stashed changes
@@ -253,14 +249,8 @@
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 14ddec1a7472f1dcfca4ad1c0e9c31c6 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
-=======
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4abb283319c7ce98ecf26ddbf90f3dfb -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a1a51b7ba5b6784fd662a95078d17c5d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: eddf1f2e290808996e1558389323ce93 -->
->>>>>>> Stashed changes
 =======
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4abb283319c7ce98ecf26ddbf90f3dfb -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a1a51b7ba5b6784fd662a95078d17c5d -->
@@ -277,14 +267,8 @@
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5f94d14d41c0f6134c8b18ffad5159e4 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 56af4b0d44e7cbf56d0a4de16b4524d6 -->
-=======
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 553ba768464fe9979c3a24a5ca2faca7 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6b5c19410fcbe12b61865728558f6025 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6341693c39eb80d0adb01d794070ce25 -->
->>>>>>> Stashed changes
 =======
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 553ba768464fe9979c3a24a5ca2faca7 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6b5c19410fcbe12b61865728558f6025 -->
@@ -299,11 +283,8 @@
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 =======
-=======
->>>>>>> Stashed changes
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 77273064f4e5d0c50a96646190d9b8bc -->
 >>>>>>> Stashed changes
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
@@ -398,15 +379,12 @@
 - [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
 <<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a882b0ebe1d1e1109ab0af08e5cb9dff -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8a05bce2742a05d4a62a2f2433f10864 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 399f51deba9e8c7aeeca040f8d15cc06 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f90796e0e12622c23868e525ead96d78 -->
 =======
-=======
->>>>>>> Stashed changes
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c90e48581bb298a7ad4b36c2c22954ab -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2ab9afff66e24af4821c645b121676d2 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f1c10e9eadbef0722f78743eecc68068 -->
@@ -414,9 +392,6 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 49d1c37da1b6c700ebf74ec4f64bc1a1 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5606f733e7d67826db631b7820ed85cd -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 05d1f465eca38ccacb440d42aacc46cf -->
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
 >>>>>>> Stashed changes
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
