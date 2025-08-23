@@ -2543,7 +2543,7 @@ app.post('/ai-chat-stream/*', async (req, res) => {
     let thinkingContent = '';
     let isThinking = false;
     
-    claude.stdout.on('data', (data) => {
+    claude.stdout.on('data', async (data) => {
       const lines = data.toString().split('\n').filter(line => line.trim());
       
       for (const line of lines) {
