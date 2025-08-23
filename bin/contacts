@@ -8,6 +8,7 @@ import { getDatabase } from '../src/database-service.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createDAVClient } from 'tsdav';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -338,6 +339,9 @@ class ContactsSync {
         }
 
         console.log(`   Found ${addressBooks.length} address book(s)`);
+        
+        // Store the first address book for later use (for adding contacts)
+        this.addressBook = addressBooks[0];
         
         // Fetch vCards from the first (default) address book
         console.log('   Fetching contacts...');
@@ -697,6 +701,196 @@ async function main() {
         break;
 
       case '--help':
+      case 'sync-tracking':
+        // Bidirectional sync between database and tracking file
+        await contactsSync.sync();
+        const trackingFile = path.join(process.cwd(), 'vault/logs/every_six_weeks.md');
+        
+        // Read the tracking file
+        let fileData = new Map();
+        if (fs.existsSync(trackingFile)) {
+          const content = fs.readFileSync(trackingFile, 'utf8');
+          const lines = content.split('\n');
+          for (const line of lines) {
+            // Parse lines like "- 2025-08-07 Name"
+            const match = line.match(/^-\s+(\d{4}-\d{2}-\d{2})\s+(.+)$/);
+            if (match) {
+              fileData.set(match[2].trim(), match[1]);
+            }
+          }
+        }
+        
+        // Get all contacts with last_contacted dates from database
+        const dbContacts = contactsSync.db.prepare(`
+          SELECT full_name, last_contacted 
+          FROM contacts 
+          WHERE last_contacted IS NOT NULL
+          ORDER BY last_contacted, full_name
+        `).all();
+        
+        // Update database from file changes
+        let dbUpdates = 0;
+        for (const [name, date] of fileData) {
+          const contact = contactsSync.db.prepare('SELECT id, last_contacted FROM contacts WHERE full_name = ?').get(name);
+          if (contact && contact.last_contacted !== date) {
+            contactsSync.db.prepare('UPDATE contacts SET last_contacted = ? WHERE id = ?').run(date, contact.id);
+            dbUpdates++;
+            console.log(`Updated ${name}: ${contact.last_contacted || 'none'} → ${date}`);
+          }
+        }
+        
+        // Rebuild file with current database state (sorted by date)
+        const allTracked = contactsSync.db.prepare(`
+          SELECT full_name, last_contacted 
+          FROM contacts 
+          WHERE last_contacted IS NOT NULL
+          ORDER BY last_contacted, full_name
+        `).all();
+        
+        let fileContent = `# Contact Tracking - Every 6 Weeks
+Format: YYYY-MM-DD Name  
+Edit dates here and run 'bin/sync' to update the database  
+Sorted by oldest date first (who to contact next)
+
+`;
+        
+        for (const contact of allTracked) {
+          fileContent += `- ${contact.last_contacted} ${contact.full_name}\n`;
+        }
+        
+        // Write back to file
+        fs.writeFileSync(trackingFile, fileContent);
+        
+        console.log(`✅ Synced contact tracking`);
+        if (dbUpdates > 0) {
+          console.log(`   Updated ${dbUpdates} contact(s) in database from file`);
+        }
+        console.log(`   Tracking ${allTracked.length} contacts in every_six_weeks.md`);
+        
+        // Show overdue contacts
+        const sixWeeksAgo = new Date();
+        sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
+        const overdue = allTracked.filter(c => new Date(c.last_contacted) < sixWeeksAgo);
+        if (overdue.length > 0) {
+          console.log(`   ⚠️  ${overdue.length} contact(s) overdue (6+ weeks):`);
+          overdue.slice(0, 5).forEach(c => {
+            const weeks = Math.floor((Date.now() - new Date(c.last_contacted)) / (7 * 24 * 60 * 60 * 1000));
+            console.log(`      • ${c.full_name} (${weeks} weeks ago)`);
+          });
+        }
+        break;
+
+      case 'update-note':
+        // Update a contact's note field
+        const searchName = process.argv[3];
+        const newNote = process.argv[4];
+        
+        if (!searchName || !newNote) {
+          console.log('Usage: contacts update-note <name> <note>');
+          process.exit(1);
+        }
+        
+        await contactsSync.sync();
+        const contacts = contactsSync.searchContacts(searchName);
+        
+        if (contacts.length === 0) {
+          console.log(`No contact found for: ${searchName}`);
+          process.exit(1);
+        }
+        
+        if (contacts.length > 1) {
+          console.log(`Multiple contacts found for: ${searchName}`);
+          contacts.forEach((c, i) => console.log(`  ${i+1}. ${c.name}`));
+          console.log('Please be more specific');
+          process.exit(1);
+        }
+        
+        const contact = contacts[0];
+        await contactsSync.synciCloudContacts();
+        
+        // Fetch the existing vCard
+        const vcards = await contactsSync.client.fetchVCards({
+          addressBook: contactsSync.addressBook
+        });
+        
+        const existingVcard = vcards.find(v => v.data && v.data.includes(contact.name));
+        if (!existingVcard) {
+          console.log(`Could not find vCard for ${contact.name}`);
+          process.exit(1);
+        }
+        
+        // Update the NOTE field in the vCard
+        let updatedData = existingVcard.data;
+        if (updatedData.includes('NOTE:')) {
+          // Replace existing note
+          updatedData = updatedData.replace(/NOTE:.*?(\r\n|\n|$)/, `NOTE:${newNote}\r\n`);
+        } else {
+          // Add note before END:VCARD
+          updatedData = updatedData.replace(/END:VCARD/, `NOTE:${newNote}\r\nEND:VCARD`);
+        }
+        
+        try {
+          await contactsSync.client.updateVCard({
+            vCard: {
+              url: existingVcard.url,
+              data: updatedData,
+              etag: existingVcard.etag
+            }
+          });
+          console.log(`✅ Updated note for ${contact.name}: ${newNote}`);
+        } catch (error) {
+          console.error(`Failed to update contact: ${error.message}`);
+          process.exit(1);
+        }
+        break;
+
+      case 'add':
+        // Simple add contact for Ken Felts
+        const firstName = process.argv[3];
+        const lastName = process.argv[4];
+        const url = process.argv[5];
+        const note = process.argv[6];
+        
+        if (!firstName || !lastName) {
+          console.log('Usage: contacts add <firstName> <lastName> [url] [note]');
+          process.exit(1);
+        }
+        
+        await contactsSync.synciCloudContacts();
+        
+        // Create a simple vCard
+        const vcard = [
+          'BEGIN:VCARD',
+          'VERSION:3.0',
+          `FN:${firstName} ${lastName}`,
+          `N:${lastName};${firstName};;;`,
+          url ? `URL:${url}` : '',
+          note ? `NOTE:${note}` : '',
+          'END:VCARD'
+        ].filter(line => line).join('\r\n');
+        
+        try {
+          // Use the address book from the synced data
+          console.log('Creating vCard with data:', vcard);
+          console.log('Using addressBook:', contactsSync.addressBook);
+          
+          const response = await contactsSync.client.createVCard({
+            addressBook: contactsSync.addressBook,
+            vCard: vcard,
+            filename: `${firstName}_${lastName}_${Date.now()}.vcf`
+          });
+          
+          console.log('Response from createVCard:', response);
+          console.log(`✅ Added contact: ${firstName} ${lastName}`);
+          if (url) console.log(`   URL: ${url}`);
+          if (note) console.log(`   Note: ${note}`);
+        } catch (error) {
+          console.error('Failed to add contact:', error);
+          console.error('Full error:', error);
+          process.exit(1);
+        }
+        break;
+
       case 'help':
         console.log('Usage: contacts [command] [options]');
         console.log('');
@@ -709,6 +903,7 @@ async function main() {
         console.log('  export [filename]  Export contacts to JSON file');
         console.log('  cache              Check cache status');
         console.log('  clear-cache        Mark cache for refresh');
+        console.log('  add <first> <last> [url] [note]  Add a new contact');
         console.log('  help               Show this help message');
         console.log('');
         console.log('Configuration:');
