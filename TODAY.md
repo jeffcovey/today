@@ -167,6 +167,13 @@ vault/notes/tasks/streaks-today.md contains what remains undone in my Streaks ap
 
 My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someone is coming, I need to make up the room in time for their arrival at 3PM. If someone is leaving, I need to clean up the room after they're gone at their 12PM check-out time.
 
+#### Contact Tracking
+
+I track regular contact with ~22 close friends using a 6-week follow-up system. The database tracks who I haven't contacted in 6+ weeks (see the SQL query below). 
+- **This is an excellent "Off Stage" activity** - reaching out to friends aligns perfectly with Off Stage days (Tuesday/Friday) when the focus is on personal connections and relationships
+- When I contact someone, update the database directly: `UPDATE contacts SET last_contacted = DATE('now') WHERE full_name = 'Name';`
+- The tracking file at `vault/logs/every_six_weeks.md` will sync automatically during the next `bin/sync`
+
 #### Stages
 
 **⚠️ IMPORTANT FOR CLAUDE: Always calculate the actual day of the week from the date. Never infer the day from scheduled activities. Events may be scheduled on any day regardless of the theme.**
@@ -364,6 +371,17 @@ WHERE DATE(te.start) = DATE('now', 'localtime')
     AND te.stop IS NOT NULL
 GROUP BY p.name
 ORDER BY SUM(te.duration) DESC;
+
+-- Get overdue contacts (6+ weeks since last contact)
+SELECT 
+    full_name,
+    last_contacted,
+    CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago
+FROM contacts
+WHERE last_contacted IS NOT NULL
+    AND julianday('now') - julianday(last_contacted) > 42
+ORDER BY last_contacted
+LIMIT 10;
 
 -- Get this week's time tracking patterns
 SELECT 
