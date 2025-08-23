@@ -24,3 +24,4 @@ Tasks and projects related to Personal Finance.
 - [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
 - [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
 - [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
+
