@@ -51,6 +51,7 @@ async function fetchContactsDatabase() {
       
       // Extract properties using actual database schema
       const name = properties.Name?.title?.[0]?.text?.content || 'Unknown';
+      const lastContactedOrEdited = properties['Last Contacted Or Edited']?.formula?.date?.start || null;
       const manualContactDate = properties['Manual Contact Date']?.date?.start || null;
       const lastEdited = properties['Last Edited']?.last_edited_time || null;
       const weeksSinceContact = properties['Weeks Since Contact']?.formula?.number || null;
@@ -58,8 +59,8 @@ async function fetchContactsDatabase() {
       const isToggled = properties.Toggle?.checkbox || false;
       const url = properties.URL?.url || '';
       
-      // Use Manual Contact Date if available, otherwise fall back to Last Edited
-      const lastContacted = manualContactDate || lastEdited;
+      // Use Last Contacted Or Edited formula field
+      const lastContacted = lastContactedOrEdited;
       
       return {
         id: page.id,
@@ -80,33 +81,15 @@ async function fetchContactsDatabase() {
     // Filter for overdue contacts (using the Due? formula from Notion)
     const overdueContacts = contacts.filter(contact => contact.isDue);
 
-    // Display results
-    console.log(chalk.cyan(`\n📊 Contact Summary:`));
-    console.log(`   Total contacts: ${contacts.length}`);
-    console.log(`   Tracked contacts: ${trackedContacts.length}`);
-    console.log(`   Overdue for contact: ${overdueContacts.length}`);
-    
-    if (overdueContacts.length > 0) {
-      console.log(chalk.yellow(`\n⚠️  Contacts needing attention (6+ weeks):`));
-      overdueContacts.forEach(contact => {
-        const weeksSince = contact.weeksSinceContact ? Math.round(contact.weeksSinceContact) : 'Unknown';
-        const lastDate = contact.manualContactDate || 'Never manually logged';
-        console.log(`   • ${contact.name} (${weeksSince} weeks ago, last: ${lastDate})`);
-        if (contact.url) {
-          console.log(`     ${contact.url}`);
-        }
-      });
-    }
-    
-    // Also show recently contacted if any
-    const recentContacts = trackedContacts.filter(c => c.weeksSinceContact && c.weeksSinceContact < 2);
-    if (recentContacts.length > 0) {
-      console.log(chalk.green(`\n✅ Recently contacted (< 2 weeks):`));
-      recentContacts.forEach(contact => {
-        const weeksSince = contact.weeksSinceContact ? Math.round(contact.weeksSinceContact) : 0;
-        console.log(`   • ${contact.name} (${weeksSince} weeks ago)`);
-      });
-    }
+    // For one-time sync: Show ALL contacts with their dates
+    console.log(chalk.cyan(`\n📊 All Notion Contacts with Dates:`));
+    contacts.forEach(contact => {
+      if (contact.lastContacted) {
+        // Extract just the date part (YYYY-MM-DD)
+        const dateOnly = contact.lastContacted.split('T')[0];
+        console.log(`${contact.name}: Last contacted: ${dateOnly}`);
+      }
+    });
 
     // Return data for potential integration
     return {

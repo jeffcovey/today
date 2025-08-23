@@ -112,6 +112,9 @@ main() {
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
     
+    # Contact tracking sync (bidirectional between database and every_six_weeks.md)
+    run_sync_step "📞 Contact Tracking" sync_contact_tracking "Contact tracking synced" "Contact tracking"
+    
     # Toggl time tracking sync (if configured)
     if grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null && ! grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
         run_sync_step "⏱️ Toggl Sync" sync_toggl "Toggl synced" "Toggl sync"
@@ -755,6 +758,51 @@ sync_contacts() {
         else
             print_info "Error: $sync_output"
         fi
+        return 1
+    fi
+}
+
+# Sync contact tracking between database and vault/logs/every_six_weeks.md
+sync_contact_tracking() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if contacts database exists
+    if [[ ! -f .data/today.db ]]; then
+        print_info "Contacts database not found"
+        return 1
+    fi
+    
+    # Run the contacts sync-tracking command
+    print_info "Syncing contact tracking file with database..."
+    
+    sync_output=$(bin/contacts sync-tracking 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract stats from output
+        if echo "$sync_output" | grep -q "Updated [0-9]* contact"; then
+            update_count=$(echo "$sync_output" | grep -oE "Updated [0-9]+ contact" | grep -oE "[0-9]+" | head -1)
+            print_info "Updated $update_count contact(s) from file edits"
+        fi
+        
+        if echo "$sync_output" | grep -q "Tracking [0-9]* contacts"; then
+            total_count=$(echo "$sync_output" | grep -oE "Tracking [0-9]+ contacts" | grep -oE "[0-9]+" | head -1)
+            print_info "Tracking $total_count contacts total"
+        fi
+        
+        # Show overdue contacts if any
+        if echo "$sync_output" | grep -q "overdue"; then
+            overdue_count=$(echo "$sync_output" | grep -oE "[0-9]+ contact.*overdue" | grep -oE "[0-9]+" | head -1)
+            if [[ "$overdue_count" -gt 0 ]]; then
+                print_info "⚠️  $overdue_count contact(s) overdue for 6+ weeks"
+                # Show first few overdue contacts
+                echo "$sync_output" | grep "•" | head -3 | while IFS= read -r line; do
+                    print_info "  $line"
+                done
+            fi
+        fi
+        
+        return 0
+    else
+        print_error "Contact tracking sync failed"
         return 1
     fi
 }

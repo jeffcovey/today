@@ -136,7 +136,13 @@
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(fly logs:*)",
       "WebFetch(domain:www.poolbuildersinc.com)",
-      "WebFetch(domain:mdbootstrap.com)"
+      "WebFetch(domain:mdbootstrap.com)",
+      "Bash(curl:*)",
+      "Bash(bin/deploy-do:*)",
+      "Bash(scp:*)",
+      "Bash(bin/contacts search:*)",
+      "Bash(bin/contacts list:*)",
+      "Bash(bin/contacts:*)"
     ],
     "deny": []
   }
