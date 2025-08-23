@@ -6,7 +6,7 @@
 
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
+- [x] Respond to OGM bug reports <!-- task-id: 27730eaf9a4273b68e679d066671f7a1 -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
