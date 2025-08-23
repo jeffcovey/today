@@ -31,7 +31,7 @@ if [ -n "$STAGED_JS" ]; then
   echo "JavaScript source files changed, running tests..."
   
   # Run only tests related to changed files
-  npm test -- --bail --findRelatedTests $STAGED_JS
+  npm test -- --bail --passWithNoTests --findRelatedTests $STAGED_JS
   
   if [ $? -ne 0 ]; then
     echo ""

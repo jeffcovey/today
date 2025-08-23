@@ -107,7 +107,7 @@ const pageStyle = `
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Font Awesome -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
 <!-- Google Fonts -->
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet"/>
 <!-- MDB -->
@@ -946,7 +946,15 @@ Contents:
           recentPages = recentPages.filter(page => page.path !== currentPath);
           
           // Add current page to the beginning
-          const pageTitle = document.title.replace('Vault: ', '');
+          // For directory pages, clean up the title
+          let pageTitle = document.title;
+          if (pageTitle.startsWith('Vault: ')) {
+            pageTitle = pageTitle.replace('Vault: ', '');
+            // If it's just '/', show 'Home'
+            if (pageTitle === '/') {
+              pageTitle = 'Home';
+            }
+          }
           recentPages.unshift({
             path: currentPath,
             title: pageTitle,
@@ -2065,6 +2073,28 @@ async function renderMarkdownUncached(filePath, urlPath) {
             checkbox.disabled = false;
             alert('Failed to save checkbox state');
           });
+        }
+        
+        // Track page visits for recents
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/' && currentPath !== '') {
+          let recentPages = JSON.parse(localStorage.getItem('recentPages') || '[]');
+          
+          // Remove current page if it exists in the list
+          recentPages = recentPages.filter(page => page.path !== currentPath);
+          
+          // Add current page to the beginning
+          const pageTitle = document.title;
+          recentPages.unshift({
+            path: currentPath,
+            title: pageTitle,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Keep only the 10 most recent
+          recentPages = recentPages.slice(0, 10);
+          
+          localStorage.setItem('recentPages', JSON.stringify(recentPages));
         }
       </script>
     </body>
