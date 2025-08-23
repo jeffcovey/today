@@ -13,15 +13,19 @@ This project uses Turso for database synchronization across multiple deployments
 ## Initial Setup (One Time)
 
 1. **Authenticate with Turso:**
+
    ```bash
    bin/migrate-to-turso auth
    ```
+
    This opens a browser for signup/login.
 
 2. **Create database:**
+
    ```bash
    bin/migrate-to-turso create today-db
    ```
+
    This will:
    - Create a Turso database
    - Generate credentials
@@ -29,17 +33,21 @@ This project uses Turso for database synchronization across multiple deployments
    - Encrypt them with dotenvx
 
 3. **Push existing data:**
+
    ```bash
    bin/migrate-to-turso push
    ```
+
    This migrates your local SQLite database to Turso.
 
 4. **Test connection:**
+
    ```bash
    bin/migrate-to-turso test
    ```
 
 5. **Commit the updated encrypted env:**
+
    ```bash
    git add .env
    git commit -m "Add Turso database credentials (encrypted)"
@@ -52,12 +60,14 @@ On each new deployment, you only need the `.env.keys` file:
 
 1. **Copy `.env.keys`** from your main environment
 2. **Run commands with dotenvx:**
+
    ```bash
    npx dotenvx run -- bin/sync
    npx dotenvx run -- bin/tasks
    ```
 
 Or set up an alias:
+
 ```bash
 alias today="npx dotenvx run -- bin/today"
 ```
@@ -69,6 +79,7 @@ The Dockerfiles are already configured with Turso CLI. Just ensure:
 1. `.env.keys` is present
 2. `.env` with encrypted values is in the repository
 3. Use dotenvx to run commands:
+
    ```bash
    docker run -v $(pwd)/.env.keys:/app/.env.keys \
               myimage \
@@ -88,16 +99,19 @@ If Turso credentials are not available (missing `.env.keys` or encrypted `.env`)
 ## Troubleshooting
 
 ### "TURSO_DATABASE_URL not found"
+
 - Ensure `.env.keys` is present
 - Ensure `.env` with encrypted values is committed
 - Run with `npx dotenvx run --`
 
 ### "Database not syncing"
+
 - Check internet connection
 - Verify credentials: `bin/migrate-to-turso test`
 - Check Turso dashboard: https://turso.tech
 
 ### "Permission denied"
+
 - Make scripts executable: `chmod +x bin/*`
 
 ## Costs

@@ -24,12 +24,14 @@ cp .env.example .env
 ### 2. Required Configurations
 
 #### Notion Integration
+
 ```bash
 # Get from https://www.notion.so/my-integrations
 NOTION_TOKEN=your_notion_integration_token_here
 ```
 
 #### Email Setup (IMAP)
+
 ```bash
 EMAIL_ACCOUNT=your.email@gmail.com
 EMAIL_PASSWORD=your_app_password_here
@@ -38,6 +40,7 @@ EMAIL_PORT=993
 ```
 
 #### Google Calendar
+
 ```bash
 # Create service account at https://console.cloud.google.com/
 GOOGLE_SERVICE_ACCOUNT_KEY=base64_encoded_json_key_here
@@ -45,6 +48,7 @@ GOOGLE_CALENDAR_IDS=primary,work@group.calendar.google.com
 ```
 
 #### iCloud Calendar
+
 ```bash
 # Get app-specific password from https://appleid.apple.com
 ICLOUD_USERNAME=your@icloud.com
@@ -72,15 +76,19 @@ This will:
 ### 4. Automated Sync
 
 #### Using Cron
+
 Add to your crontab for hourly sync:
+
 ```bash
 0 * * * * cd /path/to/today && bin/sync
 ```
 
 #### Using systemd Timer
+
 Create a service file for Linux systems with systemd.
 
 #### Using launchd (macOS)
+
 Create a LaunchAgent for automatic syncing on macOS.
 
 ## Task Management
@@ -88,17 +96,21 @@ Create a LaunchAgent for automatic syncing on macOS.
 The built-in task manager syncs between SQLite and Markdown files:
 
 ### File Structure
+
 - `vault/notes/tasks/tasks.md` - Main task list
 - `vault/notes/tasks/today.md` - Auto-generated daily tasks
 - `vault/projects/*.md` - Project-specific tasks
 
 ### Task Format
+
 Tasks in Markdown include unique IDs:
+
 ```markdown
 - [x] Task title <!-- task-id: unique-id-here --> <!-- task-id: 6b6041280977d040be271ac4b188042f -->
 ```
 
 ### Sync Process
+
 1. Reads all task files
 2. Adds IDs to new tasks
 3. Updates database with changes
@@ -108,11 +120,13 @@ Tasks in Markdown include unique IDs:
 ## Performance Optimization
 
 ### Caching Strategy
+
 - SQLite database stores all synced data
 - Incremental sync only fetches changes
 - Cache TTL configured per data source
 
 ### Sync Frequency
+
 Recommended intervals:
 - GitHub notes: Every sync (quick)
 - Notion: Every 15-30 minutes
@@ -137,13 +151,17 @@ Recommended intervals:
    - Force refresh only when needed
 
 ### Debug Mode
+
 Enable verbose logging:
+
 ```bash
 DEBUG=1 bin/sync
 ```
 
 ### Manual Sync
+
 Sync individual components:
+
 ```bash
 bin/tasks sync           # Tasks only
 bin/notion fetch-tasks   # Notion only

@@ -1,27 +1,32 @@
 # Vault Web Server Deployment Guide
 
 ## Overview
+
 The vault web server provides secure, authenticated web access to your vault files with directory browsing and markdown rendering.
 
 ## Components
 
 ### 1. Web Server (`src/web-server.js`)
+
 - Express 4.x server with basic authentication
 - Directory browsing with clickable navigation
 - Markdown file rendering with GitHub-style CSS
 - Runs on port 3001 (configurable via WEB_PORT)
 
 ### 2. Systemd Service (`config/vault-web.service`)
+
 - Auto-starts on boot
 - Restarts on failure
 - Runs with dotenvx for encrypted environment variables
 
 ### 3. Nginx Configuration (`config/nginx-vault.conf`)
+
 - Reverse proxy to Node.js server
 - SSL/HTTPS support via Let's Encrypt
 - Security headers and rate limiting
 
 ### 4. Setup Script (`bin/setup-vault-web`)
+
 - Automated deployment to DigitalOcean droplet
 - Installs dependencies (nginx, certbot)
 - Generates secure credentials
@@ -42,6 +47,7 @@ The vault web server provides secure, authenticated web access to your vault fil
 ## Deployment Steps
 
 ### 1. Set Up Domain
+
 ```bash
 # Add DNS A record at your domain registrar:
 Type: A
@@ -51,6 +57,7 @@ TTL: 3600 (or default)
 ```
 
 ### 2. Deploy to Droplet
+
 ```bash
 # SSH into your droplet
 ssh root@45.55.122.152
@@ -66,6 +73,7 @@ git pull
 ```
 
 ### 3. What the Setup Script Does
+
 1. Installs nginx and certbot if needed
 2. Generates random password for web interface
 3. Adds credentials to encrypted .env file
@@ -75,6 +83,7 @@ git pull
 7. Starts the web server
 
 ### 4. Access Your Vault
+
 - URL: `https://vault.yourdomain.com`
 - Username: `admin`
 - Password: (shown during setup, saved encrypted in .env)
@@ -82,21 +91,25 @@ git pull
 ## Managing the Service
 
 ### Check Status
+
 ```bash
 systemctl status vault-web
 ```
 
 ### View Logs
+
 ```bash
 journalctl -u vault-web -f
 ```
 
 ### Restart Service
+
 ```bash
 systemctl restart vault-web
 ```
 
 ### View Credentials
+
 ```bash
 cd /opt/today
 npx dotenvx run -- bash -c 'echo Username: $WEB_USER; echo Password: $WEB_PASSWORD'
@@ -137,11 +150,13 @@ sudo systemctl start vault-web
 ## Domain Options
 
 ### Free Domain Services
+
 1. **DuckDNS** (duckdns.org) - Free subdomains like `yourvault.duckdns.org`
 2. **Freenom** (freenom.com) - Free .tk, .ml, .ga domains
 3. **No-IP** (noip.com) - Free dynamic DNS service
 
 ### Using a Subdomain
+
 If you already own a domain, create a subdomain:
 - `vault.yourdomain.com`
 - `notes.yourdomain.com`
@@ -150,16 +165,19 @@ If you already own a domain, create a subdomain:
 ## Troubleshooting
 
 ### SSL Certificate Issues
+
 - Ensure domain points to correct IP
 - Check DNS propagation: `nslookup vault.yourdomain.com`
 - Verify port 80 and 443 are open in firewall
 
 ### Service Won't Start
+
 - Check logs: `journalctl -u vault-web -n 50`
 - Verify .env file exists and is encrypted
 - Check Node.js version: `node --version` (needs v20+)
 
 ### Authentication Not Working
+
 - Verify credentials in .env
 - Check nginx is passing auth headers
 - Test locally first: `curl -u admin:password http://localhost:3001`
@@ -167,6 +185,7 @@ If you already own a domain, create a subdomain:
 ### Testing and Accessing the Web Server
 
 #### From Development Environment (Codespace/Local)
+
 ```bash
 # The correct way to access the deployed web server with authentication:
 # Note: Use the domain name, NOT the IP address directly
@@ -184,7 +203,8 @@ npx dotenvx run -- bash -c 'curl -u "$WEB_USER:$WEB_PASSWORD" http://today.older
 bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admin:\$WEB_PASSWORD http://localhost:3001/daily | grep chatMessages'"
 ```
 
-#### Important Notes:
+#### Important Notes
+
 - The web server runs on port 3001 on the server
 - It's proxied through nginx to the domain
 - Always use the domain name (today.oldergay.men) not the raw IP
@@ -192,6 +212,7 @@ bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admi
 - The server requires Basic Auth with credentials from .env
 
 ## File Structure
+
 ```
 /opt/today/
 ├── src/
@@ -211,6 +232,7 @@ bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admi
 ```
 
 ## Notes
+
 - The web server only provides read-only access to vault files
 - Files are rendered as HTML for .md files, plain text for others
 - Directory listings show files and folders with icons

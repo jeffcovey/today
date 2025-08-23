@@ -64,17 +64,20 @@ test/
 ## Priority Testing Areas
 
 ### Priority 1 - Core Business Logic (80% coverage target)
+
 - **DateParser** (`src/date-parser.js`) - Natural language date parsing ✅
 - **TaskManager** (`src/task-manager.js`) - Task CRUD and markdown sync ✅
 - **DatabaseSync** (`src/database-sync.js`) - Turso synchronization
 - **SqliteCache** (`src/sqlite-cache.js`) - Caching layer
 
 ### Priority 2 - Data Integrity (70% coverage target)
+
 - **TursoSync** (`src/turso-sync.js`) - Bidirectional database sync
 - **SyncScheduler** (`src/sync-scheduler.js`) - Sync coordination
 - **EmailManager** (`src/email-manager.js`) - Email parsing
 
 ### Priority 3 - User Features (60% coverage target)
+
 - **TaskStageClassifier** (`src/task-stage-classifier.js`) - AI classification
 - **TemporalManager** (`src/temporal-manager.js`) - Time-based tasks
 - CLI commands (`bin/` directory)
@@ -91,6 +94,7 @@ test/
 ## Writing Tests
 
 ### Test File Naming
+
 - Unit tests: `[module].test.js`
 - Integration tests: `[feature].integration.test.js`
 - End-to-end tests: `[workflow].e2e.test.js`
@@ -149,6 +153,7 @@ describe('ModuleName', () => {
 ## Mocking Guidelines
 
 ### Database Mocking
+
 ```javascript
 jest.mock('../src/database-sync.js', () => ({
   getDatabaseSync: jest.fn(() => {
@@ -159,6 +164,7 @@ jest.mock('../src/database-sync.js', () => ({
 ```
 
 ### File System Mocking
+
 ```javascript
 import { jest } from '@jest/globals';
 import fs from 'fs/promises';
@@ -174,6 +180,7 @@ beforeEach(() => {
 ## Continuous Integration
 
 ### GitHub Actions (Future)
+
 ```yaml
 name: Tests
 on: [push, pull_request]
@@ -201,6 +208,7 @@ When fixing bugs:
 ## Performance Testing
 
 For critical paths like sync operations:
+
 ```javascript
 test('should sync 1000 tasks in under 2 seconds', async () => {
   const startTime = Date.now();
@@ -231,6 +239,7 @@ A recurring task is set up to review and improve test coverage weekly. During th
 ## Common Test Scenarios
 
 ### Date Parsing Tests
+
 - Quick tags (@today, @tomorrow, @weekend)
 - Relative dates (@3d, @2w, @1m)
 - Natural language (@next tuesday, @in 3 days)
@@ -238,6 +247,7 @@ A recurring task is set up to review and improve test coverage weekly. During th
 - Edge cases (invalid dates, past dates)
 
 ### Task Management Tests
+
 - CRUD operations
 - Markdown synchronization
 - Date tag extraction
@@ -245,6 +255,7 @@ A recurring task is set up to review and improve test coverage weekly. During th
 - Project association
 
 ### Sync Tests
+
 - Incremental sync
 - Conflict resolution
 - Network failures
@@ -260,6 +271,7 @@ A recurring task is set up to review and improve test coverage weekly. During th
 4. **Database locks**: Use separate test databases
 
 ### Debug Mode
+
 ```bash
 # Run tests with debugging
 node --inspect-brk node_modules/.bin/jest --runInBand

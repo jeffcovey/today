@@ -169,7 +169,7 @@ My Airbnb and MisterB&B calendars are for two rooms I rent in my home. If someon
 
 #### Contact Tracking
 
-I track regular contact with ~22 close friends using a 6-week follow-up system. The database tracks who I haven't contacted in 6+ weeks (see the SQL query below). 
+I track regular contact with ~22 close friends using a 6-week follow-up system. The database tracks who I haven't contacted in 6+ weeks (see the SQL query below).
 - **This is an excellent "Off Stage" activity** - reaching out to friends aligns perfectly with Off Stage days (Tuesday/Friday) when the focus is on personal connections and relationships
 - When I contact someone, update the database directly: `UPDATE contacts SET last_contacted = DATE('now') WHERE full_name = 'Name';`
 - The tracking file at `vault/logs/every_six_weeks.md` will sync automatically during the next `bin/sync`
@@ -445,6 +445,7 @@ Address any wellbeing concerns from recent notes and tasks
 - Gaps in tracking (unaccounted time)
 
 Use queries like:
+
 ```sql
 -- Compare tracked time to work categories
 SELECT 

@@ -5,6 +5,7 @@ Now that all data is in SQLite, here are powerful queries that were impossible w
 ## 1. Cross-Entity Relationship Queries
 
 ### Find emails about upcoming calendar events
+
 ```sql
 -- Find emails that might be about meetings in the next week
 SELECT DISTINCT
@@ -23,6 +24,7 @@ ORDER BY c.start_date;
 ```
 
 ### Find overdue tasks mentioned in recent emails
+
 ```sql
 SELECT 
   t.title as task,
@@ -41,6 +43,7 @@ ORDER BY e.date DESC;
 ## 2. Activity Pattern Analysis
 
 ### Daily activity heatmap
+
 ```sql
 SELECT 
   strftime('%H', datetime) as hour,
@@ -60,6 +63,7 @@ ORDER BY day_of_week, hour;
 ```
 
 ### Communication patterns with top contacts
+
 ```sql
 WITH email_stats AS (
   SELECT 
@@ -89,6 +93,7 @@ LIMIT 20;
 ## 3. Intelligent Recommendations
 
 ### People to reconnect with
+
 ```sql
 -- Find contacts we haven't heard from in a while but used to email frequently
 WITH contact_activity AS (
@@ -124,6 +129,7 @@ LIMIT 10;
 ```
 
 ### Meeting preparation checklist
+
 ```sql
 -- For each upcoming meeting, show related tasks and recent emails
 SELECT 
@@ -145,6 +151,7 @@ ORDER BY c.start_date;
 ## 4. Data Quality & Insights
 
 ### File activity insights
+
 ```sql
 -- Show which types of files are being updated most frequently
 SELECT 
@@ -161,6 +168,7 @@ ORDER BY avg_age_days ASC;
 ```
 
 ### Sync health monitoring
+
 ```sql
 -- Monitor sync reliability and patterns
 SELECT 
@@ -180,6 +188,7 @@ GROUP BY sync_direction;
 ## 5. Smart Daily Briefing Query
 
 ### Everything I need to know for today
+
 ```sql
 WITH today_events AS (
   SELECT 'EVENT' as type, title, datetime(start_date) as when_, location as details
@@ -230,6 +239,7 @@ ORDER BY type, when_;
 ## 6. Advanced Analytics
 
 ### Email response time analysis
+
 ```sql
 WITH response_times AS (
   SELECT 
@@ -273,11 +283,13 @@ ORDER BY
 ## Using These Queries
 
 You can run any of these queries directly:
+
 ```bash
 sqlite3 .data/today.db "YOUR_QUERY_HERE"
 ```
 
 Or save frequently used queries as views:
+
 ```sql
 CREATE VIEW daily_briefing AS
   [query content here];

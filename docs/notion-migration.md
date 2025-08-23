@@ -127,31 +127,37 @@ bin/tasks clear-notion-ids --force
 ## Complete Migration Workflow
 
 1. **Import tasks from Notion**
+
    ```bash
    bin/notion
    ```
 
 2. **Review imported tasks**
+
    ```bash
    bin/tasks list --with-notion
    ```
 
 3. **Test with dry run**
+
    ```bash
    bin/notion-mark-done --dry-run 197d00
    ```
 
 4. **Mark individual tasks as done**
+
    ```bash
    bin/notion-mark-done 197d00
    ```
 
 5. **Or mark all tasks as done**
+
    ```bash
    bin/notion-mark-done --all
    ```
 
 6. **Clean up Notion IDs**
+
    ```bash
    bin/tasks clear-notion-ids --force
    ```

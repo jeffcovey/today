@@ -43,16 +43,19 @@ bin/deploy-do deploy
 ## Daily Operations
 
 ### Check Status
+
 ```bash
 bin/deploy-do status
 ```
 
 ### View Logs
+
 ```bash
 bin/deploy-do logs
 ```
 
 ### SSH Access
+
 ```bash
 bin/deploy-do ssh
 # Once connected, you can use:
@@ -61,12 +64,14 @@ bin/today "Work on my projects"  # Interactive Claude works!
 ```
 
 ### Deploy Updates
+
 ```bash
 # After making code changes
 bin/deploy-do deploy
 ```
 
 ### Restart Scheduler
+
 ```bash
 bin/deploy-do restart
 ```
@@ -83,6 +88,7 @@ Edit `src/scheduler.js` to customize the schedule.
 ## Monitoring
 
 ### Check scheduler logs
+
 ```bash
 bin/deploy-do logs
 # Or directly on the droplet:
@@ -90,6 +96,7 @@ journalctl -u today-scheduler -f
 ```
 
 ### Check system resources
+
 ```bash
 bin/deploy-do exec "free -h"
 bin/deploy-do exec "df -h"
@@ -99,12 +106,14 @@ bin/deploy-do exec "top -bn1 | head -20"
 ## Troubleshooting
 
 ### Scheduler not running?
+
 ```bash
 bin/deploy-do status
 bin/deploy-do start
 ```
 
 ### Need to debug?
+
 ```bash
 bin/deploy-do ssh
 cd /opt/today
@@ -116,6 +125,7 @@ bin/today "Test Claude"
 ```
 
 ### Update Node.js or dependencies?
+
 ```bash
 bin/deploy-do ssh
 # Update Node.js
@@ -135,11 +145,14 @@ npm install -g @anthropic-ai/claude-code@latest
 
 1. **SSH Key Only**: Password authentication is disabled by default
 2. **Firewall**: Consider enabling UFW firewall:
+
    ```bash
    bin/deploy-do exec "ufw allow 22 && ufw --force enable"
    ```
+
 3. **Keep Secrets Secure**: Never commit `.env` or `.env.keys` files
 4. **Regular Updates**: Keep system updated:
+
    ```bash
    bin/deploy-do exec "apt update && apt upgrade -y"
    ```

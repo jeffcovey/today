@@ -7,6 +7,7 @@ This directory contains the database schema from the restored Turso database (20
 The database has evolved significantly from what the code expects. There are 37 tables in production but our sync scripts only handle 7 core tables.
 
 ## Core Tables (Used by sync)
+
 - `tasks.sql` - Main task storage with priorities and statuses
 - `projects.sql` - Project definitions  
 - `tags.sql` - Tag definitions
@@ -16,6 +17,7 @@ The database has evolved significantly from what the code expects. There are 37 
 - `emails.sql` - Email storage
 
 ## Additional Tables (37 total)
+
 The complete schema is in `complete-schema.sql`. Many tables appear to be from:
 - Notion integration (cache tables)
 - Calendar/contact management
@@ -23,6 +25,7 @@ The complete schema is in `complete-schema.sql`. Many tables appear to be from:
 - Various sync tracking
 
 ## Schema Version
+
 - Restored from: 2025-08-19T09:30:00Z (5:30 AM EDT)
 - Database: today-db-restored
 - Size: ~254 MB

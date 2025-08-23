@@ -1,6 +1,7 @@
 # Database Sync Strategy
 
 ## Problem
+
 - Local database is 89MB with emails, cached data, etc.
 - Turso embedded replicas timeout on initial sync of large databases
 - Need bidirectional sync with conflict resolution
@@ -33,6 +34,7 @@ After testing, we found that Turso embedded replicas have limitations:
 - Archive old data periodically
 
 **Option 2: Hybrid Approach**
+
 ```javascript
 // For initial setup or recovery
 bin/turso-sync pull  // Batch sync

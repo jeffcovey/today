@@ -22,7 +22,7 @@ SCOUT_API_KEY=your_scout_api_key
 SCOUT_APP_ID=76830  # OlderGay.Men app ID
 ```
 
-#### Getting the tokens:
+#### Getting the tokens
 
 - **GitHub**: Create a personal access token at https://github.com/settings/tokens
   - Needs `repo` scope for private repositories
@@ -133,14 +133,17 @@ tmp/scout throughput
 ## Troubleshooting
 
 ### No data syncing?
+
 - Check that API tokens are correctly set in `.env`
 - Run `bin/ogm-sync` manually to see detailed error messages
 
 ### Database errors?
+
 - The tables are created automatically on first run
 - To reset: `sqlite3 .data/today.db "DROP TABLE ogm_github_issues;"`
 
 ### Sync taking too long?
+
 - Limit the sync to recent data only
 - Consider running individual syncs (issues, errors, performance) separately
 

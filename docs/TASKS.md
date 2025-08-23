@@ -40,11 +40,13 @@ Tasks in Markdown files include an HTML comment with their ID:
 ## CLI Commands
 
 ### Sync tasks
+
 ```bash
 bin/tasks sync [file]  # Sync all or specific file
 ```
 
 ### List tasks
+
 ```bash
 bin/tasks list         # List all active tasks
 bin/tasks list --today # Show today's tasks
@@ -52,21 +54,25 @@ bin/tasks list --stage inbox  # Filter by stage
 ```
 
 ### Add tasks
+
 ```bash
 bin/tasks add "Task title" --date 2025-08-14 --priority 4 --tags "work,urgent"
 ```
 
 ### Update tasks
+
 ```bash
 bin/tasks update <id> --title "New title" --stage active
 ```
 
 ### Mark as done
+
 ```bash
 bin/tasks done <id>
 ```
 
 ### View projects
+
 ```bash
 bin/tasks projects
 ```

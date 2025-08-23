@@ -449,6 +449,13 @@ function getBreadcrumb(filePath) {
 }
 
 // Helper function to extract title from markdown file
+// Helper function to get week number
+function getWeekNumber(date) {
+  const startOfYear = new Date(date.getFullYear(), 0, 1);
+  const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000));
+  return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+}
+
 async function getMarkdownTitle(filePath) {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
@@ -516,6 +523,117 @@ async function renderDirectory(dirPath, urlPath) {
         <div class="row">
           <!-- Content column -->
           <div class="col-12 col-lg-7 mb-3">
+  `;
+  
+  // Special homepage content
+  if (!urlPath) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const quarter = `Q${Math.floor(today.getMonth() / 3) + 1}`;
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const week = getWeekNumber(today);
+    const day = String(today.getDate()).padStart(2, '0');
+    
+    // Check for today's plan
+    const todayPlanFile = `${year}-${quarter}-${month}-${day}.md`;
+    const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
+    const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
+    
+    // Check for other plan files
+    const weekPlanFile = `${year}-${quarter}-${month}-W${week}.md`;
+    const monthPlanFile = `${year}-${quarter}-${month}.md`;
+    const quarterPlanFile = `${year}-${quarter}.md`;
+    const yearPlanFile = `${year}.md`;
+    
+    const plansDir = path.join(dirPath, 'plans');
+    const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
+    const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
+    const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
+    const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
+    
+    // Add today's plan if it exists
+    if (todayPlanExists) {
+      html += `
+            <div class="card shadow-sm mb-3">
+              <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-calendar-day me-3"></i>
+                  <div>
+                    <strong>Today's Plan</strong>
+                    <br>
+                    <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                  </div>
+                </div>
+              </a>
+            </div>`;
+    }
+    
+    // Add Plans section (collapsed)
+    html += `
+            <div class="card shadow-sm mb-3">
+              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-calendar-alt me-2"></i>Plans</span>
+                  <i class="fas fa-chevron-down" id="plansChevron"></i>
+                </div>
+              </div>
+              <div class="collapse" id="plansSection">
+                <div class="list-group list-group-flush">`;
+    
+    if (weekPlanExists) {
+      html += `
+                  <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-calendar-week text-info me-3"></i>
+                    Week ${week}
+                  </a>`;
+    }
+    if (monthPlanExists) {
+      html += `
+                  <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-calendar text-success me-3"></i>
+                    ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
+                  </a>`;
+    }
+    if (quarterPlanExists) {
+      html += `
+                  <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-business-time text-warning me-3"></i>
+                    Quarter ${quarter.slice(1)} - ${year}
+                  </a>`;
+    }
+    if (yearPlanExists) {
+      html += `
+                  <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-calendar-check text-danger me-3"></i>
+                    Year ${year}
+                  </a>`;
+    }
+    
+    html += `
+                </div>
+              </div>
+            </div>`;
+    
+    // Add Recents section (collapsed) - placeholder for now
+    html += `
+            <div class="card shadow-sm mb-3">
+              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-history me-2"></i>Recent Pages</span>
+                  <i class="fas fa-chevron-down" id="recentsChevron"></i>
+                </div>
+              </div>
+              <div class="collapse" id="recentsSection">
+                <div class="list-group list-group-flush" id="recentsList">
+                  <div class="list-group-item text-muted">
+                    <small>Recent pages will appear here</small>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+  }
+  
+  html += `
             <div class="card shadow-sm h-100">
               <div class="list-group list-group-flush">
   `;
@@ -802,6 +920,99 @@ Contents:
         
         // Load chat history on page load
         loadChatHistory();
+        
+        // Toggle collapse sections
+        window.toggleCollapse = function(sectionId) {
+          const section = document.getElementById(sectionId);
+          const chevron = document.getElementById(sectionId.replace('Section', 'Chevron'));
+          
+          if (section.classList.contains('show')) {
+            section.classList.remove('show');
+            chevron.classList.remove('fa-chevron-up');
+            chevron.classList.add('fa-chevron-down');
+          } else {
+            section.classList.add('show');
+            chevron.classList.remove('fa-chevron-down');
+            chevron.classList.add('fa-chevron-up');
+          }
+        }
+        
+        // Track page visits for recents
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/' && currentPath !== '') {
+          let recentPages = JSON.parse(localStorage.getItem('recentPages') || '[]');
+          
+          // Remove current page if it exists in the list
+          recentPages = recentPages.filter(page => page.path !== currentPath);
+          
+          // Add current page to the beginning
+          const pageTitle = document.title.replace('Vault: ', '');
+          recentPages.unshift({
+            path: currentPath,
+            title: pageTitle,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Keep only the 10 most recent
+          recentPages = recentPages.slice(0, 10);
+          
+          localStorage.setItem('recentPages', JSON.stringify(recentPages));
+        }
+        
+        // Load recent pages if on homepage
+        if (window.location.pathname === '/' || window.location.pathname === '') {
+          const recentPages = JSON.parse(localStorage.getItem('recentPages') || '[]');
+          const recentsList = document.getElementById('recentsList');
+          
+          if (recentsList && recentPages.length > 0) {
+            let recentsHtml = '';
+            recentPages.forEach(page => {
+              const icon = page.path.endsWith('.md') ? 'fa-file-alt text-info' : 
+                           page.path.includes('/') ? 'fa-folder text-warning' : 
+                           'fa-file text-secondary';
+              const timeAgo = getTimeAgo(new Date(page.timestamp));
+              recentsHtml += \`
+                <a href="\${page.path}" class="list-group-item list-group-item-action">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <i class="fas \${icon} me-2"></i>
+                      <span>\${page.title}</span>
+                    </div>
+                    <small class="text-muted">\${timeAgo}</small>
+                  </div>
+                </a>
+              \`;
+            });
+            recentsList.innerHTML = recentsHtml;
+          }
+        }
+        
+        // Helper function for time ago
+        function getTimeAgo(date) {
+          const seconds = Math.floor((new Date() - date) / 1000);
+          
+          let interval = Math.floor(seconds / 31536000);
+          if (interval > 1) return interval + ' years ago';
+          if (interval === 1) return '1 year ago';
+          
+          interval = Math.floor(seconds / 2592000);
+          if (interval > 1) return interval + ' months ago';
+          if (interval === 1) return '1 month ago';
+          
+          interval = Math.floor(seconds / 86400);
+          if (interval > 1) return interval + ' days ago';
+          if (interval === 1) return '1 day ago';
+          
+          interval = Math.floor(seconds / 3600);
+          if (interval > 1) return interval + ' hours ago';
+          if (interval === 1) return '1 hour ago';
+          
+          interval = Math.floor(seconds / 60);
+          if (interval > 1) return interval + ' minutes ago';
+          if (interval === 1) return '1 minute ago';
+          
+          return 'just now';
+        }
       </script>
     </body>
     </html>
