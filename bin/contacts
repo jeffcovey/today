@@ -35,6 +35,8 @@ class ContactsSync {
         birthday TEXT,
         url TEXT,
         etag TEXT,
+        notes TEXT,
+        last_contacted TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -116,6 +118,8 @@ class ContactsSync {
         birthday: contact.birthday,
         url: contact.url,
         etag: contact.etag,
+        notes: contact.notes,
+        lastContacted: contact.last_contacted,
         emails: contact.emails ? contact.emails.split(',') : [],
         phones: contact.phones ? contact.phones.split(',') : []
       }));
@@ -152,8 +156,8 @@ class ContactsSync {
   async saveToDatabase() {
     const insertContact = this.db.prepare(`
       INSERT OR REPLACE INTO contacts (
-        id, first_name, last_name, full_name, organization, birthday, url, etag, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        id, first_name, last_name, full_name, organization, birthday, url, etag, notes, last_contacted, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
 
     const deleteEmails = this.db.prepare('DELETE FROM contact_emails WHERE contact_id = ?');
@@ -185,7 +189,9 @@ class ContactsSync {
           contact.organization || null,
           contact.birthday || null,
           contact.url || null,
-          contact.etag || null
+          contact.etag || null,
+          contact.notes || null,
+          contact.lastContacted || null
         );
 
         // Clear and re-insert related data
@@ -265,6 +271,11 @@ class ContactsSync {
           contact.organization = value.trim();
         } else if (key.startsWith('NOTE')) {
           contact.notes = value.trim().replace(/\\n/g, '\n');
+          // Extract last contacted date from notes if present
+          const lastContactedMatch = contact.notes.match(/Last\s+contacted?:\s*(\d{4}-\d{2}-\d{2})/i);
+          if (lastContactedMatch) {
+            contact.lastContacted = lastContactedMatch[1];
+          }
         } else if (key.startsWith('BDAY')) {
           contact.birthday = value.trim();
         } else if (key.startsWith('ADR')) {
@@ -348,6 +359,13 @@ class ContactsSync {
               // Add the URL for potential updates
               contact.url = vcard.url;
               contact.etag = vcard.etag;
+              // Also check for custom X- fields for last contacted
+              if (vcard.data.includes('X-LAST-CONTACTED:')) {
+                const match = vcard.data.match(/X-LAST-CONTACTED:(\d{4}-\d{2}-\d{2})/i);
+                if (match) {
+                  contact.lastContacted = match[1];
+                }
+              }
               contacts.push(contact);
             }
           }
@@ -410,6 +428,8 @@ class ContactsSync {
       lastName: row.last_name,
       organization: row.organization,
       birthday: row.birthday,
+      notes: row.notes,
+      lastContacted: row.last_contacted,
       emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(row.id).map(e => e.email),
       phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(row.id).map(p => p.phone)
     }));
@@ -434,6 +454,8 @@ class ContactsSync {
       lastName: result.last_name,
       organization: result.organization,
       birthday: result.birthday,
+      notes: result.notes,
+      lastContacted: result.last_contacted,
       emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
       phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
     };
@@ -461,6 +483,8 @@ class ContactsSync {
       lastName: result.last_name,
       organization: result.organization,
       birthday: result.birthday,
+      notes: result.notes,
+      lastContacted: result.last_contacted,
       emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
       phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
     };
@@ -510,6 +534,34 @@ class ContactsSync {
       }
       if (contact.birthday) {
         console.log(`   Birthday: ${contact.birthday}`);
+      }
+      if (contact.lastContacted) {
+        // Calculate days since last contact
+        const lastDate = new Date(contact.lastContacted);
+        const today = new Date();
+        const daysSince = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+        const weeksSince = Math.floor(daysSince / 7);
+        
+        let timeString = `${contact.lastContacted}`;
+        if (daysSince === 0) {
+          timeString += ' (today)';
+        } else if (daysSince === 1) {
+          timeString += ' (yesterday)';
+        } else if (daysSince < 7) {
+          timeString += ` (${daysSince} days ago)`;
+        } else if (weeksSince < 8) {
+          timeString += ` (${weeksSince} week${weeksSince === 1 ? '' : 's'} ago)`;
+        } else {
+          const monthsSince = Math.floor(daysSince / 30);
+          timeString += ` (${monthsSince} month${monthsSince === 1 ? '' : 's'} ago)`;
+        }
+        
+        console.log(`   Last contacted: ${timeString}`);
+        
+        // Highlight if it's been more than 6 weeks
+        if (weeksSince >= 6) {
+          console.log(`   ⚠️  Time to reach out! (${weeksSince} weeks)`);
+        }
       }
       console.log('');
     });
@@ -594,6 +646,29 @@ async function main() {
         console.log(`   With address: ${stats.withAddress}`);
         break;
 
+      case 'due':
+      case 'overdue':
+        // Show contacts who haven't been contacted in 6+ weeks
+        await contactsSync.loadCache();
+        const overdueContacts = contactsSync.contacts.filter(contact => {
+          if (!contact.lastContacted) return false;
+          const lastDate = new Date(contact.lastContacted);
+          const today = new Date();
+          const daysSince = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+          return daysSince >= 42; // 6 weeks = 42 days
+        }).sort((a, b) => {
+          // Sort by last contacted date (oldest first)
+          return new Date(a.lastContacted) - new Date(b.lastContacted);
+        });
+        
+        if (overdueContacts.length === 0) {
+          console.log('\n✅ No contacts are overdue for reaching out!');
+        } else {
+          console.log(`\n⚠️  ${overdueContacts.length} contact(s) haven't been contacted in 6+ weeks:\n`);
+          contactsSync.displayContacts(overdueContacts);
+        }
+        break;
+
       case 'export':
         const filename = args[1] || 'contacts-export.json';
         await contactsSync.exportJSON(filename);
@@ -629,6 +704,7 @@ async function main() {
         console.log('  sync [--force]     Sync contacts from iCloud (default)');
         console.log('  search <query>     Search contacts by name, email, or phone');
         console.log('  list               List all contacts');
+        console.log('  due/overdue        Show contacts not contacted in 6+ weeks');
         console.log('  stats              Show contact statistics');
         console.log('  export [filename]  Export contacts to JSON file');
         console.log('  cache              Check cache status');
