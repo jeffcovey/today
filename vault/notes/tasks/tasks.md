@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1459 tasks)</summary>
+<summary><strong>General Tasks</strong> (1464 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -306,8 +306,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6a5eebc78a470989a61723559becfbd7 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fc594d4a91564c94e883a54d15f7d127 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 80741e20ccefe400f3d492aee1c276f0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f20d12e76933996845ede90ead815c57 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 438d690a6a772bedc666b07859e61a20 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6e99d3885dc3bdb31025932ff0c9016b -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7ee0eb00c450e0c4967c999b84443004 -->
 - [ ] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
 - [ ] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
 - [ ] Complete cost analysis <!-- task-id: b2c71c9660a67e7190435257d7aea9e3 -->
@@ -408,8 +409,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b0648fddb21e96b33f5a6c207019c62c -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 21f1256d273935e43a3c4f9316a86202 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1b88a1b1fe7efb3c34bfe4de0bd2356d -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ee6effc083b6ce46e732bcc4b26f916a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1d40ef83a46bb8f81184b39aa7e8591f -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: cd3f6843f087169f408d89835644648b -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: df252a289ff4f99af90d2093e82413c9 -->
 - [ ] Document all Heroku applications and their purposes <!-- task-id: c930bc2108bf5dc796b1be2001c615b2 -->
 - [ ] Document all cron jobs and scheduled tasks <!-- task-id: 678da3fc4c896d33ea83f42975445a70 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
@@ -502,8 +504,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6848b46d8b0588bdcdafd34c281e3b5a -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: fc0b7836177ddbd73a9237b5a10d7eed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 907d4f54b5f986a12b31caa9a543f767 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9770c30f0436bac6b5f7d8e404d406c5 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2c56d8b42f54513b756f2d1700cbb3bf -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 14b3a3d8040bddebf8be46edb006caf5 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: bb81b43bcf2fa53536e17815fe897bc8 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
@@ -724,8 +727,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 079455a645d567bbf189b759612efd63 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5f936e764876997bb6e81a760072cdba -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6833e72c6a3202918a4f87032cd6f111 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 992694f26c6ad3f1f7b22dbc15d3fc39 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c1cc23bdf0bb11ba49897c9f182a0647 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 879da0bd0a28dfceab68410c3e1666d8 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 4ad0834a72ff0468a07f6510fd956ffe -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 02f0ff08fa6369d2e9f1599479d30f3f -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 614b52e0b070f6634263e37b917adb2b -->
@@ -800,8 +804,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 4c902a8d861865767cd05abd91228a4a -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5b843f205f2f0dfd494b782d31b49804 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 261c7fd69820a5bcb9dbdaabc82509c8 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d1ebecaf96a762a10724c04bd7a1849c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 41d62ce7ffd4ce67d399a7455034df51 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 48d054647fb1887a937806f6d828ddd8 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 600480ed598fe27c8f17b4c2b16f2ffb -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
