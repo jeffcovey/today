@@ -1125,10 +1125,13 @@ async function renderEditor(filePath, urlPath) {
           height: 100%;
           font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
           font-size: 14px;
-          border: 1px solid #dee2e6;
-          border-radius: 0.375rem;
+          line-height: 1.6;
           padding: 1rem;
           resize: none;
+        }
+        #editor:focus {
+          outline: none;
+          box-shadow: none;
         }
         .editor-toolbar {
           background: #f8f9fa;
@@ -1136,22 +1139,6 @@ async function renderEditor(filePath, urlPath) {
           border-radius: 0.375rem 0.375rem 0 0;
           border: 1px solid #dee2e6;
           border-bottom: none;
-        }
-        
-        /* CodeMirror styles */
-        .cm-editor {
-          height: calc(100vh - 250px);
-          min-height: 400px;
-          border: 1px solid #dee2e6;
-          border-radius: 0 0 0.375rem 0.375rem;
-        }
-        .cm-editor.cm-focused {
-          outline: none;
-          border-color: #86b7fe;
-          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-        .cm-scroller {
-          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
         }
       </style>
     </head>
@@ -1204,8 +1191,9 @@ async function renderEditor(filePath, urlPath) {
             </div>
           </div>
           <div class="card-body p-0">
-            <div class="editor-container"></div>
-            <textarea id="editor" style="display: none;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            <div class="editor-container">
+              <textarea id="editor" class="form-control border-0">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -1213,63 +1201,9 @@ async function renderEditor(filePath, urlPath) {
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
-      <!-- CodeMirror 6 -->
-      <script type="module">
-        import {EditorView, basicSetup} from "https://cdn.jsdelivr.net/npm/codemirror@6/+esm";
-        import {markdown} from "https://cdn.jsdelivr.net/npm/@codemirror/lang-markdown@6/+esm";
-        import {oneDark} from "https://cdn.jsdelivr.net/npm/@codemirror/theme-one-dark@6/+esm";
-        import {EditorState} from "https://cdn.jsdelivr.net/npm/@codemirror/state@6/+esm";
-        import {keymap} from "https://cdn.jsdelivr.net/npm/@codemirror/view@6/+esm";
-        import {defaultKeymap, indentWithTab} from "https://cdn.jsdelivr.net/npm/@codemirror/commands@6/+esm";
-        
-        // Get initial content
-        const initialContent = document.getElementById('editor').value;
-        
-        // Create the editor
-        const editor = new EditorView({
-          doc: initialContent,
-          extensions: [
-            basicSetup,
-            markdown(),
-            keymap.of([
-              ...defaultKeymap,
-              indentWithTab
-            ]),
-            EditorView.theme({
-              "&": {
-                fontSize: "14px"
-              },
-              ".cm-content": {
-                padding: "1rem",
-                minHeight: "calc(100vh - 250px)"
-              },
-              ".cm-focused .cm-cursor": {
-                borderLeftColor: "#000"
-              },
-              ".cm-line": {
-                lineHeight: "1.6"
-              }
-            }),
-            EditorView.lineWrapping,
-            EditorView.updateListener.of((v) => {
-              if (v.docChanged) {
-                // Clear save status when document changes
-                const saveStatus = document.getElementById('save-status');
-                if (saveStatus && saveStatus.textContent.includes('Saved')) {
-                  saveStatus.textContent = '';
-                  saveStatus.className = 'text-muted small me-3';
-                }
-              }
-            })
-          ],
-          parent: document.querySelector('.editor-container')
-        });
-        
-        // Store editor instance globally for save function
-        window.cmEditor = editor;
-        
+      <script>
         // Search functionality
-        window.performSearch = function(event) {
+        function performSearch(event) {
           event.preventDefault();
           const searchQuery = document.getElementById('searchInput').value.trim();
           if (searchQuery) {
@@ -1277,8 +1211,8 @@ async function renderEditor(filePath, urlPath) {
           }
         }
         
-        window.saveFile = function() {
-          const content = window.cmEditor.state.doc.toString();
+        function saveFile() {
+          const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
           
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
@@ -1312,12 +1246,24 @@ async function renderEditor(filePath, urlPath) {
         document.addEventListener('keydown', function(e) {
           if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
-            window.saveFile();
+            saveFile();
           }
         });
         
         // Focus the editor when page loads
-        editor.focus();
+        document.getElementById('editor').focus();
+        
+        // Add Tab key support in textarea
+        document.getElementById('editor').addEventListener('keydown', function(e) {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            const value = this.value;
+            this.value = value.substring(0, start) + '  ' + value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 2;
+          }
+        });
       </script>
     </body>
     </html>
@@ -2653,91 +2599,27 @@ app.post('/ai-chat-stream/*', async (req, res) => {
     
     console.log('[AI Stream] Starting Claude with streaming...');
     
-    // Use spawn with --output-format stream-json for streaming
-    const claude = spawn('claude', ['--print', '--output-format', 'stream-json'], {
-      cwd: process.cwd()
+    // Use spawn with --print for regular output (stream-json might not be supported)
+    const claude = spawn('claude', ['--print'], {
+      cwd: process.cwd(),
+      timeout: 300000 // 5 minute hard timeout
     });
     
     let fullResponse = '';
     let thinkingContent = '';
     let isThinking = false;
     
-    claude.stdout.on('data', async (data) => {
-      const lines = data.toString().split('\n').filter(line => line.trim());
+    claude.stdout.on('data', (data) => {
+      const chunk = data.toString();
       
-      for (const line of lines) {
-        try {
-          const json = JSON.parse(line);
-          
-          // Debug logging to see what we're getting
-          console.log('[AI Stream] Received JSON type:', json.type);
-          
-          if (json.type === 'thinking') {
-            isThinking = true;
-            thinkingContent += json.text || '';
-            // Send thinking update to client
-            res.write(`data: ${JSON.stringify({
-              type: 'thinking',
-              content: json.text || ''
-            })}\n\n`);
-          } else if (json.type === 'message' && json.content) {
-            // Handle different message format from Claude
-            fullResponse += json.content || '';
-            res.write(`data: ${JSON.stringify({
-              type: 'text',
-              content: json.content || ''
-            })}\n\n`);
-          } else if (json.type === 'text') {
-            if (isThinking && thinkingContent) {
-              // Send signal to collapse thinking
-              res.write(`data: ${JSON.stringify({
-                type: 'thinking-complete',
-                content: thinkingContent
-              })}\n\n`);
-              isThinking = false;
-            }
-            
-            fullResponse += json.text || '';
-            // Send text update to client
-            res.write(`data: ${JSON.stringify({
-              type: 'text',
-              content: json.text || ''
-            })}\n\n`);
-          } else if (json.type === 'done') {
-            // Check if file was modified
-            let fileModified = false;
-            if (initialMtime !== null) {
-              try {
-                const newStats = await fs.stat(fullPath);
-                fileModified = newStats.mtimeMs !== initialMtime;
-              } catch (e) {
-                // File might have been deleted or become inaccessible
-              }
-            }
-            
-            // Send completion signal
-            res.write(`data: ${JSON.stringify({
-              type: 'done',
-              fileModified: fileModified,
-              fullResponse: fullResponse
-            })}\n\n`);
-            
-            clearInterval(keepAlive);
-            res.end();
-          } else if (json.type === 'error') {
-            res.write(`data: ${JSON.stringify({
-              type: 'error',
-              message: json.message || 'An error occurred'
-            })}\n\n`);
-            
-            clearInterval(keepAlive);
-            res.end();
-          }
-        } catch (e) {
-          // If it's not JSON, it might be plain text output
-          console.log('[AI Stream] Non-JSON output:', line);
-        }
-      }
+      // For plain text output, just stream it directly
+      fullResponse += chunk;
+      
+      // Send text update to client
+      res.write(`data: ${JSON.stringify({
+        type: 'text',
+        content: chunk
+      })}\n\n`);
     });
     
     claude.stderr.on('data', (data) => {
@@ -2748,14 +2630,34 @@ app.post('/ai-chat-stream/*', async (req, res) => {
     claude.stdin.write(conversation);
     claude.stdin.end();
     
-    claude.on('close', (code) => {
+    claude.on('close', async (code) => {
       console.log('[AI Stream] Claude process exited with code:', code);
-      if (code !== 0) {
+      
+      if (code === 0) {
+        // Check if file was modified
+        let fileModified = false;
+        if (initialMtime !== null) {
+          try {
+            const newStats = await fs.stat(fullPath);
+            fileModified = newStats.mtimeMs !== initialMtime;
+          } catch (e) {
+            // File might have been deleted or become inaccessible
+          }
+        }
+        
+        // Send completion signal
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          fileModified: fileModified,
+          fullResponse: fullResponse
+        })}\n\n`);
+      } else {
         res.write(`data: ${JSON.stringify({
           type: 'error',
           message: `Process exited with code ${code}`
         })}\n\n`);
       }
+      
       clearInterval(keepAlive);
       res.end();
     });
