@@ -15,7 +15,7 @@ STAGED_MD=$(echo "$STAGED_FILES" | grep '\.md$' || true)
 
 if [ -n "$STAGED_MD" ]; then
   echo "Auto-fixing markdown files with markdownlint..."
-  npx markdownlint-cli2-fix $STAGED_MD
+  npx markdownlint-cli2 --fix $STAGED_MD
   
   # Re-add the fixed files to the commit
   for file in $STAGED_MD; do
