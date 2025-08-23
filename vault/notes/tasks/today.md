@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/23/2025, 8:40:21 AM EDT*
+*Generated: 8/23/2025, 8:42:51 AM EDT*
 
 ## Next Up
 
@@ -12,16 +12,16 @@
 <details>
 <summary><strong>✅ Done Today</strong> (1044 tasks completed)</summary>
 
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a959f6a89bf0bd1893aa943a79176d85 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 58d1b9535431261a5eba9e67b71bfe10 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 82abdb344dcc3abd9a066e2279d59890 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0479a9bbf2030a3ea20ce78a82d0e9ff -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5a0167069b22d34224500b2b4dcff50d -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ea9f0c0cb7f8a08309a57f06a18c308c -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2af6e2d13dd43568972c4e30fd28700f -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c88495daadcd7c96c2e1dcf3ad7c9471 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 483fa6fd954d240bb81a0940998c7a08 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 09df07b6a0bb08913f46cb894571d1e0 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a959f6a89bf0bd1893aa943a79176d85 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 58d1b9535431261a5eba9e67b71bfe10 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 82abdb344dcc3abd9a066e2279d59890 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0479a9bbf2030a3ea20ce78a82d0e9ff -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5a0167069b22d34224500b2b4dcff50d -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7d346bb5e09e0c1c7a80d25d47ed3bf5 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e8a514adc862ae1cf562907cfad7bf40 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 82c38bd09ea2437f08317da697b3b613 -->
