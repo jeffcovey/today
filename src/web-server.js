@@ -1123,7 +1123,7 @@ async function renderEditor(filePath, urlPath) {
         #editor {
           width: 100%;
           height: 100%;
-          font-family: 'Roboto Mono', monospace;
+          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
           font-size: 14px;
           border: 1px solid #dee2e6;
           border-radius: 0.375rem;
@@ -1137,6 +1137,22 @@ async function renderEditor(filePath, urlPath) {
           border: 1px solid #dee2e6;
           border-bottom: none;
         }
+        
+        /* CodeMirror styles */
+        .cm-editor {
+          height: calc(100vh - 250px);
+          min-height: 400px;
+          border: 1px solid #dee2e6;
+          border-radius: 0 0 0.375rem 0.375rem;
+        }
+        .cm-editor.cm-focused {
+          outline: none;
+          border-color: #86b7fe;
+          box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+        .cm-scroller {
+          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
       </style>
     </head>
     <body>
@@ -1146,7 +1162,7 @@ async function renderEditor(filePath, urlPath) {
           <a class="navbar-brand" href="/">
             <i class="fas fa-edit me-2"></i>Editing: ${fileName}
           </a>
-          <form class="d-flex ms-auto me-2" onsubmit="performSearch(event)">
+          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
             <div class="input-group">
               <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
               <button class="btn btn-light btn-sm" type="submit">
@@ -1154,12 +1170,6 @@ async function renderEditor(filePath, urlPath) {
               </button>
             </div>
           </form>
-          <button onclick="saveFile()" class="btn btn-success btn-sm me-2">
-            <i class="fas fa-save me-1"></i>Save
-          </button>
-          <a href="/${urlPath}" class="btn btn-light btn-sm">
-            <i class="fas fa-times me-1"></i>Cancel
-          </a>
         </div>
       </nav>
 
@@ -1183,14 +1193,19 @@ async function renderEditor(filePath, urlPath) {
                 </span>
               </div>
               <div class="col-auto">
-                <span id="save-status" class="text-muted small"></span>
+                <span id="save-status" class="text-muted small me-3"></span>
+                <button onclick="saveFile()" class="btn btn-success btn-sm me-2">
+                  <i class="fas fa-save me-1"></i>Save
+                </button>
+                <a href="/${urlPath}" class="btn btn-light btn-sm">
+                  <i class="fas fa-times me-1"></i>Close
+                </a>
               </div>
             </div>
           </div>
           <div class="card-body p-0">
-            <div class="editor-container">
-              <textarea id="editor" class="form-control border-0">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
-            </div>
+            <div class="editor-container"></div>
+            <textarea id="editor" style="display: none;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
           </div>
         </div>
       </div>
@@ -1198,9 +1213,63 @@ async function renderEditor(filePath, urlPath) {
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
-      <script>
+      <!-- CodeMirror 6 -->
+      <script type="module">
+        import {EditorView, basicSetup} from "https://cdn.jsdelivr.net/npm/codemirror@6/+esm";
+        import {markdown} from "https://cdn.jsdelivr.net/npm/@codemirror/lang-markdown@6/+esm";
+        import {oneDark} from "https://cdn.jsdelivr.net/npm/@codemirror/theme-one-dark@6/+esm";
+        import {EditorState} from "https://cdn.jsdelivr.net/npm/@codemirror/state@6/+esm";
+        import {keymap} from "https://cdn.jsdelivr.net/npm/@codemirror/view@6/+esm";
+        import {defaultKeymap, indentWithTab} from "https://cdn.jsdelivr.net/npm/@codemirror/commands@6/+esm";
+        
+        // Get initial content
+        const initialContent = document.getElementById('editor').value;
+        
+        // Create the editor
+        const editor = new EditorView({
+          doc: initialContent,
+          extensions: [
+            basicSetup,
+            markdown(),
+            keymap.of([
+              ...defaultKeymap,
+              indentWithTab
+            ]),
+            EditorView.theme({
+              "&": {
+                fontSize: "14px"
+              },
+              ".cm-content": {
+                padding: "1rem",
+                minHeight: "calc(100vh - 250px)"
+              },
+              ".cm-focused .cm-cursor": {
+                borderLeftColor: "#000"
+              },
+              ".cm-line": {
+                lineHeight: "1.6"
+              }
+            }),
+            EditorView.lineWrapping,
+            EditorView.updateListener.of((v) => {
+              if (v.docChanged) {
+                // Clear save status when document changes
+                const saveStatus = document.getElementById('save-status');
+                if (saveStatus && saveStatus.textContent.includes('Saved')) {
+                  saveStatus.textContent = '';
+                  saveStatus.className = 'text-muted small me-3';
+                }
+              }
+            })
+          ],
+          parent: document.querySelector('.editor-container')
+        });
+        
+        // Store editor instance globally for save function
+        window.cmEditor = editor;
+        
         // Search functionality
-        function performSearch(event) {
+        window.performSearch = function(event) {
           event.preventDefault();
           const searchQuery = document.getElementById('searchInput').value.trim();
           if (searchQuery) {
@@ -1208,12 +1277,12 @@ async function renderEditor(filePath, urlPath) {
           }
         }
         
-        function saveFile() {
-          const content = document.getElementById('editor').value;
+        window.saveFile = function() {
+          const content = window.cmEditor.state.doc.toString();
           const saveStatus = document.getElementById('save-status');
           
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-          saveStatus.className = 'text-primary small';
+          saveStatus.className = 'text-primary small me-3';
           
           fetch('/save/${urlPath}', {
             method: 'POST',
@@ -1225,7 +1294,7 @@ async function renderEditor(filePath, urlPath) {
           .then(response => {
             if (response.ok) {
               saveStatus.innerHTML = '<i class="fas fa-check me-1"></i>Saved successfully!';
-              saveStatus.className = 'text-success small';
+              saveStatus.className = 'text-success small me-3';
               setTimeout(() => {
                 saveStatus.innerHTML = '';
               }, 3000);
@@ -1235,17 +1304,20 @@ async function renderEditor(filePath, urlPath) {
           })
           .catch(error => {
             saveStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Save failed!';
-            saveStatus.className = 'text-danger small';
+            saveStatus.className = 'text-danger small me-3';
           });
         }
         
         // Auto-save on Ctrl+S / Cmd+S
-        document.getElementById('editor').addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function(e) {
           if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
-            saveFile();
+            window.saveFile();
           }
         });
+        
+        // Focus the editor when page loads
+        editor.focus();
       </script>
     </body>
     </html>
