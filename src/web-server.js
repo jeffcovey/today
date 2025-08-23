@@ -622,7 +622,6 @@ async function renderDirectory(dirPath, urlPath) {
       </div>
     </div>
   </div>
-</div>
 
       <!-- Marked.js for markdown rendering -->
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
