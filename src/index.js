@@ -752,6 +752,11 @@ program
 
 if (process.argv.length === 2) {
   program.outputHelp();
+  process.exit(0);
 } else {
   program.parse();
+  // Ensure process exits after command completes
+  process.on('beforeExit', () => {
+    process.exit(0);
+  });
 }

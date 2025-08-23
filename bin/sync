@@ -106,6 +106,11 @@ main() {
         run_sync_step "📧 Email Sync" sync_email "Email synced" "Email sync"
     fi
     
+    # Pobox sent email sync (if configured)
+    if grep -q "POBOX_ACCOUNT=" .env 2>/dev/null && grep -q "POBOX_PASSWORD=" .env 2>/dev/null; then
+        run_sync_step "📤 Pobox Sent Mail" sync_pobox "Sent emails synced" "Pobox sync"
+    fi
+    
     # Calendar sync
     run_sync_step "📅 Calendar Sync" sync_calendar "Calendar synced" "Calendar sync"
     
@@ -634,6 +639,72 @@ sync_email() {
     stats_output=$(timeout 2 $EMAIL_BIN stats 2>&1 | grep "Total emails:" | cut -d: -f2 | xargs) || true
     if [[ -n "$stats_output" ]]; then
         print_info "Total emails in database: $stats_output"
+    fi
+    
+    return 0
+}
+
+# Sync Pobox sent emails
+sync_pobox() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if Pobox credentials are configured
+    if ! grep -q "POBOX_ACCOUNT=" .env 2>/dev/null || ! grep -q "POBOX_PASSWORD=" .env 2>/dev/null; then
+        print_info "Pobox credentials not configured (skipping)"
+        return 0
+    fi
+    
+    print_info "Downloading sent emails from Pobox..."
+    
+    # Create temp file for output
+    POBOX_OUTPUT=$(mktemp /tmp/pobox-sync.XXXXXX)
+    
+    # Start the sync with timeout
+    TIMEOUT=60
+    timeout $TIMEOUT bin/pobox-sync > "$POBOX_OUTPUT" 2>&1 &
+    POBOX_PID=$!
+    
+    # Show progress dots while running
+    local dots=""
+    while kill -0 $POBOX_PID 2>/dev/null; do
+        dots="${dots}."
+        if [[ ${#dots} -gt 30 ]]; then
+            dots=""
+        fi
+        printf "\r   Syncing sent emails%-35s" "$dots"
+        sleep 0.5
+    done
+    
+    # Get exit code
+    wait $POBOX_PID 2>/dev/null || true
+    pobox_exit_code=$?
+    
+    # Clear the progress line
+    printf "\r%-70s\r" " "
+    
+    # Read output
+    output=$(cat "$POBOX_OUTPUT" 2>/dev/null || echo "")
+    rm -f "$POBOX_OUTPUT"
+    
+    # Check for timeout
+    if [[ $pobox_exit_code -eq 124 ]]; then
+        print_error "Pobox sync timed out after $TIMEOUT seconds"
+        return 1
+    elif [[ $pobox_exit_code -ne 0 ]]; then
+        print_error "Pobox sync failed"
+        echo "$output" | grep -v "^$" | head -5
+        return 1
+    fi
+    
+    # Show results
+    if echo "$output" | grep -q "Downloaded"; then
+        # Extract number of emails
+        email_count=$(echo "$output" | grep -oE "Downloaded [0-9]+ sent email" | grep -oE "[0-9]+") || true
+        if [[ -n "$email_count" ]]; then
+            print_info "Downloaded $email_count new sent emails"
+        fi
+    else
+        print_info "No new sent emails to download"
     fi
     
     return 0

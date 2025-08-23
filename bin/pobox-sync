@@ -109,6 +109,8 @@ async function syncPoboxSent() {
           const parsed = await simpleParser(message.source);
           
           // Store in database
+          const emailDate = parsed.date ? parsed.date.toISOString() : new Date().toISOString();
+          
           cache.db.prepare(`
             INSERT OR REPLACE INTO emails (
               uid, message_id, from_address, to_address, subject, date,
@@ -121,7 +123,7 @@ async function syncPoboxSent() {
             parsed.from?.text || '',
             parsed.to?.text || '',
             parsed.subject || '(no subject)',
-            parsed.date || new Date(),
+            emailDate,
             JSON.stringify(parsed.headerLines?.map(h => [h.key, h.line]) || []),
             parsed.text || '',
             parsed.html || '',
@@ -174,7 +176,11 @@ async function syncPoboxSent() {
 }
 
 // Run the sync
-syncPoboxSent().catch(error => {
-  console.error(chalk.red('Fatal error:'), error);
-  process.exit(1);
-});
+syncPoboxSent()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(error => {
+    console.error(chalk.red('Fatal error:'), error);
+    process.exit(1);
+  });
