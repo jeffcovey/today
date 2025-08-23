@@ -432,6 +432,8 @@ const pageStyle = `
     resize: none;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
+    min-height: 100px !important;
+    height: auto !important;
   }
   
   .chat-input-area .btn {
@@ -457,10 +459,9 @@ const pageStyle = `
   nav[aria-label="breadcrumb"] {
     position: sticky;
     top: 56px;
-    background: white;
+    background: transparent;
     z-index: 1010;
     padding: 0.5rem 0;
-    margin-top: -0.5rem;
     margin-bottom: 1rem;
   }
   
@@ -599,7 +600,7 @@ async function renderDirectory(dirPath, urlPath) {
       html += `
             <div class="card shadow-sm mb-3">
               <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center ps-2">
                   <i class="fas fa-calendar-day me-2"></i>
                   <div>
                     <strong>Today's Plan</strong>
