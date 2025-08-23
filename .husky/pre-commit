@@ -1,5 +1,5 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+# Husky helper file removed - not needed for our setup
 
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
