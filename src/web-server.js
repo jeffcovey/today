@@ -218,6 +218,15 @@ const pageStyle = `
     flex-direction: column;
   }
   
+  /* Make chat card sticky */
+  @media (min-width: 992px) {
+    .col-lg-5 > .card {
+      position: sticky;
+      top: 1rem;
+      max-height: calc(100vh - 2rem);
+    }
+  }
+  
   .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -438,6 +447,23 @@ const pageStyle = `
     padding: 1.5rem;
   }
   
+  /* Sticky navbar and breadcrumb */
+  .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+  }
+  
+  nav[aria-label="breadcrumb"] {
+    position: sticky;
+    top: 56px;
+    background: white;
+    z-index: 1010;
+    padding: 0.5rem 0;
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+  }
+  
   @media (max-width: 768px) {
     .chat-container {
       height: 40vh;
@@ -573,8 +599,8 @@ async function renderDirectory(dirPath, urlPath) {
       html += `
             <div class="card shadow-sm mb-3">
               <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
-                <div class="d-flex align-items-center px-2">
-                  <i class="fas fa-calendar-day me-3"></i>
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-calendar-day me-2"></i>
                   <div>
                     <strong>Today's Plan</strong>
                     <br>
@@ -590,7 +616,7 @@ async function renderDirectory(dirPath, urlPath) {
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
                 <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-calendar-alt me-2"></i>Plans</span>
+                  <span><i class="fas fa-calendar-alt me-2"></i> Plans</span>
                   <i class="fas fa-chevron-down" id="plansChevron"></i>
                 </div>
               </div>
@@ -636,7 +662,7 @@ async function renderDirectory(dirPath, urlPath) {
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
                 <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-history me-2"></i>Recent Pages</span>
+                  <span><i class="fas fa-history me-2"></i> Recent Pages</span>
                   <i class="fas fa-chevron-down" id="recentsChevron"></i>
                 </div>
               </div>
@@ -747,8 +773,7 @@ async function renderDirectory(dirPath, urlPath) {
                 id="chatInput" 
                 placeholder="Type your message or /clear to reset..."
                 rows="4"
-                onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}">
-              </textarea>
+                onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
               <button class="btn btn-primary" onclick="sendMessage()">
                 <i class="fas fa-paper-plane"></i>
               </button>
@@ -1722,8 +1747,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
                       id="chatInput" 
                       placeholder="Type your message or /clear to reset..."
                       rows="4"
-                      onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}">
-                    </textarea>
+                      onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
                     <button class="btn btn-primary" onclick="sendMessage()">
                       <i class="fas fa-paper-plane"></i>
                     </button>
