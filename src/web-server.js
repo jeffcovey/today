@@ -504,8 +504,8 @@ async function renderDirectory(dirPath, urlPath) {
         </div>
       </nav>
 
-      <!-- Main content -->
-      <div class="container mt-4">
+      <!-- Main content with chat -->
+      <div class="container-fluid mt-3">
         <!-- Breadcrumb -->
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -513,9 +513,11 @@ async function renderDirectory(dirPath, urlPath) {
           </ol>
         </nav>
 
-        <!-- File list -->
-        <div class="card shadow-sm">
-          <div class="list-group list-group-flush">
+        <div class="row">
+          <!-- Content column -->
+          <div class="col-12 col-lg-7 mb-3">
+            <div class="card shadow-sm h-100">
+              <div class="list-group list-group-flush">
   `;
   
   // Add parent directory link if not at root
@@ -590,9 +592,219 @@ async function renderDirectory(dirPath, urlPath) {
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- Chat column -->
+    <div class="col-12 col-lg-5 mb-3">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <i class="fas fa-robot me-2"></i>AI Assistant
+        </div>
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <div class="text-center text-muted p-3">
+              <small>Ask questions about this directory and its contents</small>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <div class="input-group">
+              <input type="text" 
+                class="form-control" 
+                id="chatInput" 
+                placeholder="Type your message or /clear to reset..."
+                onkeypress="if(event.key==='Enter')sendMessage()">
+              <button class="btn btn-primary" onclick="sendMessage()">
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      <!-- Marked.js for markdown rendering -->
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      
+      <script>
+        // Store directory information for AI context
+        const directoryPath = '${urlPath || '/'}';
+        const directoryContents = ${JSON.stringify(items.map(item => ({
+          name: item.name,
+          type: item.isDirectory() ? 'directory' : 'file'
+        })))};
+        
+        // Chat functionality
+        const CHAT_VERSION = 4;
+        const storedVersion = localStorage.getItem('chatVersion');
+        if (storedVersion !== String(CHAT_VERSION)) {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('chatHistory_') || key === 'inputHistory') {
+              localStorage.removeItem(key);
+            }
+          });
+          localStorage.setItem('chatVersion', String(CHAT_VERSION));
+          window.location.reload();
+        }
+        
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory_dir_${urlPath || 'root'}') || '[]');
+        let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
+        let historyIndex = -1;
+        
+        // Load existing chat messages
+        function loadChatHistory() {
+          const chatMessages = document.getElementById('chatMessages');
+          if (chatHistory.length > 0) {
+            chatMessages.innerHTML = '';
+            chatHistory.forEach(msg => {
+              addChatBubble(msg.content, msg.role, false);
+            });
+          }
+        }
+        
+        // Add a chat bubble to the interface
+        function addChatBubble(message, role, save = true) {
+          const chatMessages = document.getElementById('chatMessages');
+          const bubble = document.createElement('div');
+          bubble.className = \`chat-bubble \${role}\`;
+          
+          const timestamp = new Date().toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          
+          // Render markdown using marked
+          const renderedContent = marked.parse(message);
+          
+          let bubbleHtml = \`
+            <div class="bubble-content">
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">
+                \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
+              </small>
+              <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
+            </div>
+          \`;
+          
+          bubble.innerHTML = bubbleHtml;
+          chatMessages.appendChild(bubble);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          
+          if (save) {
+            chatHistory.push({
+              role: role,
+              content: message,
+              timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('chatHistory_dir_${urlPath || 'root'}', JSON.stringify(chatHistory));
+          }
+        }
+        
+        // Send message to AI
+        async function sendMessage() {
+          const input = document.getElementById('chatInput');
+          const message = input.value.trim();
+          
+          if (!message) return;
+          
+          // Handle /clear command
+          if (message === '/clear') {
+            chatHistory = [];
+            localStorage.removeItem('chatHistory_dir_${urlPath || 'root'}');
+            document.getElementById('chatMessages').innerHTML = \`
+              <div class="text-center text-muted p-3">
+                <small>Conversation cleared. Start fresh!</small>
+              </div>
+            \`;
+            input.value = '';
+            return;
+          }
+          
+          // Add to input history
+          inputHistory.unshift(message);
+          inputHistory = inputHistory.slice(0, 50);
+          localStorage.setItem('inputHistory', JSON.stringify(inputHistory));
+          historyIndex = -1;
+          
+          // Add user message
+          addChatBubble(message, 'user');
+          input.value = '';
+          
+          // Show typing indicator
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'chat-bubble assistant typing-indicator';
+          typingIndicator.innerHTML = \`
+            <div class="bubble-content">
+              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
+              <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          \`;
+          document.getElementById('chatMessages').appendChild(typingIndicator);
+          
+          try {
+            // Create directory context for AI
+            const directoryContext = \`Directory: \${directoryPath}
+Contents:
+\${directoryContents.map(item => \`- \${item.name}\${item.type === 'directory' ? '/' : ''}\`).join('\\n')}\`;
+            
+            const response = await fetch(\`/ai-chat-directory/\${directoryPath}\`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: message,
+                history: chatHistory,
+                directoryContext: directoryContext
+              })
+            });
+            
+            if (!response.ok) throw new Error('Failed to get AI response');
+            
+            const data = await response.json();
+            
+            // Remove typing indicator
+            typingIndicator.remove();
+            
+            // Add AI response
+            addChatBubble(data.response, 'assistant');
+            
+          } catch (error) {
+            console.error('Error sending message:', error);
+            typingIndicator.remove();
+            addChatBubble('Sorry, I encountered an error. Please try again.', 'assistant');
+          }
+        }
+        
+        // Handle input history with arrow keys
+        document.getElementById('chatInput').addEventListener('keydown', function(e) {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex < inputHistory.length - 1) {
+              historyIndex++;
+              this.value = inputHistory[historyIndex];
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+              historyIndex--;
+              this.value = inputHistory[historyIndex];
+            } else if (historyIndex === 0) {
+              historyIndex = -1;
+              this.value = '';
+            }
+          }
+        });
+        
+        // Load chat history on page load
+        loadChatHistory();
+      </script>
     </body>
     </html>
   `;
@@ -1854,6 +2066,119 @@ app.post('/ai-chat/*', async (req, res) => {
     
   } catch (error) {
     console.error('Error in AI chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      response: 'An error occurred while processing your request.' 
+    });
+  }
+});
+
+// AI Chat route handler for directories
+app.post('/ai-chat-directory/*', async (req, res) => {
+  // Set timeout for this specific request to 5 minutes
+  req.setTimeout(300000); // 5 minutes
+  res.setTimeout(300000); // 5 minutes
+  
+  try {
+    const urlPath = req.path.slice(19); // Remove '/ai-chat-directory/' prefix
+    const { message, history, directoryContext } = req.body;
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    
+    // Build conversation for Claude
+    let conversation = "You are an AI assistant helping with a directory in a markdown vault. ";
+    conversation += `The user is viewing directory: ${urlPath || '/'}\n`;
+    conversation += `Full path: vault/${urlPath || '/'}\n\n`;
+    conversation += "Directory contents:\n";
+    conversation += directoryContext || "(No directory content available)";
+    conversation += "\n\n";
+    conversation += "You can help the user understand what files are in this directory, ";
+    conversation += "suggest which files to look at, and answer questions about organizing ";
+    conversation += "or navigating the content.\n\n";
+    
+    if (history && history.length > 0) {
+      conversation += "Previous conversation:\n";
+      history.forEach(msg => {
+        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+      });
+      conversation += "\n";
+    }
+    
+    conversation += `User: ${message}\n`;
+    conversation += "Assistant: ";
+    
+    // Call Claude using the claude CLI
+    const { spawn } = await import('child_process');
+    
+    try {
+      // Debug logging
+      console.log('[AI Directory Chat] Starting Claude execution...');
+      console.log('[AI Directory Chat] Directory path:', urlPath || '/');
+      
+      // Use spawn to properly pipe input to claude --print
+      const claude = spawn('claude', ['--print'], {
+        cwd: process.cwd(),
+        timeout: 300000 // 5 minute timeout for complex requests
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      claude.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      claude.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      // Write the conversation to stdin
+      claude.stdin.write(conversation);
+      claude.stdin.end();
+      
+      // Wait for the process to complete
+      await new Promise((resolve, reject) => {
+        claude.on('close', (code) => {
+          console.log('[AI Directory Chat] Claude process exited with code:', code);
+          
+          if (code !== 0) {
+            console.error('[AI Directory Chat] Claude failed with code:', code);
+            console.error('[AI Directory Chat] stderr:', stderr);
+            if (code === null) {
+              reject(new Error('Request timed out after 5 minutes'));
+            } else {
+              reject(new Error(`Claude exited with code ${code}: ${stderr || 'Unknown error'}`));
+            }
+          } else {
+            resolve();
+          }
+        });
+        
+        claude.on('error', (err) => {
+          console.error('[AI Directory Chat] Failed to start Claude:', err);
+          reject(err);
+        });
+      });
+      
+      res.json({ 
+        response: stdout.trim()
+      });
+    } catch (error) {
+      console.error('[AI Directory Chat] Error calling Claude:', error);
+      
+      let errorResponse = "I'm having trouble processing your request.";
+      if (error.message && error.message.includes('timed out')) {
+        errorResponse = "The AI request took too long. Please try a shorter or simpler question.";
+      } else if (error.message && error.message.includes('code')) {
+        errorResponse = "The AI service encountered an error. Please try again in a moment.";
+      }
+      
+      res.json({ 
+        response: errorResponse
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error in AI directory chat:', error);
     res.status(500).json({ 
       success: false, 
       response: 'An error occurred while processing your request.' 
