@@ -123,15 +123,9 @@ const pageStyle = `
     border-left: 4px solid #007bff;
   }
   
-  .table-of-contents summary {
-    cursor: pointer;
-    user-select: none;
+  .table-of-contents h5 {
     color: #007bff;
     font-weight: 500;
-  }
-  
-  .table-of-contents summary:hover {
-    color: #0056b3;
   }
   
   .table-of-contents a {
@@ -1687,8 +1681,7 @@ function generateTableOfContents(content) {
   
   // Generate TOC HTML
   let tocHtml = '<nav class="table-of-contents mb-4">\n';
-  tocHtml += '<details>\n';
-  tocHtml += '<summary class="h5 mb-3"><i class="fas fa-list me-2"></i>Table of Contents</summary>\n';
+  tocHtml += '<h5 class="mb-3"><i class="fas fa-list me-2"></i>Table of Contents</h5>\n';
   tocHtml += '<ul class="list-unstyled ms-3">\n';
   
   headings.forEach(heading => {
@@ -1700,7 +1693,6 @@ function generateTableOfContents(content) {
   });
   
   tocHtml += '</ul>\n';
-  tocHtml += '</details>\n';
   tocHtml += '</nav>\n';
   
   // Add IDs to headings in content
