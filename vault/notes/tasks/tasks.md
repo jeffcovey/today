@@ -46,7 +46,6 @@
 
 - [ ] **12:30 PM**: Zazen meditation <!-- task-id: f5c26873dcd6f4f03da64e841a6a2e58 -->
 - [ ] **Airbnb: Wae's inquiry** - MUST respond today <!-- task-id: 1e8fd0956fff1271876dd0059ccfcbe5 -->
-- [x] **App badges** - Clear all red dots <!-- task-id: e2110e5272d2fbc1021a8e637e010cc5 -->
 - [ ] **Apple Reminders** - Review tasks <!-- task-id: 3d870a2aa505420779683c8f7f400266 -->
 - [ ] **Calendar** - Review today's schedule <!-- task-id: 1c5ecc590523098581c9e52bab7b6dbb -->
 - [ ] **Contact "Older"** - Listed in people_to_contact table <!-- task-id: a5f33f8f268727a011b976e1a52930ac -->
@@ -65,7 +64,6 @@
 - [ ] **⏱️ Start the fasting timer** - Begin overnight fast <!-- task-id: 1a5f94c378a6739cdc8249f22d8f9238 -->
 - [ ] **☕ Prepare coffee** - Ready for tomorrow morning <!-- task-id: 29a44f904485f1fc91bb8cdc1d5b65a8 -->
 - [ ] **✅ Close Streaks** - Complete your daily goals <!-- task-id: 6445820708408445b9515d45a41cb133 -->
-- [x] **✍️ Journal** - Process and reflect <!-- task-id: b47c18ec60f85861c38beba73609bd1c -->
 - [ ] **🍽️ Finish meal tracking** - Log your nutrition <!-- task-id: 2cf3c350175ae847a5d23b718082e981 -->
 - [ ] **🎯 Set top three priorities for tomorrow** - Plan ahead <!-- task-id: 8f318ce149ccd95a419cd5f838de465e -->
 - [ ] **🐱 Feed Buster** - Take care of your cat <!-- task-id: 292ec2fb5c65ad09975ee01c2c3edc75 -->
@@ -1434,3 +1432,10 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
+
+# Archive
+
+## 2025-08-23
+
+- [x] **App badges** - Clear all red dots <!-- task-id: e2110e5272d2fbc1021a8e637e010cc5 -->
+- [x] **✍️ Journal** - Process and reflect <!-- task-id: b47c18ec60f85861c38beba73609bd1c -->
