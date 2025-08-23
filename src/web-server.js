@@ -552,6 +552,14 @@ async function renderDirectory(dirPath, urlPath) {
           <a class="navbar-brand" href="/">
             <i class="fas fa-folder-open me-2"></i>Vault Browser
           </a>
+          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+            <div class="input-group">
+              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
+              <button class="btn btn-light btn-sm" type="submit">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </form>
         </div>
       </nav>
 
@@ -792,6 +800,15 @@ async function renderDirectory(dirPath, urlPath) {
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
       <script>
+        // Search functionality
+        function performSearch(event) {
+          event.preventDefault();
+          const searchQuery = document.getElementById('searchInput').value.trim();
+          if (searchQuery) {
+            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+          }
+        }
+        
         // Store directory information for AI context
         const directoryPath = '${urlPath || '/'}';
         const directoryContents = ${JSON.stringify(items.map(item => ({
@@ -1129,14 +1146,20 @@ async function renderEditor(filePath, urlPath) {
           <a class="navbar-brand" href="/">
             <i class="fas fa-edit me-2"></i>Editing: ${fileName}
           </a>
-          <div class="ms-auto">
-            <button onclick="saveFile()" class="btn btn-success btn-sm me-2">
-              <i class="fas fa-save me-1"></i>Save
-            </button>
-            <a href="/${urlPath}" class="btn btn-light btn-sm">
-              <i class="fas fa-times me-1"></i>Cancel
-            </a>
-          </div>
+          <form class="d-flex ms-auto me-2" onsubmit="performSearch(event)">
+            <div class="input-group">
+              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
+              <button class="btn btn-light btn-sm" type="submit">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </form>
+          <button onclick="saveFile()" class="btn btn-success btn-sm me-2">
+            <i class="fas fa-save me-1"></i>Save
+          </button>
+          <a href="/${urlPath}" class="btn btn-light btn-sm">
+            <i class="fas fa-times me-1"></i>Cancel
+          </a>
         </div>
       </nav>
 
@@ -1176,6 +1199,15 @@ async function renderEditor(filePath, urlPath) {
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
       <script>
+        // Search functionality
+        function performSearch(event) {
+          event.preventDefault();
+          const searchQuery = document.getElementById('searchInput').value.trim();
+          if (searchQuery) {
+            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+          }
+        }
+        
         function saveFile() {
           const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
@@ -1699,11 +1731,17 @@ async function renderMarkdownUncached(filePath, urlPath) {
           <a class="navbar-brand" href="/">
             <i class="fas fa-file-alt me-2"></i>${fileName}
           </a>
-          <div class="ms-auto">
-            <a href="/edit/${urlPath}" class="btn btn-light btn-sm">
-              <i class="fas fa-edit me-1"></i>Edit
-            </a>
-          </div>
+          <form class="d-flex ms-auto me-2" onsubmit="performSearch(event)">
+            <div class="input-group">
+              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
+              <button class="btn btn-light btn-sm" type="submit">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </form>
+          <a href="/edit/${urlPath}" class="btn btn-light btn-sm">
+            <i class="fas fa-edit me-1"></i>Edit
+          </a>
         </div>
       </nav>
 
@@ -1767,6 +1805,15 @@ async function renderMarkdownUncached(filePath, urlPath) {
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
       <script>
+        // Search functionality
+        function performSearch(event) {
+          event.preventDefault();
+          const searchQuery = document.getElementById('searchInput').value.trim();
+          if (searchQuery) {
+            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+          }
+        }
+        
         // Chat functionality
         // Version 4: Force clear all old chat to fix structure
         const CHAT_VERSION = 4;
@@ -2762,6 +2809,231 @@ app.post('/ai-chat-directory/*', async (req, res) => {
       success: false, 
       response: 'An error occurred while processing your request.' 
     });
+  }
+});
+
+// Search route handler
+app.get('/search', async (req, res) => {
+  try {
+    const searchQuery = req.query.q || '';
+    
+    if (!searchQuery) {
+      return res.redirect('/');
+    }
+    
+    // Use grep to search for the query in markdown files
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      // Search in file contents
+      const { stdout: contentResults } = await execAsync(
+        `grep -r -i -l --include="*.md" "${searchQuery.replace(/"/g, '\\"')}" "${VAULT_PATH}" | head -100`,
+        { maxBuffer: 1024 * 1024 * 10 } // 10MB buffer
+      );
+      
+      // Search in filenames
+      const { stdout: filenameResults } = await execAsync(
+        `find "${VAULT_PATH}" -type f -name "*.md" -iname "*${searchQuery.replace(/"/g, '\\"')}*" | head -100`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      );
+      
+      // Combine and deduplicate results
+      const allFiles = new Set();
+      
+      if (contentResults) {
+        contentResults.split('\n').filter(f => f).forEach(file => {
+          allFiles.add(file);
+        });
+      }
+      
+      if (filenameResults) {
+        filenameResults.split('\n').filter(f => f).forEach(file => {
+          allFiles.add(file);
+        });
+      }
+      
+      // Convert to relative paths and create result objects
+      const results = [];
+      for (const file of allFiles) {
+        const relativePath = path.relative(VAULT_PATH, file);
+        const fileName = path.basename(file);
+        
+        // Try to get snippet of matching content
+        let snippet = '';
+        try {
+          const { stdout } = await execAsync(
+            `grep -i -m 1 -C 1 "${searchQuery.replace(/"/g, '\\"')}" "${file}"`,
+            { maxBuffer: 1024 * 1024 }
+          );
+          snippet = stdout.trim().replace(/\n/g, ' ').substring(0, 200);
+        } catch (e) {
+          // No match in content, might be filename match
+        }
+        
+        results.push({
+          path: relativePath,
+          fileName: fileName,
+          snippet: snippet
+        });
+      }
+      
+      // Sort results - filename matches first
+      results.sort((a, b) => {
+        const aHasFilenameMatch = a.fileName.toLowerCase().includes(searchQuery.toLowerCase());
+        const bHasFilenameMatch = b.fileName.toLowerCase().includes(searchQuery.toLowerCase());
+        if (aHasFilenameMatch && !bHasFilenameMatch) return -1;
+        if (!aHasFilenameMatch && bHasFilenameMatch) return 1;
+        return a.fileName.localeCompare(b.fileName);
+      });
+      
+      // Render search results page
+      const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <title>Search: ${searchQuery}</title>
+          ${pageStyle}
+        </head>
+        <body>
+          <!-- Navbar -->
+          <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+              <a class="navbar-brand" href="/">
+                <i class="fas fa-search me-2"></i>Search Results
+              </a>
+              <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+                <div class="input-group">
+                  <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" value="${searchQuery.replace(/"/g, '&quot;')}" style="max-width: 250px;">
+                  <button class="btn btn-light btn-sm" type="submit">
+                    <i class="fas fa-search"></i>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </nav>
+          
+          <div class="container-fluid mt-3">
+            <div class="row">
+              <div class="col">
+                <div class="card shadow-sm">
+                  <div class="card-header">
+                    <h5 class="mb-0">
+                      <i class="fas fa-search me-2"></i>
+                      Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${searchQuery}"
+                    </h5>
+                  </div>
+                  <div class="list-group list-group-flush">
+                    ${results.length === 0 ? `
+                      <div class="list-group-item text-muted text-center py-4">
+                        No results found. Try a different search term.
+                      </div>
+                    ` : results.map(result => `
+                      <a href="/${result.path}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                          <h6 class="mb-1">
+                            <i class="fas fa-file-alt text-info me-2"></i>
+                            ${result.fileName}
+                          </h6>
+                        </div>
+                        <p class="mb-1 text-muted small">${result.path}</p>
+                        ${result.snippet ? `
+                          <small class="text-muted">
+                            ...${result.snippet}...
+                          </small>
+                        ` : ''}
+                      </a>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <script>
+            function performSearch(event) {
+              event.preventDefault();
+              const searchQuery = document.getElementById('searchInput').value.trim();
+              if (searchQuery) {
+                window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+              }
+            }
+          </script>
+        </body>
+        </html>
+      `;
+      
+      res.send(html);
+      
+    } catch (error) {
+      console.error('Search error:', error);
+      
+      // Return empty results on error
+      const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <title>Search: ${searchQuery}</title>
+          ${pageStyle}
+        </head>
+        <body>
+          <!-- Navbar -->
+          <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+              <a class="navbar-brand" href="/">
+                <i class="fas fa-search me-2"></i>Search Results
+              </a>
+              <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+                <div class="input-group">
+                  <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" value="${searchQuery.replace(/"/g, '&quot;')}" style="max-width: 250px;">
+                  <button class="btn btn-light btn-sm" type="submit">
+                    <i class="fas fa-search"></i>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </nav>
+          
+          <div class="container-fluid mt-3">
+            <div class="row">
+              <div class="col">
+                <div class="card shadow-sm">
+                  <div class="card-header">
+                    <h5 class="mb-0">
+                      <i class="fas fa-search me-2"></i>
+                      Search Results for "${searchQuery}"
+                    </h5>
+                  </div>
+                  <div class="list-group list-group-flush">
+                    <div class="list-group-item text-muted text-center py-4">
+                      An error occurred while searching. Please try again.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <script>
+            function performSearch(event) {
+              event.preventDefault();
+              const searchQuery = document.getElementById('searchInput').value.trim();
+              if (searchQuery) {
+                window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+              }
+            }
+          </script>
+        </body>
+        </html>
+      `;
+      
+      res.send(html);
+    }
+    
+  } catch (error) {
+    console.error('Error in search handler:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
