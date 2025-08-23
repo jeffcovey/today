@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/23/2025, 6:21:16 PM EDT*
+*Generated: 8/23/2025, 6:30:20 PM EDT*
 
 ## Next Up
 
@@ -9,8 +9,13 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (1854 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (1859 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 21a85b1c005fc28a9b9a3fa1598fc25e -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7303177a8ad70ba60075636f855f32ff -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6465aa8676094689cadf244543b1e78b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: fa38562790d0636fc7551d807f648995 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f7ecf4db22a31f99b8bbf6fa0915ff24 -->
 - [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
 - [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
 - [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->

@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (999 tasks)</summary>
+<summary><strong>General Tasks</strong> (1004 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -279,8 +279,9 @@
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7303177a8ad70ba60075636f855f32ff -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 73ec2c7afe8cf6a497854a1b1f414db9 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5bd83246cc6f03e2fabee99c37e5267e -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6d12f5b8ef17ad11fc928c4e3b56333f -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -292,8 +293,9 @@
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 56af4b0d44e7cbf56d0a4de16b4524d6 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6465aa8676094689cadf244543b1e78b -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2aab1d8da0f6a2a80d4c9e8d5ac608de -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 297af355a8b9bdf002b35bbae9a85906 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 734995f97f6ad8d1ebb3c9d9120f9fc4 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -303,8 +305,9 @@
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 21a85b1c005fc28a9b9a3fa1598fc25e -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e9e1ab0f11688adf13baae9a7e50933d -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3fd5b356949353e57f6c13b4e82877fd -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 195ef9372dd5843a6f403456650012ce -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -397,12 +400,14 @@
 - [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8a05bce2742a05d4a62a2f2433f10864 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: fa38562790d0636fc7551d807f648995 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 43b884cbf544976e10ba601f94e8e1f5 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 671dc3c742b5ad8a14c67cf5ec601375 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 31d50d3b65d6f182cc703c978d92f1e0 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f90796e0e12622c23868e525ead96d78 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f7ecf4db22a31f99b8bbf6fa0915ff24 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 582948d78875e2dcfbbe1f57fdfffe73 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 416a7b038e51f06d0cfb5da884c4aaeb -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a71d101a17e7e96308a3060e0e38133c -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
