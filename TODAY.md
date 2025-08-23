@@ -258,6 +258,8 @@ If a task doesn't fit these criteria, it should be questioned, delegated, or eli
 The database contains these key tables:
 - **task_cache**: Tasks with titles, stages, due dates, categories
 - **emails**: Recent emails with subjects, senders, reply status
+  - **IMPORTANT**: The emails table contains BOTH received emails (synced from iCloud) AND sent emails (synced from Pobox via `bin/pobox-sync`)
+  - Sent emails are in folder='Sent' and can be used to track communications and update contact dates
 - **calendar_events**: Upcoming events with times, locations, descriptions
 - **contacts**: Contact information with emails, phones, addresses
 - **sync_log**: Synchronization history and status
@@ -291,6 +293,8 @@ The SQLite database at `.data/today.db` contains all relevant data from:
 - 📝 Local notes (in file_tracking and notion_pages tables)
 - ✅ Notion databases (in task_cache and notion_pages tables)
 - 📧 Email database (in emails table with contact relationships)
+  - **Received emails**: Synced from iCloud inbox automatically
+  - **Sent emails**: Synced from Pobox via `bin/pobox-sync` (run periodically to track sent communications)
 - 📅 Calendar events (in calendar_events table)
 - 👥 Contacts (in contacts table with normalized emails/phones)
 - 🔄 Sync history (in sync_log table)
@@ -432,6 +436,14 @@ SELECT e.subject, e.from_address, e.date
 FROM emails e
 WHERE e.has_been_replied_to = 0
   AND e.date > datetime('now', '-3 days')
+  AND e.folder != 'Sent'
+ORDER BY e.date DESC;
+
+-- Check recent sent emails to see who you've communicated with
+SELECT e.to_address, e.subject, DATE(e.date) as sent_date
+FROM emails e
+WHERE e.folder = 'Sent'
+  AND e.date > datetime('now', '-7 days')
 ORDER BY e.date DESC;
 
 -- Get today's calendar events
@@ -506,6 +518,9 @@ What complex work needs focused attention?
 ### 5. Communications to Address
 
 Based on emails and people_to_contact tables
+- Check BOTH incoming emails that need replies AND recent sent emails
+- Use sent emails to verify you've already responded to requests
+- Check the 'Sent' folder to see who you've been in touch with recently
 
 ### 6. Evening Planning
 

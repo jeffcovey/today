@@ -720,15 +720,7 @@ async function main() {
           }
         }
         
-        // Get all contacts with last_contacted dates from database
-        const dbContacts = contactsSync.db.prepare(`
-          SELECT full_name, last_contacted 
-          FROM contacts 
-          WHERE last_contacted IS NOT NULL
-          ORDER BY last_contacted, full_name
-        `).all();
-        
-        // Update database from file changes
+        // Update database from file changes FIRST
         let dbUpdates = 0;
         for (const [name, date] of fileData) {
           const contact = contactsSync.db.prepare('SELECT id, last_contacted FROM contacts WHERE full_name = ?').get(name);
@@ -737,6 +729,59 @@ async function main() {
             dbUpdates++;
             console.log(`Updated ${name}: ${contact.last_contacted || 'none'} → ${date}`);
           }
+        }
+        
+        // THEN check emails table for sent emails to tracked contacts
+        console.log('Checking for recent email contacts...');
+        
+        // Get all tracked contacts with their email addresses
+        const trackedContacts = contactsSync.db.prepare(`
+          SELECT 
+            c.id, 
+            c.full_name, 
+            c.last_contacted,
+            GROUP_CONCAT(ce.email, '|') as email_addresses
+          FROM contacts c
+          LEFT JOIN contact_emails ce ON c.id = ce.contact_id
+          WHERE c.last_contacted IS NOT NULL
+          GROUP BY c.id
+        `).all();
+        
+        // Check for sent emails and update last_contacted dates
+        let emailUpdates = 0;
+        for (const contact of trackedContacts) {
+          if (!contact.email_addresses) continue;
+          
+          const emails = contact.email_addresses.split('|').filter(e => e && e.length > 0);
+          if (emails.length === 0) continue;
+          
+          // Check for most recent sent email to any of their addresses
+          for (const emailAddress of emails) {
+            const mostRecentEmail = contactsSync.db.prepare(`
+              SELECT DATE(date) as sent_date
+              FROM emails
+              WHERE folder = 'Sent'
+              AND to_address LIKE ?
+              ORDER BY date DESC
+              LIMIT 1
+            `).get(`%${emailAddress}%`);
+            
+            if (mostRecentEmail?.sent_date && mostRecentEmail.sent_date > contact.last_contacted) {
+              contactsSync.db.prepare('UPDATE contacts SET last_contacted = ? WHERE id = ?').run(
+                mostRecentEmail.sent_date, 
+                contact.id
+              );
+              console.log(`Updated ${contact.full_name} from email: ${contact.last_contacted} → ${mostRecentEmail.sent_date}`);
+              emailUpdates++;
+              break; // Only update once per contact
+            }
+          }
+        }
+        
+        if (emailUpdates > 0) {
+          console.log(`   Updated ${emailUpdates} contact(s) from sent emails`);
+        } else {
+          console.log('   No email updates found');
         }
         
         // Rebuild file with current database state (sorted by date)
