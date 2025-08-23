@@ -212,7 +212,8 @@ const pageStyle = `
   
   /* Chat interface styles */
   .chat-container {
-    height: calc(100vh - 200px);
+    height: calc(100vh - 250px);
+    max-height: 600px;
     display: flex;
     flex-direction: column;
   }
@@ -414,6 +415,22 @@ const pageStyle = `
     background: white;
   }
   
+  .chat-input-area .input-group {
+    align-items: stretch;
+  }
+  
+  .chat-input-area textarea {
+    resize: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  
+  .chat-input-area .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    align-self: stretch;
+  }
+  
   /* Card body with markdown content has scrolling */
   .card-body.markdown-content {
     height: calc(100vh - 200px);
@@ -556,8 +573,8 @@ async function renderDirectory(dirPath, urlPath) {
       html += `
             <div class="card shadow-sm mb-3">
               <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
-                <div class="d-flex align-items-center">
-                  <i class="fas fa-calendar me-3"></i>
+                <div class="d-flex align-items-center px-2">
+                  <i class="fas fa-calendar-day me-3"></i>
                   <div>
                     <strong>Today's Plan</strong>
                     <br>
@@ -725,11 +742,13 @@ async function renderDirectory(dirPath, urlPath) {
           </div>
           <div class="chat-input-area">
             <div class="input-group">
-              <input type="text" 
+              <textarea 
                 class="form-control" 
                 id="chatInput" 
                 placeholder="Type your message or /clear to reset..."
-                onkeypress="if(event.key==='Enter')sendMessage()">
+                rows="4"
+                onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}">
+              </textarea>
               <button class="btn btn-primary" onclick="sendMessage()">
                 <i class="fas fa-paper-plane"></i>
               </button>
@@ -1698,11 +1717,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
                 </div>
                 <div class="chat-input-area">
                   <div class="input-group">
-                    <input type="text" 
+                    <textarea 
                       class="form-control" 
                       id="chatInput" 
                       placeholder="Type your message or /clear to reset..."
-                      onkeypress="if(event.key==='Enter')sendMessage()">
+                      rows="4"
+                      onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}">
+                    </textarea>
                     <button class="btn btn-primary" onclick="sendMessage()">
                       <i class="fas fa-paper-plane"></i>
                     </button>
