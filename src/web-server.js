@@ -1798,6 +1798,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
           }
         }
         
+        // Escape HTML for safe display
+        function escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+        
         // Add a chat bubble to the interface
         function addChatBubble(message, role, save = true, replyTime = null) {
           const chatMessages = document.getElementById('chatMessages');
@@ -1911,11 +1918,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
             // Get the markdown content
             const markdownContent = document.querySelector('.markdown-content').innerText || '';
             
-            // Create abort controller with 5 minute timeout (matching server)
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 300000); // 5 minutes
+            // Create a container for thinking content that will be collapsed
+            let thinkingContainer = null;
+            let thinkingContent = '';
+            let responseContent = '';
+            let responseStarted = false;
             
-            const response = await fetch(\`/ai-chat/${urlPath}\`, {
+            // Use fetch with streaming response for SSE
+            const response = await fetch(\`/ai-chat-stream/${urlPath}\`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1924,37 +1934,141 @@ async function renderMarkdownUncached(filePath, urlPath) {
                 message: message,
                 history: chatHistory,
                 documentContent: markdownContent
-              }),
-              signal: controller.signal
+              })
             });
             
-            clearTimeout(timeout);
-            
-            if (!response.ok) throw new Error('Failed to get AI response');
-            
-            const data = await response.json();
-            
-            // Remove typing indicator and clear timer
-            clearInterval(timerInterval);
-            typingIndicator.remove();
-            
-            // Calculate response time
-            const responseTime = Math.floor((Date.now() - startTime) / 1000);
-            let timeStr;
-            if (responseTime < 60) {
-              timeStr = responseTime + ' second' + (responseTime !== 1 ? 's' : '');
-            } else {
-              const minutes = Math.floor(responseTime / 60);
-              const seconds = (responseTime % 60).toString().padStart(2, '0');
-              timeStr = minutes + ':' + seconds;
+            if (!response.ok) {
+              throw new Error('Failed to connect to streaming endpoint');
             }
             
-            // Add AI response with time
-            addChatBubble(data.response, 'assistant', true, timeStr);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
             
-            // If file was modified, refresh the content area
-            if (data.fileModified) {
-              refreshContentArea();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\\n');
+              buffer = lines.pop(); // Keep incomplete line in buffer
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    if (data.type === 'thinking') {
+                      // Update thinking indicator
+                      thinkingContent += data.content;
+                      const thinkingElement = typingIndicator.querySelector('.thinking-content');
+                      if (thinkingElement) {
+                        thinkingElement.textContent = thinkingContent.slice(-200); // Show last 200 chars
+                      } else {
+                        typingIndicator.innerHTML = \`
+                          <div class="bubble-content">
+                            <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
+                            <div class="thinking-content text-muted small" style="max-height: 100px; overflow-y: auto; font-family: monospace;">
+                              \${thinkingContent.slice(-200)}
+                            </div>
+                          </div>
+                        \`;
+                      }
+                    } else if (data.type === 'thinking-complete') {
+                      // Thinking is done, prepare to show response
+                      thinkingContent = data.content;
+                    } else if (data.type === 'text') {
+                      if (!responseStarted) {
+                        // First text chunk - remove typing indicator
+                        clearInterval(timerInterval);
+                        typingIndicator.remove();
+                        
+                        // If we have thinking content, create collapsible section
+                        if (thinkingContent) {
+                          const thinkingId = 'thinking-' + Date.now();
+                          const thinkingHtml = \`
+                            <div class="chat-bubble assistant">
+                              <div class="bubble-content">
+                                <small class="d-block" style="opacity: 0.6; margin: 0 0 0.25rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking Process</small>
+                                <details class="mb-2">
+                                  <summary class="text-muted small" style="cursor: pointer;">
+                                    <i class="fas fa-brain me-1"></i> View thinking process
+                                  </summary>
+                                  <div class="mt-2 p-2 bg-light rounded" style="font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">
+                                    \${escapeHtml(thinkingContent)}
+                                  </div>
+                                </details>
+                              </div>
+                            </div>
+                          \`;
+                          
+                          const tempDiv = document.createElement('div');
+                          tempDiv.innerHTML = thinkingHtml;
+                          thinkingContainer = tempDiv.firstChild;
+                          document.getElementById('chatMessages').appendChild(thinkingContainer);
+                        }
+                        
+                        // Create response bubble
+                        const responseBubble = document.createElement('div');
+                        responseBubble.className = 'chat-bubble assistant';
+                        responseBubble.id = 'streaming-response';
+                        responseBubble.innerHTML = \`
+                          <div class="bubble-content">
+                            <small class="d-block" style="opacity: 0.6; margin: 0 0 0.25rem 0; font-size: 0.65rem; line-height: 1;">AI · <span id="response-timer">Responding...</span></small>
+                            <div class="response-text"></div>
+                          </div>
+                        \`;
+                        document.getElementById('chatMessages').appendChild(responseBubble);
+                        responseStarted = true;
+                      }
+                      
+                      // Append text to response
+                      responseContent += data.content;
+                      const responseElement = document.querySelector('#streaming-response .response-text');
+                      if (responseElement) {
+                        responseElement.innerHTML = marked.parse(responseContent);
+                      }
+                      
+                      // Scroll to bottom
+                      const chatMessages = document.getElementById('chatMessages');
+                      chatMessages.scrollTop = chatMessages.scrollHeight;
+                    } else if (data.type === 'done') {
+                      // Calculate response time
+                      const responseTime = Math.floor((Date.now() - startTime) / 1000);
+                      let timeStr;
+                      if (responseTime < 60) {
+                        timeStr = responseTime + ' second' + (responseTime !== 1 ? 's' : '');
+                      } else {
+                        const minutes = Math.floor(responseTime / 60);
+                        const seconds = (responseTime % 60).toString().padStart(2, '0');
+                        timeStr = minutes + ':' + seconds;
+                      }
+                      
+                      // Update timer in response
+                      const timerElement = document.getElementById('response-timer');
+                      if (timerElement) {
+                        timerElement.textContent = 'Replied in ' + timeStr;
+                      }
+                      
+                      // Save to chat history
+                      chatHistory.push(
+                        { role: 'user', content: message },
+                        { role: 'assistant', content: data.fullResponse || responseContent }
+                      );
+                      saveHistory();
+                      
+                      // If file was modified, refresh the content area
+                      if (data.fileModified) {
+                        refreshContentArea();
+                      }
+                    } else if (data.type === 'error') {
+                      throw new Error(data.message);
+                    }
+                  } catch (error) {
+                    console.error('Error parsing SSE data:', error);
+                  }
+                }
+              }
             }
             
           } catch (error) {
@@ -2355,6 +2469,186 @@ app.post('/ai-chat/*', async (req, res) => {
       success: false, 
       response: 'An error occurred while processing your request.' 
     });
+  }
+});
+
+// SSE endpoint for streaming AI chat responses
+app.post('/ai-chat-stream/*', async (req, res) => {
+  // Set up SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+  
+  // Keep connection alive
+  const keepAlive = setInterval(() => {
+    res.write(':keepalive\n\n');
+  }, 30000);
+  
+  // Clean up on client disconnect
+  req.on('close', () => {
+    clearInterval(keepAlive);
+  });
+  
+  try {
+    const urlPath = req.path.slice(16); // Remove '/ai-chat-stream/' prefix
+    const { message, history, documentContent } = req.body;
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    
+    // Get initial file modification time
+    let initialMtime = null;
+    try {
+      const stats = await fs.stat(fullPath);
+      initialMtime = stats.mtimeMs;
+    } catch (e) {
+      // File might not exist or be accessible
+    }
+    
+    // Build conversation for Claude
+    let conversation = "You are an AI assistant helping with a markdown document. ";
+    conversation += `The user is viewing: ${urlPath}\n`;
+    conversation += `File location: vault/${urlPath}\n\n`;
+    conversation += "IMPORTANT: When the user asks you to edit or update this document:\n";
+    conversation += "- You have the ability to directly edit the file\n";
+    conversation += "- Make the requested changes to the content\n";
+    conversation += "- The interface will automatically refresh to show your changes\n\n";
+    conversation += "---CURRENT DOCUMENT CONTENT---\n";
+    conversation += documentContent || "(No document content available)";
+    conversation += "\n---END DOCUMENT---\n\n";
+    
+    if (history && history.length > 0) {
+      conversation += "Previous conversation:\n";
+      history.forEach(msg => {
+        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+      });
+      conversation += "\n";
+    }
+    
+    conversation += `User: ${message}\n`;
+    conversation += "Assistant: ";
+    
+    // Call Claude using the claude CLI with streaming
+    const { spawn } = await import('child_process');
+    
+    console.log('[AI Stream] Starting Claude with streaming...');
+    
+    // Use spawn with --output-format stream-json for streaming
+    const claude = spawn('claude', ['--print', '--output-format', 'stream-json'], {
+      cwd: process.cwd()
+    });
+    
+    let fullResponse = '';
+    let thinkingContent = '';
+    let isThinking = false;
+    
+    claude.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(line => line.trim());
+      
+      for (const line of lines) {
+        try {
+          const json = JSON.parse(line);
+          
+          if (json.type === 'thinking') {
+            isThinking = true;
+            thinkingContent += json.text || '';
+            // Send thinking update to client
+            res.write(`data: ${JSON.stringify({
+              type: 'thinking',
+              content: json.text || ''
+            })}\n\n`);
+          } else if (json.type === 'text') {
+            if (isThinking && thinkingContent) {
+              // Send signal to collapse thinking
+              res.write(`data: ${JSON.stringify({
+                type: 'thinking-complete',
+                content: thinkingContent
+              })}\n\n`);
+              isThinking = false;
+            }
+            
+            fullResponse += json.text || '';
+            // Send text update to client
+            res.write(`data: ${JSON.stringify({
+              type: 'text',
+              content: json.text || ''
+            })}\n\n`);
+          } else if (json.type === 'done') {
+            // Check if file was modified
+            let fileModified = false;
+            if (initialMtime !== null) {
+              try {
+                const newStats = await fs.stat(fullPath);
+                fileModified = newStats.mtimeMs !== initialMtime;
+              } catch (e) {
+                // File might have been deleted or become inaccessible
+              }
+            }
+            
+            // Send completion signal
+            res.write(`data: ${JSON.stringify({
+              type: 'done',
+              fileModified: fileModified,
+              fullResponse: fullResponse
+            })}\n\n`);
+            
+            clearInterval(keepAlive);
+            res.end();
+          } else if (json.type === 'error') {
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              message: json.message || 'An error occurred'
+            })}\n\n`);
+            
+            clearInterval(keepAlive);
+            res.end();
+          }
+        } catch (e) {
+          // If it's not JSON, it might be plain text output
+          console.log('[AI Stream] Non-JSON output:', line);
+        }
+      }
+    });
+    
+    claude.stderr.on('data', (data) => {
+      console.error('[AI Stream] stderr:', data.toString());
+    });
+    
+    // Write the conversation to stdin
+    claude.stdin.write(conversation);
+    claude.stdin.end();
+    
+    claude.on('close', (code) => {
+      console.log('[AI Stream] Claude process exited with code:', code);
+      if (code !== 0) {
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: `Process exited with code ${code}`
+        })}\n\n`);
+      }
+      clearInterval(keepAlive);
+      res.end();
+    });
+    
+    claude.on('error', (err) => {
+      console.error('[AI Stream] Failed to start Claude:', err);
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        message: err.message
+      })}\n\n`);
+      clearInterval(keepAlive);
+      res.end();
+    });
+    
+  } catch (error) {
+    console.error('[AI Stream] Error:', error);
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
+      message: error.message
+    })}\n\n`);
+    clearInterval(keepAlive);
+    res.end();
   }
 });
 
