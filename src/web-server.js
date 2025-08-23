@@ -592,7 +592,6 @@ async function renderDirectory(dirPath, urlPath) {
           </div>
         </div>
       </div>
-    </div>
 
     <!-- Chat column -->
     <div class="col-12 col-lg-5 mb-3">
