@@ -557,7 +557,7 @@ async function renderDirectory(dirPath, urlPath) {
             <div class="card shadow-sm mb-3">
               <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
                 <div class="d-flex align-items-center">
-                  <i class="fas fa-calendar-day me-3"></i>
+                  <i class="fas fa-calendar me-3"></i>
                   <div>
                     <strong>Today's Plan</strong>
                     <br>
