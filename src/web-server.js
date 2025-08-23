@@ -856,8 +856,20 @@ async function renderDirectory(dirPath, urlPath) {
             hour12: true 
           });
           
-          // Render markdown using marked
-          const renderedContent = marked.parse(message);
+          // Create renderer for external links
+          const renderer = new marked.Renderer();
+          const originalLink = renderer.link.bind(renderer);
+          renderer.link = function(href, title, text) {
+            const isExternal = /^https?:\/\//.test(href);
+            let link = originalLink(href, title, text);
+            if (isExternal) {
+              link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+            }
+            return link;
+          };
+          
+          // Render markdown using marked with custom renderer
+          const renderedContent = marked.parse(message, { renderer });
           
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -1597,6 +1609,25 @@ async function getCachedRender(filePath, urlPath) {
   }
 }
 
+// Create a marked renderer that opens external links in new tabs
+function createExternalLinkRenderer() {
+  const renderer = new marked.Renderer();
+  const originalLinkRenderer = renderer.link.bind(renderer);
+  renderer.link = function(href, title, text) {
+    // Check if the link is external (starts with http:// or https://)
+    const isExternal = /^https?:\/\//.test(href);
+    let link = originalLinkRenderer(href, title, text);
+    
+    if (isExternal) {
+      // Add target="_blank" and rel="noopener noreferrer" for external links
+      link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+    }
+    
+    return link;
+  };
+  return renderer;
+}
+
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
@@ -1624,8 +1655,11 @@ async function renderMarkdownUncached(filePath, urlPath) {
     }
   });
   
-  // Render the markdown normally (without the title if we extracted it)
-  let htmlContent = marked(contentToRender);
+  // Use custom renderer for external links
+  const renderer = createExternalLinkRenderer();
+  
+  // Render the markdown with custom renderer (without the title if we extracted it)
+  let htmlContent = marked(contentToRender, { renderer });
   
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
@@ -1884,8 +1918,20 @@ async function renderMarkdownUncached(filePath, urlPath) {
             hour12: true 
           });
           
-          // Render markdown using marked
-          const renderedContent = marked.parse(message);
+          // Create renderer for external links
+          const renderer = new marked.Renderer();
+          const originalLink = renderer.link.bind(renderer);
+          renderer.link = function(href, title, text) {
+            const isExternal = /^https?:\/\//.test(href);
+            let link = originalLink(href, title, text);
+            if (isExternal) {
+              link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+            }
+            return link;
+          };
+          
+          // Render markdown using marked with custom renderer
+          const renderedContent = marked.parse(message, { renderer });
           
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -2091,7 +2137,18 @@ async function renderMarkdownUncached(filePath, urlPath) {
                       responseContent += data.content;
                       const responseElement = document.querySelector('#streaming-response .response-text');
                       if (responseElement) {
-                        responseElement.innerHTML = marked.parse(responseContent);
+                        // Create renderer for external links
+                        const renderer = new marked.Renderer();
+                        const originalLink = renderer.link.bind(renderer);
+                        renderer.link = function(href, title, text) {
+                          const isExternal = /^https?:\/\//.test(href);
+                          let link = originalLink(href, title, text);
+                          if (isExternal) {
+                            link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+                          }
+                          return link;
+                        };
+                        responseElement.innerHTML = marked.parse(responseContent, { renderer });
                       }
                       
                       // Scroll to bottom
