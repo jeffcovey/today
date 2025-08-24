@@ -249,6 +249,15 @@ const pageStyle = `
     transition: all 0.3s ease;
   }
   
+  /* When AI assistant is collapsed, expand main content */
+  @media (min-width: 992px) {
+    .row:has(.ai-assistant-wrapper.collapsed) .col-lg-7 {
+      flex: 0 0 100%;
+      max-width: 100%;
+      transition: all 0.3s ease;
+    }
+  }
+  
   /* Make chat card sticky on desktop */
   @media (min-width: 992px) {
     .col-lg-5 > .card {
@@ -363,12 +372,7 @@ const pageStyle = `
   /* Override any nested card styles */
   /* Override ANY nested elements that might have backgrounds */
   .chat-bubble .card,
-  .chat-bubble .card-body,
-  .chat-bubble div,
-  .chat-bubble p,
-  .chat-bubble blockquote,
-  .chat-bubble pre,
-  .chat-bubble code {
+  .chat-bubble .card-body {
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
@@ -389,24 +393,55 @@ const pageStyle = `
   }
   
   /* Special handling for code blocks to maintain readability */
+  .chat-bubble pre {
+    background: #1e1e1e !important;
+    border: 1px solid #333 !important;
+    margin: 0.5rem 0 !important;
+  }
+  
   .chat-bubble pre code {
-    background: rgba(0,0,0,0.8) !important;
-    color: #f8f9fa !important;
-    padding: 0.5rem !important;
+    background: #1e1e1e !important;
+    color: #d4d4d4 !important;
+    padding: 0.75rem !important;
     border-radius: 0.25rem !important;
-    font-family: 'Courier New', monospace !important;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    display: block !important;
+    overflow-x: auto !important;
+  }
+  
+  .chat-bubble.user pre {
+    background: #f5f5f5 !important;
+    border: 1px solid #ccc !important;
   }
   
   .chat-bubble.user pre code {
-    background: rgba(255,255,255,0.9) !important;
-    color: #212529 !important;
+    background: #f5f5f5 !important;
+    color: #333 !important;
+  }
+  
+  .chat-bubble.assistant pre,
+  .chat-bubble.ai pre {
+    background: #1e1e1e !important;
   }
   
   .chat-bubble.assistant pre code,
   .chat-bubble.ai pre code {
-    background: #2d2d2d !important;
-    color: #f8f9fa !important;
-    border: 1px solid rgba(0,0,0,0.2) !important;
+    background: #1e1e1e !important;
+    color: #d4d4d4 !important;
+  }
+  
+  /* Inline code styling */
+  .chat-bubble code:not(pre code) {
+    background: rgba(0,0,0,0.75) !important;
+    color: #e6e6e6 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 3px !important;
+    font-size: 0.9em !important;
+  }
+  
+  .chat-bubble.user code:not(pre code) {
+    background: rgba(0,0,0,0.1) !important;
+    color: #333 !important;
   }
   
   /* AI assistant bubble styling */
