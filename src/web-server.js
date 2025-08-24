@@ -116,13 +116,6 @@ const pageStyle = `
   /* Custom styles to complement MDBootstrap */
   
   /* Table of Contents styles */
-  .table-of-contents {
-    background-color: #f0f4f8;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    border-left: 4px solid #007bff;
-  }
-  
   details summary.h5 {
     color: #007bff;
     font-weight: 500;
@@ -132,12 +125,13 @@ const pageStyle = `
     color: #0056b3;
   }
   
-  .table-of-contents a {
+  .toc-links a {
     color: #495057;
     transition: color 0.2s;
+    text-decoration: none;
   }
   
-  .table-of-contents a:hover {
+  .toc-links a:hover {
     color: #007bff;
     text-decoration: underline;
   }
@@ -1687,19 +1681,19 @@ function generateTableOfContents(content) {
   let tocHtml = '<div class="mb-4">\n';
   tocHtml += '<details>\n';
   tocHtml += '<summary class="h5 mb-3" style="cursor: pointer; user-select: none;"><i class="fas fa-list me-2"></i>Table of Contents</summary>\n';
-  tocHtml += '<nav class="table-of-contents mt-3">\n';
+  tocHtml += '<div class="toc-links mt-3">\n';
   tocHtml += '<ul class="list-unstyled ms-3">\n';
   
   headings.forEach(heading => {
     const indent = (heading.level - 2) * 20; // Start from h2, each level adds 20px
     tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.5rem;">`;
-    tocHtml += `<a href="#${heading.id}" class="text-decoration-none">`;
+    tocHtml += `<a href="#${heading.id}">`;
     tocHtml += heading.text;
     tocHtml += '</a></li>\n';
   });
   
   tocHtml += '</ul>\n';
-  tocHtml += '</nav>\n';
+  tocHtml += '</div>\n';
   tocHtml += '</details>\n';
   tocHtml += '</div>\n';
   
