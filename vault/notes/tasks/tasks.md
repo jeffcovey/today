@@ -1218,6 +1218,7 @@
 <summary><strong>Treat Arthritis</strong> (2 tasks)</summary>
 
 ### No Dat
+
 e Set
 
 - [ ] Implement exercises from the book <!-- task-id: d412ac5ed599c5572dd93b5ff3b73238 -->
