@@ -2,10 +2,10 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/24/2025, 7:32:26 PM EDT*
+*Generated: 8/24/2025, 7:40:59 PM EDT*
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (55 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (56 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -28,6 +28,7 @@
 - [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
 - [ ] Make bigger brochures for Tropics <!-- task-id: 9db426663cb6dd0094c884b9dc78e098 -->
 - [ ] alert members of new photos from people they follow (on the site and in the newsletter) <!-- task-id: 3ce9f792ab3e744418f8aaf85a40d7ed -->
+- [ ] Victor: cute guy from Clarksburg, was librarian for Rutgers <!-- task-id: 6f70402d3857b1e9732a50acc5e3b484 -->
 - [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
@@ -82,7 +83,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (495 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (532 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -230,6 +231,43 @@
 - [ ] Improve the title HTML tag on Image subdirectories <!-- task-id: f089f1e7f2325b41ebafcfb433f959f9 -->
 - [ ] Spark | Add DateAdded Collections hasn't checked in <!-- task-id: 7a30367f934e11565cb9525fd83239dc -->
 - [ ] Periodically update the visitor guides in the guestroom <!-- task-id: 789dbf0a793e8fc9da9c698ce05866a2 -->
+- [ ] See why we have lingering ImageContributions <!-- task-id: a27634aa9732fd5da28badeb81c665c7 -->
+- [ ] Link to the CR archive when it's back <!-- task-id: e08ca6b0f83f2fe2cd1dabc3e3292116 -->
+- [ ] Paint all the doors <!-- task-id: f73f45a2f1c2cb1323b5285be16ca25c -->
+- [ ] robert molosse | Flickr <!-- task-id: 2995e3402f53b1e7a7baa6df2a2a3b5b -->
+- [ ] Touch up paint edges <!-- task-id: bb118f1a7e36bc4baa6300a9f0a5a35d -->
+- [ ] add turbo frame placeholders? <!-- task-id: 2c72f8d306e4f1fb88c69393fd5591c7 -->
+- [ ] only use file_attached scope in galleries/carousels <!-- task-id: d3dd73990101d32890f6f408e97a6a81 -->
+- [ ] See why we are even calling events, etc. <!-- task-id: ff105f31958c8eb8f3325b35dbc7ff87 -->
+- [ ] Surface Waiting, future, etc. <!-- task-id: 8ec20038522de778602bce349dbd9a00 -->
+- [ ] get guest books and world maps <!-- task-id: 64ae652b9c7653ff937e4eb3f8aab8d5 -->
+- [ ] remove Branson's exception in SynchronizePatreonJob <!-- task-id: 68762ca1c44c4b21686edc0b1dbc93ed -->
+- [ ] See why unapproved photos are getting in the newsletter <!-- task-id: 85ab6a0eb2131a22dc5295559f7adcf1 -->
+- [ ] TipTop <!-- task-id: 8059b714984c84f068e97e1d84420e0d -->
+- [ ] Spark | Air on Mutopia missing tie into second alternative <!-- task-id: a6b525b9a3d568a2c05967e4dd6779ab -->
+- [ ] use `file_attached` in other contexts, like User show pages <!-- task-id: d028ba59775f5bafd4fcdeee90d3f1ed -->
+- [ ] check discourse `similar_users` <!-- task-id: abbf3c642836b8cd7fb09e4e8af37ef8 -->
+- [ ] check Prime Timers WW regularly <!-- task-id: 3b27ee8e58f460fd4a918482b1f54ae1 -->
+- [ ] Paint doors and frames <!-- task-id: fb19e337b10c9c43ae2bd0caa83510c3 -->
+- [ ] replace hallway light <!-- task-id: 5a3c0160f14d80ff3ce359f703a00844 -->
+- [ ] Use last_login in the sidebar <!-- task-id: 3c55172ed7fbdda849233480d686bc56 -->
+- [ ] cache User IP lookups (and, later, GPS lookups) <!-- task-id: 1fbad95b87824243f51a5ffbdd0c6bcc -->
+- [ ] see if favicon needs to be in the manifest <!-- task-id: 4c078e22286d18ceea0307d9cd7ed773 -->
+- [ ] Nearby Objects Abstraction <!-- task-id: 49585bf8945e86c2cea1a294acd55a32 -->
+- [ ] remove Barneymax1955@gmail.com Patreon exception after fixing <!-- task-id: 4c0c4f3ecb851a971d32c35bbcd725d2 -->
+- [ ] use disappearing notifications <!-- task-id: 853e55def8393574d07ca094a82d483a -->
+- [ ] use scopes in User.nearby. events, etc. <!-- task-id: f478acf93da42b7edba7e633320f5ff1 -->
+- [ ] Fix testing.ogm SSL <!-- task-id: 923959d7d7cb590865f51c2ced3ba056 -->
+- [ ] add <header> <!-- task-id: d633ac448dec7d9d06dbef4a7b347fec -->
+- [ ] center side_profiles (is `sized_image` breaking it?) <!-- task-id: 08f7bddbb088d99b3c3cbe2c14422862 -->
+- [ ] check that the new VCR cassette is being created <!-- task-id: 6b88530bf34a98b804c78ee1aaeb5047 -->
+- [ ] confirm that side_profiles are limited to logins with 90 days <!-- task-id: b035b787156608c7030ebca705829ee4 -->
+- [ ] handle trips <!-- task-id: 97c28b0681c67a7f5fed2cca0c630c9c -->
+- [ ] hide side_profiles from small (for example, mobile) views <!-- task-id: e8a172f4bad5cd7aaa801123ab7c1e45 -->
+- [ ] order more bath rugs <!-- task-id: 0549114bae48fc11e1abf3347a8c8f83 -->
+- [ ] see why https://oldergay.men/users/jim has "about" <!-- task-id: 5963984ccb46923da4211bc25e4898e8 -->
+- [ ] see why I can't change User's role <!-- task-id: 6591660ff38f02df3d0c8fb452bb3e1f -->
+- [ ] update html-pipeline & common marker <!-- task-id: d364e65c8d69beaa0573034bb71917cc -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
@@ -599,7 +637,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (112 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (114 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -620,6 +658,8 @@
 - [ ] Nifty Archive: visiting-the-grandparents <!-- task-id: 266ca205700c11821d64fc2bf2f8d514 -->
 - [ ] Get new glasses <!-- task-id: a60a9ca9526669bcc05d5847ebfa7924 -->
 - [ ] Spark | Live healthier and get rewarded <!-- task-id: 6c644a071958c6d5d7e8c9361faecd34 -->
+- [ ] Order new glasses <!-- task-id: 6abc69e1a9d814c3ea7ffd30f9755222 -->
+- [ ] Visit MyHealthONE.com to login or create an account. <!-- task-id: 04f8ab75842c1f6f61d4a252bfab72e4 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
