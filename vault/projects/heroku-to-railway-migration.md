@@ -29,10 +29,10 @@ This project aims to migrate all applications and services from Heroku to Railwa
 ### Applications Inventory
 
 *To be completed during Week 1 analysis*
-- [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
-- [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
-- [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
-- [x] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
+- [ ] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
+- [ ] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
+- [ ] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
+- [ ] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
 
 ## Target Architecture
 
@@ -116,24 +116,24 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 
 ##### PostgreSQL Migration
 
-- [x] Set up Railway PostgreSQL instance <!-- task-id: p1-001 --> <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
-- [x] Configure connection pooling <!-- task-id: p1-002 --> <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
-- [x] Set up read replica from Heroku <!-- task-id: p1-003 --> <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
-- [x] Test connection from Heroku apps <!-- task-id: p1-004 --> <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
-- [x] Implement automated backups <!-- task-id: p1-005 --> <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
-- [x] Switch Heroku apps to use Railway DB <!-- task-id: p1-006 --> <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
-- [x] Monitor for 48 hours <!-- task-id: p1-007 --> <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
-- [x] Decommission Heroku PostgreSQL <!-- task-id: p1-008 --> <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
+- [ ] Set up Railway PostgreSQL instance <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
+- [ ] Configure connection pooling <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
+- [ ] Set up read replica from Heroku <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
+- [ ] Test connection from Heroku apps <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
+- [ ] Implement automated backups <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
+- [ ] Switch Heroku apps to use Railway DB <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
+- [ ] Monitor for 48 hours <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
+- [ ] Decommission Heroku PostgreSQL <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
 
 ##### Redis Migration  
 
-- [x] Create Railway Redis instance <!-- task-id: r1-001 --> <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
-- [x] Export Redis data from Heroku <!-- task-id: r1-002 --> <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
-- [x] Import data to Railway Redis <!-- task-id: r1-003 --> <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
-- [x] Update connection strings in Heroku apps <!-- task-id: r1-004 --> <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
-- [x] Test cache operations <!-- task-id: r1-005 --> <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
-- [x] Monitor performance <!-- task-id: r1-006 --> <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
-- [x] Cancel Heroku Redis <!-- task-id: r1-007 --> <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
+- [ ] Create Railway Redis instance <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
+- [ ] Export Redis data from Heroku <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
+- [ ] Import data to Railway Redis <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
+- [ ] Update connection strings in Heroku apps <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
+- [ ] Test cache operations <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
+- [ ] Monitor performance <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
+- [ ] Cancel Heroku Redis <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
 
 #### Stage 2: Add-ons & Services Migration (Week 3)
 
@@ -142,50 +142,50 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 
 ##### Logging Migration
 
-- [x] Evaluate Railway's built-in logging <!-- task-id: l2-001 --> <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
-- [x] Set up log aggregation if needed <!-- task-id: l2-002 --> <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
-- [x] Export historical logs from Papertrail <!-- task-id: l2-003 --> <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
-- [x] Update log shipping configuration <!-- task-id: l2-004 --> <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
-- [x] Cancel Papertrail <!-- task-id: l2-005 --> <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
+- [ ] Evaluate Railway's built-in logging <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
+- [ ] Set up log aggregation if needed <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
+- [ ] Export historical logs from Papertrail <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
+- [ ] Update log shipping configuration <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
+- [ ] Cancel Papertrail <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
 
 ##### Email Service Migration
 
-- [x] Set up AWS SES or Resend <!-- task-id: e2-001 --> <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
-- [x] Migrate email templates <!-- task-id: e2-002 --> <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
-- [x] Update SMTP settings <!-- task-id: e2-003 --> <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
-- [x] Test email delivery <!-- task-id: e2-004 --> <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
-- [x] Cancel SendGrid Gold <!-- task-id: e2-005 --> <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
+- [ ] Set up AWS SES or Resend <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
+- [ ] Migrate email templates <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
+- [ ] Update SMTP settings <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
+- [ ] Test email delivery <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
+- [ ] Cancel SendGrid Gold <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
 
 ##### Scheduled Jobs
 
-- [x] Document all Heroku Scheduler tasks <!-- task-id: s2-001 --> <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
-- [x] Set up Railway cron jobs <!-- task-id: s2-002 --> <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
-- [x] Test job execution <!-- task-id: s2-003 --> <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
-- [x] Monitor for failures <!-- task-id: s2-004 --> <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
+- [ ] Document all Heroku Scheduler tasks <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
+- [ ] Set up Railway cron jobs <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
+- [ ] Test job execution <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
+- [ ] Monitor for failures <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
 
 #### Stage 3: Non-Critical Applications (Week 4-5)
 
 **Timeline:** September 13-26, 2025  
 **Potential Savings:** $100-150/month
 
-- [x] Identify non-critical applications <!-- task-id: nc3-001 --> <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
-- [x] Deploy to Railway one at a time <!-- task-id: nc3-002 --> <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
-- [x] Test each application thoroughly <!-- task-id: nc3-003 --> <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
-- [x] Update DNS/routing as needed <!-- task-id: nc3-004 --> <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
-- [x] Monitor for issues <!-- task-id: nc3-005 --> <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
-- [x] Keep Heroku as backup for 1 week <!-- task-id: nc3-006 --> <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
+- [ ] Identify non-critical applications <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
+- [ ] Deploy to Railway one at a time <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
+- [ ] Test each application thoroughly <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
+- [ ] Update DNS/routing as needed <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
+- [ ] Monitor for issues <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
+- [ ] Keep Heroku as backup for 1 week <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
 
 #### Stage 4: Critical Applications (Week 6-8)
 
 **Timeline:** September 27 - October 10, 2025  
 **Potential Savings:** $167/month
 
-- [x] Create detailed migration plan <!-- task-id: c4-001 --> <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
-- [x] Set up blue-green deployment <!-- task-id: c4-002 --> <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
-- [x] Migrate during low-traffic window <!-- task-id: c4-003 --> <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
-- [x] Implement instant rollback capability <!-- task-id: c4-004 --> <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
-- [x] Monitor intensively for 2 weeks <!-- task-id: c4-005 --> <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
-- [x] Gradually decommission Heroku <!-- task-id: c4-006 --> <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
+- [ ] Create detailed migration plan <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
+- [ ] Set up blue-green deployment <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
+- [ ] Migrate during low-traffic window <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
+- [ ] Implement instant rollback capability <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
+- [ ] Monitor intensively for 2 weeks <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
+- [ ] Gradually decommission Heroku <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
 
 ### Hybrid Architecture During Migration
 
@@ -231,12 +231,12 @@ Savings: $370/mo total
 
 #### Network Security & Performance
 
-- [x] Get Railway database connection strings <!-- task-id: ns-001 --> <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
-- [x] Test connection latency (expect 5-20ms between providers) <!-- task-id: ns-002 --> <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
-- [x] Set up connection pooling (PgBouncer if needed) <!-- task-id: ns-003 --> <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
-- [x] Configure SSL certificates <!-- task-id: ns-004 --> <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
-- [x] Set up monitoring for cross-platform connections <!-- task-id: ns-005 --> <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
-- [x] Document all connection strings securely <!-- task-id: ns-006 --> <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
+- [ ] Get Railway database connection strings <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
+- [ ] Test connection latency (expect 5-20ms between providers) <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
+- [ ] Set up connection pooling (PgBouncer if needed) <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
+- [ ] Configure SSL certificates <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
+- [ ] Set up monitoring for cross-platform connections <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
+- [ ] Document all connection strings securely <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
 
 ### Cost Impact Timeline
 
@@ -353,30 +353,30 @@ This approach gives you immediate cost relief while maintaining stability!
 
 ### Week 1 Success Metrics
 
-- [x] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
-- [x] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
-- [x] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
+- [ ] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
+- [ ] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
+- [ ] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
 
 ### Week 2 Success Metrics
 
-- [x] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
-- [x] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
-- [x] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
+- [ ] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
+- [ ] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
+- [ ] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
 
 ### Week 3-4 Success Metrics
 
-- [x] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
-- [x] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
-- [x] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
-- [x] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
+- [ ] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
+- [ ] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
+- [ ] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
+- [ ] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
 
 ### 30-Day Success Criteria
 
-- [x] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
-- [x] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
-- [x] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
-- [x] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
-- [x] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
+- [ ] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
+- [ ] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
+- [ ] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
+- [ ] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
+- [ ] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
 
 ## Budget & Resources
 
@@ -429,23 +429,23 @@ This approach gives you immediate cost relief while maintaining stability!
 
 ### Monthly Review Checklist
 
-- [x] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
-- [x] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
-- [x] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
-- [x] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
-- [x] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
-- [x] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
+- [ ] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
+- [ ] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
+- [ ] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
+- [ ] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
+- [ ] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
+- [ ] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
 
 ## Documentation & Training
 
 ### Documentation Needed
 
-- [x] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
-- [x] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
-- [x] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
-- [x] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
-- [x] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
-- [x] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
+- [ ] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
+- [ ] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
+- [ ] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
+- [ ] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
+- [ ] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
+- [ ] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
 
 ### Team Training Topics
 
@@ -459,23 +459,23 @@ This approach gives you immediate cost relief while maintaining stability!
 
 ### Immediate (Today - August 22)
 
-- [x] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
-- [x] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
-- [x] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
-- [x] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
+- [ ] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
+- [ ] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
+- [ ] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
+- [ ] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
 
 ### This Week (by August 29)
 
-- [x] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
-- [x] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
-- [x] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
-- [x] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
+- [ ] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
+- [ ] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
+- [ ] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
+- [ ] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
 
 ### Next Week (by September 5)
 
-- [x] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
-- [x] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
-- [x] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
+- [ ] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
+- [ ] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
+- [ ] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
 
 ## Notes & References
 
