@@ -126,6 +126,7 @@ case "$ACTION" in
         
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
         
         print_status "Deployment complete!"
         ;;
@@ -195,6 +196,13 @@ case "$ACTION" in
         check_config
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler"
         print_status "Scheduler restarted"
+        ;;
+        
+    web-restart)
+        echo "🌐 Restarting web server..."
+        check_config
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web"
+        print_status "Web server restarted"
         ;;
         
     stop)
@@ -399,6 +407,7 @@ case "$ACTION" in
         echo "  logs        - Show scheduler logs"
         echo "  status      - Show scheduler status"
         echo "  restart     - Restart scheduler"
+        echo "  web-restart - Restart web server"
         echo "  stop        - Stop scheduler"
         echo "  start       - Start scheduler"
         echo "  exec CMD    - Execute command in deploy directory"

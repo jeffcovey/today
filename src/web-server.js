@@ -115,6 +115,58 @@ const pageStyle = `
 <style>
   /* Custom styles to complement MDBootstrap */
   
+  /* Sticky card header with TOC */
+  .card-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+  }
+  
+  /* Add scroll padding to account for sticky header */
+  html {
+    scroll-padding-top: 140px; /* Accounts for sticky header height */
+  }
+  
+  /* Table of Contents styles in header */
+  .card-header .toc-header {
+    margin-bottom: 0;
+  }
+  
+  .toc-header summary {
+    color: #6c757d;
+    font-weight: 500;
+    transition: color 0.3s;
+  }
+  
+  .toc-header summary:hover {
+    color: #495057;
+  }
+  
+  .toc-header .toc-links {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    margin-top: 0.5rem;
+  }
+  
+  .toc-links a {
+    color: #495057;
+    text-decoration: none;
+    transition: all 0.3s;
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+  
+  .toc-links a:hover {
+    color: #007bff;
+    background: white;
+  }
+  
   /* Table of Contents styles */
   details summary.h5 {
     color: #007bff;
@@ -1882,12 +1934,12 @@ function generateTableOfContents(content) {
   
   if (headings.length === 0) return { toc: '', contentWithIds: content };
   
-  // Generate TOC HTML
-  let tocHtml = '<div class="mb-4">\n';
-  tocHtml += '<details>\n';
-  tocHtml += '<summary class="h5 mb-3" style="cursor: pointer; user-select: none;"><i class="fas fa-list me-2"></i>Table of Contents</summary>\n';
-  tocHtml += '<div class="toc-links mt-3">\n';
-  tocHtml += '<ul class="list-unstyled ms-3">\n';
+  // Generate TOC HTML for header
+  let tocHtml = '';
+  tocHtml += '<details class="toc-header">\n';
+  tocHtml += '<summary class="text-muted small" style="cursor: pointer; user-select: none;"><i class="fas fa-list me-1"></i>Table of Contents</summary>\n';
+  tocHtml += '<div class="toc-links mt-2">\n';
+  tocHtml += '<ul class="list-unstyled small mb-0">\n';
   
   headings.forEach(heading => {
     const indent = (heading.level - 2) * 20; // Start from h2, each level adds 20px
@@ -1900,7 +1952,6 @@ function generateTableOfContents(content) {
   tocHtml += '</ul>\n';
   tocHtml += '</div>\n';
   tocHtml += '</details>\n';
-  tocHtml += '</div>\n';
   
   // Add IDs to headings in content
   headingId = 0;
@@ -1950,10 +2001,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // Render the markdown with custom renderer (with IDs added to headings)
   let htmlContent = marked(contentToRender, { renderer });
   
-  // Prepend table of contents if there are headings
-  if (toc) {
-    htmlContent = toc + htmlContent;
-  }
+  // Don't prepend TOC to content - we'll add it to the header instead
   
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
@@ -2108,6 +2156,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
                     <i class="fas fa-edit me-1"></i>Edit
                   </a>
                 </div>
+                ${toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : ''}
               </div>
               <div class="card-body markdown-content">
                 ${htmlContent}
