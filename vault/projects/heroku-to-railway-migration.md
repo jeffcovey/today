@@ -3,24 +3,24 @@ Created: August 22, 2025
 Status: Planning
 Priority: HIGH
 Parent Project: [Financial Improvement 2025](financial-improvement-2025.md)
-Est. Savings: $583/month ($6,996/year)
+Est. Savings: $1,044/month ($12,528/year)
 
 # Heroku to Railway Migration
 
 ## Executive Summary
 
-This project aims to migrate all applications and services from Heroku to Railway.app, reducing hosting costs from $733/month to approximately $150/month while maintaining performance and reliability. This migration is a critical component of the broader [Financial Improvement 2025](./financial-improvement-2025.md) initiative.
+This project aims to migrate all applications and services from Heroku to Railway.app, reducing hosting costs from $1,194/month to approximately $150/month while maintaining performance and reliability. This migration is a critical component of the broader [Financial Improvement 2025](./financial-improvement-2025.md) initiative.
 
 ## Current State Analysis
 
-### Heroku Infrastructure (Monthly: $733)
+### Heroku Infrastructure (Monthly: $1,194 as of August 24, 2025)
 
-After downgrading from Performance-L to Standard-2X (completed August 2025):
-- **Standard-2X dyno**: $50/mo (reduced from $500/mo Performance-L)
-- **Standard dynos**: $237/mo (various applications)
+**⚠️ URGENT: Performance-L downgrade NOT completed yet (will save $450/mo)**
+- **Application dynos**: $637/mo (includes Performance-L at ~$500/mo)
+- **Standard dynos**: $137/mo (various applications)
 - **PostgreSQL databases**: ~$200/mo (standard-0 + essential-0)
 - **Redis instances**: ~$100/mo (premium-3 + mini)
-- **Add-ons**: ~$146/mo
+- **Add-ons**: ~$256/mo
   - Papertrail logging
   - Scheduler
   - SendGrid Gold

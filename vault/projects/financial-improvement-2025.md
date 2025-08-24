@@ -18,16 +18,20 @@ Based on review of financial documents and recent analysis, this project aims to
 - Long-term expenses (homeowners insurance) catching by surprise
 - Multiple redundant services and subscriptions
 
-### Monthly Expense Analysis (Last 6 Months)
+### Monthly Expense Analysis (Updated August 24, 2025)
 
 **Total Average Monthly Expenses:** ~$27,864
 
-#### Major Categories
+#### Major Categories - Past 12 Months Analysis
 
-1. **Business/OlderGay.Men:** $4,191/mo (reduced from $4,641/mo)
-   - Heroku hosting: $733/mo (reduced from $1,183/mo)
-   - AWS: $192/mo
-   - Other hosting: ~$50/mo
+1. **Business/OlderGay.Men:** $4,625/mo average
+   - Heroku hosting: $1,548/mo average (NOW $1,193/mo as of Aug 2025)
+   - AWS: $234/mo average
+   - Cloudflare: $145/mo average
+   - GitHub: $154/mo average
+   - Discourse: $423/mo average
+   - LocationIQ: $132/mo average
+   - Other services: ~$1,989/mo
 2. **Housing:** $2,360/mo
    - Homeowners Insurance: $1,207/mo (annual $7,242)
    - Household supplies: $461/mo
@@ -66,6 +70,61 @@ Based on review of financial documents and recent analysis, this project aims to
 - Net monthly cash flow (positive)
 - Go to Palm Springs with my accounts reconciled, and a clear view of my financial situation
 
+## 🚨 URGENT UPDATE - August 24, 2025
+
+### Critical Findings from Financial Analysis
+
+**Your actual monthly OGM costs are $4,625/mo - NOT the $2,700 estimated!**
+
+#### Top 10 Immediate Cost-Cutting Opportunities
+
+1. **Heroku Migration** - Save $1,043/mo
+   - Current: $1,193/mo → Railway: $150/mo
+   - **ACTION TODAY**: Start PostgreSQL migration to Railway
+
+2. **Duplicate/Redundant Services** - Save $400/mo
+   - Multiple ChatGPT subscriptions ($21.28 x 19 = $404/year)
+   - Multiple GitHub subscriptions (review necessity)
+   - Cursor + ChatGPT overlap (choose one)
+
+3. **Cloudflare Optimization** - Save $100/mo
+   - Current: $145/mo average (31 charges)
+   - Consolidate to single plan or free tier
+
+4. **Software Subscriptions Audit** - Save $200/mo
+   - YNAB: $98.99/mo (you're not using it actively)
+   - Multiple Apple device payments: $455/mo (extend lifecycle)
+   - Duplicate entertainment subscriptions
+
+5. **LocationIQ Alternative** - Save $132/mo
+   - Current: $132/mo average
+   - Switch to free-tier alternatives or self-host
+
+6. **Insurance Shopping** - Save $500/mo
+   - Homeowners: $1,823/mo (shop for better rates)
+   - Health: $634/mo (check ACA marketplace)
+
+7. **Upcoming Big Expenses to Prepare For**
+   - Property Taxes: $10,765 (February 2026)
+   - Homeowners Insurance: $7,242 (June 2026)
+   - Flood Insurance: $2,461 (July 2026)
+   - **Total needed by July 2026: $20,468**
+
+8. **Cancel Unused Services** - Save $150/mo
+   - Akismet: $638.96/year (if spam not an issue)
+   - MDBootstrap: $169/mo (recent charge)
+   - Various unused software subscriptions
+
+9. **Consolidate Communication Tools** - Save $100/mo
+   - Front, Jitsi, Discourse hosting overlap
+   - Consider self-hosting or free alternatives
+
+10. **Food & Dining Optimization** - Save $200/mo
+    - HelloFresh: $60.95/mo (cook from scratch)
+    - Restaurant spending: $130/mo average
+
+### Total Potential Monthly Savings: $3,225/mo ($38,700/year)
+
 ## Action Plan
 
 ### Phase 1: Immediate Cost Reduction (Weeks 1-2)
@@ -100,7 +159,7 @@ Based on review of financial documents and recent analysis, this project aims to
 
 #### C. Quick Wins
 
-- [x] ✓ COMPLETED: Downgraded Heroku Performance-L to Standard-2X (saved $450/mo) <!-- task-id: 75db6433ecadda74101526604ffd716e -->
+- [ ] **URGENT: Downgrade Heroku Performance-L to Standard-2X (will save $450/mo)** <!-- task-id: 75db6433ecadda74101526604ffd716e -->
 - [ ] Switch SendGrid Gold to Starter (save $60/mo) <!-- task-id: 4357f8c535b156ab7fc2b9054d98e160 -->
 - [ ] Review and cancel unused software subscriptions <!-- task-id: 2ceaf50e43429c26fd30f4eeb17d30f2 -->
 
@@ -207,13 +266,13 @@ Based on review of financial documents and recent analysis, this project aims to
 
 ### Heroku to Railway Migration Plan
 
-#### Current Heroku Setup (Monthly: ~$733 after Standard-2X downgrade)
+#### Current Heroku Setup (Monthly: $1,193.60 as of August 2025)
 
-- Standard-2X dyno: $50/mo (reduced from Performance-L $500/mo)
-- Standard dynos: $237/mo
+- Application dynos: $637/mo
 - PostgreSQL databases: ~$200/mo
 - Redis instances: ~$100/mo
-- Add-ons (Papertrail, Scheduler, SendGrid): ~$146/mo
+- Add-ons (Papertrail, Scheduler, SendGrid): ~$256/mo
+- **Note: Performance-L to Standard-2X downgrade NOT YET IMPLEMENTED**
 
 #### Target Railway Setup (Monthly: ~$150)
 
@@ -338,7 +397,8 @@ Based on review of financial documents and recent analysis, this project aims to
 1. **Monthly Burn Rate**: Current: $27,864 → Target: $20,000
 2. **Days Since 401k Withdrawal**: Current: 0 → Target: 90+
 3. **Emergency Fund Balance**: Current: $0 → Target: $60,000
-4. **Hosting Costs**: Current: $975 (reduced from $1,425) → Target: $150
+4. **Hosting Costs**: Current: $1,193 → Target: $150
+5. **Total OGM Expenses**: Current: $4,625/mo → Target: $1,500/mo
 5. **Food Expenses**: Current: $758 → Target: $500
 6. **Net Monthly Cash Flow**: Current: Negative → Target: +$2,000
 
@@ -397,6 +457,59 @@ Based on review of financial documents and recent analysis, this project aims to
 - Automation prevents decision fatigue
 
 ---
+
+## 🔥 IMMEDIATE ACTIONS FOR TODAY (August 24, 2025)
+
+### Next 2 Hours (Before 5 PM)
+
+1. **Heroku Performance-L Downgrade** (Save $450/mo immediately!)
+   - [ ] Log into Heroku dashboard
+   - [ ] Navigate to dyno settings
+   - [ ] Downgrade Performance-L to Standard-2X
+   - [ ] Monitor for 30 minutes to ensure stability
+   - **Instant savings: $450/month starting tomorrow**
+
+2. **Cancel Duplicate Subscriptions** (Save $150/mo)
+   - [ ] Cancel unused ChatGPT subscriptions (keep only one)
+   - [ ] Cancel YNAB ($98.99/mo - not using it)
+   - [ ] Review and cancel duplicate entertainment services
+
+3. **Start Railway Migration Prep**
+   - [ ] Create Railway account (free)
+   - [ ] Export Heroku PostgreSQL connection details
+   - [ ] Document current Heroku configuration
+
+### This Evening (5-8 PM)
+
+4. **Subscription Audit**
+   - [ ] Export all recurring charges from credit cards
+   - [ ] List in spreadsheet with monthly costs
+   - [ ] Mark as: Keep / Cancel / Negotiate
+   - [ ] Set calendar reminders to cancel before next billing
+
+5. **Insurance Shopping Prep**
+   - [ ] Gather current insurance policy details
+   - [ ] List coverage amounts needed
+   - [ ] Schedule calls with 3 insurance agents for Monday
+
+### Tomorrow (Monday - Front Stage Day)
+
+6. **Make Phone Calls**
+   - [ ] Call insurance companies for quotes
+   - [ ] Cancel subscriptions that require phone calls
+   - [ ] Negotiate Cloudflare plan consolidation
+
+### This Week Priority Actions
+
+7. **Railway Migration - Stage 1**
+   - [ ] Migrate PostgreSQL to Railway (save $180/mo)
+   - [ ] Migrate Redis to Railway (save $90/mo)
+   - [ ] Test thoroughly before canceling Heroku databases
+
+8. **Big Expense Planning**
+   - [ ] Set aside $1,700/mo for upcoming taxes/insurance
+   - [ ] Open high-yield savings for these funds
+   - [ ] Automate weekly transfer of $425
 
 ## Next Actions (TODAY)
 
