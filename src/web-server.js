@@ -244,12 +244,96 @@ const pageStyle = `
     flex-direction: column;
   }
   
-  /* Make chat card sticky */
+  /* AI Assistant Card Container */
+  .ai-assistant-wrapper {
+    transition: all 0.3s ease;
+  }
+  
+  /* Make chat card sticky on desktop */
   @media (min-width: 992px) {
     .col-lg-5 > .card {
       position: sticky;
       top: 1rem;
       max-height: calc(100vh - 2rem);
+    }
+    
+    /* Collapsed state - slides to the right */
+    .ai-assistant-wrapper.collapsed {
+      position: fixed;
+      right: -400px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 450px;
+      z-index: 1050;
+    }
+    
+    .ai-assistant-wrapper.collapsed .card {
+      box-shadow: -2px 0 10px rgba(0,0,0,0.15);
+    }
+    
+    .ai-assistant-wrapper.collapsed .toggle-btn {
+      position: absolute;
+      left: -40px;
+      top: 50%;
+      transform: translateY(-50%) rotate(180deg);
+      width: 40px;
+      height: 80px;
+      border-radius: 8px 0 0 8px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    }
+  }
+  
+  /* Mobile styles */
+  @media (max-width: 991px) {
+    /* Collapsed state - slides to the bottom */
+    .ai-assistant-wrapper.collapsed .card {
+      position: fixed;
+      bottom: -100%;
+      left: 0;
+      right: 0;
+      width: 100%;
+      z-index: 1050;
+      transform: translateY(calc(100% - 50px));
+      transition: transform 0.3s ease;
+      max-height: 70vh;
+    }
+    
+    .ai-assistant-wrapper.collapsed .card-header {
+      cursor: pointer;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+    }
+    
+    .ai-assistant-wrapper.collapsed .chat-container {
+      display: none;
+    }
+  }
+  
+  /* Toggle button styles */
+  .toggle-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0.25rem;
+    margin-left: auto;
+    transition: transform 0.3s ease;
+  }
+  
+  .toggle-btn:hover {
+    transform: scale(1.1);
+  }
+  
+  /* Hide button on mobile in favor of header click */
+  @media (max-width: 991px) {
+    .toggle-btn.desktop-only {
+      display: none;
     }
   }
   
@@ -834,6 +918,77 @@ async function renderDirectory(dirPath, urlPath) {
             window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
           }
         }
+        
+        // AI Assistant Toggle Functionality for Directory View
+        let isCollapsed = false;
+        
+        // Check if mobile and set default collapsed state
+        function initializeAIAssistant() {
+          const isMobile = window.innerWidth <= 991;
+          const savedState = localStorage.getItem('aiAssistantCollapsed');
+          
+          // Default to collapsed on mobile, expanded on desktop
+          if (savedState !== null) {
+            isCollapsed = savedState === 'true';
+          } else {
+            isCollapsed = isMobile;
+          }
+          
+          const card = document.getElementById('aiAssistantCard');
+          if (card) {
+            if (isCollapsed) {
+              card.classList.add('collapsed');
+              updateToggleIcon();
+            }
+            
+            // Add click handler for mobile header
+            if (isMobile) {
+              const header = document.getElementById('aiAssistantHeader');
+              header.style.cursor = 'pointer';
+              header.onclick = toggleAIAssistant;
+            }
+          }
+        }
+        
+        function toggleAIAssistant() {
+          const card = document.getElementById('aiAssistantCard');
+          if (!card) return;
+          
+          isCollapsed = !isCollapsed;
+          
+          if (isCollapsed) {
+            card.classList.add('collapsed');
+          } else {
+            card.classList.remove('collapsed');
+          }
+          
+          updateToggleIcon();
+          localStorage.setItem('aiAssistantCollapsed', isCollapsed);
+        }
+        
+        function updateToggleIcon() {
+          const icon = document.getElementById('toggleIcon');
+          if (icon) {
+            const isMobile = window.innerWidth <= 991;
+            if (isMobile) {
+              icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+            } else {
+              icon.className = isCollapsed ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+            }
+          }
+        }
+        
+        // Handle resize events
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            updateToggleIcon();
+          }, 250);
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeAIAssistant);
         
         // Store directory information for AI context
         const directoryPath = '${urlPath || '/'}';
@@ -1912,9 +2067,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
           
           <!-- Chat column -->
           <div class="col-12 col-lg-5 mb-3">
-            <div class="card shadow-sm">
-              <div class="card-header bg-primary text-white">
-                <i class="fas fa-robot me-2"></i>AI Assistant
+            <div class="card shadow-sm ai-assistant-wrapper" id="aiAssistantCard">
+              <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
+                <i class="fas fa-robot me-2"></i>
+                <span>AI Assistant</span>
+                <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
+                  <i class="fas fa-chevron-right" id="toggleIcon"></i>
+                </button>
               </div>
               <div class="chat-container">
                 <div class="chat-messages" id="chatMessages">
@@ -1956,6 +2115,77 @@ async function renderMarkdownUncached(filePath, urlPath) {
             window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
           }
         }
+        
+        // AI Assistant Toggle Functionality
+        let isCollapsed = false;
+        
+        // Check if mobile and set default collapsed state
+        function initializeAIAssistant() {
+          const isMobile = window.innerWidth <= 991;
+          const savedState = localStorage.getItem('aiAssistantCollapsed');
+          
+          // Default to collapsed on mobile, expanded on desktop
+          if (savedState !== null) {
+            isCollapsed = savedState === 'true';
+          } else {
+            isCollapsed = isMobile;
+          }
+          
+          const card = document.getElementById('aiAssistantCard');
+          if (card) {
+            if (isCollapsed) {
+              card.classList.add('collapsed');
+              updateToggleIcon();
+            }
+            
+            // Add click handler for mobile header
+            if (isMobile) {
+              const header = document.getElementById('aiAssistantHeader');
+              header.style.cursor = 'pointer';
+              header.onclick = toggleAIAssistant;
+            }
+          }
+        }
+        
+        function toggleAIAssistant() {
+          const card = document.getElementById('aiAssistantCard');
+          if (!card) return;
+          
+          isCollapsed = !isCollapsed;
+          
+          if (isCollapsed) {
+            card.classList.add('collapsed');
+          } else {
+            card.classList.remove('collapsed');
+          }
+          
+          updateToggleIcon();
+          localStorage.setItem('aiAssistantCollapsed', isCollapsed);
+        }
+        
+        function updateToggleIcon() {
+          const icon = document.getElementById('toggleIcon');
+          if (icon) {
+            const isMobile = window.innerWidth <= 991;
+            if (isMobile) {
+              icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+            } else {
+              icon.className = isCollapsed ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+            }
+          }
+        }
+        
+        // Handle resize events
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            updateToggleIcon();
+          }, 250);
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeAIAssistant);
         
         // Chat functionality
         // Version 4: Force clear all old chat to fix structure
