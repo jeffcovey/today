@@ -25,6 +25,9 @@ Tasks and projects related to Health.
 =======
 - [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
 >>>>>>> Stashed changes
+<<<<<<< Updated upstream
 =======
 - [ ] Check Sanitas coverage <!-- task-id: b0df3d1db79248ba0cd8bf633561c0ff -->
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes

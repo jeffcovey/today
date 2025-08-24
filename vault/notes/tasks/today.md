@@ -1,10 +1,14 @@
 # Today's Tasks
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 *Generated: 8/24/2025, 3:10:23 PM EDT*
 =======
 
 *Generated: 8/24/2025, 3:10:24 PM EDT*
+>>>>>>> Stashed changes
+=======
+*Generated: 8/24/2025, 3:10:23 PM EDT*
 >>>>>>> Stashed changes
 
 ## Next Up
@@ -15,6 +19,9 @@
 
 <details>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 <summary><strong>✅ Done Today</strong> (2571 tasks completed)</summary>
 
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e2f886f846ec4e53ccfb6c9b9ec934a5 -->
