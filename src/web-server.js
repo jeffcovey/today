@@ -390,14 +390,23 @@ const pageStyle = `
   
   /* Special handling for code blocks to maintain readability */
   .chat-bubble pre code {
-    background: rgba(0,0,0,0.1) !important;
+    background: rgba(0,0,0,0.8) !important;
+    color: #f8f9fa !important;
     padding: 0.5rem !important;
     border-radius: 0.25rem !important;
+    font-family: 'Courier New', monospace !important;
   }
   
   .chat-bubble.user pre code {
-    background: rgba(255,255,255,0.2) !important;
-    color: white !important;
+    background: rgba(255,255,255,0.9) !important;
+    color: #212529 !important;
+  }
+  
+  .chat-bubble.assistant pre code,
+  .chat-bubble.ai pre code {
+    background: #2d2d2d !important;
+    color: #f8f9fa !important;
+    border: 1px solid rgba(0,0,0,0.2) !important;
   }
   
   /* AI assistant bubble styling */
@@ -875,9 +884,14 @@ async function renderDirectory(dirPath, urlPath) {
 
     <!-- Chat column -->
     <div class="col-12 col-lg-5 mb-3">
+      <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
       <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white">
-          <i class="fas fa-robot me-2"></i>AI Assistant
+        <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
+          <i class="fas fa-robot me-2"></i>
+          <span>AI Assistant</span>
+          <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
+            <i class="fas fa-chevron-right" id="toggleIcon"></i>
+          </button>
         </div>
         <div class="chat-container">
           <div class="chat-messages" id="chatMessages">
@@ -899,6 +913,7 @@ async function renderDirectory(dirPath, urlPath) {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -934,10 +949,10 @@ async function renderDirectory(dirPath, urlPath) {
             isCollapsed = isMobile;
           }
           
-          const card = document.getElementById('aiAssistantCard');
-          if (card) {
+          const wrapper = document.getElementById('aiAssistantWrapper');
+          if (wrapper) {
             if (isCollapsed) {
-              card.classList.add('collapsed');
+              wrapper.classList.add('collapsed');
               updateToggleIcon();
             }
             
@@ -951,15 +966,15 @@ async function renderDirectory(dirPath, urlPath) {
         }
         
         function toggleAIAssistant() {
-          const card = document.getElementById('aiAssistantCard');
-          if (!card) return;
+          const wrapper = document.getElementById('aiAssistantWrapper');
+          if (!wrapper) return;
           
           isCollapsed = !isCollapsed;
           
           if (isCollapsed) {
-            card.classList.add('collapsed');
+            wrapper.classList.add('collapsed');
           } else {
-            card.classList.remove('collapsed');
+            wrapper.classList.remove('collapsed');
           }
           
           updateToggleIcon();
@@ -2067,7 +2082,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
           
           <!-- Chat column -->
           <div class="col-12 col-lg-5 mb-3">
-            <div class="card shadow-sm ai-assistant-wrapper" id="aiAssistantCard">
+            <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
+            <div class="card shadow-sm">
               <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
                 <i class="fas fa-robot me-2"></i>
                 <span>AI Assistant</span>
@@ -2095,6 +2111,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -2131,10 +2148,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
             isCollapsed = isMobile;
           }
           
-          const card = document.getElementById('aiAssistantCard');
-          if (card) {
+          const wrapper = document.getElementById('aiAssistantWrapper');
+          if (wrapper) {
             if (isCollapsed) {
-              card.classList.add('collapsed');
+              wrapper.classList.add('collapsed');
               updateToggleIcon();
             }
             
@@ -2148,15 +2165,15 @@ async function renderMarkdownUncached(filePath, urlPath) {
         }
         
         function toggleAIAssistant() {
-          const card = document.getElementById('aiAssistantCard');
-          if (!card) return;
+          const wrapper = document.getElementById('aiAssistantWrapper');
+          if (!wrapper) return;
           
           isCollapsed = !isCollapsed;
           
           if (isCollapsed) {
-            card.classList.add('collapsed');
+            wrapper.classList.add('collapsed');
           } else {
-            card.classList.remove('collapsed');
+            wrapper.classList.remove('collapsed');
           }
           
           updateToggleIcon();
