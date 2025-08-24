@@ -2,10 +2,10 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/24/2025, 6:31:17 PM EDT*
+*Generated: 8/24/2025, 6:40:32 PM EDT*
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (55 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -26,6 +26,8 @@
 - [ ] link to other members who have been to a location, to ask for suggestions <!-- task-id: e8d147e5b1b6df7084bc06b9bf22ab7c -->
 - [ ] Send out reminders about the newsletter every six weeks <!-- task-id: 939813963e72b2544bb093e1660503ce -->
 - [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
+- [ ] Make bigger brochures for Tropics <!-- task-id: 9db426663cb6dd0094c884b9dc78e098 -->
+- [ ] alert members of new photos from people they follow (on the site and in the newsletter) <!-- task-id: 3ce9f792ab3e744418f8aaf85a40d7ed -->
 - [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
 - [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
@@ -80,7 +82,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (459 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (495 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -191,7 +193,43 @@
 - [ ] Link https://x.com/elosculohirsuto?s=11&t=ec0Et6qVODxQPvd5kBaeAw <!-- task-id: 3e8d4a043d3581ad112a8a273dc8ceff -->
 - [ ] Replace the iPad Pro and Magic Keyboard <!-- task-id: 0d77f58d4ecdf6d54291c956d4cc4489 -->
 - [ ] use the new canonical association <!-- task-id: 94eab479427dc970fef0547f69edad80 -->
+- [ ] see why Brakeman is running twice on commit <!-- task-id: 71e2be585d81a2353e87a2c50d683528 -->
+- [ ] Update all GitHub workflow files <!-- task-id: 1a26315c916bb01e39472ec8b05be4ec -->
 - [ ] Handle odd upload content types <!-- task-id: edd0c36e093048dde181afc1df329dbd -->
+- [ ] Reduce OGM logging <!-- task-id: d479b35be83402ab5200c38384c921d0 -->
+- [ ] Cancel Apple Mac App Store subscriptions <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
+- [ ] Replace the toilet seats <!-- task-id: 7021c90ec8698ae414968823aed36c38 -->
+- [ ] Replace the water filter in the refrigerator <!-- task-id: 3ee6e3d6e0fcf3574cb04330fb6662d5 -->
+- [ ] Fix the discourse topics which have a bad title for the link back to OGM <!-- task-id: a1f3d8af2979c86c83d979f497c9113c -->
+- [ ] Include image previews in Image discussion topics <!-- task-id: 7c2af37f323df570ae384e19717eca8c -->
+- [ ] Fix the Front Door Light <!-- task-id: b6491692e183569017423f9b9fc482ce -->
+- [ ] Replace Postgres 12 on Heroku <!-- task-id: 414a7a12fb7905124ce30b26c427863f -->
+- [ ] Remove secrets in Git repository <!-- task-id: e1b28da3cf5367b093ea1e98e0ac9476 -->
+- [ ] Update my state of residency with Patreon <!-- task-id: 1ddb95024d5f0be9446139b62e1655dc -->
+- [ ] Update my address with Vanguard <!-- task-id: d5ac159a3d4c667b689d1fa8cf7af767 -->
+- [ ] cancel AA card before annual $99 fee, signed up 4/6/24 <!-- task-id: c417993e4493ea3946f3c36ed05b75e9 -->
+- [ ] Write a test for the image missing problem <!-- task-id: d9a40b5e1f182645ec444a2af826b083 -->
+- [ ] add patreon_email to User search <!-- task-id: 32e11c6148c3f92430960c968371f94c -->
+- [ ] Let supporting members attach images to messages <!-- task-id: 692953e8b3fab23e3bee946364345ce6 -->
+- [ ] Look for more of these weird old/new OlderGay.Men members <!-- task-id: ea92fa09553489ba765b2a22672b7127 -->
+- [ ] remove DateAdded from chat postings (or PublicActivity?) <!-- task-id: 81d955570aee23978a86d889c46c0b8c -->
+- [ ] Try facial recognition to match photos to members <!-- task-id: 7dc7ad4e08f670e399037da9c5b9cb7e -->
+- [ ] User redis-lock in other places, esp. jobs <!-- task-id: 06ad7efcfc49acb8f34936c7a16a8a74 -->
+- [ ] Use discourse_api in the newsletter mailer (where else?) <!-- task-id: b5c4382915e07bce22d44ee321166ede -->
+- [ ] Pick one Notion email service, delete the other <!-- task-id: aa7c8c990d289afce6824581185cf8aa -->
+- [ ] Look for other text on OlderGay.Men that uses the unsupported <> markdown syntax <!-- task-id: cc865a0a74996a5cd0424117d4aadf3d -->
+- [ ] Look for round inserts for the ceiling lightbulb openings <!-- task-id: 16566f0ff2f860ea5320e41c012bc0b9 -->
+- [ ] add middle pieces to side room curtain rods <!-- task-id: 21e962cb2ea9c185beecb016c5ddfd69 -->
+- [ ] Get another cover for the office light knob <!-- task-id: 5e24c6e277471252416c23dd6fd6c637 -->
+- [ ] Spark | Heroku app "ogm-production" logging stopped <!-- task-id: 8bb734fea24dcca9b3deb9bf3581353f -->
+- [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
+- [ ] use file_attached scope in other contexts <!-- task-id: 0975c32e79602847cfbecc565c067e4b -->
+- [ ] Use Redirects for canonical Images? <!-- task-id: 6befe94932d041e977dbd6cb0787f6f8 -->
+- [ ] ipad docker at DuckDuckGo <!-- task-id: a03606ee9d3320f90730579d8d49104e -->
+- [ ] Fix seeding in codespaces <!-- task-id: 615b53d6aaf9b8b522babac457a1ba4b -->
+- [ ] Improve the title HTML tag on Image subdirectories <!-- task-id: f089f1e7f2325b41ebafcfb433f959f9 -->
+- [ ] Spark | Add DateAdded Collections hasn't checked in <!-- task-id: 7a30367f934e11565cb9525fd83239dc -->
+- [ ] Periodically update the visitor guides in the guestroom <!-- task-id: 789dbf0a793e8fc9da9c698ce05866a2 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
@@ -561,7 +599,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (110 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (112 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -580,6 +618,8 @@
 - [ ] Read DMARC introduction <!-- task-id: 340699a314e5991a7f774ca08c1218f2 -->
 - [ ] Get more tourist brochures <!-- task-id: 50f31a051f0bef2549cceba5adeb2341 -->
 - [ ] Nifty Archive: visiting-the-grandparents <!-- task-id: 266ca205700c11821d64fc2bf2f8d514 -->
+- [ ] Get new glasses <!-- task-id: a60a9ca9526669bcc05d5847ebfa7924 -->
+- [ ] Spark | Live healthier and get rewarded <!-- task-id: 6c644a071958c6d5d7e8c9361faecd34 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
