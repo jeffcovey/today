@@ -77,6 +77,7 @@
 - Full schedule of activities, learning sessions, and social events
 - Free breakfast at hotel daily
 - Two-drink reception each evening at hotel
+- Invite Lou to attend this convention
 
 ## Contact Information
 
