@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1289 tasks)</summary>
+<summary><strong>General Tasks</strong> (1294 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -365,8 +365,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b804c4edd9a45f0b82e36b0c7bfe4194 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6a4d586dd14a3123c027fc8914e88fe2 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0b09a7d2b396955dea4b15917964853b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b969b7e4173390123d83a2dd64eed506 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1e8f24b1dc533467aaeaa05406c8b8a9 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dc19c0912439559a23299f46102a85b4 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 72b0c353ebabe4aa506445cd22576ed3 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
@@ -437,8 +438,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4966a1e281cb3651ab26d98e9196de92 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c9c9291b6e8396f94ccecd29268f3c5e -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2c417f5cc9b9abc25733ffc25335b273 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 705b89c364d6be4731ff268d04767039 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4448fda53cbf7689bddb554a70599cf3 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 951b242d9348260759c0dad0ab80798d -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 33f4c6f0b6e2055757b60819cf649dbf -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -506,8 +508,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ccef6bd213ee9326f0492f559b021516 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b09d76b32383529c6cdbc865219e598c -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f10c4695b3519037e2daed01aa588a62 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5d69fa4cdc7917941ef176854ae503c9 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 11d9e17b27612a870c9c95d48d600e01 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9c9ff7db8cc49a798235f433b6ef49ff -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9d0e2ff57d3dc9fad9f98dd17b623a30 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -658,8 +661,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 396e76c46046ec75a6e987e36da20db1 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c0bf8f282d8014b4399b3565eb260083 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 39fa9465cc9c868727717313c62b58f2 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: fe0f0d84b5a14dd30a2bb0dcd6105d18 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9b2f584378662c55fadc3305a6a2c59b -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ef7dbd0043fa89bc794ff00f2256a20e -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c295b05692682b8daef282f999b1a3fa -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f90796e0e12622c23868e525ead96d78 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 582948d78875e2dcfbbe1f57fdfffe73 -->
@@ -721,8 +725,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e87fec7a352c51b28e96b93b22498376 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 99490f7697a8c51f13d228365bd091af -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 81b8febdf6f42d7937ffd5215a3c4266 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 57b642de375c2aa5e5418f1d1f1085cf -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 4ee1158a8ea775d70041cfc545c856db -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 76f94ad90151f8cf488cf4b2419bb629 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 4973d292806cc00fcdc3b6b676f4d606 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
