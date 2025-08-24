@@ -1,8 +1,12 @@
 <details>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 <summary><strong>General Tasks</strong> (1748 tasks)</summary>
 =======
 <summary><strong>General Tasks</strong> (987 tasks)</summary>
+>>>>>>> Stashed changes
+=======
+<summary><strong>General Tasks</strong> (1748 tasks)</summary>
 >>>>>>> Stashed changes
 
 ### Monday, Aug 11 (overdue)
@@ -484,9 +488,12 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 92f3e6dbb6ee2049d4c5e6c589ed2bac -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 848687b5eaed0b2043e1b840a199e4e4 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0bc04296152eac00bac87931e2d75d9a -->
+<<<<<<< Updated upstream
 =======
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66868c6129fbbb74826c50839d360476 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8086f1c5ba91e757cbca6e4939d35c1 -->
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
@@ -638,8 +645,11 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1c905b70d48f4ea3a38f3863f124c6e4 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9f5692e2dfe9b13690f01857fcf329bc -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 955b8ba01c6e5cd4b40e7e235f07bc9b -->
+<<<<<<< Updated upstream
 =======
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f696391580be138a3d58834f9351e70b -->
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
@@ -1015,12 +1025,15 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b2973ff7bf0bf60eb8146788ad6d8a10 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8335ee700f1c5af3e8fe227438795b4f -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 569580872db4bbdcfa9c8ed453deaf6c -->
+<<<<<<< Updated upstream
 =======
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2d38c152237ab2d769d43e0ffb2cfcfe -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2967af130bae9e2e433712e5c99d2cce -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b981a1bb4274f1bc26d2a6872620a30c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8cd1628e127e6ccea2a253d611af10cb -->
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
