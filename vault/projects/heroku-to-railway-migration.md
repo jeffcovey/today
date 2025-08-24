@@ -52,13 +52,13 @@ This project aims to migrate all applications and services from Heroku to Railwa
 
 | Service | Heroku | Railway | Savings |
 |---------|--------|---------|---------|
-| Compute | $287 | $40 | $247 |
-| PostgreSQL | $200 | $20 | $180 |
+| Compute | $187 | $40 | $147 |
+| PostgreSQL | $50 | $20 | $30 |
 | Redis | $100 | $10 | $90 |
 | Logging | $50 | $0 | $50 |
 | Scheduler | $30 | $0 | $30 |
 | Email | $66 | $10 | $56 |
-| **Total** | **$733** | **$150** | **$583** |
+| **Total** | **$593** | **$150** | **$443** |
 
 ## Migration Plan - Staged Approach
 
@@ -75,7 +75,7 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
    - Can run on Railway while ALL apps stay on Heroku
    - Heroku apps connect via DATABASE_URL to Railway PostgreSQL
    - Zero code changes required, just update connection string
-   - **Immediate savings: $180/mo**
+   - **Immediate savings: $30/mo**
 
 2. **Redis Instances ($100/mo → $10/mo)**
    - **Why Second**: Simple connection string change
@@ -112,7 +112,7 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 #### Stage 1: Database & Cache Migration (Week 1-2)
 
 **Timeline:** August 23 - September 5, 2025  
-**Potential Savings:** $270/month
+**Potential Savings:** $120/month
 
 ##### PostgreSQL Migration
 
@@ -209,7 +209,7 @@ Heroku App → Railway PostgreSQL ($20/mo) [via DATABASE_URL]
            → Papertrail ($50/mo)
 ```
 
-Savings: $270/mo with ZERO app code changes!
+Savings: $120/mo with ZERO app code changes!
 
 **Stage 2 Hybrid (Add Services on Railway/External):**
 

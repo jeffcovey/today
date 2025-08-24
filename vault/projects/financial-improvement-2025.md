@@ -25,12 +25,13 @@ Based on review of financial documents and recent analysis, this project aims to
 #### Major Categories - Past 12 Months Analysis
 
 1. **Business/OlderGay.Men:** $4,625/mo average
-   - Heroku hosting: $1,548/mo average (NOW $1,193/mo as of Aug 2025)
+   - Heroku hosting: WAS $1,193/mo → NOW ~$743/mo (after Standard-2X downgrade)
    - AWS: $234/mo average
-   - Cloudflare: $145/mo average
-   - GitHub: $154/mo average
+   - Cloudflare: $145/mo average (31 separate charges!)
+   - GitHub: $154/mo average (multiple subscriptions)
    - Discourse: $423/mo average
    - LocationIQ: $132/mo average
+   - ChatGPT/Cursor: Multiple duplicate subscriptions
    - Other services: ~$1,989/mo
 2. **Housing:** $2,360/mo
    - Homeowners Insurance: $1,207/mo (annual $7,242)
@@ -78,9 +79,13 @@ Based on review of financial documents and recent analysis, this project aims to
 
 #### Top 10 Immediate Cost-Cutting Opportunities
 
-1. **Heroku Migration** - Save $1,043/mo
-   - Current: $1,193/mo → Railway: $150/mo
-   - **ACTION TODAY**: Start PostgreSQL migration to Railway
+1. **Cancel Duplicate Services** - Save $500/mo IMMEDIATELY
+   - Cloudflare: Consolidate 31 charges ($145/mo) to single $20/mo plan = Save $125/mo
+   - Multiple ChatGPT/Cursor subscriptions: Keep only one = Save $40/mo
+   - MDBootstrap: $169/mo (cancel if not actively using)
+   - YNAB: $98.99/mo (you said you're not using it)
+   - LocationIQ: $132/mo (switch to free tier or Mapbox)
+   - **ACTION TODAY**: Cancel these duplicates and unused services
 
 2. **Duplicate/Redundant Services** - Save $400/mo
    - Multiple ChatGPT subscriptions ($21.28 x 19 = $404/year)
@@ -123,7 +128,56 @@ Based on review of financial documents and recent analysis, this project aims to
     - HelloFresh: $60.95/mo (cook from scratch)
     - Restaurant spending: $130/mo average
 
-### Total Potential Monthly Savings: $3,225/mo ($38,700/year)
+### CORRECTED Total Potential Monthly Savings: ~$1,200/mo ($14,400/year)
+
+## 🎯 REVISED HIGHEST-IMPACT ACTIONS (Heroku downgrade already done!)
+
+Since you've already completed the Heroku downgrade (saving $450/mo), here are the ACTUAL highest-impact actions for TODAY:
+
+### CORRECTED: Actual High-Impact Monthly Savings
+
+1. **LocationIQ** - $99/mo (ACTUAL MONTHLY CHARGE)
+   - Switch to Mapbox free tier (50k requests/mo free)
+   - Or use OpenStreetMap Nominatim (free)
+   - **Real savings: $99/mo**
+
+2. **Discourse hosting** - $316.20/mo
+   - Consider self-hosting or managed alternatives
+   - DigitalOcean Discourse droplet: ~$40/mo
+   - **Potential savings: $276/mo**
+
+3. **Cloudflare charges** - Multiple charges totaling ~$140/mo
+   - You have multiple $16.44, $36.43, and $72.82 charges
+   - Consolidate to single Pro plan at $20/mo
+   - **Real savings: $120/mo**
+
+4. **Apple device payments** - $455/mo total
+   - MacBook Pro: $133.25/mo
+   - iMac/iPad: $217.65/mo  
+   - Mac Mini: $49.91/mo
+   - Consider paying off or extending lifecycle
+   - **Not immediate but significant**
+
+5. **YNAB & MDBootstrap** - ANNUAL charges, not monthly!
+   - YNAB: $98.99/YEAR (only $8.25/mo)
+   - MDBootstrap: $169/YEAR (only $14/mo)
+   - You use both - KEEP THEM
+
+### Next Priority (This week) - Save $200/mo
+
+6. **Heroku Add-ons Optimization**
+   - Downgrade SendGrid Gold to Starter: Save $56/mo
+   - Switch Papertrail to free tier: Save $50/mo
+   - Migrate Redis to Railway: Save $90/mo
+
+7. **Migrate HIGHEST-COST services to Railway**
+   - Since PostgreSQL is only $50/mo (not $200), focus on:
+   - Redis migration first ($100 → $10 = save $90/mo)
+   - Then add-ons consolidation
+
+### Not PostgreSQL
+
+With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the bigger wins above first!
 
 ## Action Plan
 
@@ -266,13 +320,16 @@ Based on review of financial documents and recent analysis, this project aims to
 
 ### Heroku to Railway Migration Plan
 
-#### Current Heroku Setup (Monthly: $1,193.60 as of August 2025)
+#### Current Heroku Setup (Monthly: ~$743 after successful downgrade)
 
-- Application dynos: $637/mo
-- PostgreSQL databases: ~$200/mo
+- Application dynos: ~$187/mo (Standard-2X at $50 + others)
+- PostgreSQL databases: $50/mo
 - Redis instances: ~$100/mo
-- Add-ons (Papertrail, Scheduler, SendGrid): ~$256/mo
-- **Note: Performance-L to Standard-2X downgrade NOT YET IMPLEMENTED**
+- Add-ons: ~$406/mo
+  - SendGrid Gold: $66/mo (can downgrade to $10/mo)
+  - Papertrail: $50/mo (can use free tier)
+  - Scheduler: $30/mo
+  - Other add-ons: ~$260/mo
 
 #### Target Railway Setup (Monthly: ~$150)
 
@@ -397,7 +454,7 @@ Based on review of financial documents and recent analysis, this project aims to
 1. **Monthly Burn Rate**: Current: $27,864 → Target: $20,000
 2. **Days Since 401k Withdrawal**: Current: 0 → Target: 90+
 3. **Emergency Fund Balance**: Current: $0 → Target: $60,000
-4. **Hosting Costs**: Current: $1,193 → Target: $150
+4. **Hosting Costs**: Current: $743 (after downgrade) → Target: $150
 5. **Total OGM Expenses**: Current: $4,625/mo → Target: $1,500/mo
 5. **Food Expenses**: Current: $758 → Target: $500
 6. **Net Monthly Cash Flow**: Current: Negative → Target: +$2,000
@@ -462,12 +519,13 @@ Based on review of financial documents and recent analysis, this project aims to
 
 ### Next 2 Hours (Before 5 PM)
 
-1. **Heroku Performance-L Downgrade** (Save $450/mo immediately!)
-   - [ ] Log into Heroku dashboard
-   - [ ] Navigate to dyno settings
-   - [ ] Downgrade Performance-L to Standard-2X
-   - [ ] Monitor for 30 minutes to ensure stability
-   - **Instant savings: $450/month starting tomorrow**
+1. **REAL Immediate Savings Opportunities**
+   - [ ] Switch LocationIQ to free alternative - Save $99/mo
+   - [ ] Consolidate Cloudflare charges - Save $120/mo  
+   - [ ] Downgrade SendGrid Gold to Starter - Save $56/mo
+   - [ ] Switch Papertrail to free tier - Save $50/mo
+   - [ ] Consider Discourse alternatives - Save up to $276/mo
+   - **Realistic instant savings: $325/month (without Discourse)**
 
 2. **Cancel Duplicate Subscriptions** (Save $150/mo)
    - [ ] Cancel unused ChatGPT subscriptions (keep only one)
