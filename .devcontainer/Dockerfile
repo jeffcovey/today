@@ -3,9 +3,14 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:20
 # Install build dependencies for native modules (better-sqlite3) and sqlite3 CLI
 RUN apt-get update && apt-get install -y python3 make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
 
-# Install Turso CLI
-RUN curl -sSfL https://get.tur.so/install.sh | bash && \
-    mv /root/.turso/bin/turso /usr/local/bin/turso
+# Install Turso CLI manually (avoid auto-auth issues)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then ARCH="x86_64"; fi && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then ARCH="arm64"; fi && \
+    curl -sSfL "https://github.com/tursodatabase/turso-cli/releases/latest/download/turso-cli_Linux_$ARCH.tar.gz" | \
+    tar -xz -C /tmp && \
+    mv /tmp/turso /usr/local/bin/turso && \
+    chmod +x /usr/local/bin/turso
 
 # Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless)
 RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev && rm -rf /var/lib/apt/lists/*
