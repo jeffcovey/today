@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 5:58:14 PM EDT*
+*Generated: 8/24/2025, 5:58:42 PM EDT*
 
 ## Next Up
 
@@ -9,8 +9,13 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (350 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (355 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2ad7d6d3b99e1c65c40a29f321e32d82 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cd038edb0621042638b54a4767daf76a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 71badf80d7625564b143304527e61af5 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6fece72e011bb5252fd783cb268f2b4f -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 23864ef37457f1782a65fc14b5284e4d -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 33103be367e4269024f86010175cedbf -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3b27ab47faa3c9b66e546e21074722be -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6c442f88f820ee426186418ca80eba19 -->
