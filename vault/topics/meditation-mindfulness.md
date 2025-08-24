@@ -14,4 +14,3 @@ Tasks and projects related to Meditation Mindfulness.
 ### No Date Set
 
 - [ ] Add the other sitting weekend times <!-- task-id: 5e85d3be804d7cf445f53e4bcd579c5e -->
-
