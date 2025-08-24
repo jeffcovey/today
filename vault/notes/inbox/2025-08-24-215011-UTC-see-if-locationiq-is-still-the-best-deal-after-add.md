@@ -1,0 +1,1 @@
+- [ ] see if LocationIQ is still the best deal after adding optimizations
