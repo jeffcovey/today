@@ -1,5 +1,7 @@
+## 🌄 Evening Routine
+
 <details>
-<summary><h2>🌙 🌄 <strong>EVENING ROUTINE - Click to Wind Down!</strong> 🌄 🌙</h2></summary>
+<summary>Click to Wind Down!</summary>
 
 > *Wind down with purpose and prepare for tomorrow*
 

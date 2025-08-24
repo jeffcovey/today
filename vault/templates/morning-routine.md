@@ -1,5 +1,7 @@
+## 🌅 Morning Routine
+
 <details>
-<summary><h2>🌅 ☀️ <strong>MORNING ROUTINE - Click to Start Your Day!</strong> ☀️ 🌅</h2></summary>
+<summary>Click to Start Your Day!</summary>
 
 > *Start your day with intention and clarity*
 
