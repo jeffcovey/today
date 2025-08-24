@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 6:14:51 PM EDT*
+*Generated: 8/24/2025, 6:20:34 PM EDT*
 
 ## Next Up
 
@@ -9,8 +9,12 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (3535 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (3539 tasks completed)</summary>
 
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c597cf670db81a4d543e7c1591a06240 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a2778ddadc9ff67bdf1498ffa3d928a8 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8786e38d1a1a1627b07b221517161545 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 69d104d72c44bf216d8f3ea1a1a13ee7 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8817251c4b54e5285e9f89f1cda0946c -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 98c1e695995c36f9e1172cb5a183f44c -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6b19dd1f84f84823ef652023aba2e49c -->
