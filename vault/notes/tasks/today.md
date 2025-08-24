@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 3:50:24 PM EDT*
+*Generated: 8/24/2025, 4:00:34 PM EDT*
 
 ## Next Up
 
@@ -9,17 +9,22 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (2788 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (2793 tasks completed)</summary>
 
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71391b71776de21d7f49971447504a8e -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 46a177f167c224c50c41e8485f022f32 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bf65947c85ca2a5ae45aaedfe3fdbe45 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c165e2c6febb373fd5a9408535f0c5be -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7b1700ebceab09c6bd0d5facbb0b0d69 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a4af5726b30775f5a99a403322c903d5 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0d66b1f5ddc08811b51e14b30b128277 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0d5cd803384bc0581257897aa129ca1d -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5f0fe529e24086ca70be477ca4340634 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 17542a5476f81c9267b57e26f71ecd90 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e7d66d83e584bb508534f30277477c55 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: dce0e88272f93b7fb9dfcf42a20441c7 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 207edc3bb240566ad11a7a1e49688a88 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a0034f41f96205393c854094c99ffde3 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71391b71776de21d7f49971447504a8e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 46a177f167c224c50c41e8485f022f32 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bf65947c85ca2a5ae45aaedfe3fdbe45 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c165e2c6febb373fd5a9408535f0c5be -->
 - [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [x] Create views for ChatVisits (Priority task) <!-- task-id: caddc0b0410750b8965110630b96275f -->
 - [x] Assign topics to photo uploaders, etc. (Priority task) <!-- task-id: e062fb34e6226c8c05575eb3154f6f83 -->
