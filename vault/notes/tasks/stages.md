@@ -2,10 +2,10 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/24/2025, 4:46:50 PM EDT*
+*Generated: 8/24/2025, 4:50:29 PM EDT*
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (57 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -13,49 +13,45 @@
 
 - [ ] Add a suggestion in the newsletter to set up video chat times <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
 - [ ] Email participants to remind them of chats <!-- task-id: 609834e53d5dee7ec696bab191fc8ed8 -->
-- [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
+- [ ] Reply to Nelson about Palm Springs <!-- task-id: f10bc210d36d48b4933e646f3f5316ef -->
+- [ ] Reply to Lou about chamber music concerts <!-- task-id: b3046fbf6eb60fa64f953807c4ae3a35 -->
 - [ ] Reply to Nelson about redesign <!-- task-id: efa43011cc7b49bca42d32187a744cdf -->
+- [ ] Give coding tasks to Mehul <!-- task-id: 70f43457658a35b275da7119e9fee6e2 -->
+- [ ] Reply to David Edwards <!-- task-id: 87fb1d83126671d052030289fbba81fe -->
+- [ ] Reply to David Edwards about trip <!-- task-id: 9c7f6263547d4f800f5fa466816f3202 -->
+- [ ] Give belated Gene Fett birthday greetings <!-- task-id: a04e1df871a4f9150cd6ce6f9c9cc33b -->
+- [ ] Reply to Daniel <!-- task-id: c4a0a7e06470f71c3b25aa68fa0a0bc8 -->
+- [ ] point members to forum for help <!-- task-id: ca69f11240892e620343e31eb69f5f34 -->
 - [ ] Reply to Melv <!-- task-id: ebc1246fb92978b8fe15859198ab89ab -->
 - [ ] link to other members who have been to a location, to ask for suggestions <!-- task-id: e8d147e5b1b6df7084bc06b9bf22ab7c -->
-- [ ] Make bigger brochures for Tropics <!-- task-id: 9db426663cb6dd0094c884b9dc78e098 -->
-- [ ] alert members of new photos from people they follow (on the site and in the newsletter) <!-- task-id: 3ce9f792ab3e744418f8aaf85a40d7ed -->
-- [ ] find someone to redo the chairs <!-- task-id: ed53c7c5cb501dc67654f5f918a4d3a7 -->
+- [ ] Send out reminders about the newsletter every six weeks <!-- task-id: 939813963e72b2544bb093e1660503ce -->
+- [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
+- [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
+- [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
-- [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
-- [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4 <!-- task-id: eac32265e3f3d0c438f94cd9efb23b7d -->
-- [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Catch up OGM member requests <!-- task-id: f7807d3f715886f8b90137cccfe380d9 -->
-- [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
 - [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
+- [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
+- [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
+- [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4 <!-- task-id: eac32265e3f3d0c438f94cd9efb23b7d -->
 - [ ] offer video chat help for Patrons <!-- task-id: 5a981b742c46f39bd949e1e077131962 -->
 - [ ] Reply to Rosemary <!-- task-id: 19421c4472862f124112c82645637d4b -->
 - [ ] put site updates in the newsletter <!-- task-id: 804c67647522989767c398d434b96d61 -->
 - [ ] Report to users with unread messages <!-- task-id: f4f7b4931026f9d6a9840c56f47ffb16 -->
 - [ ] update tier descriptions on Patreon <!-- task-id: 5ef0794348fdb7f0e5a9b22a38e0ee19 -->
-- [ ] Reply to Nelson about Palm Springs <!-- task-id: f10bc210d36d48b4933e646f3f5316ef -->
-- [ ] Reply to Lou about chamber music concerts <!-- task-id: b3046fbf6eb60fa64f953807c4ae3a35 -->
 - [ ] Celebrate new patrons <!-- task-id: 663f574bd98fb204351a9f5828b97f7a -->
 - [ ] Do something for the big OlderGay.Men anniversary <!-- task-id: 881739c8b6aef723d02cd63a473ce6a7 -->
 - [ ] Take Lou to Buenos Aires <!-- task-id: b126139516d55faf5a2d7720385c94fb -->
 - [ ] Reply to Nelson about Sauna Bruc <!-- task-id: 6e9b30320db8d769082364ad370f91a2 -->
 - [ ] Reply to Nelson <!-- task-id: 50cb385281289d128853e13872d84e8b -->
-- [ ] Give coding tasks to Mehul <!-- task-id: 70f43457658a35b275da7119e9fee6e2 -->
 - [ ] Show Lou Stephen Fry documentary <!-- task-id: c1a2282767871ff3a8a45ce6396b275b -->
-- [ ] Reply to David Edwards <!-- task-id: 87fb1d83126671d052030289fbba81fe -->
-- [ ] Reply to David Edwards about trip <!-- task-id: 9c7f6263547d4f800f5fa466816f3202 -->
-- [ ] Give belated Gene Fett birthday greetings <!-- task-id: a04e1df871a4f9150cd6ce6f9c9cc33b -->
 - [ ] Reply to Robert Anaya <!-- task-id: a5e2209878ca9f5ed7a6199205d1b3fc -->
+- [ ] See Mr. Burton <!-- task-id: 1adceab45f7cc8955d1a9a9b77559e38 -->
 - [ ] Post a poll asking what weekday and times are good for chats <!-- task-id: 87db00c07ee06eacd7cda4225aa7a8ea -->
-- [ ] Reply to Daniel <!-- task-id: c4a0a7e06470f71c3b25aa68fa0a0bc8 -->
-- [ ] point members to forum for help <!-- task-id: ca69f11240892e620343e31eb69f5f34 -->
-- [ ] Send out reminders about the newsletter every six weeks <!-- task-id: 939813963e72b2544bb093e1660503ce -->
-- [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
-- [ ] Victor: cute guy from Clarksburg, was librarian for Rutgers <!-- task-id: 6f70402d3857b1e9732a50acc5e3b484 -->
-- [ ] check Prime Timers WW regularly <!-- task-id: 3b27ee8e58f460fd4a918482b1f54ae1 -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
@@ -84,7 +80,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (552 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (459 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -95,89 +91,107 @@
 - [ ] Check MiniMagick mail <!-- task-id: 6172d3a7aeb2f087a8daf7ea051f9574 -->
 - [ ] Check that page comments show in public activity <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
 - [ ] Add a photo of the laundry room to all four listings <!-- task-id: 9278f84e9fc0866930829b91c91e358d -->
-- [ ] make a system for checking for many identical jobs <!-- task-id: efe9b6b8f6dffbcefaee4bf974a72c38 -->
-- [ ] check that test is getting Bullet errors <!-- task-id: eb86aab1bad3e80081bfbc501b7f288d -->
-- [ ] set up doc/background-agent-testing.md <!-- task-id: ed65e8b2780aac6f256c1a8b49c6f49c -->
-- [ ] Repurpose the text entry counter for general use <!-- task-id: ef3df7ffdc855c655374d6b1f261cbd4 -->
-- [ ] Limit "Outdated Groups" to staff <!-- task-id: eff59bf49328dac74b5272b8312599ca -->
-- [ ] fix more bullet errors at http://localhost:3000/rails/mailers/newsletter_mailer/newsletter <!-- task-id: e802eb44e05cf72bc5c478790e8e96e0 -->
-- [ ] look for init_tabmenu <!-- task-id: ef5a61830000ec2f22bbbba77fec8f6c -->
-- [ ] Restore nearby items on profiles <!-- task-id: e526af0262be9dbe9b4aaac4efe582e9 -->
+- [ ] Register for the Prime Timers cruise <!-- task-id: 9db2640b1771a35e1ac39273ebe3bb9a -->
+- [ ] Fix Docker on Mac <!-- task-id: 0173622b8faf46359a4767632f3e7887 -->
+- [ ] see why some videos aren't playing <!-- task-id: 9195b78c197a55607d138540e5932347 -->
+- [ ] get Zero subscription <!-- task-id: 2f6095d940c8bbb8ad07ecdc30563d53 -->
+- [ ] stop unread notice covering up other flash messages <!-- task-id: 00ffbbe7eaef8f708d513d9b097a94b1 -->
+- [ ] On trip pages, pre-fill the topic when writing the traveler <!-- task-id: 69d338ecb6c7a955e058b9faedcd1ab5 -->
+- [ ] restore common marker and selma <!-- task-id: 086865437b9033e3d3a17ed4473e9509 -->
+- [ ] update Discourse profiles for members deleted or banned on OGM <!-- task-id: 78b0b805a46567df03a34877e653966e -->
+- [ ] Test all the possible content that can go into a newsletter <!-- task-id: a9a8dfc04413411b29177774722b04c5 -->
+- [ ] Price the cost of installing a cabana <!-- task-id: c0dd242dedf31d5cdaf19ec9ce6f9211 -->
+- [ ] Move more articles from General to In The News <!-- task-id: 9f1e5aa9b0ec9290a0cbea66e417e90c -->
 - [ ] Use more colored text in the newsletter <!-- task-id: e05e6b32f54220d5372e9537f06ddf45 -->
+- [ ] Move offline tracking to javascript, et al. <!-- task-id: da5e9a5d1f1b58914ef626e35dec75cb -->
+- [ ] Use a smaller search radius if we return many results <!-- task-id: d412411fe273e17ca08cdc5d74244d6f -->
+- [ ] fill the side bar with "add photos", "add video", etc. <!-- task-id: 5bb8e9839e1a4e75e1783bf98ee72322 -->
+- [ ] Put up a sign asking guests to use the path on the right side of the house <!-- task-id: 70b5f9c03a8055400c2828c4527e9df6 -->
+- [ ] Move the items in the closet out of view <!-- task-id: 5f60484640fab8b48f08a9bfbb2cb962 -->
+- [ ] trim the tree from the street <!-- task-id: c56f5c4afa8980d7991773f98f534940 -->
+- [ ] change the Sanitas password <!-- task-id: 44d5291600aa2fd68241e0eff09f95bb -->
+- [ ] Use JavaScript scrolling to go to the bottom of a conversation <!-- task-id: 23ba2bec32655640c3753b37e2af7922 -->
+- [ ] cache lat/long lookups? Incorporate in existing Locations model? <!-- task-id: ac4ee14751fed19bc7e9f606c9d9a08c -->
+- [ ] test location setting when you're not logged in <!-- task-id: 11e1754c8877aab251e5f978368d2c77 -->
+- [ ] Write minitest tests, stubbing and using the house sit software for button pressing <!-- task-id: 7d4445ac7f5c938f01862ef93b93056d -->
 - [ ] periodically check the links in the OlderGay.Men <head> <!-- task-id: e97ff1d879f11bb6f459cc3ba14dbdc3 -->
+- [ ] Include current location for User searches <!-- task-id: 488023f4ffe389d9b71a20f4868b74ba -->
+- [ ] upgrade the Pi <!-- task-id: 7033abb02d41fb09c11f2b198393b0a1 -->
+- [ ] See why links are still marked broken <!-- task-id: 0418c82510cdaa2b0038b7cf049f9372 -->
+- [ ] Price T-Mobile hotspot vs. iPad with cellular <!-- task-id: 497a5814b1778863060f26bebf55240a -->
+- [ ] Try remote screen with Pi <!-- task-id: 4cd5768d612a4b35dbf361dd5efd54be -->
+- [ ] Use closed and open envelopes for red and unread conversations <!-- task-id: 6344ac9637d03f2b19af65d82406e421 -->
+- [ ] Check Sanitas coverage <!-- task-id: b0df3d1db79248ba0cd8bf633561c0ff -->
+- [ ] add to Pi setup: sudo mv /var/lib/docker/network/files/local-kv.db /var/lib/docker/network/files/local-kv.db.backup <!-- task-id: 718784de449e7294a8f2e1950fced587 -->
+- [ ] Move comments on users above nearby places, etc. <!-- task-id: 6020b344ae6ec0dcd5ce26cc8c9b77ee -->
+- [ ] In the view omit the checkbox if the image is already the key image <!-- task-id: af39060a03375b66dbadbfff40af1b97 -->
+- [ ] install Rails Admin <!-- task-id: 76f2ef07bbbdf28ba459619ed27f5ec3 -->
+- [ ] Move drafts into branches <!-- task-id: 123f15cbd88a3cc968b52bf4a34bf4cb -->
+- [ ] Only show birthdays of active users (not banned) <!-- task-id: 3ad6666928cef3705f0df19a126a1037 -->
+- [ ] Test & fix sorting of members gallery <!-- task-id: 9479dbe2e53401b0fdfd9f2415a9e9a3 -->
+- [ ] see if attached images are being optimized <!-- task-id: 51f51b36b0cdb9ae79605a296ae231b4 -->
+- [ ] Look at AdSense <!-- task-id: db5792bf2e97c9d9dbbc195ad83c649e -->
 - [ ] Update WHOIS <!-- task-id: e0c4f76671696ee878bcac78c7af0605 -->
 - [ ] Replace the exhaust fan in the Bathroom <!-- task-id: ef4603fabffcc309de8d0a4ce8ef18df -->
+- [ ] Verify MBB information <!-- task-id: 818aa2c28416054a725bbfbfb56ab549 -->
+- [ ] Open the location search tab if in use <!-- task-id: 3f4f3be8a2a55577b9fb7b03c31a5984 -->
+- [ ] Improve read/unread layout <!-- task-id: a2a2e6de2adca6a620b59af42b2f4674 -->
+- [ ] See why locations are not showing on the place index <!-- task-id: d795bc5f7f41adff2102398c446aae59 -->
 - [ ] remove Patreon gem? <!-- task-id: e18ee6f28a1e87fb161c89bee03f47a2 -->
+- [ ] Make pictures hazy for `user`s in the DateAdded index <!-- task-id: 7833f5beddd48c105ae4bdb81b62fe55 -->
+- [ ] fix single Patrons not being updated <!-- task-id: d5968a686564020af9a7d2a202e254f8 -->
+- [ ] move Pi to direct iPad connection with passthrough charging <!-- task-id: 3da4df50625be4b68c44c479eae78c73 -->
+- [ ] Fix the string of lights <!-- task-id: 4b3c8cdcf1f37422b7d57bff50f1e2ef -->
+- [ ] `bundle update --ruby` <!-- task-id: 25171c3e286d9442bcdad32388a132d9 -->
+- [ ] add: Gem install doing <!-- task-id: 49a3f94bba0ea37326b7bce600353a7a -->
+- [ ] Fix "logged-in user can show image" <!-- task-id: d17c7bfd29312a4ba25303fc403a2ad4 -->
+- [ ] Register warranty for the air-conditioning units <!-- task-id: d09a0d6a46b3d78c49a8d86229428fbf -->
+- [ ] Remove VS Code from Dockerfile <!-- task-id: acbb993d55a20fbcbc86ef3aa2b80851 -->
+- [ ] Update the instructions about the thermostat <!-- task-id: ae251bfb78b9a88999889b25ca998f45 -->
+- [ ] block the AC vents with fiberglass <!-- task-id: 254b3b9487e772587e99b8ada19eb66b -->
+- [ ] move `users_with_conversations` to where it's really needed <!-- task-id: fb97c518337c1c1092757e2c020705eb -->
+- [ ] make /edited load faster <!-- task-id: dbe6c8bfd3de420898d1284e77242b6a -->
+- [ ] Use includes to include small images in the edited controller <!-- task-id: 929cc72566212bdf5ca7c74b38b6d8c2 -->
+- [ ] look for instances of using PrivateRelation when we don't have to <!-- task-id: 8f19be8606d98924006ff0912b607a76 -->
+- [ ] sort side bar news by creation, not update <!-- task-id: d91a28f180667674d643413a7e979148 -->
+- [ ] fix freezer temperature <!-- task-id: 6d9e1a915ab8b05431f88dc1ff7547fb -->
+- [ ] Look for other places to use ActiveRecord::Base.transaction <!-- task-id: 4ba1728edfe5e3389dfd00f5335b591a -->
+- [ ] Use review apps <!-- task-id: 8d356099a9d9bdd7c06e3146bd5a12b3 -->
+- [ ] Clean and close the codespace <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
+- [ ] make room on linode <!-- task-id: 0c907caeecf7f831be2696c3eda02cf4 -->
+- [ ] set /images/members to show the newest photos, not just the newest members <!-- task-id: 9540dce517da8dea56a8479c90ca2692 -->
+- [ ] Upgrade Pagy <!-- task-id: 36f5cba2a53d811b43a9ec08f85a4693 -->
 - [ ] add `doing` configuration to OlderGay.Men setup <!-- task-id: ea083ed2c0d97069c6cb4f6f9e30b7f7 -->
+- [ ] honeybadger ruby on rails feedback at DuckDuckGo <!-- task-id: 3ffe1d8853683c8f6477360bd024ceb6 -->
+- [ ] Cancel Dekkoo and Paramount+ <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
+- [ ] Use Airbnb coupon code SHTIGAXJXMXASI <!-- task-id: 36d359ee11ab5263c3ae1c424a56f973 -->
+- [ ] research hurricane preparations <!-- task-id: f9af775b1bbcd02b6eb5cb780948df34 -->
+- [ ] Move jobs into namespaces <!-- task-id: 264dc4110a92c1f8c3c9230b0c83ea92 -->
+- [ ] Increase the resolution of avatars in the header <!-- task-id: cf53556e33ef3e32ac0bb6fb8f858555 -->
+- [ ] search bicycle trailer cargo <!-- task-id: 9d956d6d9a684f9e6823b8969c2f808d -->
+- [ ] make sure you're checking Sidekiq daily <!-- task-id: 7650ea67319ebc5284e56ab0c0b7cb62 -->
+- [ ] Wash the guest room windows <!-- task-id: 2cc286a0a2048be1ca8ccc12fbf94d0c -->
+- [ ] keep adding tasks to FlowSavv <!-- task-id: 718fe98b11fc4ad223edde178403f70d -->
+- [ ] File the homeowners insurance <!-- task-id: 603648660893533d7c6288b5d1ef189c -->
+- [ ] File the 4-point inspection <!-- task-id: f0af3af47482c0cd613c151fccba0a82 -->
+- [ ] Move the bricks next to the trash can <!-- task-id: 3284f53820988f533e8af77068870821 -->
 - [ ] see Drafts ongoing <!-- task-id: efd983a14504c3a8458247cd3837a46f -->
+- [ ] Fix images/members showing non-canonical images to add to members <!-- task-id: 2a75be81fb4fc2254717e34fa638dd52 -->
+- [ ] grep user.images <!-- task-id: 07aa699be7764a25c48579e2b2a24ef5 -->
 - [ ] search `role: "banned"` <!-- task-id: ea2bfccf4d3b9bd2e710564eae65ed78 -->
-- [ ] see why Brakeman is running twice on commit <!-- task-id: 71e2be585d81a2353e87a2c50d683528 -->
-- [ ] Update all GitHub workflow files <!-- task-id: 1a26315c916bb01e39472ec8b05be4ec -->
+- [ ] check Rubocop's report on the User model <!-- task-id: 145a86d9655ebb6c8b6780a5851fa2ae -->
+- [ ] Read Valimail report <!-- task-id: b61993e15bc658d403b7b9ba7a38c175 -->
+- [ ] remove `file_attached`, just delete Images meeting the criterion <!-- task-id: f25c3b1aded0902416d8e807cd1a228c -->
+- [ ] Finish work on the side window in the back room <!-- task-id: 68d7da6a432435490b7f7cf407ffce42 -->
+- [ ] check what happened to `miles` in _index <!-- task-id: 214c47563ce9a984808872b68e553be8 -->
+- [ ] See if Valimail solves the Gmail problem <!-- task-id: 81493dfb894e0824bc4be8199374a35c -->
+- [ ] run `doing` when fish launches, if available <!-- task-id: c1d5bfe9743d0a29cf3a722750c18806 -->
+- [ ] See why the list of conversations with other users isn’t loading <!-- task-id: 51da1781f971e45c8a2eb21c4dd6515d -->
+- [ ] Restore PostUpdatesToChatJob <!-- task-id: 13c78a89416e5dea5bb00c49d55a8608 -->
+- [ ] Link https://x.com/elosculohirsuto?s=11&t=ec0Et6qVODxQPvd5kBaeAw <!-- task-id: 3e8d4a043d3581ad112a8a273dc8ceff -->
+- [ ] Replace the iPad Pro and Magic Keyboard <!-- task-id: 0d77f58d4ecdf6d54291c956d4cc4489 -->
+- [ ] use the new canonical association <!-- task-id: 94eab479427dc970fef0547f69edad80 -->
 - [ ] Handle odd upload content types <!-- task-id: edd0c36e093048dde181afc1df329dbd -->
-- [ ] Reduce OGM logging <!-- task-id: d479b35be83402ab5200c38384c921d0 -->
-- [ ] Cancel Apple Mac App Store subscriptions <!-- task-id: ecf9f6209ca0b09ffe422efa6c666976 -->
-- [ ] Replace the toilet seats <!-- task-id: 7021c90ec8698ae414968823aed36c38 -->
-- [ ] Replace the water filter in the refrigerator <!-- task-id: 3ee6e3d6e0fcf3574cb04330fb6662d5 -->
-- [ ] Fix the discourse topics which have a bad title for the link back to OGM <!-- task-id: a1f3d8af2979c86c83d979f497c9113c -->
-- [ ] Include image previews in Image discussion topics <!-- task-id: 7c2af37f323df570ae384e19717eca8c -->
-- [ ] Fix the Front Door Light <!-- task-id: b6491692e183569017423f9b9fc482ce -->
-- [ ] Replace Postgres 12 on Heroku <!-- task-id: 414a7a12fb7905124ce30b26c427863f -->
-- [ ] Remove secrets in Git repository <!-- task-id: e1b28da3cf5367b093ea1e98e0ac9476 -->
-- [ ] Update my state of residency with Patreon <!-- task-id: 1ddb95024d5f0be9446139b62e1655dc -->
-- [ ] Update my address with Vanguard <!-- task-id: d5ac159a3d4c667b689d1fa8cf7af767 -->
-- [ ] cancel AA card before annual $99 fee, signed up 4/6/24 <!-- task-id: c417993e4493ea3946f3c36ed05b75e9 -->
-- [ ] Write a test for the image missing problem <!-- task-id: d9a40b5e1f182645ec444a2af826b083 -->
-- [ ] add patreon_email to User search <!-- task-id: 32e11c6148c3f92430960c968371f94c -->
-- [ ] Let supporting members attach images to messages <!-- task-id: 692953e8b3fab23e3bee946364345ce6 -->
-- [ ] Look for more of these weird old/new OlderGay.Men members <!-- task-id: ea92fa09553489ba765b2a22672b7127 -->
-- [ ] remove DateAdded from chat postings (or PublicActivity?) <!-- task-id: 81d955570aee23978a86d889c46c0b8c -->
-- [ ] Try facial recognition to match photos to members <!-- task-id: 7dc7ad4e08f670e399037da9c5b9cb7e -->
-- [ ] User redis-lock in other places, esp. jobs <!-- task-id: 06ad7efcfc49acb8f34936c7a16a8a74 -->
-- [ ] Use discourse_api in the newsletter mailer (where else?) <!-- task-id: b5c4382915e07bce22d44ee321166ede -->
-- [ ] Pick one Notion email service, delete the other <!-- task-id: aa7c8c990d289afce6824581185cf8aa -->
-- [ ] Look for other text on OlderGay.Men that uses the unsupported <> markdown syntax <!-- task-id: cc865a0a74996a5cd0424117d4aadf3d -->
-- [ ] Look for round inserts for the ceiling lightbulb openings <!-- task-id: 16566f0ff2f860ea5320e41c012bc0b9 -->
-- [ ] add middle pieces to side room curtain rods <!-- task-id: 21e962cb2ea9c185beecb016c5ddfd69 -->
-- [ ] Get another cover for the office light knob <!-- task-id: 5e24c6e277471252416c23dd6fd6c637 -->
-- [ ] Spark | Heroku app "ogm-production" logging stopped <!-- task-id: 8bb734fea24dcca9b3deb9bf3581353f -->
-- [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
-- [ ] use file_attached scope in other contexts <!-- task-id: 0975c32e79602847cfbecc565c067e4b -->
-- [ ] Use Redirects for canonical Images? <!-- task-id: 6befe94932d041e977dbd6cb0787f6f8 -->
-- [ ] Fix seeding in codespaces <!-- task-id: 615b53d6aaf9b8b522babac457a1ba4b -->
-- [ ] Improve the title HTML tag on Image subdirectories <!-- task-id: f089f1e7f2325b41ebafcfb433f959f9 -->
-- [ ] Spark | Add DateAdded Collections hasn't checked in <!-- task-id: 7a30367f934e11565cb9525fd83239dc -->
-- [ ] Periodically update the visitor guides in the guestroom <!-- task-id: 789dbf0a793e8fc9da9c698ce05866a2 -->
-- [ ] See why we have lingering ImageContributions <!-- task-id: a27634aa9732fd5da28badeb81c665c7 -->
-- [ ] Link to the CR archive when it's back <!-- task-id: e08ca6b0f83f2fe2cd1dabc3e3292116 -->
-- [ ] Paint all the doors <!-- task-id: f73f45a2f1c2cb1323b5285be16ca25c -->
-- [ ] Touch up paint edges <!-- task-id: bb118f1a7e36bc4baa6300a9f0a5a35d -->
-- [ ] add turbo frame placeholders? <!-- task-id: 2c72f8d306e4f1fb88c69393fd5591c7 -->
-- [ ] only use file_attached scope in galleries/carousels <!-- task-id: d3dd73990101d32890f6f408e97a6a81 -->
-- [ ] See why we are even calling events, etc. <!-- task-id: ff105f31958c8eb8f3325b35dbc7ff87 -->
-- [ ] hide side_profiles from small (for example, mobile) views <!-- task-id: e8a172f4bad5cd7aaa801123ab7c1e45 -->
-- [ ] Replace the chair out back <!-- task-id: e9a4dbde9464276867a20194cd298397 -->
-- [ ] Turn on the Guest Hallway Light when the back door is unlocked <!-- task-id: e9e43ef9031a50acb78dc86edd987b41 -->
-- [ ] cucumber software at DuckDuckGo <!-- task-id: e040e0c86cf00520d196e2c9806843b3 -->
-- [ ] Review comments lost in image controller <!-- task-id: ea6c09e04cf5190e63b992b529b87506 -->
-- [ ] Test actually following a link instead of just hitting the controller <!-- task-id: e8eec88c728e6a5d39c0432998413b42 -->
-- [ ] Remove entries from daily_tracking if they're logged on Notion <!-- task-id: e1da0550dd9642c0153f136368f4fe1e -->
-- [ ] Seed less in review apps <!-- task-id: e78eb7eaf575fa92f5093dd3644b8204 -->
-- [ ] Seed site news <!-- task-id: ea2f9a6321c511a1e9229964c37f0178 -->
-- [ ] Move from repeating tasks to weekly-added templates <!-- task-id: e0b1c6753dc231a4679f13445cc230fc -->
-- [ ] add homeowner's insurance to the budget <!-- task-id: e265412cc333aa82a46bb57cc0082e17 -->
-- [ ] Standardize tags <!-- task-id: e50a9c4c3e4645adf7a2079ebd6921aa -->
-- [ ] Add space before “Upcoming chats” <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
-- [ ] Add test: "destroying user also destroys associated images and records" <!-- task-id: e3ead79e45e3786ce6146fc5fd448a90 -->
-- [ ] Expand patio after inspections <!-- task-id: ed528cc47f2be0c6b1fc6f48d896dd40 -->
-- [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
-- [ ] Check tmp/ in OlderGay.Men <!-- task-id: e3fd9728b5e98ba0d9d2f7b2bdaef432 -->
-- [ ] Check that we still have access to GitHub security <!-- task-id: e1e10e4f9e4a3cd94a0d5e78d360f6b9 -->
-- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
-- [ ] Check the date you need to return to the veterinarian <!-- task-id: e85432d10712e07689f47391981f5123 -->
-- [ ] Create a db of my Royal Caribbean points progress <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
-- [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
-- [ ] Issue #5177: Fix duplicate job accumulation in Sidekiq queues (5000+ duplicates) <!-- task-id: edac51d9eb6996c819959fd5086916ee -->
-- [ ] Issue #5166: Remove legacy direct geocoding from User model <!-- task-id: e4cfa03982af840bde2fb733ab08d69a -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
@@ -190,13 +204,20 @@
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Adjust plans based on progress <!-- task-id: 8e7d8f9dbbd20177dbe8dbcd27b6c3a7 -->
 - [ ] Prepare for week 4 push <!-- task-id: 51305c47f0902571ef3432c36ca6995d -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
-- [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
-- [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
-- [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
-- [ ] Update `vault/logs/drinks.csv` <!-- task-id: e0ac423f92aa73a5d1dffe2f3b8041ca -->
-- [ ] Have the AI set task topics if they don't exist <!-- task-id: e2b27da565b838831e0be7fe6f61b7a0 -->
+- [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
+- [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
+- [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
+- [ ] Analyze Airbnb listings with pools vs without in Oakland Park <!-- task-id: 3e7a053d0898fe1555551e95f08fca96 -->
+- [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
+- [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
+- [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
+- [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
+- [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
+- [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
+- [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
+- [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
 - [ ] Check that one-action Drafts are going to Notion <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Review health insurance options <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
@@ -207,19 +228,26 @@
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
 - [ ] Review financial transactions and budgets <!-- task-id: 25dcb212f4952a6b7628dd726ab21b44 -->
+- [ ] Import all the Notion tasks <!-- task-id: ed7b7d3c1304395431a2dc731ae5ee9c -->
 - [ ] add weight to Today <!-- task-id: 9b420827bb411492a65402d16a75d1b3 -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
 - [ ] Issue #5172: H12 Timeout Analysis - Multiple root causes identified <!-- task-id: b7aa816384a0a9902c8a07ae4cad26bb -->
+- [ ] Issue #5177: Fix duplicate job accumulation in Sidekiq queues (5000+ duplicates) <!-- task-id: edac51d9eb6996c819959fd5086916ee -->
 - [ ] Issue #5171: Implement proper async ActiveStorage variant generation <!-- task-id: 0b142217eec66d0d5e899688c300edc0 -->
 - [ ] Issue #5197: Investigate parallel test execution hanging issues <!-- task-id: 3961f91c4ffc527e35da36ce9f615a99 -->
 - [ ] Issue #5233: Images missing file_attached flag on staging <!-- task-id: 0a1d67b1a1730ebd1e767ecb9ce7c01d -->
 - [ ] Issue #5196: Migrate image galleries from Galleria to MDBootstrap <!-- task-id: 3ff8c5a789f994de423531cfd71b2d3d -->
 - [ ] Issue #5180: Reduce Heroku dynos (cost optimization) <!-- task-id: 63f34d4f145bc6daa4e8e45b524f22f4 -->
 - [ ] Issue #5167: Migrate Event, Group, Place to Location-based geocoding <!-- task-id: 406df18eb73eb6ee00b397aec39d2695 -->
+- [ ] Issue #5166: Remove legacy direct geocoding from User model <!-- task-id: e4cfa03982af840bde2fb733ab08d69a -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Increase income and reduce expenses to cover long-term costs like taxes and homeowner's insurance <!-- task-id: 66fc79fd085fad2123a50831411ddc8b -->
 - [ ] Moving more data into Today <!-- task-id: 44d88e8ab23c87b91b110815848932a8 -->
+- [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
+- [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
+- [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
 - [ ] Note any significant changes or patterns <!-- task-id: 6e39c50825b78b432d93903ee9f1fb89 -->
 - [ ] Establish consistent weekly weighing routine <!-- task-id: 6b07ea22625995e0d1ce23c4d494d19c -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
@@ -236,26 +264,16 @@
 - [ ] Note triggers (stress, boredom, social) <!-- task-id: 99f1e8d743105122e688c1ebb2b39e99 -->
 - [ ] Calculate weekly totals <!-- task-id: 4304e6d7a493723f19e9980d05925f03 -->
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
+- [ ] Update `vault/logs/drinks.csv` <!-- task-id: e0ac423f92aa73a5d1dffe2f3b8041ca -->
 - [ ] Calculate weekly totals and trends <!-- task-id: dc04201535c487ee20e802a916405a40 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] check the Prime Timers of the Desert calendar for the times I'll be in Palm Springs <!-- task-id: 3f4a91e75a7390ee63c50d4d7fb4b78e -->
+- [ ] Have the AI set task topics if they don't exist <!-- task-id: e2b27da565b838831e0be7fe6f61b7a0 -->
 - [ ] Move house sits into Today <!-- task-id: 2728147a3cc80ca184eaeb0f5e55d861 -->
 - [ ] fix Fly <!-- task-id: 3437879752239d2e0c148e946f613f14 -->
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] find more accurate geocoding from addresses <!-- task-id: 995c2caddeab4d49d6c3d6bb191892be -->
 - [ ] Add to scheduler or stats:  desc "Check newsletter status and recent sends" task :status => :environment do <!-- task-id: 0a5de6210c69e476cbeec725c30de5e3 -->
-- [ ] Research pool maintenance costs in Oakland Park <!-- task-id: 433b673b985a34c86e41e5915b7c1938 -->
-- [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
-- [ ] Calculate impact on homeowner's insurance <!-- task-id: 89af27134482db853d426fafdd81bc1d -->
-- [ ] Analyze Airbnb listings with pools vs without in Oakland Park <!-- task-id: 3e7a053d0898fe1555551e95f08fca96 -->
-- [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
-- [ ] Research financing options (HELOC, pool loan, etc.) <!-- task-id: 8931ea35f6e435ed1f5df8a7651b2560 -->
-- [ ] Create financial plan to cover pool + taxes + insurance <!-- task-id: f624bb4d01ff2b5c85dc1a51c1ce7551 -->
-- [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
-- [ ] Add E6W to Today <!-- task-id: b1cd658506a12d01323be1c6c3516128 -->
-- [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
-- [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
-- [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -274,6 +292,7 @@
 - [ ] improve pagy visuals <!-- task-id: 43cd149febb737264bfe244d131bf1d8 -->
 - [ ] lower dynos to necessary levels <!-- task-id: 32b640fc22f3c8266b5e694ba89636c4 -->
 - [ ] Make "with photos" respect existing sort/filters <!-- task-id: dfd71f1807389183180929f55a03a439 -->
+- [ ] make a system for checking for many identical jobs <!-- task-id: efe9b6b8f6dffbcefaee4bf974a72c38 -->
 - [ ] remove rake emergency:restart_web from scheduler <!-- task-id: 9b2c5f3123f81a8c363616f8534625a0 -->
 - [ ] rg -i emergency <!-- task-id: 86a3e6e9f2af6f8874b537bccced53c3 -->
 - [ ] run the tasks for checking stuck images <!-- task-id: 2c361d744e09d09c4aa9026135bfacc0 -->
@@ -301,6 +320,8 @@
 - [ ] schedule messaging analysis <!-- task-id: 7528c7492d71d72236b0ce4b59107e46 -->
 - [ ] see why I don't see the section about new patrons in my newsletter <!-- task-id: 345eb53441f251bcb32d05829343128a -->
 - [ ] Write users when someone follows them <!-- task-id: dcf9ecfe5e62ce9af9c2bfe6d31f3981 -->
+- [ ] check that test is getting Bullet errors <!-- task-id: eb86aab1bad3e80081bfbc501b7f288d -->
+- [ ] set up doc/background-agent-testing.md <!-- task-id: ed65e8b2780aac6f256c1a8b49c6f49c -->
 - [ ] fix the faded thumbnails <!-- task-id: 49ea7cad2b168cd2273672fe07105d48 -->
 - [ ] lock the old color kindle <!-- task-id: d6d3ce9ec6a03f1fffd63229e339c4b0 -->
 - [ ] Wash the side window <!-- task-id: d5d79ad5c9ac82d7e84d425b8587a8c0 -->
@@ -308,18 +329,23 @@
 - [ ] Put plates and silverware in the back room <!-- task-id: 540b64efe1044e01fcfc55929ae8546f -->
 - [ ] Finish styling individual pages <!-- task-id: 86f61c4f29238a8a4372785f5d2581d8 -->
 - [ ] Make search buttons into up/down toggles <!-- task-id: 9e9bfe57675ed610f700ba645821d5da -->
+- [ ] Repurpose the text entry counter for general use <!-- task-id: ef3df7ffdc855c655374d6b1f261cbd4 -->
 - [ ] Incorporate `redis-server start && yes | howzit -r clean ; clear ; bin/rails assets:clobber && bin/rails assets:precompile && howzit -r server <!-- task-id: 8a4ecb3f6952905b20d89fbf2515ba08 -->
 - [ ] Log GitHub annual fee $504.00 Amount based on 2 purchased licenses, valid until July 10, 2025. <!-- task-id: 448944240c61f44d98a9a99fbff63e3a -->
+- [ ] Limit "Outdated Groups" to staff <!-- task-id: eff59bf49328dac74b5272b8312599ca -->
 - [ ] Move law article editing into page actions: <!-- task-id: 0f449f1181a7cd75c614533c8e5a7b84 -->
 - [ ] Review the Deployment Checklist <!-- task-id: 88c65fc86bb4a9a8615ccada475811b9 -->
 - [ ] fix messages sent 4 "monthsago" <!-- task-id: 432c75ddb01974c191683211b7a83e43 -->
 - [ ] Add a link on photos to “my favorites“ <!-- task-id: d748c731852041ecd0292d1b6a66ba21 -->
 - [ ] Fix "recently joined" members <!-- task-id: b646d207a3924c657e8195455d8357a5 -->
 - [ ] fix duplicate page action buttons <!-- task-id: 71c9bdca81e393c73f8601db82c8282c -->
+- [ ] fix more bullet errors at http://localhost:3000/rails/mailers/newsletter_mailer/newsletter <!-- task-id: e802eb44e05cf72bc5c478790e8e96e0 -->
 - [ ] get staging working, inc. Patreon sync guide <!-- task-id: 2469d6fce6203505f565fcbd8d11840b -->
 - [ ] Improve stacking filters on top of each other (with photos + near me) <!-- task-id: 43adaf381153191a533464171ec9d3ba -->
+- [ ] look for init_tabmenu <!-- task-id: ef5a61830000ec2f22bbbba77fec8f6c -->
 - [ ] Make sure that only administrators are seeing banned users <!-- task-id: d2a4211301998a4bb290151d7823fb23 -->
 - [ ] Price a trip to Philadelphia <!-- task-id: 79ee573976ce0b8b329c8bec89f18c03 -->
+- [ ] Restore nearby items on profiles <!-- task-id: e526af0262be9dbe9b4aaac4efe582e9 -->
 - [ ] review the Cursor agent <!-- task-id: 4414bd43dae31520e95ec34d5aede90e -->
 - [ ] Review the Cursor AI usage plan <!-- task-id: f5a2a6d5caa85bab7a538884d386688b -->
 - [ ] See why some profiles don't show "Member since" <!-- task-id: 4993375b6b515d125efb4e547b0a4d20 -->
@@ -351,6 +377,7 @@
 - [ ] Restore two skipped tests in ImageControllerTest <!-- task-id: 20d4e5162bd915d9c98e87d31fd6c52f -->
 - [ ] Integrate webcams with chat <!-- task-id: d66101c6c2b749b608b2066922f0bb3f -->
 - [ ] Look for a who's-online sidebar in Discourse chat <!-- task-id: 8a80f11f7623631962fcab6d0ca9f9e4 -->
+- [ ] Order more printed photos <!-- task-id: 64c8579da4917ae4f4fa5be6f075367c -->
 - [ ] check mdboostrap 9.0 <!-- task-id: 84ac4363183cecea5b0a01d2d775746e -->
 - [ ] Price Heroku Enterprise <!-- task-id: bc3e001bff274c5bfc5de00280aaa973 -->
 - [ ] See if we still need our fork of acts-as-follower <!-- task-id: c8d25a76b5f22ef64604925af4b43647 -->
@@ -361,8 +388,6 @@
 - [ ] Note Virgin cc fee date <!-- task-id: 45466799592cfedb04c39b898b7bf2ee -->
 - [ ] Add Virgin card to 1password <!-- task-id: 58ab3aeaa30dde8ee08aa8372a7361be -->
 - [ ] Update Eero payment <!-- task-id: 85ea4dd95a409cf73c851acc8e7c394a -->
-- [ ] Look for the other nude party groups <!-- task-id: 0e54121982af43f939d1da18bdf3e5eb -->
-- [ ] Look at https://oldergay.men/users/jeff-covey in private mode <!-- task-id: aab3aca20a595d30a753771a12adb4d6 -->
 - [ ] complete the Rails 8 tasks <!-- task-id: 537936237d67227a5fe4f4ad31d1ee39 -->
 - [ ] Review the site updates besides "small" <!-- task-id: a674a98d9fc16e60c054a01b9abd7ec1 -->
 - [ ] fix pagination items <!-- task-id: 47a86d7d89031d8113621bb863566b99 -->
@@ -387,128 +412,6 @@
 - [ ] Show “video chat with“ etc. to non-logged in users <!-- task-id: bea4ee585aa3b88b805da3cd7c7c8a21 -->
 - [ ] Install first-party analytics <!-- task-id: adfaca2a4dcca1beb9d6aa4d953bc1ec -->
 - [ ] Look at fiber optic plans(https://www.att.com/buy/internet/plans) <!-- task-id: 84f1bfc91c630baf657eefbe07383b2e -->
-- [ ] Register for the Prime Timers cruise <!-- task-id: 9db2640b1771a35e1ac39273ebe3bb9a -->
-- [ ] Fix Docker on Mac <!-- task-id: 0173622b8faf46359a4767632f3e7887 -->
-- [ ] see why some videos aren't playing <!-- task-id: 9195b78c197a55607d138540e5932347 -->
-- [ ] get Zero subscription <!-- task-id: 2f6095d940c8bbb8ad07ecdc30563d53 -->
-- [ ] stop unread notice covering up other flash messages <!-- task-id: 00ffbbe7eaef8f708d513d9b097a94b1 -->
-- [ ] On trip pages, pre-fill the topic when writing the traveler <!-- task-id: 69d338ecb6c7a955e058b9faedcd1ab5 -->
-- [ ] restore common marker and selma <!-- task-id: 086865437b9033e3d3a17ed4473e9509 -->
-- [ ] update Discourse profiles for members deleted or banned on OGM <!-- task-id: 78b0b805a46567df03a34877e653966e -->
-- [ ] Subscribe to(https://www.starobserver.com.au/category/grey-matters) <!-- task-id: 0cf02d4c43b03d8007ab00cd63b00720 -->
-- [ ] Test all the possible content that can go into a newsletter <!-- task-id: a9a8dfc04413411b29177774722b04c5 -->
-- [ ] Price the cost of installing a cabana <!-- task-id: c0dd242dedf31d5cdaf19ec9ce6f9211 -->
-- [ ] Move more articles from General to In The News <!-- task-id: 9f1e5aa9b0ec9290a0cbea66e417e90c -->
-- [ ] Move offline tracking to javascript, et al. <!-- task-id: da5e9a5d1f1b58914ef626e35dec75cb -->
-- [ ] Use a smaller search radius if we return many results <!-- task-id: d412411fe273e17ca08cdc5d74244d6f -->
-- [ ] fill the side bar with "add photos", "add video", etc. <!-- task-id: 5bb8e9839e1a4e75e1783bf98ee72322 -->
-- [ ] Put up a sign asking guests to use the path on the right side of the house <!-- task-id: 70b5f9c03a8055400c2828c4527e9df6 -->
-- [ ] Move the items in the closet out of view <!-- task-id: 5f60484640fab8b48f08a9bfbb2cb962 -->
-- [ ] trim the tree from the street <!-- task-id: c56f5c4afa8980d7991773f98f534940 -->
-- [ ] change the Sanitas password <!-- task-id: 44d5291600aa2fd68241e0eff09f95bb -->
-- [ ] Use JavaScript scrolling to go to the bottom of a conversation <!-- task-id: 23ba2bec32655640c3753b37e2af7922 -->
-- [ ] cache lat/long lookups? Incorporate in existing Locations model? <!-- task-id: ac4ee14751fed19bc7e9f606c9d9a08c -->
-- [ ] test location setting when you're not logged in <!-- task-id: 11e1754c8877aab251e5f978368d2c77 -->
-- [ ] Write minitest tests, stubbing and using the house sit software for button pressing <!-- task-id: 7d4445ac7f5c938f01862ef93b93056d -->
-- [ ] Include current location for User searches <!-- task-id: 488023f4ffe389d9b71a20f4868b74ba -->
-- [ ] upgrade the Pi <!-- task-id: 7033abb02d41fb09c11f2b198393b0a1 -->
-- [ ] See why links are still marked broken <!-- task-id: 0418c82510cdaa2b0038b7cf049f9372 -->
-- [ ] Price T-Mobile hotspot vs. iPad with cellular <!-- task-id: 497a5814b1778863060f26bebf55240a -->
-- [ ] Try remote screen with Pi <!-- task-id: 4cd5768d612a4b35dbf361dd5efd54be -->
-- [ ] Use closed and open envelopes for red and unread conversations <!-- task-id: 6344ac9637d03f2b19af65d82406e421 -->
-- [ ] Check Sanitas coverage <!-- task-id: b0df3d1db79248ba0cd8bf633561c0ff -->
-- [ ] add to Pi setup: sudo mv /var/lib/docker/network/files/local-kv.db /var/lib/docker/network/files/local-kv.db.backup <!-- task-id: 718784de449e7294a8f2e1950fced587 -->
-- [ ] Move comments on users above nearby places, etc. <!-- task-id: 6020b344ae6ec0dcd5ce26cc8c9b77ee -->
-- [ ] In the view omit the checkbox if the image is already the key image <!-- task-id: af39060a03375b66dbadbfff40af1b97 -->
-- [ ] install Rails Admin <!-- task-id: 76f2ef07bbbdf28ba459619ed27f5ec3 -->
-- [ ] Move drafts into branches <!-- task-id: 123f15cbd88a3cc968b52bf4a34bf4cb -->
-- [ ] Only show birthdays of active users (not banned) <!-- task-id: 3ad6666928cef3705f0df19a126a1037 -->
-- [ ] Test & fix sorting of members gallery <!-- task-id: 9479dbe2e53401b0fdfd9f2415a9e9a3 -->
-- [ ] see if attached images are being optimized <!-- task-id: 51f51b36b0cdb9ae79605a296ae231b4 -->
-- [ ] Look at AdSense <!-- task-id: db5792bf2e97c9d9dbbc195ad83c649e -->
-- [ ] Verify MBB information <!-- task-id: 818aa2c28416054a725bbfbfb56ab549 -->
-- [ ] Open the location search tab if in use <!-- task-id: 3f4f3be8a2a55577b9fb7b03c31a5984 -->
-- [ ] Improve read/unread layout <!-- task-id: a2a2e6de2adca6a620b59af42b2f4674 -->
-- [ ] See why locations are not showing on the place index <!-- task-id: d795bc5f7f41adff2102398c446aae59 -->
-- [ ] Make pictures hazy for `user`s in the DateAdded index <!-- task-id: 7833f5beddd48c105ae4bdb81b62fe55 -->
-- [ ] fix single Patrons not being updated <!-- task-id: d5968a686564020af9a7d2a202e254f8 -->
-- [ ] move Pi to direct iPad connection with passthrough charging <!-- task-id: 3da4df50625be4b68c44c479eae78c73 -->
-- [ ] Fix the string of lights <!-- task-id: 4b3c8cdcf1f37422b7d57bff50f1e2ef -->
-- [ ] `bundle update --ruby` <!-- task-id: 25171c3e286d9442bcdad32388a132d9 -->
-- [ ] add: Gem install doing <!-- task-id: 49a3f94bba0ea37326b7bce600353a7a -->
-- [ ] Fix "logged-in user can show image" <!-- task-id: d17c7bfd29312a4ba25303fc403a2ad4 -->
-- [ ] Register warranty for the air-conditioning units <!-- task-id: d09a0d6a46b3d78c49a8d86229428fbf -->
-- [ ] Remove VS Code from Dockerfile <!-- task-id: acbb993d55a20fbcbc86ef3aa2b80851 -->
-- [ ] Update the instructions about the thermostat <!-- task-id: ae251bfb78b9a88999889b25ca998f45 -->
-- [ ] block the AC vents with fiberglass <!-- task-id: 254b3b9487e772587e99b8ada19eb66b -->
-- [ ] move `users_with_conversations` to where it's really needed <!-- task-id: fb97c518337c1c1092757e2c020705eb -->
-- [ ] make /edited load faster <!-- task-id: dbe6c8bfd3de420898d1284e77242b6a -->
-- [ ] Use includes to include small images in the edited controller <!-- task-id: 929cc72566212bdf5ca7c74b38b6d8c2 -->
-- [ ] look for instances of using PrivateRelation when we don't have to <!-- task-id: 8f19be8606d98924006ff0912b607a76 -->
-- [ ] sort side bar news by creation, not update <!-- task-id: d91a28f180667674d643413a7e979148 -->
-- [ ] fix freezer temperature <!-- task-id: 6d9e1a915ab8b05431f88dc1ff7547fb -->
-- [ ] Look for other places to use ActiveRecord::Base.transaction <!-- task-id: 4ba1728edfe5e3389dfd00f5335b591a -->
-- [ ] Use review apps <!-- task-id: 8d356099a9d9bdd7c06e3146bd5a12b3 -->
-- [ ] Clean and close the codespace <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
-- [ ] make room on linode <!-- task-id: 0c907caeecf7f831be2696c3eda02cf4 -->
-- [ ] set /images/members to show the newest photos, not just the newest members <!-- task-id: 9540dce517da8dea56a8479c90ca2692 -->
-- [ ] Upgrade Pagy <!-- task-id: 36f5cba2a53d811b43a9ec08f85a4693 -->
-- [ ] honeybadger ruby on rails feedback at DuckDuckGo <!-- task-id: 3ffe1d8853683c8f6477360bd024ceb6 -->
-- [ ] Cancel Dekkoo and Paramount+ <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
-- [ ] Use Airbnb coupon code SHTIGAXJXMXASI <!-- task-id: 36d359ee11ab5263c3ae1c424a56f973 -->
-- [ ] research hurricane preparations <!-- task-id: f9af775b1bbcd02b6eb5cb780948df34 -->
-- [ ] Move jobs into namespaces <!-- task-id: 264dc4110a92c1f8c3c9230b0c83ea92 -->
-- [ ] Increase the resolution of avatars in the header <!-- task-id: cf53556e33ef3e32ac0bb6fb8f858555 -->
-- [ ] make sure you're checking Sidekiq daily <!-- task-id: 7650ea67319ebc5284e56ab0c0b7cb62 -->
-- [ ] Wash the guest room windows <!-- task-id: 2cc286a0a2048be1ca8ccc12fbf94d0c -->
-- [ ] keep adding tasks to FlowSavv <!-- task-id: 718fe98b11fc4ad223edde178403f70d -->
-- [ ] File the homeowners insurance <!-- task-id: 603648660893533d7c6288b5d1ef189c -->
-- [ ] File the 4-point inspection <!-- task-id: f0af3af47482c0cd613c151fccba0a82 -->
-- [ ] Move the bricks next to the trash can <!-- task-id: 3284f53820988f533e8af77068870821 -->
-- [ ] Fix images/members showing non-canonical images to add to members <!-- task-id: 2a75be81fb4fc2254717e34fa638dd52 -->
-- [ ] grep user.images <!-- task-id: 07aa699be7764a25c48579e2b2a24ef5 -->
-- [ ] check Rubocop's report on the User model <!-- task-id: 145a86d9655ebb6c8b6780a5851fa2ae -->
-- [ ] Read Valimail report <!-- task-id: b61993e15bc658d403b7b9ba7a38c175 -->
-- [ ] remove `file_attached`, just delete Images meeting the criterion <!-- task-id: f25c3b1aded0902416d8e807cd1a228c -->
-- [ ] Finish work on the side window in the back room <!-- task-id: 68d7da6a432435490b7f7cf407ffce42 -->
-- [ ] check what happened to `miles` in _index <!-- task-id: 214c47563ce9a984808872b68e553be8 -->
-- [ ] See if Valimail solves the Gmail problem <!-- task-id: 81493dfb894e0824bc4be8199374a35c -->
-- [ ] run `doing` when fish launches, if available <!-- task-id: c1d5bfe9743d0a29cf3a722750c18806 -->
-- [ ] See why the list of conversations with other users isn’t loading <!-- task-id: 51da1781f971e45c8a2eb21c4dd6515d -->
-- [ ] Get more tourist brochures <!-- task-id: 50f31a051f0bef2549cceba5adeb2341 -->
-- [ ] Restore PostUpdatesToChatJob <!-- task-id: 13c78a89416e5dea5bb00c49d55a8608 -->
-- [ ] Link https://x.com/elosculohirsuto?s=11&t=ec0Et6qVODxQPvd5kBaeAw <!-- task-id: 3e8d4a043d3581ad112a8a273dc8ceff -->
-- [ ] Replace the iPad Pro and Magic Keyboard <!-- task-id: 0d77f58d4ecdf6d54291c956d4cc4489 -->
-- [ ] use the new canonical association <!-- task-id: 94eab479427dc970fef0547f69edad80 -->
-- [ ] Surface Waiting, future, etc. <!-- task-id: 8ec20038522de778602bce349dbd9a00 -->
-- [ ] get guest books and world maps <!-- task-id: 64ae652b9c7653ff937e4eb3f8aab8d5 -->
-- [ ] Order new glasses <!-- task-id: 6abc69e1a9d814c3ea7ffd30f9755222 -->
-- [ ] remove Branson's exception in SynchronizePatreonJob <!-- task-id: 68762ca1c44c4b21686edc0b1dbc93ed -->
-- [ ] See why unapproved photos are getting in the newsletter <!-- task-id: 85ab6a0eb2131a22dc5295559f7adcf1 -->
-- [ ] TipTop <!-- task-id: 8059b714984c84f068e97e1d84420e0d -->
-- [ ] Spark | Air on Mutopia missing tie into second alternative <!-- task-id: a6b525b9a3d568a2c05967e4dd6779ab -->
-- [ ] use `file_attached` in other contexts, like User show pages <!-- task-id: d028ba59775f5bafd4fcdeee90d3f1ed -->
-- [ ] check discourse `similar_users` <!-- task-id: abbf3c642836b8cd7fb09e4e8af37ef8 -->
-- [ ] Paint doors and frames <!-- task-id: fb19e337b10c9c43ae2bd0caa83510c3 -->
-- [ ] replace hallway light <!-- task-id: 5a3c0160f14d80ff3ce359f703a00844 -->
-- [ ] Use last_login in the sidebar <!-- task-id: 3c55172ed7fbdda849233480d686bc56 -->
-- [ ] cache User IP lookups (and, later, GPS lookups) <!-- task-id: 1fbad95b87824243f51a5ffbdd0c6bcc -->
-- [ ] see if favicon needs to be in the manifest <!-- task-id: 4c078e22286d18ceea0307d9cd7ed773 -->
-- [ ] Nearby Objects Abstraction <!-- task-id: 49585bf8945e86c2cea1a294acd55a32 -->
-- [ ] remove Barneymax1955@gmail.com Patreon exception after fixing <!-- task-id: 4c0c4f3ecb851a971d32c35bbcd725d2 -->
-- [ ] use disappearing notifications <!-- task-id: 853e55def8393574d07ca094a82d483a -->
-- [ ] use scopes in User.nearby. events, etc. <!-- task-id: f478acf93da42b7edba7e633320f5ff1 -->
-- [ ] Fix testing.ogm SSL <!-- task-id: 923959d7d7cb590865f51c2ced3ba056 -->
-- [ ] add <header> <!-- task-id: d633ac448dec7d9d06dbef4a7b347fec -->
-- [ ] center side_profiles (is `sized_image` breaking it?) <!-- task-id: 08f7bddbb088d99b3c3cbe2c14422862 -->
-- [ ] check that the new VCR cassette is being created <!-- task-id: 6b88530bf34a98b804c78ee1aaeb5047 -->
-- [ ] confirm that side_profiles are limited to logins with 90 days <!-- task-id: b035b787156608c7030ebca705829ee4 -->
-- [ ] handle trips <!-- task-id: 97c28b0681c67a7f5fed2cca0c630c9c -->
-- [ ] order more bath rugs <!-- task-id: 0549114bae48fc11e1abf3347a8c8f83 -->
-- [ ] see why https://oldergay.men/users/jim has "about" <!-- task-id: 5963984ccb46923da4211bc25e4898e8 -->
-- [ ] see why I can't change User's role <!-- task-id: 6591660ff38f02df3d0c8fb452bb3e1f -->
-- [ ] update html-pipeline & common marker <!-- task-id: d364e65c8d69beaa0573034bb71917cc -->
-- [ ] Visit MyHealthONE.com to login or create an account. <!-- task-id: 04f8ab75842c1f6f61d4a252bfab72e4 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 - [ ] +Trip Prep <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
@@ -658,33 +561,32 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (116 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (110 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
 ### General Tasks
 
-- [ ] bernard gohiemont | Flickr <!-- task-id: e2da03454fead46f10439b19dd8cb954 -->
+- [ ] log vaccines in apple health <!-- task-id: 59a6d8fec1c96ded2e349d5ed73fb1a4 -->
+- [ ] Subscribe to(https://www.starobserver.com.au/category/grey-matters) <!-- task-id: 0cf02d4c43b03d8007ab00cd63b00720 -->
 - [ ] Read the 12/24 PG newsletter <!-- task-id: e61ef456a4652f56f4dc09d5457f68cb -->
+- [ ] Listen to:(https://www.npr.org/2015/12/23/460851160/90-year-old-gay-man-recalls-long-struggle-with-his-sexuality) <!-- task-id: 9b9ed46420d442135a8b4812d8f5ee58 -->
+- [ ] cecil kellaway at DuckDuckGo <!-- task-id: 2a024ea8e060785e1bd816a5a8752c8a -->
+- [ ] check protein powder recipes <!-- task-id: 883a194cc06cdde24c6c78ebd9962834 -->
+- [ ] buy a snorkel and goggles (and flippers?) <!-- task-id: 199bc22785a5124607c1ca317f0f0ce4 -->
+- [ ] Vim for iOS and iPadOS – Blink Shell <!-- task-id: 184bdc42c271b21b8081c5dafffcd652 -->
 - [ ] try the eye supplement <!-- task-id: e29e2737363b0c6fb33d08c072c5e61f -->
-- [ ] Get new glasses <!-- task-id: a60a9ca9526669bcc05d5847ebfa7924 -->
-- [ ] ipad docker at DuckDuckGo <!-- task-id: a03606ee9d3320f90730579d8d49104e -->
-- [ ] Spark | Live healthier and get rewarded <!-- task-id: 6c644a071958c6d5d7e8c9361faecd34 -->
-- [ ] robert molosse | Flickr <!-- task-id: 2995e3402f53b1e7a7baa6df2a2a3b5b -->
-- [ ] Read "How to Start Logging With Ruby on Rails" Better Stack Community <!-- task-id: ece8bf4fdf502664f9791dc7ab4be827 -->
-- [ ] actions/starter-workflows: Accelerating new GitHub Actions workflows <!-- task-id: e08754fb01e91babbf92992f3cc747a5 -->
-- [ ] sign up for Kanopy <!-- task-id: e654f981f2c8733afed0cceb6437fc41 -->
+- [ ] Watch DMARC introduction <!-- task-id: b2eae899d84724c6cc8047727dd1a827 -->
+- [ ] Read DMARC introduction <!-- task-id: 340699a314e5991a7f774ca08c1218f2 -->
+- [ ] Get more tourist brochures <!-- task-id: 50f31a051f0bef2549cceba5adeb2341 -->
+- [ ] Nifty Archive: visiting-the-grandparents <!-- task-id: 266ca205700c11821d64fc2bf2f8d514 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
 - [ ] Health and wellness goals <!-- task-id: 6b939eb362f70a1e3cf68c8d5663b355 -->
 - [ ] Personal growth and learning <!-- task-id: 9da080c60dbc223d9cc2445eeae60ac6 -->
 - [ ] Maintain daily habits and streaks <!-- task-id: 896d841cab6070a727edb061cbc3a5de -->
-- [ ] Established exercise routine <!-- task-id: ebd9111ee978affef53d1da46eaced64 -->
-- [ ] Reduce daily intake by 25% <!-- task-id: ec0f8b72ce23166231de4681f488c000 -->
-- [ ] Reduce daily intake by 50% <!-- task-id: e888e9662bbbed421025e029b8c98c2e -->
-- [ ] See weight loss acceleration <!-- task-id: eddda61787dae40076c7df6938c0257d -->
-- [ ] Motivation <!-- task-id: e99c6bb351da88478bc4dce5401c02f4 -->
+- [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
@@ -706,6 +608,7 @@
 - [ ] Noticeable pain reduction <!-- task-id: 3927e1f72b220379e5b96732e7936ae0 -->
 - [ ] Improved morning flexibility <!-- task-id: 0adbc3253563fe274d4848752a84cc97 -->
 - [ ] 8-10 lbs weight loss achieved <!-- task-id: 0c495168b5c5a49c3a2f3d8b52111b8e -->
+- [ ] Established exercise routine <!-- task-id: ebd9111ee978affef53d1da46eaced64 -->
 - [ ] Significant mobility improvement <!-- task-id: 58ff397a7b2d003117681817fedd272d -->
 - [ ] Weight at or near target (165 lbs) <!-- task-id: de53fd453b094ee29ad6875bff5ece07 -->
 - [ ] Reduced medication needs <!-- task-id: 85eed556cbcff7d3db0c5a6d031ea3a0 -->
@@ -723,10 +626,13 @@
 - [ ] Identify top 3 triggers <!-- task-id: 06e9d946a337891ae71b85acfa8fc032 -->
 - [ ] Try 3 mocktail recipes <!-- task-id: d1ed681a3ecbea39b33b541c64e47bff -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
+- [ ] Reduce daily intake by 25% <!-- task-id: ec0f8b72ce23166231de4681f488c000 -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
 - [ ] Save 5,000+ calories <!-- task-id: 23393735b2b0a5d162072b5efb6b5ed6 -->
 - [ ] Notice sleep improvement <!-- task-id: dbc2d5ae12d038c375953624d2bbb9eb -->
+- [ ] Reduce daily intake by 50% <!-- task-id: e888e9662bbbed421025e029b8c98c2e -->
 - [ ] Maintain 3-4 AF days/week <!-- task-id: 7e4ecc2f652ef8530d022da98facce1b -->
+- [ ] See weight loss acceleration <!-- task-id: eddda61787dae40076c7df6938c0257d -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
 - [ ] Reach target consumption level <!-- task-id: 0abfe5f12947fa0667b8e3413a4be652 -->
 - [ ] Sustainable routine established <!-- task-id: 43f3f4879cdfbd1625c04f996e7dda98 -->
@@ -740,8 +646,8 @@
 - [ ] Mood stability <!-- task-id: adf218de001f79050d0847a58ed0b9f0 -->
 - [ ] Anxiety levels <!-- task-id: 468f506d5001c0eebac8c1d87073e3c7 -->
 - [ ] Mental clarity <!-- task-id: ace31dbeb6beb122f59d41cbad5d14a3 -->
+- [ ] Motivation <!-- task-id: e99c6bb351da88478bc4dce5401c02f4 -->
 - [ ] Review(https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching) <!-- task-id: 55acdb054a9077ac2cf3fcea61f4fcf6 -->
-- [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
 - [ ] Look for John Boswell books <!-- task-id: 7c1e0f703585ff96c2c60ee9b678f65b -->
 - [ ] get Rosuvastatin <!-- task-id: 2071468f9afdaddafd83962193651e09 -->
 - [ ] Visit Poverty Point <!-- task-id: fa0d333ca5e1f31a5233904c560245d2 -->
@@ -756,21 +662,12 @@
 - [ ] Rather Not | Flickr <!-- task-id: 3293d74153e51e37020e1d1e103a111f -->
 - [ ] Fill in diary <!-- task-id: 8e86c9738cdd0845b32e86124272263e -->
 - [ ] Read June 2025 PG newsletter <!-- task-id: d4736c55483ba125b9a0f6bec15bdd33 -->
+- [ ] bernard gohiemont | Flickr <!-- task-id: e2da03454fead46f10439b19dd8cb954 -->
 - [ ] Read about YNAB updates <!-- task-id: 73e023b545c49be52675f5e139bd46ec -->
 - [ ] Look for gay Pickleball meet up groups <!-- task-id: 363d27df2b360174643073b39c548991 -->
-- [ ] Order more printed photos <!-- task-id: 64c8579da4917ae4f4fa5be6f075367c -->
-- [ ] See Mr. Burton <!-- task-id: 1adceab45f7cc8955d1a9a9b77559e38 -->
+- [ ] Look for the other nude party groups <!-- task-id: 0e54121982af43f939d1da18bdf3e5eb -->
+- [ ] Look at https://oldergay.men/users/jeff-covey in private mode <!-- task-id: aab3aca20a595d30a753771a12adb4d6 -->
 - [ ] Look for operas at the cinema <!-- task-id: dfbf53b7757eddec00519299847c9571 -->
-- [ ] log vaccines in apple health <!-- task-id: 59a6d8fec1c96ded2e349d5ed73fb1a4 -->
-- [ ] Listen to:(https://www.npr.org/2015/12/23/460851160/90-year-old-gay-man-recalls-long-struggle-with-his-sexuality) <!-- task-id: 9b9ed46420d442135a8b4812d8f5ee58 -->
-- [ ] cecil kellaway at DuckDuckGo <!-- task-id: 2a024ea8e060785e1bd816a5a8752c8a -->
-- [ ] check protein powder recipes <!-- task-id: 883a194cc06cdde24c6c78ebd9962834 -->
-- [ ] buy a snorkel and goggles (and flippers?) <!-- task-id: 199bc22785a5124607c1ca317f0f0ce4 -->
-- [ ] search bicycle trailer cargo <!-- task-id: 9d956d6d9a684f9e6823b8969c2f808d -->
-- [ ] Vim for iOS and iPadOS – Blink Shell <!-- task-id: 184bdc42c271b21b8081c5dafffcd652 -->
-- [ ] Watch DMARC introduction <!-- task-id: b2eae899d84724c6cc8047727dd1a827 -->
-- [ ] Read DMARC introduction <!-- task-id: 340699a314e5991a7f774ca08c1218f2 -->
-- [ ] Nifty Archive: visiting-the-grandparents <!-- task-id: 266ca205700c11821d64fc2bf2f8d514 -->
 
 ### Financial Improvement Project 2025
 
