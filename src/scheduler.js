@@ -55,12 +55,13 @@ const jobs = [
         description: 'Quick sync'
     },
     {
-        schedule: '0 * * * *', // Every hour at the top of the hour
+        schedule: '30 * * * *', // Every hour at :30 (half past)
         command: 'bin/sync || true', // Full sync (all data sources)
-        description: 'Full sync'
+        description: 'Full sync',
+        timezone: true
     },
     {
-        schedule: '0 */2 5-21 * *', // Every 2 hours between 5AM and 9PM
+        schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EDT
         command: 'bin/today --non-interactive "Update today\'s review file for the current time" || true',
         description: 'Update daily review with Claude (non-interactive)',
         timezone: true
