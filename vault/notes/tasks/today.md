@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 3:40:25 PM EDT*
+*Generated: 8/24/2025, 3:50:24 PM EDT*
 
 ## Next Up
 
@@ -9,12 +9,17 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (2783 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (2788 tasks completed)</summary>
 
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9f5692e2dfe9b13690f01857fcf329bc -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 848687b5eaed0b2043e1b840a199e4e4 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: db2b72cca9264da65f1b8decd97dc292 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8335ee700f1c5af3e8fe227438795b4f -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71391b71776de21d7f49971447504a8e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 46a177f167c224c50c41e8485f022f32 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bf65947c85ca2a5ae45aaedfe3fdbe45 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c165e2c6febb373fd5a9408535f0c5be -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7b1700ebceab09c6bd0d5facbb0b0d69 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a4af5726b30775f5a99a403322c903d5 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0d66b1f5ddc08811b51e14b30b128277 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0d5cd803384bc0581257897aa129ca1d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5f0fe529e24086ca70be477ca4340634 -->
 - [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [x] Create views for ChatVisits (Priority task) <!-- task-id: caddc0b0410750b8965110630b96275f -->
 - [x] Assign topics to photo uploaders, etc. (Priority task) <!-- task-id: e062fb34e6226c8c05575eb3154f6f83 -->
@@ -32,10 +37,26 @@
 - [x] **Check upcoming bills** - Insurance, utilities, etc. <!-- task-id: 81cc4a9159fe48d9b529d43d312eb7d6 -->
 - [x] Respond to Airbnb inquiry status <!-- task-id: 0e20dcecd7b0485c67813a98726c84b3 -->
 - [x] Clear browser tabs and bookmarks <!-- task-id: 45821e03a7639b25474131af35526471 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71391b71776de21d7f49971447504a8e -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 46a177f167c224c50c41e8485f022f32 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bf65947c85ca2a5ae45aaedfe3fdbe45 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c165e2c6febb373fd5a9408535f0c5be -->
+- [x] Register online at https://theprimetimersww.com/2025-omaha-online/ <!-- task-id: e0f47ed1c9be66d9ab731537f34c153f -->
+- [x] Book hotel after registration confirmation <!-- task-id: c57aa0a37ed2f94604064b37f079536c -->
+- [x] Book flights <!-- task-id: adf61816c49cb1163be49416c75e72a5 -->
+- [x] Arrange airport transportation (taxi/rideshare) <!-- task-id: 916f277da44ef37f0138125e88d62401 -->
+- [x] Business casual attire for events <!-- task-id: 71f895719eba27b171aab0dddd1865ff -->
+- [x] Comfortable walking shoes <!-- task-id: 58119f1389bca27053dfed53bc4470c0 -->
+- [x] Weather-appropriate clothing for October in Nebraska <!-- task-id: ad5d499f8e7e7b8f007b7da45af5b7d1 -->
+- [x] Toiletries <!-- task-id: 843ecf7238b8c71922b24c241ab25575 -->
+- [x] Medications <!-- task-id: 08dd9cbdde344cfc934e6237141deebe -->
+- [x] Phone charger <!-- task-id: ce49619b30f047ead924a60e92dbe244 -->
+- [x] Camera <!-- task-id: 4f2525b37f9fb3958abf0a0e882d1480 -->
+- [x] Research Omaha Old Market District attractions <!-- task-id: da93afd494446c70d6bb0565919aed57 -->
+- [x] Check if any Prime Timers friends are attending <!-- task-id: e8bc4f15d2924f46b9ac93d15a28f531 -->
+- [x] Review convention schedule when available <!-- task-id: d41e94c7eb8ff0008144aab087a613d6 -->
+- [x] Plan any pre/post convention activities <!-- task-id: 02997ec7facca5bf21cb6a415a3ffa92 -->
+- [x] Check passport/ID expiration dates <!-- task-id: f5f1bc13287191dd7172ff3bc71b896e -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9f5692e2dfe9b13690f01857fcf329bc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 848687b5eaed0b2043e1b840a199e4e4 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: db2b72cca9264da65f1b8decd97dc292 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8335ee700f1c5af3e8fe227438795b4f -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 73ec2c7afe8cf6a497854a1b1f414db9 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6d12f5b8ef17ad11fc928c4e3b56333f -->
@@ -163,22 +184,6 @@
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 719e3486e9db5dd0266b6b82697fbff6 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd19c11c38227c42d11f7aea031ee101 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 23236f6fa475d2e582ae7f38bdab8b57 -->
-- [x] Register online at https://theprimetimersww.com/2025-omaha-online/ <!-- task-id: e0f47ed1c9be66d9ab731537f34c153f -->
-- [x] Book hotel after registration confirmation <!-- task-id: c57aa0a37ed2f94604064b37f079536c -->
-- [x] Book flights <!-- task-id: adf61816c49cb1163be49416c75e72a5 -->
-- [x] Arrange airport transportation (taxi/rideshare) <!-- task-id: 916f277da44ef37f0138125e88d62401 -->
-- [x] Business casual attire for events <!-- task-id: 71f895719eba27b171aab0dddd1865ff -->
-- [x] Comfortable walking shoes <!-- task-id: 58119f1389bca27053dfed53bc4470c0 -->
-- [x] Weather-appropriate clothing for October in Nebraska <!-- task-id: ad5d499f8e7e7b8f007b7da45af5b7d1 -->
-- [x] Toiletries <!-- task-id: 843ecf7238b8c71922b24c241ab25575 -->
-- [x] Medications <!-- task-id: 08dd9cbdde344cfc934e6237141deebe -->
-- [x] Phone charger <!-- task-id: ce49619b30f047ead924a60e92dbe244 -->
-- [x] Camera <!-- task-id: 4f2525b37f9fb3958abf0a0e882d1480 -->
-- [x] Research Omaha Old Market District attractions <!-- task-id: da93afd494446c70d6bb0565919aed57 -->
-- [x] Check if any Prime Timers friends are attending <!-- task-id: e8bc4f15d2924f46b9ac93d15a28f531 -->
-- [x] Review convention schedule when available <!-- task-id: d41e94c7eb8ff0008144aab087a613d6 -->
-- [x] Plan any pre/post convention activities <!-- task-id: 02997ec7facca5bf21cb6a415a3ffa92 -->
-- [x] Check passport/ID expiration dates <!-- task-id: f5f1bc13287191dd7172ff3bc71b896e -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 45470ee3c46bcdcbae7b92b679c36e35 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 56b16713ce571ee00a1b4fe623b43dfe -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d0fa0947c72c6e5b92cdb91a826818bd -->
