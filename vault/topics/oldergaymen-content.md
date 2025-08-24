@@ -31,4 +31,3 @@ Tasks and projects related to Oldergaymen Content.
 - [ ] Consistently format phone numbers, current and going forward <!-- task-id: a77e0d90125a38d19941d08cf1a3430a -->
 - [ ] Credit Pewit on the "About" page <!-- task-id: 6fc53314dd9a0230bc3fd76b5d05f9ff -->
 - [ ] Discourse integrations | Discourse - Civilized Discussion <!-- task-id: 348b1bb7448d9a4cd8fd763d929d3897 -->
-
