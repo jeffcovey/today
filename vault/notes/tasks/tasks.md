@@ -1252,3 +1252,5 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
+- [ ] Move Mehul's tasks to OGM admin https://www.notion.so/jeffcovey/de1740b0242143a18bdaf177cec69e11?v=2535e77830968036a8b7000cc4412be6&p=f7377afe6df5425d91351fc21344f244&pm=s
+- [ ] see if LocationIQ is still the best deal after adding optimizations
