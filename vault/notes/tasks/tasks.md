@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1533 tasks)</summary>
+<summary><strong>General Tasks</strong> (1554 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -337,11 +337,18 @@
 - [ ] Achieve target weight of 165 lbs <!-- task-id: 7430a6ac52bbfa2c408f4bb14fa71f81 -->
 - [ ] Add to scheduler or stats:  desc "Check newsletter status and recent sends" task :status => :environment do <!-- task-id: 0a5de6210c69e476cbeec725c30de5e3 -->
 - [ ] Anxiety levels <!-- task-id: 468f506d5001c0eebac8c1d87073e3c7 -->
+- [ ] Arrange airport transportation (taxi/rideshare) <!-- task-id: 916f277da44ef37f0138125e88d62401 -->
+- [ ] Book flights <!-- task-id: adf61816c49cb1163be49416c75e72a5 -->
+- [ ] Book hotel after registration confirmation <!-- task-id: c57aa0a37ed2f94604064b37f079536c -->
 - [ ] Book reading habit consistent (30 min/day) <!-- task-id: b81cfee342c5029b75336d9aa52b250a -->
+- [ ] Business casual attire for events <!-- task-id: 71f895719eba27b171aab0dddd1865ff -->
 - [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
 - [ ] Calculate weekly totals <!-- task-id: 4304e6d7a493723f19e9980d05925f03 -->
 - [ ] Calculate weekly totals and trends <!-- task-id: dc04201535c487ee20e802a916405a40 -->
+- [ ] Camera <!-- task-id: 4f2525b37f9fb3958abf0a0e882d1480 -->
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
+- [ ] Check if any Prime Timers friends are attending <!-- task-id: e8bc4f15d2924f46b9ac93d15a28f531 -->
+- [ ] Check passport/ID expiration dates <!-- task-id: f5f1bc13287191dd7172ff3bc71b896e -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 73ec2c7afe8cf6a497854a1b1f414db9 -->
@@ -445,8 +452,10 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dc6b2ed21eb1ef5d51474880e288bed1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 719e3486e9db5dd0266b6b82697fbff6 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd19c11c38227c42d11f7aea031ee101 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5b997369d8dad9716d2f4aad34913a1b -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 23236f6fa475d2e582ae7f38bdab8b57 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 839cae6382ce9223b9f59e83eb263e6f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 45470ee3c46bcdcbae7b92b679c36e35 -->
+- [ ] Comfortable walking shoes <!-- task-id: 58119f1389bca27053dfed53bc4470c0 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -558,8 +567,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2a84ef990346faee3a8315de37ee0d5e -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: dd37ab4d52a0b1e0d44b7c0106f9df87 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 42917b08a145614790302d4eaba3ce45 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 498745be9209e5bdca475b8c368ee0d8 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b1bef6bc0792475526a77840683477f0 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1bb1cc1dd7998a7228de96c25d5e5d1a -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6d129a43eefd45229e4e4c023c689dda -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -669,8 +679,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 8d3c90342a4103b4eabc1d604b3c1d71 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 29dee197bcc7549c5a7cbec156578376 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4808f873d7ca817b7c9dc0e43ed12ac7 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c6cbe7fe34fcd72eb01a42b80ad2236d -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7faa3012c3a6e8cfe0e8b2a4bcefc2d5 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1bba2ac996cbf879cc55fd80b9bdd57e -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2d7173a665d526655666ae57712831f9 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -701,6 +712,7 @@
 - [ ] Maintain consistent sleep schedule <!-- task-id: 54a4cbad4cdc5124c3b4b1d675a67f09 -->
 - [ ] Maintain for at least 1 month <!-- task-id: 33f826708e0af4073867c4cb9d55a831 -->
 - [ ] Maintain project tracking for key initiatives <!-- task-id: 7a150b6927b8cbb32a71c915c21b941e -->
+- [ ] Medications <!-- task-id: 08dd9cbdde344cfc934e6237141deebe -->
 - [ ] Mental clarity <!-- task-id: ace31dbeb6beb122f59d41cbad5d14a3 -->
 - [ ] Mood stability <!-- task-id: adf218de001f79050d0847a58ed0b9f0 -->
 - [ ] Motivation <!-- task-id: e99c6bb351da88478bc4dce5401c02f4 -->
@@ -714,6 +726,8 @@
 - [ ] Notice any changes in joint comfort <!-- task-id: 8ebbfcbf3e77035dc2ecedea64fbf50d -->
 - [ ] Notice sleep improvement <!-- task-id: dbc2d5ae12d038c375953624d2bbb9eb -->
 - [ ] Noticeable pain reduction <!-- task-id: 3927e1f72b220379e5b96732e7936ae0 -->
+- [ ] Phone charger <!-- task-id: ce49619b30f047ead924a60e92dbe244 -->
+- [ ] Plan any pre/post convention activities <!-- task-id: 02997ec7facca5bf21cb6a415a3ffa92 -->
 - [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
 - [ ] Reach 170 lbs <!-- task-id: 1b460326e233080a8fedf3f00df9f937 -->
 - [ ] Reach target consumption level <!-- task-id: 0abfe5f12947fa0667b8e3413a4be652 -->
@@ -722,10 +736,13 @@
 - [ ] Reduce daily intake by 25% <!-- task-id: ec0f8b72ce23166231de4681f488c000 -->
 - [ ] Reduce daily intake by 50% <!-- task-id: e888e9662bbbed421025e029b8c98c2e -->
 - [ ] Reduced medication needs <!-- task-id: 85eed556cbcff7d3db0c5a6d031ea3a0 -->
+- [ ] Register online at https://theprimetimersww.com/2025-omaha-online/ <!-- task-id: e0f47ed1c9be66d9ab731537f34c153f -->
 - [ ] Replace evening cocktails with mocktails <!-- task-id: ca7bd0947d0d80c56f61b9da9be1d7a6 -->
 - [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4 <!-- task-id: eac32265e3f3d0c438f94cd9efb23b7d -->
+- [ ] Research Omaha Old Market District attractions <!-- task-id: da93afd494446c70d6bb0565919aed57 -->
 - [ ] Review and address any critical system issues <!-- task-id: 085dcaee3a75e54dc845667a2a7ec853 -->
 - [ ] Review and organize inbox notes daily <!-- task-id: 951cabe9552a60e5a2944aad79e8570b -->
+- [ ] Review convention schedule when available <!-- task-id: d41e94c7eb8ff0008144aab087a613d6 -->
 - [ ] Review financial transactions and budgets <!-- task-id: 25dcb212f4952a6b7628dd726ab21b44 -->
 - [ ] Review health insurance options [Health] <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
 - [ ] Review(https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching) <!-- task-id: 55acdb054a9077ac2cf3fcea61f4fcf6 -->
@@ -739,6 +756,7 @@
 - [ ] Sustainable lifestyle changes integrated <!-- task-id: 4366244f1314f08e09487aeda50f4cdd -->
 - [ ] Sustainable routine established <!-- task-id: 43f3f4879cdfbd1625c04f996e7dda98 -->
 - [ ] Target: Maximum 14 units per week <!-- task-id: b50ce20f988a36e264e0171c40da81a4 -->
+- [ ] Toiletries <!-- task-id: 843ecf7238b8c71922b24c241ab25575 -->
 - [ ] Track how you feel next morning <!-- task-id: 4757f1860e0ab2316ade44186bd518de -->
 - [ ] Track medication effectiveness <!-- task-id: 5b76edda855c11cca0b901d7784a11f1 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
@@ -749,6 +767,7 @@
 - [ ] Update weight log every Sunday morning before breakfast <!-- task-id: ef3724684f9332d6be54b9a7491abddd -->
 - [ ] Update weight weekly (Sundays) to track joint pressure reduction <!-- task-id: weight-log-weekly --> <!-- task-id: 67416207c06f8986797ad579805c2ac5 -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
+- [ ] Weather-appropriate clothing for October in Nebraska <!-- task-id: ad5d499f8e7e7b8f007b7da45af5b7d1 -->
 - [ ] Weight at or near target (165 lbs) <!-- task-id: de53fd453b094ee29ad6875bff5ece07 -->
 - [ ] Weight loss progress <!-- task-id: 6c9a430dc2e3ecc3764cea32c845bd00 -->
 - [ ] Weight loss progress (2-4 lbs) <!-- task-id: 550116273421a9fcff92406188259df8 -->
@@ -863,8 +882,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 939a9b045865b881f753c54c36624539 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 12020b4cbfccd28c138747644b4981dd -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 89e16c3bb96242b131ead4334503a0de -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2ea640d104e06e94c58ae45d4d518c80 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2a07fcff5f6400592e90376447b18a0e -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c0eaa5e652c23a92fedfcfb83a19fd6a -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 829704ed389486604e235849000ac913 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f90796e0e12622c23868e525ead96d78 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 582948d78875e2dcfbbe1f57fdfffe73 -->
@@ -968,8 +988,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d914621d4bcab0f1eb6e6761c8d3155a -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: edfaacb0122077dfb85315805d90e96e -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c25acdab649978ab7a1bd1c1111fdd08 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 731b790630f046a484da544dc4953efc -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1486660eef823af0073820fbb5fd451e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8521b444633f34c9291699a6a03bb8fe -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 0489b595b25675f92c9a480fed00e42c -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
