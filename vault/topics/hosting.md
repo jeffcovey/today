@@ -22,4 +22,3 @@ Tasks and projects related to Hosting.
 - [ ] Clean the guest room AC units <!-- task-id: dcb61b3d0ceefd5987bf63dc987feb66 -->
 - [ ] Create QR codes, people can use to get on our Wi-Fi network <!-- task-id: 09fa472528524b2e095e7a506d769dce -->
 - [ ] +Guest Preparation Template <!-- task-id: 61c2b44d173c6b266e7a093bcfd2e014 -->
-

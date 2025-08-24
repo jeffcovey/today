@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 7:30:32 PM EDT*
+*Generated: 8/24/2025, 7:32:26 PM EDT*
 
 ## Next Up
 
@@ -9,14 +9,107 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (3623 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (3627 tasks completed)</summary>
 
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: df7cc45cfc7dd0446bc97fbfb7767e1c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3fb3ee4a978924f3d1cab7e34101f38d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2c732249bb75068cfbebd8b4c1b8f4bf -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c75b96b39a454d65c83540b580cd0218 -->
+- [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
+- [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
+- [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
+- [x] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
+- [x] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
+- [x] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
+- [x] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
+- [x] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
+- [x] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
+- [x] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
+- [x] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
+- [x] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
+- [x] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
+- [x] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
+- [x] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
+- [x] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
+- [x] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
+- [x] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
+- [x] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
+- [x] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
+- [x] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
+- [x] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
+- [x] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
+- [x] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
+- [x] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
+- [x] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
+- [x] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
+- [x] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
+- [x] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
+- [x] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
+- [x] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
+- [x] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
+- [x] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
+- [x] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
+- [x] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
+- [x] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
+- [x] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
+- [x] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
+- [x] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
+- [x] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
+- [x] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
+- [x] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
+- [x] Set up Railway PostgreSQL instance <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
+- [x] Configure connection pooling <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
+- [x] Set up read replica from Heroku <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
+- [x] Test connection from Heroku apps <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
+- [x] Implement automated backups <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
+- [x] Switch Heroku apps to use Railway DB <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
+- [x] Monitor for 48 hours <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
+- [x] Decommission Heroku PostgreSQL <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
+- [x] Create Railway Redis instance <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
+- [x] Export Redis data from Heroku <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
+- [x] Import data to Railway Redis <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
+- [x] Update connection strings in Heroku apps <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
+- [x] Test cache operations <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
+- [x] Monitor performance <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
+- [x] Cancel Heroku Redis <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
+- [x] Evaluate Railway's built-in logging <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
+- [x] Set up log aggregation if needed <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
+- [x] Export historical logs from Papertrail <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
+- [x] Update log shipping configuration <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
+- [x] Cancel Papertrail <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
+- [x] Set up AWS SES or Resend <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
+- [x] Migrate email templates <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
+- [x] Update SMTP settings <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
+- [x] Test email delivery <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
+- [x] Cancel SendGrid Gold <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
+- [x] Document all Heroku Scheduler tasks <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
+- [x] Set up Railway cron jobs <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
+- [x] Test job execution <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
+- [x] Monitor for failures <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
+- [x] Identify non-critical applications <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
+- [x] Deploy to Railway one at a time <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
+- [x] Test each application thoroughly <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
+- [x] Update DNS/routing as needed <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
+- [x] Monitor for issues <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
+- [x] Keep Heroku as backup for 1 week <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
+- [x] Create detailed migration plan <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
+- [x] Set up blue-green deployment <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
+- [x] Migrate during low-traffic window <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
+- [x] Implement instant rollback capability <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
+- [x] Monitor intensively for 2 weeks <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
+- [x] Gradually decommission Heroku <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
+- [x] Get Railway database connection strings <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
+- [x] Test connection latency (expect 5-20ms between providers) <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
+- [x] Set up connection pooling (PgBouncer if needed) <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
+- [x] Configure SSL certificates <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
+- [x] Set up monitoring for cross-platform connections <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
+- [x] Document all connection strings securely <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
+- [x] Physical tidying/pest control if energy permits <!-- task-id: b36bb3652621d7246fd1630690a8ab0f -->
+- [x] Begin wrapping up for evening routine by 5 PM <!-- task-id: 45430192df84b0e12303161625abb9f3 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 53e0b74fb31fcd6f5230a44347763a91 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 82c73bbe8f20a2fdfa70b78d12da80da -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b2a2f94039a6d134e939d0cf1f8f7c29 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e065c24d9f62a059ed8019fd371d04ce -->
-- [x] Physical tidying/pest control if energy permits <!-- task-id: b36bb3652621d7246fd1630690a8ab0f -->
-- [x] Begin wrapping up for evening routine by 5 PM <!-- task-id: 45430192df84b0e12303161625abb9f3 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 85127f21557d9f1bc8e67f3a33964fcc -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ec5ee330a0cc2bf7e7b088ef1118f9a1 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 50a02bff57b19e6dfe623aeebcd1e23b -->
@@ -287,10 +380,6 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1d0028096404dc5ad37f48a82652fb3a -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 625984097eed05534f54eb55677ed5ad -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e630279019d7f75e1c87e39f472a8ecf -->
-- [x] List all Heroku applications <!-- task-id: e61eb74c16bed2fa39837f368a851a77 -->
-- [x] Document dependencies between apps <!-- task-id: 1251c6ea3301d6480deee331c57fc9bb -->
-- [x] Identify critical vs non-critical services <!-- task-id: 105133fa9801d93feb28aa7ed4a6291c -->
-- [x] Note traffic patterns and resource usage <!-- task-id: 5608e870d32bc7770f24148f94a8fce3 -->
 - [x] Export all Heroku environment variables <!-- task-id: a474dc47487ef7d1e7a6e38e62a15665 -->
 - [x] Document all Heroku applications and their purposes <!-- task-id: c930bc2108bf5dc796b1be2001c615b2 -->
 - [x] List all add-ons and their configurations <!-- task-id: 376c73a6f9941a0577fea25e1261b317 -->
@@ -345,44 +434,6 @@
 - [x] Downgrade to free tier (keep for 30 days) <!-- task-id: 975a9d21f14407f74b07f53369e6ea7a -->
 - [x] Document lessons learned <!-- task-id: 8c655deb24f2e433465ca9f0f7992e6b -->
 - [x] Complete cost analysis <!-- task-id: b2c71c9660a67e7190435257d7aea9e3 -->
-- [x] Complete application inventory <!-- task-id: 2e638c8a00a95336635aecee807f63c7 -->
-- [x] Railway account ready <!-- task-id: 26e1ca4cef375517075f346231e29bee -->
-- [x] Migration plan reviewed and approved <!-- task-id: dd7f3146831576b89c5fbe588e05608c -->
-- [x] Staging environment fully functional <!-- task-id: f075e1553b232065a1633b5c8788142c -->
-- [x] Performance benchmarks documented <!-- task-id: 573755ae67782bf4d4f8f0f0529344a5 -->
-- [x] All tests passing <!-- task-id: 290b466916f8f2e87e4d748f400be53d -->
-- [x] Zero data loss <!-- task-id: 1c03dfa9e047d0379ab306186b0d2ca0 -->
-- [x] Downtime < 5 minutes <!-- task-id: f87170338c23d219de5489bc7654bfa5 -->
-- [x] All applications running on Railway <!-- task-id: 69135995a4ecd456c90cc61fbccfdf1f -->
-- [x] Monitoring showing stable performance <!-- task-id: 679366569e9d15342143a2273a200c99 -->
-- [x] 99.9% uptime achieved <!-- task-id: c1b5f9a053f6d293ceccded84e4b5420 -->
-- [x] Monthly cost < $200 <!-- task-id: 55e77c49fdfa541cda703f5f2c279ad9 -->
-- [x] No critical issues <!-- task-id: f6bed0e369c64179a5112f735323f91a -->
-- [x] Team comfortable with Railway <!-- task-id: f0569e4ee9eeed3fcd9b61f4f4120c96 -->
-- [x] Heroku fully decommissioned <!-- task-id: f06def31b50687cbb5b3677dbecc4589 -->
-- [x] Review Railway invoices <!-- task-id: cf27ff49a6f64c1a66011b8b260b0de5 -->
-- [x] Analyze performance metrics <!-- task-id: 234fc807e3410967fcad22bc0ba33a43 -->
-- [x] Check for unused resources <!-- task-id: efe089183dfc081694cb4ff2210cef41 -->
-- [x] Review scaling needs <!-- task-id: 0a740e1512f86846ed49d3507fd27822 -->
-- [x] Update documentation <!-- task-id: d99096775eb00ff5880cd3e1ced9ea92 -->
-- [x] Security patches applied <!-- task-id: 4ee5a0625beb0f87ba45342f230d706c -->
-- [x] Railway deployment guide <!-- task-id: e5ae9be2945154519a4c457e94a185c1 -->
-- [x] Environment variable reference <!-- task-id: d66449e33ea78849c381a8f91dcf2552 -->
-- [x] Troubleshooting guide <!-- task-id: 24674390c584c20542e1204942c7b01d -->
-- [x] Disaster recovery procedures <!-- task-id: 616f3a18bb96e850371989291b31bd60 -->
-- [x] Architecture diagrams <!-- task-id: db5759430e989fb846ea6d62cd10044e -->
-- [x] API endpoint mappings <!-- task-id: 811eeea667194df7a4877193b35a8a2f -->
-- [x] Review and refine this migration plan <!-- task-id: 2e718d3fcc291863969897f9de698892 -->
-- [x] Get stakeholder approval <!-- task-id: ae38239137d5d9967e83ed746b4f8fd7 -->
-- [x] Create Railway account <!-- task-id: 3847510bdce6fe62b4820af567bddd62 -->
-- [x] Schedule migration kickoff meeting <!-- task-id: e89e83ce35294e28ee560205492c4170 -->
-- [x] Complete application inventory <!-- task-id: 2cceb616bf672933cb1b545657e72f79 -->
-- [x] Begin documenting current architecture <!-- task-id: 71d590f18017af84dee3706d0c5c7212 -->
-- [x] Start backing up all data <!-- task-id: 7995a0b11a81ad8264b9ce43a9442484 -->
-- [x] Research Railway-specific requirements <!-- task-id: a8c3fe058e246c8b34cf08fb355ecc6d -->
-- [x] Deploy first app to Railway staging <!-- task-id: 7b217afe456229d2fdd3994afa383d96 -->
-- [x] Complete performance benchmarking <!-- task-id: a52872cba523fa5e6cc28a26278bbad2 -->
-- [x] Finalize migration schedule <!-- task-id: 405791c6d9e5a547d0e8c1f8034977d9 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f568237e221901e1e587507346da886f -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71cc6a1f007c92ab2e9b5c6cb24b06ee -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7cf95338e634218cc2df047bbc7f0061 -->
@@ -2152,53 +2203,6 @@
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 90e8b1c522404630d6475c7e03718a7c -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 896291611740816c2ceae0f14a1efde6 -->
 - [x] fix OGM task sync (GH, Front, HB, Scout) <!-- task-id: 0d57e63aae92e57d850f28d0ee52b254 -->
-- [x] Set up Railway PostgreSQL instance <!-- task-id: e6e0dd4d8a2306cde70cbb0abc54687a -->
-- [x] Configure connection pooling <!-- task-id: a8f9af62059a59d29f2c22f57da53892 -->
-- [x] Set up read replica from Heroku <!-- task-id: 732d9a3c28fbf1a5be70fa5ce7500643 -->
-- [x] Test connection from Heroku apps <!-- task-id: 9b7e76c198094ce72da9b3abc364d29d -->
-- [x] Implement automated backups <!-- task-id: 19fe8213d85f04e635b456e6df1ddd97 -->
-- [x] Switch Heroku apps to use Railway DB <!-- task-id: fb1e4d12fcf71de951b7807ecd58fda9 -->
-- [x] Monitor for 48 hours <!-- task-id: 31aeea26b777c41e55f5f585d13c7e26 -->
-- [x] Decommission Heroku PostgreSQL <!-- task-id: 7647268dd93f28f84d2665cb00102186 -->
-- [x] Create Railway Redis instance <!-- task-id: 1df8ca28295b709babfed1d6faafd702 -->
-- [x] Export Redis data from Heroku <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 -->
-- [x] Import data to Railway Redis <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e -->
-- [x] Update connection strings in Heroku apps <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 -->
-- [x] Test cache operations <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 -->
-- [x] Monitor performance <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
-- [x] Cancel Heroku Redis <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
-- [x] Evaluate Railway's built-in logging <!-- task-id: f6b63f3e43675332a1c8c6c9ac748989 -->
-- [x] Set up log aggregation if needed <!-- task-id: ee3b21a8f041d21cd5e28fdac71b5774 -->
-- [x] Export historical logs from Papertrail <!-- task-id: e7592c6f60cabb10d420cd99e74f9683 -->
-- [x] Update log shipping configuration <!-- task-id: 2aabb12c72b664e368b9c557526dbc58 -->
-- [x] Cancel Papertrail <!-- task-id: 331addc46146a1664e3c1fb91eeff37b -->
-- [x] Set up AWS SES or Resend <!-- task-id: 0914e0ecc65e629bc653cbc28953f2f4 -->
-- [x] Migrate email templates <!-- task-id: b40ebd010aa65694ba19b122492bce8d -->
-- [x] Update SMTP settings <!-- task-id: 5e429df3edecb9334e34e1bd58448593 -->
-- [x] Test email delivery <!-- task-id: 61d08392a6c7ca3b1bbf344e4d6376f1 -->
-- [x] Cancel SendGrid Gold <!-- task-id: e97d6fc94f809b3b646533d743bcfada -->
-- [x] Document all Heroku Scheduler tasks <!-- task-id: 113ed15463f1a37c94d51344f94c5d0e -->
-- [x] Set up Railway cron jobs <!-- task-id: bc4564ff295fac8f230795c57bd48eda -->
-- [x] Test job execution <!-- task-id: 17edf4a2cf28f32b40da0634ffc06df1 -->
-- [x] Monitor for failures <!-- task-id: b53e7c599850e7336c77223ea74e0cc2 -->
-- [x] Identify non-critical applications <!-- task-id: e8c63cd6eebe382df55c662bdafdfda9 -->
-- [x] Deploy to Railway one at a time <!-- task-id: e6de4c1fece0283fa61048f2e36a4f14 -->
-- [x] Test each application thoroughly <!-- task-id: 25cfb4fbf1b067b7b8a75464da8a9356 -->
-- [x] Update DNS/routing as needed <!-- task-id: d7ead4a8572d408b5440ef1bdb47e8d9 -->
-- [x] Monitor for issues <!-- task-id: 55d7a441f47f1a8452fa68e3082ac2dc -->
-- [x] Keep Heroku as backup for 1 week <!-- task-id: b9b6b58e2b73cbd77acc4e0d6a63a463 -->
-- [x] Create detailed migration plan <!-- task-id: 5f51b19e1e717dd8cd41b48ca9398d6c -->
-- [x] Set up blue-green deployment <!-- task-id: 5dd33a0d48d0e84603cbb043a1133391 -->
-- [x] Migrate during low-traffic window <!-- task-id: 1c93f47b769990153bae9a3036220ebf -->
-- [x] Implement instant rollback capability <!-- task-id: f9a9116553417e5383cf999ce33206ee -->
-- [x] Monitor intensively for 2 weeks <!-- task-id: b32357a9c58f7b7ba18cf7a5c1af74fb -->
-- [x] Gradually decommission Heroku <!-- task-id: acb17cb14f974431fd5972cb300297ad -->
-- [x] Get Railway database connection strings <!-- task-id: 7be55e464fe0962484f73e5ed04194d4 -->
-- [x] Test connection latency (expect 5-20ms between providers) <!-- task-id: 99585fed3d939471c64ca6c7a85a377f -->
-- [x] Set up connection pooling (PgBouncer if needed) <!-- task-id: de98b02e1f51e7f8c7f8a267026ab8ea -->
-- [x] Configure SSL certificates <!-- task-id: 79fa4fcc5d4d1870a4c0b19063c82162 -->
-- [x] Set up monitoring for cross-platform connections <!-- task-id: 5223db47839d7e5f444472042a9c7dfb -->
-- [x] Document all connection strings securely <!-- task-id: 30522d01e44809f9429cf18d92d70941 -->
 - [x] Rice cooker → drawer near cooking area <!-- task-id: 44c747923d3e47af344ed085f282a4ca -->
 - [x] Small appliances → cabinets/drawers where used <!-- task-id: f6bff7052d4c4edce663f6f3a8b92672 -->
 - [x] Clear countertops completely except daily essentials <!-- task-id: 6e7ced4a3ade7245a47cd8b96c41c092 -->

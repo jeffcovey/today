@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (987 tasks)</summary>
+<summary><strong>General Tasks</strong> (993 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -336,8 +336,9 @@
 - [ ] Calculate weekly totals and trends <!-- task-id: dc04201535c487ee20e802a916405a40 -->
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: df7cc45cfc7dd0446bc97fbfb7767e1c -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 12f9bbd6780d8df6eb53d9f3e9a5775a -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f068b097ddcc494cabb250ec07e7ebae -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: adf8ed497b86f1c88cd676ff328e6242 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -347,8 +348,9 @@
 - [ ] Daily review and update of plans <!-- task-id: 1fbfc8acd7f100eeed0386b58251c8fe -->
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3fb3ee4a978924f3d1cab7e34101f38d -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e9201d65c436d1a048e7c335438210ad -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: efd69f8222896e10107c951d321dcb8a -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9c47b62e2065944335c9c7d5e4a2fef3 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -358,6 +360,8 @@
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b5e6895bdd43fec1dc794521c67e41cf -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d59d587aeed468ce6631430e92c64b04 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -447,11 +451,13 @@
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2c732249bb75068cfbebd8b4c1b8f4bf -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d28e3c27ab0bf3105f961669e9db6626 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 83b244ea8d13032da976d914f31f6fc9 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a02c96143c190821b54ac095c4aded6c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c75b96b39a454d65c83540b580cd0218 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5a51a398fb90f81fd731e483be68b08a -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e5d471ade2811f59b4c5913fc1e5b8bb -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a292e027d4d8604785558f19344e8a36 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -1197,4 +1203,3 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
-
