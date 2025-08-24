@@ -192,7 +192,7 @@ Based on review of financial documents and recent analysis, this project aims to
 #### B. Insurance Optimization
 
 - [ ] Shop homeowners insurance (annual) <!-- task-id: d672f92612d28ca6306fe250c492bf44 -->
-- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
+- [ ] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [ ] Consider higher deductibles for lower premiums <!-- task-id: 4358df3c2511686afd236d0976cda468 -->
 - [ ] Bundle policies for discounts <!-- task-id: 22d848472aaadd2a19d5c5942765f194 -->
 
@@ -420,52 +420,6 @@ Based on review of financial documents and recent analysis, this project aims to
 - I can probably cancel some of my GitHub and ChatGPT services now that I'm using Claude.
 
 ## Historical Analysis
-
-### AI analysis from 7/31/25
-
-```
-Based on my analysis of your last 6 months of expenses, here are effective ways to reduce your
-  spending:
-
-  Top Spending Areas & Reduction Strategies:
-
-  1. OlderGay.Men Business Expenses ($27,844/6mo, $4,641/mo)
-
-  - Heroku: $16,575 ($2,763/mo) - Consider migrating to cheaper alternatives like Railway, Render, or
-  self-hosting on a VPS
-  - AWS: $1,151 ($192/mo) - Review and optimize your AWS usage, shut down unused instances
-  - Multiple hosting services: You're paying for Heroku, AWS, Linode, Cloudflare - consolidate where
-  possible
-
-  2. Housing ($14,157/6mo, $2,360/mo)
-
-  - Homeowners Insurance: $7,242 annual - Shop around for better rates annually
-  - Household Supplies: $2,765 - Review Amazon purchases for non-essentials
-
-  3. Health ($7,976/6mo, $1,329/mo)
-
-  - Health Insurance: $634/mo - Check for ACA marketplace alternatives during open enrollment
-  - Massage therapy: $809 ($135/mo) - Consider reducing frequency
-
-  4. Electronics & Software ($6,346/6mo, $1,058/mo)
-
-  - Hardware: Multiple Apple device payments totaling $456/mo - Consider extending device lifecycles
-  - Software subscriptions: Review and cancel unused subscriptions
-
-  5. Food ($4,546/6mo, $758/mo)
-
-  - Groceries: $270/mo average
-  - Restaurants/Fast food: $268/mo - Cut dining out by 50% to save $134/mo
-
-  Quick Wins:
-
-  1. Consolidate hosting services - Potential savings: $2,000+/mo
-  2. Review all subscriptions - Cancel 30% for ~$200/mo savings
-  3. Reduce dining out by 50% - Save $134/mo
-  4. Shop insurance annually - Save 10-20% on premiums
-
-  Total potential monthly savings: $2,500-3,000
-```
 
 ### AI analysis from 8/3/2025
 
