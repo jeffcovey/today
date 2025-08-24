@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/23/2025, 8:40:19 PM EDT*
+*Generated: 8/23/2025, 8:42:14 PM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
@@ -13,25 +13,28 @@
 
 - [ ] Add a suggestion in the newsletter to set up video chat times <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
 - [ ] Email participants to remind them of chats <!-- task-id: 609834e53d5dee7ec696bab191fc8ed8 -->
-- [x] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
 - [ ] Reply to Nelson about Palm Springs <!-- task-id: f10bc210d36d48b4933e646f3f5316ef -->
-- [x] Reply to Lou about chamber music concerts <!-- task-id: b3046fbf6eb60fa64f953807c4ae3a35 -->
+- [ ] Reply to Lou about chamber music concerts <!-- task-id: b3046fbf6eb60fa64f953807c4ae3a35 -->
 - [ ] Reply to Nelson about redesign <!-- task-id: efa43011cc7b49bca42d32187a744cdf -->
-- [x] Reply to David Edwards <!-- task-id: 87fb1d83126671d052030289fbba81fe -->
+- [ ] Give coding tasks to Mehul <!-- task-id: 70f43457658a35b275da7119e9fee6e2 -->
+- [ ] Reply to David Edwards <!-- task-id: 87fb1d83126671d052030289fbba81fe -->
+- [ ] Reply to David Edwards about trip <!-- task-id: 9c7f6263547d4f800f5fa466816f3202 -->
+- [ ] Give belated Gene Fett birthday greetings <!-- task-id: a04e1df871a4f9150cd6ce6f9c9cc33b -->
 - [ ] Reply to Daniel <!-- task-id: c4a0a7e06470f71c3b25aa68fa0a0bc8 -->
-- [x] point members to forum for help <!-- task-id: ca69f11240892e620343e31eb69f5f34 -->
+- [ ] point members to forum for help <!-- task-id: ca69f11240892e620343e31eb69f5f34 -->
 - [ ] Reply to Melv <!-- task-id: ebc1246fb92978b8fe15859198ab89ab -->
 - [ ] link to other members who have been to a location, to ask for suggestions <!-- task-id: e8d147e5b1b6df7084bc06b9bf22ab7c -->
 - [ ] Send out reminders about the newsletter every six weeks <!-- task-id: 939813963e72b2544bb093e1660503ce -->
 - [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
+- [ ] Announce in the chat room 30 minutes before a group or public video chat begins <!-- task-id: 06b574cf0a73fe19b72f24c3fb7cd0f7 -->
+- [ ] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
 - [ ] Advance OlderGay.Men website and community <!-- task-id: c46bd786edc4adaadcd1cd3d2cff63a7 -->
 - [ ] Holiday preparations and celebrations <!-- task-id: 6ba8315993edfc7def3a7ac2459dbe42 -->
+- [ ] Catch up OGM member requests <!-- task-id: f7807d3f715886f8b90137cccfe380d9 -->
 - [ ] Call Pool Builders Inc for free estimate: **954.797.7700** <!-- task-id: f7167eccbe655ecbd9bb7a054a90e836 -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Tell Lou about Don Schmoll <!-- task-id: 73d99f94e7e44c29da618d1ccb55c5fa -->
 - [ ] Reply to all text messages <!-- task-id: 9fe181eca257e0d518d356e41281bf5a -->
-- [x] Implement the newsletter re-engagement plan <!-- task-id: 012341bf6c3f3520b4a2ca79d57d4968 -->
-- [x] Catch up OGM member requests <!-- task-id: f7807d3f715886f8b90137cccfe380d9 -->
 - [ ] Catching up on OGM member requests <!-- task-id: efdf18306622192e7f63be249501c6a1 -->
 - [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] Reply to: "when I go to a person profile page and a bit down the screen there are three tabs.. the first two (Activity and Photos & Videos) work but when I select Connections I am asked to sign in, but I believe I **AM** signed in" https://talk.oldergay.men/t/confusion-about-the-page-and-changes/317352/4 <!-- task-id: eac32265e3f3d0c438f94cd9efb23b7d -->
@@ -45,15 +48,12 @@
 - [ ] Take Lou to Buenos Aires <!-- task-id: b126139516d55faf5a2d7720385c94fb -->
 - [ ] Reply to Nelson about Sauna Bruc <!-- task-id: 6e9b30320db8d769082364ad370f91a2 -->
 - [ ] Reply to Nelson <!-- task-id: 50cb385281289d128853e13872d84e8b -->
-- [x] Give coding tasks to Mehul <!-- task-id: 70f43457658a35b275da7119e9fee6e2 -->
 - [ ] Show Lou Stephen Fry documentary <!-- task-id: c1a2282767871ff3a8a45ce6396b275b -->
-- [x] Reply to David Edwards about trip <!-- task-id: 9c7f6263547d4f800f5fa466816f3202 -->
-- [x] Give belated Gene Fett birthday greetings <!-- task-id: a04e1df871a4f9150cd6ce6f9c9cc33b -->
 - [ ] Reply to Robert Anaya <!-- task-id: a5e2209878ca9f5ed7a6199205d1b3fc -->
 - [ ] See Mr. Burton <!-- task-id: 1adceab45f7cc8955d1a9a9b77559e38 -->
 - [ ] Post a poll asking what weekday and times are good for chats <!-- task-id: 87db00c07ee06eacd7cda4225aa7a8ea -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
-- [x] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
+- [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
 
 ### Financial Improvement Project 2025
