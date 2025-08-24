@@ -579,9 +579,9 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 ### This Evening (5-8 PM)
 
 4. **Subscription Audit**
-   - [ ] Export all recurring charges from credit cards
-   - [ ] List in spreadsheet with monthly costs
-   - [ ] Mark as: Keep / Cancel / Negotiate
+   - [x] Export all recurring charges from credit cards
+   - [x] List in spreadsheet with monthly costs
+   - [x] Mark as: Keep / Cancel / Negotiate
    - [ ] Set calendar reminders to cancel before next billing
 
 5. **Insurance Shopping Prep**
