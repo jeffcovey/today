@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/24/2025, 8:20:30 AM EDT*
+*Generated: 8/24/2025, 8:30:25 AM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (53 tasks) - Tasks involving interaction with other people</summary>
@@ -580,6 +580,8 @@
 - [ ] Read DMARC introduction <!-- task-id: 340699a314e5991a7f774ca08c1218f2 -->
 - [ ] Get more tourist brochures <!-- task-id: 50f31a051f0bef2549cceba5adeb2341 -->
 - [ ] Nifty Archive: visiting-the-grandparents <!-- task-id: 266ca205700c11821d64fc2bf2f8d514 -->
+- [x] Morning stretching routine focusing on hip mobility <!-- task-id: fa8889de16341a9f55d9db4b18ae89c8 -->
+- [x] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
@@ -590,8 +592,6 @@
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
-- [ ] Morning stretching routine focusing on hip mobility <!-- task-id: fa8889de16341a9f55d9db4b18ae89c8 -->
-- [ ] Continue regular meditation/mindfulness practice <!-- task-id: 19b1153849fadcdf7e71833e42bad1cd -->
 - [ ] Maintain consistent sleep schedule <!-- task-id: 54a4cbad4cdc5124c3b4b1d675a67f09 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
