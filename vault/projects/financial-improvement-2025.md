@@ -84,7 +84,7 @@ Based on review of financial documents and recent analysis, this project aims to
    - Multiple ChatGPT/Cursor subscriptions: Keep only one = Save $40/mo
    - MDBootstrap: $169/YEAR ($14/mo - you use it, keep it)
    - YNAB: $98.99/YEAR ($8.25/mo - you use it, keep it)
-   - Discourse: $316/mo (biggest non-Heroku expense)
+   - Discourse: $316/mo (important community platform - keeping for now)
    - **ACTION TODAY**: Focus on consolidation, not LocationIQ
 
 2. **Duplicate/Redundant Services** - Save $400/mo
@@ -138,13 +138,9 @@ Since you've already completed the Heroku downgrade (saving $450/mo), here are t
 
 ### CORRECTED: Actual High-Impact Monthly Savings
 
-1. **Discourse hosting** - $316/mo (BIGGEST MONTHLY COST after Heroku)
-   - Current: Hosted Discourse at $316.20/mo
-   - Alternative: DigitalOcean Discourse droplet ~$40/mo
-   - Or use free alternatives like Flarum
-   - **Potential savings: $276/mo**
-
-2. **Cloudflare consolidation** - Multiple charges totaling ~$140/mo
+1. **Cloudflare consolidation** - Save $120/mo immediately
+   - Currently: Multiple charges totaling ~$140/mo
+   - Consolidate to single Pro plan at $20/mo
    - You have multiple $16.44, $36.43, and $72.82 charges
    - Consolidate to single Pro plan at $20/mo
    - **Real savings: $120/mo**
@@ -523,23 +519,36 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 
 ### 🎯 REAL Highest-Impact Actions for TODAY
 
-1. **Discourse Hosting** - Biggest opportunity: Save $276/mo
-   - [ ] Current: $316/mo for hosted Discourse
-   - [ ] Option 1: DigitalOcean Discourse droplet ($40/mo)
-   - [ ] Option 2: Self-host on existing infrastructure
-   - [ ] Option 3: Switch to Flarum or other free forum software
-
-2. **Cloudflare Consolidation** - Save $120/mo
+1. **Cloudflare Consolidation** - Save $120/mo immediately
    - [ ] You have 31 separate charges averaging $140/mo total
    - [ ] Consolidate to single Pro plan at $20/mo
    - [ ] Review which domains actually need Cloudflare
 
-3. **Heroku Add-ons** - Save $196/mo total
+2. **Heroku Add-ons** - Save $196/mo total
    - [ ] SendGrid Gold → Starter: Save $56/mo
    - [ ] Papertrail → Free tier: Save $50/mo
    - [ ] Redis → Railway: Save $90/mo
 
-**Realistic Immediate Savings: $592/month = $7,104/year**
+**Realistic Immediate Savings: $316/month = $3,792/year**
+
+### 📌 Important Services to Keep (Review Later)
+
+**Discourse** ($316/mo) - Critical for OGM community, happy with hosting
+**YNAB** ($8.25/mo) - Useful financial tracking tool
+**MDBootstrap** ($14/mo) - Actively used for OGM development
+
+### 💭 Services to Review Again Someday
+
+**Discourse** ($316/mo)
+- Currently essential for community engagement
+- Potential savings: $276/mo if self-hosted
+- Revisit only if financial situation requires
+
+**LocationIQ** ($99/mo)  
+- Currently best value for 426K requests/month
+- Alternatives cost more (Mapbox: $245/mo, OpenCage: $150/mo)
+- Could optimize usage or implement caching to reduce requests
+- Revisit if usage patterns change or better alternatives emerge
 
 2. **Review Railway Migration Priority**
    - [ ] Migrate Redis from Heroku to Railway - Save $90/mo
