@@ -27,7 +27,7 @@ Based on review of financial documents and recent analysis, this project aims to
 1. **Business/OlderGay.Men:** $4,625/mo average
    - Heroku hosting: WAS $1,193/mo → NOW ~$743/mo (after Standard-2X downgrade)
    - AWS: $234/mo average
-   - Cloudflare: $145/mo average (31 separate charges!)
+   - Cloudflare: $100/mo average (Argo acceleration + services)
    - GitHub: $154/mo average (multiple subscriptions)
    - Discourse: $423/mo average
    - LocationIQ: $99/mo (good value for 426K requests/month)
@@ -92,9 +92,9 @@ Based on review of financial documents and recent analysis, this project aims to
    - Multiple GitHub subscriptions (review necessity)
    - Cursor + ChatGPT overlap (choose one)
 
-3. **Cloudflare Optimization** - Save $100/mo
-   - Current: $145/mo average (31 charges)
-   - Consolidate to single plan or free tier
+3. **Cloudflare Optimization** - Save $75-85/mo
+   - Current: ~$100/mo in usage-based charges
+   - Main cost is Argo acceleration ($75-95/mo)
 
 4. **Apple Device Payments** - $455/mo total
    - MacBook Pro: $133.25/mo
@@ -130,7 +130,7 @@ Based on review of financial documents and recent analysis, this project aims to
     - HelloFresh: $60.95/mo (cook from scratch)
     - Restaurant spending: $130/mo average
 
-### CORRECTED Total Potential Monthly Savings: ~$1,100/mo ($13,200/year)
+### CORRECTED Total Potential Monthly Savings: ~$800/mo ($9,600/year)
 
 ## 🎯 REVISED HIGHEST-IMPACT ACTIONS (Heroku downgrade already done!)
 
@@ -138,12 +138,18 @@ Since you've already completed the Heroku downgrade (saving $450/mo), here are t
 
 ### CORRECTED: Actual High-Impact Monthly Savings
 
-1. **Cloudflare consolidation** - Save $120/mo immediately
-   - Currently: Multiple charges totaling ~$140/mo
-   - Consolidate to single Pro plan at $20/mo
-   - You have multiple $16.44, $36.43, and $72.82 charges
-   - Consolidate to single Pro plan at $20/mo
-   - **Real savings: $120/mo**
+1. **Cloudflare Optimization** - Save up to $85/mo
+   - Current actual bills: $93-116/mo (averaging ~$100/mo)
+   - Breakdown of charges:
+     • Argo Accelerated Transfer: 688-951 GB/mo @ $0.10/GB = $69-95/mo
+     • Advanced Certificate Manager: $10/mo
+     • Argo Zone Level Plan: $5/mo  
+     • Cache Reserve: ~$5/mo in usage
+   - **Optimization strategy:**
+     • Disable Argo acceleration to save $75-85/mo
+     • Test if site performance is acceptable without it
+     • Keep Advanced Certificates for security ($10/mo)
+   - **Potential new cost: $15-20/mo (save $80/mo)**
 
 4. **Apple device payments** - $455/mo total
    - MacBook Pro: $133.25/mo
@@ -519,17 +525,19 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 
 ### 🎯 REAL Highest-Impact Actions for TODAY
 
-1. **Cloudflare Consolidation** - Save $120/mo immediately
-   - [ ] You have 31 separate charges averaging $140/mo total
-   - [ ] Consolidate to single Pro plan at $20/mo
-   - [ ] Review which domains actually need Cloudflare
+1. **Cloudflare Optimization** - Save up to $85/mo
+   - [ ] Disable Argo acceleration (currently $75-95/mo)
+   - [ ] Test OGM site performance without Argo
+   - [ ] Keep only Advanced Certificates ($10/mo) if performance is acceptable
+   - [ ] Monitor site speed for 1 week before deciding
 
 2. **Heroku Add-ons** - Save $196/mo total
    - [ ] SendGrid Gold → Starter: Save $56/mo
    - [ ] Papertrail → Free tier: Save $50/mo
    - [ ] Redis → Railway: Save $90/mo
 
-**Realistic Immediate Savings: $316/month = $3,792/year**
+**Realistic Immediate Savings: $281/month = $3,372/year**
+(Cloudflare optimization: $85/mo + Heroku add-ons: $196/mo)
 
 ### 📌 Important Services to Keep (Review Later)
 
@@ -549,6 +557,13 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 - Alternatives cost more (Mapbox: $245/mo, OpenCage: $150/mo)
 - Could optimize usage or implement caching to reduce requests
 - Revisit if usage patterns change or better alternatives emerge
+
+**Cloudflare Argo** ($75-95/mo)
+- Argo acceleration speeds up your site by routing through Cloudflare's network
+- Currently processing 700-950 GB/month at $0.10/GB
+- Test disabling Argo to measure actual performance impact
+- If site remains fast enough without it, save $85/mo
+- Keep Advanced Certificates ($10/mo) for SSL security
 
 2. **Review Railway Migration Priority**
    - [ ] Migrate Redis from Heroku to Railway - Save $90/mo
