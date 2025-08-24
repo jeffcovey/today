@@ -19,4 +19,3 @@ Tasks and projects related to Yardpoollandscaping.
 - [ ] Add the lights to the small fountain <!-- task-id: 474916adcc597fb07adb33e6f846ab9d -->
 - [ ] Add to contacts and Notion: Eddy says to call Davilus at 954-822-2906 for sprinkler work. <!-- task-id: 576f02a12000cd91efc81c46f11bbae0 -->
 - [ ] Automatic fish feeder? <!-- task-id: 6eddb6b3e542e9e7a2663edc40456ccd -->
-
