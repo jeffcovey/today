@@ -519,6 +519,7 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 
 ### Next 2 Hours (Before 5 PM)
 
+<<<<<<< Updated upstream
 1. **REAL Immediate Savings Opportunities**
    - [ ] Switch LocationIQ to free alternative - Save $99/mo
    - [ ] Consolidate Cloudflare charges - Save $120/mo  
@@ -526,9 +527,17 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
    - [ ] Switch Papertrail to free tier - Save $50/mo
    - [ ] Consider Discourse alternatives - Save up to $276/mo
    - **Realistic instant savings: $325/month (without Discourse)**
+=======
+1. **Heroku Performance-L Downgrade** (Save $450/mo immediately!)
+   - [x] Log into Heroku dashboard
+   - [x] Navigate to dyno settings
+   - [x] Downgrade Performance-L to Standard-2X
+   - [ ] Monitor for 30 minutes to ensure stability
+   - **Instant savings: $450/month starting tomorrow**
+>>>>>>> Stashed changes
 
 2. **Cancel Duplicate Subscriptions** (Save $150/mo)
-   - [ ] Cancel unused ChatGPT subscriptions (keep only one)
+   - [x] Cancel unused ChatGPT subscriptions (keep only one)
    - [ ] Cancel YNAB ($98.99/mo - not using it)
    - [ ] Review and cancel duplicate entertainment services
 
