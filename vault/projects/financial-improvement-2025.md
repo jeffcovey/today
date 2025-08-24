@@ -519,61 +519,59 @@ With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the big
 
 ### Next 2 Hours (Before 5 PM)
 
-<<<<<<< Updated upstream
-1. **REAL Immediate Savings Opportunities**
+1. **Heroku Performance-L Downgrade** (✅ COMPLETED - Saved $450/mo!)
+   - [x] Log into Heroku dashboard
+   - [x] Navigate to dyno settings
+   - [x] Downgrade Performance-L to Standard-2X
+   - [x] Monitor for 30 minutes to ensure stability
+   - **Achieved savings: $450/month**
+
+2. **REAL Immediate Savings Opportunities**
    - [ ] Switch LocationIQ to free alternative - Save $99/mo
    - [ ] Consolidate Cloudflare charges - Save $120/mo  
    - [ ] Downgrade SendGrid Gold to Starter - Save $56/mo
    - [ ] Switch Papertrail to free tier - Save $50/mo
    - [ ] Consider Discourse alternatives - Save up to $276/mo
-   - **Realistic instant savings: $325/month (without Discourse)**
-=======
-1. **Heroku Performance-L Downgrade** (Save $450/mo immediately!)
-   - [x] Log into Heroku dashboard
-   - [x] Navigate to dyno settings
-   - [x] Downgrade Performance-L to Standard-2X
-   - [ ] Monitor for 30 minutes to ensure stability
-   - **Instant savings: $450/month starting tomorrow**
->>>>>>> Stashed changes
+   - **Additional potential savings: $325/month (without Discourse)**
 
-2. **Cancel Duplicate Subscriptions** (Save $150/mo)
+3. **Cancel Duplicate Subscriptions** (Save $150/mo)
    - [x] Cancel unused ChatGPT subscriptions (keep only one)
    - [ ] Cancel YNAB ($98.99/mo - not using it)
    - [ ] Review and cancel duplicate entertainment services
 
-3. **Start Railway Migration Prep**
+4. **Start Railway Migration Prep**
    - [ ] Create Railway account (free)
    - [ ] Export Heroku PostgreSQL connection details
    - [ ] Document current Heroku configuration
 
 ### This Evening (5-8 PM)
 
-4. **Subscription Audit**
+5. **Subscription Audit**
    - [ ] Export all recurring charges from credit cards
    - [ ] List in spreadsheet with monthly costs
    - [ ] Mark as: Keep / Cancel / Negotiate
    - [ ] Set calendar reminders to cancel before next billing
 
-5. **Insurance Shopping Prep**
+6. **Insurance Shopping Prep**
    - [ ] Gather current insurance policy details
    - [ ] List coverage amounts needed
    - [ ] Schedule calls with 3 insurance agents for Monday
 
 ### Tomorrow (Monday - Front Stage Day)
 
-6. **Make Phone Calls**
+7. **Make Phone Calls**
    - [ ] Call insurance companies for quotes
    - [ ] Cancel subscriptions that require phone calls
    - [ ] Negotiate Cloudflare plan consolidation
 
 ### This Week Priority Actions
 
-7. **Railway Migration - Stage 1**
+8. **Railway Migration - Stage 1**
    - [ ] Migrate PostgreSQL to Railway (save $180/mo)
    - [ ] Migrate Redis to Railway (save $90/mo)
    - [ ] Test thoroughly before canceling Heroku databases
 
-8. **Big Expense Planning**
+9. **Big Expense Planning**
    - [ ] Set aside $1,700/mo for upcoming taxes/insurance
    - [ ] Open high-yield savings for these funds
    - [ ] Automate weekly transfer of $425
