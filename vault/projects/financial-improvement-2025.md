@@ -31,7 +31,7 @@ Based on review of financial documents and recent analysis, this project aims to
    - GitHub: $154/mo average (multiple subscriptions)
    - Discourse: $423/mo average
    - LocationIQ: $99/mo (good value for 426K requests/month)
-   - ChatGPT/Cursor: Multiple duplicate subscriptions
+   - ChatGPT: Check for duplicate subscriptions
    - Other services: ~$1,989/mo
 2. **Housing:** $2,360/mo
    - Homeowners Insurance: $1,207/mo (annual $7,242)
@@ -81,16 +81,17 @@ Based on review of financial documents and recent analysis, this project aims to
 
 1. **Cancel Duplicate Services** - Save $500/mo IMMEDIATELY
    - Cloudflare: Consolidate 31 charges ($145/mo) to single $20/mo plan = Save $125/mo
-   - Multiple ChatGPT/Cursor subscriptions: Keep only one = Save $40/mo
+   - ✅ Cursor subscriptions: ALREADY CANCELED
+   - Review ChatGPT subscriptions for any duplicates
    - MDBootstrap: $169/YEAR ($14/mo - you use it, keep it)
    - YNAB: $98.99/YEAR ($8.25/mo - you use it, keep it)
    - Discourse: $316/mo (important community platform - keeping for now)
    - **ACTION TODAY**: Focus on consolidation, not LocationIQ
 
-2. **Duplicate/Redundant Services** - Save $400/mo
-   - Multiple ChatGPT subscriptions ($21.28 x 19 = $404/year)
+2. **Duplicate/Redundant Services** - Review for savings
+   - Multiple ChatGPT subscriptions (verify if duplicates exist)
    - Multiple GitHub subscriptions (review necessity)
-   - Cursor + ChatGPT overlap (choose one)
+   - ✅ Cursor subscriptions CANCELED (already saved)
 
 3. **Cloudflare Optimization** - Save $75-85/mo
    - Current: ~$100/mo in usage-based charges
