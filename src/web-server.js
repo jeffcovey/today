@@ -113,7 +113,7 @@ const pageStyle = `
 <!-- MDB -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet"/>
 <style>
-  /* Custom styles to complement MDBootstrap */
+  /* Custom styles to complement MDBootstrap - v${Date.now()} */
   
   /* Sticky card header with TOC */
   .card-header {
@@ -123,9 +123,14 @@ const pageStyle = `
     background: white;
   }
   
-  /* Add scroll padding to account for sticky header */
+  /* Add scroll padding to account for sticky header and navbar */
   html {
-    scroll-padding-top: 140px; /* Accounts for sticky header height */
+    scroll-padding-top: 200px; /* Increased to account for navbar + sticky header */
+  }
+  
+  /* Ensure anchor targets are visible */
+  [id]:target {
+    scroll-margin-top: 200px;
   }
   
   /* Table of Contents styles in header */
@@ -232,8 +237,8 @@ const pageStyle = `
   }
   
   .markdown-content pre {
-    background: #263238;
-    color: #aed581;
+    background: #1e1e1e;
+    color: #d4d4d4;
     padding: 1rem;
     border-radius: 0.375rem;
     overflow-x: auto;
@@ -250,7 +255,7 @@ const pageStyle = `
   
   .markdown-content pre code {
     background: transparent;
-    color: #aed581;
+    color: #d4d4d4;
     padding: 0;
   }
   
@@ -446,14 +451,15 @@ const pageStyle = `
   
   /* Special handling for code blocks to maintain readability */
   .chat-bubble pre {
-    background: #1e1e1e !important;
-    border: 1px solid #333 !important;
+    background: #282c34 !important;
+    border: 1px solid #3e4451 !important;
     margin: 0.5rem 0 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
   }
   
   .chat-bubble pre code {
-    background: #1e1e1e !important;
-    color: #d4d4d4 !important;
+    background: #282c34 !important;
+    color: #abb2bf !important;
     padding: 0.75rem !important;
     border-radius: 0.25rem !important;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
@@ -478,8 +484,8 @@ const pageStyle = `
   
   .chat-bubble.assistant pre code,
   .chat-bubble.ai pre code {
-    background: #1e1e1e !important;
-    color: #d4d4d4 !important;
+    background: #282c34 !important;
+    color: #abb2bf !important;
   }
   
   /* Inline code styling */
@@ -2012,9 +2018,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // Enhance blockquotes with MDBootstrap styling
   htmlContent = htmlContent.replace(/<blockquote>/g, '<blockquote class="blockquote border-start border-4 border-primary ps-3 my-3">');
   
-  // Enhance code blocks with better styling
+  // Enhance code blocks with better styling - using inline styles to override
   htmlContent = htmlContent.replace(/<pre><code class="language-([^"]*)">([\s\S]*?)<\/code><\/pre>/g, 
-    '<div class="card bg-dark mb-3"><div class="card-body p-0"><pre class="mb-0"><code class="language-$1 text-light p-3 d-block">$2</code></pre></div></div>');
+    '<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1rem !important; border: 1px solid #333 !important; border-radius: 0.375rem !important; overflow-x: auto !important;"><code class="language-$1" style="background: transparent !important; color: #d4d4d4 !important;">$2</code></pre>');
   
   // Add alerts for certain keywords
   htmlContent = htmlContent.replace(/<p><strong>(NOTE|IMPORTANT|WARNING|TIP):<\/strong>([^<]*)<\/p>/g, function(match, type, content) {
