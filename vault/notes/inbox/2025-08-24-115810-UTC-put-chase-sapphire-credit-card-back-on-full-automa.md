@@ -1,1 +1,0 @@
-- [ ] put Chase Sapphire credit card back on full automatic payments
