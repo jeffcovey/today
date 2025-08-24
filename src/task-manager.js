@@ -649,12 +649,18 @@ export class TaskManager {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // Match both normal and corrupted comment formats (em-dashes from formatters)
-      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>)?$/);
+      // Also match "none" as a special task-id for template/routine tasks
+      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|none) [-—]+>)?$/);
       
       if (taskMatch) {
         const isCompleted = taskMatch[1] === 'x';
         let title = taskMatch[2].trim();
         const existingId = taskMatch[3];
+
+        // Skip tasks marked with task-id: none (template/routine tasks)
+        if (existingId === 'none') {
+          continue;
+        }
 
         // Remove any topic tags from the title (e.g., [Health], [Programming])
         // These are stored separately in the database and shouldn't be in the title
