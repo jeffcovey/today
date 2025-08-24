@@ -1,4 +1,5 @@
 <details>
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <summary><strong>General Tasks</strong> (1748 tasks)</summary>
@@ -8,6 +9,9 @@
 =======
 <summary><strong>General Tasks</strong> (1748 tasks)</summary>
 >>>>>>> Stashed changes
+=======
+<summary><strong>General Tasks</strong> (997 tasks)</summary>
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 
 ### Monday, Aug 11 (overdue)
 
@@ -50,6 +54,11 @@
 - [ ] Check and restart Honeybadger production errors <!-- task-id: 402b6abf2877434a17058c9ca62625de -->
 - [ ] Check Honeybadger production errors (#12285, #12286) <!-- task-id: 8082af772ca5f368963fdf3ad764290b -->
 
+### Invalid Date, Invalid Date
+
+- [ ] Begin wrapping up for evening routine by 5 PM <!-- task-id: e472bfa2aa1cc5a26a3cbecda7279834 -->
+- [ ] Physical tidying/pest control if energy permits <!-- task-id: 2b3a3c5ced21d28a1367f2600182e289 -->
+
 ### No Date Set
 
 - [ ] Add a suggestion in the newsletter to set up video chat times [Oldergaymen Chat Room] <!-- task-id: 4dbf26450f4bba6b7990465fc9385174 -->
@@ -74,11 +83,13 @@
 - [ ] Check that we still have access to GitHub security [Oldergaymen Sysadmin] <!-- task-id: e1e10e4f9e4a3cd94a0d5e78d360f6b9 -->
 - [ ] Check the date you need to return to the veterinarian [Cats] <!-- task-id: e85432d10712e07689f47391981f5123 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4835502c2185ffcd0fb50901a9b7585d -->
 - [ ] Check tmp/ in OlderGay.Men [Oldergaymen Sysadmin] <!-- task-id: e3fd9728b5e98ba0d9d2f7b2bdaef432 -->
 - [ ] Complete 2025 annual goals <!-- task-id: 718b8fb208e9aee248202ab28693d0ce -->
 - [ ] Complete mid-month review <!-- task-id: cdb29eb07b70f70c612fe9911f8c55bc -->
 - [ ] Create a db of my Royal Caribbean points progress [Travel] <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66868c6129fbbb74826c50839d360476 -->
 - [ ] Do profit & loss statements [Personal Finance] <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
 - [ ] Donate the exercise bike [Personal Finance] <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Established exercise routine <!-- task-id: ebd9111ee978affef53d1da46eaced64 -->
@@ -165,7 +176,9 @@
 - [ ] test that Fly is updating Today <!-- task-id: ec3245fb71a6a08b01d06baec208fdc8 -->
 - [ ] try the eye supplement <!-- task-id: e29e2737363b0c6fb33d08c072c5e61f -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2d38c152237ab2d769d43e0ffb2cfcfe -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b981a1bb4274f1bc26d2a6872620a30c -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house [Homehousehold] <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Check that one-action Drafts are going to Notion [Personal Admin] <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] 8-10 lbs weight loss achieved <!-- task-id: 0c495168b5c5a49c3a2f3d8b52111b8e -->
@@ -184,155 +197,9 @@
 - [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
 - [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
-<<<<<<< Updated upstream
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 73ec2c7afe8cf6a497854a1b1f414db9 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6d12f5b8ef17ad11fc928c4e3b56333f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5bf3701a5dce6cfef243a696d24fa6c0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6f324522858037d96cc663f24b4ec794 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4e026a43d7d2cd893d9649c660fc319e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 55dd68e65e8d2d7382efb7d141ed410d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f02dcdba44edd8ca49ad9bcd5dbd160e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 55a60e075a564ab1404ac374fe2109b5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c5ea845488ecbe8f7b9a1f93f6050313 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d85f7e1d7df69c0ab57b5d1795ebf571 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d79c508188f565bf5e003bd82ee18008 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fa45259cdad0b81e434069bb5da0f135 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5c33d11c6e026a708f4ce01a466e3333 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7a164af8b4c3d1eab0dc5c5013e1da90 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f867ae27ddcdd33936075724c8e4f4fb -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d2d12d3a5a0f89c0f29bef5c922346c0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 774ba2c535f6ef3984b946833a6a8f86 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c2f27d5ec608955b80be1c3280f5ad2e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 06d4785ccb33b1e34e0035ff8434a905 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 063863a73ba26f4d98686ed4223f10d5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 06324f4ad9fa68d7816f537e2db8ada1 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f16831e9a8a72bddfb8e87a9ddf5f542 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 75454aa6485d89b0b280abd9199686ab -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3a0c553dbede7f556c0a9ebc64f5064d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1026f19c617bff36dde382000dd7e85b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ab9eafa388378ad4f823011764105360 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: bc9b42016a4ee2ae1ba800542782d8b8 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5b64085924b504730d1adf26df9c35f2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 875dcd41f039756aa6134cf7edf03c3b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 02b56c645fa0df683da116b3b43f2649 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b240a4ef8629a55601eca5b4b6a65a03 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4e2d67bfbf04f8c3031994a9de8af7b2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4844eb3ef28215728a118845f4b82cc5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 98b89e02b92921b5c4071628e2f2be22 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d04a68113ab5d448bedecdf3f498b7b4 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 06421aa847967853c0a1fb1c03707eda -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e78a88c8d41c5f1acecc55d35370bf1d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6dfdc004528acb923e7dca6aee273e3c -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5fd7ab44a0889861bb50267ce8d295da -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a904d9586acbf9dca6ce3b86753dbb29 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2a8709ab53a814ee6d59def63b4be1e1 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dffc7ad5ddad0ba2bd88054a4518534e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 844a8b985479a4d735ec38d96ed2742a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cea83f2a24db7918e2da28f7cbd52e1e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ccbd3c64447767730c6fd8d138c786ef -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8f37076d5f0234e0d7a1580faabd5118 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ea9507bcc5e53c72a71222ed41036e2b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8f1fe99dec2ce28f6082bd7b0d0e6277 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3abd25d2c6b8a8aa32cdc95fd8f06d66 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5f7a856a709ffb4043ba057292e0f6dc -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f7d0fc8d54ba7fdeaa8cc0999e99f268 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ebfc3467c5753d545d0ddd4d9ee43514 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d926dfa53a346579f276a69f8973252c -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b311a998be7fce7bbfac0c9329cd8df8 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: eb1b956805fb25b7c841a6e3b42b2f9a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 04fd497eacb7e95ff1e317004c93c0c0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b804c4edd9a45f0b82e36b0c7bfe4194 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6a4d586dd14a3123c027fc8914e88fe2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0b09a7d2b396955dea4b15917964853b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1e8f24b1dc533467aaeaa05406c8b8a9 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 72b0c353ebabe4aa506445cd22576ed3 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 92a8b0b363c0b5c12583ba7fb892dc3a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4431de77e67b8c6671ef746018c3fa4e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b5b7a31820572d223f6cf1f925871a15 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 37d32eb8f68d763ec59b324e476d0418 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1902cd39d008aecf0f7d0b870b699aa5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 52626f6d1f87b46c4a5e5bd214312c56 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 355bfa449a77d7b8b0daeb7251772b68 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c443fae526eb2853e726a4802e7335a5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0f60401d9d1931c3811bbd12e000c9c5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0ca7966f659938935a3584666a92f927 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d36fa09d20c821e10b5f0a58bd33a3fa -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fdbe8c2eb32cbb4e5a0ac2d0dad1bcfc -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2a236485445bb221ad1e4bfd135ca23d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c853c325e97b6d6ff11461dd54b502f1 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7c32538e2317b4413e06e14758f46072 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 12941c35c5f70d8953c55d68c7d3bea9 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b3c7aefa1838c72920ad012231504f9c -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d59a72d08910a04cd87b41af9db30da9 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 04d359aad9472022f926e45f39acd8b2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 20da7e32169b923dd36eac074c4a5315 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3141f79aad40135296f336d87ea51634 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 64caac23769400e6d827dfbb2a774eb7 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cbb950d8fa34d47ea86ed59ff4b92b2e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3b8d24356e2af42f5c6ddc9cabf43c67 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 597b83db1a8ad696d8b80c57ec3989d5 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 80b36ba404945430a8757f862133ac3e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 276b293a8bc2f24293d6e1f103f9cfb2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 903c1b25fe97c2f3035169257c306162 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d7aebba715c241a4fd7902566c00c6d1 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 50b1f03c4c63d3c7b6f8fccd8735854f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1310f44d88acfe814080f52ff2d31ef8 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b3ec044887c7e65e57e8fdb3daab5433 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 112c44473e738a1ca12c6be6e720fa19 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 80b58c739d15dacf808eb849656858f2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 905e6605ef4ae3efc1782cb64a1b7a3b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1f3f461ba6c983f6ec663d93e8c4b44d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 69fa1b1c0384293252398ee02f9fa7c4 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dc6b2ed21eb1ef5d51474880e288bed1 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 719e3486e9db5dd0266b6b82697fbff6 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd19c11c38227c42d11f7aea031ee101 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 23236f6fa475d2e582ae7f38bdab8b57 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 45470ee3c46bcdcbae7b92b679c36e35 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 56b16713ce571ee00a1b4fe623b43dfe -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d0fa0947c72c6e5b92cdb91a826818bd -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 178e7c2885c20705c9977ab535675a6a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a0f2ca1268b1560b40ee5daa5cb76e54 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 392cbf6ecc99d78888c54b114e3412e7 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8b624d7c9bbf531f15e9c54c8b767bdd -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b96d2bc3845e7dfe5c79c600599efe45 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 97775be709af4944a00b5b879f324944 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e046dae29bb4bd6d5a7a531842424bc0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a9635d7d0f3fbd8f2479c2ec62215233 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e2b3cd27d8f576847f11c891a273371b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9e322c4f6edc8854b04c9bb15e1cc484 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ee4cb7af8830b97aca6a2972ca00199a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 862cea8651c0a6f41ccf566aefad0347 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fe0aa670f467eed6d66fe8137b5b465d -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 445c21d5d63aa436e111f732a935950b -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 311fdc751cba70f95671b3eee0be68e0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c49fd4be52cf1bcbe5c0433059db0b4e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fcb9dd315225720968b053abf9a6db3e -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8a0c2f3d79b941ddec90580797bde7ae -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5d498d1a35efeb002665dabdbb10add0 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fe2d07b7a917935b6dedc21526ae82fc -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9e39bccd7ed0306d7edba5de49ed8ad7 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 8499c2a0adb8a4e6e7be2829c1e98208 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6b96181ccc1654077a585c8a2ce9f535 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 127ebddc0bd27bd3b8546bfa7422c6ea -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 56a4b27cd179c66ee9e568ae6acad878 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6328a24b6e65dacf99081082533e227c -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7a5cf1cc69143731a467d4dc7e2a7746 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6c7f36444b67db66964bdd43384a20a4 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3bdd72512d678c2a27b493a9a264a2cd -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ad5bc64f4f056ab2e91a8386e6e05511 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4bedd5f2ae6bc909cdeaa3c402c5ae64 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 36d2cc436c1097a8cbf085f9ed88b47a -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f695ccea2273445d7c944d68f1222579 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: dd2202967a220605d88fcf6792625986 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e108a66ecef6b62f430cc9e7848693ca -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 341645370a458ffa0f6f732d5d87b2f7 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7a1e96c4f78197f704cc56e43d722e64 -->
-- [ ] Comfortable walking shoes <!-- task-id: 58119f1389bca27053dfed53bc4470c0 -->
-=======
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4835502c2185ffcd0fb50901a9b7585d -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 48833ee6cd2657d0377002a6dc476ef0 -->
->>>>>>> Stashed changes
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: cc9bbfbcce81ed0ef8d742af6f4b5cff -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 79154adc201ff1bd78a9b5a26f4932ac -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -344,6 +211,7 @@
 - [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 56af4b0d44e7cbf56d0a4de16b4524d6 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2aab1d8da0f6a2a80d4c9e8d5ac608de -->
@@ -495,6 +363,11 @@
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8086f1c5ba91e757cbca6e4939d35c1 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: fa8eb4214b01d5460a646cf78a882803 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 49aa2bcf8799a8393c2b6ab565c3cb8b -->
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -502,6 +375,7 @@
 - [ ] Establish sustainable eating patterns <!-- task-id: a5bbd0c20f13df1ba37dbf861891ba4e -->
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 916d32784930100b77063dae082c66ed -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e9e1ab0f11688adf13baae9a7e50933d -->
@@ -651,6 +525,9 @@
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f696391580be138a3d58834f9351e70b -->
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get 2-3 additional estimates for comparison <!-- task-id: 593135b33372baa9d735121aa3878068 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
@@ -737,6 +614,7 @@
 - [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8a05bce2742a05d4a62a2f2433f10864 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 43b884cbf544976e10ba601f94e8e1f5 -->
@@ -1028,13 +906,21 @@
 <<<<<<< Updated upstream
 =======
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2d38c152237ab2d769d43e0ffb2cfcfe -->
+=======
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2967af130bae9e2e433712e5c99d2cce -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d233f850b14ee781d44ccab93cab5e5d -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 728f326d4b2ef4c67127cb628cd6e949 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b981a1bb4274f1bc26d2a6872620a30c -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8cd1628e127e6ccea2a253d611af10cb -->
+<<<<<<< HEAD
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f4e0faed29e77b78738cbcd760e70d91 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a08689143eb2b040a23a9d4bce12854c -->
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->

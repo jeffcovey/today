@@ -21,11 +21,10 @@ Tasks and projects related to Personal Finance.
 - [ ] Ask about Airbnb mortgage or pool home equity loan <!-- task-id: b079a49e54ff6ea0d3f70899dbe2be5f -->
 - [ ] Cancel Dekkoo and Paramount+ <!-- task-id: 52d80dce46f9d4b3b14ef03f91345090 -->
 - [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
-<<<<<<< Updated upstream
 - [ ] Check that I'm using the proper goal types in YNAB <!-- task-id: b5927c33782b5e501122df70560e03d1 -->
 - [ ] Clean and close the codespace <!-- task-id: 736b5f25d3bca78d6bebf0515a5ed409 -->
-<<<<<<< Updated upstream
 - [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
+<<<<<<< HEAD
 =======
 - [ ] Compare house expenses versus house income <!-- task-id: 092b14ba68fb7a0c82cf3ae36d5b1f7b -->
 >>>>>>> Stashed changes
@@ -35,3 +34,5 @@ Tasks and projects related to Personal Finance.
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28

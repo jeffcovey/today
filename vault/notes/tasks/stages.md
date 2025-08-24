@@ -2,6 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 *Generated: 8/24/2025, 3:10:23 PM EDT*
@@ -12,9 +13,12 @@
 =======
 *Generated: 8/24/2025, 3:10:23 PM EDT*
 >>>>>>> Stashed changes
+=======
+*Generated: 8/24/2025, 3:29:01 PM EDT*
+>>>>>>> 9ae2d104b23dd5b7a270197acdb4da9a8bee3f28
 
 <details>
-<summary><strong>🎭 Front Stage</strong> (55 tasks) - Tasks involving interaction with other people</summary>
+<summary><strong>🎭 Front Stage</strong> (57 tasks) - Tasks involving interaction with other people</summary>
 
 *Meetings, calls, emails, customer support, presentations, social activities*
 
@@ -63,6 +67,8 @@
 - [ ] Send out reminders about the newsletter every six weeks <!-- task-id: 939813963e72b2544bb093e1660503ce -->
 - [ ] alert members who have comments on page topics they own <!-- task-id: d7ebc14ed22662713aa6816364fada66 -->
 - [ ] alert members of new photos from people they follow (on the site and in the newsletter) <!-- task-id: 3ce9f792ab3e744418f8aaf85a40d7ed -->
+- [ ] Victor: cute guy from Clarksburg, was librarian for Rutgers <!-- task-id: 6f70402d3857b1e9732a50acc5e3b484 -->
+- [ ] check Prime Timers WW regularly <!-- task-id: 3b27ee8e58f460fd4a918482b1f54ae1 -->
 - [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
 - [ ] Reply to Heroku notification <!-- task-id: d42f6aded0ffc524fd28dc2a0937096b -->
 - [ ] Write reviews for both guests <!-- task-id: pending-17-5 --> <!-- task-id: 9812ef7ccecced13dc0b0b300290e8f2 -->
@@ -91,7 +97,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (523 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (555 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -181,6 +187,7 @@
 - [ ] Calculate new moving average <!-- task-id: e6f0a82afa9b94821a8fc94cf2aab306 -->
 - [ ] Update `vault/logs/drinks.csv` <!-- task-id: e0ac423f92aa73a5d1dffe2f3b8041ca -->
 - [ ] Have the AI set task topics if they don't exist <!-- task-id: e2b27da565b838831e0be7fe6f61b7a0 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4835502c2185ffcd0fb50901a9b7585d -->
 - [ ] Check that one-action Drafts are going to Notion <!-- task-id: 36654b1d4d1a65b44ac0d9b9494d8fa7 -->
 - [ ] Add a check through shortcuts that all the doors are locked when I leave the house <!-- task-id: beac703fcdfc9099db03a29659776ead -->
 - [ ] Review health insurance options <!-- task-id: 4dde5deca5708cb3dab6544329c07485 -->
@@ -240,6 +247,8 @@
 - [ ] Add Day One to Today <!-- task-id: 598b5198a136dcae9fa4daeb170db867 -->
 - [ ] See ramble in Concerns for things to add to Today <!-- task-id: 3ac62fcf040ae98eba4a8b67bd42595c -->
 - [ ] Improve image search and tagging <!-- task-id: 399432f92454d2da6bf8d6ab1d6dd520 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 48833ee6cd2657d0377002a6dc476ef0 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f696391580be138a3d58834f9351e70b -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -487,6 +496,35 @@
 - [ ] add turbo frame placeholders? <!-- task-id: 2c72f8d306e4f1fb88c69393fd5591c7 -->
 - [ ] only use file_attached scope in galleries/carousels <!-- task-id: d3dd73990101d32890f6f408e97a6a81 -->
 - [ ] See why we are even calling events, etc. <!-- task-id: ff105f31958c8eb8f3325b35dbc7ff87 -->
+- [ ] Surface Waiting, future, etc. <!-- task-id: 8ec20038522de778602bce349dbd9a00 -->
+- [ ] get guest books and world maps <!-- task-id: 64ae652b9c7653ff937e4eb3f8aab8d5 -->
+- [ ] Order new glasses <!-- task-id: 6abc69e1a9d814c3ea7ffd30f9755222 -->
+- [ ] remove Branson's exception in SynchronizePatreonJob <!-- task-id: 68762ca1c44c4b21686edc0b1dbc93ed -->
+- [ ] See why unapproved photos are getting in the newsletter <!-- task-id: 85ab6a0eb2131a22dc5295559f7adcf1 -->
+- [ ] TipTop <!-- task-id: 8059b714984c84f068e97e1d84420e0d -->
+- [ ] Spark | Air on Mutopia missing tie into second alternative <!-- task-id: a6b525b9a3d568a2c05967e4dd6779ab -->
+- [ ] use `file_attached` in other contexts, like User show pages <!-- task-id: d028ba59775f5bafd4fcdeee90d3f1ed -->
+- [ ] check discourse `similar_users` <!-- task-id: abbf3c642836b8cd7fb09e4e8af37ef8 -->
+- [ ] Paint doors and frames <!-- task-id: fb19e337b10c9c43ae2bd0caa83510c3 -->
+- [ ] replace hallway light <!-- task-id: 5a3c0160f14d80ff3ce359f703a00844 -->
+- [ ] Use last_login in the sidebar <!-- task-id: 3c55172ed7fbdda849233480d686bc56 -->
+- [ ] cache User IP lookups (and, later, GPS lookups) <!-- task-id: 1fbad95b87824243f51a5ffbdd0c6bcc -->
+- [ ] see if favicon needs to be in the manifest <!-- task-id: 4c078e22286d18ceea0307d9cd7ed773 -->
+- [ ] Nearby Objects Abstraction <!-- task-id: 49585bf8945e86c2cea1a294acd55a32 -->
+- [ ] remove Barneymax1955@gmail.com Patreon exception after fixing <!-- task-id: 4c0c4f3ecb851a971d32c35bbcd725d2 -->
+- [ ] use disappearing notifications <!-- task-id: 853e55def8393574d07ca094a82d483a -->
+- [ ] use scopes in User.nearby. events, etc. <!-- task-id: f478acf93da42b7edba7e633320f5ff1 -->
+- [ ] Fix testing.ogm SSL <!-- task-id: 923959d7d7cb590865f51c2ced3ba056 -->
+- [ ] add <header> <!-- task-id: d633ac448dec7d9d06dbef4a7b347fec -->
+- [ ] center side_profiles (is `sized_image` breaking it?) <!-- task-id: 08f7bddbb088d99b3c3cbe2c14422862 -->
+- [ ] check that the new VCR cassette is being created <!-- task-id: 6b88530bf34a98b804c78ee1aaeb5047 -->
+- [ ] confirm that side_profiles are limited to logins with 90 days <!-- task-id: b035b787156608c7030ebca705829ee4 -->
+- [ ] handle trips <!-- task-id: 97c28b0681c67a7f5fed2cca0c630c9c -->
+- [ ] order more bath rugs <!-- task-id: 0549114bae48fc11e1abf3347a8c8f83 -->
+- [ ] see why https://oldergay.men/users/jim has "about" <!-- task-id: 5963984ccb46923da4211bc25e4898e8 -->
+- [ ] see why I can't change User's role <!-- task-id: 6591660ff38f02df3d0c8fb452bb3e1f -->
+- [ ] update html-pipeline & common marker <!-- task-id: d364e65c8d69beaa0573034bb71917cc -->
+- [ ] Visit MyHealthONE.com to login or create an account. <!-- task-id: 04f8ab75842c1f6f61d4a252bfab72e4 -->
 - [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 - [ ] +Trip Prep <!-- task-id: 5fb931c8c7f986195267f9ab564e8371 -->
@@ -636,7 +674,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (116 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (122 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -660,6 +698,9 @@
 - [ ] Reduce daily intake by 50% <!-- task-id: e888e9662bbbed421025e029b8c98c2e -->
 - [ ] See weight loss acceleration <!-- task-id: eddda61787dae40076c7df6938c0257d -->
 - [ ] Motivation <!-- task-id: e99c6bb351da88478bc4dce5401c02f4 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 66868c6129fbbb74826c50839d360476 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2d38c152237ab2d769d43e0ffb2cfcfe -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b981a1bb4274f1bc26d2a6872620a30c -->
 - [ ] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Track pain levels and mobility improvements daily <!-- task-id: 0ff44a5e9200df3923b94a5701f2d03b -->
@@ -717,6 +758,9 @@
 - [ ] Mental clarity <!-- task-id: ace31dbeb6beb122f59d41cbad5d14a3 -->
 - [ ] Review(https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching) <!-- task-id: 55acdb054a9077ac2cf3fcea61f4fcf6 -->
 - [ ] Get glasses <!-- task-id: 0aa5c1d6a3830dbf125401b2ef051267 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d8086f1c5ba91e757cbca6e4939d35c1 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 2967af130bae9e2e433712e5c99d2cce -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8cd1628e127e6ccea2a253d611af10cb -->
 - [ ] Look for John Boswell books <!-- task-id: 7c1e0f703585ff96c2c60ee9b678f65b -->
 - [ ] get Rosuvastatin <!-- task-id: 2071468f9afdaddafd83962193651e09 -->
 - [ ] Visit Poverty Point <!-- task-id: fa0d333ca5e1f31a5233904c560245d2 -->
