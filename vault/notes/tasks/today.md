@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 3:30:46 PM EDT*
+*Generated: 8/24/2025, 3:40:25 PM EDT*
 
 ## Next Up
 
@@ -9,8 +9,33 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (2779 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (2783 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9f5692e2dfe9b13690f01857fcf329bc -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 848687b5eaed0b2043e1b840a199e4e4 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: db2b72cca9264da65f1b8decd97dc292 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8335ee700f1c5af3e8fe227438795b4f -->
+- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
+- [x] Create views for ChatVisits (Priority task) <!-- task-id: caddc0b0410750b8965110630b96275f -->
+- [x] Assign topics to photo uploaders, etc. (Priority task) <!-- task-id: e062fb34e6226c8c05575eb3154f6f83 -->
+- [x] Guest Preparation Template (Priority task) <!-- task-id: 5beb0c96896df758422f4232dbe88373 -->
+- [x] **Today CLI Enhancement** - Continue improving this daily review system <!-- task-id: 3c77363f28cf5e36fd42b845abe4f2b6 -->
+- [x] **File Organization** - Archive completed plans, organize vault structure <!-- task-id: b9b4869dee0ab3bd7b47a90c576aded5 -->
+- [x] **Database Cleanup** - Review and optimize SQLite queries, clear old cache <!-- task-id: 3eebe5701c5f49e92d5731e553bafede -->
+- [x] **Create ChatVisits views** - Backend database work (🚀 Priority) <!-- task-id: 5671bcc3f5845c6c973c80b372c064fa -->
+- [x] **Topic assignment system** - Infrastructure for photo uploaders (🚀 Priority) <!-- task-id: cf0eb0df22ce2f569bb4da24e77cbc96 -->
+- [x] **Check newsletter status** - Backend review (overdue from Aug 11) <!-- task-id: 41a3127e0f7f14d0c0a202059a2cbfee -->
+- [x] **Try Pest Control again** - Overdue from Aug 21 <!-- task-id: 3e079d5c3ffcb3c2981ecb17877c6ec8 -->
+- [x] **Guest room preparation** - If Wae's booking is confirmed <!-- task-id: b350ad35a421e810fc058b807d674c18 -->
+- [x] **General tidying** - Physical spaces <!-- task-id: 58aa2316e85a1f973471baa1884b4068 -->
+- [x] **Review weekly expenses** - Part of August financial health goal <!-- task-id: 9231d2907708b978b2068caad705b77c -->
+- [x] **Check upcoming bills** - Insurance, utilities, etc. <!-- task-id: 81cc4a9159fe48d9b529d43d312eb7d6 -->
+- [x] Respond to Airbnb inquiry status <!-- task-id: 0e20dcecd7b0485c67813a98726c84b3 -->
+- [x] Clear browser tabs and bookmarks <!-- task-id: 45821e03a7639b25474131af35526471 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 71391b71776de21d7f49971447504a8e -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 46a177f167c224c50c41e8485f022f32 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: bf65947c85ca2a5ae45aaedfe3fdbe45 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c165e2c6febb373fd5a9408535f0c5be -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6ef73abea4fb703223a41920a0c42b2 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 73ec2c7afe8cf6a497854a1b1f414db9 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6d12f5b8ef17ad11fc928c4e3b56333f -->
@@ -93,22 +118,6 @@
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d59a72d08910a04cd87b41af9db30da9 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 04d359aad9472022f926e45f39acd8b2 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 20da7e32169b923dd36eac074c4a5315 -->
-- [x] Create views for ChatVisits (Priority task) <!-- task-id: caddc0b0410750b8965110630b96275f -->
-- [x] Assign topics to photo uploaders, etc. (Priority task) <!-- task-id: e062fb34e6226c8c05575eb3154f6f83 -->
-- [x] Guest Preparation Template (Priority task) <!-- task-id: 5beb0c96896df758422f4232dbe88373 -->
-- [x] **Today CLI Enhancement** - Continue improving this daily review system <!-- task-id: 3c77363f28cf5e36fd42b845abe4f2b6 -->
-- [x] **File Organization** - Archive completed plans, organize vault structure <!-- task-id: b9b4869dee0ab3bd7b47a90c576aded5 -->
-- [x] **Database Cleanup** - Review and optimize SQLite queries, clear old cache <!-- task-id: 3eebe5701c5f49e92d5731e553bafede -->
-- [x] **Create ChatVisits views** - Backend database work (🚀 Priority) <!-- task-id: 5671bcc3f5845c6c973c80b372c064fa -->
-- [x] **Topic assignment system** - Infrastructure for photo uploaders (🚀 Priority) <!-- task-id: cf0eb0df22ce2f569bb4da24e77cbc96 -->
-- [x] **Check newsletter status** - Backend review (overdue from Aug 11) <!-- task-id: 41a3127e0f7f14d0c0a202059a2cbfee -->
-- [x] **Try Pest Control again** - Overdue from Aug 21 <!-- task-id: 3e079d5c3ffcb3c2981ecb17877c6ec8 -->
-- [x] **Guest room preparation** - If Wae's booking is confirmed <!-- task-id: b350ad35a421e810fc058b807d674c18 -->
-- [x] **General tidying** - Physical spaces <!-- task-id: 58aa2316e85a1f973471baa1884b4068 -->
-- [x] **Review weekly expenses** - Part of August financial health goal <!-- task-id: 9231d2907708b978b2068caad705b77c -->
-- [x] **Check upcoming bills** - Insurance, utilities, etc. <!-- task-id: 81cc4a9159fe48d9b529d43d312eb7d6 -->
-- [x] Respond to Airbnb inquiry status <!-- task-id: 0e20dcecd7b0485c67813a98726c84b3 -->
-- [x] Clear browser tabs and bookmarks <!-- task-id: 45821e03a7639b25474131af35526471 -->
 - [x] Mark completed tasks <!-- task-id: dcedacba4753693225612eb3c43560fa -->
 - [x] Review tomorrow's Front Stage Monday <!-- task-id: 4f5e6df6fb8ee1a218841f15fe67c9b2 -->
 - [x] Prep anything needed for the week <!-- task-id: 5dd51be936ab85706bf50647e3fa4393 -->
@@ -219,7 +228,6 @@
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 0ad428e0957933a3842d614de38d41a7 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 68229561dfd1018ae0124ee0ea4721a9 -->
-- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fd8bc195ca77285df6487b9c8ef81861 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0fc659075138d2455fadda65c36c470a -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b32dd183fe60c0e12dedde4a5c08d265 -->
@@ -2349,11 +2357,7 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3900df057a66cb6b529966488e0fc4b3 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: f779128cedbb7254ce258b5e75e6aaf2 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c12bc58f6f4215076886155d20844088 -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9f5692e2dfe9b13690f01857fcf329bc -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 341645370a458ffa0f6f732d5d87b2f7 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 848687b5eaed0b2043e1b840a199e4e4 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: db2b72cca9264da65f1b8decd97dc292 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8335ee700f1c5af3e8fe227438795b4f -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e2f886f846ec4e53ccfb6c9b9ec934a5 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4ba1fbabdebade71b751e2ed9c30f8ee -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 39e0cdb45387f4bcf18019b9975442b6 -->

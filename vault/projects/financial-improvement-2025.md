@@ -251,7 +251,7 @@ Based on review of financial documents and recent analysis, this project aims to
 #### B. Insurance Optimization
 
 - [ ] Shop homeowners insurance (annual) <!-- task-id: d672f92612d28ca6306fe250c492bf44 -->
-- [ ] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
+- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
 - [ ] Consider higher deductibles for lower premiums <!-- task-id: 4358df3c2511686afd236d0976cda468 -->
 - [ ] Bundle policies for discounts <!-- task-id: 22d848472aaadd2a19d5c5942765f194 -->
 
