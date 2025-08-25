@@ -1,9 +1,13 @@
 # Today's Tasks
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 *Generated: 8/25/2025, 1:31:16 PM EDT*
 =======
 
+*Generated: 8/24/2025, 9:50:29 PM EDT*
+>>>>>>> Stashed changes
+=======
 *Generated: 8/24/2025, 9:50:29 PM EDT*
 >>>>>>> Stashed changes
 
@@ -134,6 +138,7 @@
 - [ ] Review and improve test coverage <!-- task-id: 8d110495601cc2418a6e283b8a3b8e4d -->
 - [ ] Review and improve test coverage <!-- task-id: 6bbd1d695a3bb66635ed5328b0b216a7 -->
 - [ ] Review and improve test coverage <!-- task-id: 35d675cc1dc3f98d766c3f694c0c35bf -->
+<<<<<<< Updated upstream
 
 <details>
 <<<<<<< Updated upstream
@@ -679,6 +684,16 @@
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6f6aadf8023e7088b88e9a58ef504502 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8207f8d404b6842ffb896081388a81cd -->
 =======
+=======
+
+## Next Up
+
+- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
+- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
+- [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
+
+<details>
+>>>>>>> Stashed changes
 <summary><strong>✅ Done Today</strong> (3748 tasks completed)</summary>
 
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 601ce19bcb9edc7ccc6d67c6e5f1a6f2 -->
@@ -686,11 +701,15 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 307f9606328b9b89196b7c1574e8cd11 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8291b3aaee1573ce89e77b41c6a9f6e8 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 528e2f5adfe24958f6c661f940908230 -->
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 83249cac7fdb6ce2ab4357dbae33100d -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6b8efd6cab56c5dc3e360cbe35f86338 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9c9cddfcef5efb2f133bd05e0e05c4d1 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3f29b97a2058e71a4898eb42aec9cfa6 -->
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
 - [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
@@ -1509,6 +1528,8 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1a059c30cda235eb914d4a912c42a5a2 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 634148363cdcfee84a19248f516efdfc -->
 =======
+=======
+>>>>>>> Stashed changes
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 11b5449690ff6b5c8e30cbd859e8e262 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6c12c6b61515c8583431db1e2c280bb -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1df9566b15e3bab9076d3c4bb0ced5fc -->
