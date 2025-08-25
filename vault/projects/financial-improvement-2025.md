@@ -4,832 +4,114 @@
 **Created:** August 16, 2025  
 **Status:** Active  
 **Priority:** HIGH  
+**Last Updated:** August 24, 2025
 
 ## Executive Summary
 
-Based on review of financial documents and recent analysis, this project aims to achieve financial stability and reduce monthly expenses by $3,000-4,000 through systematic cost reduction, expense tracking, and strategic financial management.
+This project aims to reduce monthly expenses by $3,000-4,000 through systematic cost reduction, expense tracking, and strategic financial management. Current focus is on hosting consolidation and subscription optimization.
+
+**Progress to Date:** $620-625/month saved (Heroku $450/mo + Redis $90/mo + Cloudflare Argo $80-85/mo)
 
 ## Current Financial Situation
 
-### Key Concerns (from August 2025 notes)
+### Monthly Expense Analysis (August 24, 2025)
 
-- Not tracking income and expenses systematically
-- Withdrawing from Roth 401k to cover expenses
-- Long-term expenses (homeowners insurance) catching by surprise
-- Multiple redundant services and subscriptions
+**Total Monthly Expenses:** ~$27,864
 
-### Monthly Expense Analysis (Updated August 24, 2025)
+#### Major Categories
 
-**Total Average Monthly Expenses:** ~$27,864
-
-#### Major Categories - Past 12 Months Analysis
-
-1. **Business/OlderGay.Men:** $4,625/mo average
-   - Heroku hosting: WAS $1,193/mo → NOW ~$743/mo (after Standard-2X downgrade)
-   - AWS: $234/mo average
-   - Cloudflare: $100/mo average (Argo acceleration + services)
-   - GitHub: $154/mo average (multiple subscriptions)
-   - Discourse: $423/mo average
-   - LocationIQ: $99/mo (good value for 426K requests/month)
-   - ChatGPT: Check for duplicate subscriptions
+1. **Business/OGM:** $4,545/mo (after savings)
+   - Heroku: ~$653/mo (after $540 in savings)
+   - AWS: $234/mo
+   - Cloudflare: $15-20/mo (Argo disabled, kept certificates)
+   - Discourse: $423/mo
+   - LocationIQ: $99/mo (cost-effective for usage)
    - Other services: ~$1,989/mo
+
 2. **Housing:** $2,360/mo
-   - Homeowners Insurance: $1,207/mo (annual $7,242)
-   - Household supplies: $461/mo
-3. **Health:** $1,329/mo
-   - Health Insurance: $634/mo
-   - Massage therapy: $135/mo
+3. **Health:** $1,329/mo  
 4. **Electronics & Software:** $1,058/mo
-   - Apple device payments: $456/mo
-   - Software subscriptions: ~$600/mo
 5. **Food:** $758/mo
-   - Groceries: $270/mo
-   - Restaurants/Fast food: $268/mo
 
-### Income Sources
+## Primary Goals
 
-- Airbnb rental income (recent payout: $203.70)
-- OGM Patreon members
-- Other business income (needs tracking)
-
-## Project Goals
-
-### Primary Objectives
-
-1. **Reduce monthly expenses by $3,000-4,000** (Target: $24,000/mo → $20,000/mo)
-2. **Establish comprehensive expense tracking system**
-3. **Stop Roth 401k withdrawals within 3 months**
-4. **Build 3-month emergency fund by end of 2025**
-5. **Increase passive income streams**
-
-### Success Metrics
-
-- Monthly expense reduction achieved
-- Days without 401k withdrawal
-- Emergency fund balance
-- Expense tracking compliance rate
-- Net monthly cash flow (positive)
-- Go to Palm Springs with my accounts reconciled, and a clear view of my financial situation
-
-## 🚨 URGENT UPDATE - August 24, 2025
-
-### Critical Findings from Financial Analysis
-
-**Your actual monthly OGM costs are $4,625/mo - NOT the $2,700 estimated!**
-
-#### Top 10 Immediate Cost-Cutting Opportunities
-
-1. **Cancel Duplicate Services** - Save $500/mo IMMEDIATELY
-   - Cloudflare: Consolidate 31 charges ($145/mo) to single $20/mo plan = Save $125/mo
-   - ✅ Cursor subscriptions: ALREADY CANCELED
-   - Review ChatGPT subscriptions for any duplicates
-   - MDBootstrap: $169/YEAR ($14/mo - you use it, keep it)
-   - YNAB: $98.99/YEAR ($8.25/mo - you use it, keep it)
-   - Discourse: $316/mo (important community platform - keeping for now)
-   - **ACTION TODAY**: Focus on consolidation, not LocationIQ
+1. **Reduce monthly expenses by $3,000-4,000**
+2. **Stop Roth 401k withdrawals within 3 months**
+3. **Build 3-month emergency fund by end of 2025**
+4. **Establish comprehensive expense tracking**
 
-2. **Duplicate/Redundant Services** - Review for savings
-   - Multiple ChatGPT subscriptions (verify if duplicates exist)
-   - Multiple GitHub subscriptions (review necessity)
-   - ✅ Cursor subscriptions CANCELED (already saved)
+## 🎯 Current High-Impact Actions
 
-3. **Cloudflare Optimization** - Save $75-85/mo
-   - Current: ~$100/mo in usage-based charges
-   - Main cost is Argo acceleration ($75-95/mo)
+### ✅ Completed Savings ($620-625/month)
 
-4. **Apple Device Payments** - $455/mo total
-   - MacBook Pro: $133.25/mo
-   - iMac/iPad: $217.65/mo
-   - Mac Mini: $49.91/mo
-   - Consider paying off early or extending lifecycle
+1. **Heroku Performance-L → Standard-2X downgrade** - $450/mo saved
+2. **Redis migration to Railway** - $90/mo saved ✓ August 24, 2025
+3. **Cloudflare Argo optimization** - $80-85/mo saved ✓ August 24, 2025
 
-5. **LocationIQ** - KEEP IT (Actually cost-effective!)
-   - Current: $99/mo for 426K requests/month
-   - Mapbox would cost $245/mo, OpenCage $150/mo
-   - **LocationIQ is the cheapest option for your usage**
+### 🔄 Next Priority Actions ($56/month potential)
 
-6. **Insurance Shopping** - Save $500/mo
-   - Homeowners: $1,823/mo (shop for better rates)
-   - Health: $634/mo (check ACA marketplace)
+1. **SendGrid Gold → Starter** - Save $56/mo
+2. ✅ **Papertrail already on free tier** - No additional savings
 
-7. **Upcoming Big Expenses to Prepare For**
-   - Property Taxes: $10,765 (February 2026)
-   - Homeowners Insurance: $7,242 (June 2026)
-   - Flood Insurance: $2,461 (July 2026)
-   - **Total needed by July 2026: $20,468**
+### 💰 Medium-Term Opportunities
 
-8. **Review Annual Services**
-   - Akismet: $638.96/year ($53/mo - needed for spam)
-   - MDBootstrap: $169/year ($14/mo - actively used)
-   - YNAB: $98.99/year ($8.25/mo - actively used)
+4. **Apple device payments** - $455/mo (consider payoff strategy)
+5. **Insurance shopping** - $500/mo potential savings
+6. **Subscription audit** - $200-300/mo potential
 
-9. **Consolidate Communication Tools** - Save $100/mo
-   - Front, Jitsi, Discourse hosting overlap
-   - Consider self-hosting or free alternatives
+## Action Plan Progress
 
-10. **Food & Dining Optimization** - Save $200/mo
-    - HelloFresh: $60.95/mo (cook from scratch)
-    - Restaurant spending: $130/mo average
+### Phase 1: Hosting Consolidation ✅ IN PROGRESS
 
-### CORRECTED Total Potential Monthly Savings: ~$800/mo ($9,600/year)
+- [x] Heroku Performance-L downgrade ($450/mo saved) <!-- task-id: 34dd4c8c9989ee6de883dfc7458234b2 -->
+- [x] Redis migration to Railway ($90/mo saved) <!-- task-id: 9e9e155fe136667902fd2774432f6c4c -->
+- [x] Cloudflare Argo optimization ($80-85/mo saved) <!-- task-id: aa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d -->
+- [ ] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
+- [x] Papertrail optimization (already on free tier) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
+- [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
 
-## 🎯 REVISED HIGHEST-IMPACT ACTIONS (Heroku downgrade already done!)
+### Phase 2: Expense Tracking 📋 PENDING
 
-Since you've already completed the Heroku downgrade (saving $450/mo), here are the ACTUAL highest-impact actions for TODAY:
+- [ ] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
+- [ ] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
+- [ ] Create monthly budget dashboard <!-- task-id: 017f6c6f22617fd16b0af9f5c53f1e93 -->
 
-### CORRECTED: Actual High-Impact Monthly Savings
+### Phase 3: Insurance & Subscriptions 📋 PENDING
 
-1. **Cloudflare Optimization** - Save up to $85/mo
-   - Current actual bills: $93-116/mo (averaging ~$100/mo)
-   - Breakdown of charges:
-     • Argo Accelerated Transfer: 688-951 GB/mo @ $0.10/GB = $69-95/mo
-     • Advanced Certificate Manager: $10/mo
-     • Argo Zone Level Plan: $5/mo  
-     • Cache Reserve: ~$5/mo in usage
-   - **Optimization strategy:**
-     • Disable Argo acceleration to save $75-85/mo
-     • Test if site performance is acceptable without it
-     • Keep Advanced Certificates for security ($10/mo)
-   - **Potential new cost: $15-20/mo (save $80/mo)**
+- [ ] Shop homeowners insurance <!-- task-id: 7d1b36fd22868ee3522747a4c5da6197 -->
+- [ ] Review health insurance options <!-- task-id: a09b51c176b6fef743ad7b60d39c933b -->
+- [ ] Complete subscription audit <!-- task-id: 056a31f62c9f33523bcc0da8505b7025 -->
 
-4. **Apple device payments** - $455/mo total
-   - MacBook Pro: $133.25/mo
-   - iMac/iPad: $217.65/mo  
-   - Mac Mini: $49.91/mo
-   - Consider paying off or extending lifecycle
-   - **Not immediate but significant**
+## Success Metrics
 
-5. **YNAB & MDBootstrap** - ANNUAL charges, not monthly!
-   - YNAB: $98.99/YEAR (only $8.25/mo)
-   - MDBootstrap: $169/YEAR (only $14/mo)
-   - You use both - KEEP THEM
+- **Monthly savings achieved:** $620-625/mo ✓ (Target: $3,000-4,000)
+- **Hosting costs:** $568-573/mo (Target: $150/mo)
+- **Days without 401k withdrawal:** Track needed
+- **Emergency fund balance:** $0 (Target: $60,000)
 
-### Next Priority (This week) - Save $200/mo
+## Services to Keep (Confirmed Cost-Effective)
 
-6. **Heroku Add-ons Optimization**
-   - Downgrade SendGrid Gold to Starter: Save $56/mo
-   - Switch Papertrail to free tier: Save $50/mo
-   - Migrate Redis to Railway: Save $90/mo
+- **LocationIQ** ($99/mo) - Cheapest for 426K requests/month
+- **YNAB** ($8.25/mo) - Annual charge, actively used
+- **MDBootstrap** ($14/mo) - Annual charge, actively used  
+- **Discourse** ($316/mo) - Important for community, review later
 
-7. **Migrate HIGHEST-COST services to Railway**
-   - Since PostgreSQL is only $50/mo (not $200), focus on:
-   - Redis migration first ($100 → $10 = save $90/mo)
-   - Then add-ons consolidation
+## Next Actions (This Week)
 
-### Not PostgreSQL
+1. **SendGrid downgrade** - Easy $56/mo win (only remaining Heroku add-on optimization)
+2. **Subscription audit** - Export bank/credit card charges
+3. **Insurance quotes** - Get 3 homeowners quotes
+4. **Full Railway migration planning** - Next phase for bigger savings
 
-With PostgreSQL at only $50/mo, migrating it saves just $30/mo. Focus on the bigger wins above first!
+## Notes
 
-## Action Plan
-
-### Phase 1: Immediate Cost Reduction (Weeks 1-2)
-
-**Target Savings: $1,500-2,000/month**
-
-#### A. Hosting Consolidation (Priority 1)
-
-**Current Cost:** $975/mo (reduced from $1,425/mo) | **Target:** $200/mo | **Savings:** $775/mo remaining
-
-1. **Week 1: Analysis & Planning**
-   - [ ] Inventory all Heroku applications and dependencies
-   - [ ] Document current Heroku add-ons and usage
-   - [ ] Research Railway.app vs Render.com vs self-hosting
-   - [ ] Create migration checklist
-
-2. **Week 2: Staging Migration**
-   - [ ] Set up staging environment on chosen platform
-   - [ ] Test application functionality
-   - [ ] Benchmark performance
-   - [ ] Plan zero-downtime migration
-
-#### B. Subscription Audit
-
-**Target Savings: $300-500/month**
-
-- [ ] Export all recurring charges from bank/credit cards <!-- task-id: ac09220ad7087335e08571cb84be9022 -->
-- [ ] Categorize as Essential/Nice-to-have/Unused <!-- task-id: 1ff13e4e5427032eda2220b9278b89e9 -->
-- [ ] Cancel unused subscriptions immediately <!-- task-id: 668ce36eac168a66850683011f427eff -->
-- [ ] Negotiate or downgrade nice-to-haves <!-- task-id: cbc2d7b1ac4cd7c0425191cc86e9356c -->
-- [ ] Set calendar reminders for annual reviews <!-- task-id: 60006753693bf21080427c6fcbaed903 -->
-
-#### C. Quick Wins
-
-- [x] **URGENT: Downgrade Heroku Performance-L to Standard-2X (will save $450/mo)** <!-- task-id: 75db6433ecadda74101526604ffd716e -->
-- [ ] Switch SendGrid Gold to Starter (save $60/mo) <!-- task-id: 4357f8c535b156ab7fc2b9054d98e160 -->
-- [ ] Review and cancel unused software subscriptions <!-- task-id: 2ceaf50e43429c26fd30f4eeb17d30f2 -->
-
-### Phase 2: Financial Tracking System (Weeks 2-3)
-
-**Prevent surprise expenses and enable data-driven decisions**
-
-#### A. Expense Tracking Setup
-
-- [ ] Choose tracking tool (YNAB, Mint, or custom solution) <!-- task-id: 67885c1cc0816d713e52930cfa918b59 -->
-- [ ] Import historical data from CSV <!-- task-id: b757bad02af80628e3bfc9df69ebabbc -->
-- [ ] Set up categories aligned with tax needs <!-- task-id: d469efee132a9ed8f7dd633dac954d78 -->
-- [ ] Create monthly budget based on reduced expenses <!-- task-id: 8d1340cd7380d7e40760f9c58fe3cdf1 -->
-- [ ] Set up alerts for unusual spending <!-- task-id: d04f39619ecc4e9687037193c1f0d0ac -->
-
-#### B. Income Tracking
-
-- [ ] Document all income sources <!-- task-id: 523c7dd5ba969c68db5a72ca3f8c3992 -->
-- [ ] Track Airbnb income and occupancy <!-- task-id: 05bd086049a01590fa36383e55b00a1f -->
-- [ ] Monitor OGM/Patreon subscriber trends <!-- task-id: 6eb895b807494a53dc3592b7f013671d -->
-- [ ] Calculate true hourly rate for contract work <!-- task-id: 2a5773306060bb9b208e1605c05efaca -->
-
-#### C. Automated Reporting
-
-- [ ] Weekly expense summary email <!-- task-id: 54ed2820920872f79b98f85792f71a24 -->
-- [ ] Monthly financial health dashboard <!-- task-id: 09a904ceeac6ffc9b612b84705cacb4a -->
-- [ ] Quarterly trend analysis <!-- task-id: a74f63e6a0a71f0356505c082b840d8a -->
-- [ ] Annual tax preparation checklist <!-- task-id: 2e7bc24d00e9492f1613590ac508654a -->
-
-### Phase 3: Platform Migration (Weeks 3-6)
-
-**Execute the hosting consolidation plan**
-
-#### Week 3-4: Production Migration
-
-- [ ] Backup all production data <!-- task-id: 01f63f852e54ac62353a94e6d2359dbb -->
-- [ ] Set up production environment <!-- task-id: 6e1e61265f55d18a9b9ad330703fc143 -->
-- [ ] Configure DNS and SSL <!-- task-id: 67cc92a466d05997827f0120f619c7e4 -->
-- [ ] Migrate database with minimal downtime <!-- task-id: 373e96a1db154860ba35f1749aa1ed2e -->
-- [ ] Update environment variables <!-- task-id: 987530f27439a3c8aea48625636e3f0f -->
-- [ ] Test all critical paths <!-- task-id: 3ae7ea424e1cff4b60773715c262b28b -->
-- [ ] Monitor for 48 hours post-migration <!-- task-id: f7abacee3ef78cb1c4e9aabf9d321487 -->
-
-#### Week 5-6: Optimization
-
-- [ ] Fine-tune performance settings <!-- task-id: 67a807615788dadbb5a718adec8e9574 -->
-- [ ] Implement caching strategies <!-- task-id: ea3fe27dbb25665e0fa4a7d233e11fac -->
-- [ ] Set up monitoring and alerts <!-- task-id: ecc14a678db74549b3097d4d6749c84d -->
-- [ ] Document new infrastructure <!-- task-id: b4809f8af28eee488413df96a1d3a8a2 -->
-- [ ] Train on new deployment process <!-- task-id: 55403da490a9f7bd70bb0b9cf5b46eab -->
-- [ ] Cancel Heroku subscriptions <!-- task-id: d29d3593a4e9072f67043e69b314440e -->
-
-### Phase 4: Income Enhancement (Months 2-3)
-
-**Increase passive and semi-passive income**
-
-#### A. Airbnb Optimization
-
-- [ ] Professional photos of rental spaces <!-- task-id: 20c65d8d837a48e2b3f5051ba4c2956d -->
-- [ ] Optimize listing descriptions for SEO <!-- task-id: cab6640aa204eff29b2c619ddaa2f826 -->
-- [ ] Implement dynamic pricing <!-- task-id: c7503175ec169366aeff5add041bb234 -->
-- [ ] Add amenities to justify higher rates <!-- task-id: 26d8b144a133ef0765f766ef962b82c5 -->
-- [ ] Target longer-term stays (less turnover) <!-- task-id: 9d9fd5437259ba803742b6f4474e62fe -->
-
-#### B. OGM Revenue Growth
-
-- [ ] Launch premium membership tier <!-- task-id: a6a74ea5f1adf8d4f96ed2fe3afe8ec8 -->
-- [ ] Create exclusive content for Patreon <!-- task-id: 165c555a8a6157c0382d1cce3a9d7daa -->
-- [ ] Implement affiliate partnerships <!-- task-id: 3e25bdafaca468138d6d34e0630cc1da -->
-- [ ] Develop digital products/courses <!-- task-id: 289e28314a34b5b22188377f1abd4e5a -->
-- [ ] Optimize member retention <!-- task-id: 0d6b4aecbc099899e90e895b5deb8451 -->
-
-#### C. New Revenue Streams
-
-- [ ] Identify skills for consulting/freelance <!-- task-id: 4bad75b7e5cc046d0da8f599c0580a91 -->
-- [ ] Create passive income products <!-- task-id: dfd43d3bcf5546080b409022c8db26cd -->
-- [ ] Explore investment opportunities <!-- task-id: 004679a0b3daa3d17258f87688cbce9d -->
-- [ ] Consider additional rental opportunities <!-- task-id: 3bba9f1dc48de17b52d206aa0fe70c76 -->
-
-### Phase 5: Long-term Financial Health (Months 3-6)
-
-#### A. Emergency Fund Building
-
-- [ ] Open high-yield savings account <!-- task-id: 983a79e220267106d579b154c0df5116 -->
-- [ ] Automate weekly transfers ($500/week goal) <!-- task-id: f21a6de8feab84b3fc22cc46b272a8c3 -->
-- [ ] Track progress visually <!-- task-id: 4ded23085efd52b027c3149c33f35d66 -->
-- [ ] Resist non-emergency withdrawals <!-- task-id: f321a2dee235538ca7fd386082817487 -->
-
-#### B. Insurance Optimization
-
-- [ ] Shop homeowners insurance (annual) <!-- task-id: d672f92612d28ca6306fe250c492bf44 -->
-- [x] Review health insurance options <!-- task-id: e00682949810346ccfedfab5dcda5cbd -->
-- [ ] Consider higher deductibles for lower premiums <!-- task-id: 4358df3c2511686afd236d0976cda468 -->
-- [ ] Bundle policies for discounts <!-- task-id: 22d848472aaadd2a19d5c5942765f194 -->
-
-#### C. Tax Optimization
-
-- [ ] Track all business expenses <!-- task-id: 9da966ed1cccc9c1f5a82455ee0bb9aa -->
-- [ ] Maximize deductions <!-- task-id: 6e071a65a5c5cfb39d2c1368f4ebd749 -->
-- [ ] Consider quarterly estimated payments <!-- task-id: 413aeed2554ffecdaf766601ef78f8e5 -->
-- [ ] Consult with tax professional <!-- task-id: ed80da27a7ed4b5d0e5c8bd66685002a -->
-
-## Detailed Migration Plans
-
-### Heroku to Railway Migration Plan
-
-#### Current Heroku Setup (Monthly: ~$743 after successful downgrade)
-
-- Application dynos: ~$187/mo (Standard-2X at $50 + others at $137)
-- PostgreSQL databases: $50/mo (not $200 as previously thought!)
-- Redis instances: ~$100/mo
-- Add-ons: ~$406/mo
-  - SendGrid Gold: $66/mo → can downgrade to $10/mo
-  - Papertrail: $50/mo → can use free tier
-  - Scheduler: $30/mo
-  - Other add-ons: ~$260/mo
-
-#### Target Railway Setup (Monthly: ~$150)
-
-- Production services: $40/mo
-- PostgreSQL: $20/mo
-- Redis: $10/mo
-- Cron jobs: Included
-- Logging: Free tier
-- Email: AWS SES ($10/mo)
-
-#### Migration Steps
-
-1. **Preparation (Day 1-2)**
-   - Export Heroku environment variables
-   - Backup all databases
-   - Document current architecture
-   - Create Railway account
-
-2. **Staging Setup (Day 3-4)**
-   - Deploy application to Railway
-   - Import database backup
-   - Configure environment variables
-   - Set up Redis
-   - Test all functionality
-
-3. **Production Migration (Day 5-6)**
-   - Schedule maintenance window
-   - Final database backup
-   - Update DNS to Railway
-   - Monitor for issues
-   - Keep Heroku as fallback for 1 week
-
-4. **Cleanup (Day 7-14)**
-   - Verify stable operation
-   - Migrate any missed services
-   - Cancel Heroku subscriptions
-   - Document new setup
-
-### Alternative: Self-Hosted VPS Solution
-
-#### Target Setup (Monthly: ~$100)
-
-- Hetzner VPS (8 vCPU, 32GB RAM): $48/mo
-- Backup storage: $10/mo
-- Monitoring service: $10/mo
-- Domain/SSL: $5/mo
-- Email service: $10/mo
-
-#### Benefits
-
-- Full control over infrastructure
-- No vendor lock-in
-- Can host multiple projects
-- Learn valuable DevOps skills
-
-#### Implementation
-
-- Use Docker Compose for orchestration
-- Implement automated backups
-- Set up monitoring with Prometheus/Grafana
-- Use Caddy for automatic SSL
-- Implement CI/CD with GitHub Actions
-
-## Risk Management
-
-### Identified Risks
-
-1. **Migration Downtime**
-   - Mitigation: Blue-green deployment, extensive testing
-
-2. **Unexpected Expenses**
-   - Mitigation: Weekly expense reviews, emergency fund
-
-3. **Income Volatility**
-   - Mitigation: Diversify income sources, longer rental stays
-
-4. **Technical Complexity**
-   - Mitigation: Gradual migration, maintain backups
-
-### Contingency Plans
-
-- Keep Heroku account active (free tier) for emergency fallback
-- Maintain 1-month expense buffer before major changes
-- Document all systems for quick recovery
-- Have expert contacts for emergency support
-
-## Monthly Review Checklist
-
-### Week 1 of Each Month
-
-- [ ] Review previous month's expenses <!-- task-id: bf99947d52794d9ff22829ce7c8b85b0 -->
-- [ ] Calculate actual vs. budgeted spending <!-- task-id: 1d4ea6d0084a3ca1dd44651e7503467c -->
-- [ ] Identify top 3 expense reduction opportunities <!-- task-id: 3837886a9416853050138d0f2bea033e -->
-- [ ] Update income projections <!-- task-id: 92bf3129792a08f38a2f53ffa9e3c6ac -->
-- [ ] Check progress on savings goals <!-- task-id: 1a4fe4d8bb5d5357cb5e3d6970c1606d -->
-
-### Week 2
-
-- [ ] Review and optimize subscriptions <!-- task-id: 8f4a169f4b6fab0c19bdd4bd480fe74c -->
-- [ ] Check for better insurance rates <!-- task-id: 8c36efec1fb63b6235c9803e631f14a1 -->
-- [ ] Analyze Airbnb performance <!-- task-id: 45a4cebd506c388323126ad0c947a360 -->
-- [ ] Review investment account balances <!-- task-id: 5523faf71672c321af8ee595b06181f0 -->
-
-### Week 3
-
-- [ ] Prepare for upcoming large expenses <!-- task-id: 0c3c8539eb46b5644cb31cd65d93ca7d -->
-- [ ] Review and pay credit card balances <!-- task-id: a7f552ed61b46eaf81246fc1812e0d44 -->
-- [ ] Check tax withholding adequacy <!-- task-id: 02acb36197eca6d50b1ecf05e93bbd1c -->
-- [ ] Update financial tracking systems <!-- task-id: 96fd13e2144876709787d6746becc429 -->
-
-### Week 4
-
-- [ ] Calculate month's net cash flow <!-- task-id: 029916930e547c275e25c7627c3fad5e -->
-- [ ] Transfer savings to emergency fund <!-- task-id: ae3747aac7c63521f2ad24bdf018768c -->
-- [ ] Review and adjust next month's budget <!-- task-id: 9442038c69701ce5c12840004748531a -->
-- [ ] Celebrate wins and learn from misses <!-- task-id: f2b3308edee2219cf0749a14fad1ff42 -->
-
-## Success Tracking
-
-### Key Performance Indicators (KPIs)
-
-1. **Monthly Burn Rate**: Current: $27,864 → Target: $20,000
-2. **Days Since 401k Withdrawal**: Current: 0 → Target: 90+
-3. **Emergency Fund Balance**: Current: $0 → Target: $60,000
-4. **Hosting Costs**: Current: $743 (after downgrade) → Target: $150
-5. **Total OGM Expenses**: Current: $4,625/mo → Target: $1,500/mo
-5. **Food Expenses**: Current: $758 → Target: $500
-6. **Net Monthly Cash Flow**: Current: Negative → Target: +$2,000
-
-### Milestones
-
-- **Month 1**: Reduce expenses by $1,500/mo
-- **Month 2**: Reduce expenses by $2,500/mo
-- **Month 3**: Achieve positive cash flow
-- **Month 6**: 3-month emergency fund established
-- **Month 12**: Financial independence trajectory
-
-## Resources and Tools
-
-### Financial Management
-
-- YNAB or custom expense tracking solution
-- High-yield savings account (Ally, Marcus)
-- Investment tracking (Personal Capital)
-
-### Technical Migration
-
-- Railway.app documentation
-- Docker and Docker Compose
-- GitHub Actions for CI/CD
-- Monitoring: UptimeRobot, Sentry
-
-### Learning Resources
-
-- Railway migration guides
-- Docker best practices
-- Financial independence communities
-- Tax optimization strategies
-
-## Notes and Insights
-
-### From Financial Review
-
-- Heroku costs are the biggest opportunity for savings
-- Multiple hosting services indicate lack of consolidation
-- Food expenses reasonable but could be optimized
-- Health insurance shopping could yield savings
-- Device payment cycle could be extended
-
-### From Personal Notes
-
-- Current system (Notion) isn't providing needed visibility
-- Need automated daily reviews and summaries
-- Multiple data silos preventing holistic view
-- Feeling overwhelmed requires systematic approach
-
-### Lessons Learned
-
-- Small recurring charges add up significantly
-- Annual expenses need monthly allocation
-- Tracking alone changes behavior
-- Automation prevents decision fatigue
+- Redis migration completed successfully with zero downtime
+- Cloudflare Argo optimization completed - $80-85/mo saved, performance monitoring ongoing
+- PostgreSQL migration only saves $30/mo - lower priority
+- Focus on biggest wins first: SendGrid downgrade ($56/mo), then full Railway migration
 
 ---
 
-## 🔥 CORRECTED PRIORITIES - ACTUAL HIGHEST IMPACT (August 24, 2025)
-
-### ✅ What You've Already Done Right
-
-- Heroku Performance-L downgrade: Saving $450/mo ✓
-- LocationIQ at $99/mo is actually the BEST deal for 426K requests/month
-- YNAB ($8.25/mo) and MDBootstrap ($14/mo) are ANNUAL, not monthly - keep them!
-
-### 🎯 REAL Highest-Impact Actions for TODAY
-
-1. **Cloudflare Optimization** - Save up to $85/mo
-   - [ ] Disable Argo acceleration (currently $75-95/mo)
-   - [ ] Test OGM site performance without Argo
-   - [ ] Keep only Advanced Certificates ($10/mo) if performance is acceptable
-   - [ ] Monitor site speed for 1 week before deciding
-
-2. **Heroku Add-ons** - Save $196/mo total
-   - [ ] SendGrid Gold → Starter: Save $56/mo
-   - [ ] Papertrail → Free tier: Save $50/mo
-   - [ ] Redis → Railway: Save $90/mo
-
-**Realistic Immediate Savings: $281/month = $3,372/year**
-(Cloudflare optimization: $85/mo + Heroku add-ons: $196/mo)
-
-### 📌 Important Services to Keep (Review Later)
-
-**Discourse** ($316/mo) - Critical for OGM community, happy with hosting
-**YNAB** ($8.25/mo) - Useful financial tracking tool
-**MDBootstrap** ($14/mo) - Actively used for OGM development
-
-### 💭 Services to Review Again Someday
-
-**Discourse** ($316/mo)
-- Currently essential for community engagement
-- Potential savings: $276/mo if self-hosted
-- Revisit only if financial situation requires
-
-**LocationIQ** ($99/mo)  
-- Currently best value for 426K requests/month
-- Alternatives cost more (Mapbox: $245/mo, OpenCage: $150/mo)
-- Could optimize usage or implement caching to reduce requests
-- Revisit if usage patterns change or better alternatives emerge
-
-**Cloudflare Argo** ($75-95/mo)
-- Argo acceleration speeds up your site by routing through Cloudflare's network
-- Currently processing 700-950 GB/month at $0.10/GB
-- Test disabling Argo to measure actual performance impact
-- If site remains fast enough without it, save $85/mo
-- Keep Advanced Certificates ($10/mo) for SSL security
-
-2. **Review Railway Migration Priority**
-   - [ ] Migrate Redis from Heroku to Railway - Save $90/mo
-   - [ ] Downgrade SendGrid Gold to Starter - Save $56/mo
-   - [ ] Switch Papertrail to free tier - Save $50/mo
-
-3. **Start Railway Migration Prep**
-   - [ ] Create Railway account (free)
-   - [ ] Export Heroku PostgreSQL connection details
-   - [ ] Document current Heroku configuration
-
-### This Evening (5-8 PM)
-
-4. **Subscription Audit**
-   - [x] Export all recurring charges from credit cards
-   - [x] List in spreadsheet with monthly costs
-   - [x] Mark as: Keep / Cancel / Negotiate
-   - [ ] Set calendar reminders to cancel before next billing
-
-5. **Insurance Shopping Prep**
-   - [ ] Gather current insurance policy details
-   - [ ] List coverage amounts needed
-   - [ ] Schedule calls with 3 insurance agents for Monday
-
-### Tomorrow (Monday - Front Stage Day)
-
-6. **Make Phone Calls**
-   - [ ] Call insurance companies for quotes
-   - [ ] Cancel subscriptions that require phone calls
-   - [ ] Negotiate Cloudflare plan consolidation
-
-### This Week Priority Actions
-
-7. **Railway Migration - Stage 1**
-   - [ ] Migrate PostgreSQL to Railway (save only $30/mo - lower priority)
-   - [ ] Migrate Redis to Railway (save $90/mo)
-   - [ ] Test thoroughly before canceling Heroku databases
-
-8. **Big Expense Planning**
-   - [ ] Set aside $1,700/mo for upcoming taxes/insurance
-   - [ ] Open high-yield savings for these funds
-   - [ ] Automate weekly transfer of $425
-
-## Next Actions (TODAY)
-
-1. **Immediate (Next 2 hours):**
-   - [ ] Download and review last 3 months bank statements
-   - [ ] List all recurring subscriptions
-   - [ ] Cancel 3 unused subscriptions
-
-2. **Today:**
-   - [ ] Research Railway.app pricing and features
-   - [ ] Document current Heroku application architecture
-   - [ ] Set up basic expense tracking spreadsheet
-
-3. **This Week:**
-   - [ ] Complete full subscription audit
-   - [ ] Get quotes from 3 insurance companies
-   - [ ] Start Heroku to Railway migration planning
-
-## Notes/Thoughts
-
-- I can probably cancel some of my GitHub and ChatGPT services now that I'm using Claude.
-
-## Historical Analysis
-
-### AI analysis from 8/3/2025
-
-```
-> Let's review @2024 Fresh Start as of 2025-07-31 10-03 - 
-  Register.csv What would be effective ways to start reducing my 
-  expenses?
-
-● I'll analyze your expenses from the CSV file to help identify
-  ways to reduce them.
-
-> They include dates. Let's look at the last six months.
-
-● I'll analyze your expenses from the last six months to identify
-  spending patterns and suggest ways to reduce them.
-
-● Update Todos
-  ⎿  ☒ Extract and analyze expenses from the last 6 months
-     ☐ Categorize spending by major expense groups
-     ☐ Identify top spending categories and amounts
-     ☐ Provide specific recommendations to reduce expenses
-
-● Let me get more details on the specific expenses within the top
-  categories:
-
-● Update Todos
-  ⎿  ☒ Extract and analyze expenses from the last 6 months
-     ☒ Categorize spending by major expense groups
-     ☒ Identify top spending categories and amounts
-     ☐ Provide specific recommendations to reduce expenses
-
-● Based on my analysis of your last 6 months of expenses, here are
-  effective ways to reduce your spending:
-
-  Top Spending Areas & Reduction Strategies:
-
-  1. OlderGay.Men Business Expenses ($27,844/6mo, $4,641/mo)
-
-  - Heroku: $16,575 ($2,763/mo) - Consider migrating to cheaper
-  alternatives like Railway, Render, or self-hosting on a VPS
-  - AWS: $1,151 ($192/mo) - Review and optimize your AWS usage,
-  shut down unused instances
-  - Multiple hosting services: You're paying for Heroku, AWS,
-  Linode, Cloudflare - consolidate where possible
-
-  2. Housing ($14,157/6mo, $2,360/mo)
-
-  - Homeowners Insurance: $7,242 annual - Shop around for better
-  rates annually
-  - Household Supplies: $2,765 - Review Amazon purchases for
-  non-essentials
-
-  3. Health ($7,976/6mo, $1,329/mo)
-
-  - Health Insurance: $634/mo - Check for ACA marketplace
-  alternatives during open enrollment
-  - Massage therapy: $809 ($135/mo) - Consider reducing frequency
-
-  4. Electronics & Software ($6,346/6mo, $1,058/mo)
-
-  - Hardware: Multiple Apple device payments totaling $456/mo -
-  Consider extending device lifecycles
-  - Software subscriptions: Review and cancel unused subscriptions
-
-  5. Food ($4,546/6mo, $758/mo)
-
-  - Groceries: $270/mo average
-  - Restaurants/Fast food: $268/mo - Cut dining out by 50% to save
-  $134/mo
-
-  Quick Wins:
-
-  1. Consolidate hosting services - Potential savings: $2,000+/mo
-  2. Review all subscriptions - Cancel 30% for ~$200/mo savings
-  3. Reduce dining out by 50% - Save $134/mo
-  4. Shop insurance annually - Save 10-20% on premiums
-
-  Total potential monthly savings: $2,500-3,000
-
-> OK, let's start with #1. BTW, the Heroku bill includes some 
-  add-on services. @Heroku | Invoice.html shows the breakdown for 
-  last month. Now: How can we combine services, and/or move to 
-  cheaper ones?
-
-● I'll analyze your Heroku invoice to understand the breakdown and
-  suggest consolidation and cost-saving strategies.
-
-● Based on the Heroku invoice analysis, here's your breakdown and
-  recommendations for reducing costs:
-
-  Current Heroku Costs (Monthly):
-
-  - Application dynos: $637.29
-    - Performance-L dyno: $400.59/mo ($500/mo rate)
-    - Standard dynos: ~$237/mo (various at $25-50/mo)
-  - Add-on services: $480.91
-    - PostgreSQL (standard-0 + essential-0)
-    - Redis (premium-3 + mini)
-    - Papertrail logging
-    - Scheduler
-    - SendGrid Gold
-  - Total: $1,183.05 (with tax)
-
-  Cost Reduction Strategy:
-
-  1. Move to Railway.app or Render.com (Save ~$800/mo)
-
-  - Railway: ~$20/mo for similar compute + $10/mo PostgreSQL
-  - Render: $25/mo for web service + $20/mo PostgreSQL
-  - Both include Redis, cron jobs, and basic logging
-
-  2. Self-host on a VPS (Save ~$1,000/mo)
-
-  - DigitalOcean/Hetzner: $48-96/mo for equivalent compute
-  - Use Docker Compose for easy management
-  - Free alternatives:
-    - PostgreSQL: Self-hosted
-    - Redis: Self-hosted
-    - Logging: ELK stack or Loki
-    - Scheduler: System cron
-    - Email: SMTP relay or AWS SES ($0.10/1000 emails)
-
-  3. Consolidate with existing services:
-
-  - You're already paying for AWS ($161/mo) and Linode ($25/mo)
-  - Move Heroku apps to these existing servers
-
-  4. Optimize current Heroku usage:
-
-  - ✓ COMPLETED: Downgraded Performance-L to Standard-2X ($50/mo) - saved $450/mo
-  - Replace SendGrid Gold with Starter plan - save ~$60/mo
-  - Use free Papertrail plan or self-hosted logs - save ~$50/mo
-
-  Recommended Action Plan:
-
-  1. ✓ COMPLETED: Downgraded Heroku dynos (saved $450/mo)
-  2. Week 1-2: Set up staging on Railway/Render
-  3. Week 3-4: Migrate production with zero downtime
-  4. Result: Reduce hosting from $1,183 to ~$150/mo
-
-  Would you like me to create a detailed migration plan for any of
-  these options?
-
-● Update Todos
-  ⎿  ☒ Analyze Heroku invoice breakdown              
-     ☒ Identify add-on services and costs
-     ☒ Research cheaper alternatives for each service
-     ☒ Create migration plan to reduce hosting costs
-```
-
-### AI Analysis from 8/24/2025
-
-```
-Analysis of Your LocationIQ Usage
-
-  Based on your actual usage data from August 1-24, 2025:
-
-  Current Usage
-
-  - 330,199 requests in 24 days
-  - ~13,758 requests/day average
-  - ~426,507 requests/month projected
-
-  Cost Breakdown
-
-  ❌ Mapbox would cost MORE than LocationIQ:
-  - Current LocationIQ: $99/month
-  - Mapbox would cost: $245/month (after 100K free requests)
-  - You'd lose $146/month switching to Mapbox
-
-  Recommendations
-
-  1. STAY WITH LOCATIONIQ - Despite the accuracy issues, it's
-  significantly cheaper for your usage level
-  2. Alternative Options to Consider:
-    - OpenCage ($150/month for 15,000 requests/day) - Still more
-  expensive
-    - Geocod.io ($500/month for 500K requests) - Much more expensive
-    - HERE (250K free/month, then $1/1000) - Would cost ~$176/month
-  3. Fix Accuracy Issues Instead:
-    - Keep your GeocodingService corrections
-    - Add more known issue mappings as you discover them
-    - Consider implementing a fallback to a second provider only for
-  problematic locations
-  4. Optimize Usage:
-    - Increase cache duration (currently 30 days)
-    - Implement client-side caching
-    - Batch requests where possible
-    - Review if all geocoding requests are necessary
-
-  Your high usage (426K requests/month) makes LocationIQ at $99/month
-  actually a good deal compared to alternatives. The accuracy issues
-  are frustrating but switching providers would cost you an additional
-  $50-400/month.
-```
-
----
-
-*This project plan is a living document. Update weekly with progress, learnings, and adjustments.*
-
-**Project Owner:** [Your Name]  
+**Project Owner:** Jeffrey Covey  
 **Review Schedule:** Weekly on Sundays  
-**Next Review:** August 23, 2025
+**Next Review:** August 31, 2025
