@@ -27,4 +27,3 @@ Tasks and projects related to Personal Admin.
 - [ ] Database automations – Notion Help Center <!-- task-id: f82f050b5c7db0ec2fe72010b01108f9 -->
 - [ ] Do monthly review <!-- task-id: a8769d91aa8e29fc174a462f4c13769f -->
 - [ ] Empty long-term/recurring <!-- task-id: d713c9bd3e4aa6cfba57c500851a4c11 -->
-
