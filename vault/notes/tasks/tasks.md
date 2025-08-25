@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (1843 tasks)</summary>
+<summary><strong>General Tasks</strong> (1849 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -151,6 +151,7 @@
 - [ ] Review and improve test coverage <!-- task-id: c3567a1f6389f1690d6d85876f4a7118 -->
 - [ ] Review and improve test coverage <!-- task-id: bb03f88d2f735bb9cf57d288d1a19c22 -->
 - [ ] Review and improve test coverage <!-- task-id: 6a21eef076cfde7dbbdab024487c185f -->
+- [ ] Review and improve test coverage <!-- task-id: 29d17516071c06d3d1e7785d5018daec -->
 - [ ] add OGM news stories <!-- task-id: a110abe4bc058621ef9653a0d606343c -->
 
 ### Monday, Dec 1
@@ -684,8 +685,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 27e895e7475a8e91c88706dca37ca3a1 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6501be66e08e25dcbd7a8f04237c3e66 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b61e63e4452a134f3d44bb65ff9fc0f9 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 08cd0de4ebc0442ff60aee4b41c284ab -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ceb3cf11f47abeada807f11e2d543f16 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f08d8f6713e0fb921a7b7dc5de1a9a4f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 76d32e34f340fe2f8d7d93f542fe8a69 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
@@ -823,8 +825,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b1b98a0b8c43c25db8658d7a6d4604a6 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 62440fed2110f2f1928fe489d6226e91 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 748c06476d5d284ecf551570ccfdb464 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4f58536a9b097027b87d65f8231b35d6 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ce82e992c4e8cc788145e5cb59f73831 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 773d44ff1a60003bcc5476b358e0306c -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 035269c64a5f17150a5c1b61cf4ddf23 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -963,8 +966,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b1bc6cb203eaccf0001775a4fc182b07 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 97c625bb6a3db4e9f5011c3a8d61f3e0 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 8c1c89da58359835a6c8c759625228c5 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5f4bf56910b43471a959ffe4ecadb914 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 9a4dead4d9bda72fae955e5c3ddd1c17 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a4bc78fc3aef9f0b75a9ddacdaf77a8c -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 409b0b8b8b10ee4d3470f779777482e4 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -1185,8 +1189,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 26971ae595e6bdc62fd7a5604071153b -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 65a8339d2bef26f70468c117291f6a14 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 935a6f43d76cc2588448d0065a83512a -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5aa9755df3920ec36b417b235f74d0fe -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 37ec15badc0ade008469bb46170c3dc0 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0b531b46b806745fe73e4e873995a9a7 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 40d2319859d6fdccb36d313bad840df9 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b6be408f8e586e9132cf09abce0510b0 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a74969467788cf03b89109a230bf6e3d -->
@@ -1318,8 +1323,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 347625cf3814fe9881faabcf591db9f9 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 00d251e2d055733a036596ebbf9635e7 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c99138690f0770e7ba68e26f500a6401 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3629e120eb65494555d5dd36eb432f39 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3b2b89d8e7b686a0ebcf0c5ba32c8cc8 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 0f99774a39be0b6d99a7b606aa6e6a8d -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 6cb2524763e4549244d7686b4de63fc2 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
