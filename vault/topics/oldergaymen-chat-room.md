@@ -21,4 +21,3 @@ Tasks and projects related to Oldergaymen Chat Room.
 - [ ] Assign topics to owners <!-- task-id: 7e06e38fc152d6ba88b33b7bb165a0be -->
 - [ ] Deal with avatars that won’t upload <!-- task-id: b394666061a8b27092e41b004ba7b249 -->
 - [ ] Create views for ChatVisits <!-- task-id: 21fe6533be215adef8b6b0ef6dd7c67d -->
-
