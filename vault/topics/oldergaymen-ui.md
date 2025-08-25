@@ -30,4 +30,3 @@ Tasks and projects related to Oldergaymen Ui.
 - [ ] Do Material Minimal tutorial <!-- task-id: b5b27c157a8fefe0428df5959fde7ff3 -->
 - [ ] Don't include messages from banned users in the index of conversations <!-- task-id: f4e04774d8be9e45feefa075464a6ce0 -->
 - [ ] Enable drag-and-drop uploading for places, groups, and events <!-- task-id: ce76190b12d29e627c3f4daba4a23f42 -->
-
