@@ -1,1 +1,1 @@
-- [ ] add OGM news stories @today 
+- [ ] add OGM news stories @today
