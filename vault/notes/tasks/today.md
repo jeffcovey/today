@@ -1,11 +1,12 @@
 # Today's Tasks
 
-*Generated: 8/24/2025, 8:10:26 PM EDT*
+*Generated: 8/24/2025, 8:20:37 PM EDT*
 
 ## 🎭 Stage
 
 - [ ] Review and improve test coverage <!-- task-id: 3561d349bfbdd9665e633c1041e3d199 -->
 - [ ] Review and improve test coverage <!-- task-id: 3a7ec066a8ffe02940ae6e337d9b8cd5 -->
+- [ ] Review and improve test coverage <!-- task-id: 0d6c75435b0f9f39405fdac26e289583 -->
 
 ## Next Up
 
@@ -14,8 +15,18 @@
 - [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (3647 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (3652 tasks completed)</summary>
 
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b5d67c4c8c89d1d7c726e21f59a1b8ff -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0d85e0d52e768b41c4c36970636cbfdf -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3420f6ac2734b546cee79ff66c255fcb -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 385bf246adb40d5eea5477a72b6c47a4 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 265500f00d17c4d03ef202049e2c6d4c -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b8d1982c7c4f7145cabda89bb935c49a -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: e4649ce6b2b0459451aca95544361b64 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6e0d4f5f6f22bfaaf3162344436d387b -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 20ba658faf0aa9547dd5884983febe87 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c3f5634920887b999bcba55b57bae69a -->
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
 - [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
@@ -3653,11 +3664,6 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 20253672a73b2ae9452cfeb4bd1a485f -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ce9271debbcb3521f4a6c59954dc644d -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 94f94edc9d81c3091013bdd979ad151f -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b5d67c4c8c89d1d7c726e21f59a1b8ff -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 0d85e0d52e768b41c4c36970636cbfdf -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3420f6ac2734b546cee79ff66c255fcb -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 385bf246adb40d5eea5477a72b6c47a4 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 265500f00d17c4d03ef202049e2c6d4c -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2c37590feeeec31fc2108252e51f7bf5 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 280bdb592064e3d8a173017ef02cd896 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5b094bee904f0581358a85fe87a10727 -->
