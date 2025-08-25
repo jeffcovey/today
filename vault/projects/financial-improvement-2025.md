@@ -66,21 +66,21 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 - [x] Heroku Performance-L downgrade ($450/mo saved) <!-- task-id: 34dd4c8c9989ee6de883dfc7458234b2 -->
 - [x] Redis migration to Railway ($90/mo saved) <!-- task-id: 9e9e155fe136667902fd2774432f6c4c -->
 - [x] Cloudflare Argo optimization ($80-85/mo saved) <!-- task-id: aa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d -->
-- [x] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
+- [ ] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
 - [x] Papertrail optimization (already on free tier) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
-- [x] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
+- [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
 
 ### Phase 2: Expense Tracking 📋 PENDING
 
-- [x] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
-- [x] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
-- [x] Create monthly budget dashboard <!-- task-id: 017f6c6f22617fd16b0af9f5c53f1e93 -->
+- [ ] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
+- [ ] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
+- [ ] Create monthly budget dashboard <!-- task-id: 017f6c6f22617fd16b0af9f5c53f1e93 -->
 
 ### Phase 3: Insurance & Subscriptions 📋 PENDING
 
-- [x] Shop homeowners insurance <!-- task-id: 7d1b36fd22868ee3522747a4c5da6197 -->
-- [x] Review health insurance options <!-- task-id: a09b51c176b6fef743ad7b60d39c933b -->
-- [x] Complete subscription audit <!-- task-id: 056a31f62c9f33523bcc0da8505b7025 -->
+- [ ] Shop homeowners insurance <!-- task-id: 7d1b36fd22868ee3522747a4c5da6197 -->
+- [ ] Review health insurance options <!-- task-id: a09b51c176b6fef743ad7b60d39c933b -->
+- [ ] Complete subscription audit <!-- task-id: 056a31f62c9f33523bcc0da8505b7025 -->
 
 ## Success Metrics
 
