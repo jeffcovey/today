@@ -1,15 +1,6 @@
 # Today's Tasks
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-*Generated: 8/25/2025, 12:31:16 PM EDT*
-=======
-
-*Generated: 8/24/2025, 9:50:29 PM EDT*
->>>>>>> Stashed changes
-=======
-*Generated: 8/24/2025, 9:50:29 PM EDT*
->>>>>>> Stashed changes
+*Generated: 8/25/2025, 12:41:16 PM EDT*
 
 ## 🎭 Stage
 
@@ -116,6 +107,8 @@
 - [ ] Review and improve test coverage <!-- task-id: c239b7f97428185bff59c0717dd62d36 -->
 - [ ] Review and improve test coverage <!-- task-id: 717253ba9a8091e7c282b366af57f6a9 -->
 - [ ] Review and improve test coverage <!-- task-id: fa3756b22b48d92c797597e5a9ae5c06 -->
+- [ ] Review and improve test coverage <!-- task-id: 8db795c6d8fff3a8b79088947dbe3bce -->
+- [ ] Review and improve test coverage <!-- task-id: ac32b013e7c9a93311e44805135e6af4 -->
 
 ## Next Up
 
@@ -130,23 +123,30 @@
 - [ ] Review and improve test coverage <!-- task-id: 04b65a67d6b0ce2b3587af37c0a7a715 -->
 - [ ] Review and improve test coverage <!-- task-id: 8d110495601cc2418a6e283b8a3b8e4d -->
 - [ ] Review and improve test coverage <!-- task-id: 6bbd1d695a3bb66635ed5328b0b216a7 -->
-- [ ] Review and improve test coverage <!-- task-id: 35d675cc1dc3f98d766c3f694c0c35bf -->
-<<<<<<< Updated upstream
 
 <details>
-<<<<<<< Updated upstream
-<summary><strong>✅ Done Today</strong> (4248 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (4258 tasks completed)</summary>
 
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b485a38c7a1ae787cb983def67926591 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9c04d75b6b897a1e8511b2cd7d22706a -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d7699071ddcfa5158308441e9668b593 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b43404f6cdba20b4475fd510b968a547 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 04cf4de9066f3bbead3fe265cfd24647 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: f0163eb9b5221c7f55ff8e53956d5737 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 09ff6a9521a36fa284351171caf67e18 -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ccd8b3344a0438b658f9b22ed9ab8cd0 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 74209abd018d8503e537403c8b185400 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 876c606c60fd5c14199c214c96222581 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 976c8d024331b04640b12d864d8581c2 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9688b6b27f38a7f64bea037f32c2e71c -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 18a235f663aba00691e181d6bf02779d -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7874e593e898f6c7f6c9a52e57fe449d -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 00d1333a4e50da50864b5259fc188408 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 1dc7700ac8c3444e523a697b6fcc5e44 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 53180dcbb39b16943f43bc2721aad6cc -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 86666b8cc37800080a4cd0c2150bed6e -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6f3eef72be5013028cabcd49a21e0693 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3e28743c3fa5d647ccf7f4c432701bf5 -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b485a38c7a1ae787cb983def67926591 -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9c04d75b6b897a1e8511b2cd7d22706a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d7699071ddcfa5158308441e9668b593 -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b43404f6cdba20b4475fd510b968a547 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 04cf4de9066f3bbead3fe265cfd24647 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 811ef57c81bb37346b04c5d652f0ee43 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 59b65641ca067d6fc37a6910d55d51a4 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 0cd3cb7a84739cc035e9616a16cffce2 -->
@@ -641,34 +641,10 @@
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 85b00d1efbad61c7369375e9a8076bbb -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6f6aadf8023e7088b88e9a58ef504502 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8207f8d404b6842ffb896081388a81cd -->
-=======
-=======
-
-## Next Up
-
-- [ ] Quick social media check for OGM mentions <!-- task-id: 2b0a9aded5f8c1ee50ba6048d4f7b299 -->
-- [ ] Check OGM newsletter status <!-- task-id: 86fba922c9ad1b986295cd7dbfd854cf -->
-- [ ] Try Pest Control again <!-- task-id: 76739afd3df8a32fa47dc6487e1769de -->
-
-<details>
->>>>>>> Stashed changes
-<summary><strong>✅ Done Today</strong> (3748 tasks completed)</summary>
-
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 601ce19bcb9edc7ccc6d67c6e5f1a6f2 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: f7090cbee4fdcb194ac37a7e46b11f1b -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 307f9606328b9b89196b7c1574e8cd11 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8291b3aaee1573ce89e77b41c6a9f6e8 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 528e2f5adfe24958f6c661f940908230 -->
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 83249cac7fdb6ce2ab4357dbae33100d -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 6b8efd6cab56c5dc3e360cbe35f86338 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 9c9cddfcef5efb2f133bd05e0e05c4d1 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3f29b97a2058e71a4898eb42aec9cfa6 -->
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 - [x] Check that Meetup creators can edit them <!-- task-id: 9916e7716e585d7e7ac336dba4f289f7 -->
 - [x] Fix sorting outdated Groups <!-- task-id: dfb6943db975604ab7e65ac9b329fdd0 -->
 - [x] Spark | Version deprecation warning for Postgres 11 on your Postgres add-on (RED) <!-- task-id: 4dd151eebaaa7ce67a8df15619d3b149 -->
@@ -1485,34 +1461,6 @@
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 99e77624e6d90829ef77a2523c078ac8 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1a059c30cda235eb914d4a912c42a5a2 -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 634148363cdcfee84a19248f516efdfc -->
-=======
-=======
->>>>>>> Stashed changes
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 11b5449690ff6b5c8e30cbd859e8e262 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b6c12c6b61515c8583431db1e2c280bb -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1df9566b15e3bab9076d3c4bb0ced5fc -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 804853b6881f31f904fc3a719c9f9297 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 56d7b7cb82463147da0475e0ebe8f822 -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a6b154aff19bb44f37ee35a4b93668b4 -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d3f1e61c2246303ef9b75738e8c10c22 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3f3de2003a4abd79c11156548b297619 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b41088fc9fe6a2ef3c8b3bbfa69f0021 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f209b03d0cf59cca98e978b682b683ed -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7e7de06e1f60b09b5316db7ec1815f3d -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fc1f188845f06c92030f634e62ac0efe -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 90701e1919957119c49a2396f1127244 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cb5270bdb45bb891c4c81702262ad18e -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5e2d34f34b0e10d5b2e4e7d066d91fcd -->
-- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5471d365806e04d7282a4181ea40715d -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 44765cb5999f65ee14b6ceef84a09037 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 19a3d3f896d009a002226aa5ee68b14b -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e928d1faccfb134e546d98b45132b621 -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3ed105c97e7dedcc76c5f7aa6eb437ce -->
-- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 507dd2c969a63e5049087093f04db5c7 -->
-- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ae6732eaa4cc49e8551f0a3f8031c4a4 -->
-- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5469a1a70cf5ebc25edbd0b8bcee93bf -->
-- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a90615aff292d5853bef71679f64a85b -->
->>>>>>> Stashed changes
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: c72c0be8a2e76e9e44c126a51c28d4b4 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: db53018754ec40461568e98b18bf279a -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 21c4d92f1c8cac296fcab6d4a5ba8b46 -->
