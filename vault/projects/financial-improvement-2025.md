@@ -10,7 +10,7 @@
 
 This project aims to reduce monthly expenses by $3,000-4,000 through systematic cost reduction, expense tracking, and strategic financial management. Current focus is on hosting consolidation and subscription optimization.
 
-**Progress to Date:** $540/month saved (Heroku downgrade $450/mo + Redis migration $90/mo)
+**Progress to Date:** $620-625/month saved (Heroku $450/mo + Redis $90/mo + Cloudflare Argo $80-85/mo)
 
 ## Current Financial Situation
 
@@ -20,10 +20,10 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 #### Major Categories
 
-1. **Business/OGM:** $4,625/mo
+1. **Business/OGM:** $4,545/mo (after savings)
    - Heroku: ~$653/mo (after $540 in savings)
    - AWS: $234/mo
-   - Cloudflare: $100/mo (Argo acceleration + services)
+   - Cloudflare: $15-20/mo (Argo disabled, kept certificates)
    - Discourse: $423/mo
    - LocationIQ: $99/mo (cost-effective for usage)
    - Other services: ~$1,989/mo
@@ -42,16 +42,16 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 ## 🎯 Current High-Impact Actions
 
-### ✅ Completed Savings ($540/month)
+### ✅ Completed Savings ($620-625/month)
 
 1. **Heroku Performance-L → Standard-2X downgrade** - $450/mo saved
 2. **Redis migration to Railway** - $90/mo saved ✓ August 24, 2025
+3. **Cloudflare Argo optimization** - $80-85/mo saved ✓ August 24, 2025
 
-### 🔄 Next Priority Actions ($196/month potential)
+### 🔄 Next Priority Actions ($56/month potential)
 
 1. **SendGrid Gold → Starter** - Save $56/mo
-2. **Papertrail → Free tier** - Save $50/mo  
-3. **Cloudflare Argo optimization** - Save $75-85/mo (test performance impact)
+2. ✅ **Papertrail already on free tier** - No additional savings
 
 ### 💰 Medium-Term Opportunities
 
@@ -65,8 +65,9 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 - [x] Heroku Performance-L downgrade ($450/mo saved) <!-- task-id: 34dd4c8c9989ee6de883dfc7458234b2 -->
 - [x] Redis migration to Railway ($90/mo saved) <!-- task-id: 9e9e155fe136667902fd2774432f6c4c -->
+- [x] Cloudflare Argo optimization ($80-85/mo saved) <!-- task-id: aa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d -->
 - [ ] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
-- [ ] Papertrail optimization ($50/mo) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
+- [x] Papertrail optimization (already on free tier) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
 - [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
 
 ### Phase 2: Expense Tracking 📋 PENDING
@@ -83,8 +84,8 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 ## Success Metrics
 
-- **Monthly savings achieved:** $540/mo ✓ (Target: $3,000-4,000)
-- **Hosting costs:** $653/mo (Target: $150/mo)
+- **Monthly savings achieved:** $620-625/mo ✓ (Target: $3,000-4,000)
+- **Hosting costs:** $568-573/mo (Target: $150/mo)
 - **Days without 401k withdrawal:** Track needed
 - **Emergency fund balance:** $0 (Target: $60,000)
 
@@ -97,17 +98,17 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 ## Next Actions (This Week)
 
-1. **SendGrid downgrade** - Easy $56/mo win
-2. **Papertrail optimization** - $50/mo savings
-3. **Subscription audit** - Export bank/credit card charges
-4. **Insurance quotes** - Get 3 homeowners quotes
+1. **SendGrid downgrade** - Easy $56/mo win (only remaining Heroku add-on optimization)
+2. **Subscription audit** - Export bank/credit card charges
+3. **Insurance quotes** - Get 3 homeowners quotes
+4. **Full Railway migration planning** - Next phase for bigger savings
 
 ## Notes
 
 - Redis migration completed successfully with zero downtime
-- Cloudflare Argo ($75-95/mo) needs performance testing before disabling
+- Cloudflare Argo optimization completed - $80-85/mo saved, performance monitoring ongoing
 - PostgreSQL migration only saves $30/mo - lower priority
-- Focus on biggest wins first: SendGrid, Papertrail, Cloudflare optimization
+- Focus on biggest wins first: SendGrid downgrade ($56/mo), then full Railway migration
 
 ---
 
