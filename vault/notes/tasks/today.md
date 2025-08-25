@@ -1,6 +1,6 @@
 # Today's Tasks
 
-*Generated: 8/25/2025, 8:20:56 AM EDT*
+*Generated: 8/25/2025, 8:31:31 AM EDT*
 
 ## 🎭 Stage
 
@@ -78,6 +78,7 @@
 - [ ] add OGM news stories <!-- task-id: a110abe4bc058621ef9653a0d606343c -->
 - [ ] Review and improve test coverage <!-- task-id: 23decb1bb452c7e3975285e87d0eee8c -->
 - [ ] Review and improve test coverage <!-- task-id: ae29420877765d840496ff173f54be84 -->
+- [ ] Review and improve test coverage <!-- task-id: e300241d364556c9d84c76c723a35279 -->
 
 ## Next Up
 
@@ -94,7 +95,7 @@
 - [ ] Review and improve test coverage <!-- task-id: 6bbd1d695a3bb66635ed5328b0b216a7 -->
 
 <details>
-<summary><strong>✅ Done Today</strong> (4146 tasks completed)</summary>
+<summary><strong>✅ Done Today</strong> (4151 tasks completed)</summary>
 
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 33e52258b916025da8548f753d80f73c -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 65afbd264151d5d81f2fac4c64cc4f25 -->
@@ -139,12 +140,17 @@
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4efb0fce90d218fea7f3cd6157175833 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 4fa31e2825d0adbd914b7398e6e8d9a5 -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: cc12d628b15a9b8258ea09133840ec0e -->
-- [x] Identify data export options from Notion <!-- task-id: 22c67a98c8c8917d9e949ce79744f3cf -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 0926f67b86fbff29fda064cb13906c62 -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: ec59bffa3caa02f49226f84b546bd3e9 -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 26c7fd0d89b4aa4c8354d18feabe5172 -->
 - [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: beea06beab12d635d721729df1784ebd -->
 - [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e8dac71bb665a17ae84f6f3ee1a673ec -->
+- [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: cb1e5ea4a00426018eecc03817131d0c -->
+- [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 7bf375984d6615c31ace603b3fcc558a -->
+- [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d5db59af82dda7c494871d854fa38e9a -->
+- [x] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 963e8ed48dd3884c58e30006e0249ee5 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 0ebd9ae0bbd1a2b2d25dbb736ba516ae -->
+- [x] Identify data export options from Notion <!-- task-id: 22c67a98c8c8917d9e949ce79744f3cf -->
 - [x] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 45c08fecd93249d9252019f4b5e5a16d -->
 - [x] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 13b5364988cc850c3ca86d71c9d0cc0b -->
 - [x] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1549fd8fde91c6575224eb26d5186a96 -->
