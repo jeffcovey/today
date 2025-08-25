@@ -48,10 +48,9 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 2. **Redis migration to Railway** - $90/mo saved ✓ August 24, 2025
 3. **Cloudflare Argo optimization** - $80-85/mo saved ✓ August 24, 2025
 
-### 🔄 Next Priority Actions ($56/month potential)
+### 🔄 Next Priority Actions
 
-1. **SendGrid Gold → Starter** - Save $56/mo
-2. ✅ **Papertrail already on free tier** - No additional savings
+**Focus: Full Railway Migration Planning & Subscription Audit**
 
 ### 💰 Medium-Term Opportunities
 
@@ -66,7 +65,7 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 - [x] Heroku Performance-L downgrade ($450/mo saved) <!-- task-id: 34dd4c8c9989ee6de883dfc7458234b2 -->
 - [x] Redis migration to Railway ($90/mo saved) <!-- task-id: 9e9e155fe136667902fd2774432f6c4c -->
 - [x] Cloudflare Argo optimization ($80-85/mo saved) <!-- task-id: aa1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d -->
-- [ ] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
+- [x] SendGrid (keeping for now - review later) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
 - [x] Papertrail optimization (already on free tier) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
 - [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
 
@@ -95,20 +94,35 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 - **YNAB** ($8.25/mo) - Annual charge, actively used
 - **MDBootstrap** ($14/mo) - Annual charge, actively used  
 - **Discourse** ($316/mo) - Important for community, review later
+- **SendGrid Gold** ($66/mo) - Email service, review later for potential $56/mo savings
 
 ## Next Actions (This Week)
 
-1. **SendGrid downgrade** - Easy $56/mo win (only remaining Heroku add-on optimization)
-2. **Subscription audit** - Export bank/credit card charges
-3. **Insurance quotes** - Get 3 homeowners quotes
-4. **Full Railway migration planning** - Next phase for bigger savings
+### 🎯 IMMEDIATE PRIORITY: Full Railway Migration
+
+1. **Complete Railway migration planning** - Potential $400+/mo savings
+   - Document all Heroku applications and dependencies
+   - Create detailed migration timeline
+   - Set up Railway staging environment
+   - Test PostgreSQL migration (saves $30/mo)
+
+### 📊 SECONDARY: Financial Visibility
+
+2. **Subscription audit** - Potential $200-300/mo savings
+   - Export all recurring charges from bank/credit cards
+   - Identify duplicate services (GitHub, ChatGPT, etc.)
+   - Create cancellation list
+
+3. **Insurance shopping** - Potential $500/mo savings
+   - Get 3 homeowners insurance quotes
+   - Review health insurance during open enrollment
 
 ## Notes
 
 - Redis migration completed successfully with zero downtime
 - Cloudflare Argo optimization completed - $80-85/mo saved, performance monitoring ongoing
 - PostgreSQL migration only saves $30/mo - lower priority
-- Focus on biggest wins first: SendGrid downgrade ($56/mo), then full Railway migration
+- Focus on biggest wins first: Full Railway migration ($400+/mo potential), then subscription audit
 
 ---
 
