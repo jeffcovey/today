@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (998 tasks)</summary>
+<summary><strong>General Tasks</strong> (1001 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -13,6 +13,7 @@
 ### Today - Monday, Aug 25
 
 - [ ] Review and improve test coverage <!-- task-id: 5efd828fa0f52510d969fc293127651d -->
+- [ ] Review and improve test coverage <!-- task-id: ce42fb732c5663aded3f84641168bae9 -->
 
 ### Monday, Dec 1
 
@@ -238,8 +239,9 @@
 - [ ] Check HOA/city permit requirements <!-- task-id: cffd1cc721b6d92688df3e14d29df0cb -->
 - [ ] Check references and reviews for Pool Builders Inc <!-- task-id: 9e2dc5eb03d85a0d3859d636038d84fe -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2d7e2b1b9e6bb869a7f8217b85f807f -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2766cbd451fc19598e1b0f28e4d4accb -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: efbb42eb25d058eef0c6ce31dc45a5bd -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: c8cedac75a87dc81c623d46ea4b7ecb9 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: be2eb61ba0b02e02a1a20693f3a511ef -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Complete subscription audit <!-- task-id: 056a31f62c9f33523bcc0da8505b7025 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
@@ -253,8 +255,9 @@
 - [ ] Determine optimal pool size/type for lot <!-- task-id: b5d41aac5c169660bb67e6a85af2f7b9 -->
 - [ ] Digestive health <!-- task-id: 4ac324f70c96a1172da738a12e8dece9 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 70687fc588e76f4f0d31cef24e738e6a -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 4c03fec27cfce37e25894e1e4d360d11 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8445ff39e97bad7fe4af152afd36615e -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 73937644710249bb6dba6e34e1651c14 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b0e545f9630c16f4d5d2ab6398c7e4f9 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -262,7 +265,6 @@
 - [ ] Establish sustainable eating patterns <!-- task-id: a5bbd0c20f13df1ba37dbf861891ba4e -->
 - [ ] Export DrinkControl data to CSV <!-- task-id: 563d52507dc82013ef08e618c0563a7a -->
 - [ ] Feel joint improvement <!-- task-id: bb5e069376435e37f60074525b77e204 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3acc85c103ac8222e0e4f6d934f3aecd -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 99f00f8419506e750a92d6cf08e7e8d4 -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
@@ -308,7 +310,6 @@
 - [ ] Notice any changes in joint comfort <!-- task-id: 8ebbfcbf3e77035dc2ecedea64fbf50d -->
 - [ ] Notice sleep improvement <!-- task-id: dbc2d5ae12d038c375953624d2bbb9eb -->
 - [ ] Noticeable pain reduction <!-- task-id: 3927e1f72b220379e5b96732e7936ae0 -->
-- [ ] Papertrail optimization ($50/mo) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
 - [ ] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
 - [ ] Reach 170 lbs <!-- task-id: 1b460326e233080a8fedf3f00df9f937 -->
 - [ ] Reach target consumption level <!-- task-id: 0abfe5f12947fa0667b8e3413a4be652 -->
@@ -357,11 +358,13 @@
 - [ ] sanitize Today for sharing with Nelson <!-- task-id: 9a1702407147d9bf1d98f59e5a50e672 -->
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 764ce3926a2b52e7933e949a48c9ab24 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 50c4ad40a4b41002f8d6989313c1fe6a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1d9f790ecb4c5375c52ac12b2a2f5279 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: cc53c314ee1ca303ab580fcfa1afc982 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1583854d364fc6856b33bf3fbe07ed67 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 79ebee794cfd1b94c9a481becd9613c8 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: acee276346788846b88bbca057836856 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 01b0da1d71c878914d03a475c328779e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a7d4697d3475d5c5255dc01cbb496f30 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
