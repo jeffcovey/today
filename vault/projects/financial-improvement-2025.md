@@ -63,23 +63,23 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 ### Phase 1: Hosting Consolidation ✅ IN PROGRESS
 
-- [x] Heroku Performance-L downgrade ($450/mo saved)
-- [x] Redis migration to Railway ($90/mo saved)
-- [ ] SendGrid downgrade ($56/mo)
-- [ ] Papertrail optimization ($50/mo)
-- [ ] Full Railway migration planning
+- [x] Heroku Performance-L downgrade ($450/mo saved) <!-- task-id: 34dd4c8c9989ee6de883dfc7458234b2 -->
+- [x] Redis migration to Railway ($90/mo saved) <!-- task-id: 9e9e155fe136667902fd2774432f6c4c -->
+- [ ] SendGrid downgrade ($56/mo) <!-- task-id: f9222128cc94f9b6b857adbb1ceeb001 -->
+- [ ] Papertrail optimization ($50/mo) <!-- task-id: 9f1a0fd6d6bab84c07442147e77eeb72 -->
+- [ ] Full Railway migration planning <!-- task-id: 43130e653f3be7d00c2e005218b7a1ef -->
 
 ### Phase 2: Expense Tracking 📋 PENDING
 
-- [ ] Set up comprehensive tracking system
-- [ ] Import historical data
-- [ ] Create monthly budget dashboard
+- [ ] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
+- [ ] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
+- [ ] Create monthly budget dashboard <!-- task-id: 017f6c6f22617fd16b0af9f5c53f1e93 -->
 
 ### Phase 3: Insurance & Subscriptions 📋 PENDING
 
-- [ ] Shop homeowners insurance
-- [ ] Review health insurance options
-- [ ] Complete subscription audit
+- [ ] Shop homeowners insurance <!-- task-id: 7d1b36fd22868ee3522747a4c5da6197 -->
+- [ ] Review health insurance options <!-- task-id: a09b51c176b6fef743ad7b60d39c933b -->
+- [ ] Complete subscription audit <!-- task-id: 056a31f62c9f33523bcc0da8505b7025 -->
 
 ## Success Metrics
 

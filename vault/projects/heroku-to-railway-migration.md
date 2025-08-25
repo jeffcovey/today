@@ -137,13 +137,13 @@ Yes, absolutely! We can migrate in stages. Since your Discourse instance is alre
 - [x] Monitor performance <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 -->
 - [x] Cancel Heroku Redis <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa -->
 =======
-- [x] Create Railway Redis instance <!-- task-id: 1df8ca28295b709babfed1d6faafd702 --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Export Redis data from Heroku <!-- task-id: 6f0a4a934698517372cd2e27f41ea256 --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Import data to Railway Redis <!-- task-id: 4bd0d11d4a77f3705f55ab20bf2d218e --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Update connection strings in Heroku apps <!-- task-id: a45b0f0972a21acceb1aa4d3fa4d7d32 --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Test cache operations <!-- task-id: ebfe9c7ed4caf2555cb2a03073c0ab18 --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Monitor performance <!-- task-id: 33b4bbb32b5ac8ed4b1b40f8899d8d72 --> **✓ COMPLETED AUGUST 24, 2025**
-- [x] Cancel Heroku Redis <!-- task-id: 7cf3c59b82abd0221b854924d67b2faa --> **✓ COMPLETED AUGUST 24, 2025**
+- [x] Create Railway Redis instance  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: de992d0b9d8bbdba0f332a3348b8cabb -->
+- [x] Export Redis data from Heroku  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: 83c9029a5b4cf1722ed2f1ca68824f08 -->
+- [x] Import data to Railway Redis  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: b6d07146036cfed39be8a217077ba8cd -->
+- [x] Update connection strings in Heroku apps  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: 9d1d167195c8bfa584ec2f027f4bdad4 -->
+- [x] Test cache operations  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: e8e0552953334c95bd3f5e00fe2e1325 -->
+- [x] Monitor performance  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: d1c1949dc6ad81cdea765781d552ed80 -->
+- [x] Cancel Heroku Redis  **✓ COMPLETED AUGUST 24, 2025** <!-- task-id: 96fff6c7ee267d396204a051d83699a5 -->
 >>>>>>> Stashed changes
 
 #### Stage 2: Add-ons & Services Migration (Week 3)
