@@ -2,12 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-<<<<<<< Updated upstream
-*Generated: 8/25/2025, 10:32:31 AM EDT*
-=======
-
-*Generated: 8/24/2025, 9:50:29 PM EDT*
->>>>>>> Stashed changes
+*Generated: 8/25/2025, 10:41:30 AM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (59 tasks) - Tasks involving interaction with other people</summary>
@@ -91,7 +86,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (736 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (752 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -541,6 +536,22 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a2ce01f96c2ef7099574726cb3a94656 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6e973d3cce7ef81a44b16169c88c0dfa -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 848c1d1db8a4fc803c3f76b16badd475 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 281b0a290a73c1b0568189366948fdbe -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3ede0a23a4acbfe1280638bce1bb8115 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a25a7c35bab3c2033025694254d41ce3 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 5be741ab4318edba59171623cba2235f -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d2ec09f2a9727ebe52f985ee7fc9583b -->
+- [ ] Iden <!-- task-id: becc003b019b20fd22f8a2d70297d5fb -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 722f60388abe6ad362e42c54b462a779 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b747d8da2ae0e4bdcb3e27efbcbffdaa -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4899e6e68afc6720c7ab68d0b37b44d9 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 19b8fb769ee05d75f8f99a784513e7b2 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: eca4b3c4e29cc670676b609e9d5f3dfc -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: be184c8daf401a60f63720f323daf115 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 242dc6505d847fe760939700d479d404 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 09f1b4c0c8c647a896fd4e8f94f0178f -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 16645a29244c3512473a8181517dddf6 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4a85d87e86acd1aa0d069819c82de29c -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -849,7 +860,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (355 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (379 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -1181,6 +1192,30 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f2b69f8c8cc9636679c89db8a7d74d44 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 4e29899235d2fdbb863ad8627b7aacee -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e251a084bedc095f764a91ef86084df0 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: f2c64ac7642a6ab41351319fda473310 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: e8d709673d5c461ae70817cb31abd9c1 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c79e1b17ea42ac0856bb8e58eeeb0bc7 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 072709e995994652fd1746023469a07d -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 63e85bcd1818b756047d413d5d74fc87 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3b0c84a382f34923dff955d804870162 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3f7da3f7c038adec7b69ea13056b6329 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 32355a3f37a740ea8afe6f27eed8ab9b -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f40f13597010353c07d06b5c46948520 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: bcbd098efeb19de94c58d5bfcd225ad3 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 17f57cee4c1413eef414b66f762b7b74 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: c817c5004bc012ac43a86ec9ad7191ab -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 3dfaa153b34aea0353d409fe15320791 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ebaf31a7a4545e8f7639f6d76e72ec43 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e7ac5bdf05cde6306cc266892277541e -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 23bd8bb577344fc658d3059f0162cd60 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 445016593f02aa2b7e471ff72402ad3f -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a3554a966bfe98929097e3958b9de07c -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 8f9204d8ce95be739c7552688bc4b2dc -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8eee78327c7acfd724ecbd80e42a215f -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 24750ecea4f2cee8f7925e12bcf36cb6 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5b4f20d12807329eefe50816a651aa1b -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ac82e5e24bff03ed732e26ad0d1b764f -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 246fe42e321475718f90e6a2c7feb731 -->
 - [ ] Look for John Boswell books <!-- task-id: 7c1e0f703585ff96c2c60ee9b678f65b -->
 - [ ] get Rosuvastatin <!-- task-id: 2071468f9afdaddafd83962193651e09 -->
 - [ ] Visit Poverty Point <!-- task-id: fa0d333ca5e1f31a5233904c560245d2 -->
