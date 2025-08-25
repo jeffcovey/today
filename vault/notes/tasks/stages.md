@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/24/2025, 8:31:04 PM EDT*
+*Generated: 8/24/2025, 8:40:29 PM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (56 tasks) - Tasks involving interaction with other people</summary>
@@ -83,7 +83,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (532 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (560 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -268,6 +268,28 @@
 - [ ] see why https://oldergay.men/users/jim has "about" <!-- task-id: 5963984ccb46923da4211bc25e4898e8 -->
 - [ ] see why I can't change User's role <!-- task-id: 6591660ff38f02df3d0c8fb452bb3e1f -->
 - [ ] update html-pipeline & common marker <!-- task-id: d364e65c8d69beaa0573034bb71917cc -->
+- [ ] find someone to redo the chairs <!-- task-id: ed53c7c5cb501dc67654f5f918a4d3a7 -->
+- [ ] Replace the chair out back <!-- task-id: e9a4dbde9464276867a20194cd298397 -->
+- [ ] Turn on the Guest Hallway Light when the back door is unlocked <!-- task-id: e9e43ef9031a50acb78dc86edd987b41 -->
+- [ ] cucumber software at DuckDuckGo <!-- task-id: e040e0c86cf00520d196e2c9806843b3 -->
+- [ ] Review comments lost in image controller <!-- task-id: ea6c09e04cf5190e63b992b529b87506 -->
+- [ ] Test actually following a link instead of just hitting the controller <!-- task-id: e8eec88c728e6a5d39c0432998413b42 -->
+- [ ] Remove entries from daily_tracking if they're logged on Notion <!-- task-id: e1da0550dd9642c0153f136368f4fe1e -->
+- [ ] Seed less in review apps <!-- task-id: e78eb7eaf575fa92f5093dd3644b8204 -->
+- [ ] Seed site news <!-- task-id: ea2f9a6321c511a1e9229964c37f0178 -->
+- [ ] sign up for Kanopy <!-- task-id: e654f981f2c8733afed0cceb6437fc41 -->
+- [ ] Move from repeating tasks to weekly-added templates <!-- task-id: e0b1c6753dc231a4679f13445cc230fc -->
+- [ ] add homeowner's insurance to the budget <!-- task-id: e265412cc333aa82a46bb57cc0082e17 -->
+- [ ] Standardize tags <!-- task-id: e50a9c4c3e4645adf7a2079ebd6921aa -->
+- [ ] Add space before “Upcoming chats” <!-- task-id: e72e73774092c69e9c7cc1ccd52c06ca -->
+- [ ] Add test: "destroying user also destroys associated images and records" <!-- task-id: e3ead79e45e3786ce6146fc5fd448a90 -->
+- [ ] Expand patio after inspections <!-- task-id: ed528cc47f2be0c6b1fc6f48d896dd40 -->
+- [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
+- [ ] Check tmp/ in OlderGay.Men <!-- task-id: e3fd9728b5e98ba0d9d2f7b2bdaef432 -->
+- [ ] Check that we still have access to GitHub security <!-- task-id: e1e10e4f9e4a3cd94a0d5e78d360f6b9 -->
+- [ ] Add plugs to routines and scenes (e.g., “Evening Lights”) <!-- task-id: eee088dc538bdc4010ce0173ccd104bb -->
+- [ ] Check the date you need to return to the veterinarian <!-- task-id: e85432d10712e07689f47391981f5123 -->
+- [ ] Create a db of my Royal Caribbean points progress <!-- task-id: ee97e103d4b64ac2443f2014670a99a3 -->
 - [ ] check Grindr and SD search options for comparable <!-- task-id: b57f43e1e30972daeab2b4ec390383a1 -->
 - [ ] Donate the exercise bike <!-- task-id: 66f5be4259e24e3521f1c207fe71535b -->
 - [ ] Do profit & loss statements <!-- task-id: 0217fa235c67264f39425370f643dfb6 -->
@@ -350,6 +372,12 @@
 - [ ] set up Ollama on all deployments <!-- task-id: 7a8dd25028e569e6f86a6d171fda5f8f -->
 - [ ] find more accurate geocoding from addresses <!-- task-id: 995c2caddeab4d49d6c3d6bb191892be -->
 - [ ] Add to scheduler or stats:  desc "Check newsletter status and recent sends" task :status => :environment do <!-- task-id: 0a5de6210c69e476cbeec725c30de5e3 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 12f9bbd6780d8df6eb53d9f3e9a5775a -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: adf8ed497b86f1c88cd676ff328e6242 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d59d587aeed468ce6631430e92c64b04 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 554e47c96fd1c0795deaafc15c57248b -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 2a6ccb0c8797fd9ac125885af4991c26 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 4be201d2e0d3a1924493f8f3b8dcf92c -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -637,7 +665,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (114 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (126 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -660,6 +688,8 @@
 - [ ] Spark | Live healthier and get rewarded <!-- task-id: 6c644a071958c6d5d7e8c9361faecd34 -->
 - [ ] Order new glasses <!-- task-id: 6abc69e1a9d814c3ea7ffd30f9755222 -->
 - [ ] Visit MyHealthONE.com to login or create an account. <!-- task-id: 04f8ab75842c1f6f61d4a252bfab72e4 -->
+- [ ] Read "How to Start Logging With Ruby on Rails" Better Stack Community <!-- task-id: ece8bf4fdf502664f9791dc7ab4be827 -->
+- [ ] actions/starter-workflows: Accelerating new GitHub Actions workflows <!-- task-id: e08754fb01e91babbf92992f3cc747a5 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b -->
@@ -728,6 +758,16 @@
 - [ ] Mental clarity <!-- task-id: ace31dbeb6beb122f59d41cbad5d14a3 -->
 - [ ] Motivation <!-- task-id: e99c6bb351da88478bc4dce5401c02f4 -->
 - [ ] Review(https://guides.rubyonrails.org/caching_with_rails.html#russian-doll-caching) <!-- task-id: 55acdb054a9077ac2cf3fcea61f4fcf6 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e9201d65c436d1a048e7c335438210ad -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d28e3c27ab0bf3105f961669e9db6626 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5a51a398fb90f81fd731e483be68b08a -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 9c47b62e2065944335c9c7d5e4a2fef3 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a02c96143c190821b54ac095c4aded6c -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a292e027d4d8604785558f19344e8a36 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b1b37c69088bdbdd65ff7935f0696d12 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 66a2a922374df7ba8882feaf2d7a8e97 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 8d7d3024bc419b238db6c41b96e95a05 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 06e3a8544b34f12eb8a9abd737818494 -->
 - [ ] Look for John Boswell books <!-- task-id: 7c1e0f703585ff96c2c60ee9b678f65b -->
 - [ ] get Rosuvastatin <!-- task-id: 2071468f9afdaddafd83962193651e09 -->
 - [ ] Visit Poverty Point <!-- task-id: fa0d333ca5e1f31a5233904c560245d2 -->
