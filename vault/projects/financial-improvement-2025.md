@@ -72,8 +72,8 @@ This project aims to reduce monthly expenses by $3,000-4,000 through systematic 
 
 ### Phase 2: Expense Tracking 📋 PENDING
 
-- [ ] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
-- [ ] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
+- [x] Set up comprehensive tracking system <!-- task-id: 2f09d9f87cfef5c9c4195213b2becd41 -->
+- [x] Import historical data <!-- task-id: a2515fdd362c435053c07ed8fb552650 -->
 - [ ] Create monthly budget dashboard <!-- task-id: 017f6c6f22617fd16b0af9f5c53f1e93 -->
 
 ### Phase 3: Insurance & Subscriptions 📋 PENDING
