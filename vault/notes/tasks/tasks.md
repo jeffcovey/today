@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (2532 tasks)</summary>
+<summary><strong>General Tasks</strong> (2554 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -259,6 +259,7 @@
 - [ ] Review and improve test coverage <!-- task-id: 475454fca7b588c42786b639fdb78c0f -->
 - [ ] Review and improve test coverage <!-- task-id: 63152a2a813e4881062a4c7d3a5f80af -->
 - [ ] Review and improve test coverage <!-- task-id: dceb29ca762495b7beca5fb5b7c8b42a -->
+- [ ] Review and improve test coverage <!-- task-id: a70e0d923a8de383edd5766b4932f341 -->
 - [ ] add OGM news stories <!-- task-id: a110abe4bc058621ef9653a0d606343c -->
 
 ### Monday, Dec 1
@@ -363,6 +364,25 @@
 - [ ] September content calendar for OGM <!-- task-id: 59bafc4c0fe9f54fe6d16c72b5ce887f -->
 - [ ] Update expense tracking in YNAB <!-- task-id: 78482c73d88ca29daf1e8814b4dc14be -->
 - [ ] Watch first Hip Hook instructional video - take notes on technique <!-- task-id: 350d9648c897413f55c3005f07dde780 -->
+
+### Invalid Date, Invalid Date
+
+- [ ] 30 minutes reading "Tight Hip, Twisted Core" (health focus) <!-- task-id: e42ce50b3256cbc2e44561e92b410094 -->
+- [ ] Check Patreon new member Jon <!-- task-id: 96cdddef6079cd1efd25bfb302e9e189 -->
+- [ ] Create written checklist with specific reps/duration <!-- task-id: 325e26d59b49b6408ac1f6df578c3bd6 -->
+- [ ] Extract Day 1 exercise routine from "Tight Hip, Twisted Core" book <!-- task-id: 0a8fed8aba92806ac7c57ac8bb810abf -->
+- [ ] Feed Buster special treat (Off Stage day!) <!-- task-id: 74271fd0c483ba46e4a7f00f43ddc84c -->
+- [ ] Leisure reading of choice book <!-- task-id: af561efce213630fb60fddb7e0cbc8eb -->
+- [ ] Plan conversation topics for Coffee & Conversation at 2 PM <!-- task-id: 8d0577c5d79bf49ce81721447d787ba2 -->
+- [ ] Quick social media check for OGM mentions <!-- task-id: b9aba551e2ef731ec85820b1cb6f11f0 -->
+- [ ] RSVP to Elena's birthday invite <!-- task-id: cb6f2dfd2baadf6176d011329cf3e842 -->
+- [ ] RSVP to Elena's invite for Lucy's 6th birthday party (Saturday Aug 30, 4 PM) <!-- task-id: 1af54918605840ec2c602f43b8a2ab28 -->
+- [ ] Review contacts not reached in 6+ weeks <!-- task-id: f8e839ecd98a827e7a8a80855cd05403 -->
+- [ ] Review recent journal entries for patterns/insights <!-- task-id: 7bf5385ba35ffbb021902dcac6765584 -->
+- [ ] Send 2-3 personal messages to friends <!-- task-id: 45d677485e445731bdcd38b49c67f128 -->
+- [ ] Set up pain tracking log in vault/logs/pain.csv <!-- task-id: 07bfca83a4d5e773cff10b49ff6ec289 -->
+- [ ] Try the routine once to test timing (target: 15 minutes) <!-- task-id: 3bfb1051db5988b726a531c2fc3b1901 -->
+- [ ] Water the plants <!-- task-id: 442c054d88f81e2c2adff94952a82f06 -->
 
 ### No Date Set
 
@@ -958,8 +978,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: d07dd7bc1c2262987252369ab5692e23 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: bcc4473eedd99a636769b0b51f2652f6 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 69c6f37f8a70109dd9f71d194ff4d0b2 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9e4c4b12aa7748035831550725ffb6ac -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a767d7b6d604fb3d472684c429593650 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 38c0124dc0ca8d02bf2f9d39f0daa8e7 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 2b95d97b017c78606a8f1162aaccf1b6 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
 - [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup --> <!-- task-id: 5359f3c61cdf8801a37f7852349da73c -->
@@ -1203,8 +1224,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 7d52c3a2dbc20206c2e1052971178f24 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: d92fb6a9ddcdeeefc5876d7c268dfdcc -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 26e6f4e95f690fc0bb42d30fa4e0d282 -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e634a18373e54444fe40bc71d4516d25 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: e6e8bda0f7a02524ce895e7cda5bfbbc -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2055cd92915da7c38b6b8c18d3f93cad -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b06d97f0440f8a77cc0428629721fda5 -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -1451,8 +1473,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 980f0f6578e892611058d1a669cbcfff -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 05836592308443c6d590c8662ad97fc6 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 738bc4a8c9ff6a9c4e404ad0c4ae2fe7 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 53814ce8e2b759d528f2217a38ad8928 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b3e7fc8ffc3af662aa6a30b5096ee4e4 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: a16f8e3621bd6d3d6b197b89910330a8 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 03d01a1ebeacf1f00c37aafda3afb79a -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -1772,8 +1795,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 5ad056c22d715af206d93c22c25160e0 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a5835be826456dccc2f62340b1d44880 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 3dc79c2d38713fcd703bfcf35803d239 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: a18618dbc52c862c2e6a4942543f4c4a -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 6d697af0ec630ca39d5c18f27d380965 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 911ea8b4f3f67b8bdfc03ded0930bc1c -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 1f775260e8161573e3f1d78c380cedb7 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b6be408f8e586e9132cf09abce0510b0 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a74969467788cf03b89109a230bf6e3d -->
@@ -2013,8 +2037,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d61db16d1592ea01e46dcc6d02721e47 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 372554c19e042f92a65c7e5fcf754bc2 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 90cb02e44bc3879cbf4681664546375b -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: daf228bd39beffe6e0b30957200509ed -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 5c0f1a48237203c609458adc1c1fd251 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f26c584115c8c2aa9d586ea52730ae89 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 570969fbfa8ab87e964e872287e5de13 -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
