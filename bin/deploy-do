@@ -85,15 +85,16 @@ case "$ACTION" in
         # Create deployment and data directories if they don't exist
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p ${DEPLOY_PATH} ${DEPLOY_PATH}/.data"
         
-        # Sync files (INCLUDING .git for sync operations, but excluding node_modules and local data)
-        # IMPORTANT: --delete will remove files not in source, but excluded dirs are preserved
-        rsync -avz --delete -e "ssh -i $SSH_KEY" \
-            --exclude='node_modules' \
-            --exclude='.data' \
-            --exclude='.notion-cache' \
-            --exclude='.calendar-cache' \
-            --exclude='.env.keys' \
-            --exclude='.last-dep-check' \
+        # Use git pull for code updates (much faster than rsync)
+        print_info "Pulling latest code from git..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && git pull"
+        
+        # Only sync essential files that aren't in git (like .env)
+        print_info "Syncing configuration files..."
+        rsync -avz -e "ssh -i $SSH_KEY" \
+            --include='.env' \
+            --include='.env.keys' \
+            --exclude='*' \
             ./ ${DROPLET_USER}@${DROPLET_IP}:${DEPLOY_PATH}/
         
         # Ensure git is configured properly on droplet
