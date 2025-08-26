@@ -16,3 +16,4 @@ Tasks and projects related to Oldergaymen Newsletter.
 - [ ] Add an "invited" NewsletterLog status <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add a newsletter archive <!-- task-id: b53c8a58824cbe12cc7f28f1b8b86abd -->
 - [ ] Add small avatars of the favorite profiles and profiles who follow you in the newsletter <!-- task-id: 409445e05f8d856a6c0bfa380586cee7 -->
+
