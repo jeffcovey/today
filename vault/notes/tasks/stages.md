@@ -2,12 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-<<<<<<< Updated upstream
-*Generated: 8/26/2025, 8:41:14 AM EDT*
-=======
-
-*Generated: 8/24/2025, 9:50:29 PM EDT*
->>>>>>> Stashed changes
+*Generated: 8/26/2025, 8:53:07 AM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (60 tasks) - Tasks involving interaction with other people</summary>
