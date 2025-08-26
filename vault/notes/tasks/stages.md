@@ -2,7 +2,7 @@
 
 *This file organizes all open tasks by their stage (Front, Back, or Off). Generated automatically.*
 
-*Generated: 8/26/2025, 9:38:58 AM EDT*
+*Generated: 8/26/2025, 9:42:18 AM EDT*
 
 <details>
 <summary><strong>🎭 Front Stage</strong> (60 tasks) - Tasks involving interaction with other people</summary>
@@ -87,7 +87,7 @@
 </details>
 
 <details>
-<summary><strong>🔧 Back Stage</strong> (617 tasks) - Maintenance and behind-the-scenes work</summary>
+<summary><strong>🔧 Back Stage</strong> (631 tasks) - Maintenance and behind-the-scenes work</summary>
 
 *Organizing, cleaning, fixing bugs, paying bills, admin, planning, setup*
 
@@ -417,6 +417,20 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 5586f48e54004a36dbcd09ef660a8093 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a853aa345a72a188477998f9b4de964f -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: ed3268199337cb691a036c4c9db394e4 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6a0a78014a6c34dae9374a6a0d5718ba -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 453d73b76c630c0f833bc229d30164e1 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 997dfe52f03fd62951771bd1206682e5 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 00fe2bf960ea9a2abab06573ed161965 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: a7f1837ceb1a99e2c9d7404764a5e8d9 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: dc21a5b0495732c5840aa6b73cf2ae74 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 3899bcd296278d62bc8188f42b6ab7c5 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 3b3fec91a627cdb644eb346611af05f4 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: b89592229692e8c1f3d689e996e1d915 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: e237ce864cfef4b2b1ea6ef069aa0f36 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 17c06ea1df94bfa6942666b70d917aa1 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 6fa0b2ed9e094c440211c6161a795bb9 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 558e479ed1c7ff14d8c0edf07b4c4d02 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: b7d08ea8a0834d88f7d6941b136c147c -->
 - [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Enable action buttons on User show when not logged in <!-- task-id: bce88c38cf512eea9348064df05c1caf -->
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -726,7 +740,7 @@
 </details>
 
 <details>
-<summary><strong>🌟 Off Stage</strong> (152 tasks) - Personal time and self-care</summary>
+<summary><strong>🌟 Off Stage</strong> (173 tasks) - Personal time and self-care</summary>
 
 *Reading, exercise, hobbies, relaxation, learning, health*
 
@@ -852,6 +866,27 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 14c0e1dc0ad4b1dfb3f867a94b912b17 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 04e44e5315fadf30bfd828f6636bda6d -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 1fea2dc72cc462baa17bbab01f7b1b21 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 11d8efcf2db3ae34ad6e2bfc2867b8aa -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 781f24e79dc69efb1ffad955eb90ff14 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: aae93067da4aea3e326e03091f71d1f3 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: fd5dd6e917e394d88afe72391a19ce0a -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 05abeda79a457fc247213577881f1d1e -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: bea9a304ab6652e820a9cee89d5e0fa6 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 405cf49a45e2d4fda9374b0adb32a1c5 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 7a8c390d89b14b2e22cde59d458f3113 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: f4e6fbf6c237b754d6f5c85b4d76c420 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: a4ba00901b5e0294369ed3a52e9e082e -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 45acbbfa9a05d621bcacde7529732707 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 690c6ec2a3c3ec8f7bd6fa053dbf4329 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: b574604d2ae90cdd9ee66522eef0dfd1 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: d6162b7098418e1d5ec6f8c04fc0c1f7 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d9291651b5994c05c5385e9ec58ec425 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1903966633bc07b15ad6e1918a0adbe4 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 60625431d49da8b6132659d3d6b84760 -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 21bfc52fd057301857cfc62bba07f2c8 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 2eb6c35f2597402396a9c59c6ade1ab2 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: b9997602756e0e72aa56bbe322192ebf -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 7aefbbeaae3cac7d2fd40b40b217c668 -->
 - [ ] Look for John Boswell books <!-- task-id: 7c1e0f703585ff96c2c60ee9b678f65b -->
 - [ ] get Rosuvastatin <!-- task-id: 2071468f9afdaddafd83962193651e09 -->
 - [ ] Visit Poverty Point <!-- task-id: fa0d333ca5e1f31a5233904c560245d2 -->
