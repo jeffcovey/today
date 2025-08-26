@@ -4,12 +4,14 @@
 
 The Today system synchronizes multiple data sources to provide a unified view of your tasks, notes, and schedule:
 
-- **GitHub**: Sync notes and documentation
+- **Syncthing**: Real-time sync of vault files across devices (replaces GitHub sync)
 - **Notion**: Import tasks and projects from databases
 - **Task Manager**: Local SQLite-based task management with Markdown sync
 - **Email**: Fetch and cache emails for review
 - **Calendar**: Import events from Google Calendar and iCloud
 - **Contacts**: Sync contact information
+
+> **Note**: Vault files are now synced using Syncthing for real-time synchronization across your MacBook, development container, and production droplet. GitHub is no longer used for vault sync.
 
 ## Setup Instructions
 
@@ -22,6 +24,14 @@ cp .env.example .env
 ```
 
 ### 2. Required Configurations
+
+#### Syncthing Setup (for vault sync)
+
+Vault files are synchronized using Syncthing instead of Git. See [SYNCTHING_VAULT_SETUP.md](../SYNCTHING_VAULT_SETUP.md) for setup instructions.
+
+- DevContainer: Runs `bin/syncthing-headless setup` automatically
+- Droplet: Run `bin/syncthing-droplet-setup` after deployment
+- MacBook: Add device IDs and accept folder shares in Syncthing GUI
 
 #### Notion Integration
 

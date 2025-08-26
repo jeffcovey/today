@@ -76,7 +76,8 @@ main() {
     # Critical path operations (fast, important)
     # Single bidirectional Turso sync (replaces separate pull and push)
     run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
-    run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
+    # NOTE: Vault sync removed - now using Syncthing for real-time sync
+    # run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     
     # Task sync without classification
@@ -135,8 +136,8 @@ main() {
         run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
     fi
     
-    # Final vault sync to push any changes made during sync operations
-    run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
+    # NOTE: Final vault push removed - Syncthing handles vault sync now
+    # run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
     
     print_status "All sync operations completed (classification running in background)."
     
@@ -166,6 +167,14 @@ main() {
 
 # Sync GitHub vault
 sync_github_vault() {
+    # DEPRECATED: Vault is now synced via Syncthing, not GitHub
+    # This function is kept for backwards compatibility but does nothing
+    print_info "Vault sync skipped - using Syncthing for real-time sync"
+    return 0
+}
+
+sync_github_vault_original() {
+    # Original implementation kept for reference
     # Change to project directory
     cd "$(dirname "$0")/.." || return 1
     
@@ -1465,15 +1474,14 @@ case "${1:-}" in
     --quick)
         # Quick sync - only critical sources
         print_info "Quick sync mode - GitHub vault, tasks, inbox, and consistency check"
-        sync_github_vault
+        # NOTE: sync_github_vault removed - using Syncthing
         clean_markdown_files
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
         check_task_consistency
         
-        # Final vault push to commit any changes made during sync
-        print_info "Pushing vault changes back to GitHub..."
-        sync_github_vault
+        # NOTE: Final vault push removed - Syncthing handles this
+        # sync_github_vault
         ;;
     --force)
         # Force full sync - bypasses smart caching
@@ -1510,14 +1518,14 @@ case "${1:-}" in
         echo "  • Uses efficient timeouts and smart caching"
         echo ""
         echo "Options:"
-        echo "  --vault       Sync GitHub vault only"
-        echo "  --quick       Quick sync (GitHub and tasks only)"
+        echo "  --vault       (Deprecated - vault now uses Syncthing)"
+        echo "  --quick       Quick sync (tasks and inbox only)"
         echo "  --force       Force full refresh (bypass cache)"
         echo "  --quick-email Download last 24 hours of email"
         echo "  --help        Show this help message"
         echo ""
         echo "Data sources synced:"
-        echo "  • GitHub vault content"
+        echo "  • Vault files (via Syncthing - real-time sync)"
         echo "  • Markdown formatting cleanup (via markdownlint)"
         echo "  • Local task manager"
         echo "  • Email inbox (cached for 4 hours)"
