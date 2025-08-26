@@ -17,3 +17,4 @@ Tasks and projects related to Oldergaymen Places.
 - [ ] Add the Prague bar to Places <!-- task-id: abb72b53e454da3e72c7a07bda60ca71 -->
 - [ ] Ask for place suggestions using people’s locations <!-- task-id: 1255c39d7a15ca934bd4a50ce7c7d6b1 -->
 - [ ] Create searchable categories for Places <!-- task-id: 41a077f040663e9cc1b2ccac0099afe2 -->
+
