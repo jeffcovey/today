@@ -8,7 +8,7 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 3. Updates the SQLite database with comprehensive content
 4. Starts this interactive session where Claude will:
    - Review all your data
-   - Create or update today's plan file in `vault/plans/YYYY-QQ-MM-DD.md`
+   - Create or update today's plan file in `vault/plans/YYYY_QQ_MM_W##_DD.md`
    - Provide recommendations based on your schedule and priorities
    - Continue working with you as long as needed
 
@@ -36,12 +36,12 @@ When this session starts, please:
    - **Two guest rooms need tracking - check BOTH rooms' status**
    - **Guest transitions require room preparation between checkout (12 PM) and check-in (3 PM)**
 4. **📊 Check Hierarchical Plans** (BEFORE creating today's plan!)
-   - Read the year plan (`vault/plans/YYYY.md`) to understand annual objectives
-   - Check the quarter plan (`vault/plans/YYYY-QQ.md`) for current initiatives
-   - Review the month plan (`vault/plans/YYYY-QQ-MM.md`) for this month's focus
-   - Look at the week plan (`vault/plans/YYYY-QQ-MM-W##.md`) if it exists
+   - Read the year plan (`vault/plans/YYYY_00.md`) to understand annual objectives
+   - Check the quarter plan (`vault/plans/YYYY_QQ_00.md`) for current initiatives
+   - Review the month plan (`vault/plans/YYYY_QQ_MM_00.md`) for this month's focus
+   - Look at the week plan (`vault/plans/YYYY_QQ_MM_W##_00.md`) if it exists
    - THEN create/update today's plan to align with these higher goals
-5. Check if a plan file exists for today in `vault/plans/YYYY-QQ-MM-DD.md` (e.g., `vault/plans/2025-Q3-08-16.md`)
+5. Check if a plan file exists for today in `vault/plans/YYYY_QQ_MM_W##_DD.md` (e.g., `vault/plans/2025_Q3_08_W33_16.md`)
    - **If today's review EXISTS**:
      - Load the existing review file
      - Query the database for recent changes (using SQL queries)
@@ -61,14 +61,14 @@ When this session starts, please:
 
 ### Plan Files Structure
 
-Plans are organized in a flat structure in the `vault/plans/` directory with the naming scheme:
-- **Daily plans**: `YYYY-QQ-MM-DD.md` (e.g., `2025-Q3-08-16.md`)
-- **Weekly plans**: `YYYY-QQ-MM-W##.md` (e.g., `2025-Q3-08-W03.md`)
-- **Monthly plans**: `YYYY-QQ-MM.md` (e.g., `2025-Q3-08.md`)
-- **Quarterly plans**: `YYYY-QQ.md` (e.g., `2025-Q3.md`)
-- **Yearly plans**: `YYYY.md` (e.g., `2025.md`)
+Plans are organized in a flat structure in the `vault/plans/` directory with a hierarchical naming scheme that ensures proper sorting:
+- **Yearly plans**: `YYYY_00.md` (e.g., `2025_00.md`)
+- **Quarterly plans**: `YYYY_QQ_00.md` (e.g., `2025_Q3_00.md`)
+- **Monthly plans**: `YYYY_QQ_MM_00.md` (e.g., `2025_Q3_08_00.md`)
+- **Weekly plans**: `YYYY_QQ_MM_W##_00.md` (e.g., `2025_Q3_08_W33_00.md`)
+- **Daily plans**: `YYYY_QQ_MM_W##_DD.md` (e.g., `2025_Q3_08_W33_16.md`)
 
-This naming ensures files sort alphabetically with higher-level plans appearing before their sub-plans. When creating new plan files:
+The `_00` suffix for aggregate levels (year, quarter, month, week) ensures they sort before their child items. Days include their week number (W##) to group them properly under their respective weeks. When creating new plan files:
 1. Check if higher-level plans exist (year, quarter, month)
 2. Reference objectives from higher-level plans in lower-level ones
 3. Roll up completed items from daily plans to weekly/monthly summaries

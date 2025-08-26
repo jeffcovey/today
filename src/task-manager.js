@@ -618,7 +618,7 @@ export class TaskManager {
     // Check if this is a review file and extract the date
     let reviewDate = null;
     if (filePath.startsWith('vault/plans/')) {
-      const dateMatch = filePath.match(/(\d{4}-Q\d+-\d{2}-\d{2})\.md$/);  
+      const dateMatch = filePath.match(/(\d{4}_Q\d+_\d{2}_W\d{2}_\d{2})\.md$/);  
       if (dateMatch) {
         reviewDate = dateMatch[1];
       }

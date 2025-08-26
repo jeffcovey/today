@@ -207,7 +207,8 @@ const pageStyle = `
     min-height: 100vh;
   }
   
-  .markdown-content {
+  /* Only apply background to markdown content that's NOT in a chat bubble */
+  .markdown-content:not(.chat-bubble .markdown-content) {
     background: white;
     padding: 2rem;
     border-radius: 0.5rem;
@@ -429,11 +430,13 @@ const pageStyle = `
   /* Override any nested card styles */
   /* Override ANY nested elements that might have backgrounds */
   .chat-bubble .card,
-  .chat-bubble .card-body {
+  .chat-bubble .card-body,
+  .chat-bubble .markdown-content {
     background: transparent !important;
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    padding: 0 !important;
   }
   
   /* Ensure bubble content inherits color */
@@ -712,6 +715,129 @@ function getWeekNumber(date) {
   return Math.ceil((days + startOfYear.getDay() + 1) / 7);
 }
 
+// Parse plan file names to extract components
+function parsePlanFile(filename) {
+  const name = filename.replace('.md', '');
+  const parts = name.split('_');
+  
+  // Year file: YYYY_00.md
+  if (parts.length === 2 && parts[0].match(/^\d{4}$/) && parts[1] === '00') {
+    return { year: parseInt(parts[0]), level: 'year' };
+  }
+  
+  // Quarter file: YYYY_QQ_00.md
+  if (parts.length === 3 && parts[0].match(/^\d{4}$/) && parts[1].match(/^Q[1-4]$/) && parts[2] === '00') {
+    return { year: parseInt(parts[0]), quarter: parseInt(parts[1].substring(1)), level: 'quarter' };
+  }
+  
+  // Month file: YYYY_QQ_MM_00.md
+  if (parts.length === 4 && parts[0].match(/^\d{4}$/) && parts[1].match(/^Q[1-4]$/) && parts[2].match(/^\d{2}$/) && parts[3] === '00') {
+    return { 
+      year: parseInt(parts[0]), 
+      quarter: parseInt(parts[1].substring(1)), 
+      month: parseInt(parts[2]), 
+      level: 'month' 
+    };
+  }
+  
+  // Week file: YYYY_QQ_MM_W##_00.md
+  if (parts.length === 5 && parts[0].match(/^\d{4}$/) && parts[1].match(/^Q[1-4]$/) && parts[2].match(/^\d{2}$/) && parts[3].match(/^W\d{2}$/) && parts[4] === '00') {
+    return { 
+      year: parseInt(parts[0]), 
+      quarter: parseInt(parts[1].substring(1)), 
+      month: parseInt(parts[2]), 
+      week: parseInt(parts[3].substring(1)), 
+      level: 'week' 
+    };
+  }
+  
+  // Day file: YYYY_QQ_MM_W##_DD.md
+  if (parts.length === 5 && parts[0].match(/^\d{4}$/) && parts[1].match(/^Q[1-4]$/) && parts[2].match(/^\d{2}$/) && parts[3].match(/^W\d{2}$/) && parts[4].match(/^\d{2}$/)) {
+    return { 
+      year: parseInt(parts[0]), 
+      quarter: parseInt(parts[1].substring(1)), 
+      month: parseInt(parts[2]), 
+      week: parseInt(parts[3].substring(1)),
+      day: parseInt(parts[4]), 
+      level: 'day' 
+    };
+  }
+  
+  return null;
+}
+
+// Compare two plan files for sorting
+function comparePlanFiles(a, b) {
+  const aData = parsePlanFile(a);
+  const bData = parsePlanFile(b);
+  
+  // Handle unparseable files
+  if (!aData && !bData) return a.localeCompare(b);
+  if (!aData) return 1;
+  if (!bData) return -1;
+  
+  // Compare years
+  if (aData.year !== bData.year) return aData.year - bData.year;
+  
+  // If one is year-level and other isn't, year comes first
+  if (aData.level === 'year' && bData.level !== 'year') return -1;
+  if (bData.level === 'year' && aData.level !== 'year') return 1;
+  
+  // Compare quarters
+  if (aData.quarter !== bData.quarter) {
+    if (aData.quarter === undefined) return -1;
+    if (bData.quarter === undefined) return 1;
+    return aData.quarter - bData.quarter;
+  }
+  
+  // If one is quarter-level and other isn't, quarter comes first  
+  if (aData.level === 'quarter' && bData.level !== 'quarter') return -1;
+  if (bData.level === 'quarter' && aData.level !== 'quarter') return 1;
+  
+  // Compare months
+  if (aData.month !== bData.month) {
+    if (aData.month === undefined) return -1;
+    if (bData.month === undefined) return 1;
+    return aData.month - bData.month;
+  }
+  
+  // If one is month-level and other isn't, month comes first
+  if (aData.level === 'month' && bData.level !== 'month') return -1;
+  if (bData.level === 'month' && aData.level !== 'month') return 1;
+  
+  // Compare weeks and days
+  if (aData.level === 'week' && bData.level === 'week') {
+    return aData.week - bData.week;
+  }
+  if (aData.level === 'week' && bData.level === 'day') return -1;
+  if (aData.level === 'day' && bData.level === 'week') return 1;
+  
+  if (aData.level === 'day' && bData.level === 'day') {
+    // First compare by week number, then by day
+    if (aData.week !== bData.week) {
+      return aData.week - bData.week;
+    }
+    return aData.day - bData.day;
+  }
+  
+  return a.localeCompare(b);
+}
+
+// Get hierarchical level for plan files
+function getPlanHierarchyLevel(filename) {
+  const data = parsePlanFile(filename);
+  if (!data) return 0;
+  
+  switch(data.level) {
+    case 'year': return 0;
+    case 'quarter': return 1;
+    case 'month': return 2;
+    case 'week': return 3;
+    case 'day': return 4;
+    default: return 0;
+  }
+}
+
 async function getMarkdownTitle(filePath) {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
@@ -730,12 +856,22 @@ async function getMarkdownTitle(filePath) {
 async function renderDirectory(dirPath, urlPath) {
   const items = await fs.readdir(dirPath, { withFileTypes: true });
   
-  // Sort: directories first, then files
-  items.sort((a, b) => {
-    if (a.isDirectory() && !b.isDirectory()) return -1;
-    if (!a.isDirectory() && b.isDirectory()) return 1;
-    return a.name.localeCompare(b.name);
-  });
+  // Special handling for plans directory
+  if (urlPath === 'plans') {
+    items.sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) return -1;
+      if (!a.isDirectory() && b.isDirectory()) return 1;
+      // Just use alphabetical sorting - our naming scheme handles the hierarchy
+      return a.name.localeCompare(b.name);
+    });
+  } else {
+    // Default sort: directories first, then files
+    items.sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) return -1;
+      if (!a.isDirectory() && b.isDirectory()) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
   
   // Build breadcrumb items
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
@@ -791,7 +927,9 @@ async function renderDirectory(dirPath, urlPath) {
   
   // Special homepage content
   if (!urlPath) {
-    const today = new Date();
+    // Use Eastern timezone for consistency with other scripts
+    const easternTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/New_York"}));
+    const today = easternTime;
     const year = today.getFullYear();
     const quarter = `Q${Math.floor(today.getMonth() / 3) + 1}`;
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -799,15 +937,15 @@ async function renderDirectory(dirPath, urlPath) {
     const day = String(today.getDate()).padStart(2, '0');
     
     // Check for today's plan
-    const todayPlanFile = `${year}-${quarter}-${month}-${day}.md`;
+    const todayPlanFile = `${year}_${quarter}_${month}_W${week}_${day}.md`;
     const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
     const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
     
     // Check for other plan files
-    const weekPlanFile = `${year}-${quarter}-${month}-W${week}.md`;
-    const monthPlanFile = `${year}-${quarter}-${month}.md`;
-    const quarterPlanFile = `${year}-${quarter}.md`;
-    const yearPlanFile = `${year}.md`;
+    const weekPlanFile = `${year}_${quarter}_${month}_W${week}_00.md`;
+    const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
+    const quarterPlanFile = `${year}_${quarter}_00.md`;
+    const yearPlanFile = `${year}_00.md`;
     
     const plansDir = path.join(dirPath, 'plans');
     const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
@@ -929,7 +1067,36 @@ async function renderDirectory(dirPath, urlPath) {
     if (!item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
       const fullFilePath = path.join(dirPath, item.name);
-      const icon = item.name.endsWith('.md') ? 'fa-file-alt text-info' : 'fa-file text-secondary';
+      let icon = item.name.endsWith('.md') ? 'fa-file-alt text-info' : 'fa-file text-secondary';
+      
+      // Calculate indentation and special icons for plans directory
+      let indentStyle = '';
+      if (urlPath === 'plans') {
+        const level = getPlanHierarchyLevel(item.name);
+        indentStyle = `padding-left: ${1.5 + level * 1.5}rem !important;`;
+        
+        // Use specific icons for each plan level
+        const planData = parsePlanFile(item.name);
+        if (planData) {
+          switch(planData.level) {
+            case 'year':
+              icon = 'fa-calendar-check text-danger';
+              break;
+            case 'quarter':
+              icon = 'fa-business-time text-warning';
+              break;
+            case 'month':
+              icon = 'fa-calendar text-success';
+              break;
+            case 'week':
+              icon = 'fa-calendar-week text-info';
+              break;
+            case 'day':
+              icon = 'fa-calendar-day text-primary';
+              break;
+          }
+        }
+      }
       
       // For markdown files, try to get the title from the first H1
       let displayContent;
@@ -964,7 +1131,7 @@ async function renderDirectory(dirPath, urlPath) {
       }
       
       html += `
-        <a href="/${itemPath}" class="list-group-item list-group-item-action">
+        <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
         </a>`;
     }

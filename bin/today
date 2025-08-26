@@ -118,13 +118,14 @@ if [ -n "$LAST_SYNC" ]; then
     YEAR=$(date +%Y)
     MONTH=$(date +%m)  
     DAY=$(date +%d)
+    WEEK=$(date +%V)  # ISO week number
     # Determine quarter from month
     if [ $MONTH -le 3 ]; then Q="Q1"
     elif [ $MONTH -le 6 ]; then Q="Q2"
     elif [ $MONTH -le 9 ]; then Q="Q3"
     else Q="Q4"
     fi
-    REVIEW_FILE="vault/plans/${YEAR}-${Q}-${MONTH}-${DAY}.md"
+    REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review

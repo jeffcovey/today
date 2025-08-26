@@ -142,7 +142,8 @@
       "Bash(scp:*)",
       "Bash(bin/contacts search:*)",
       "Bash(bin/contacts list:*)",
-      "Bash(bin/contacts:*)"
+      "Bash(bin/contacts:*)",
+      "WebFetch(domain:ptod.us)"
     ],
     "deny": []
   }
