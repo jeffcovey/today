@@ -20,4 +20,3 @@ Tasks and projects related to Health.
 - [ ] Add logging health stats to medical notes (BP, weight at office, etc.) <!-- task-id: f5c01c9f9991ea1eb2f975090fe165ae -->
 - [ ] Calculate caloric density on my own <!-- task-id: 7f5dc688128aef42a4bcc0e3028b29bb -->
 - [ ] Check Blue365 <!-- task-id: 74829e8fdf6206bb2dd9bdea7e7721ce -->
-
