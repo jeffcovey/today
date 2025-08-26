@@ -10,8 +10,8 @@ STAGED_JS=$(echo "$STAGED_FILES" | grep -E '^src/.*\.js$' || true)
 # Update file dates index for new markdown files
 bin/update-file-dates-index
 
-# Auto-fix markdown files with markdownlint
-STAGED_MD=$(echo "$STAGED_FILES" | grep '\.md$' || true)
+# Auto-fix markdown files with markdownlint (excluding vault files)
+STAGED_MD=$(echo "$STAGED_FILES" | grep '\.md$' | grep -v '^vault/' || true)
 
 if [ -n "$STAGED_MD" ]; then
   echo "Auto-fixing markdown files with markdownlint..."

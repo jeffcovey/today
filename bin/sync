@@ -356,19 +356,8 @@ clean_markdown_files() {
         print_info "All markdown files are already clean"
     fi
     
-    # Commit the cleaned files if there were any changes
-    if [[ -n $(git status --porcelain vault/ 2>/dev/null) ]]; then
-        print_info "Committing markdown formatting fixes..."
-        git add vault/ 2>/dev/null
-        
-        # Create appropriate commit message based on what was fixed
-        if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
-            git commit -m "Fix corrupted HTML comments and clean markdown formatting" --quiet 2>/dev/null
-        else
-            git commit -m "Clean up markdown formatting with markdownlint" --quiet 2>/dev/null
-        fi
-        git push origin main --quiet 2>/dev/null
-    fi
+    # NOTE: No longer committing vault changes - Syncthing handles synchronization
+    # Files are cleaned in-place and will sync automatically
     
     return 0
 }
