@@ -3,6 +3,7 @@
 <!-- Entries are automatically added from inbox notes -->
 <!-- Format: YYYY-MM-DD entry text -->
 
+2025-08-26 upcoming time away.
 2025-08-25 light, bright mornings.
 2025-08-24  AI. So, so much help.
 2025-08-23 second and third and twentieth chances.
