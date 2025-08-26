@@ -26,7 +26,8 @@ apt-get install -y \
     curl \
     jq \
     bc \
-    tmux
+    tmux \
+    syncthing
 
 # Install Claude CLI globally
 echo "📦 Installing Claude CLI..."

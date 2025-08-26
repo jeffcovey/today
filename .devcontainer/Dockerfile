@@ -12,8 +12,8 @@ RUN ARCH=$(uname -m) && \
     mv /tmp/turso /usr/local/bin/turso && \
     chmod +x /usr/local/bin/turso
 
-# Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless)
-RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev && rm -rf /var/lib/apt/lists/*
+# Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless), syncthing
+RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev syncthing && rm -rf /var/lib/apt/lists/*
 
 # Create symlinks for common aliases
 RUN ln -s /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true && \

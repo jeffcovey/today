@@ -1,0 +1,22 @@
+[Unit]
+Description=Syncthing for Today Vault
+Documentation=https://syncthing.net/
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/syncthing serve --no-browser --no-restart --logflags=0
+Restart=on-failure
+RestartSec=10
+Environment="STHOME=/opt/today/.config/syncthing"
+Environment="VAULT_PATH=/opt/today/vault"
+
+# Security hardening
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/today/vault /opt/today/.config/syncthing
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -15,6 +15,7 @@ if [ -f "bin/setup" ]; then
     bash bin/setup --tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
 fi
 
+
 # Start code-server
 if [ -f "bin/start-code-server" ]; then
     echo "Starting code-server..."
