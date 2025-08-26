@@ -1,5 +1,5 @@
 <details>
-<summary><strong>General Tasks</strong> (2005 tasks)</summary>
+<summary><strong>General Tasks</strong> (2006 tasks)</summary>
 
 ### Monday, Aug 11 (overdue)
 
@@ -178,6 +178,7 @@
 - [ ] Review and improve test coverage <!-- task-id: 5a7593ab012117123b7dfa0a7e1696f8 -->
 - [ ] Review and improve test coverage <!-- task-id: 4b8ced1a1597ddad8e7256cf40e6af95 -->
 - [ ] Review and improve test coverage <!-- task-id: 502c70981f1d18ca2773b6f778c24566 -->
+- [ ] Review and improve test coverage <!-- task-id: 60f3994696b412e414d4659ee196cbc3 -->
 - [ ] add OGM news stories <!-- task-id: a110abe4bc058621ef9653a0d606343c -->
 
 ### Monday, Dec 1
@@ -232,11 +233,6 @@
 
 ### Invalid Date, Invalid Date
 
-- [x] Daily review and update of plans <!-- task-id: 1fbfc8acd7f100eeed0386b58251c8fe -->
-- [x] Maintain project tracking for key initiatives <!-- task-id: 7a150b6927b8cbb32a71c915c21b941e -->
-- [x] Process and organize any pending documents <!-- task-id: fbabc54923ca0b95da87e179e3bada75 -->
-- [x] Review and address any critical system issues <!-- task-id: 085dcaee3a75e54dc845667a2a7ec853 -->
-- [x] Watch Hip Hook/Mark instructional videos <!-- task-id: f00a58f3ffd3f2006286ff8f17234183 -->
 - [ ] Continue ongoing development tasks as scheduled <!-- task-id: f2da3fd04c788bcbeeea6457e2c441fe -->
 - [ ] Implement first set of exercises from the book <!-- task-id: 96e24641ca535f67c52d19ee1916b8b8 -->
 - [ ] Maintain consistent sleep schedule <!-- task-id: 54a4cbad4cdc5124c3b4b1d675a67f09 -->
@@ -752,8 +748,9 @@
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 021d18c52c6f481a35adfe37ba470aba -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 67fdeed8015ccdf95e2f495cab1a718f -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9d8fd1159757566af71b8fecbbd77e22 -->
-- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 1d81fc1551310c72137acb37b4060789 -->
 - [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 6c3347b276d7376d475db2f969f61bac -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: fa97cd774f6858e0771ab8a326e679b4 -->
+- [ ] Check the fridge water lines (6 days overdue) <!-- task-id: f --> <!-- task-id: 9876a2e5177680673a3575f6b4bebd67 -->
 - [ ] Complete daily logging <!-- task-id: 841a0bce761ddf4009c05c7e1bf89b18 -->
 - [ ] Create a Pool project <!-- task-id: 76db1c791814f599494775eacee9f96a -->
 - [ ] Create daily pain tracking log <!-- task-id: pain-tracking-setup --> <!-- task-id: 5359f3c61cdf8801a37f7852349da73c -->
@@ -916,8 +913,9 @@
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 1ab582bdf4fdcce8eb374a37d02e4856 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 274444e2feeac6a8416d85a7feb9f5b5 -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 5ecab93179b861e8b1c92dda4a9c340c -->
-- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: ac2785a564fda2e4cfa09c695fd930aa -->
 - [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: 68e302af788afa660a250759022154c1 -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: c8562e185ec6f48a746d80c44ce24d0e -->
+- [ ] Do Apple Fitness+ Workouts <!-- task-id: a --> <!-- task-id: cb280ff5a30308fe43a685c8eb2c83fb -->
 - [ ] Document arthritis symptom improvements <!-- task-id: c9aa889a5fb4e4b1e92094f702b52f33 -->
 - [ ] Energy levels <!-- task-id: bd05d96a1caf324fcc9173761655b60b -->
 - [ ] Establish 2 regular AF days <!-- task-id: c54bfdced4b3355f86921c623e11bd11 -->
@@ -1083,8 +1081,9 @@
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: d5640add4eaf03628acc538a33f54368 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 4c271710a3826a0ee9a90f34ff60f589 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 7a4b6e1a559788fc53633ac55d4e9704 -->
-- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: c860eceb3c35979e9d8e4e03ff48c002 -->
 - [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 08fb2b95f12be0e5bb73f32262850a49 -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 56d3134e0c9861334548913acf23458d -->
+- [ ] Fix Chronological Sorting Of The Events Index (🚀 1st Priority) <!-- task-id: e --> <!-- task-id: 86bb7efd643376116f90ccd54ad319ba -->
 - [ ] Focus on quality over quantity <!-- task-id: 346616f7e316f84ecb74c7cc2e60ffb2 -->
 - [ ] Get a clear view of my finances <!-- task-id: 2aef940753e560346e163b89e962916f -->
 - [ ] Have 2 alcohol-free days <!-- task-id: d1ac35f2d03703f14161722e99263a8e -->
@@ -1323,8 +1322,9 @@
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ca38c5b609fa2726d3a05d8b43e14fcb -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 8cfc4c32b8e1f711b1f1fc577701d9f9 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 60604344b119b8acd5a4eb8181bb4cd8 -->
-- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 0aecb18d2c0f3a62a0baf06f32273ef1 -->
 - [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 46c656efabf2fd28420298a02c50c9ed -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: 553ae339a0bac0923fdda4569a5d54f0 -->
+- [ ] ♥︎ Activity Rings <!-- task-id: ac --> <!-- task-id: ddc64ca002afe8b209ee3430e02a6b3f -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 62ceba67804bf74368caf7d627087364 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: b6be408f8e586e9132cf09abce0510b0 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: a74969467788cf03b89109a230bf6e3d -->
@@ -1483,8 +1483,9 @@
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 07ee4eef06b5e96e2dd7ddeaecb82678 -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 207f6a0416d026683735fa7df3661ccb -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 3c957b5c997844ceb95c30e5e2130141 -->
-- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: e7519166e8d846ae40d3e09c682f7dfa -->
 - [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: d33e220cc637767716f79141f652c06f -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 922a9094796b5121c63f613b0b936bac -->
+- [ ] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 227e2d20c9623a2515a94a5daa663c5e -->
 - [ ] Add AI photo gallery [Oldergaymen Content] <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] Add an "invited" NewsletterLog status [Oldergaymen Newsletter] <!-- task-id: fa87438561333c6a156dbba4e0bcfa33 -->
 - [ ] Add comments from people joining events and meetups [Oldergaymen Events] <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
@@ -2223,4 +2224,3 @@
 - [ ] Watch videos about the Hip Hook/Mark <!-- task-id: 739942d0de77ba67dd64b9640005bd4c -->
 
 </details>
-
