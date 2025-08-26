@@ -15,4 +15,3 @@ Tasks and projects related to Oldergaymen Events.
 
 - [ ] Add comments from people joining events and meetups <!-- task-id: 3ee4ac803c53eb8961ff347c0fd88bfb -->
 - [ ] Add to Events: "Add to my calendar" links <!-- task-id: 59c92352d64eea2ca851f756fbc7a699 -->
-
