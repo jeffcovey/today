@@ -15,4 +15,3 @@ Tasks and projects related to Clubs Memberships.
 
 - [ ] Add flashcards to Streaks <!-- task-id: 41512b86d4f63268bbabb19053c1b5aa -->
 - [ ] Add to Notion Prime Gentlemen Membership Directory <!-- task-id: 13f9943a1befac78912501aa60505e78 -->
-
