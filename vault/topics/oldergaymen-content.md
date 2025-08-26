@@ -15,7 +15,7 @@ Tasks and projects related to Oldergaymen Content.
 
 - [ ] Check that page comments show in public activity <!-- task-id: 0e5eb5b4284e0681c7d6c3fe9c663e63 -->
 - [ ] Check site Paul recommends for OlderGay.Men <!-- task-id: e4af89f94bee51cccca857b7ddfddf83 -->
-- [ ] Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
+- [x] ♥︎ Burn More Energy <!-- task-id: b --> <!-- task-id: 34b28863fd09b9d54e5161c90610ff25 -->- Add AI photo gallery <!-- task-id: ddd8bc6b8798569e5a9f561319c6d963 -->
 - [ ] A Guide to Finding an LGBTQ+ Inclusive Long-Term Care Community – SAGE <!-- task-id: 1b82a9fa1f8bef0b2a9fcab414e8feb9 -->
 - [ ] AI images <!-- task-id: 95b911487eb1d3629d87cd21af3e836e -->
 - [ ] Add "Papa Fred" part 2 <!-- task-id: b7e89b3a23f5e4a217a2abb6ddb7896f -->
