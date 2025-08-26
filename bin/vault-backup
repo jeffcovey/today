@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Create daily backups of vault directory
+# Keeps last 7 days of backups
+
+BACKUP_DIR="${HOME}/vault-backups"
+VAULT_DIR="/workspaces/today/vault"
+DATE=$(date +%Y%m%d-%H%M%S)
+BACKUP_FILE="${BACKUP_DIR}/vault-${DATE}.tar.gz"
+
+# Create backup directory if it doesn't exist
+mkdir -p "$BACKUP_DIR"
+
+# Create compressed backup
+echo "Creating backup: $BACKUP_FILE"
+tar -czf "$BACKUP_FILE" -C "$(dirname "$VAULT_DIR")" "$(basename "$VAULT_DIR")" 2>/dev/null
+
+# Keep only last 7 days of backups
+echo "Cleaning old backups..."
+find "$BACKUP_DIR" -name "vault-*.tar.gz" -mtime +7 -delete
+
+echo "✓ Backup complete!"
+echo "  Saved to: $BACKUP_FILE"
+echo "  Size: $(du -h "$BACKUP_FILE" | cut -f1)"
+echo ""
+echo "Recent backups:"
+ls -lh "$BACKUP_DIR" | tail -5
+
+# To restore a backup:
+echo ""
+echo "To restore a backup:"
+echo "  tar -xzf $BACKUP_FILE -C /workspaces/today/"

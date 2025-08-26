@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Enable Syncthing versioning for vault folder
+# This keeps old versions of files when they're modified or deleted
+
+set -e
+
+SYNCTHING_CONFIG_DIR="${HOME}/.config/syncthing"
+SYNCTHING_PORT="${SYNCTHING_PORT:-8384}"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+print_status() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+# Get API key
+if [ -f "${SYNCTHING_CONFIG_DIR}/config.xml" ]; then
+    API_KEY=$(grep -oP '(?<=<apikey>)[^<]+' "${SYNCTHING_CONFIG_DIR}/config.xml")
+else
+    API_KEY=$(grep -oP '(?<=<apikey>)[^<]+' ~/.local/state/syncthing/config.xml 2>/dev/null)
+fi
+
+if [ -z "$API_KEY" ]; then
+    print_warning "Could not find API key. Is Syncthing running?"
+    exit 1
+fi
+
+# Get current folder config
+FOLDER_CONFIG=$(curl -s -H "X-API-Key: $API_KEY" \
+    "http://localhost:${SYNCTHING_PORT}/rest/config/folders/today-vault")
+
+if [ "$FOLDER_CONFIG" = "null" ] || [ -z "$FOLDER_CONFIG" ]; then
+    print_warning "Vault folder not found in Syncthing"
+    exit 1
+fi
+
+# Enable versioning (Simple versioning keeps 5 old versions by default)
+print_status "Enabling versioning for vault folder..."
+
+# Update config with versioning
+UPDATED_CONFIG=$(echo "$FOLDER_CONFIG" | jq '.versioning = {
+    "type": "simple",
+    "params": {
+        "keep": "10"  
+    },
+    "cleanupIntervalS": 3600,
+    "fsPath": "",
+    "fsType": "basic"
+}')
+
+# Apply the configuration
+echo "$UPDATED_CONFIG" | curl -X PUT -H "X-API-Key: $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d @- \
+    "http://localhost:${SYNCTHING_PORT}/rest/config/folders/today-vault" \
+    > /dev/null 2>&1
+
+# Restart Syncthing to apply changes
+curl -X POST -H "X-API-Key: $API_KEY" \
+    "http://localhost:${SYNCTHING_PORT}/rest/system/restart" \
+    > /dev/null 2>&1
+
+print_status "Versioning enabled!"
+echo ""
+echo "Syncthing will now keep the last 10 versions of each file."
+echo "Old versions are stored in: ~/.config/syncthing/.stversions/"
+echo ""
+echo "To recover an old version:"
+echo "  1. Look in ~/.config/syncthing/.stversions/today-vault/"
+echo "  2. Files are named like: filename~20250826-143022.ext"
+echo "  3. Copy the version you want back to vault/"

@@ -71,6 +71,12 @@ const jobs = [
         command: 'bin/notion daily --all || true', // Run all Notion daily automation tasks
         description: 'Notion daily automation (temporary until migration)',
         timezone: true
+    },
+    {
+        schedule: '0 2 * * *', // Daily at 2 AM
+        command: 'bin/vault-snapshot || true', // Backup vault daily
+        description: 'Daily vault snapshot backup',
+        timezone: true
     }
 ];
 
