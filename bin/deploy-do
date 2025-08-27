@@ -125,6 +125,11 @@ case "$ACTION" in
             ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
         fi
         
+        # Ensure Syncthing service file is correct (fix for STHOME issue)
+        print_info "Updating Syncthing service configuration..."
+        scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/syncthing.service 2>/dev/null || true
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if ! grep -q 'STHOME=/opt/today/.config/syncthing' /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi" || true
+        
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
@@ -373,6 +378,36 @@ case "$ACTION" in
         echo "Use the device ID above to pair with your other devices"
         ;;
         
+    syncthing-fix)
+        echo "🔧 Fixing Syncthing configuration..."
+        check_config
+        
+        print_info "Stopping Syncthing service..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop syncthing"
+        
+        print_info "Moving existing config to project directory..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /root/.local/state/syncthing ] && [ ! -d /opt/today/.config/syncthing ]; then mkdir -p /opt/today/.config && mv /root/.local/state/syncthing /opt/today/.config/syncthing && echo 'Moved existing config'; fi"
+        
+        print_info "Updating systemd service file..."
+        scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload"
+        
+        print_info "Ensuring vault directory exists..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/vault"
+        
+        print_info "Starting Syncthing with correct config..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl start syncthing"
+        
+        print_info "Waiting for Syncthing to start..."
+        sleep 3
+        
+        print_info "Checking service status..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl status syncthing --no-pager | head -20"
+        
+        print_status "Syncthing fix complete!"
+        echo "Access Syncthing at: http://${DROPLET_IP}:8384"
+        ;;
+        
     ollama)
         echo "🤖 Managing Ollama models..."
         check_config
@@ -436,6 +471,7 @@ case "$ACTION" in
         echo "  db-upload   - Upload local database to droplet"
         echo "  git-setup   - Manually setup git repository"
         echo "  syncthing-setup - Setup Syncthing for vault sync"
+        echo "  syncthing-fix - Fix Syncthing config location issue"
         echo "  ollama-setup - Install and setup Ollama with phi3-mini model"
         echo "  ollama      - Manage Ollama models (list|pull|rm|test)"
         echo "  nginx-config - Update nginx configuration"
