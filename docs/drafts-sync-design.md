@@ -14,7 +14,7 @@ Since Drafts doesn't have traditional folders, we'll use tags to mirror the dire
 vault/notes/daily/2025-08-12-note.md     →  Tags: ["notes", "notes/daily"]
 vault/notes/tasks/tasks.md               →  Tags: ["notes", "notes/tasks"]
 vault/notes/concerns/2025-08-12.md       →  Tags: ["notes", "notes/concerns"]
-vault/notes/reviews/2025-08-12.md        →  Tags: ["notes", "notes/reviews"]
+vault/logs/ogm-work/2025-08-12.md        →  Tags: ["logs", "logs/ogm-work"]
 ```
 
 ### Draft Metadata Storage

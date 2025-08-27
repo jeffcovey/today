@@ -280,7 +280,7 @@ sync_github_vault_original() {
     print_info "Total notes: $note_count, plans: $plan_count, projects: $project_count, topics: $topic_count"
     
     # Count OGM work files
-    ogm_count=$(find vault/notes/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
+    ogm_count=$(find vault/logs/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
     if [[ $ogm_count -gt 0 ]]; then
         print_info "OlderGay.Men work summaries: $ogm_count"
     fi

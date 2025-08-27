@@ -65,17 +65,14 @@
   "vault/notes/daily/2025-08-21-023320-UTC-2018-07-17-nurse-practitioner-home-visit.md": "2025-08-26T22:52:45+00:00",
   "vault/notes/daily/2025-08-21-030517-UTC-in-ruby-several-common-design-patterns-are-used-to.md": "2025-08-26T22:52:45+00:00",
   "vault/notes/mindset.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-12-activestorage-and-messaging-critical.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-13-oldergaymen-work-summaries.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-16-activestorage-and-memory-critical.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-18-issues-resolved.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-18-production-issues-update.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/2025-08-18-resolution-summary.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/ogm-work/README.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-12-activestorage-and-messaging-critical.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-13-oldergaymen-work-summaries.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-16-activestorage-and-memory-critical.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-18-issues-resolved.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-18-production-issues-update.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/2025-08-18-resolution-summary.md": "2025-08-26T22:52:45+00:00",
+  "vault/logs/ogm-work/README.md": "2025-08-26T22:52:45+00:00",
   "vault/notes/README.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/reviews/2025-08-13.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/reviews/2025-08-15.md": "2025-08-26T22:52:45+00:00",
-  "vault/notes/reviews/2025-08-16.md": "2025-08-26T22:52:45+00:00",
   "vault/notes/tasks/stages.md": "2025-08-27T00:41:19+00:00",
   "vault/notes/tasks/streaks-today.md": "2025-08-26T22:52:45+00:00",
   "vault/notes/tasks/tasks.md": "2025-08-27T00:41:19+00:00",
@@ -154,5 +151,8 @@
   "vault/topics/yardpoollandscaping.md": "2025-08-27T00:02:24+00:00"
 ,
   "vault/logs/every_six_weeks.md": "2025-08-27T01:15:48+00:00"
+
+,
+  "vault/plans/2025_Q3_08_W35_27.md": "2025-08-27T10:36:40+00:00"
 
 }

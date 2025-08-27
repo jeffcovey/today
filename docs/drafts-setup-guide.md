@@ -80,8 +80,7 @@ After initial sync, your drafts will have these tags:
 - `notes/daily` - Daily journal entries
 - `notes/tasks` - Task lists
 - `notes/concerns` - Concerns and worries
-- `notes/reviews` - Daily review files
-- `notes/ogm-work` - OlderGay.Men work
+- `logs/ogm-work` - OlderGay.Men work
 - `projects` - Projects category
 - `topics` - Topics category
 - `plans` - Plans category
