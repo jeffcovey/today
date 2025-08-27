@@ -340,6 +340,107 @@ EOF
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION vault-watcher && sudo systemctl status vault-watcher --no-pager"
         ;;
     
+    inbox-api-setup)
+        echo "📮 Setting up inbox upload API..."
+        check_config
+        
+        print_info "Generating API key..."
+        
+        # Generate a random API key if not exists
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+            if [ ! -f /opt/today/.inbox-api-key ]; then
+                API_KEY=$(openssl rand -hex 32)
+                echo "INBOX_API_KEY=$API_KEY" > /opt/today/.inbox-api-key
+                chmod 600 /opt/today/.inbox-api-key
+                echo "Generated new API key: $API_KEY"
+            else
+                source /opt/today/.inbox-api-key
+                echo "Using existing API key: $INBOX_API_KEY"
+            fi
+EOF
+        
+        # Copy service file
+        scp -i "$SSH_KEY" config/inbox-api.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/inbox-api.service
+        
+        # Install service and nginx config
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+            # Install service
+            sudo mv /tmp/inbox-api.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable inbox-api
+            sudo systemctl restart inbox-api
+            
+            # Update nginx config if not already configured
+            if ! grep -q "/api/inbox/" /etc/nginx/sites-available/default; then
+                # Add the inbox API configuration before the last closing brace
+                sudo sed -i '/^}$/i \
+    # Inbox API endpoint\
+    location /api/inbox/ {\
+        proxy_pass http://127.0.0.1:3333/inbox/;\
+        proxy_http_version 1.1;\
+        proxy_set_header Upgrade $http_upgrade;\
+        proxy_set_header Connection '"'"'upgrade'"'"';\
+        proxy_set_header Host $host;\
+        proxy_cache_bypass $http_upgrade;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        client_max_body_size 10M;\
+        proxy_connect_timeout 60s;\
+        proxy_send_timeout 60s;\
+        proxy_read_timeout 60s;\
+    }\
+    \
+    location /api/health {\
+        proxy_pass http://127.0.0.1:3333/health;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+    }' /etc/nginx/sites-available/default
+                
+                # Test and reload nginx
+                sudo nginx -t && sudo systemctl reload nginx
+                echo "Nginx configuration updated"
+            else
+                echo "Nginx already configured for inbox API"
+            fi
+            
+            sleep 2
+            sudo systemctl status inbox-api --no-pager
+            
+            # Show the API key for user to copy
+            echo ""
+            echo "================================"
+            source /opt/today/.inbox-api-key
+            echo "Inbox API Key: $INBOX_API_KEY"
+            echo "================================"
+            echo ""
+            echo "Save this API key in your Drafts app!"
+            echo "Endpoint: https://ptod.us/api/inbox/upload"
+EOF
+        
+        print_status "Inbox API installed and configured"
+        ;;
+    
+    inbox-api)
+        # Control inbox API on droplet
+        check_config
+        ACTION="${2:-status}"
+        print_info "Inbox API: $ACTION"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION inbox-api && sudo systemctl status inbox-api --no-pager"
+        
+        if [ "$ACTION" = "status" ] || [ "$ACTION" = "restart" ]; then
+            # Show API key
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+                if [ -f /opt/today/.inbox-api-key ]; then
+                    echo ""
+                    source /opt/today/.inbox-api-key
+                    echo "API Key: $INBOX_API_KEY"
+                    echo "Endpoint: https://ptod.us/api/inbox/upload"
+                fi
+EOF
+        fi
+        ;;
+    
     ollama-setup)
         echo "🤖 Setting up Ollama on droplet..."
         check_config
@@ -559,6 +660,8 @@ EOF
         echo "  syncthing-restore - Restore Syncthing device ID from backup"
         echo "  vault-watcher-setup - Setup vault file watcher service"
         echo "  vault-watcher - Control vault watcher (start|stop|restart|status)"
+        echo "  inbox-api-setup - Setup inbox upload API for Drafts"
+        echo "  inbox-api   - Control inbox API (start|stop|restart|status)"
         echo "  ollama-setup - Install and setup Ollama with phi3-mini model"
         echo "  ollama      - Manage Ollama models (list|pull|rm|test)"
         echo "  nginx-config - Update nginx configuration"
