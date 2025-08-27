@@ -678,11 +678,11 @@ export class TaskManager {
 
         let taskId;
         if (existingId) {
-          // Update existing task
+          // Task has an ID - either update existing or create with that ID
           taskId = existingId;
           const task = this.getTask(taskId);
           if (task) {
-            // Check if markdown file is newer than database update
+            // Task exists in database - check if we need to update it
             const taskUpdateTime = task.updated_at ? new Date(task.updated_at) : new Date(0);
             const markdownIsNewer = fileModTime > taskUpdateTime;
             
@@ -731,9 +731,37 @@ export class TaskManager {
                 }
               }
             }
+          } else {
+            // Task has ID but doesn't exist in database - create it with that ID
+            console.log(`  • Creating missing task: ${title.substring(0, 50)}... (ID: ${taskId.substring(0, 8)}...)`);
+            
+            const taskData = {
+              id: taskId,  // Use the existing ID
+              title,
+              status: isCompleted ? '✅ Done' : '🎭 Stage',
+              project_id: projectId
+            };
+            
+            // Set do_date from extracted date tag, review date, or neither
+            if (extractedDate && !reviewDate) {
+              taskData.do_date = extractedDate;
+            } else if (reviewDate && !isCompleted) {
+              taskData.do_date = reviewDate;
+            }
+            
+            // Insert with specific ID
+            this.db.prepare(`
+              INSERT INTO tasks (id, title, status, project_id, do_date, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `).run(taskId, taskData.title, taskData.status, taskData.project_id, taskData.do_date);
+            
+            // If this is a topic file, automatically assign the topic to the new task
+            if (topicName) {
+              this.addTopicToTask(taskId, topicName);
+            }
           }
         } else {
-          // Create new task
+          // No existing ID - create new task
           const taskData = {
             title,
             status: isCompleted ? '✅ Done' : '🎭 Stage',

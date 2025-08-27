@@ -7,6 +7,7 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import fs from 'fs';
+import path from 'path';
 
 program
   .name('tasks')
@@ -260,33 +261,74 @@ program
         console.log(chalk.gray('  • No topics with tasks to generate'));
       }
       
-      // Classify stages for tasks without them (skip if env var set)
+      // Classify stages for tasks without them in background
+      // This prevents the sync from hanging while waiting for AI
       if (process.env.SKIP_CLASSIFICATION) {
-        console.log(chalk.yellow('⚡ Classification skipped (running in background)'));
+        console.log(chalk.yellow('⚡ Classification skipped (SKIP_CLASSIFICATION set)'));
       } else {
-        console.log(chalk.blue('Classifying task stages...'));
-        const classifier = new TaskStageClassifier();
-        try {
-          const result = await classifier.classifyTasks(true);
-          if (result.classified > 0) {
-            console.log(chalk.green(`✓ Classified ${result.classified} tasks into Front/Back/Off Stage`));
-          } else {
-            console.log(chalk.gray('  • All tasks already have stages assigned'));
-          }
-        } catch (err) {
-          console.log(chalk.yellow('  • Stage classification skipped (AI not available)'));
-        } finally {
-          classifier.close();
+        // Count tasks needing classification
+        const unclassifiedCount = tm.db.prepare(`
+          SELECT COUNT(*) as count FROM tasks 
+          WHERE stage IS NULL 
+          AND status != '✅ Done'
+        `).get().count;
+        
+        if (unclassifiedCount > 0) {
+          console.log(chalk.blue(`⚡ Launching background classification for ${unclassifiedCount} tasks...`));
+          
+          // Spawn classification in background
+          const { spawn } = await import('child_process');
+          const classifyProcess = spawn('node', [
+            '-e',
+            `
+            const { TaskStageClassifier } = require('./src/task-stage-classifier.js');
+            const classifier = new TaskStageClassifier();
+            classifier.classifyTasks(true).then(result => {
+              if (result.classified > 0) {
+                console.log('✓ Background: Classified', result.classified, 'tasks');
+              }
+              classifier.close();
+              process.exit(0);
+            }).catch(err => {
+              console.error('Background classification error:', err.message);
+              classifier.close();
+              process.exit(1);
+            });
+            `
+          ], {
+            detached: true,
+            stdio: 'ignore',
+            cwd: process.cwd()
+          });
+          
+          // Detach the child process so it continues after parent exits
+          classifyProcess.unref();
+        } else {
+          console.log(chalk.gray('  • All tasks already have stages assigned'));
         }
       }
     } catch (error) {
       console.error(chalk.red('Error syncing tasks:'), error.message);
       process.exit(1);
     } finally {
-      // Push any pending changes to Turso before closing
-      const db = getDatabase();
-      await db.forcePush();
+      // Close task manager first
       tm.close();
+      
+      // Push any pending changes to Turso before exiting
+      try {
+        const db = getDatabase();
+        await Promise.race([
+          db.forcePush(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('forcePush timeout')), 5000)
+          )
+        ]);
+      } catch (err) {
+        console.error(chalk.yellow('Warning: Could not push to Turso:', err.message));
+      }
+      
+      // Exit cleanly
+      process.exit(0);
     }
   });
 
@@ -865,6 +907,7 @@ program
     try {
       if (options.verbose) {
         console.log(chalk.blue('Checking task consistency across all markdown files...'));
+        console.log(chalk.gray('Using latest modification time to determine correct state'));
       }
       
       // Find all markdown files
@@ -877,44 +920,41 @@ program
         console.log(chalk.gray(`Scanning ${markdownFiles.length} markdown files...`));
       }
       
-      // Collect all task statuses from all files
-      const taskStatuses = new Map(); // taskId -> { completed: boolean, files: Set }
+      // Collect all task statuses from all files with modification times
+      const taskStatuses = new Map(); // taskId -> { states: Map<filePath, {completed, mtime}> }
       const taskTitles = new Map(); // taskId -> title
       
       for (const filePath of markdownFiles) {
         try {
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
+          const stats = await fs.stat(filePath);
+          const mtime = stats.mtime;
           
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             // Match task lines with IDs - handle both normal and corrupted formats
-            const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>|<!-- task-id: ([a-f0-9]{32}) -->)/);
+            // Also matches "task-id: none" for proper handling
+            const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|none) [-—]+>|<!-- task-id: ([a-f0-9]{32}|none) -->)/);
             
             if (taskMatch) {
               const isCompleted = taskMatch[1] === 'x';
               const title = taskMatch[2].trim();
               const taskId = taskMatch[3] || taskMatch[4];
               
+              // Skip tasks marked with task-id: none (template/routine tasks)
+              if (taskId === 'none') {
+                continue;
+              }
+              
               if (!taskStatuses.has(taskId)) {
                 taskStatuses.set(taskId, { 
-                  completed: isCompleted, 
-                  files: new Set([filePath]),
-                  completedIn: isCompleted ? new Set([filePath]) : new Set(),
-                  notCompletedIn: isCompleted ? new Set() : new Set([filePath])
+                  states: new Map([[filePath, { completed: isCompleted, mtime }]])
                 });
                 taskTitles.set(taskId, title);
               } else {
                 const status = taskStatuses.get(taskId);
-                status.files.add(filePath);
-                
-                if (isCompleted) {
-                  status.completedIn.add(filePath);
-                  // If ANY file has it completed, mark as completed
-                  status.completed = true;
-                } else {
-                  status.notCompletedIn.add(filePath);
-                }
+                status.states.set(filePath, { completed: isCompleted, mtime });
               }
             }
           }
@@ -923,16 +963,36 @@ program
         }
       }
       
-      // Find inconsistent tasks
+      // Find inconsistent tasks and determine correct state based on latest change
       const inconsistentTasks = [];
       for (const [taskId, status] of taskStatuses) {
-        if (status.completedIn.size > 0 && status.notCompletedIn.size > 0) {
+        const states = Array.from(status.states.entries());
+        const completedStates = states.filter(([_, state]) => state.completed);
+        const notCompletedStates = states.filter(([_, state]) => !state.completed);
+        
+        // Only inconsistent if we have both completed and not completed states
+        if (completedStates.length > 0 && notCompletedStates.length > 0) {
+          // Find the most recent modification
+          let latestFile = null;
+          let latestMtime = new Date(0);
+          let latestCompleted = false;
+          
+          for (const [file, state] of status.states) {
+            if (state.mtime > latestMtime) {
+              latestMtime = state.mtime;
+              latestFile = file;
+              latestCompleted = state.completed;
+            }
+          }
+          
           inconsistentTasks.push({
             id: taskId,
             title: taskTitles.get(taskId),
-            completedIn: Array.from(status.completedIn),
-            notCompletedIn: Array.from(status.notCompletedIn),
-            shouldBeCompleted: status.completed
+            completedIn: completedStates.map(([file]) => file),
+            notCompletedIn: notCompletedStates.map(([file]) => file),
+            shouldBeCompleted: latestCompleted,
+            latestFile,
+            latestMtime
           });
         }
       }
@@ -954,14 +1014,15 @@ program
       for (const task of inconsistentTasks) {
         const taskTitle = task.title.length > 37 ? task.title.substring(0, 34) + '...' : task.title;
         const status = task.shouldBeCompleted ? '→ Done' : '→ Not Done';
-        const fileInfo = `✓ in: ${task.completedIn.length} file(s)\n✗ in: ${task.notCompletedIn.length} file(s)`;
-        table.push([taskTitle, status, fileInfo]);
+        const latestInfo = `Latest: ${path.basename(task.latestFile)}\n${task.latestMtime.toLocaleString()}`;
+        table.push([taskTitle, status, latestInfo]);
       }
       
       console.log(table.toString());
       
       if (!options.fix) {
-        console.log(chalk.yellow('\nRun with --fix to automatically resolve these inconsistencies'));
+        console.log(chalk.yellow('\nRun with --fix to automatically resolve inconsistencies'));
+        console.log(chalk.gray('(Latest change wins strategy)'));
         return;
       }
       

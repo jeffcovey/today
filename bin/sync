@@ -368,8 +368,15 @@ check_task_consistency() {
     
     print_info "Checking task consistency across markdown files..."
     
+    # DISABLED: Auto-fix was causing all tasks to be marked as done incorrectly
+    # The check-consistency --fix uses "majority rule" which doesn't work well
+    # when tasks exist in many files but you only unchecked in one
+    print_info "Task consistency check disabled (was causing incorrect auto-completion)"
+    return 0
+    
+    # Original code kept for reference:
     # Run the consistency check with auto-fix
-    output=$(bin/tasks check-consistency --fix 2>&1)
+    # output=$(bin/tasks check-consistency --fix 2>&1)
     
     if echo "$output" | grep -q "All tasks are consistent"; then
         print_info "All tasks are consistent"

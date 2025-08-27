@@ -143,7 +143,8 @@
       "Bash(bin/contacts search:*)",
       "Bash(bin/contacts list:*)",
       "Bash(bin/contacts:*)",
-      "WebFetch(domain:ptod.us)"
+      "WebFetch(domain:ptod.us)",
+      "Bash(do echo -n \"$file: \")"
     ],
     "deny": []
   }
