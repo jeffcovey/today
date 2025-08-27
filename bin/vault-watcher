@@ -104,7 +104,8 @@ async function processChanges() {
     if (hasInbox) {
       log('Processing inbox...', 'info');
       try {
-        execSync('bin/sync --vault', {
+        // Run inbox processing directly without full vault sync
+        execSync('bin/sync --process-inbox-only', {
           cwd: projectRoot,
           encoding: 'utf8'
         });

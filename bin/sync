@@ -1436,6 +1436,16 @@ EOF
 
 # Parse command line arguments
 case "${1:-}" in
+    --process-inbox-only)
+        # Only process inbox files, no other sync operations
+        print_header "📥 Process Inbox Only"
+        if process_inbox; then
+            print_status "Inbox processed successfully!"
+        else
+            print_error "Inbox processing failed"
+        fi
+        exit 0
+        ;;
     --vault)
         # Sync only GitHub vault and process inbox
         print_header "📝 GitHub Vault"
