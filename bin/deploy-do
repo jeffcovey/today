@@ -126,9 +126,11 @@ case "$ACTION" in
         fi
         
         # Ensure Syncthing service file is correct (fix for STHOME issue)
-        print_info "Updating Syncthing service configuration..."
-        scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/syncthing.service 2>/dev/null || true
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if ! grep -q 'STHOME=/opt/today/.config/syncthing' /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi" || true
+        if [ -f config/syncthing.service ]; then
+            print_info "Checking Syncthing service configuration..."
+            scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/syncthing.service 2>/dev/null || true
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /etc/systemd/system/syncthing.service ]; then if ! grep -q 'HOME=/opt/today' /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi; fi" || true
+        fi
         
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
@@ -358,8 +360,14 @@ case "$ACTION" in
         print_info "Creating Syncthing config directory..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/.config/syncthing"
         
+        print_info "Backing up any existing Syncthing keys..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /opt/today/.config/syncthing/key.pem ]; then cp /opt/today/.config/syncthing/*.pem /opt/today/.config/syncthing.backup/ 2>/dev/null || true; fi"
+        
         print_info "Generating Syncthing configuration..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd /opt/today && STHOME=/opt/today/.config/syncthing syncthing generate"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd /opt/today && HOME=/opt/today syncthing generate"
+        
+        print_info "Ensuring config is in correct location..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /opt/today/.local/state/syncthing ] && [ ! -d /opt/today/.config/syncthing ]; then mkdir -p /opt/today/.config && mv /opt/today/.local/state/syncthing /opt/today/.config/; fi"
         
         print_info "Starting Syncthing service..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl enable syncthing && sudo systemctl start syncthing"
@@ -385,8 +393,14 @@ case "$ACTION" in
         print_info "Stopping Syncthing service..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop syncthing"
         
+        print_info "Backing up existing keys to preserve device ID..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /tmp/syncthing-keys && find /root /opt/today -name 'key.pem' -path '*/syncthing/*' -exec cp {} /tmp/syncthing-keys/key.pem.backup \; 2>/dev/null; find /root /opt/today -name 'cert.pem' -path '*/syncthing/*' -exec cp {} /tmp/syncthing-keys/cert.pem.backup \; 2>/dev/null || true"
+        
         print_info "Moving existing config to project directory..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /root/.local/state/syncthing ] && [ ! -d /opt/today/.config/syncthing ]; then mkdir -p /opt/today/.config && mv /root/.local/state/syncthing /opt/today/.config/syncthing && echo 'Moved existing config'; fi"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /root/.local/state/syncthing ]; then mkdir -p /opt/today/.config && rm -rf /opt/today/.config/syncthing && mv /root/.local/state/syncthing /opt/today/.config/syncthing && echo 'Moved existing config'; elif [ -d /root/.config/syncthing ]; then mkdir -p /opt/today/.config && rm -rf /opt/today/.config/syncthing && mv /root/.config/syncthing /opt/today/.config/syncthing && echo 'Moved config from .config'; fi"
+        
+        print_info "Restoring keys if available..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /tmp/syncthing-keys/key.pem.backup ]; then cp /tmp/syncthing-keys/*.backup /opt/today/.config/syncthing/ && cd /opt/today/.config/syncthing && mv key.pem.backup key.pem 2>/dev/null; mv cert.pem.backup cert.pem 2>/dev/null; fi"
         
         print_info "Updating systemd service file..."
         scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/
@@ -406,6 +420,46 @@ case "$ACTION" in
         
         print_status "Syncthing fix complete!"
         echo "Access Syncthing at: http://${DROPLET_IP}:8384"
+        ;;
+        
+    syncthing-backup)
+        echo "💾 Backing up Syncthing device ID..."
+        check_config
+        
+        print_info "Backing up Syncthing keys and config..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/backups/syncthing && cp -r /opt/today/.config/syncthing/*.pem /opt/today/.config/syncthing/config.xml /opt/today/backups/syncthing/ 2>/dev/null && ls -la /opt/today/backups/syncthing/"
+        
+        print_info "Getting device ID..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "grep 'My ID' /var/log/syslog | grep syncthing | tail -1 || journalctl -u syncthing | grep 'My ID' | tail -1"
+        
+        print_status "Backup complete!"
+        echo "Keys backed up to /opt/today/backups/syncthing/"
+        ;;
+        
+    syncthing-restore)
+        echo "♻️ Restoring Syncthing device ID..."
+        check_config
+        
+        print_info "Checking for backup..."
+        if ! ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "test -f /opt/today/backups/syncthing/key.pem"; then
+            print_error "No backup found at /opt/today/backups/syncthing/"
+            exit 1
+        fi
+        
+        print_info "Stopping Syncthing..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop syncthing"
+        
+        print_info "Restoring keys..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cp /opt/today/backups/syncthing/*.pem /opt/today/.config/syncthing/"
+        
+        print_info "Starting Syncthing..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl start syncthing"
+        
+        print_info "Verifying device ID..."
+        sleep 3
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "journalctl -u syncthing --since '10 seconds ago' | grep 'My ID'"
+        
+        print_status "Restore complete!"
         ;;
         
     ollama)
@@ -472,6 +526,8 @@ case "$ACTION" in
         echo "  git-setup   - Manually setup git repository"
         echo "  syncthing-setup - Setup Syncthing for vault sync"
         echo "  syncthing-fix - Fix Syncthing config location issue"
+        echo "  syncthing-backup - Backup Syncthing device ID and keys"
+        echo "  syncthing-restore - Restore Syncthing device ID from backup"
         echo "  ollama-setup - Install and setup Ollama with phi3-mini model"
         echo "  ollama      - Manage Ollama models (list|pull|rm|test)"
         echo "  nginx-config - Update nginx configuration"
