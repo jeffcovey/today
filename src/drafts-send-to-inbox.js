@@ -11,7 +11,7 @@
 // ============ CONFIGURATION ============
 const config = {
     // Droplet API (primary)
-    dropletUrl: 'https://ptod.us/api/inbox/upload',  // Your droplet URL
+    dropletUrl: 'https://today.jeffcovey.net/api/inbox/upload',  // Your droplet URL
     
     // GitHub (fallback)
     owner: 'OlderGay-Men',  // Organization name
