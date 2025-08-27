@@ -9,6 +9,7 @@ import fs from 'fs/promises';
 import { marked } from 'marked';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { TaskManager } from './task-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -941,6 +942,16 @@ async function renderDirectory(dirPath, urlPath) {
     const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
     const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
     
+    // Get task count for today
+    let taskCount = 0;
+    try {
+      const taskManager = new TaskManager(path.join(__dirname, '..', '.data', 'today.db'), { readOnly: true });
+      const todayTasks = taskManager.getTodayTasks();
+      taskCount = todayTasks.length;
+    } catch (error) {
+      console.error('Error getting task count:', error);
+    }
+    
     // Check for other plan files
     const weekPlanFile = `${year}_${quarter}_${month}_W${week}_00.md`;
     const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
@@ -953,7 +964,7 @@ async function renderDirectory(dirPath, urlPath) {
     const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
     const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
     
-    // Add today's plan if it exists
+    // Add today's plan button if it exists
     if (todayPlanExists) {
       html += `
             <div class="card shadow-sm mb-3">
@@ -969,6 +980,24 @@ async function renderDirectory(dirPath, urlPath) {
               </a>
             </div>`;
     }
+    
+    // Add Today's Tasks button (always show it)
+    html += `
+            <div class="card shadow-sm mb-3">
+              <a href="/notes/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
+                <div class="d-flex align-items-center justify-content-between ps-2">
+                  <div class="d-flex align-items-center">
+                    <i class="fas fa-tasks me-2"></i>
+                    <div>
+                      <strong>Today's Tasks</strong>
+                      <br>
+                      <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} due/overdue` : 'No tasks due'}</small>
+                    </div>
+                  </div>
+                  ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
+                </div>
+              </a>
+            </div>`;
     
     // Add Plans section (collapsed)
     html += `
