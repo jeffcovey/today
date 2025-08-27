@@ -107,8 +107,8 @@ The built-in task manager syncs between SQLite and Markdown files:
 
 ### File Structure
 
-- `vault/notes/tasks/tasks.md` - Main task list
-- `vault/notes/tasks/today.md` - Auto-generated daily tasks
+- `vault/tasks/tasks.md` - Main task list
+- `vault/tasks/today.md` - Auto-generated daily tasks
 - `vault/projects/*.md` - Project-specific tasks
 
 ### Task Format

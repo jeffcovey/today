@@ -181,7 +181,7 @@ program
           
           for (const filePath of allMarkdownFiles) {
             // Skip auto-generated files - they have their own checkbox sync logic
-            if (filePath === 'vault/notes/tasks/today.md' || filePath === 'vault/notes/tasks/tasks.md') {
+            if (filePath === 'vault/tasks/today.md' || filePath === 'vault/tasks/tasks.md') {
               continue;
             }
             if (fs.existsSync(filePath)) {
@@ -222,7 +222,7 @@ program
       // First, sync checkbox states from auto-generated files BEFORE regenerating
       // Check file modification times to sync the most recently edited file last
       // This ensures the most recent user edits take precedence
-      const taskFiles = ['vault/notes/tasks/today.md', 'vault/notes/tasks/tasks.md'];
+      const taskFiles = ['vault/tasks/today.md', 'vault/tasks/tasks.md'];
       const fileStats = [];
       
       for (const taskFile of taskFiles) {

@@ -31,7 +31,7 @@ Manage local tasks with Markdown sync.
 
 ```bash
 bin/tasks sync                     # Sync all markdown files with database
-bin/tasks sync vault/notes/tasks/tasks.md # Sync specific file
+bin/tasks sync vault/tasks/tasks.md # Sync specific file
 bin/tasks list                     # List all active tasks
 bin/tasks list --today             # Show today's tasks
 bin/tasks list --stage inbox      # Filter by stage

@@ -1019,7 +1019,7 @@ process_inbox() {
                 /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0; next}  # Add checkbox to non-checkbox lines
                 {print}  # Keep other lines as-is
             ')
-            DEST_DIR="vault/notes/tasks"
+            DEST_DIR="vault/tasks"
             DEST_FILE="streaks-today.md"
             echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
             print_info "  • Streaks file → tasks/streaks-today.md"
@@ -1142,8 +1142,8 @@ process_inbox() {
             
             if [[ "$TASK_ONLY" == "true" ]]; then
                 # Append to consolidated tasks.md file
-                TASKS_FILE="vault/notes/tasks/tasks.md"
-                mkdir -p vault/notes/tasks 2>/dev/null
+                TASKS_FILE="vault/tasks/tasks.md"
+                mkdir -p vault/tasks 2>/dev/null
                 
                 # Insert tasks before Archive section (or at end if no Archive)
                 if [[ -f "$TASKS_FILE" ]]; then
@@ -1188,7 +1188,7 @@ process_inbox() {
                 continue  # Skip the normal file move logic
             else
                 # Mixed content - keep as separate file
-                DEST_DIR="vault/notes/tasks"
+                DEST_DIR="vault/tasks"
                 DEST_FILE="$BASENAME"
                 print_info "  • Mixed task file → tasks/$BASENAME"
             fi
@@ -1233,7 +1233,7 @@ process_inbox() {
 archive_completed_tasks() {
     cd "$(dirname "$0")/.." || return 1
     
-    TASKS_FILE="vault/notes/tasks/tasks.md"
+    TASKS_FILE="vault/tasks/tasks.md"
     
     # Check if tasks.md exists
     if [[ ! -f "$TASKS_FILE" ]]; then

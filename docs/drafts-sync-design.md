@@ -12,7 +12,7 @@ Since Drafts doesn't have traditional folders, we'll use tags to mirror the dire
 
 ```
 vault/notes/daily/2025-08-12-note.md     →  Tags: ["notes", "notes/daily"]
-vault/notes/tasks/tasks.md               →  Tags: ["notes", "notes/tasks"]
+vault/tasks/tasks.md                     →  Tags: ["tasks"]
 vault/notes/concerns/2025-08-12.md       →  Tags: ["notes", "notes/concerns"]
 vault/logs/ogm-work/2025-08-12.md        →  Tags: ["logs", "logs/ogm-work"]
 ```
@@ -58,7 +58,7 @@ The actual content starts here...
 1. Query all drafts with tag "notes"
 2. For each draft:
    - Extract github_path from metadata
-   - If no path: Determine path from tags (notes/tasks → vault/notes/tasks/untitled.md)
+   - If no path: Determine path from tags (tasks → vault/tasks/untitled.md)
    - Check GitHub for existing file
    - Upload/update if draft is newer
 3. Handle special files (tasks.md, streaks-today.md) with append logic

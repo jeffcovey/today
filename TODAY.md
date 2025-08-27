@@ -81,7 +81,7 @@ The review file should include:
 - Or numbered format: `1. **Task name** (time estimate)`
 - Group tasks by time of day or category
 - Track completed tasks with ✓ marks
-- **Keep files manageable**: Wrap outdated sections (morning tasks, completed items, old updates) in `<details><summary>` tags to collapse them, just like in `vault/notes/tasks/tasks.md`. This keeps the active content visible while preserving history.
+- **Keep files manageable**: Wrap outdated sections (morning tasks, completed items, old updates) in `<details><summary>` tags to collapse them, just like in `vault/tasks/tasks.md`. This keeps the active content visible while preserving history.
 - **Include routine templates**: Insert the contents of `vault/templates/morning-routine.md` at the start of the day section and `vault/templates/evening-routine.md` in the evening section of daily plan files. These provide consistent daily habits and checklists.
 
 ### Incremental Updates (Performance Optimization)
@@ -161,7 +161,7 @@ Check the `ogm_*` tables for production issues that need attention.
 
 #### Streaks
 
-vault/notes/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
+vault/tasks/streaks-today.md contains what remains undone in my Streaks app (https://streaksapp.com). I want to complete these tasks every day. They're long-term habits, and should contribute toward my ongoing goals, like exercise tasks to keep me physically healthy.
 
 #### Hosting
 
@@ -613,7 +613,7 @@ When creating project files in `vault/projects/`:
 ### Task Management
 
 When creating tasks:
-- In `vault/notes/tasks/tasks.md` for general tasks
+- In `vault/tasks/tasks.md` for general tasks
 - In `vault/projects/*.md` for project-specific tasks  
 - Use checkbox format: `- [ ] Task description`
 - Mark complete with: `- [x] Task description`

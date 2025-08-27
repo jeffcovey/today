@@ -688,7 +688,7 @@ export class TaskManager {
             
             // For today.md and tasks.md, always sync checkbox states regardless of timestamps
             // These files are auto-generated but users edit checkboxes manually
-            const isAutoGenFile = filePath === 'vault/notes/tasks/today.md' || filePath === 'vault/notes/tasks/tasks.md';
+            const isAutoGenFile = filePath === 'vault/tasks/today.md' || filePath === 'vault/tasks/tasks.md';
             
             // Important: Never revert a completed task back to uncompleted unless file is MUCH newer
             // This prevents the sync conflict where tasks.md reverts today.md changes
@@ -816,7 +816,7 @@ export class TaskManager {
 
   // Generate all active tasks file
   // Note: Checkbox syncing is handled separately, not during generation
-  async generateAllTasksFile(outputPath = 'vault/notes/tasks/tasks.md') {
+  async generateAllTasksFile(outputPath = 'vault/tasks/tasks.md') {
 
     // Get all active tasks (not Done) with project information
     const tasks = this.db.prepare(`
@@ -974,7 +974,7 @@ export class TaskManager {
 
   // Generate today's task file
   // Note: Checkbox syncing is handled separately, not during generation
-  async generateTodayFile(outputPath = 'vault/notes/tasks/today.md') {
+  async generateTodayFile(outputPath = 'vault/tasks/today.md') {
     // Check if file was recently modified (within last 30 seconds)
     // This prevents overwriting manual edits that just happened
     try {
@@ -1399,7 +1399,7 @@ export class TaskManager {
     }
   }
 
-  async generateStagesFile(outputPath = 'vault/notes/tasks/stages.md') {
+  async generateStagesFile(outputPath = 'vault/tasks/stages.md') {
     // Get all active tasks (not Done) grouped by stage
     const frontStageTasks = this.db.prepare(`
       SELECT t.*, p.name as project_name
