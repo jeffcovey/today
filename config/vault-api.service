@@ -1,0 +1,30 @@
+[Unit]
+Description=Today Vault Read API
+Documentation=https://github.com/OlderGay-Men/today
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/today
+ExecStart=/usr/bin/node /opt/today/src/vault-api.js
+Restart=on-failure
+RestartSec=10
+Environment="NODE_ENV=production"
+Environment="HOME=/opt/today"
+Environment="VAULT_API_PORT=3334"
+# Use the same API key as inbox API
+EnvironmentFile=-/opt/today/.inbox-api-key
+
+# Logging
+StandardOutput=append:/opt/today/.data/vault-api.log
+StandardError=append:/opt/today/.data/vault-api.log
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+ReadOnlyPaths=/opt/today/vault
+ReadOnlyPaths=/opt/today/.file-dates.json
+
+[Install]
+WantedBy=multi-user.target

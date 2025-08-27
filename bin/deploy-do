@@ -421,6 +421,67 @@ EOF
         print_status "Inbox API installed and configured"
         ;;
     
+    vault-api-setup)
+        echo "📚 Setting up vault read API..."
+        check_config
+        
+        print_info "Installing vault API service..."
+        
+        # Copy service file
+        scp -i "$SSH_KEY" config/vault-api.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/vault-api.service
+        
+        # Install service and nginx config
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+            # Install service
+            sudo mv /tmp/vault-api.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable vault-api
+            sudo systemctl restart vault-api
+            
+            # Update nginx config if not already configured
+            if ! grep -q "/api/vault/" /etc/nginx/sites-available/today.jeffcovey.net; then
+                # Add the vault API configuration before the first location block
+                sudo sed -i '/location \/ {/i\
+    # Vault API endpoints\
+    location /api/vault/ {\
+        proxy_pass http://127.0.0.1:3334/vault/;\
+        proxy_http_version 1.1;\
+        proxy_set_header Upgrade $http_upgrade;\
+        proxy_set_header Connection '"'"'upgrade'"'"';\
+        proxy_set_header Host $host;\
+        proxy_cache_bypass $http_upgrade;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_connect_timeout 60s;\
+        proxy_send_timeout 60s;\
+        proxy_read_timeout 60s;\
+    }\
+' /etc/nginx/sites-available/today.jeffcovey.net
+                
+                # Test and reload nginx
+                sudo nginx -t && sudo systemctl reload nginx
+                echo "Nginx configuration updated"
+            else
+                echo "Nginx already configured for vault API"
+            fi
+            
+            sleep 2
+            sudo systemctl status vault-api --no-pager
+EOF
+        
+        print_status "Vault API installed and configured"
+        print_info "Vault API endpoint: https://today.jeffcovey.net/api/vault/"
+        ;;
+    
+    vault-api)
+        # Control vault API on droplet
+        check_config
+        ACTION="${2:-status}"
+        print_info "Vault API: $ACTION"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION vault-api && sudo systemctl status vault-api --no-pager"
+        ;;
+    
     inbox-api)
         # Control inbox API on droplet
         check_config
@@ -435,7 +496,8 @@ EOF
                     echo ""
                     source /opt/today/.inbox-api-key
                     echo "API Key: $INBOX_API_KEY"
-                    echo "Endpoint: https://ptod.us/api/inbox/upload"
+                    echo "Upload endpoint: https://today.jeffcovey.net/api/inbox/upload"
+                    echo "Vault endpoint: https://today.jeffcovey.net/api/vault/"
                 fi
 EOF
         fi
@@ -662,6 +724,8 @@ EOF
         echo "  vault-watcher - Control vault watcher (start|stop|restart|status)"
         echo "  inbox-api-setup - Setup inbox upload API for Drafts"
         echo "  inbox-api   - Control inbox API (start|stop|restart|status)"
+        echo "  vault-api-setup - Setup vault read API for Drafts sync"
+        echo "  vault-api   - Control vault API (start|stop|restart|status)"
         echo "  ollama-setup - Install and setup Ollama with phi3-mini model"
         echo "  ollama      - Manage Ollama models (list|pull|rm|test)"
         echo "  nginx-config - Update nginx configuration"
