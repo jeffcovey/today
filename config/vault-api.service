@@ -23,8 +23,6 @@ StandardError=append:/opt/today/.data/vault-api.log
 # Security
 PrivateTmp=true
 NoNewPrivileges=true
-ReadOnlyPaths=/opt/today/vault
-ReadOnlyPaths=/opt/today/.file-dates.json
 
 [Install]
 WantedBy=multi-user.target

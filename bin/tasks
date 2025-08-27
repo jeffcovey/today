@@ -32,20 +32,15 @@ program
         const fs = await import('fs');
         const { execSync } = await import('child_process');
         
-        // Load last sync state and file dates (unless --full flag is used)
+        // Load last sync state (unless --full flag is used)
         const syncStateFile = '.data/task-sync-state.json';
-        const fileDatesFile = '.file-dates.json';
         let lastSyncTime = null;
-        let fileDates = {};
         
         if (!options.full) {
           try {
             if (fs.existsSync(syncStateFile)) {
               const state = JSON.parse(fs.readFileSync(syncStateFile, 'utf8'));
               lastSyncTime = state.lastSyncTime;
-            }
-            if (fs.existsSync(fileDatesFile)) {
-              fileDates = JSON.parse(fs.readFileSync(fileDatesFile, 'utf8'));
             }
           } catch (e) {
             // No previous state

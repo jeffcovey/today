@@ -7,9 +7,6 @@ STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 # Check if any JavaScript source files are being committed
 STAGED_JS=$(echo "$STAGED_FILES" | grep -E '^src/.*\.js$' || true)
 
-# Update file dates index for new markdown files
-bin/update-file-dates-index
-
 # Auto-fix markdown files with markdownlint (excluding vault files)
 STAGED_MD=$(echo "$STAGED_FILES" | grep '\.md$' | grep -v '^vault/' || true)
 

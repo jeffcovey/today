@@ -178,11 +178,6 @@ sync_github_vault_original() {
     # Change to project directory
     cd "$(dirname "$0")/.." || return 1
     
-    # Update file dates index first
-    if [[ -x bin/update-file-dates-index ]]; then
-        bin/update-file-dates-index > /dev/null 2>&1
-    fi
-    
     # ALWAYS pull first to get latest changes before trying to push
     # This prevents push failures when remote has changes
     print_info "Fetching latest changes from GitHub..."

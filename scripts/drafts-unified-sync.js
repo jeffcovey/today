@@ -261,32 +261,6 @@ function fetchDropletFileList() {
     }
 }
 
-// Fetch file dates from droplet
-function fetchDropletFileDates() {
-    try {
-        const http = HTTP.create();
-        const response = http.request({
-            "url": `${CONFIG.dropletUrl}/api/vault/file-dates`,
-            "method": "GET",
-            "headers": {
-                "X-API-Key": CONFIG.dropletApiKey,
-                "Accept": "application/json"
-            },
-            timeout: 30
-        });
-        
-        if (response.success) {
-            return JSON.parse(response.responseText);
-        } else {
-            console.log(`Failed to fetch file dates: ${response.statusCode} ${response.error}`);
-            return null;
-        }
-    } catch (error) {
-        console.log(`Error fetching file dates: ${error}`);
-        return null;
-    }
-}
-
 // Fetch single file from droplet
 function fetchDropletFile(path) {
     try {

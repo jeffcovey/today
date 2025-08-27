@@ -121,44 +121,6 @@ class FileTracker {
     return 'notes';
   }
   
-  async updateFileDates() {
-    // Check if .file-dates.json exists (created by Drafts)
-    const fileDatesPath = path.join(__dirname, '..', '.file-dates.json');
-    
-    try {
-      const content = await fs.readFile(fileDatesPath, 'utf-8');
-      const fileDates = JSON.parse(content);
-      
-      console.log('📱 Importing file dates from Drafts sync...');
-      
-      const upsertFile = this.db.prepare(`
-        INSERT OR REPLACE INTO file_tracking (
-          file_path, file_type, category, 
-          last_modified, updated_at
-        ) VALUES (?, ?, ?, ?, datetime('now'))
-      `);
-      
-      let imported = 0;
-      for (const [filePath, dateStr] of Object.entries(fileDates)) {
-        const category = this.getCategory(filePath);
-        
-        upsertFile.run(
-          filePath,
-          'markdown',
-          category,
-          dateStr
-        );
-        imported++;
-      }
-      
-      console.log(`✅ Imported ${imported} file dates from Drafts`);
-    } catch (error) {
-      // File doesn't exist or is invalid - that's OK
-      if (error.code !== 'ENOENT') {
-        console.log('ℹ️  No Drafts sync data found');
-      }
-    }
-  }
 }
 
 // Run if called directly
@@ -167,7 +129,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   
   try {
     await tracker.scanNotes();
-    await tracker.updateFileDates();
     
     // Show summary
     const stats = tracker.db.prepare(`

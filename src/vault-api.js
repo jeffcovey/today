@@ -239,27 +239,6 @@ app.post('/vault/batch', authenticateApiKey, async (req, res) => {
   }
 });
 
-// Get file dates index
-app.get('/vault/file-dates', authenticateApiKey, async (req, res) => {
-  try {
-    const indexPath = path.join(projectRoot, '.file-dates.json');
-    const content = await fs.readFile(indexPath, 'utf8');
-    const index = JSON.parse(content);
-    
-    res.json({
-      success: true,
-      count: Object.keys(index).length,
-      index: index
-    });
-  } catch (error) {
-    console.error('Error reading file dates index:', error);
-    res.status(500).json({
-      error: 'Failed to read file dates index',
-      message: error.message
-    });
-  }
-});
-
 // ============ INBOX ENDPOINTS ============
 
 // Upload endpoint (inbox functionality)
@@ -363,7 +342,6 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log('Vault endpoints:');
   console.log(`  - List files: http://127.0.0.1:${PORT}/vault/list`);
   console.log(`  - Get file: http://127.0.0.1:${PORT}/vault/file/[path]`);
-  console.log(`  - Get file dates: http://127.0.0.1:${PORT}/vault/file-dates`);
   console.log('');
   console.log('Inbox endpoints:');
   console.log(`  - Upload: http://127.0.0.1:${PORT}/inbox/upload`);
