@@ -1455,12 +1455,14 @@ case "${1:-}" in
             print_error "Notes sync failed"
         fi
         
-        # Clean markdown files after syncing
-        print_header "🧹 Clean Markdown"
-        if clean_markdown_files; then
-            print_status "Markdown cleaned successfully!"
-        else
-            print_error "Markdown cleaning failed"
+        # Clean markdown files after syncing (unless SKIP_MARKDOWN_CLEAN is set)
+        if [[ -z "$SKIP_MARKDOWN_CLEAN" ]]; then
+            print_header "🧹 Clean Markdown"
+            if clean_markdown_files; then
+                print_status "Markdown cleaned successfully!"
+            else
+                print_error "Markdown cleaning failed"
+            fi
         fi
         
         # Also process inbox when syncing vault

@@ -104,10 +104,11 @@ async function processChanges() {
     if (hasInbox) {
       log('Processing inbox...', 'info');
       try {
-        // Run inbox processing directly without full vault sync
-        execSync('bin/sync --process-inbox-only', {
+        // Skip markdown cleaning since we handle that separately for changed files only
+        execSync('SKIP_MARKDOWN_CLEAN=1 bin/sync --vault', {
           cwd: projectRoot,
-          encoding: 'utf8'
+          encoding: 'utf8',
+          env: { ...process.env, SKIP_MARKDOWN_CLEAN: '1' }
         });
         log('Inbox processed', 'success');
       } catch (error) {
