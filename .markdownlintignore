@@ -5,3 +5,6 @@ build/
 coverage/
 *.min.md
 vendor/
+# Ignore all dot directories
+.*
+**/.*

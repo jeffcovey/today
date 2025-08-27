@@ -80,7 +80,7 @@ print_info "Testing vault API..."
 API_KEY=$(ssh -i ~/.ssh/do_deploy_key root@today.jeffcovey.net "grep INBOX_API_KEY /opt/today/.inbox-api-key | cut -d= -f2")
 
 # Test the health endpoint (no auth required)
-if curl -s https://today.jeffcovey.net/api/vault/health | grep -q "ok"; then
+if curl -s https://today.jeffcovey.net/api/health | grep -q "ok"; then
     print_status "Health check passed"
 else
     print_error "Health check failed"

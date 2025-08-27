@@ -306,8 +306,8 @@ clean_markdown_files() {
     
     print_info "Cleaning markdown files with markdownlint..."
     
-    # Count markdown files to process
-    MD_COUNT=$(find vault -type f -name "*.md" 2>/dev/null | wc -l)
+    # Count markdown files to process (excluding all dot directories)
+    MD_COUNT=$(find vault -type f -name "*.md" -not -path "*/.*" 2>/dev/null | wc -l)
     
     if [[ $MD_COUNT -eq 0 ]]; then
         print_info "No markdown files found to clean"
@@ -333,7 +333,7 @@ clean_markdown_files() {
             fi
             COMMENT_FIXED_COUNT=$((COMMENT_FIXED_COUNT + 1))
         fi
-    done < <(find vault -type f -name "*.md" 2>/dev/null)
+    done < <(find vault -type f -name "*.md" -not -path "*/.*" 2>/dev/null)
     
     if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
         print_info "Fixed corrupted HTML comments in $COMMENT_FIXED_COUNT file(s)"
