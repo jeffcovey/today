@@ -16,6 +16,12 @@ if [ -f "bin/setup" ]; then
 fi
 
 
+# Start Syncthing for vault sync
+if [ -f "bin/syncthing-headless" ]; then
+    echo "Starting Syncthing..."
+    bash bin/syncthing-headless start || echo "Syncthing startup failed"
+fi
+
 # Start code-server
 if [ -f "bin/start-code-server" ]; then
     echo "Starting code-server..."
