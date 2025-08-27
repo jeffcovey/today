@@ -972,13 +972,24 @@ export class TaskManager {
     // Get today's date
     const today = new Date().toISOString().split('T')[0];
     
-    // Get active tasks for today (not done)
-    const activeTasks = this.db.prepare(`
+    // Get overdue tasks (before today, not done)
+    const overdueTasks = this.db.prepare(`
       SELECT * FROM tasks 
-      WHERE (do_date = ? OR do_date < ?)
+      WHERE do_date < ?
         AND status != '✅ Done'
       ORDER BY do_date ASC, status ASC
-    `).all(today, today).map(task => ({
+    `).all(today).map(task => ({
+      ...task,
+      topics: this.getTaskTopics(task.id)
+    }));
+    
+    // Get active tasks for today (not done, not overdue)
+    const activeTasks = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE do_date = ?
+        AND status != '✅ Done'
+      ORDER BY do_date ASC, status ASC
+    `).all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
@@ -1013,6 +1024,39 @@ export class TaskManager {
     }).split(' ').pop();
     
     const lines = ['# Today\'s Tasks', '', `*Generated: ${easternTime} ${timeZone}*`, ''];
+
+    // Add overdue section if there are overdue tasks
+    if (overdueTasks.length > 0) {
+      lines.push('## ⚠️ Overdue', '');
+      
+      // Group overdue tasks by date for better readability
+      const overdueByDate = {};
+      for (const task of overdueTasks) {
+        if (!overdueByDate[task.do_date]) {
+          overdueByDate[task.do_date] = [];
+        }
+        overdueByDate[task.do_date].push(task);
+      }
+      
+      // Sort dates in ascending order
+      const sortedDates = Object.keys(overdueByDate).sort();
+      
+      for (const date of sortedDates) {
+        // Format date nicely
+        const dateObj = new Date(date + 'T00:00:00');
+        const daysDiff = Math.floor((new Date(today) - dateObj) / (1000 * 60 * 60 * 24));
+        const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        const daysAgoStr = daysDiff === 1 ? '1 day ago' : `${daysDiff} days ago`;
+        
+        lines.push(`### ${dateStr} (${daysAgoStr})`, '');
+        
+        for (const task of overdueByDate[date]) {
+          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
+    }
 
     // Group tasks by status
     const tasksByStatus = {};
@@ -1068,7 +1112,7 @@ export class TaskManager {
     }
 
     await fs.writeFile(outputPath, lines.join('\n'));
-    return activeTasks.length + completedTasks.length;
+    return activeTasks.length + overdueTasks.length + completedTasks.length;
   }
 
   // Handle repeating tasks
@@ -1088,16 +1132,17 @@ export class TaskManager {
       
       // Only create if the next date is today or earlier
       if (nextDate <= today) {
-        // Check if we already created this recurring instance today
-        const existingToday = this.db.prepare(`
+        // Check if we already have an incomplete instance of this recurring task
+        // This prevents duplicates when sync runs multiple times
+        const existingIncomplete = this.db.prepare(`
           SELECT id FROM tasks 
           WHERE title = ? 
-            AND do_date = ?
-            AND stage != 'done'
-            AND stage != 'archived'
-        `).get(task.title, nextDate);
+            AND status != '✅ Done'
+            AND repeat_interval = ?
+            AND id != ?
+        `).get(task.title, task.repeat_interval, task.id);
         
-        if (!existingToday) {
+        if (!existingIncomplete) {
           // Create new task instance
           this.createTask({
             title: task.title,
