@@ -1,0 +1,25 @@
+[Unit]
+Description=Today Vault File Watcher
+Documentation=https://github.com/OlderGay-Men/today
+After=network.target syncthing.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/today
+ExecStart=/usr/bin/node /opt/today/bin/vault-watcher
+Restart=on-failure
+RestartSec=10
+Environment="NODE_ENV=production"
+Environment="HOME=/opt/today"
+
+# Logging
+StandardOutput=append:/opt/today/.data/vault-watcher.log
+StandardError=append:/opt/today/.data/vault-watcher.log
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
