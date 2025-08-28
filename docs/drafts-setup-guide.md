@@ -78,9 +78,9 @@ After initial sync, your drafts will have these tags:
 - `github-sync` - All synced drafts
 - `notes` - Notes category
 - `notes/daily` - Daily journal entries
-- `notes/tasks` - Task lists
 - `notes/concerns` - Concerns and worries
 - `logs/ogm-work` - OlderGay.Men work
+- `tasks` - Task lists
 - `projects` - Projects category
 - `topics` - Topics category
 - `plans` - Plans category
