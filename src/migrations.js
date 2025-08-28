@@ -297,6 +297,41 @@ export class MigrationManager {
           
           console.log('    Created Toggl tracking tables and views');
         }
+      },
+      {
+        version: 6,
+        description: 'Add last_modified column to tasks table for proper sync tracking',
+        fn: (db) => {
+          // Check if column already exists
+          const columns = db.prepare('PRAGMA table_info(tasks)').all();
+          const hasLastModified = columns.some(c => c.name === 'last_modified');
+          
+          if (!hasLastModified) {
+            // Add last_modified column
+            db.exec('ALTER TABLE tasks ADD COLUMN last_modified DATETIME');
+            
+            // Set initial values to current time
+            db.exec("UPDATE tasks SET last_modified = datetime('now', 'localtime') WHERE last_modified IS NULL");
+            
+            // Create trigger to auto-update on changes
+            db.exec(`
+              CREATE TRIGGER IF NOT EXISTS update_task_last_modified 
+              AFTER UPDATE ON tasks 
+              FOR EACH ROW
+              WHEN NEW.last_modified = OLD.last_modified OR NEW.last_modified IS NULL
+              BEGIN
+                UPDATE tasks SET last_modified = datetime('now', 'localtime') WHERE id = NEW.id;
+              END
+            `);
+            
+            // Add index for performance
+            db.exec('CREATE INDEX IF NOT EXISTS idx_tasks_last_modified ON tasks(last_modified)');
+            
+            console.log('    Added last_modified column to tasks table with auto-update trigger');
+          } else {
+            console.log('    last_modified column already exists');
+          }
+        }
       }
     ];
 

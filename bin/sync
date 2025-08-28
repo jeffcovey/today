@@ -306,8 +306,8 @@ clean_markdown_files() {
     
     print_info "Cleaning markdown files with markdownlint..."
     
-    # Count markdown files to process (excluding all dot directories)
-    MD_COUNT=$(find vault -type f -name "*.md" -not -path "*/.*" 2>/dev/null | wc -l)
+    # Count markdown files to process (excluding all dot directories and sync-conflict files)
+    MD_COUNT=$(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null | wc -l)
     
     if [[ $MD_COUNT -eq 0 ]]; then
         print_info "No markdown files found to clean"
@@ -333,15 +333,56 @@ clean_markdown_files() {
             fi
             COMMENT_FIXED_COUNT=$((COMMENT_FIXED_COUNT + 1))
         fi
-    done < <(find vault -type f -name "*.md" -not -path "*/.*" 2>/dev/null)
+    done < <(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null)
     
     if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
         print_info "Fixed corrupted HTML comments in $COMMENT_FIXED_COUNT file(s)"
     fi
     
+    # Fix malformed task-id tags (multiple task-ids on same line)
+    # This handles cases like: <!-- task-id: abc <!-- task-id: def -->
+    TASK_ID_FIXED_COUNT=0
+    while IFS= read -r file; do
+        # Check if file has malformed task-id tags (multiple on same line)
+        if grep -qE '<!-- task-id:.*<!-- task-id:' "$file" 2>/dev/null; then
+            # Create temp file
+            TEMP_FILE=$(mktemp)
+            
+            # Process each line to fix malformed task-ids
+            while IFS= read -r line; do
+                # Check if line has multiple task-id tags
+                if echo "$line" | grep -qE '<!-- task-id:.*<!-- task-id:'; then
+                    # Extract the last valid task-id (most complete one)
+                    # This regex captures the last task-id: XXXXXXX pattern and ensures proper closing
+                    LAST_TASK_ID=$(echo "$line" | grep -oE '<!-- task-id: [a-f0-9]{32}' | tail -1)
+                    
+                    if [[ -n "$LAST_TASK_ID" ]]; then
+                        # Remove all task-id comments and add back the last valid one
+                        CLEANED_LINE=$(echo "$line" | sed -E 's/<!-- task-id:[^>]*>//g' | sed 's/[[:space:]]*$//')
+                        echo "${CLEANED_LINE} ${LAST_TASK_ID} -->" >> "$TEMP_FILE"
+                    else
+                        # No valid task-id found, just clean up the malformed tags
+                        echo "$line" | sed -E 's/<!-- task-id:[^>]*>//g' | sed 's/[[:space:]]*$//' >> "$TEMP_FILE"
+                    fi
+                else
+                    echo "$line" >> "$TEMP_FILE"
+                fi
+            done < "$file"
+            
+            # Replace original file
+            mv "$TEMP_FILE" "$file"
+            TASK_ID_FIXED_COUNT=$((TASK_ID_FIXED_COUNT + 1))
+        fi
+    done < <(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null)
+    
+    if [[ $TASK_ID_FIXED_COUNT -gt 0 ]]; then
+        print_info "Fixed malformed task-id tags in $TASK_ID_FIXED_COUNT file(s)"
+    fi
+    
     # Run markdownlint-cli2 with fix option
     # Using a glob pattern to process all markdown files in our content directories
-    output=$(npx markdownlint-cli2 --fix "vault/**/*.md" 2>&1) || true
+    # Exclude sync-conflict files from Syncthing
+    output=$(npx markdownlint-cli2 --fix "vault/**/*.md" --ignore "*sync-conflict*" 2>&1) || true
     
     # Check if any files were fixed
     if echo "$output" | grep -q "Fixing:"; then
@@ -363,15 +404,12 @@ check_task_consistency() {
     
     print_info "Checking task consistency across markdown files..."
     
-    # DISABLED: Auto-fix was causing all tasks to be marked as done incorrectly
-    # The check-consistency --fix uses "majority rule" which doesn't work well
-    # when tasks exist in many files but you only unchecked in one
-    print_info "Task consistency check disabled (was causing incorrect auto-completion)"
-    return 0
-    
-    # Original code kept for reference:
-    # Run the consistency check with auto-fix
-    # output=$(bin/tasks check-consistency --fix 2>&1)
+    # Run consistency check with auto-fix enabled
+    # This now works correctly because:
+    # 1. We include vault/tasks/ files to respect manual changes there
+    # 2. We use file modification time to determine the correct state
+    # 3. The latest change wins, whether it's in source or generated files
+    output=$(bin/tasks check-consistency --fix 2>&1)
     
     if echo "$output" | grep -q "All tasks are consistent"; then
         print_info "All tasks are consistent"
@@ -1008,10 +1046,11 @@ process_inbox() {
         
         # Special case: Streaks file
         if [[ "$TITLE" == "Streaks" ]]; then
-            # Convert Streaks items to TaskPaper format if needed
+            # Convert Streaks items to TaskPaper format with task-id: none
             CONVERTED_CONTENT=$(echo "$CONTENT" | awk '
                 NR==1 {print; next}  # Keep header
-                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0; next}  # Add checkbox to non-checkbox lines
+                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0 " <!-- task-id: none -->"; next}  # Add checkbox and task-id: none
+                /^- \[[ x]\]/ && !/task-id:/ {print $0 " <!-- task-id: none -->"; next}  # Add task-id: none if missing
                 {print}  # Keep other lines as-is
             ')
             DEST_DIR="vault/tasks"

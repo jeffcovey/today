@@ -74,7 +74,7 @@ program
             } else {
               console.log(chalk.gray(`  No files modified since last sync`));
               // Still scan project files in case they need initial setup
-              allMarkdownFiles = execSync('find vault/projects -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+              allMarkdownFiles = execSync('find vault/projects -name "*.md" -type f -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
                 .split('\n')
                 .filter(f => f)
                 .map(f => f.replace(/^\.\//, ''));
@@ -88,7 +88,7 @@ program
         // If we don't have changed files or no last sync time, do full scan
         if (!onlyChangedFiles && !lastSyncTime) {
           console.log(chalk.blue('Finding all markdown files (first sync)...'));
-          allMarkdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null', { encoding: 'utf8' })
+          allMarkdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
             .map(f => f.replace(/^\.\//, ''));
@@ -98,7 +98,7 @@ program
         // Always include review files (even if not modified recently)
         // This ensures tasks in review files get their do_date set properly
         try {
-          const reviewFiles = execSync('find vault/plans -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const reviewFiles = execSync('find vault/plans -name "*.md" -type f -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -133,7 +133,7 @@ program
         
         // Always include topic files to sync new tasks and checkbox changes
         try {
-          const topicFiles = execSync('find vault/topics -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const topicFiles = execSync('find vault/topics -name "*.md" -type f -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -230,6 +230,10 @@ program
       // Sort by modification time (oldest first, so newest changes win)
       fileStats.sort((a, b) => a.mtime - b.mtime);
       
+      // Sync checkbox changes from generated files (vault/tasks/)
+      // The updated sync logic in task-manager.js now properly handles this:
+      // - It only syncs FROM generated files if they're newer than the database
+      // - This prevents feedback loops while allowing manual checkbox edits
       for (const { file } of fileStats) {
         const updates = await tm.syncMarkdownFile(file);
         if (updates > 0) {
@@ -905,8 +909,8 @@ program
         console.log(chalk.gray('Using latest modification time to determine correct state'));
       }
       
-      // Find all markdown files
-      const markdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null', { encoding: 'utf8' })
+      // Find all markdown files (including vault/tasks/ for proper consistency)
+      const markdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
         .split('\n')
         .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
         .map(f => f.replace(/^\.\//, ''));

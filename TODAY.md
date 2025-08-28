@@ -82,7 +82,24 @@ The review file should include:
 - Group tasks by time of day or category
 - Track completed tasks with ✓ marks
 - **Keep files manageable**: Wrap outdated sections (morning tasks, completed items, old updates) in `<details><summary>` tags to collapse them, just like in `vault/tasks/tasks.md`. This keeps the active content visible while preserving history.
-- **Include routine templates**: Insert the contents of `vault/templates/morning-routine.md` at the start of the day section and `vault/templates/evening-routine.md` in the evening section of daily plan files. These provide consistent daily habits and checklists.
+
+### ⚠️ CRITICAL: Morning and Evening Templates MUST BE INCLUDED
+
+**ALWAYS include these routine templates in every daily review file:**
+1. **Morning Routine**: Insert the full contents of `vault/templates/morning-routine.md` near the beginning of the daily plan, typically after the day's focus/mission and before the morning priority block
+2. **Evening Routine**: Insert the full contents of `vault/templates/evening-routine.md` in the evening section, before any specific evening tasks
+
+**Why this is essential:**
+- These templates provide consistent daily habits and checklists that ground the day
+- They ensure important routines (gratitude, journaling, inbox clearing, meal tracking, etc.) are never forgotten
+- They create a rhythm and structure that supports wellbeing and productivity
+- The collapsible `<details>` sections keep them organized without cluttering the view
+
+**Template locations:**
+- Morning: `vault/templates/morning-routine.md`
+- Evening: `vault/templates/evening-routine.md`
+
+These templates contain core practices that should be part of every single day, regardless of the day's theme or specific priorities.
 
 ### Incremental Updates (Performance Optimization)
 

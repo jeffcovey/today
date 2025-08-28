@@ -606,6 +606,11 @@ export class TaskManager {
 
   // Parse markdown file and sync tasks
   async syncMarkdownFile(filePath) {
+    // Skip sync-conflict files from Syncthing
+    if (filePath.includes('sync-conflict')) {
+      return 0;
+    }
+    
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
     const updates = [];
@@ -683,26 +688,27 @@ export class TaskManager {
           const task = this.getTask(taskId);
           if (task) {
             // Task exists in database - check if we need to update it
-            const taskUpdateTime = task.updated_at ? new Date(task.updated_at) : new Date(0);
+            // Use last_modified if available, otherwise fall back to updated_at
+            const taskUpdateTime = task.last_modified ? new Date(task.last_modified) : 
+                                  (task.updated_at ? new Date(task.updated_at) : new Date(0));
             const markdownIsNewer = fileModTime > taskUpdateTime;
             
-            // For today.md and tasks.md, always sync checkbox states regardless of timestamps
-            // These files are auto-generated but users edit checkboxes manually
-            const isAutoGenFile = filePath === 'vault/tasks/today.md' || filePath === 'vault/tasks/tasks.md';
+            // For generated files in vault/tasks/, we need special handling:
+            // - Allow checkbox changes FROM these files only if they're newer than DB
+            // - This prevents feedback loops while still allowing manual checking/unchecking
+            const isGeneratedFile = filePath.startsWith('vault/tasks/');
             
-            // Important: Never revert a completed task back to uncompleted unless file is MUCH newer
-            // This prevents the sync conflict where tasks.md reverts today.md changes
+            // Check if this is a checkbox state change
             const taskIsCompleted = task.status === '✅ Done';
-            const reversingCompletion = taskIsCompleted && !isCompleted;
+            const checkboxChanged = isCompleted !== taskIsCompleted;
             
-            // Only allow reverting completion if file is at least 60 seconds newer
-            // This prevents race conditions but allows genuine unchecking
-            const allowRevert = reversingCompletion ? 
-              (fileModTime - taskUpdateTime > 60000) : true;
+            // For generated files: only sync if file is newer AND checkbox changed
+            // For source files: always sync if file is newer
+            const shouldSync = isGeneratedFile ? 
+              (markdownIsNewer && checkboxChanged) : 
+              markdownIsNewer;
             
-            // Sync if markdown is newer OR if it's an auto-gen file with checkbox changes
-            // BUT don't revert completions unless the file is significantly newer
-            if ((markdownIsNewer && allowRevert) || (isAutoGenFile && isCompleted !== taskIsCompleted && allowRevert)) {
+            if (shouldSync) {
               const newStatus = isCompleted ? '✅ Done' : (task.status === '✅ Done' ? 'Next Up' : task.status);
               const updates = {};
               
@@ -864,9 +870,49 @@ export class TaskManager {
       return { tasksByDate, noDateTasks };
     };
     
+    // Helper function to parse malformed date formats
+    const parseMalformedDate = (dateStr) => {
+      // Handle formats like "2025_Q3_08_W33_17" or "2025-Q3-08-18" or "2025_Q3_08_W34_00"
+      // Extract year, month, and day parts
+      const match = dateStr.match(/^(\d{4})[_-]Q(\d)[_-](\d{2})[_-](?:W\d+[_-])?(\d{2})$/);
+      if (match) {
+        const [_, year, quarter, month, day] = match;
+        // If day is 00, it represents a week or period, not a specific date
+        // Use the first day of the week (calculate from week number if present)
+        if (day === '00') {
+          // Extract week number if present
+          const weekMatch = dateStr.match(/W(\d+)/);
+          if (weekMatch) {
+            const weekNum = parseInt(weekMatch[1]);
+            // Calculate the first day of the ISO week
+            const jan1 = new Date(`${year}-01-01T00:00:00`);
+            const jan1Day = jan1.getDay() || 7; // Convert Sunday (0) to 7
+            const daysToAdd = (weekNum - 1) * 7 + (8 - jan1Day); // ISO week starts on Monday
+            const weekStart = new Date(jan1);
+            weekStart.setDate(jan1.getDate() + daysToAdd);
+            return weekStart;
+          }
+          // If no week number or can't calculate, use first day of month
+          return new Date(`${year}-${month.padStart(2, '0')}-01T00:00:00`);
+        }
+        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
+      }
+      
+      // Try standard date parsing
+      const date = new Date(dateStr + 'T00:00:00');
+      return date;
+    };
+    
     // Helper function to format date header
     const formatDateHeader = (dateStr) => {
-      const date = new Date(dateStr + 'T00:00:00');
+      const date = parseMalformedDate(dateStr);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        // Return the raw date string if we can't parse it
+        return `### ${dateStr}`;
+      }
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const diffDays = Math.floor((date - today) / (1000 * 60 * 60 * 24));

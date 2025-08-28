@@ -415,7 +415,7 @@ EOF
             echo "================================"
             echo ""
             echo "Save this API key in your Drafts app!"
-            echo "Endpoint: https://ptod.us/api/inbox/upload"
+            echo "Endpoint: https://today.jeffcovey.net/api/inbox/upload"
 EOF
         
         print_status "Inbox API installed and configured"
