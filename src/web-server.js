@@ -855,7 +855,10 @@ async function getMarkdownTitle(filePath) {
 
 // Directory listing
 async function renderDirectory(dirPath, urlPath) {
-  const items = await fs.readdir(dirPath, { withFileTypes: true });
+  let items = await fs.readdir(dirPath, { withFileTypes: true });
+  
+  // Filter out hidden files and directories (starting with ".")
+  items = items.filter(item => !item.name.startsWith('.'));
   
   // Special handling for plans directory
   if (urlPath === 'plans') {
