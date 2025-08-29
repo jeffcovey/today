@@ -1,0 +1,228 @@
+#!/bin/bash
+
+# Syncthing Health Check and Auto-Recovery Script
+# Ensures Syncthing stays running and properly configured
+
+set -e
+
+# Configuration
+SYNCTHING_PORT="${SYNCTHING_PORT:-8384}"
+SYNCTHING_CONFIG_DIR="/opt/today/.config/syncthing"
+LOG_FILE="/var/log/syncthing-health.log"
+MAX_RETRIES=3
+RETRY_DELAY=10
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Logging function
+log_message() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Check if Syncthing process is running
+check_process() {
+    if pgrep -x "syncthing" > /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if Syncthing API is responding
+check_api() {
+    if [ -f "${SYNCTHING_CONFIG_DIR}/config.xml" ]; then
+        API_KEY=$(grep -oP '(?<=<apikey>)[^<]+' "${SYNCTHING_CONFIG_DIR}/config.xml" 2>/dev/null || echo "")
+        if [ -n "$API_KEY" ]; then
+            # Try to get system status
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "X-API-Key: ${API_KEY}" \
+                "http://localhost:${SYNCTHING_PORT}/rest/system/status" 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
+# Check folder configuration
+check_folders() {
+    if [ -f "${SYNCTHING_CONFIG_DIR}/config.xml" ]; then
+        # Check if vault folder exists and has correct path
+        if grep -q '<folder id="today-vault"' "${SYNCTHING_CONFIG_DIR}/config.xml" && \
+           grep -q '<path>/opt/today/vault</path>' "${SYNCTHING_CONFIG_DIR}/config.xml" && \
+           ! grep -q '<folder id="" label="" path=""' "${SYNCTHING_CONFIG_DIR}/config.xml"; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Fix folder configuration
+fix_folders() {
+    log_message "Fixing folder configuration..."
+    
+    # Ensure vault directory exists
+    mkdir -p /opt/today/vault
+    
+    # Fix the path in config if it's wrong
+    if [ -f "${SYNCTHING_CONFIG_DIR}/config.xml" ]; then
+        # Fix empty or wrong vault path
+        sed -i 's|<path></path>|<path>/opt/today/vault</path>|g' "${SYNCTHING_CONFIG_DIR}/config.xml"
+        sed -i 's|<path>/workspaces/today/vault</path>|<path>/opt/today/vault</path>|g' "${SYNCTHING_CONFIG_DIR}/config.xml"
+        
+        # Remove empty folder entries (those with empty id, label, and path)
+        sed -i '/<folder id="" label="" path=""/,/<\/folder>/d' "${SYNCTHING_CONFIG_DIR}/config.xml"
+        
+        return 0
+    fi
+    return 1
+}
+
+# Restart Syncthing service
+restart_service() {
+    log_message "Restarting Syncthing service..."
+    
+    # Kill any zombie processes first
+    pkill -9 syncthing 2>/dev/null || true
+    sleep 2
+    
+    # Restart via systemd
+    systemctl restart syncthing
+    sleep 5
+    
+    # Verify it started
+    if systemctl is-active syncthing > /dev/null 2>&1; then
+        log_message "Syncthing service restarted successfully"
+        return 0
+    else
+        log_message "Failed to restart Syncthing service"
+        return 1
+    fi
+}
+
+# Main health check logic
+perform_health_check() {
+    local issues_found=0
+    local recovery_needed=0
+    
+    # Check 1: Process running
+    if ! check_process; then
+        log_message "WARNING: Syncthing process not running"
+        recovery_needed=1
+    fi
+    
+    # Check 2: API responding
+    if ! check_api; then
+        log_message "WARNING: Syncthing API not responding"
+        recovery_needed=1
+    fi
+    
+    # Check 3: Folder configuration
+    if ! check_folders; then
+        log_message "WARNING: Folder configuration incorrect"
+        fix_folders
+        recovery_needed=1
+    fi
+    
+    # Check 4: Check for recent errors
+    ERROR_COUNT=$(journalctl -u syncthing --since '5 minutes ago' 2>/dev/null | \
+        grep -E 'panic|fatal|Failed to acquire lock' | wc -l || echo 0)
+    if [ "$ERROR_COUNT" -gt 0 ]; then
+        log_message "WARNING: Found $ERROR_COUNT critical errors in recent logs"
+        recovery_needed=1
+    fi
+    
+    # Perform recovery if needed
+    if [ "$recovery_needed" -eq 1 ]; then
+        log_message "Recovery needed, attempting to fix..."
+        
+        for i in $(seq 1 $MAX_RETRIES); do
+            log_message "Recovery attempt $i of $MAX_RETRIES"
+            
+            if restart_service; then
+                sleep $RETRY_DELAY
+                
+                # Verify everything is working
+                if check_process && check_api; then
+                    log_message "Recovery successful!"
+                    return 0
+                fi
+            fi
+            
+            if [ "$i" -lt "$MAX_RETRIES" ]; then
+                log_message "Recovery attempt $i failed, retrying..."
+                sleep $RETRY_DELAY
+            fi
+        done
+        
+        log_message "ERROR: Recovery failed after $MAX_RETRIES attempts"
+        return 1
+    else
+        # Everything is healthy
+        return 0
+    fi
+}
+
+# Command line handling
+case "${1:-check}" in
+    check)
+        if perform_health_check; then
+            echo -e "${GREEN}✓${NC} Syncthing is healthy"
+            exit 0
+        else
+            echo -e "${RED}✗${NC} Syncthing health check failed"
+            exit 1
+        fi
+        ;;
+    
+    fix)
+        log_message "Manual fix requested"
+        restart_service
+        ;;
+    
+    status)
+        echo "Syncthing Health Status:"
+        echo "========================"
+        
+        if check_process; then
+            echo -e "${GREEN}✓${NC} Process: Running"
+        else
+            echo -e "${RED}✗${NC} Process: Not running"
+        fi
+        
+        if check_api; then
+            echo -e "${GREEN}✓${NC} API: Responding"
+        else
+            echo -e "${RED}✗${NC} API: Not responding"
+        fi
+        
+        if check_folders; then
+            echo -e "${GREEN}✓${NC} Folders: Configured correctly"
+        else
+            echo -e "${YELLOW}⚠${NC} Folders: Configuration issues"
+        fi
+        
+        # Show recent errors
+        ERROR_COUNT=$(journalctl -u syncthing --since '1 hour ago' 2>/dev/null | \
+            grep -E 'ERROR|WARNING|Failed' | wc -l || echo 0)
+        if [ "$ERROR_COUNT" -eq 0 ]; then
+            echo -e "${GREEN}✓${NC} Recent errors: None"
+        else
+            echo -e "${YELLOW}⚠${NC} Recent errors: $ERROR_COUNT in last hour"
+        fi
+        ;;
+    
+    *)
+        echo "Usage: $0 {check|fix|status}"
+        echo ""
+        echo "Commands:"
+        echo "  check  - Perform health check and auto-recover if needed (default)"
+        echo "  fix    - Force restart Syncthing"
+        echo "  status - Show current health status"
+        exit 1
+        ;;
+esac

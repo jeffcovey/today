@@ -1,0 +1,40 @@
+[Unit]
+Description=Syncthing for Today Vault
+Documentation=https://syncthing.net/
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=4
+
+[Service]
+Type=simple
+User=root
+ExecStartPre=/bin/bash -c 'pkill -9 syncthing || true'
+ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/mkdir -p /opt/today/vault /opt/today/.config/syncthing
+ExecStart=/usr/bin/syncthing serve --no-browser --no-restart --logflags=0
+Restart=always
+RestartSec=30
+TimeoutStopSec=10
+
+# Environment
+Environment="HOME=/opt/today"
+Environment="STHOME=/opt/today/.config/syncthing"
+Environment="VAULT_PATH=/opt/today/vault"
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=500M
+
+# Security hardening (relaxed for reliability)
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/today
+NoNewPrivileges=true
+
+# Watchdog
+WatchdogSec=120
+NotifyAccess=main
+
+[Install]
+WantedBy=multi-user.target

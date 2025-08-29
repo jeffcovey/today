@@ -77,6 +77,22 @@ const jobs = [
         command: 'bin/vault-snapshot || true', // Backup vault daily
         description: 'Daily vault snapshot backup',
         timezone: true
+    },
+    {
+        schedule: '*/5 * * * *', // Every 5 minutes
+        command: '/opt/today/bin/syncthing-health-check check >> /var/log/syncthing-health.log 2>&1 || true',
+        description: 'Syncthing health check and auto-recovery'
+    },
+    {
+        schedule: '0 3 * * *', // Daily at 3 AM
+        command: 'systemctl restart syncthing >> /var/log/syncthing-health.log 2>&1 || true',
+        description: 'Daily Syncthing restart to clear issues',
+        timezone: true
+    },
+    {
+        schedule: '0 * * * *', // Every hour
+        command: 'journalctl --vacuum-time=24h > /dev/null 2>&1 || true',
+        description: 'Clean up old systemd logs'
     }
 ];
 

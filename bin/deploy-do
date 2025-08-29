@@ -135,7 +135,8 @@ case "$ACTION" in
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart syncthing || true"
+        # Only restart Syncthing if it's not healthy
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -x /opt/today/bin/syncthing-health-check ]; then /opt/today/bin/syncthing-health-check check || systemctl restart syncthing; else systemctl restart syncthing; fi || true"
         
         print_status "Deployment complete!"
         ;;
