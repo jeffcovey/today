@@ -125,11 +125,16 @@ case "$ACTION" in
             ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
         fi
         
-        # Ensure Syncthing service file is correct (fix for STHOME issue)
+        # Ensure Syncthing is properly configured
         if [ -f config/syncthing.service ]; then
-            print_info "Checking Syncthing service configuration..."
+            print_info "Updating Syncthing configuration..."
+            # Copy health check script
+            scp -i "$SSH_KEY" bin/syncthing-health-check ${DROPLET_USER}@${DROPLET_IP}:/opt/today/bin/ 2>/dev/null || true
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod +x /opt/today/bin/syncthing-health-check" 2>/dev/null || true
+            
+            # Update service file if needed
             scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/syncthing.service 2>/dev/null || true
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /etc/systemd/system/syncthing.service ]; then if ! grep -q 'HOME=/opt/today' /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi; fi" || true
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /etc/systemd/system/syncthing.service ]; then if ! cmp -s /tmp/syncthing.service /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi; fi" || true
         fi
         
         print_info "Restarting services..."
@@ -544,75 +549,61 @@ EOF
         echo "📂 Setting up Syncthing for vault sync..."
         check_config
         
+        print_info "Copying health check script..."
+        scp -i "$SSH_KEY" bin/syncthing-health-check ${DROPLET_USER}@${DROPLET_IP}:/opt/today/bin/
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod +x /opt/today/bin/syncthing-health-check"
+        
         print_info "Copying Syncthing systemd service..."
         scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/
         
         print_info "Installing systemd service..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp /tmp/syncthing.service /etc/systemd/system/ && sudo systemctl daemon-reload"
         
-        print_info "Creating Syncthing config directory..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/.config/syncthing"
+        print_info "Creating Syncthing directories..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/.config/syncthing /opt/today/vault"
         
-        print_info "Backing up any existing Syncthing keys..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /opt/today/.config/syncthing/key.pem ]; then cp /opt/today/.config/syncthing/*.pem /opt/today/.config/syncthing.backup/ 2>/dev/null || true; fi"
-        
-        print_info "Generating Syncthing configuration..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd /opt/today && HOME=/opt/today syncthing generate"
-        
-        print_info "Ensuring config is in correct location..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /opt/today/.local/state/syncthing ] && [ ! -d /opt/today/.config/syncthing ]; then mkdir -p /opt/today/.config && mv /opt/today/.local/state/syncthing /opt/today/.config/; fi"
+        # Only generate config if it doesn't exist
+        print_info "Checking for existing configuration..."
+        if ! ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ -f /opt/today/.config/syncthing/config.xml ]"; then
+            print_info "Generating Syncthing configuration..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd /opt/today && HOME=/opt/today STHOME=/opt/today/.config/syncthing syncthing generate"
+        else
+            print_info "Using existing Syncthing configuration"
+        fi
         
         print_info "Starting Syncthing service..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl enable syncthing && sudo systemctl start syncthing"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl enable syncthing && sudo systemctl restart syncthing"
         
         print_info "Waiting for Syncthing to start..."
-        sleep 3
+        sleep 5
         
         print_info "Running headless setup..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && STHOME=/opt/today/.config/syncthing bin/syncthing-headless add-vault"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && HOME=/opt/today STHOME=/opt/today/.config/syncthing bin/syncthing-headless add-vault || true"
         
         print_info "Getting device ID..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && STHOME=/opt/today/.config/syncthing bin/syncthing-headless device-id"
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "journalctl -u syncthing --since '10 seconds ago' | grep 'My ID' | tail -1 || echo 'Check logs for device ID'"
+        
+        print_info "Running health check..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check status"
         
         print_status "Syncthing setup complete!"
         echo "Access Syncthing at: http://${DROPLET_IP}:8384"
-        echo "Use the device ID above to pair with your other devices"
         ;;
         
     syncthing-fix)
-        echo "🔧 Fixing Syncthing configuration..."
+        echo "🔧 Fixing Syncthing..."
         check_config
         
-        print_info "Stopping Syncthing service..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop syncthing"
+        print_info "Running health check and auto-fix..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check fix"
         
-        print_info "Backing up existing keys to preserve device ID..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /tmp/syncthing-keys && find /root /opt/today -name 'key.pem' -path '*/syncthing/*' -exec cp {} /tmp/syncthing-keys/key.pem.backup \; 2>/dev/null; find /root /opt/today -name 'cert.pem' -path '*/syncthing/*' -exec cp {} /tmp/syncthing-keys/cert.pem.backup \; 2>/dev/null || true"
+        print_info "Waiting for service to stabilize..."
+        sleep 5
         
-        print_info "Moving existing config to project directory..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -d /root/.local/state/syncthing ]; then mkdir -p /opt/today/.config && rm -rf /opt/today/.config/syncthing && mv /root/.local/state/syncthing /opt/today/.config/syncthing && echo 'Moved existing config'; elif [ -d /root/.config/syncthing ]; then mkdir -p /opt/today/.config && rm -rf /opt/today/.config/syncthing && mv /root/.config/syncthing /opt/today/.config/syncthing && echo 'Moved config from .config'; fi"
-        
-        print_info "Restoring keys if available..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /tmp/syncthing-keys/key.pem.backup ]; then cp /tmp/syncthing-keys/*.backup /opt/today/.config/syncthing/ && cd /opt/today/.config/syncthing && mv key.pem.backup key.pem 2>/dev/null; mv cert.pem.backup cert.pem 2>/dev/null; fi"
-        
-        print_info "Updating systemd service file..."
-        scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload"
-        
-        print_info "Ensuring vault directory exists..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/vault"
-        
-        print_info "Starting Syncthing with correct config..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl start syncthing"
-        
-        print_info "Waiting for Syncthing to start..."
-        sleep 3
-        
-        print_info "Checking service status..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl status syncthing --no-pager | head -20"
+        print_info "Checking status..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check status"
         
         print_status "Syncthing fix complete!"
-        echo "Access Syncthing at: http://${DROPLET_IP}:8384"
         ;;
         
     syncthing-backup)
