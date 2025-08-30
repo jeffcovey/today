@@ -1069,16 +1069,32 @@ export class TaskManager {
     }));
     
     // Get tasks completed today using completed_at from tasks table
-    const completedTasks = this.db.prepare(`
+    // IMPORTANT: Only show tasks that have BOTH status='✅ Done' AND completed_at is today
+    // This prevents showing tasks marked done without a completion date
+    const completedTasksQuery = this.db.prepare(`
       SELECT * 
       FROM tasks
       WHERE DATE(completed_at) = DATE(?)
         AND status = '✅ Done'
+        AND completed_at IS NOT NULL
       ORDER BY completed_at DESC
-    `).all(today).map(task => ({
+    `);
+    
+    const completedTasks = completedTasksQuery.all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
+    
+    // Debug logging to trace the issue
+    if (completedTasks.length > 100) {
+      console.error(`WARNING: generateTodayFile found ${completedTasks.length} completed tasks for today - this seems wrong!`);
+      console.error(`First few tasks:`, completedTasks.slice(0, 3).map(t => ({ 
+        id: t.id, 
+        title: t.title, 
+        status: t.status, 
+        completed_at: t.completed_at 
+      })));
+    }
     
     // Use Eastern timezone for timestamp
     const now = new Date();
