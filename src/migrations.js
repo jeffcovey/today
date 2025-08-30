@@ -1029,6 +1029,86 @@ export class MigrationManager {
           
           console.log('    Fixed OGM monitoring table schemas');
         }
+      },
+      {
+        version: 10,
+        description: 'Add remaining OGM table columns for complete sync',
+        fn: (db) => {
+          // Add missing columns to ogm_github_issues
+          const issuesColumns = db.prepare('PRAGMA table_info(ogm_github_issues)').all();
+          const issueColumnNames = issuesColumns.map(c => c.name);
+          
+          if (issuesColumns.length > 0) {
+            if (!issueColumnNames.includes('comments_count')) {
+              db.exec('ALTER TABLE ogm_github_issues ADD COLUMN comments_count INTEGER DEFAULT 0');
+              console.log('    Added comments_count to ogm_github_issues');
+            }
+            if (!issueColumnNames.includes('assignee')) {
+              db.exec('ALTER TABLE ogm_github_issues ADD COLUMN assignee TEXT');
+              console.log('    Added assignee to ogm_github_issues');
+            }
+            if (!issueColumnNames.includes('milestone')) {
+              db.exec('ALTER TABLE ogm_github_issues ADD COLUMN milestone TEXT');
+              console.log('    Added milestone to ogm_github_issues');
+            }
+            if (!issueColumnNames.includes('user')) {
+              db.exec('ALTER TABLE ogm_github_issues ADD COLUMN user TEXT');
+              console.log('    Added user to ogm_github_issues');
+            }
+          }
+          
+          // Add missing columns to ogm_honeybadger_faults
+          const faultsColumns = db.prepare('PRAGMA table_info(ogm_honeybadger_faults)').all();
+          const faultColumnNames = faultsColumns.map(c => c.name);
+          
+          if (faultsColumns.length > 0) {
+            if (!faultColumnNames.includes('notices_count')) {
+              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN notices_count INTEGER DEFAULT 0');
+              console.log('    Added notices_count to ogm_honeybadger_faults');
+            }
+            if (!faultColumnNames.includes('project_id')) {
+              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN project_id INTEGER');
+              console.log('    Added project_id to ogm_honeybadger_faults');
+            }
+            if (!faultColumnNames.includes('component')) {
+              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN component TEXT');
+              console.log('    Added component to ogm_honeybadger_faults');
+            }
+            if (!faultColumnNames.includes('action')) {
+              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN action TEXT');
+              console.log('    Added action to ogm_honeybadger_faults');
+            }
+            if (!faultColumnNames.includes('tags')) {
+              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN tags TEXT');
+              console.log('    Added tags to ogm_honeybadger_faults');
+            }
+          }
+          
+          // Add missing columns to ogm_scout_metrics
+          const metricsColumns = db.prepare('PRAGMA table_info(ogm_scout_metrics)').all();
+          const metricColumnNames = metricsColumns.map(c => c.name);
+          
+          if (metricsColumns.length > 0) {
+            if (!metricColumnNames.includes('controller')) {
+              db.exec('ALTER TABLE ogm_scout_metrics ADD COLUMN controller TEXT');
+              console.log('    Added controller to ogm_scout_metrics');
+            }
+            if (!metricColumnNames.includes('action')) {
+              db.exec('ALTER TABLE ogm_scout_metrics ADD COLUMN action TEXT');
+              console.log('    Added action to ogm_scout_metrics');
+            }
+            if (!metricColumnNames.includes('count')) {
+              db.exec('ALTER TABLE ogm_scout_metrics ADD COLUMN count INTEGER');
+              console.log('    Added count to ogm_scout_metrics');
+            }
+            if (!metricColumnNames.includes('percentile_50')) {
+              db.exec('ALTER TABLE ogm_scout_metrics ADD COLUMN percentile_50 REAL');
+              console.log('    Added percentile_50 to ogm_scout_metrics');
+            }
+          }
+          
+          console.log('    Completed OGM table schema updates');
+        }
       }
     ];
 
