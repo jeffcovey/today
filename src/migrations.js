@@ -937,6 +937,31 @@ export class MigrationManager {
             console.log('    last_modified column already exists');
           }
         }
+      },
+      {
+        version: 7,
+        description: 'Add notes column to contacts table',
+        fn: (db) => {
+          // Check if contacts table exists first
+          const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'").get();
+          
+          if (!tableExists) {
+            console.log('    Skipped: contacts table does not exist');
+            return;
+          }
+          
+          // Check if column already exists
+          const columns = db.prepare('PRAGMA table_info(contacts)').all();
+          const hasNotes = columns.some(c => c.name === 'notes');
+          
+          if (!hasNotes) {
+            // Add notes column
+            db.exec('ALTER TABLE contacts ADD COLUMN notes TEXT');
+            console.log('    Added notes column to contacts table');
+          } else {
+            console.log('    notes column already exists in contacts table');
+          }
+        }
       }
     ];
 
