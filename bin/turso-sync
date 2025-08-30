@@ -201,6 +201,9 @@ class TursoSync {
         // Clear local table first
         this.db.exec(`DELETE FROM ${tableName}`);
         
+        // Use smaller batch size for emails table to avoid OOM
+        const actualBatchSize = tableName === 'emails' ? 50 : batchSize;
+        
         // Pull data in batches
         let offset = 0;
         let rowsPulled = 0;
@@ -211,7 +214,7 @@ class TursoSync {
           // Get batch of rows
           const dataResult = await this.db.tursoClient.execute(`
             SELECT * FROM ${tableName} 
-            LIMIT ${batchSize} 
+            LIMIT ${actualBatchSize} 
             OFFSET ${offset}
           `);
           
@@ -235,10 +238,10 @@ class TursoSync {
           
           transaction();
           rowsPulled += dataResult.rows.length;
-          offset += batchSize;
+          offset += actualBatchSize;
           
           // Show progress for large tables
-          if (totalCount > batchSize * 2) {
+          if (totalCount > actualBatchSize * 2) {
             process.stdout.write(chalk.gray(`${Math.round(rowsPulled / totalCount * 100)}%... `));
           }
         }
