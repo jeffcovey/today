@@ -182,11 +182,23 @@ export class TaskManager {
       fields.push('status = ?');
       values.push(data.status);
       
-      // Set completed_at when marking as done
-      if (data.status === '✅ Done') {
-        fields.push('completed_at = CURRENT_TIMESTAMP');
-      } else if (data.status !== '✅ Done') {
-        fields.push('completed_at = NULL');
+      // Only update completed_at when transitioning TO or FROM done status
+      // Get the current task status to check for state transition
+      const currentTask = this.db.prepare('SELECT status FROM tasks WHERE id = ?').get(id);
+      
+      if (currentTask) {
+        const wasCompleted = currentTask.status === '✅ Done';
+        const isNowCompleted = data.status === '✅ Done';
+        
+        // Only set completed_at when transitioning from not-done to done
+        // This handles both first-time completions and repeating task completions
+        if (!wasCompleted && isNowCompleted) {
+          fields.push('completed_at = CURRENT_TIMESTAMP');
+        } else if (wasCompleted && !isNowCompleted) {
+          // Clear completed_at when un-completing a task
+          fields.push('completed_at = NULL');
+        }
+        // If status doesn't change completion state, leave completed_at unchanged
       }
     }
     if (data.stage !== undefined) {
@@ -1085,16 +1097,6 @@ export class TaskManager {
       topics: this.getTaskTopics(task.id)
     }));
     
-    // Debug logging to trace the issue
-    if (completedTasks.length > 100) {
-      console.error(`WARNING: generateTodayFile found ${completedTasks.length} completed tasks for today - this seems wrong!`);
-      console.error(`First few tasks:`, completedTasks.slice(0, 3).map(t => ({ 
-        id: t.id, 
-        title: t.title, 
-        status: t.status, 
-        completed_at: t.completed_at 
-      })));
-    }
     
     // Use Eastern timezone for timestamp
     const now = new Date();
