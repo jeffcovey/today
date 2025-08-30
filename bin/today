@@ -156,7 +156,7 @@ if [ -n "$LAST_SYNC" ]; then
         # Create a prompt that includes context but focuses on the request
         if [ "$NON_INTERACTIVE" = true ]; then
             # Non-interactive mode - use --no-interactive flag
-            cat <<EOF | claude --print
+            claude --print "$(cat <<EOF
 # Focused Work Session
 
 You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
@@ -187,9 +187,10 @@ Please:
 
 Let's get started with the request!
 EOF
+)"
         else
             # Interactive mode - normal claude command
-            cat <<EOF | claude
+            claude "$(cat <<EOF
 # Focused Work Session
 
 You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
@@ -220,6 +221,7 @@ Please:
 
 Let's get started with the request!
 EOF
+)"
         fi
     else
         # Normal review mode
@@ -242,10 +244,10 @@ EOF
         # Start Claude session with TODAY.md
         if [ "$NON_INTERACTIVE" = true ]; then
             echo "🤖 Running Claude in non-interactive mode..."
-            cat TODAY.md | claude --print
+            claude --print "$(cat TODAY.md)"
         else
             echo "🤖 Starting Claude interactive session..."
-            cat TODAY.md | claude
+            claude "$(cat TODAY.md)"
         fi
     fi
     
