@@ -962,6 +962,40 @@ export class MigrationManager {
             console.log('    notes column already exists in contacts table');
           }
         }
+      },
+      {
+        version: 8,
+        description: 'Fix diary table schema for Day One sync',
+        fn: (db) => {
+          // Drop the old diary table and recreate with correct schema for Day One
+          console.log('    Recreating diary table with Day One schema...');
+          
+          db.exec(`
+            DROP TABLE IF EXISTS diary;
+            
+            CREATE TABLE diary (
+              id TEXT PRIMARY KEY,
+              creation_date TEXT NOT NULL,
+              modified_date TEXT,
+              text TEXT NOT NULL,
+              starred INTEGER DEFAULT 0,
+              location_name TEXT,
+              location_latitude REAL,
+              location_longitude REAL,
+              weather_temp_celsius REAL,
+              weather_conditions TEXT,
+              tags TEXT,
+              journal_file_modified TEXT,
+              UNIQUE(id)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_diary_creation_date ON diary(creation_date);
+            CREATE INDEX IF NOT EXISTS idx_diary_starred ON diary(starred);
+            CREATE INDEX IF NOT EXISTS idx_diary_location ON diary(location_name);
+          `);
+          
+          console.log('    Created diary table with Day One schema');
+        }
       }
     ];
 
