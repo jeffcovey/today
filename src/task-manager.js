@@ -706,9 +706,11 @@ export class TaskManager {
             const markdownIsNewer = fileModTime > taskUpdateTime;
             
             // For generated files in vault/tasks/, we need special handling:
-            // - Allow checkbox changes FROM these files only if they're newer than DB
-            // - This prevents feedback loops while still allowing manual checking/unchecking
-            const isGeneratedFile = filePath.startsWith('vault/tasks/');
+            // Only sync checkbox changes if the file is newer AND checkbox state changed
+            // This allows manual checking/unchecking while preventing re-applying old states
+            const isGeneratedFile = filePath === 'vault/tasks/today.md' || 
+                                  filePath === 'vault/tasks/tasks.md' ||
+                                  filePath === 'vault/tasks/stages.md';
             
             // Check if this is a checkbox state change
             const taskIsCompleted = task.status === '✅ Done';
@@ -822,8 +824,8 @@ export class TaskManager {
     // Find tasks that were removed from the markdown
     for (const task of previousTasks) {
       if (!seenTaskIds.has(task.id)) {
-        // Task was removed from markdown, archive it
-        this.updateTask(task.id, { status: '✅ Done' });
+        // Task was removed from markdown - just remove the sync association
+        // Do NOT mark as done - the task may have been moved to another file
         this.db.prepare('DELETE FROM markdown_sync WHERE file_path = ? AND task_id = ?')
           .run(filePath, task.id);
       }

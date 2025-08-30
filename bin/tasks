@@ -214,34 +214,7 @@ program
         console.log(chalk.blue(`✓ Created ${repeated} recurring task instances`));
       }
 
-      // First, sync checkbox states from auto-generated files BEFORE regenerating
-      // Check file modification times to sync the most recently edited file last
-      // This ensures the most recent user edits take precedence
-      const taskFiles = ['vault/tasks/today.md', 'vault/tasks/tasks.md'];
-      const fileStats = [];
-      
-      for (const taskFile of taskFiles) {
-        if (fs.existsSync(taskFile)) {
-          const stats = fs.statSync(taskFile);
-          fileStats.push({ file: taskFile, mtime: stats.mtime });
-        }
-      }
-      
-      // Sort by modification time (oldest first, so newest changes win)
-      fileStats.sort((a, b) => a.mtime - b.mtime);
-      
-      // Sync checkbox changes from generated files (vault/tasks/)
-      // The updated sync logic in task-manager.js now properly handles this:
-      // - It only syncs FROM generated files if they're newer than the database
-      // - This prevents feedback loops while allowing manual checkbox edits
-      for (const { file } of fileStats) {
-        const updates = await tm.syncMarkdownFile(file);
-        if (updates > 0) {
-          console.log(chalk.gray(`  • Synced ${updates} checkbox changes from ${file}`));
-        }
-      }
-      
-      // Now generate the files with the updated task states
+      // Generate the files fresh from database state
       const todayCount = await tm.generateTodayFile();
       console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
       
@@ -924,6 +897,14 @@ program
       const taskTitles = new Map(); // taskId -> title
       
       for (const filePath of markdownFiles) {
+        // Skip auto-generated files - they reflect DB state, not source of truth
+        if (filePath === 'vault/tasks/today.md' || 
+            filePath === 'vault/tasks/tasks.md' ||
+            filePath === 'vault/tasks/stages.md' ||
+            filePath.startsWith('vault/tasks/topics/')) {
+          continue;
+        }
+        
         try {
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
@@ -1042,6 +1023,13 @@ program
         const filesToUpdate = task.shouldBeCompleted ? task.notCompletedIn : task.completedIn;
         
         for (const filePath of filesToUpdate) {
+          // Skip auto-generated files - they will be regenerated from DB
+          if (filePath === 'vault/tasks/today.md' || 
+              filePath === 'vault/tasks/tasks.md' ||
+              filePath === 'vault/tasks/stages.md' ||
+              filePath.startsWith('vault/tasks/topics/')) {
+            continue;
+          }
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
           let updated = false;
