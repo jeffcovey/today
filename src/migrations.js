@@ -996,6 +996,39 @@ export class MigrationManager {
           
           console.log('    Created diary table with Day One schema');
         }
+      },
+      {
+        version: 9,
+        description: 'Add missing columns to OGM monitoring tables',
+        fn: (db) => {
+          // Check and add missing columns to OGM tables
+          
+          // Add last_notice_at to ogm_honeybadger_faults if missing
+          const faultsColumns = db.prepare('PRAGMA table_info(ogm_honeybadger_faults)').all();
+          const hasLastNoticeAt = faultsColumns.some(c => c.name === 'last_notice_at');
+          if (!hasLastNoticeAt && faultsColumns.length > 0) {
+            db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN last_notice_at DATETIME');
+            console.log('    Added last_notice_at to ogm_honeybadger_faults');
+          }
+          
+          // Add metric_type to ogm_scout_metrics if missing
+          const metricsColumns = db.prepare('PRAGMA table_info(ogm_scout_metrics)').all();
+          const hasMetricType = metricsColumns.some(c => c.name === 'metric_type');
+          if (!hasMetricType && metricsColumns.length > 0) {
+            db.exec('ALTER TABLE ogm_scout_metrics ADD COLUMN metric_type TEXT');
+            console.log('    Added metric_type to ogm_scout_metrics');
+          }
+          
+          // Add stat_date to ogm_summary_stats if missing
+          const statsColumns = db.prepare('PRAGMA table_info(ogm_summary_stats)').all();
+          const hasStatDate = statsColumns.some(c => c.name === 'stat_date');
+          if (!hasStatDate && statsColumns.length > 0) {
+            db.exec('ALTER TABLE ogm_summary_stats ADD COLUMN stat_date DATE');
+            console.log('    Added stat_date to ogm_summary_stats');
+          }
+          
+          console.log('    Fixed OGM monitoring table schemas');
+        }
       }
     ];
 
