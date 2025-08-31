@@ -175,10 +175,8 @@ program
           let filesWithUpdates = 0;
           
           for (const filePath of allMarkdownFiles) {
-            // Skip auto-generated files - they have their own checkbox sync logic
-            if (filePath === 'vault/tasks/today.md' || filePath === 'vault/tasks/tasks.md') {
-              continue;
-            }
+            // Process ALL markdown files including vault/tasks/
+            // The syncMarkdownFile method will handle "latest change wins" logic
             if (fs.existsSync(filePath)) {
               const updates = await tm.syncMarkdownFile(filePath);
               totalUpdates += updates;
@@ -897,13 +895,8 @@ program
       const taskTitles = new Map(); // taskId -> title
       
       for (const filePath of markdownFiles) {
-        // Skip auto-generated files - they reflect DB state, not source of truth
-        if (filePath === 'vault/tasks/today.md' || 
-            filePath === 'vault/tasks/tasks.md' ||
-            filePath === 'vault/tasks/stages.md' ||
-            filePath.startsWith('vault/tasks/topics/')) {
-          continue;
-        }
+        // Process ALL files including vault/tasks/ to check consistency
+        // The "latest modification wins" logic will determine the correct state
         
         try {
           const content = await fs.readFile(filePath, 'utf-8');
@@ -1023,13 +1016,8 @@ program
         const filesToUpdate = task.shouldBeCompleted ? task.notCompletedIn : task.completedIn;
         
         for (const filePath of filesToUpdate) {
-          // Skip auto-generated files - they will be regenerated from DB
-          if (filePath === 'vault/tasks/today.md' || 
-              filePath === 'vault/tasks/tasks.md' ||
-              filePath === 'vault/tasks/stages.md' ||
-              filePath.startsWith('vault/tasks/topics/')) {
-            continue;
-          }
+          // Update ALL files to maintain consistency
+          // Even auto-generated files should reflect the latest state
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
           let updated = false;
