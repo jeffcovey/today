@@ -1,0 +1,12 @@
+# Configuration for Today system
+# Edit this file when your situation changes (e.g., when traveling)
+
+# Your current timezone
+# You can use:
+#   - City names: "Madrid", "London", "Tokyo", "New York"
+#   - Country names: "Spain", "Germany", "Japan"  
+#   - Full timezone IDs: "America/New_York", "Europe/Madrid"
+#   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
+#
+# The system will automatically resolve these to proper timezone IDs.
+timezone = "America/New_York"

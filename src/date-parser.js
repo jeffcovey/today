@@ -1,15 +1,17 @@
 // Date parser for natural language date tags in task titles
+import { getTimezone } from './config.js';
+
 export class DateParser {
   constructor() {
-    // Get today in NY timezone
+    // Get today in configured timezone
     const now = new Date();
-    const nyTime = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
+    const localTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: getTimezone(),
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
     }).format(now);
-    const [month, day, year] = nyTime.split('/');
+    const [month, day, year] = localTime.split('/');
     this.today = `${year}-${month}-${day}`;
     this.todayDate = new Date(`${this.today}T00:00:00`);
   }

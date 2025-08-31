@@ -6,12 +6,13 @@
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-# Use Eastern timezone as specified in TODAY.md
-TODAY_DATE=$(TZ='America/New_York' date +%Y-%m-%d)
-YEAR=$(TZ='America/New_York' date +%Y)
-MONTH=$(TZ='America/New_York' date +%m)
-DAY=$(TZ='America/New_York' date +%d)
-WEEK=$(TZ='America/New_York' date +%V)  # ISO week number
+# Use timezone from config.toml
+TZ_CONFIG=$(bin/get-config timezone)
+TODAY_DATE=$(TZ=$TZ_CONFIG date +%Y-%m-%d)
+YEAR=$(TZ=$TZ_CONFIG date +%Y)
+MONTH=$(TZ=$TZ_CONFIG date +%m)
+DAY=$(TZ=$TZ_CONFIG date +%d)
+WEEK=$(TZ=$TZ_CONFIG date +%V)  # ISO week number
 # Determine quarter from month
 if [ $MONTH -le 3 ]; then Q="Q1"
 elif [ $MONTH -le 6 ]; then Q="Q2"
@@ -19,7 +20,7 @@ elif [ $MONTH -le 9 ]; then Q="Q3"
 else Q="Q4"
 fi
 REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
-TIMESTAMP=$(TZ='America/New_York' date +"%H:%M %Z")
+TIMESTAMP=$(TZ=$TZ_CONFIG date +"%H:%M %Z")
 
 # Check if review file exists
 if [ ! -f "$REVIEW_FILE" ]; then

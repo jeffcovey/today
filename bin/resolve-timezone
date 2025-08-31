@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""
+Resolve a city, country, or timezone string to a valid timezone.
+Uses the system's timezone database.
+"""
+import sys
+import zoneinfo
+
+def find_timezone(query):
+    """Find a timezone that matches the query."""
+    query_lower = query.lower().strip()
+    
+    # Special case for EST/CST/MST/PST which are valid but not DST-aware
+    if query.upper() in ['EST', 'CST', 'MST', 'PST', 'EDT', 'CDT', 'MDT', 'PDT']:
+        # Skip direct lookup for these
+        pass
+    else:
+        # Direct timezone lookup - if it's already valid, return it
+        try:
+            zoneinfo.ZoneInfo(query)
+            return query
+        except:
+            pass
+    
+    # Get all available timezones
+    all_zones = zoneinfo.available_timezones()
+    
+    # Common abbreviation mappings
+    abbreviations = {
+        'est': 'America/New_York',
+        'edt': 'America/New_York', 
+        'cst': 'America/Chicago',
+        'cdt': 'America/Chicago',
+        'mst': 'America/Denver',
+        'mdt': 'America/Denver',
+        'pst': 'America/Los_Angeles',
+        'pdt': 'America/Los_Angeles',
+        'gmt': 'GMT',
+        'utc': 'UTC',
+        'bst': 'Europe/London',
+        'cet': 'Europe/Paris',
+        'cest': 'Europe/Paris',
+    }
+    
+    if query_lower in abbreviations:
+        return abbreviations[query_lower]
+    
+    # Search for city name in timezone strings
+    # Timezones are like "America/New_York" or "Europe/Madrid"
+    matches = []
+    for tz in all_zones:
+        tz_lower = tz.lower()
+        # Skip some meta zones
+        if tz.startswith('Etc/') or tz.startswith('SystemV/'):
+            continue
+            
+        # Check if query matches the city part (after the /)
+        if '/' in tz:
+            parts = tz.split('/')
+            city_part = parts[-1].replace('_', ' ').lower()
+            
+            # Exact match on city
+            if city_part == query_lower:
+                return tz
+            
+            # Partial match
+            if query_lower in city_part or city_part in query_lower:
+                matches.append((tz, 1))  # Higher priority for city match
+        
+        # Check if query is in the full timezone string
+        if query_lower in tz_lower:
+            matches.append((tz, 2))  # Lower priority for full string match
+    
+    # Country/region search - check these BEFORE partial matches
+    countries = {
+        'usa': 'America/New_York',
+        'us': 'America/New_York',
+        'united states': 'America/New_York',
+        'uk': 'Europe/London',
+        'britain': 'Europe/London',
+        'england': 'Europe/London',
+        'france': 'Europe/Paris',
+        'germany': 'Europe/Berlin',
+        'spain': 'Europe/Madrid',
+        'italy': 'Europe/Rome',
+        'japan': 'Asia/Tokyo',
+        'china': 'Asia/Shanghai',
+        'india': 'Asia/Kolkata',
+        'australia': 'Australia/Sydney',
+        'canada': 'America/Toronto',
+        'mexico': 'America/Mexico_City',
+        'brazil': 'America/Sao_Paulo',
+        'argentina': 'America/Argentina/Buenos_Aires',
+    }
+    
+    for country, tz in countries.items():
+        if query_lower == country:
+            return tz
+    
+    # Return the best match
+    if matches:
+        # Sort by priority (1 is better than 2)
+        matches.sort(key=lambda x: x[1])
+        return matches[0][0]
+    
+    # Fallback - return the query and let the system handle it
+    return query
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        # Read from config
+        import tomllib
+        from pathlib import Path
+        config_path = Path(__file__).parent.parent / 'config.toml'
+        try:
+            with open(config_path, 'rb') as f:
+                config = tomllib.load(f)
+            input_tz = config.get('timezone', 'America/New_York')
+        except:
+            input_tz = 'America/New_York'
+    else:
+        input_tz = ' '.join(sys.argv[1:])
+    
+    result = find_timezone(input_tz)
+    print(result)

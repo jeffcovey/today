@@ -96,8 +96,10 @@ const jobs = [
     }
 ];
 
+import { getTimezone } from './config.js';
+
 jobs.forEach(job => {
-    const options = job.timezone ? { timezone: process.env.TZ || 'America/New_York' } : {};
+    const options = job.timezone ? { timezone: process.env.TZ || getTimezone() } : {};
     
     console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
     

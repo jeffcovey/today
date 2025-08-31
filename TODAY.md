@@ -25,14 +25,14 @@ This file starts an interactive Claude session for your daily review. The `bin/t
    - Divide by 7: remainder determines day
    - Verify calculation before proceeding
 
-2. **Get Current Eastern Time**
+2. **Get Current Time** (timezone from config.toml)
 
    ```bash
-   TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z'
+   TZ=$(bin/get-config timezone) date '+%A, %B %d, %Y at %I:%M %p %Z'
    ```
 
    - NEVER guess time - always use this command
-   - Database uses UTC - convert to ET (UTC-4 during EDT, UTC-5 during EST)
+   - Database uses UTC - convert to local time based on config.toml setting
 
 3. **Check Database Schema FIRST**
 
@@ -118,9 +118,9 @@ Jeffrey Covey ("Jeff") - see contacts database for details.
 
 ### Schedule & Timezone
 
-**🚨 Eastern Time (ET) unless traveling!**
-- EDT (March-Nov): UTC-4
-- EST (Nov-March): UTC-5
+**🚨 Check config.toml for current timezone setting!**
+- Current timezone configured in `config.toml`
+- Edit when traveling: `timezone = "America/Los_Angeles"` etc.
 - Home: Oakland Park, Florida
 - Wake: ~5:30-6:00 AM (1hr morning routine)
 - Bed: ~9:30 PM (offline last 2 hours)
