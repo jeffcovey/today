@@ -709,11 +709,18 @@ function getBreadcrumb(filePath) {
 }
 
 // Helper function to extract title from markdown file
-// Helper function to get week number
+// Helper function to get ISO week number
 function getWeekNumber(date) {
-  const startOfYear = new Date(date.getFullYear(), 0, 1);
-  const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000));
-  return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  // ISO week date standard: weeks start on Monday, first week contains January 4th
+  const tempDate = new Date(date.valueOf());
+  const dayNum = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+  tempDate.setDate(tempDate.getDate() - dayNum + 3); // Thursday of current week
+  const firstThursday = tempDate.valueOf();
+  tempDate.setMonth(0, 1); // January 1st
+  if (tempDate.getDay() !== 4) { // If not Thursday
+    tempDate.setMonth(0, 1 + ((4 - tempDate.getDay()) + 7) % 7); // First Thursday of year
+  }
+  return 1 + Math.ceil((firstThursday - tempDate) / 604800000); // weeks difference
 }
 
 // Parse plan file names to extract components
@@ -941,7 +948,7 @@ async function renderDirectory(dirPath, urlPath) {
     const day = String(today.getDate()).padStart(2, '0');
     
     // Check for today's plan
-    const todayPlanFile = `${year}_${quarter}_${month}_W${week}_${day}.md`;
+    const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
     const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
     const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
     
@@ -956,7 +963,7 @@ async function renderDirectory(dirPath, urlPath) {
     }
     
     // Check for other plan files
-    const weekPlanFile = `${year}_${quarter}_${month}_W${week}_00.md`;
+    const weekPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_00.md`;
     const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
     const quarterPlanFile = `${year}_${quarter}_00.md`;
     const yearPlanFile = `${year}_00.md`;
