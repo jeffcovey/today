@@ -19,6 +19,9 @@ const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
 const VAULT_PATH = path.join(__dirname, '..', 'vault');
 
+// Initialize TaskManager for direct database updates
+const taskManager = new TaskManager(path.join(__dirname, '..', '.data', 'today.db'));
+
 // Cache for rendered Markdown
 const renderCache = new Map();
 const fileStatsCache = new Map();
@@ -3763,6 +3766,10 @@ app.post('/toggle-checkbox{/*path}', async (req, res) => {
     if (lineNumber >= 0 && lineNumber < lines.length) {
       const line = lines[lineNumber];
       
+      // Extract task ID if present (handles both normal and corrupted comment formats)
+      const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
+      const taskId = taskIdMatch ? taskIdMatch[1] : null;
+      
       // Match checkbox patterns: - [ ] or - [x] or - [X]
       if (checked) {
         // Check the box
@@ -3776,7 +3783,24 @@ app.post('/toggle-checkbox{/*path}', async (req, res) => {
       content = lines.join('\n');
       await fs.writeFile(fullPath, content, 'utf-8');
       
-      console.log(`Checkbox toggled in: ${fullPath}, line ${lineNumber}`);
+      // If task has an ID, update it directly in the database
+      if (taskId) {
+        try {
+          const task = taskManager.getTask(taskId);
+          if (task) {
+            const newStatus = checked ? '✅ Done' : 
+                            (task.status === '✅ Done' ? '🗂️ To File' : task.status);
+            
+            taskManager.updateTask(taskId, { status: newStatus });
+            console.log(`Task ${taskId} status updated: ${task.status} → ${newStatus}`);
+          }
+        } catch (dbError) {
+          // Log error but don't fail the request - file was still updated
+          console.error(`Failed to update task ${taskId} in database:`, dbError);
+        }
+      }
+      
+      console.log(`Checkbox toggled in: ${fullPath}, line ${lineNumber}${taskId ? ` (task: ${taskId})` : ''}`);
       res.json({ success: true, message: 'Checkbox toggled successfully' });
     } else {
       res.status(400).json({ success: false, message: 'Invalid line number' });
