@@ -3063,7 +3063,7 @@ app.post('/_cache/clear', sessionAuth, (req, res) => {
 });
 
 // File edit endpoint for AI
-app.post('/ai-edit/*', async (req, res) => {
+app.post('/ai-edit/:path(*)', async (req, res) => {
   try {
     const urlPath = req.path.slice(9); // Remove '/ai-edit/' prefix
     const fullPath = path.join(VAULT_PATH, urlPath);
@@ -3085,7 +3085,7 @@ app.post('/ai-edit/*', async (req, res) => {
 });
 
 // AI Chat route handler  
-app.post('/ai-chat/*', async (req, res) => {
+app.post('/ai-chat/:path(*)', async (req, res) => {
   // Set timeout for this specific request to 5 minutes
   req.setTimeout(300000); // 5 minutes
   res.setTimeout(300000); // 5 minutes
@@ -3227,7 +3227,7 @@ app.post('/ai-chat/*', async (req, res) => {
 });
 
 // SSE endpoint for streaming AI chat responses
-app.post('/ai-chat-stream/*', async (req, res) => {
+app.post('/ai-chat-stream/:path(*)', async (req, res) => {
   // Set up SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -3373,7 +3373,7 @@ app.post('/ai-chat-stream/*', async (req, res) => {
 });
 
 // AI Chat route handler for directories
-app.post('/ai-chat-directory/*', async (req, res) => {
+app.post('/ai-chat-directory/:path(*)', async (req, res) => {
   // Set timeout for this specific request to 5 minutes
   req.setTimeout(300000); // 5 minutes
   res.setTimeout(300000); // 5 minutes
@@ -3711,7 +3711,7 @@ app.get('/search', async (req, res) => {
 });
 
 // Edit route handler
-app.get('/edit/*', async (req, res) => {
+app.get('/edit/:path(*)', async (req, res) => {
   try {
     const urlPath = req.path.slice(6); // Remove '/edit/' prefix
     const fullPath = path.join(VAULT_PATH, urlPath);
@@ -3736,7 +3736,7 @@ app.get('/edit/*', async (req, res) => {
 });
 
 // Toggle checkbox route handler
-app.post('/toggle-checkbox/*', async (req, res) => {
+app.post('/toggle-checkbox/:path(*)', async (req, res) => {
   try {
     const urlPath = req.path.slice(16); // Remove '/toggle-checkbox/' prefix
     const fullPath = path.join(VAULT_PATH, urlPath);
@@ -3788,7 +3788,7 @@ app.post('/toggle-checkbox/*', async (req, res) => {
 });
 
 // Save route handler
-app.post('/save/*', async (req, res) => {
+app.post('/save/:path(*)', async (req, res) => {
   try {
     const urlPath = req.path.slice(6); // Remove '/save/' prefix
     const fullPath = path.join(VAULT_PATH, urlPath);
@@ -3817,7 +3817,7 @@ app.post('/save/*', async (req, res) => {
 });
 
 // Main route handler
-app.get('*', async (req, res) => {
+app.get('/:path(*)', async (req, res) => {
   try {
     const urlPath = req.path.slice(1); // Remove leading slash
     const fullPath = path.join(VAULT_PATH, urlPath);
