@@ -419,37 +419,33 @@ generate_summary() {
     
     today=$(date +%Y-%m-%d)
     
+    # Calculate metrics
+    open_issues=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
+    closed_today=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)='$today'" 2>/dev/null || echo 0)
+    active_errors=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
+    
+    # Insert metrics using the correct schema
     sqlite3 "$DB_PATH" <<EOF
--- Insert or update today's summary statistics
-INSERT OR REPLACE INTO ogm_summary_stats (
-    stat_date,
-    open_issues,
-    closed_issues_today,
-    active_errors,
-    avg_response_time,
-    p95_response_time,
-    error_rate
-)
-SELECT 
-    '$today' as stat_date,
-    (SELECT COUNT(*) FROM ogm_github_issues WHERE state='open') as open_issues,
-    (SELECT COUNT(*) FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)='$today') as closed_issues_today,
-    (SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0) as active_errors,
-    (SELECT value FROM ogm_scout_metrics WHERE metric_type='avg_response_time' ORDER BY timestamp DESC LIMIT 1) as avg_response_time,
-    (SELECT value FROM ogm_scout_metrics WHERE metric_type='p95_response_time' ORDER BY timestamp DESC LIMIT 1) as p95_response_time,
-    (SELECT value FROM ogm_scout_metrics WHERE metric_type='error_rate' ORDER BY timestamp DESC LIMIT 1) as error_rate;
+-- GitHub metrics
+INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
+VALUES ('$today', 'github', 'open_issues', $open_issues, 'count', '$today');
+
+INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
+VALUES ('$today', 'github', 'closed_today', $closed_today, 'count', '$today');
+
+-- HoneyBadger metrics
+INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
+VALUES ('$today', 'honeybadger', 'active_errors', $active_errors, 'count', '$today');
 EOF
     
     # Display summary
-    sqlite3 "$DB_PATH" -header -column <<EOF
-SELECT 
-    open_issues as "Open Issues",
-    active_errors as "Active Errors",
-    ROUND(COALESCE(avg_response_time, 0), 2) as "Avg Response (ms)",
-    ROUND(COALESCE(p95_response_time, 0), 2) as "95th % Response (ms)"
-FROM ogm_summary_stats 
-WHERE stat_date='$today';
-EOF
+    echo ""
+    echo "Summary for $today:"
+    echo "───────────────────────────────"
+    echo "GitHub Issues:     $open_issues open"
+    echo "Closed Today:      $closed_today"
+    echo "HoneyBadger Errors: $active_errors active"
+    echo ""
     
     print_status "Summary statistics generated"
 }
@@ -464,8 +460,9 @@ main() {
     
     # Sync each data source
     sync_github_issues
-    sync_honeybadger_faults
-    sync_scout_metrics
+    # TODO: Fix HoneyBadger jq performance issue with large responses
+    # sync_honeybadger_faults
+    # sync_scout_metrics
     
     # Generate summary
     generate_summary
