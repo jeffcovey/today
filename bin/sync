@@ -982,7 +982,7 @@ sync_ogm_monitoring() {
     # Run OGM sync
     print_info "Syncing OlderGay.Men monitoring data..."
     
-    sync_output=$(bin/ogm-sync 2>&1)
+    sync_output=$(env bin/ogm-sync 2>&1)
     if [[ $? -eq 0 ]]; then
         # Extract stats from output
         if echo "$sync_output" | grep -q "Open Issues"; then
@@ -1103,13 +1103,16 @@ process_inbox() {
                 
                 print_info "  • Gratitude note → Added to logs/gratitude.md"
                 print_info "    $TODAY_DATE: $GRATITUDE_LINE"
+                
+                # Delete the gratitude note from inbox only after successful processing
+                rm "$file"
+                continue  # Skip the normal file move logic
             else
                 print_error "  • Gratitude note has no content after 'I'm grateful for...'"
+                print_info "    Note kept in inbox - please add content after 'I'm grateful for...'"
+                # Don't delete the file - user can fix the format
+                continue  # Skip the normal file move logic but keep the file
             fi
-            
-            # Delete the gratitude note from inbox
-            rm "$file"
-            continue  # Skip the normal file move logic
         
         # Special case: Progress note - append to today's review
         elif [[ "$TITLE" == "Progress" ]]; then
@@ -1137,13 +1140,16 @@ process_inbox() {
                 echo "$PROGRESS_CONTENT" >> "$REVIEW_FILE"
                 print_info "  • Progress note → Added to today's review"
                 print_info "    $TIMESTAMP: $(echo "$PROGRESS_CONTENT" | head -1)"
+                
+                # Delete the progress note from inbox only after successful append
+                rm "$file"
+                continue  # Skip the normal file move logic
             else
                 print_error "  • No review file for today. Run 'bin/today' first"
+                print_info "    Progress note kept in inbox for next sync"
+                # Don't delete the file - leave it in inbox for next sync attempt
+                continue  # Skip the normal file move logic but keep the file
             fi
-            
-            # Delete the progress note from inbox
-            rm "$file"
-            continue  # Skip the normal file move logic
         
         # Special case: Concerns file
         elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then

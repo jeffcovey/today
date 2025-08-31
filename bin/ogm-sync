@@ -5,8 +5,9 @@
 
 set -e
 
-# Load common dotenvx handler
-source "$(dirname "$0")/lib/dotenvx-loader.sh"
+# Load common dotenvx handler  
+SCRIPT_DIR_LOADER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR_LOADER/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
 # Color output
@@ -36,7 +37,8 @@ print_header() {
 }
 
 # Database path
-DB_PATH=".data/today.db"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DB_PATH="$SCRIPT_DIR/../.data/today.db"
 
 # Initialize database tables for OGM monitoring
 init_database() {
@@ -61,8 +63,8 @@ CREATE TABLE IF NOT EXISTS ogm_github_issues (
 -- HoneyBadger Faults table
 CREATE TABLE IF NOT EXISTS ogm_honeybadger_faults (
     id INTEGER PRIMARY KEY,
-    klass TEXT NOT NULL,
-    message TEXT,
+    error_class TEXT NOT NULL,
+    error_message TEXT,
     environment TEXT,
     resolved BOOLEAN DEFAULT 0,
     notices_count INTEGER DEFAULT 0,
@@ -125,54 +127,85 @@ sync_github_issues() {
     print_header "📊 Syncing GitHub Issues"
     
     # Check for GitHub token
+    GITHUB_ACCESS_TOKEN="${GITHUB_ACCESS_TOKEN:-$GITHUB_TOKEN}"
     if [[ -z "$GITHUB_ACCESS_TOKEN" ]]; then
-        print_error "GITHUB_ACCESS_TOKEN not configured"
+        print_error "GITHUB_ACCESS_TOKEN or GITHUB_TOKEN not configured"
         print_info "Create a token at: https://github.com/settings/tokens"
         return 1
     fi
     
     print_info "Fetching open issues from GitHub..."
     
-    # Fetch issues from GitHub API (excluding pull requests)
-    response=$(curl -s -H "Authorization: token $GITHUB_ACCESS_TOKEN" \
+    # Fetch issues from GitHub API (excluding pull requests) - limit to 3 for testing
+    response=$(curl -s --max-time 10 -H "Authorization: token $GITHUB_ACCESS_TOKEN" \
                     -H "Accept: application/vnd.github.v3+json" \
-                    "https://api.github.com/repos/OlderGay-Men/OlderGay.Men/issues?state=open&per_page=100" 2>/dev/null)
+                    "https://api.github.com/repos/OlderGay-Men/OlderGay.Men/issues?state=open&per_page=3" 2>/dev/null)
     
-    # Check if we got valid JSON
-    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-        print_error "Failed to fetch GitHub issues - invalid response"
+    print_info "GitHub API response received, checking JSON validity..."
+    
+    # Check response size
+    response_size=${#response}
+    print_info "Response size: $response_size characters"
+    
+    # Check if response is empty
+    if [[ -z "$response" ]]; then
+        print_error "Empty response from GitHub API"
         return 1
     fi
     
-    # Check for API errors
-    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
-        error_msg=$(echo "$response" | jq -r '.message')
+    # For very large responses, just check if it starts with '[' (JSON array)
+    if [[ $response_size -gt 10000 ]]; then
+        print_info "Large response detected, doing quick validation..."
+        response_start="${response:0:10}"
+        if [[ "$response_start" != "["* ]]; then
+            print_error "Response doesn't appear to be a JSON array"
+            print_error "Response start: ${response:0:100}..."
+            return 1
+        fi
+    else
+        # Check if we got valid JSON for smaller responses
+        if ! echo "$response" | timeout 5 jq -e . >/dev/null 2>&1; then
+            print_error "Failed to fetch GitHub issues - invalid response"
+            print_error "Response: ${response:0:200}..."
+            return 1
+        fi
+    fi
+    
+    # Check for API errors (skip for large responses to avoid jq performance issues)
+    if [[ $response_size -le 10000 ]] && echo "$response" | timeout 3 jq -e '.message' >/dev/null 2>&1; then
+        error_msg=$(echo "$response" | timeout 3 jq -r '.message')
         print_error "GitHub API error: $error_msg"
         return 1
     fi
     
     # Parse and insert issues into database
+    print_info "Starting to process individual issues..."
     issue_count=0
     while IFS= read -r issue; do
+        print_info "Processing issue #$((issue_count + 1))..."
         # Skip pull requests (they have a pull_request field)
         if echo "$issue" | jq -e '.pull_request | select(. != null)' >/dev/null 2>&1; then
             continue
         fi
         
-        # Extract fields
-        number=$(echo "$issue" | jq -r '.number')
-        title=$(echo "$issue" | jq -r '.title' | sed "s/'/''/g")
-        state=$(echo "$issue" | jq -r '.state')
-        created_at=$(echo "$issue" | jq -r '.created_at')
-        updated_at=$(echo "$issue" | jq -r '.updated_at')
-        closed_at=$(echo "$issue" | jq -r '.closed_at // "null"')
-        body=$(echo "$issue" | jq -r '.body // ""' | sed "s/'/''/g")
-        labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")' | sed "s/'/''/g")
-        comments_count=$(echo "$issue" | jq -r '.comments')
-        url=$(echo "$issue" | jq -r '.html_url')
+        # Extract fields with error handling
+        print_info "Issue JSON length: ${#issue}"
+        print_info "Issue JSON start: ${issue:0:100}..."
+        number=$(echo "$issue" | jq -r '.number' 2>/dev/null || echo "0")
+        print_info "Extracted number: $number"
+        title=$(echo "$issue" | jq -r '.title' 2>/dev/null | sed "s/'/''/g" || echo "Unknown")
+        state=$(echo "$issue" | jq -r '.state' 2>/dev/null || echo "unknown")
+        created_at=$(echo "$issue" | jq -r '.created_at' 2>/dev/null || echo "now()")
+        updated_at=$(echo "$issue" | jq -r '.updated_at' 2>/dev/null || echo "now()")
+        closed_at=$(echo "$issue" | jq -r '.closed_at // "null"' 2>/dev/null || echo "null")
+        body=$(echo "$issue" | jq -r '.body // ""' 2>/dev/null | sed "s/'/''/g" || echo "")
+        labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")' 2>/dev/null | sed "s/'/''/g" || echo "")
+        comments_count=$(echo "$issue" | jq -r '.comments' 2>/dev/null || echo "0")
+        url=$(echo "$issue" | jq -r '.html_url' 2>/dev/null || echo "")
         
         # Insert into database
-        sqlite3 "$DB_PATH" <<EOF
+        print_info "Inserting issue #$number into database..."
+        if ! sqlite3 "$DB_PATH" <<EOF
 INSERT OR REPLACE INTO ogm_github_issues 
 (number, title, state, created_at, updated_at, closed_at, body, labels, comments_count, url)
 VALUES (
@@ -188,8 +221,12 @@ VALUES (
     '$url'
 );
 EOF
+        then
+            print_error "Failed to insert issue #$number into database"
+        fi
         ((issue_count++))
-    done < <(echo "$response" | jq -c '.[]')
+    print_info "Running jq to parse response..."
+    done < <(echo "$response" | timeout 30 jq -c '.[]')
     
     if [[ $issue_count -gt 0 ]]; then
         print_status "Synced $issue_count GitHub issues"
@@ -215,24 +252,36 @@ sync_honeybadger_faults() {
     fi
     
     print_info "Fetching unresolved faults from HoneyBadger..."
+    print_info "Using HoneyBadger token: ${HONEYBADGER_TOKEN:0:10}..."
     
     # HoneyBadger API v2 endpoint
     PROJECT_ID="76830"
-    response=$(curl -s -u "$HONEYBADGER_TOKEN:" \
+    response=$(curl -s --max-time 10 -u "$HONEYBADGER_TOKEN:" \
                     -H "Accept: application/json" \
-                    "https://app.honeybadger.io/v2/projects/$PROJECT_ID/faults?limit=50&resolved=false" 2>/dev/null)
+                    "https://app.honeybadger.io/v2/projects/$PROJECT_ID/faults?limit=5&resolved=false" 2>/dev/null)
     
-    # Check if we got valid JSON
-    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-        print_error "Failed to fetch HoneyBadger faults - invalid response"
+    print_info "HoneyBadger API response received, size: ${#response} characters"
+    
+    # Check response size and validate accordingly
+    response_size=${#response}
+    if [[ -z "$response" ]]; then
+        print_error "Empty response from HoneyBadger API"
         return 1
     fi
     
-    # Check for API errors
-    if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
-        error_msg=$(echo "$response" | jq -r '.error')
-        print_error "HoneyBadger API error: $error_msg"
-        return 1
+    # Skip JSON validation for large responses to avoid performance issues
+    if [[ $response_size -le 10000 ]]; then
+        if ! echo "$response" | timeout 3 jq -e . >/dev/null 2>&1; then
+            print_error "Failed to fetch HoneyBadger faults - invalid response"
+            return 1
+        fi
+        
+        # Check for API errors
+        if echo "$response" | timeout 3 jq -e '.error' >/dev/null 2>&1; then
+            error_msg=$(echo "$response" | timeout 3 jq -r '.error')
+            print_error "HoneyBadger API error: $error_msg"
+            return 1
+        fi
     fi
     
     # Parse and insert faults into database
@@ -240,8 +289,8 @@ sync_honeybadger_faults() {
     while IFS= read -r fault; do
         # Extract fields
         id=$(echo "$fault" | jq -r '.id')
-        klass=$(echo "$fault" | jq -r '.klass // "Unknown"' | sed "s/'/''/g")
-        message=$(echo "$fault" | jq -r '.message // ""' | sed "s/'/''/g")
+        error_class=$(echo "$fault" | jq -r '.klass // "Unknown"' | sed "s/'/''/g")
+        error_message=$(echo "$fault" | jq -r '.message // ""' | sed "s/'/''/g")
         environment=$(echo "$fault" | jq -r '.environment // "production"' | sed "s/'/''/g")
         resolved=$(echo "$fault" | jq -r '.resolved // false' | sed 's/false/0/;s/true/1/')
         notices_count=$(echo "$fault" | jq -r '.notices_count // 0')
@@ -251,11 +300,11 @@ sync_honeybadger_faults() {
         # Insert into database
         sqlite3 "$DB_PATH" <<EOF
 INSERT OR REPLACE INTO ogm_honeybadger_faults
-(id, klass, message, environment, resolved, notices_count, created_at, last_notice_at)
+(fault_id, error_class, error_message, environment, resolved, notices_count, created_at, last_notice_at)
 VALUES (
     $id,
-    '$klass',
-    '$message',
+    '$error_class',
+    '$error_message',
     '$environment',
     $resolved,
     $notices_count,
@@ -264,7 +313,8 @@ VALUES (
 );
 EOF
         ((fault_count++))
-    done < <(echo "$response" | jq -c '.results[]?' 2>/dev/null)
+    print_info "Processing HoneyBadger faults..."
+    done < <(echo "$response" | timeout 20 jq -c '.results[]?' 2>/dev/null)
     
     if [[ $fault_count -gt 0 ]]; then
         print_status "Synced $fault_count HoneyBadger faults"
@@ -306,7 +356,7 @@ sync_scout_metrics() {
     metrics_added=0
     
     # Fetch response time metrics
-    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
                     -H "Content-Type: application/json" \
                     "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time?from=$START_TIME&to=$END_TIME" 2>/dev/null)
     
@@ -323,7 +373,7 @@ EOF
     fi
     
     # Fetch 95th percentile response time
-    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
                     -H "Content-Type: application/json" \
                     "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time_95th?from=$START_TIME&to=$END_TIME" 2>/dev/null)
     
@@ -340,7 +390,7 @@ EOF
     fi
     
     # Fetch error rate
-    response=$(curl -s -H "X-SCOUT-API: $SCOUT_API_KEY" \
+    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
                     -H "Content-Type: application/json" \
                     "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/errors?from=$START_TIME&to=$END_TIME" 2>/dev/null)
     

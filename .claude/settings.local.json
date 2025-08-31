@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(TZ='America/New_York' date '+%A, %B %d, %Y at %I:%M %p %Z')",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(npx dotenvx run:*)"
     ],
     "deny": [],
     "ask": []
