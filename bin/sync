@@ -78,6 +78,7 @@ main() {
     run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
     # NOTE: Vault sync removed - now using Syncthing for real-time sync
     # run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
+    run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     
     # Task sync without classification
@@ -295,6 +296,79 @@ sync_github_vault_original() {
             xargs ls -t 2>/dev/null | head -5 | while read -r file; do
             echo "  • $(basename "$file") ($(dirname "$file"))"
         done
+    fi
+    
+    return 0
+}
+
+# Clean up Syncthing sync-conflict files
+cleanup_sync_conflicts() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    print_info "Checking for Syncthing sync-conflict files..."
+    
+    # Find all sync-conflict files
+    CONFLICT_FILES=$(find vault -name "*sync-conflict-*" -type f 2>/dev/null)
+    
+    if [[ -z "$CONFLICT_FILES" ]]; then
+        print_info "No sync-conflict files found"
+        return 0
+    fi
+    
+    TOTAL_CONFLICTS=$(echo "$CONFLICT_FILES" | wc -l)
+    print_info "Found $TOTAL_CONFLICTS sync-conflict file(s)"
+    
+    REMOVED_COUNT=0
+    KEPT_COUNT=0
+    
+    # Process each conflict file
+    while IFS= read -r conflict_file; do
+        if [[ -z "$conflict_file" ]]; then
+            continue
+        fi
+        
+        # Extract the original filename by removing the sync-conflict suffix
+        # Pattern: filename.sync-conflict-YYYYMMDD-HHMMSS-XXXXX.extension
+        original_file=$(echo "$conflict_file" | sed 's/\.sync-conflict-[0-9]\{8\}-[0-9]\{6\}-[A-Z0-9]\{7\}//')
+        
+        if [[ -f "$original_file" ]]; then
+            # Both files exist, compare them
+            if diff -q "$original_file" "$conflict_file" > /dev/null 2>&1; then
+                # Files are identical, safe to remove conflict
+                rm "$conflict_file"
+                REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                print_info "  ✓ Removed duplicate: $(basename "$conflict_file")"
+            else
+                # Files differ, check which is newer
+                # Use stat -c for Linux (GitHub Codespaces uses Linux)
+                original_mtime=$(stat -c %Y "$original_file" 2>/dev/null)
+                conflict_mtime=$(stat -c %Y "$conflict_file" 2>/dev/null)
+                
+                if [[ "$conflict_mtime" -lt "$original_mtime" ]]; then
+                    # Conflict file is older than original, safe to remove
+                    rm "$conflict_file"
+                    REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                    print_info "  ✓ Removed older conflict: $(basename "$conflict_file")"
+                else
+                    # Conflict file is newer or same age, keep it for manual review
+                    KEPT_COUNT=$((KEPT_COUNT + 1))
+                    # print_info "  ⚠ Keeping for review: $(basename "$conflict_file")"
+                fi
+            fi
+        else
+            # Original file doesn't exist, rename conflict to original
+            mv "$conflict_file" "$original_file"
+            REMOVED_COUNT=$((REMOVED_COUNT + 1))
+            print_info "  ✓ Restored missing file: $(basename "$original_file")"
+        fi
+    done <<< "$CONFLICT_FILES"
+    
+    if [[ $REMOVED_COUNT -gt 0 ]]; then
+        print_info "Cleaned up $REMOVED_COUNT sync-conflict file(s)"
+    fi
+    
+    if [[ $KEPT_COUNT -gt 0 ]]; then
+        print_info "Kept $KEPT_COUNT conflict file(s) for manual review (newer than original)"
     fi
     
     return 0
@@ -1476,6 +1550,16 @@ EOF
 
 # Parse command line arguments
 case "${1:-}" in
+    --cleanup-conflicts)
+        # Only cleanup sync-conflict files
+        print_header "🗑️ Cleanup Sync Conflicts"
+        if cleanup_sync_conflicts; then
+            print_status "Sync conflicts cleaned successfully!"
+        else
+            print_error "Sync conflict cleanup failed"
+        fi
+        exit 0
+        ;;
     --process-inbox-only)
         # Only process inbox files, no other sync operations
         print_header "📥 Process Inbox Only"
@@ -1523,6 +1607,7 @@ case "${1:-}" in
         # Quick sync - only critical sources
         print_info "Quick sync mode - GitHub vault, tasks, inbox, and consistency check"
         # NOTE: sync_github_vault removed - using Syncthing
+        cleanup_sync_conflicts
         clean_markdown_files
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
@@ -1566,11 +1651,12 @@ case "${1:-}" in
         echo "  • Uses efficient timeouts and smart caching"
         echo ""
         echo "Options:"
-        echo "  --vault       (Deprecated - vault now uses Syncthing)"
-        echo "  --quick       Quick sync (tasks and inbox only)"
-        echo "  --force       Force full refresh (bypass cache)"
-        echo "  --quick-email Download last 24 hours of email"
-        echo "  --help        Show this help message"
+        echo "  --cleanup-conflicts  Remove duplicate sync-conflict files"
+        echo "  --vault             (Deprecated - vault now uses Syncthing)"
+        echo "  --quick             Quick sync (tasks and inbox only)"
+        echo "  --force             Force full refresh (bypass cache)"
+        echo "  --quick-email       Download last 24 hours of email"
+        echo "  --help              Show this help message"
         echo ""
         echo "Data sources synced:"
         echo "  • Vault files (via Syncthing - real-time sync)"
