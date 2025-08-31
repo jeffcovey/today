@@ -840,10 +840,9 @@ export class TaskManager {
 
     // Get all active tasks (not Done) with project information
     const tasks = this.db.prepare(`
-      SELECT t.*, p.name as project_name, tp.project_id
+      SELECT t.*, p.name as project_name
       FROM tasks t
-      LEFT JOIN task_projects tp ON t.id = tp.task_id
-      LEFT JOIN projects p ON tp.project_id = p.id
+      LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.status != '✅ Done'
       ORDER BY p.name ASC, t.do_date ASC, t.status ASC, t.title ASC
     `).all();
@@ -1470,8 +1469,7 @@ export class TaskManager {
     const frontStageTasks = this.db.prepare(`
       SELECT t.*, p.name as project_name
       FROM tasks t
-      LEFT JOIN task_projects tp ON t.id = tp.task_id
-      LEFT JOIN projects p ON tp.project_id = p.id
+      LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.stage = 'Front Stage' 
         AND t.status != '✅ Done'
       ORDER BY p.name, t.do_date ASC, t.status ASC
@@ -1480,8 +1478,7 @@ export class TaskManager {
     const backStageTasks = this.db.prepare(`
       SELECT t.*, p.name as project_name
       FROM tasks t
-      LEFT JOIN task_projects tp ON t.id = tp.task_id
-      LEFT JOIN projects p ON tp.project_id = p.id
+      LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.stage = 'Back Stage' 
         AND t.status != '✅ Done'
       ORDER BY p.name, t.do_date ASC, t.status ASC
@@ -1490,8 +1487,7 @@ export class TaskManager {
     const offStageTasks = this.db.prepare(`
       SELECT t.*, p.name as project_name
       FROM tasks t
-      LEFT JOIN task_projects tp ON t.id = tp.task_id
-      LEFT JOIN projects p ON tp.project_id = p.id
+      LEFT JOIN projects p ON t.project_id = p.id
       WHERE t.stage = 'Off Stage' 
         AND t.status != '✅ Done'
       ORDER BY p.name, t.do_date ASC, t.status ASC
