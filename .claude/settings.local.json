@@ -6,7 +6,8 @@
       "Bash(npx dotenvx run:*)",
       "Bash(env bin/ogm-sync:*)",
       "Bash(node:*)",
-      "Bash(bin/db-query:*)"
+      "Bash(bin/db-query:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

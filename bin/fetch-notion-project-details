@@ -1,0 +1,165 @@
+#!/usr/bin/env node
+
+import { config } from 'dotenv';
+import { NotionAPI } from '../src/notion-api.js';
+import chalk from 'chalk';
+import fs from 'fs/promises';
+
+config();
+
+async function fetchProjectDetails() {
+  const notionToken = process.env.NOTION_TOKEN;
+  
+  if (!notionToken) {
+    console.error(chalk.red('❌ NOTION_TOKEN not found in .env file'));
+    process.exit(1);
+  }
+
+  const notion = new NotionAPI(notionToken);
+  
+  try {
+    console.log(chalk.cyan('\n📊 Fetching All Notion Projects with Full Details\n'));
+    
+    // Get the projects database
+    const projectsDB = await notion.getProjectsDatabase();
+    if (!projectsDB) {
+      console.error(chalk.red('Projects database not found'));
+      process.exit(1);
+    }
+    
+    // Get ALL projects (not just active ones)
+    const response = await notion.notion.databases.query({
+      database_id: projectsDB.id,
+      page_size: 100,
+      sorts: [
+        {
+          property: 'Status',
+          direction: 'ascending'
+        },
+        {
+          timestamp: 'last_edited_time',
+          direction: 'descending'
+        }
+      ]
+    });
+    
+    console.log(chalk.green(`Found ${response.results.length} total projects\n`));
+    
+    const projects = [];
+    
+    for (const project of response.results) {
+      const projectData = {
+        id: project.id,
+        title: notion.extractTitle(project),
+        url: project.url,
+        created_time: project.created_time,
+        last_edited_time: project.last_edited_time,
+        properties: {}
+      };
+      
+      // Extract all properties
+      for (const [propName, propValue] of Object.entries(project.properties)) {
+        switch (propValue.type) {
+          case 'title':
+            projectData.properties[propName] = propValue.title?.[0]?.plain_text || '';
+            break;
+          case 'rich_text':
+            projectData.properties[propName] = propValue.rich_text?.map(rt => rt.plain_text).join('') || '';
+            break;
+          case 'status':
+            projectData.properties[propName] = propValue.status?.name || '';
+            break;
+          case 'select':
+            projectData.properties[propName] = propValue.select?.name || '';
+            break;
+          case 'multi_select':
+            projectData.properties[propName] = propValue.multi_select?.map(s => s.name) || [];
+            break;
+          case 'date':
+            projectData.properties[propName] = propValue.date || null;
+            break;
+          case 'checkbox':
+            projectData.properties[propName] = propValue.checkbox || false;
+            break;
+          case 'formula':
+            projectData.properties[propName] = propValue.formula || null;
+            break;
+          case 'rollup':
+            projectData.properties[propName] = propValue.rollup || null;
+            break;
+          case 'relation':
+            projectData.properties[propName] = propValue.relation?.map(r => r.id) || [];
+            break;
+          case 'people':
+            projectData.properties[propName] = propValue.people?.map(p => p.name || p.id) || [];
+            break;
+          case 'files':
+            projectData.properties[propName] = propValue.files?.map(f => f.name || f.external?.url || f.file?.url) || [];
+            break;
+          case 'url':
+            projectData.properties[propName] = propValue.url || '';
+            break;
+          default:
+            projectData.properties[propName] = propValue;
+        }
+      }
+      
+      projects.push(projectData);
+    }
+    
+    // Group projects by status
+    const projectsByStatus = {};
+    projects.forEach(project => {
+      const status = project.properties.Status || 'No Status';
+      if (!projectsByStatus[status]) {
+        projectsByStatus[status] = [];
+      }
+      projectsByStatus[status].push(project);
+    });
+    
+    // Display summary
+    console.log(chalk.cyan('📁 Projects by Status:\n'));
+    for (const [status, statusProjects] of Object.entries(projectsByStatus)) {
+      console.log(chalk.yellow(`${status} (${statusProjects.length}):`));
+      statusProjects.slice(0, 5).forEach(project => {
+        console.log(`  - ${project.title}`);
+        if (project.properties['Timeline Dates']?.start) {
+          console.log(`    Timeline: ${project.properties['Timeline Dates'].start}`);
+        }
+        if (project.properties['Review Date']?.start) {
+          console.log(`    Review: ${project.properties['Review Date'].start}`);
+        }
+      });
+      if (statusProjects.length > 5) {
+        console.log(`  ... and ${statusProjects.length - 5} more`);
+      }
+      console.log();
+    }
+    
+    // Save to JSON for further analysis
+    const outputPath = '/workspaces/today/notion-projects-export.json';
+    await fs.writeFile(outputPath, JSON.stringify({
+      database_id: projectsDB.id,
+      database_title: projectsDB.title,
+      database_url: projectsDB.url,
+      export_date: new Date().toISOString(),
+      total_projects: projects.length,
+      projects_by_status: Object.keys(projectsByStatus).map(status => ({
+        status,
+        count: projectsByStatus[status].length
+      })),
+      projects
+    }, null, 2));
+    
+    console.log(chalk.green(`\n✅ Full project data exported to: ${outputPath}`));
+    console.log(chalk.gray(`   Use this file to design the migration strategy\n`));
+    
+  } catch (error) {
+    console.error(chalk.red(`\n❌ Error: ${error.message}`));
+    process.exit(1);
+  } finally {
+    notion.close();
+  }
+}
+
+fetchProjectDetails();
