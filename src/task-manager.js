@@ -1223,36 +1223,39 @@ export class TaskManager {
       // Calculate next date based on last completion
       const nextDate = this.calculateNextDateFromInterval(task.completed_at, task.repeat_interval);
       
-      // Only create if the next date is today or earlier
-      if (nextDate <= today) {
-        // Check if we already have an incomplete instance of this recurring task
-        // This prevents duplicates when sync runs multiple times
-        const existingIncomplete = this.db.prepare(`
-          SELECT id FROM tasks 
-          WHERE title = ? 
-            AND status != '✅ Done'
-            AND repeat_interval = ?
-            AND id != ?
-        `).get(task.title, task.repeat_interval, task.id);
-        
-        if (!existingIncomplete) {
-          // Create new task instance
-          this.createTask({
-            title: task.title,
-            description: task.description,
-            do_date: nextDate,
-            status: '🎭 Stage',
-            stage: null,
-            project_id: task.project_id,
-            repeat_interval: task.repeat_interval,
-            topics: this.getTaskTopics(task.id)
-          });
-          created++;
+      // Check if we already have an incomplete instance of this recurring task
+      // Look for tasks with the same title that are not done
+      // Don't check repeat_interval as the new instance might not have it set yet
+      const existingIncomplete = this.db.prepare(`
+        SELECT id, do_date FROM tasks 
+        WHERE title = ? 
+          AND status != '✅ Done'
+          AND id != ?
+      `).get(task.title, task.id);
+      
+      if (!existingIncomplete) {
+        // Create new task instance for the calculated future date
+        // This task should be created regardless of whether nextDate is in the future
+        this.createTask({
+          title: task.title,
+          description: task.description,
+          do_date: nextDate,  // This will be the future date (e.g., 7 days from completion)
+          status: '🎭 Stage',
+          stage: null,
+          project_id: task.project_id,
+          repeat_interval: task.repeat_interval,
+          topics: this.getTaskTopics(task.id)
+        });
+        created++;
 
-          // Update the original task's repeat_next_date
-          this.db.prepare('UPDATE tasks SET repeat_next_date = ? WHERE id = ?')
-            .run(nextDate, task.id);
-        }
+        // Update the original task's repeat_next_date
+        this.db.prepare('UPDATE tasks SET repeat_next_date = ? WHERE id = ?')
+          .run(nextDate, task.id);
+      } else if (existingIncomplete.do_date !== nextDate) {
+        // Update the existing incomplete task's date if it's different
+        // This handles the case where the task was created with the wrong date
+        this.db.prepare('UPDATE tasks SET do_date = ? WHERE id = ?')
+          .run(nextDate, existingIncomplete.id);
       }
     }
 
