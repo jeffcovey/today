@@ -157,7 +157,13 @@ if [ -n "$LAST_SYNC" ]; then
         if [ "$NON_INTERACTIVE" = true ]; then
             # Non-interactive mode - use --no-interactive flag
             claude --print "$(cat <<EOF
-# Focused Work Session
+# Focused Work Session - NON-INTERACTIVE MODE
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- The user ran this command specifically requesting: "${DIRECT_REQUEST}"
+- Complete the task WITHOUT asking for confirmation
 
 You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
 
@@ -178,14 +184,14 @@ You have access to today's synchronized data in the SQLite database at .data/tod
 ## Direct Request from User
 "${DIRECT_REQUEST}"
 
-Please:
+## YOUR TASK:
 1. Query the database to understand current context
-2. Check if today's review exists to understand what's been done
-3. Focus on helping with the specific request above
-4. You can reference relevant tasks, projects, or information from the database
-5. This is an interactive session - continue helping as needed
+2. Check if today's review exists
+3. EXECUTE THE REQUEST FULLY - if it says "update", then UPDATE the file
+4. Do NOT ask "May I proceed?" or "Should I update?" - just DO IT
+5. Complete the task and exit (this is non-interactive)
 
-Let's get started with the request!
+Execute the request NOW without asking for permission!
 EOF
 )"
         else
@@ -244,7 +250,19 @@ EOF
         # Start Claude session with TODAY.md
         if [ "$NON_INTERACTIVE" = true ]; then
             echo "🤖 Running Claude in non-interactive mode..."
-            claude --print "$(cat TODAY.md)"
+            # Add explicit permission for file operations in non-interactive mode
+            claude --print "$(cat <<EOF
+## NON-INTERACTIVE MODE - FULL PERMISSIONS GRANTED
+
+You are running in non-interactive mode. This means:
+- You have FULL PERMISSION to create and update all files
+- Do NOT ask for permission - just perform the requested actions
+- Complete all tasks without waiting for user confirmation
+- When instructed to update the review file, UPDATE IT immediately
+
+$(cat TODAY.md)
+EOF
+)"
         else
             echo "🤖 Starting Claude interactive session..."
             claude "$(cat TODAY.md)"
