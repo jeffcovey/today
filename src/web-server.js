@@ -3066,9 +3066,9 @@ app.post('/_cache/clear', sessionAuth, (req, res) => {
 });
 
 // File edit endpoint for AI
-app.post('/ai-edit/*', async (req, res) => {
+app.post('/ai-edit/*path', async (req, res) => {
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     const { content } = req.body;
     
@@ -3088,13 +3088,13 @@ app.post('/ai-edit/*', async (req, res) => {
 });
 
 // AI Chat route handler  
-app.post('/ai-chat/*', async (req, res) => {
+app.post('/ai-chat/*path', async (req, res) => {
   // Set timeout for this specific request to 5 minutes
   req.setTimeout(300000); // 5 minutes
   res.setTimeout(300000); // 5 minutes
   
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const { message, history, documentContent } = req.body;
     const fullPath = path.join(VAULT_PATH, urlPath);
     
@@ -3230,7 +3230,7 @@ app.post('/ai-chat/*', async (req, res) => {
 });
 
 // SSE endpoint for streaming AI chat responses
-app.post('/ai-chat-stream/*', async (req, res) => {
+app.post('/ai-chat-stream/*path', async (req, res) => {
   // Set up SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -3250,7 +3250,7 @@ app.post('/ai-chat-stream/*', async (req, res) => {
   });
   
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const { message, history, documentContent } = req.body;
     const fullPath = path.join(VAULT_PATH, urlPath);
     
@@ -3376,13 +3376,13 @@ app.post('/ai-chat-stream/*', async (req, res) => {
 });
 
 // AI Chat route handler for directories
-app.post('/ai-chat-directory/*', async (req, res) => {
+app.post('/ai-chat-directory/*path', async (req, res) => {
   // Set timeout for this specific request to 5 minutes
   req.setTimeout(300000); // 5 minutes
   res.setTimeout(300000); // 5 minutes
   
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const { message, history, directoryContext } = req.body;
     const fullPath = path.join(VAULT_PATH, urlPath);
     
@@ -3714,9 +3714,9 @@ app.get('/search', async (req, res) => {
 });
 
 // Edit route handler
-app.get('/edit/*', async (req, res) => {
+app.get('/edit/*path', async (req, res) => {
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
@@ -3739,9 +3739,9 @@ app.get('/edit/*', async (req, res) => {
 });
 
 // Toggle checkbox route handler
-app.post('/toggle-checkbox/*', async (req, res) => {
+app.post('/toggle-checkbox/*path', async (req, res) => {
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
@@ -3812,9 +3812,9 @@ app.post('/toggle-checkbox/*', async (req, res) => {
 });
 
 // Save route handler
-app.post('/save/*', async (req, res) => {
+app.post('/save/*path', async (req, res) => {
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
@@ -3841,9 +3841,9 @@ app.post('/save/*', async (req, res) => {
 });
 
 // Main route handler
-app.get('/*', async (req, res) => {
+app.get('/*path', async (req, res) => {
   try {
-    const urlPath = req.params[0]; // Get the wildcard path
+    const urlPath = req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
