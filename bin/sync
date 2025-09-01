@@ -384,6 +384,11 @@ clean_markdown_files() {
     LINT_MARKER=".data/.last-markdown-lint"
     mkdir -p .data 2>/dev/null
     
+    # Save current timestamp BEFORE we start any processing
+    # We'll use this to mark when we started, so files we modify don't get reprocessed
+    TEMP_MARKER=$(mktemp)
+    touch "$TEMP_MARKER"
+    
     # Find files changed since last lint run
     if [[ -f "$LINT_MARKER" ]]; then
         # Files modified after the last lint run
@@ -396,8 +401,8 @@ clean_markdown_files() {
     # Count changed files
     if [[ -z "$ALL_CHANGED_FILES" ]]; then
         print_info "No markdown files changed since last lint"
-        # Update marker even when no files to process
-        touch "$LINT_MARKER"
+        # Update marker with the time we checked
+        mv "$TEMP_MARKER" "$LINT_MARKER"
         return 0
     fi
     
@@ -489,8 +494,9 @@ clean_markdown_files() {
         print_info "All markdown files are already clean"
     fi
     
-    # Update the marker file to track when we last ran lint
-    touch "$LINT_MARKER"
+    # Update the marker file with the timestamp from BEFORE we started processing
+    # This ensures files we just modified won't be re-processed next time
+    mv "$TEMP_MARKER" "$LINT_MARKER"
     
     # NOTE: No longer committing vault changes - Syncthing handles synchronization
     # Files are cleaned in-place and will sync automatically

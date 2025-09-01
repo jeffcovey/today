@@ -3860,10 +3860,30 @@ app.post('/save/*path', async (req, res) => {
   }
 });
 
-// Main route handler - handles both root and all paths
-app.get('(/*)?', async (req, res) => {
+// Main route handler for root
+app.get('/', async (req, res) => {
   try {
-    const urlPath = req.params[0] || ''; // Get the wildcard path, default to empty for root
+    const urlPath = ''; // Root path
+    const fullPath = path.join(VAULT_PATH, urlPath);
+    
+    // Render directory listing for root
+    const stats = await fs.stat(fullPath);
+    if (stats.isDirectory()) {
+      const html = await renderDirectory(fullPath, urlPath);
+      res.send(html);
+    } else {
+      res.status(404).send('Not found');
+    }
+  } catch (error) {
+    console.error('Error serving root:', error);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Main route handler for all other paths
+app.get('/*path', async (req, res) => {
+  try {
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
