@@ -380,19 +380,29 @@ clean_markdown_files() {
     
     print_info "Cleaning markdown files with markdownlint..."
     
-    # Since vault/ is not in git, we need to track changed files differently
-    # We'll process files that were recently modified (last 5 minutes)
-    # This catches files changed by sync operations (inbox processing, etc.)
-    ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -mmin -5 -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
+    # Track last lint run using a marker file
+    LINT_MARKER=".data/.last-markdown-lint"
+    mkdir -p .data 2>/dev/null
+    
+    # Find files changed since last lint run
+    if [[ -f "$LINT_MARKER" ]]; then
+        # Files modified after the last lint run
+        ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -newer "$LINT_MARKER" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
+    else
+        # First run or marker missing - process files from last 5 minutes
+        ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -mmin -5 -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
+    fi
     
     # Count changed files
     if [[ -z "$ALL_CHANGED_FILES" ]]; then
-        print_info "No recently changed markdown files to clean"
+        print_info "No markdown files changed since last lint"
+        # Update marker even when no files to process
+        touch "$LINT_MARKER"
         return 0
     fi
     
     MD_COUNT=$(echo "$ALL_CHANGED_FILES" | wc -l | tr -d ' ')
-    print_info "Processing $MD_COUNT recently changed markdown file(s)..."
+    print_info "Processing $MD_COUNT markdown file(s) changed since last lint..."
     
     # First, fix corrupted HTML comments (smart dash replacements from Drafts, etc.)
     # This fixes: <!— becomes <!-- and —> becomes -->
@@ -478,6 +488,9 @@ clean_markdown_files() {
     else
         print_info "All markdown files are already clean"
     fi
+    
+    # Update the marker file to track when we last ran lint
+    touch "$LINT_MARKER"
     
     # NOTE: No longer committing vault changes - Syncthing handles synchronization
     # Files are cleaned in-place and will sync automatically

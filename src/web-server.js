@@ -3861,9 +3861,9 @@ app.post('/save/*path', async (req, res) => {
 });
 
 // Main route handler - handles both root and all paths
-app.get('/*path?', async (req, res) => {
+app.get('(/*)?', async (req, res) => {
   try {
-    const urlPath = req.params.path ? (Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path) : ''; // Get the wildcard path, default to empty for root
+    const urlPath = req.params[0] || ''; // Get the wildcard path, default to empty for root
     const fullPath = path.join(VAULT_PATH, urlPath);
     
     // Security: prevent directory traversal
