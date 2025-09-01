@@ -380,20 +380,26 @@ clean_markdown_files() {
     
     print_info "Cleaning markdown files with markdownlint..."
     
-    # Count markdown files to process (excluding all dot directories and sync-conflict files)
-    MD_COUNT=$(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null | wc -l)
+    # Since vault/ is not in git, we need to track changed files differently
+    # We'll process files that were recently modified (last 5 minutes)
+    # This catches files changed by sync operations (inbox processing, etc.)
+    ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -mmin -5 -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
     
-    if [[ $MD_COUNT -eq 0 ]]; then
-        print_info "No markdown files found to clean"
+    # Count changed files
+    if [[ -z "$ALL_CHANGED_FILES" ]]; then
+        print_info "No recently changed markdown files to clean"
         return 0
     fi
     
-    print_info "Processing $MD_COUNT markdown files..."
+    MD_COUNT=$(echo "$ALL_CHANGED_FILES" | wc -l | tr -d ' ')
+    print_info "Processing $MD_COUNT recently changed markdown file(s)..."
     
     # First, fix corrupted HTML comments (smart dash replacements from Drafts, etc.)
     # This fixes: <!— becomes <!-- and —> becomes -->
     COMMENT_FIXED_COUNT=0
     while IFS= read -r file; do
+        # Skip empty lines
+        [[ -z "$file" ]] && continue
         # Check if file has corrupted comments
         if grep -qE '<!—|—>' "$file" 2>/dev/null; then
             # Fix the corrupted comments
@@ -407,7 +413,7 @@ clean_markdown_files() {
             fi
             COMMENT_FIXED_COUNT=$((COMMENT_FIXED_COUNT + 1))
         fi
-    done < <(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null)
+    done <<< "$ALL_CHANGED_FILES"
     
     if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
         print_info "Fixed corrupted HTML comments in $COMMENT_FIXED_COUNT file(s)"
@@ -417,6 +423,8 @@ clean_markdown_files() {
     # This handles cases like: <!-- task-id: abc <!-- task-id: def -->
     TASK_ID_FIXED_COUNT=0
     while IFS= read -r file; do
+        # Skip empty lines
+        [[ -z "$file" ]] && continue
         # Check if file has malformed task-id tags (multiple on same line)
         if grep -qE '<!-- task-id:.*<!-- task-id:' "$file" 2>/dev/null; then
             # Create temp file
@@ -447,16 +455,21 @@ clean_markdown_files() {
             mv "$TEMP_FILE" "$file"
             TASK_ID_FIXED_COUNT=$((TASK_ID_FIXED_COUNT + 1))
         fi
-    done < <(find vault -type f -name "*.md" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null)
+    done <<< "$ALL_CHANGED_FILES"
     
     if [[ $TASK_ID_FIXED_COUNT -gt 0 ]]; then
         print_info "Fixed malformed task-id tags in $TASK_ID_FIXED_COUNT file(s)"
     fi
     
-    # Run markdownlint-cli2 with fix option
-    # Using a glob pattern to process all markdown files in our content directories
-    # Exclude sync-conflict files from Syncthing
-    output=$(npx markdownlint-cli2 --fix "vault/**/*.md" --ignore "*sync-conflict*" 2>&1) || true
+    # Run markdownlint-cli2 with fix option on changed files only
+    # Convert the list of files to arguments for markdownlint
+    if [[ -n "$ALL_CHANGED_FILES" ]]; then
+        # Convert newline-separated list to space-separated arguments
+        FILES_TO_LINT=$(echo "$ALL_CHANGED_FILES" | tr '\n' ' ')
+        output=$(npx markdownlint-cli2 --fix $FILES_TO_LINT 2>&1) || true
+    else
+        output=""
+    fi
     
     # Check if any files were fixed
     if echo "$output" | grep -q "Fixing:"; then
