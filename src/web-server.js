@@ -2198,14 +2198,17 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const { toc, contentWithIds } = generateTableOfContents(contentToRender);
   contentToRender = contentWithIds;
   
-  // Find all checkbox lines in the original content (use contentWithIds for correct line numbers)
+  // Find all checkbox lines in the original content (use original content for correct line numbers)
   const checkboxLines = [];
-  const linesWithIds = contentWithIds.split('\n');
-  linesWithIds.forEach((line, index) => {
+  const originalLines = content.split('\n');
+  originalLines.forEach((line, index) => {
     if (line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
+      // Extract task ID if present
+      const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
       checkboxLines.push({
         lineNumber: index,
-        isChecked: line.match(/^(\s*)-\s*\[[xX]\]\s*/i) !== null
+        isChecked: line.match(/^(\s*)-\s*\[[xX]\]\s*/i) !== null,
+        taskId: taskIdMatch ? taskIdMatch[1] : null
       });
     }
   });
@@ -2301,9 +2304,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
         const checkbox = checkboxLines[replacementIndex];
         replacementIndex++;
         return `<input type="checkbox" class="form-check-input me-2" 
-          data-line="${checkbox.lineNumber}" 
+          data-line="${checkbox.lineNumber}"
+          ${checkbox.taskId ? `data-task-id="${checkbox.taskId}"` : ''}
           ${checkbox.isChecked ? 'checked' : ''} 
-          onchange="toggleCheckbox(this, ${checkbox.lineNumber}, event)" 
+          onchange="toggleCheckbox(this, ${checkbox.lineNumber}, '${checkbox.taskId || ''}', event)" 
           onclick="event.stopPropagation();" 
           style="cursor: pointer;">`;
       }
@@ -2941,7 +2945,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
         
         // No longer needed - using inline onclick handlers
         
-        function toggleCheckbox(checkbox, lineNumber, event) {
+        function toggleCheckbox(checkbox, lineNumber, taskId, event) {
           const isChecked = checkbox.checked;
           
           // Prevent the details element from toggling when clicking checkbox
@@ -2959,6 +2963,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
             },
             body: JSON.stringify({ 
               lineNumber: lineNumber,
+              taskId: taskId,
               checked: isChecked 
             })
           })
@@ -3757,26 +3762,41 @@ app.post('/toggle-checkbox/*path', async (req, res) => {
     
     // Read the file
     let content = await fs.readFile(fullPath, 'utf-8');
-    const { lineNumber, checked } = req.body;
+    const { lineNumber, taskId: providedTaskId, checked } = req.body;
     
     // Split into lines
     const lines = content.split('\n');
     
+    // Find the line to toggle - prioritize task ID if provided
+    let targetLineNumber = lineNumber;
+    let taskId = providedTaskId;
+    
+    if (providedTaskId) {
+      // Find line by task ID
+      const taskIdPattern = new RegExp(`<![-—]+ task-id: ${providedTaskId} [-—]+>`);
+      const foundIndex = lines.findIndex(line => taskIdPattern.test(line));
+      if (foundIndex !== -1) {
+        targetLineNumber = foundIndex;
+      }
+    }
+    
     // Find and toggle the checkbox on the specified line
-    if (lineNumber >= 0 && lineNumber < lines.length) {
-      const line = lines[lineNumber];
+    if (targetLineNumber >= 0 && targetLineNumber < lines.length) {
+      const line = lines[targetLineNumber];
       
-      // Extract task ID if present (handles both normal and corrupted comment formats)
-      const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
-      const taskId = taskIdMatch ? taskIdMatch[1] : null;
+      // Extract task ID if not provided
+      if (!taskId) {
+        const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
+        taskId = taskIdMatch ? taskIdMatch[1] : null;
+      }
       
       // Match checkbox patterns: - [ ] or - [x] or - [X]
       if (checked) {
         // Check the box
-        lines[lineNumber] = line.replace(/^(\s*)-\s*\[\s*\]\s*/, '$1- [x] ');
+        lines[targetLineNumber] = line.replace(/^(\s*)-\s*\[\s*\]\s*/, '$1- [x] ');
       } else {
         // Uncheck the box
-        lines[lineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
+        lines[targetLineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
       }
       
       // Write back to file
@@ -3800,7 +3820,7 @@ app.post('/toggle-checkbox/*path', async (req, res) => {
         }
       }
       
-      console.log(`Checkbox toggled in: ${fullPath}, line ${lineNumber}${taskId ? ` (task: ${taskId})` : ''}`);
+      console.log(`Checkbox toggled in: ${fullPath}, line ${targetLineNumber}${taskId ? ` (task: ${taskId})` : ''}`);
       res.json({ success: true, message: 'Checkbox toggled successfully' });
     } else {
       res.status(400).json({ success: false, message: 'Invalid line number' });
