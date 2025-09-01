@@ -1,0 +1,228 @@
+#!/bin/bash
+
+# Database query wrapper for daily reviews
+# This script provides safe, read-only database queries that can be pre-approved
+# Usage: bin/db-query <query_type> [options]
+
+DB_PATH=".data/today.db"
+
+# Ensure database exists
+if [ ! -f "$DB_PATH" ]; then
+    echo "❌ Database not found at $DB_PATH"
+    exit 1
+fi
+
+# Function to run a query
+run_query() {
+    sqlite3 "$DB_PATH" "$1"
+}
+
+# Main query dispatcher
+case "${1:-daily}" in
+    daily|review)
+        # Comprehensive daily review queries
+        run_query "
+-- Current day and time info
+SELECT 'Current Time: ' || datetime('now', 'localtime');
+SELECT '---';
+
+-- Urgent tasks
+SELECT '=== URGENT TASKS ===' as section;
+SELECT 
+    title,
+    json_extract(properties, '$.stage') as stage,
+    json_extract(properties, '$.due_date') as due_date,
+    json_extract(properties, '$.category') as category,
+    id
+FROM task_cache 
+WHERE json_extract(properties, '$.stage') IN ('🔥 Immediate', '🚀 1st Priority')
+   OR DATE(json_extract(properties, '$.due_date')) <= DATE('now', '+1 day')
+ORDER BY json_extract(properties, '$.due_date');
+SELECT '---';
+
+-- Today's calendar events  
+SELECT '=== TODAY''S EVENTS ===' as section;
+SELECT title, start_date, end_date, location, start_timezone
+FROM calendar_events
+WHERE DATE(start_date) = DATE('now')
+ORDER BY start_date;
+SELECT '---';
+
+-- Recent unread emails (last 2 days)
+SELECT '=== RECENT EMAILS ===' as section;
+SELECT subject, from_address, date
+FROM emails
+WHERE folder != 'Sent'
+  AND date > datetime('now', '-2 days')
+ORDER BY date DESC
+LIMIT 15;
+SELECT '---';
+
+-- Guest room status
+SELECT '=== GUEST ROOM STATUS ===' as section;
+SELECT subject, from_address, date
+FROM emails
+WHERE (lower(subject) LIKE '%airbnb%' 
+   OR lower(subject) LIKE '%misterb%'
+   OR lower(from_address) LIKE '%airbnb%'
+   OR lower(from_address) LIKE '%misterb%')
+   AND date > datetime('now', '-7 days')
+ORDER BY date DESC
+LIMIT 5;
+SELECT '---';
+
+-- Overdue contacts (6+ weeks)
+SELECT '=== OVERDUE CONTACTS ===' as section;
+SELECT 
+    full_name,
+    last_contacted,
+    CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago
+FROM contacts
+WHERE julianday('now') - julianday(last_contacted) > 42
+ORDER BY last_contacted
+LIMIT 10;
+SELECT '---';
+
+-- Time tracking today
+SELECT '=== TIME TRACKED TODAY ===' as section;
+SELECT 
+    COALESCE(p.name, 'No Project') as project,
+    printf('%.2f', SUM(te.duration) / 3600.0) as hours
+FROM toggl_time_entries te
+LEFT JOIN toggl_projects p ON te.pid = p.id
+WHERE DATE(te.start) = DATE('now', 'localtime')
+GROUP BY p.name;
+"
+        ;;
+        
+    tasks)
+        # Just tasks
+        run_query "
+SELECT 
+    title,
+    json_extract(properties, '$.stage') as stage,
+    json_extract(properties, '$.due_date') as due_date,
+    json_extract(properties, '$.category') as category,
+    id
+FROM task_cache 
+WHERE json_extract(properties, '$.stage') IN ('🔥 Immediate', '🚀 1st Priority', '🎯 2nd Priority')
+ORDER BY 
+    CASE json_extract(properties, '$.stage')
+        WHEN '🔥 Immediate' THEN 1
+        WHEN '🚀 1st Priority' THEN 2
+        WHEN '🎯 2nd Priority' THEN 3
+        ELSE 4
+    END,
+    json_extract(properties, '$.due_date');
+"
+        ;;
+        
+    events)
+        # Calendar events for next 7 days
+        run_query "
+SELECT title, start_date, end_date, location
+FROM calendar_events
+WHERE DATE(start_date) <= DATE('now', '+7 days')
+  AND DATE(start_date) >= DATE('now')
+ORDER BY start_date;
+"
+        ;;
+        
+    emails)
+        # Recent emails
+        run_query "
+SELECT subject, from_address, date, 
+       CASE WHEN folder = 'Sent' THEN '→ SENT' ELSE '← RECEIVED' END as direction
+FROM emails
+WHERE date > datetime('now', '-3 days')
+ORDER BY date DESC
+LIMIT 30;
+"
+        ;;
+        
+    contacts)
+        # Contacts needing follow-up
+        run_query "
+SELECT 
+    full_name,
+    last_contacted,
+    CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago,
+    notes
+FROM contacts
+WHERE last_contacted IS NOT NULL
+ORDER BY last_contacted
+LIMIT 20;
+"
+        ;;
+        
+    ogm)
+        # OGM monitoring data
+        run_query "
+SELECT '=== OGM ERRORS ===' as section;
+SELECT klass, notices_count, last_notice_at
+FROM ogm_honeybadger_faults 
+WHERE resolved = 0 AND notices_count > 100
+ORDER BY notices_count DESC
+LIMIT 10;
+SELECT '---';
+
+SELECT '=== OGM GITHUB ISSUES ===' as section;
+SELECT title, state, created_at
+FROM ogm_github_issues
+WHERE state = 'open'
+ORDER BY created_at DESC
+LIMIT 10;
+"
+        ;;
+        
+    journal)
+        # Recent journal entries
+        run_query "
+SELECT 
+    DATE(creation_date) as date,
+    SUBSTR(text, 1, 200) as preview,
+    CASE WHEN starred = 1 THEN '⭐' ELSE '' END as starred
+FROM diary
+WHERE datetime(creation_date) >= datetime('now', '-7 days')
+ORDER BY creation_date DESC;
+"
+        ;;
+        
+    schema)
+        # Show all tables and their schemas
+        run_query ".tables"
+        echo "---"
+        run_query ".schema"
+        ;;
+        
+    custom)
+        # Run a custom query (must be passed as second argument)
+        if [ -z "$2" ]; then
+            echo "Error: Please provide a query as the second argument"
+            echo "Usage: bin/db-query custom \"SELECT * FROM table\""
+            exit 1
+        fi
+        run_query "$2"
+        ;;
+        
+    *)
+        echo "Usage: bin/db-query [query_type]"
+        echo ""
+        echo "Available query types:"
+        echo "  daily/review - Comprehensive daily review (default)"
+        echo "  tasks        - All priority tasks"
+        echo "  events       - Calendar events (next 7 days)"
+        echo "  emails       - Recent emails (last 3 days)"
+        echo "  contacts     - Contact follow-up status"
+        echo "  ogm          - OGM monitoring data"
+        echo "  journal      - Recent journal entries"
+        echo "  schema       - Database structure"
+        echo "  custom       - Run a custom query"
+        echo ""
+        echo "Examples:"
+        echo "  bin/db-query                    # Run daily review queries"
+        echo "  bin/db-query tasks               # Show priority tasks"
+        echo "  bin/db-query custom \"SELECT * FROM emails LIMIT 5\""
+        exit 1
+        ;;
+esac

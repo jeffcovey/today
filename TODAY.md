@@ -34,20 +34,27 @@ This file starts an interactive Claude session for your daily review. The `bin/t
    - NEVER guess time - always use this command
    - Database uses UTC - convert to local time based on config.toml setting
 
-3. **Check Database Schema FIRST**
+3. **Query Database Using Pre-Approved Script**
 
-   ```sql
-   -- ALWAYS check table structure before querying!
-   .schema task_cache
-   .schema emails
-   .schema calendar_events
+   ```bash
+   # Get comprehensive daily review data (pre-approved command)
+   bin/db-query daily
+   
+   # Or query specific data types:
+   bin/db-query tasks      # Priority tasks
+   bin/db-query events     # Calendar events
+   bin/db-query emails     # Recent emails
+   bin/db-query contacts   # Contact follow-ups
+   bin/db-query ogm        # OGM monitoring
+   bin/db-query journal    # Journal entries
    ```
 
-   - Verify column names exist before using them
-   - Prevents errors from searching non-existent fields
+   - Use the `bin/db-query` script for ALL database queries
+   - This avoids approval prompts for sqlite3 commands
+   - For custom queries: `bin/db-query custom "SELECT ..."`
 
 4. **Check Guest Room Status**
-   - Query BOTH Airbnb/MisterB&B emails AND calendar_events
+   - Use `bin/db-query daily` which includes guest room section
    - Two rooms need tracking
    - Checkout: 12 PM, Check-in: 3 PM (prep time needed)
 

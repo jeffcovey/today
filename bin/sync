@@ -80,6 +80,7 @@ main() {
     # run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
     run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
+    run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
     
     # Task sync without classification
     SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
@@ -449,17 +450,19 @@ clean_markdown_files() {
             while IFS= read -r line; do
                 # Check if line has multiple task-id tags
                 if echo "$line" | grep -qE '<!-- task-id:.*<!-- task-id:'; then
-                    # Extract the last valid task-id (most complete one)
-                    # This regex captures the last task-id: XXXXXXX pattern and ensures proper closing
-                    LAST_TASK_ID=$(echo "$line" | grep -oE '<!-- task-id: [a-f0-9]{32}' | tail -1)
+                    # Extract the LAST task-id value (usually the most complete)
+                    # Match the pattern "task-id: [hex-string]" and get the last one
+                    LAST_TASK_ID=$(echo "$line" | grep -oE 'task-id: [a-f0-9-]+' | tail -1 | sed 's/task-id: //')
                     
                     if [[ -n "$LAST_TASK_ID" ]]; then
-                        # Remove all task-id comments and add back the last valid one
-                        CLEANED_LINE=$(echo "$line" | sed -E 's/<!-- task-id:[^>]*>//g' | sed 's/[[:space:]]*$//')
-                        echo "${CLEANED_LINE} ${LAST_TASK_ID} -->" >> "$TEMP_FILE"
+                        # Remove ALL task-id related HTML comments (complete or incomplete)
+                        # This handles both <!-- task-id: xxx --> and <!-- task-id: xxx (incomplete)
+                        CLEANED_LINE=$(echo "$line" | sed -E 's/<!-- task-id:[^-]*(--)?>?//g' | sed 's/[[:space:]]*$//')
+                        # Add back a single, properly formatted task-id
+                        echo "${CLEANED_LINE} <!-- task-id: ${LAST_TASK_ID} -->" >> "$TEMP_FILE"
                     else
                         # No valid task-id found, just clean up the malformed tags
-                        echo "$line" | sed -E 's/<!-- task-id:[^>]*>//g' | sed 's/[[:space:]]*$//' >> "$TEMP_FILE"
+                        echo "$line" | sed -E 's/<!-- task-id:[^-]*(--)?>?//g' | sed 's/[[:space:]]*$//' >> "$TEMP_FILE"
                     fi
                 else
                     echo "$line" >> "$TEMP_FILE"
@@ -500,6 +503,28 @@ clean_markdown_files() {
     
     # NOTE: No longer committing vault changes - Syncthing handles synchronization
     # Files are cleaned in-place and will sync automatically
+    
+    return 0
+}
+
+# Clean malformed task titles in database
+clean_database_task_titles() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Find and fix task titles that contain incomplete task-id comments
+    # This happens when tasks get duplicated with malformed titles
+    
+    # Count affected tasks
+    MALFORMED_COUNT=$(sqlite3 .data/today.db "SELECT COUNT(*) FROM tasks WHERE title LIKE '%<!-- task-id:%' AND title NOT LIKE '%-->';" 2>/dev/null || echo "0")
+    
+    if [[ "$MALFORMED_COUNT" -gt 0 ]]; then
+        print_info "Fixing $MALFORMED_COUNT task(s) with malformed task-id in title..."
+        
+        # Remove incomplete task-id comments from titles
+        sqlite3 .data/today.db "UPDATE tasks SET title = SUBSTR(title, 1, INSTR(title, ' <!-- task-id:') - 1) WHERE title LIKE '%<!-- task-id:%' AND title NOT LIKE '%-->';" 2>/dev/null || true
+        
+        print_info "Fixed malformed task titles in database"
+    fi
     
     return 0
 }
@@ -1641,6 +1666,7 @@ case "${1:-}" in
         # NOTE: sync_github_vault removed - using Syncthing
         cleanup_sync_conflicts
         clean_markdown_files
+        clean_database_task_titles
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
         check_task_consistency
