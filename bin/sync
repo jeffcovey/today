@@ -464,27 +464,35 @@ clean_markdown_files() {
         # Skip empty lines
         [[ -z "$file" ]] && continue
         # Check if file has malformed task-id tags (multiple on same line)
-        if grep -qE '<!-- task-id:.*<!-- task-id:' "$file" 2>/dev/null; then
+        # This matches both incomplete (<!-- task-id:.*<!-- task-id:) and complete (<!-- task-id: .* --> <!-- task-id:)
+        if grep -qE '<!-- task-id:.*<!-- task-id:' "$file" 2>/dev/null || grep -qE '<!-- task-id: [^>]+ --> <!-- task-id:' "$file" 2>/dev/null; then
             # Create temp file
             TEMP_FILE=$(mktemp)
             
             # Process each line to fix malformed task-ids
             while IFS= read -r line; do
-                # Check if line has multiple task-id tags
-                if echo "$line" | grep -qE '<!-- task-id:.*<!-- task-id:'; then
-                    # Extract the LAST task-id value (usually the most complete)
-                    # Match the pattern "task-id: [hex-string]" and get the last one
-                    LAST_TASK_ID=$(echo "$line" | grep -oE 'task-id: [a-f0-9-]+' | tail -1 | sed 's/task-id: //')
+                # Check if line has multiple task-id tags (complete or incomplete)
+                if echo "$line" | grep -qE '<!-- task-id:.*<!-- task-id:' || echo "$line" | grep -qE '<!-- task-id: [^>]+ --> <!-- task-id:'; then
+                    # Extract the LAST valid hex task-id value (32 character hex string, with or without dashes)
+                    # Only match valid hex patterns: either 32 chars without dashes or 36 chars with proper dash placement
+                    # First try to get IDs with dashes (36 chars total: 8-4-4-4-12 pattern)
+                    LAST_TASK_ID=$(echo "$line" | grep -oE 'task-id: [a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | tail -1 | sed 's/task-id: //')
+                    # If no dashed ID found, try 32-char format without dashes
+                    if [[ -z "$LAST_TASK_ID" ]]; then
+                        LAST_TASK_ID=$(echo "$line" | grep -oE 'task-id: [a-f0-9]{32}' | tail -1 | sed 's/task-id: //')
+                    fi
                     
                     if [[ -n "$LAST_TASK_ID" ]]; then
                         # Remove ALL task-id related HTML comments (complete or incomplete)
                         # This handles both <!-- task-id: xxx --> and <!-- task-id: xxx (incomplete)
-                        CLEANED_LINE=$(echo "$line" | sed -E 's/<!-- task-id:[^-]*(--)?>?//g' | sed 's/[[:space:]]*$//')
+                        # Remove any task-id comment (with any content between task-id: and -->)
+                        CLEANED_LINE=$(echo "$line" | sed -E 's/<!-- task-id: [^>]* -->//g' | sed 's/[[:space:]]*$//')
                         # Add back a single, properly formatted task-id
                         echo "${CLEANED_LINE} <!-- task-id: ${LAST_TASK_ID} -->" >> "$TEMP_FILE"
                     else
-                        # No valid task-id found, just clean up the malformed tags
-                        echo "$line" | sed -E 's/<!-- task-id:[^-]*(--)?>?//g' | sed 's/[[:space:]]*$//' >> "$TEMP_FILE"
+                        # No valid task-id found, remove ALL task-id tags (including invalid ones)
+                        # This removes any <!-- task-id: ... --> pattern
+                        echo "$line" | sed -E 's/<!-- task-id: [^>]* -->//g' | sed 's/[[:space:]]*$//' >> "$TEMP_FILE"
                     fi
                 else
                     echo "$line" >> "$TEMP_FILE"

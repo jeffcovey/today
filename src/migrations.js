@@ -1630,6 +1630,100 @@ export class MigrationManager {
           
           console.log('    Fixed spacing: single space for Waiting and Done for code compatibility');
         }
+      },
+      {
+        version: 18,
+        description: 'Add trigger to auto-correct malformed dates on insert/update',
+        fn: (db) => {
+          console.log('    Adding trigger to auto-correct malformed dates...');
+          
+          // Create triggers to validate date format (YYYY-MM-DD)
+          // Use GLOB to check for actual underscore character, not SQL LIKE wildcard
+          db.exec(`
+            CREATE TRIGGER IF NOT EXISTS fix_malformed_dates_insert
+            BEFORE INSERT ON tasks
+            FOR EACH ROW
+            WHEN NEW.do_date IS NOT NULL AND 
+                 (NEW.do_date GLOB '*_*' OR NEW.do_date NOT GLOB '????-??-??')
+            BEGIN
+              SELECT RAISE(FAIL, 'Invalid date format. Use YYYY-MM-DD format.');
+            END;
+            
+            CREATE TRIGGER IF NOT EXISTS fix_malformed_dates_update
+            BEFORE UPDATE ON tasks
+            FOR EACH ROW
+            WHEN NEW.do_date IS NOT NULL AND 
+                 (NEW.do_date GLOB '*_*' OR NEW.do_date NOT GLOB '????-??-??')
+            BEGIN
+              SELECT RAISE(FAIL, 'Invalid date format. Use YYYY-MM-DD format.');
+            END;
+          `);
+          
+          console.log('    Added triggers to prevent malformed dates from being inserted or updated');
+        }
+      },
+      {
+        version: 19,
+        description: 'Clean invalid task IDs and add constraint for valid hex IDs',
+        fn: (db) => {
+          console.log('    Cleaning invalid task IDs and adding constraints...');
+          
+          // First, delete any tasks with IDs that aren't 32-character hex strings
+          // Valid IDs should be 36 chars (32 hex + 4 dashes) in format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+          // OR 32 chars without dashes (legacy format)
+          const deleteInvalid = db.prepare(`
+            DELETE FROM tasks 
+            WHERE 
+              -- Not 36 chars with dashes or 32 chars without
+              (LENGTH(id) != 36 AND LENGTH(id) != 32)
+              -- Or contains non-hex characters (excluding dashes for the 36-char format)
+              OR (LENGTH(id) = 36 AND id NOT GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')
+              OR (LENGTH(id) = 32 AND id NOT GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')
+              -- Or contains any of the known invalid IDs
+              OR id IN ('activity-rings', 'tai-chi-watch', 'walk-steps')
+          `);
+          const deletedCount = deleteInvalid.run();
+          console.log(`    Deleted ${deletedCount.changes} tasks with invalid IDs`);
+          
+          // Create a trigger to validate task IDs on insert
+          db.exec(`
+            CREATE TRIGGER IF NOT EXISTS validate_task_id_insert
+            BEFORE INSERT ON tasks
+            FOR EACH ROW
+            BEGIN
+              SELECT CASE
+                -- Allow 36-char format with dashes (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+                WHEN LENGTH(NEW.id) = 36 AND 
+                     NEW.id GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+                THEN NULL
+                -- Allow 32-char format without dashes (legacy)
+                WHEN LENGTH(NEW.id) = 32 AND 
+                     NEW.id GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+                THEN NULL
+                ELSE RAISE(FAIL, 'Invalid task ID format. Must be 32 hex characters (with or without dashes).')
+              END;
+            END;
+            
+            CREATE TRIGGER IF NOT EXISTS validate_task_id_update
+            BEFORE UPDATE OF id ON tasks
+            FOR EACH ROW
+            BEGIN
+              SELECT CASE
+                -- Allow 36-char format with dashes
+                WHEN LENGTH(NEW.id) = 36 AND 
+                     NEW.id GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+                THEN NULL
+                -- Allow 32-char format without dashes
+                WHEN LENGTH(NEW.id) = 32 AND 
+                     NEW.id GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+                THEN NULL
+                ELSE RAISE(FAIL, 'Invalid task ID format. Must be 32 hex characters (with or without dashes).')
+              END;
+            END;
+          `);
+          
+          console.log('    Added triggers to validate task IDs on insert and update');
+        }
       }
     ];
 

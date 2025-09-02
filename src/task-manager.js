@@ -11,6 +11,136 @@ export class TaskManager {
     this.dateParser = new DateParser();
     // DO NOT recreate schema - database already exists with correct schema from Turso
     // Schema is managed by migrations and Turso sync, not by this module
+    
+    // Topic to emoji mapping
+    this.topicEmojis = {
+      // Home & Household
+      'Home/Household': '🏠',
+      'Home': '🏠',
+      'Household': '🏠',
+      'Cleaning': '🧹',
+      'Maintenance': '🔧',
+      'Repairs': '🔨',
+      
+      // Yard & Outdoor
+      'Yard/Pool/Landscaping': '🌳',
+      'Yard': '🌳',
+      'Pool': '🏊',
+      'Landscaping': '🌿',
+      'Garden': '🌱',
+      'Lawn': '🌾',
+      
+      // Finance & Business
+      'Finance': '💰',
+      'Money': '💵',
+      'Budget': '📊',
+      'Investment': '📈',
+      'Business': '💼',
+      'Work': '💼',
+      
+      // Health & Wellness
+      'Health': '🏥',
+      'Medical': '⚕️',
+      'Fitness': '💪',
+      'Exercise': '🏃',
+      'Wellness': '🧘',
+      'Mental Health': '🧠',
+      
+      // Personal & Family
+      'Personal': '👤',
+      'Family': '👨‍👩‍👧‍👦',
+      'Kids': '👶',
+      'Pets': '🐾',
+      'Relationships': '❤️',
+      
+      // Projects & Learning
+      'Projects': '📁',
+      'Learning': '📚',
+      'Education': '🎓',
+      'Study': '📖',
+      'Research': '🔬',
+      'Development': '💻',
+      'Programming': '💻',
+      'Code': '💻',
+      
+      // Admin & Organization
+      'Admin': '📋',
+      'Organization': '🗂️',
+      'Planning': '📅',
+      'Schedule': '📆',
+      'Meetings': '🤝',
+      
+      // Shopping & Errands
+      'Shopping': '🛒',
+      'Groceries': '🛒',
+      'Errands': '🚗',
+      'Travel': '✈️',
+      'Transportation': '🚌',
+      
+      // Entertainment & Hobbies
+      'Entertainment': '🎬',
+      'Hobbies': '🎨',
+      'Games': '🎮',
+      'Music': '🎵',
+      'Reading': '📚',
+      'Sports': '⚽',
+      
+      // Technology
+      'Technology': '🖥️',
+      'Tech': '🖥️',
+      'Devices': '📱',
+      'Software': '💾',
+      'Internet': '🌐',
+      
+      // Communication
+      'Email': '📧',
+      'Phone': '📞',
+      'Communication': '💬',
+      'Social': '👥',
+      
+      // Default
+      'Other': '📌',
+      'Misc': '📌',
+      'General': '📌'
+    };
+  }
+  
+  // Get emoji for a topic name
+  getTopicEmoji(topicName) {
+    // Try exact match first
+    if (this.topicEmojis[topicName]) {
+      return this.topicEmojis[topicName];
+    }
+    
+    // Try case-insensitive match
+    const lowerName = topicName.toLowerCase();
+    for (const [key, emoji] of Object.entries(this.topicEmojis)) {
+      if (key.toLowerCase() === lowerName) {
+        return emoji;
+      }
+    }
+    
+    // Try partial match (for compound topics like "Yard/Pool/Landscaping")
+    for (const [key, emoji] of Object.entries(this.topicEmojis)) {
+      if (topicName.includes(key) || key.includes(topicName)) {
+        return emoji;
+      }
+    }
+    
+    // Default emoji for unknown topics
+    return '📌';
+  }
+  
+  // Format topics as emoji string
+  formatTopicsAsEmojis(topicNames) {
+    if (!topicNames || topicNames.length === 0) {
+      return '';
+    }
+    
+    const emojis = topicNames.map(name => this.getTopicEmoji(name));
+    // Remove duplicates and join
+    const uniqueEmojis = [...new Set(emojis)];
+    return ' ' + uniqueEmojis.join('');
   }
 
   // DEPRECATED - Do not use. Schema is managed by migrations and Turso sync
@@ -635,9 +765,12 @@ export class TaskManager {
     // Check if this is a review file and extract the date
     let reviewDate = null;
     if (filePath.startsWith('vault/plans/')) {
-      const dateMatch = filePath.match(/(\d{4}_Q\d+_\d{2}_W\d{2}_\d{2})\.md$/);  
+      // Match format like 2025_Q3_09_W36_02.md
+      const dateMatch = filePath.match(/(\d{4})_Q\d+_(\d{2})_W\d{2}_(\d{2})\.md$/);  
       if (dateMatch) {
-        reviewDate = dateMatch[1];
+        // Convert to ISO format: YYYY-MM-DD
+        const [_, year, month, day] = dateMatch;
+        reviewDate = `${year}-${month}-${day}`;
       }
     }
     
@@ -667,11 +800,18 @@ export class TaskManager {
       const line = lines[i];
       // Match both normal and corrupted comment formats (em-dashes from formatters)
       // Also match "none" as a special task-id for template/routine tasks
-      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|none) [-—]+>)?$/);
+      // Accept both 32-char (legacy) and 36-char (with dashes) hex formats
+      const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}|none) [-—]+>)?$/);
       
       if (taskMatch) {
         const isCompleted = taskMatch[1] === 'x';
         let title = taskMatch[2].trim();
+        
+        // Clean up any HTML comment remnants that might have leaked into the title
+        // This can happen if there were malformed duplicate task-id comments
+        title = title.replace(/<!--.*$/g, '').trim();
+        title = title.replace(/<!-.*$/g, '').trim();
+        title = title.replace(/\s+task-id:.*$/g, '').trim();
         const existingId = taskMatch[3];
 
         // Skip tasks marked with task-id: none (template/routine tasks)
@@ -738,10 +878,11 @@ export class TaskManager {
               if (task.status !== newStatus) updates.status = newStatus;
               if (projectId && task.project_id !== projectId) updates.project_id = projectId;
               
-              // For review files, set do_date for uncompleted tasks if not already set
-              if (reviewDate && !isCompleted && !task.do_date) {
-                updates.do_date = reviewDate;
-              }
+              // DISABLED: Don't auto-assign dates from plan files
+              // Plan files are for organizing/reviewing tasks, not setting due dates
+              // if (reviewDate && !isCompleted && !task.do_date) {
+              //   updates.do_date = reviewDate;
+              // }
               
               if (Object.keys(updates).length > 0) {
                 this.updateTask(taskId, updates);
@@ -762,12 +903,14 @@ export class TaskManager {
               project_id: projectId
             };
             
-            // Set do_date from extracted date tag, review date, or neither
-            if (extractedDate && !reviewDate) {
+            // Set do_date from extracted date tag only (not from plan file names)
+            if (extractedDate) {
               taskData.do_date = extractedDate;
-            } else if (reviewDate && !isCompleted) {
-              taskData.do_date = reviewDate;
             }
+            // DISABLED: Don't auto-assign dates from plan file names
+            // else if (reviewDate && !isCompleted) {
+            //   taskData.do_date = reviewDate;
+            // }
             
             // Insert with specific ID
             this.db.prepare(`
@@ -803,7 +946,8 @@ export class TaskManager {
           }
           
           // Add task ID to the line (strip any corrupted comments first)
-          const cleanLine = line.replace(/<![-—]+ task-id: [a-f0-9]{32} [-—]+>/g, '');
+          // Match both 32-char and 36-char formats
+          const cleanLine = line.replace(/<![-—]+ task-id: ([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}) [-—]+>/g, '');
           lines[i] = `${cleanLine} <!-- task-id: ${taskId} -->`;
           updates.push({ line: i, content: lines[i] });
         }
@@ -963,7 +1107,7 @@ export class TaskManager {
         for (const task of sortedTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
-          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          const topicStr = this.formatTopicsAsEmojis(topics);
           const statusIcon = this.getStatusIcon(task.status);
           const iconPrefix = statusIcon ? `${statusIcon} ` : '';
           lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
@@ -983,7 +1127,7 @@ export class TaskManager {
         for (const task of sortedNoDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
-          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          const topicStr = this.formatTopicsAsEmojis(topics);
           const statusIcon = this.getStatusIcon(task.status);
           const iconPrefix = statusIcon ? `${statusIcon} ` : '';
           lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
@@ -1018,7 +1162,7 @@ export class TaskManager {
         for (const task of sortedTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
-          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          const topicStr = this.formatTopicsAsEmojis(topics);
           const statusIcon = this.getStatusIcon(task.status);
           const iconPrefix = statusIcon ? `${statusIcon} ` : '';
           lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
@@ -1038,7 +1182,7 @@ export class TaskManager {
         for (const task of sortedNoDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
-          const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
+          const topicStr = this.formatTopicsAsEmojis(topics);
           const statusIcon = this.getStatusIcon(task.status);
           const iconPrefix = statusIcon ? `${statusIcon} ` : '';
           lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
@@ -1084,27 +1228,56 @@ export class TaskManager {
       // File doesn't exist yet, continue with generation
     }
 
-    // Get today's date
+    // Get today's date in both formats
     const today = new Date().toISOString().split('T')[0];
+    const todayParts = today.split('-');
+    const year = todayParts[0];
+    const month = todayParts[1];
+    const day = todayParts[2];
+    const quarter = Math.ceil(parseInt(month) / 3);
+    const weekOfYear = Math.ceil((new Date() - new Date(year + '-01-01')) / (7 * 24 * 60 * 60 * 1000));
+    const todayAlt = `${year}_Q${quarter}_${month}_W${weekOfYear}_${day}`;
     
     // Get overdue tasks (before today, not done)
+    // Handle both date formats
     const overdueTasks = this.db.prepare(`
       SELECT * FROM tasks 
-      WHERE do_date < ?
+      WHERE (do_date < ? OR do_date < ?)
+        AND do_date IS NOT NULL
         AND status != '✅ Done'
       ORDER BY do_date ASC, status ASC
-    `).all(today).map(task => ({
+    `).all(today, todayAlt).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
     
     // Get active tasks for today (not done, not overdue)
+    // Handle both date formats
     const activeTasks = this.db.prepare(`
       SELECT * FROM tasks 
-      WHERE do_date = ?
+      WHERE (do_date = ? OR do_date = ?)
         AND status != '✅ Done'
       ORDER BY do_date ASC, status ASC
-    `).all(today).map(task => ({
+    `).all(today, todayAlt).map(task => ({
+      ...task,
+      topics: this.getTaskTopics(task.id)
+    }));
+    
+    // Get high-priority tasks without dates (1st and 2nd priority)
+    const priorityTasksWithoutDates = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE do_date IS NULL
+        AND status IN ('1️⃣  1st Priority', '2️⃣  2nd Priority', '🎭 Stage')
+      ORDER BY 
+        CASE status
+          WHEN '1️⃣  1st Priority' THEN 1
+          WHEN '2️⃣  2nd Priority' THEN 2
+          WHEN '🎭 Stage' THEN 3
+          ELSE 4
+        END,
+        updated_at DESC
+      LIMIT 50
+    `).all().map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
@@ -1177,7 +1350,7 @@ export class TaskManager {
         );
         
         for (const task of sortedTasks) {
-          const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+          const topics = this.formatTopicsAsEmojis(task.topics);
           const statusIcon = this.getStatusIcon(task.status);
           const iconPrefix = statusIcon ? `${statusIcon} ` : '';
           lines.push(`- [ ] ${iconPrefix}${task.title}${topics} <!-- task-id: ${task.id} -->`);
@@ -1186,9 +1359,10 @@ export class TaskManager {
       }
     }
 
-    // Group tasks by status
+    // Group tasks by status (combine today's tasks and priority tasks without dates)
     const tasksByStatus = {};
-    for (const task of activeTasks) {
+    const allActiveTasks = [...activeTasks, ...priorityTasksWithoutDates];
+    for (const task of allActiveTasks) {
       const status = task.status || '🎭 Stage';
       if (!tasksByStatus[status]) {
         tasksByStatus[status] = [];
@@ -1224,7 +1398,7 @@ export class TaskManager {
       );
       
       for (const task of sortedTasks) {
-        const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+        const topics = this.formatTopicsAsEmojis(task.topics);
         const statusIcon = this.getStatusIcon(task.status);
         const iconPrefix = statusIcon ? `${statusIcon} ` : '';
         lines.push(`- [ ] ${iconPrefix}${task.title}${topics} <!-- task-id: ${task.id} -->`);
@@ -1238,7 +1412,7 @@ export class TaskManager {
       lines.push(`<summary><strong>✅ Done Today</strong> (${completedTasks.length} tasks completed)</summary>`);
       lines.push('');
       for (const task of completedTasks) {
-        const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
+        const topics = this.formatTopicsAsEmojis(task.topics);
         lines.push(`- [x] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
       }
       lines.push('');
