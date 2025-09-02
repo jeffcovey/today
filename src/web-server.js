@@ -2315,6 +2315,20 @@ async function renderMarkdownUncached(filePath, urlPath) {
     }
   );
   
+  // Make tasks with IDs clickable - wrap the task text in a link
+  htmlContent = htmlContent.replace(
+    /<li>(.*?)(<input[^>]*data-task-id="([a-f0-9]{32})"[^>]*>)(.*?)<!-- task-id: ([a-f0-9]{32}) --><\/li>/gi,
+    (match, before, checkbox, taskId1, taskContent, taskId2) => {
+      // Extract the task text (remove status icons if present)
+      let cleanTaskContent = taskContent.trim();
+      
+      // Create a link around the task text, but not the checkbox
+      return `<li>${before}${checkbox} <a href="/task/${taskId1}" style="text-decoration: none; color: inherit;" 
+                onmouseover="this.style.textDecoration='underline'" 
+                onmouseout="this.style.textDecoration='none'">${cleanTaskContent}</a><!-- task-id: ${taskId2} --></li>`;
+    }
+  );
+  
   const fileName = pageTitle || path.basename(urlPath);
   
   // Build breadcrumb
@@ -3857,6 +3871,249 @@ app.post('/save/*path', async (req, res) => {
   } catch (error) {
     console.error('Error saving file:', error);
     res.status(500).json({ success: false, message: 'Failed to save file' });
+  }
+});
+
+// Task detail/edit page route
+app.get('/task/:taskId', authMiddleware, async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    const task = taskManager.getTask(taskId);
+    
+    if (!task) {
+      return res.status(404).send('Task not found');
+    }
+    
+    // Get all projects and topics for dropdowns
+    const projects = taskManager.db.prepare('SELECT id, name FROM projects ORDER BY name').all();
+    const topics = taskManager.db.prepare('SELECT id, name FROM topics ORDER BY name').all();
+    
+    // Build the task editing UI
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <title>Edit Task: ${task.title}</title>
+        ${pageStyle}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <style>
+          .form-label { font-weight: 500; margin-bottom: 0.5rem; }
+          .form-control, .form-select { margin-bottom: 1rem; }
+          .task-form { max-width: 800px; margin: 0 auto; }
+        </style>
+      </head>
+      <body>
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+              <i class="fas fa-tasks me-2"></i>Task Editor
+            </a>
+          </div>
+        </nav>
+
+        <div class="container mt-4">
+          <div class="task-form">
+            <div class="card shadow-sm">
+              <div class="card-header bg-white">
+                <h4 class="mb-0">
+                  <i class="fas fa-edit me-2"></i>Edit Task
+                </h4>
+              </div>
+              <div class="card-body">
+                <form id="taskForm">
+                  <!-- Title -->
+                  <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" id="title" name="title" 
+                           value="${task.title.replace(/"/g, '&quot;')}" required>
+                  </div>
+                  
+                  <!-- Description -->
+                  <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <input type="text" class="form-control" id="description" name="description" 
+                           value="${(task.description || '').replace(/"/g, '&quot;')}">
+                  </div>
+                  
+                  <!-- Content -->
+                  <div class="mb-3">
+                    <label for="content" class="form-label">Content</label>
+                    <textarea class="form-control" id="content" name="content" rows="5">${task.content || ''}</textarea>
+                  </div>
+                  
+                  <!-- Due Date -->
+                  <div class="mb-3">
+                    <label for="do_date" class="form-label">Due Date</label>
+                    <input type="text" class="form-control" id="do_date" name="do_date" 
+                           value="${task.do_date || ''}" placeholder="Click to select date">
+                  </div>
+                  
+                  <!-- Status -->
+                  <div class="mb-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                      <option value="🗂️ To File" ${task.status === '🗂️ To File' ? 'selected' : ''}>🗂️ To File</option>
+                      <option value="1️⃣  1st Priority" ${task.status === '1️⃣  1st Priority' ? 'selected' : ''}>1️⃣ 1st Priority</option>
+                      <option value="2️⃣  2nd Priority" ${task.status === '2️⃣  2nd Priority' ? 'selected' : ''}>2️⃣ 2nd Priority</option>
+                      <option value="3️⃣  3rd Priority" ${task.status === '3️⃣  3rd Priority' ? 'selected' : ''}>3️⃣ 3rd Priority</option>
+                      <option value="🤔 Waiting" ${task.status === '🤔 Waiting' ? 'selected' : ''}>🤔 Waiting</option>
+                      <option value="⏸️  Paused" ${task.status === '⏸️  Paused' ? 'selected' : ''}>⏸️ Paused</option>
+                      <option value="✅ Done" ${task.status === '✅ Done' ? 'selected' : ''}>✅ Done</option>
+                    </select>
+                  </div>
+                  
+                  <!-- Stage -->
+                  <div class="mb-3">
+                    <label for="stage" class="form-label">Stage</label>
+                    <select class="form-select" id="stage" name="stage">
+                      <option value="">No Stage</option>
+                      <option value="Front Stage" ${task.stage === 'Front Stage' ? 'selected' : ''}>Front Stage</option>
+                      <option value="Back Stage" ${task.stage === 'Back Stage' ? 'selected' : ''}>Back Stage</option>
+                      <option value="Off Stage" ${task.stage === 'Off Stage' ? 'selected' : ''}>Off Stage</option>
+                    </select>
+                  </div>
+                  
+                  <!-- Project -->
+                  <div class="mb-3">
+                    <label for="project_id" class="form-label">Project</label>
+                    <select class="form-select" id="project_id" name="project_id">
+                      <option value="">No Project</option>
+                      ${projects.map(p => `
+                        <option value="${p.id}" ${task.project_id === p.id ? 'selected' : ''}>${p.name}</option>
+                      `).join('')}
+                    </select>
+                  </div>
+                  
+                  <!-- Topics -->
+                  <div class="mb-3">
+                    <label for="topics" class="form-label">Topics</label>
+                    <select class="form-select" id="topics" name="topics" multiple>
+                      ${topics.map(t => `
+                        <option value="${t.name}" ${task.topics && task.topics.includes(t.name) ? 'selected' : ''}>${t.name}</option>
+                      `).join('')}
+                    </select>
+                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+                  </div>
+                  
+                  <!-- Repeat Interval -->
+                  <div class="mb-3">
+                    <label for="repeat_interval" class="form-label">Repeat Interval (days)</label>
+                    <input type="number" class="form-control" id="repeat_interval" name="repeat_interval" 
+                           value="${task.repeat_interval || ''}" min="0" placeholder="Leave empty for no repeat">
+                  </div>
+                  
+                  <!-- Buttons -->
+                  <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-save me-2"></i>Save Changes
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                      <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            
+            <!-- Task Info -->
+            <div class="card mt-3 shadow-sm">
+              <div class="card-body">
+                <small class="text-muted">
+                  <div>Task ID: ${task.id}</div>
+                  <div>Created: ${new Date(task.created_at).toLocaleString()}</div>
+                  <div>Updated: ${new Date(task.updated_at).toLocaleString()}</div>
+                  ${task.completed_at ? `<div>Completed: ${new Date(task.completed_at).toLocaleString()}</div>` : ''}
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scripts -->
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+        <script>
+          // Initialize date picker
+          flatpickr("#do_date", {
+            dateFormat: "Y-m-d",
+            allowInput: true
+          });
+          
+          // Handle form submission
+          document.getElementById('taskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {};
+            
+            // Process form data
+            for (let [key, value] of formData.entries()) {
+              if (key === 'topics') {
+                // Handle multiple topics
+                if (!data.topics) data.topics = [];
+                data.topics.push(value);
+              } else {
+                data[key] = value || null;
+              }
+            }
+            
+            // Handle empty values
+            if (data.stage === '') data.stage = null;
+            if (data.project_id === '') data.project_id = null;
+            if (data.repeat_interval === '') data.repeat_interval = null;
+            
+            try {
+              const response = await fetch('/task/${taskId}/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+              });
+              
+              if (response.ok) {
+                // Show success message
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+                alert.style.zIndex = '9999';
+                alert.innerHTML = '<i class="fas fa-check-circle me-2"></i>Task updated successfully!';
+                document.body.appendChild(alert);
+                
+                setTimeout(() => {
+                  alert.remove();
+                  window.history.back();
+                }, 1500);
+              } else {
+                throw new Error('Failed to update task');
+              }
+            } catch (error) {
+              alert('Error updating task: ' + error.message);
+            }
+          });
+        </script>
+      </body>
+      </html>
+    `;
+    
+    res.send(html);
+  } catch (error) {
+    console.error('Error loading task:', error);
+    res.status(500).send('Internal server error');
+  }
+});
+
+// Task update route
+app.post('/task/:taskId/update', authMiddleware, async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    const updates = req.body;
+    
+    // Update the task
+    taskManager.updateTask(taskId, updates);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    res.status(500).json({ error: 'Failed to update task' });
   }
 });
 
