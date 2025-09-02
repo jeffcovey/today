@@ -36,7 +36,7 @@ describe('TaskManager', () => {
     test('should create a task', () => {
       const taskData = {
         title: 'Test task',
-        status: '🎭 Stage',
+        status: '🗂️ To File',
         do_date: '2025-08-16'
       };
       
@@ -46,7 +46,7 @@ describe('TaskManager', () => {
       
       const task = taskManager.getTask(taskId);
       expect(task.title).toBe('Test task');
-      expect(task.status).toBe('🎭 Stage');
+      expect(task.status).toBe('🗂️ To File');
       expect(task.do_date).toBe('2025-08-16');
     });
 
@@ -83,7 +83,7 @@ describe('TaskManager', () => {
     });
 
     test('should get active tasks', () => {
-      taskManager.createTask({ title: 'Active 1', status: '🎭 Stage' });
+      taskManager.createTask({ title: 'Active 1', status: '🗂️ To File' });
       taskManager.createTask({ title: 'Active 2', status: 'Next Up' });
       taskManager.createTask({ title: 'Done', status: '✅ Done' });
       
@@ -223,11 +223,11 @@ describe('TaskManager', () => {
       const today = new Date().toISOString().split('T')[0];
       taskManager.createTask({ title: 'Critical task', status: '🔥 Immediate', do_date: today });
       taskManager.createTask({ title: 'High priority', status: '🚀 1st Priority', do_date: today });
-      taskManager.createTask({ title: 'Medium priority', status: '🎭 Stage', do_date: today });
+      taskManager.createTask({ title: 'Medium priority', status: '🗂️ To File', do_date: today });
       taskManager.createTask({ title: 'Low priority', status: '⏳ Waiting', do_date: today });
       
       // Create and mark task as done to set completed_at properly
-      const doneTaskId = taskManager.createTask({ title: 'Done task', status: '🎭 Stage' });
+      const doneTaskId = taskManager.createTask({ title: 'Done task', status: '🗂️ To File' });
       taskManager.updateTask(doneTaskId, { status: '✅ Done' });
       
       const outputPath = `${tempDir}/today.md`;

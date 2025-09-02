@@ -90,7 +90,7 @@ async function importSpecificTask(notionId) {
     
     const props = page.properties;
     const title = extractTitle(page);
-    const status = props.Status?.status?.name || '🎭 Stage';
+    const status = props.Status?.status?.name || '🗂️ To File';
     const doDate = props['Do Date']?.date?.start || null;
     const repeatDays = props['Repeat Every (Days)']?.number || null;
     const content = props.Description?.rich_text?.map(t => t.plain_text).join('') || '';

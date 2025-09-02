@@ -77,7 +77,7 @@ export class MigrationManager {
                 description TEXT,
                 content TEXT,
                 do_date DATE,
-                status TEXT DEFAULT '🎭 Stage',
+                status TEXT DEFAULT '🗂️ To File',
                 stage TEXT CHECK(stage IS NULL OR stage IN ('Front Stage', 'Back Stage', 'Off Stage')),
                 project_id TEXT,
                 repeat_interval INTEGER,
@@ -1723,6 +1723,126 @@ export class MigrationManager {
           `);
           
           console.log('    Added triggers to validate task IDs on insert and update');
+        }
+      },
+      {
+        version: 20,
+        description: 'Clean emoji prefixes from task titles',
+        fn: (db) => {
+          console.log('Migration v20: Cleaning emoji prefixes from task titles');
+          
+          // Define all status emojis that might be prefixed in titles
+          const statusEmojis = [
+            '🎭', '🗂️', '1️⃣', '2️⃣', '3️⃣', '📋', '✅', '⏳', '🔄', '❌', '✉️', '**'
+          ];
+          
+          // First, let's see what we're dealing with
+          const tasksWithEmojis = db.prepare(`
+            SELECT id, title, status 
+            FROM tasks 
+            WHERE title LIKE '%🎭%' OR title LIKE '%🗂️%' 
+               OR title LIKE '%1️⃣%' OR title LIKE '%2️⃣%' OR title LIKE '%3️⃣%'
+               OR title LIKE '%📋%' OR title LIKE '%✅%' 
+               OR title LIKE '%⏳%' OR title LIKE '%🔄%' OR title LIKE '%❌%'
+               OR title LIKE '%✉️%'
+          `).all();
+          
+          console.log(`    Found ${tasksWithEmojis.length} tasks with potential emoji prefixes`);
+          
+          const updateTitle = db.prepare('UPDATE tasks SET title = ? WHERE id = ?');
+          let updatedCount = 0;
+          
+          for (const task of tasksWithEmojis) {
+            let cleanTitle = task.title;
+            
+            // Remove leading status emojis and whitespace
+            // Keep removing emojis from the start until none are left
+            let previousTitle;
+            do {
+              previousTitle = cleanTitle;
+              for (const emoji of statusEmojis) {
+                if (cleanTitle.startsWith(emoji)) {
+                  cleanTitle = cleanTitle.substring(emoji.length).trim();
+                }
+              }
+            } while (cleanTitle !== previousTitle);
+            
+            // Also clean up any "**" markdown bold markers that might be left
+            if (cleanTitle.startsWith('**') && cleanTitle.includes('**', 2)) {
+              // Extract content between ** markers
+              const endIndex = cleanTitle.indexOf('**', 2);
+              const boldContent = cleanTitle.substring(2, endIndex);
+              const afterBold = cleanTitle.substring(endIndex + 2).trim();
+              cleanTitle = boldContent + (afterBold ? ' - ' + afterBold : '');
+            }
+            
+            // Clean up trailing "DONE" markers
+            cleanTitle = cleanTitle.replace(/\s*✅\s*DONE\s*-?\s*/gi, '');
+            cleanTitle = cleanTitle.replace(/\s*\bDONE\b\s*$/i, '');
+            
+            if (cleanTitle !== task.title) {
+              console.log(`      Updating task ${task.id.substring(0, 8)}...`);
+              console.log(`        From: "${task.title}"`);
+              console.log(`        To:   "${cleanTitle}"`);
+              updateTitle.run(cleanTitle, task.id);
+              updatedCount++;
+            }
+          }
+          
+          console.log(`    Updated ${updatedCount} task titles`);
+        }
+      },
+      
+      {
+        version: 21,
+        description: 'Fix invalid date strings - convert "null" string to actual NULL',
+        fn: (db) => {
+          console.log('Migration v21: Fixing invalid date strings');
+          
+          // Convert string 'null' to actual NULL
+          const result = db.prepare(`
+            UPDATE tasks 
+            SET do_date = NULL 
+            WHERE do_date = 'null' 
+               OR do_date = 'undefined'
+               OR do_date = ''
+               OR (do_date IS NOT NULL AND LENGTH(TRIM(do_date)) = 0)
+          `).run();
+          
+          console.log(`    Fixed ${result.changes} invalid date strings`);
+          
+          // Also fix any invalid date formats that don't match YYYY-MM-DD
+          const invalidDates = db.prepare(`
+            SELECT id, do_date FROM tasks 
+            WHERE do_date IS NOT NULL 
+              AND do_date != ''
+              AND (
+                LENGTH(do_date) != 10 
+                OR do_date NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+                OR SUBSTR(do_date, 5, 1) != '-'
+                OR SUBSTR(do_date, 8, 1) != '-'
+              )
+          `).all();
+          
+          console.log(`    Found ${invalidDates.length} tasks with invalid date formats`);
+          
+          // Convert any malformed dates to NULL
+          if (invalidDates.length > 0) {
+            const fixMalformed = db.prepare(`
+              UPDATE tasks 
+              SET do_date = NULL 
+              WHERE do_date IS NOT NULL 
+                AND do_date != ''
+                AND (
+                  LENGTH(do_date) != 10 
+                  OR do_date NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+                  OR SUBSTR(do_date, 5, 1) != '-'
+                  OR SUBSTR(do_date, 8, 1) != '-'
+                )
+            `).run();
+            
+            console.log(`    Fixed ${fixMalformed.changes} malformed dates`);
+          }
         }
       }
     ];

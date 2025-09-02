@@ -370,22 +370,12 @@ program
           5: '🔴', 4: '🟠', 3: '🟡', 2: '🔵', 1: '⚪'
         };
         const statusDisplay = {
-          '🎭 Stage': '🎭',
-          '🔥 Immediate': '🔥',
-          '📅 Scheduled': '📅',
-          '🚀 1st Priority': '🚀1',
-          '2nd Priority': '2️⃣',
-          '3rd Priority': '3️⃣',
-          '4th Priority': '4️⃣',
-          '5th Priority': '5️⃣',
-          '💭 Remember': '💭',
-          '⚡ Quick': '⚡',
-          '🚘 Errand': '🚘',
-          'Active': '🔵',
-          'In progress': '🏃',
-          'Next Up': '⏭️',
-          'Waiting': '⏸️',
-          'Paused': '⏸️',
+          '🗂️ To File': '🗂️',
+          '1️⃣  1st Priority': '1️⃣',
+          '2️⃣  2nd Priority': '2️⃣',
+          '3️⃣  3rd Priority': '3️⃣',
+          '🤔 Waiting': '🤔',
+          '⏸️  Paused': '⏸️',
           '✅ Done': '✅'
         };
         
@@ -417,22 +407,12 @@ program
 
       // Status abbreviations for compact display
       const statusDisplay = {
-        '🎭 Stage': '🎭',
-        '🔥 Immediate': '🔥',
-        '📅 Scheduled': '📅',
-        '🚀 1st Priority': '1️⃣',
-        '2nd Priority': '2️⃣',
-        '3rd Priority': '3️⃣',
-        '4th Priority': '4️⃣',
-        '5th Priority': '5️⃣',
-        '💭 Remember': '💭',
-        '⚡ Quick': '⚡',
-        '🚘 Errand': '🚘',
-        'Active': '🏃',
-        'In progress': '🏃',
-        'Next Up': '⏭️',
-        'Waiting': '⏸️',
-        'Paused': '⏸️',
+        '🗂️ To File': '🗂️',
+        '1️⃣  1st Priority': '1️⃣',
+        '2️⃣  2nd Priority': '2️⃣',
+        '3️⃣  3rd Priority': '3️⃣',
+        '🤔 Waiting': '🤔',
+        '⏸️  Paused': '⏸️',
         '✅ Done': '✅'
       };
 
@@ -484,7 +464,7 @@ program
   .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
   .option('-p, --priority <1-5>', 'Set priority (1-5)', '3')
   .option('-t, --topics <topics>', 'Add topics (comma-separated)')
-  .option('-s, --status <status>', 'Set status', '🎭 Stage')
+  .option('-s, --status <status>', 'Set status', '🗂️  To File')
   .option('--stage <stage>', 'Set stage (Front Stage, Back Stage, Off Stage)')
   .option('--project <name>', 'Assign to project')
   .action((title, options) => {
@@ -1072,7 +1052,7 @@ program
       
       // Update database
       for (const task of inconsistentTasks) {
-        const newStatus = task.shouldBeCompleted ? '✅ Done' : '🎭 Stage';
+        const newStatus = task.shouldBeCompleted ? '✅ Done' : '🗂️ To File';
         tm.updateTask(task.id, { status: newStatus });
         if (options.verbose) {
           console.log(chalk.green(`  ✓ Updated ${task.title.substring(0, 50)}... to ${newStatus}`));

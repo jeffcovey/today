@@ -159,7 +159,7 @@ export class TaskManager {
         description TEXT,
         content TEXT,
         do_date DATE,
-        status TEXT DEFAULT '🎭 Stage',
+        status TEXT DEFAULT '🗂️ To File',
         stage TEXT CHECK(stage IS NULL OR stage IN ('Front Stage', 'Back Stage', 'Off Stage')),
         project_id TEXT,
         repeat_interval INTEGER,
@@ -275,7 +275,7 @@ export class TaskManager {
       data.description || null,
       data.content || null,
       data.do_date || null,
-      data.status || '🎭 Stage',
+      data.status || '🗂️ To File',
       data.stage || null,
       data.project_id || null,
       data.repeat_interval || null,
@@ -899,7 +899,7 @@ export class TaskManager {
             const taskData = {
               id: taskId,  // Use the existing ID
               title,
-              status: isCompleted ? '✅ Done' : '🎭 Stage',
+              status: isCompleted ? '✅ Done' : '🗂️ To File',
               project_id: projectId
             };
             
@@ -927,7 +927,7 @@ export class TaskManager {
           // No existing ID - create new task
           const taskData = {
             title,
-            status: isCompleted ? '✅ Done' : '🎭 Stage',
+            status: isCompleted ? '✅ Done' : '🗂️ To File',
             project_id: projectId
           };
           
@@ -1263,20 +1263,21 @@ export class TaskManager {
       topics: this.getTaskTopics(task.id)
     }));
     
-    // Get high-priority tasks without dates (1st and 2nd priority)
+    // Get high-priority tasks without dates (1st, 2nd, and 3rd priority ONLY)
+    // Do NOT include '🗂️ To File' tasks - they should not appear in today.md without a date
     const priorityTasksWithoutDates = this.db.prepare(`
       SELECT * FROM tasks 
       WHERE do_date IS NULL
-        AND status IN ('1️⃣  1st Priority', '2️⃣  2nd Priority', '🎭 Stage')
+        AND status IN ('1️⃣  1st Priority', '2️⃣  2nd Priority', '3️⃣  3rd Priority')
       ORDER BY 
         CASE status
           WHEN '1️⃣  1st Priority' THEN 1
           WHEN '2️⃣  2nd Priority' THEN 2
-          WHEN '🎭 Stage' THEN 3
+          WHEN '3️⃣  3rd Priority' THEN 3
           ELSE 4
         END,
         updated_at DESC
-      LIMIT 50
+      LIMIT 20
     `).all().map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
@@ -1336,8 +1337,21 @@ export class TaskManager {
       const sortedDates = Object.keys(overdueByDate).sort();
       
       for (const date of sortedDates) {
+        // Validate date before processing
+        if (!date || date === 'null' || date === 'undefined' || date === '') {
+          console.warn(`Skipping invalid date: '${date}'`);
+          continue;
+        }
+        
         // Format date nicely
         const dateObj = new Date(date + 'T00:00:00');
+        
+        // Check if date is valid
+        if (isNaN(dateObj.getTime())) {
+          console.warn(`Skipping malformed date: '${date}'`);
+          continue;
+        }
+        
         const daysDiff = Math.floor((new Date(today) - dateObj) / (1000 * 60 * 60 * 24));
         const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
         const daysAgoStr = daysDiff === 1 ? '1 day ago' : `${daysDiff} days ago`;
@@ -1363,7 +1377,7 @@ export class TaskManager {
     const tasksByStatus = {};
     const allActiveTasks = [...activeTasks, ...priorityTasksWithoutDates];
     for (const task of allActiveTasks) {
-      const status = task.status || '🎭 Stage';
+      const status = task.status || '🗂️ To File';
       if (!tasksByStatus[status]) {
         tasksByStatus[status] = [];
       }
@@ -1456,7 +1470,7 @@ export class TaskManager {
           title: task.title,
           description: task.description,
           do_date: nextDate,  // This will be the future date (e.g., 7 days from completion)
-          status: '🎭 Stage',
+          status: '🗂️ To File',
           stage: null,
           project_id: task.project_id,
           repeat_interval: task.repeat_interval,
@@ -1669,8 +1683,8 @@ export class TaskManager {
         return 5; // Critical priority
       case '🚀 1st Priority':
         return 4; // High priority
-      case '🎭 Stage':
-        return 3; // Medium priority
+      case '🗂️ To File':
+        return 2; // Low priority
       case '3rd Priority':
         return 3; // Medium priority
       case 'Waiting':
