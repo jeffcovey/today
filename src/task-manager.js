@@ -1701,7 +1701,7 @@ export class TaskManager {
     return order[status] || 99;
   }
 
-  close() {
-    this.db.close();
+  async close() {
+    await this.db.close();
   }
 }

@@ -619,11 +619,12 @@ program
           console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
         }
       }
+      await classifier.close();
+      process.exit(0);
     } catch (error) {
       console.error(chalk.red('Error classifying stages:'), error.message);
+      await classifier.close();
       process.exit(1);
-    } finally {
-      classifier.close();
     }
   });
 
@@ -655,11 +656,12 @@ program
           console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
         }
       }
+      await classifier.close();
+      process.exit(0);
     } catch (error) {
       console.error(chalk.red('Error assigning topics:'), error.message);
+      await classifier.close();
       process.exit(1);
-    } finally {
-      classifier.close();
     }
   });
 
@@ -684,12 +686,12 @@ program
         }
       }
       
+      await classifier.close();
       process.exit(0);
     } catch (error) {
       console.error(chalk.red('Error prioritizing tasks:'), error.message);
+      await classifier.close();
       process.exit(1);
-    } finally {
-      classifier.close();
     }
   });
 

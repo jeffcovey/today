@@ -41,14 +41,14 @@ export class TaskStatusClassifier {
 
       const prompt = `Analyze these tasks currently in "To File" status and assign each to an appropriate priority status.
 
-Available statuses (use EXACTLY these values):
+You MUST choose from EXACTLY these 5 statuses (including the emoji and spacing):
 - "1️⃣  1st Priority" - Urgent and important tasks that need immediate attention (health, pets, finances, critical fixes)
 - "2️⃣  2nd Priority" - Important but less urgent (maintenance, planning, optimization)
 - "3️⃣  3rd Priority" - Nice to have, routine tasks (entertainment, grooming, reference items)
 - "🤔 Waiting" - Tasks blocked waiting for external input or confirmation
 - "⏸️  Paused" - Tasks intentionally deferred or for future activation (like packing lists)
 
-DO NOT use "✅ Done" - we are prioritizing unfinished tasks only.
+IMPORTANT: Do NOT use "✅ Done" or "🗂️  To File" or any other status. Every task MUST be assigned to one of the 5 statuses above.
 
 Consider:
 - Financial obligations and deadlines → 1st Priority
@@ -79,7 +79,8 @@ ${JSON.stringify(taskList, null, 2)}`;
         // Extract JSON from response
         const jsonMatch = result.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
-          const classifications = JSON.parse(jsonMatch[0]);
+          try {
+            const classifications = JSON.parse(jsonMatch[0]);
           
           // Apply classifications immediately
           for (const classification of classifications) {
@@ -114,6 +115,15 @@ ${JSON.stringify(taskList, null, 2)}`;
               totalFailed++;
             }
           }
+          } catch (parseError) {
+            console.error(`  Failed to parse JSON:`, parseError.message);
+            console.error(`  JSON string was:`, jsonMatch[0].substring(0, 200));
+            totalFailed += batch.length;
+          }
+        } else {
+          console.error(`  No JSON array found in Claude response`);
+          console.error(`  Response preview:`, result.substring(0, 200));
+          totalFailed += batch.length;
         }
       } catch (error) {
         console.error(`  Failed to classify batch:`, error.message);
@@ -165,7 +175,7 @@ ${JSON.stringify(taskList, null, 2)}`;
     const result = await this.classifyWithClaude(tasks, verbose);
 
     // Show summary by status
-    if (verbose && classified > 0) {
+    if (verbose && result.classified > 0) {
       const statusCounts = this.db.prepare(`
         SELECT status, COUNT(*) as count 
         FROM tasks 
@@ -189,11 +199,14 @@ ${JSON.stringify(taskList, null, 2)}`;
       }
     }
 
-    return { classified, failed };
+    return result;
   }
 
-  close() {
-    // Database connection is managed by database-service.js
+  async close() {
+    // Close the database connection
+    if (this.db && this.db.close) {
+      await this.db.close();
+    }
   }
 }
 
@@ -206,17 +219,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const verbose = args.includes('-v') || args.includes('--verbose');
   
   classifier.classifyTasks(verbose)
-    .then(result => {
+    .then(async result => {
       console.log(`\n✓ Prioritized ${result.classified} tasks from "To File" status`);
       if (result.failed > 0) {
         console.log(`✗ Failed to classify ${result.failed} tasks`);
       }
-      classifier.close();
-      process.exit(0);
+      await classifier.close();
+      // Force exit to ensure all timers are cleared
+      setTimeout(() => process.exit(0), 100);
     })
-    .catch(error => {
+    .catch(async error => {
       console.error('Error:', error.message);
-      classifier.close();
-      process.exit(1);
+      await classifier.close();
+      // Force exit to ensure all timers are cleared
+      setTimeout(() => process.exit(1), 100);
     });
 }

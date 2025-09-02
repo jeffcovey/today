@@ -202,9 +202,11 @@ ${JSON.stringify(taskList, null, 2)}`;
     return result;
   }
 
-  close() {
-    // Database connection is managed by database-service.js
-    // No need to explicitly close
+  async close() {
+    // Close the database connection
+    if (this.db && this.db.close) {
+      await this.db.close();
+    }
   }
 }
 
@@ -218,17 +220,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const verbose = args.includes('-v') || args.includes('--verbose');
   
   classifier.classifyTasks(!forceAll, verbose)
-    .then(result => {
+    .then(async result => {
       console.log(`\n✓ Assigned topics to ${result.classified} tasks`);
       if (result.failed > 0) {
         console.log(`✗ Failed to classify ${result.failed} tasks`);
       }
-      classifier.close();
-      process.exit(0);
+      await classifier.close();
+      // Force exit to ensure all timers are cleared
+      setTimeout(() => process.exit(0), 100);
     })
-    .catch(error => {
+    .catch(async error => {
       console.error('Error:', error.message);
-      classifier.close();
-      process.exit(1);
+      await classifier.close();
+      // Force exit to ensure all timers are cleared
+      setTimeout(() => process.exit(1), 100);
     });
 }

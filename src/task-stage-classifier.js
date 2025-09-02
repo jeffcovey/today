@@ -261,15 +261,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const forceAll = args.includes('--all');
   
-  classifier.classifyTasks(!forceAll).then(result => {
+  classifier.classifyTasks(!forceAll).then(async result => {
     console.log(`\n✓ Classified ${result.classified} tasks`);
     if (result.failed > 0) {
       console.log(`✗ Failed to classify ${result.failed} tasks`);
     }
-    classifier.close();
-  }).catch(err => {
+    await classifier.close();
+    // Force exit to ensure all timers are cleared
+    setTimeout(() => process.exit(0), 100);
+  }).catch(async err => {
     console.error('Error:', err);
-    classifier.close();
-    process.exit(1);
+    await classifier.close();
+    // Force exit to ensure all timers are cleared
+    setTimeout(() => process.exit(1), 100);
   });
 }
