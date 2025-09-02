@@ -955,11 +955,18 @@ export class TaskManager {
       for (const date of sortedDates) {
         lines.push(formatDateHeader(date));
         lines.push('');
-        for (const task of tasksByDate[date]) {
+        // Sort tasks by status priority
+        const sortedTasks = tasksByDate[date].sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
           const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -968,11 +975,18 @@ export class TaskManager {
       if (noDateTasks.length > 0) {
         lines.push('### No Date Set');
         lines.push('');
-        for (const task of noDateTasks) {
+        // Sort tasks by status priority
+        const sortedNoDateTasks = noDateTasks.sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedNoDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
           const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -996,11 +1010,18 @@ export class TaskManager {
       for (const date of sortedDates) {
         lines.push(formatDateHeader(date));
         lines.push('');
-        for (const task of tasksByDate[date]) {
+        // Sort tasks by status priority
+        const sortedTasks = tasksByDate[date].sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
           const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -1009,11 +1030,18 @@ export class TaskManager {
       if (noDateTasks.length > 0) {
         lines.push('### No Date Set');
         lines.push('');
-        for (const task of noDateTasks) {
+        // Sort tasks by status priority
+        const sortedNoDateTasks = noDateTasks.sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedNoDateTasks) {
           const checkbox = task.status === '✅ Done' ? 'x' : ' ';
           const topics = this.getTaskTopics(task.id);
           const topicStr = topics.length > 0 ? ` [${topics.join(', ')}]` : '';
-          lines.push(`- [${checkbox}] ${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [${checkbox}] ${iconPrefix}${task.title}${topicStr} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -1143,9 +1171,16 @@ export class TaskManager {
         
         lines.push(`### ${dateStr} (${daysAgoStr})`, '');
         
-        for (const task of overdueByDate[date]) {
+        // Sort tasks by status priority
+        const sortedTasks = overdueByDate[date].sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
-          lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [ ] ${iconPrefix}${task.title}${topics} <!-- task-id: ${task.id} -->`);
         }
         lines.push('');
       }
@@ -1183,9 +1218,16 @@ export class TaskManager {
     // Output tasks grouped by status
     for (const status of allStatuses) {
       lines.push(`## ${status}`, '');
-      for (const task of tasksByStatus[status]) {
+      // Sort tasks by status priority
+      const sortedTasks = tasksByStatus[status].sort((a, b) => 
+        this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+      );
+      
+      for (const task of sortedTasks) {
         const topics = task.topics.length > 0 ? ` [${task.topics.join(', ')}]` : '';
-        lines.push(`- [ ] ${task.title}${topics} <!-- task-id: ${task.id} -->`);
+        const statusIcon = this.getStatusIcon(task.status);
+        const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+        lines.push(`- [ ] ${iconPrefix}${task.title}${topics} <!-- task-id: ${task.id} -->`);
       }
       lines.push('');
     }
@@ -1533,10 +1575,17 @@ export class TaskManager {
       
       for (const [projectName, tasks] of Object.entries(projectGroups)) {
         content += `### ${projectName}\n\n`;
-        for (const task of tasks) {
+        // Sort tasks by status priority
+        const sortedTasks = tasks.sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const checkbox = '- [ ]';
           const taskId = task.markdown_id || task.id;
-          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          content += `${checkbox} ${iconPrefix}${task.title} <!-- task-id: ${taskId} -->\n`;
         }
         content += '\n';
       }
@@ -1563,10 +1612,17 @@ export class TaskManager {
       
       for (const [projectName, tasks] of Object.entries(projectGroups)) {
         content += `### ${projectName}\n\n`;
-        for (const task of tasks) {
+        // Sort tasks by status priority
+        const sortedTasks = tasks.sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const checkbox = '- [ ]';
           const taskId = task.markdown_id || task.id;
-          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          content += `${checkbox} ${iconPrefix}${task.title} <!-- task-id: ${taskId} -->\n`;
         }
         content += '\n';
       }
@@ -1593,10 +1649,17 @@ export class TaskManager {
       
       for (const [projectName, tasks] of Object.entries(projectGroups)) {
         content += `### ${projectName}\n\n`;
-        for (const task of tasks) {
+        // Sort tasks by status priority
+        const sortedTasks = tasks.sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
           const checkbox = '- [ ]';
           const taskId = task.markdown_id || task.id;
-          content += `${checkbox} ${task.title} <!-- task-id: ${taskId} -->\n`;
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          content += `${checkbox} ${iconPrefix}${task.title} <!-- task-id: ${taskId} -->\n`;
         }
         content += '\n';
       }
@@ -1610,6 +1673,32 @@ export class TaskManager {
     await fs.writeFile(outputPath, content, 'utf-8');
     
     return frontStageTasks.length + backStageTasks.length + offStageTasks.length;
+  }
+
+  /**
+   * Get the status icon for a task
+   */
+  getStatusIcon(status) {
+    if (!status) return '';
+    // Extract just the icon from statuses like "1️⃣  1st Priority"
+    const iconMatch = status.match(/^([^ ]+)/);
+    return iconMatch ? iconMatch[1] : '';
+  }
+
+  /**
+   * Get sort order for status (lower numbers = higher priority)
+   */
+  getStatusOrder(status) {
+    const order = {
+      '1️⃣  1st Priority': 1,
+      '2️⃣  2nd Priority': 2,
+      '3️⃣  3rd Priority': 3,
+      '🤔 Waiting': 4,
+      '⏸️  Paused': 5,
+      '🗂️  To File': 6,
+      '✅ Done': 7
+    };
+    return order[status] || 99;
   }
 
   close() {

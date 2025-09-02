@@ -93,15 +93,37 @@ main() {
     # Task classification in background (it's slow and non-critical)
     print_info "🔍 Starting task classification in background..."
     {
-        bin/tasks classify-stages > /tmp/classify-$$.log 2>&1
+        # Run stage classification
+        echo "Starting stage classification..." > /tmp/classify-$$.log
+        bin/tasks classify-stages >> /tmp/classify-$$.log 2>&1
         if [ $? -eq 0 ]; then
-            echo "✅ Task classification completed successfully" >> /tmp/classify-$$.log
+            echo "✅ Stage classification completed successfully" >> /tmp/classify-$$.log
         else
-            echo "❌ Task classification failed" >> /tmp/classify-$$.log
+            echo "❌ Stage classification failed" >> /tmp/classify-$$.log
+        fi
+        
+        # Run topic assignment
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting topic assignment..." >> /tmp/classify-$$.log
+        bin/tasks add-topics >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Topic assignment completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Topic assignment failed" >> /tmp/classify-$$.log
+        fi
+        
+        # Run status prioritization
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting status prioritization..." >> /tmp/classify-$$.log
+        bin/tasks prioritize-status >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Status prioritization completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Status prioritization failed" >> /tmp/classify-$$.log
         fi
     } &
     CLASSIFY_PID=$!
-    print_info "   Classification running in background (PID: $CLASSIFY_PID)"
+    print_info "   Classification, topics & status prioritization running in background (PID: $CLASSIFY_PID)"
     print_info "   Check progress: tail -f /tmp/classify-$$.log"
     
     # Email sync (if configured)
@@ -160,7 +182,7 @@ main() {
     
     echo ""
     if [ ! -z "$CLASSIFY_PID" ]; then
-        echo "Note: Task classification is still running in background (PID: $CLASSIFY_PID)"
+        echo "Note: Task stage & topic classification is still running in background (PID: $CLASSIFY_PID)"
         echo "      Check progress: tail -f /tmp/classify-$$.log"
     fi
     echo ""

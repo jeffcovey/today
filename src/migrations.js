@@ -1109,6 +1109,527 @@ export class MigrationManager {
           
           console.log('    Completed OGM table schema updates');
         }
+      },
+      {
+        version: 11,
+        description: 'Consolidate task statuses and set To File as default',
+        fn: (db) => {
+          console.log('    Consolidating task statuses...');
+          
+          // First, migrate all '🎭 Stage' tasks to '🗂️ To File'
+          const stageResult = db.prepare("UPDATE tasks SET status = '🗂️ To File' WHERE status = '🎭 Stage'").run();
+          console.log(`    Migrated ${stageResult.changes} tasks from '🎭 Stage' to '🗂️ To File'`);
+          
+          // Migrate other statuses that are being removed
+          const statusMigrations = [
+            { from: '🔥 Immediate', to: '🚀 1st Priority' },
+            { from: '📅 Scheduled', to: '🗂️ To File' },
+            { from: '💭 Remember', to: '🗂️ To File' },
+            { from: '⚡ Quick', to: '🗂️ To File' },
+            { from: '🚘 Errand', to: '🗂️ To File' },
+            { from: 'Ron', to: '🗂️ To File' },
+            { from: 'Freefolk', to: '🗂️ To File' },
+            { from: 'Active', to: '🗂️ To File' },
+            { from: '♻️ Repeating', to: '🗂️ To File' },
+            { from: '🚢 On the trip', to: '🗂️ To File' },
+            { from: '🏠 After the trip', to: '🗂️ To File' },
+            { from: 'In progress', to: '🗂️ To File' },
+            { from: 'Next Up', to: '🗂️ To File' },
+            { from: 'Future 1', to: '🗂️ To File' },
+            { from: 'Future 2', to: '🗂️ To File' },
+            { from: 'Future 3', to: '🗂️ To File' }
+          ];
+          
+          for (const migration of statusMigrations) {
+            const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(migration.to, migration.from);
+            if (result.changes > 0) {
+              console.log(`    Migrated ${result.changes} tasks from '${migration.from}' to '${migration.to}'`);
+            }
+          }
+          
+          // Update the default in the table schema
+          // SQLite doesn't support ALTER COLUMN directly, so we need to recreate the table
+          console.log('    Updating default status in tasks table schema...');
+          
+          db.exec(`
+            -- Create new table with updated default
+            CREATE TABLE tasks_new (
+              id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+              title TEXT NOT NULL,
+              description TEXT,
+              content TEXT,
+              do_date DATE,
+              status TEXT DEFAULT '🗂️ To File',
+              stage TEXT CHECK(stage IS NULL OR stage IN ('Front Stage', 'Back Stage', 'Off Stage')),
+              project_id TEXT,
+              repeat_interval INTEGER,
+              repeat_next_date DATE,
+              notion_id TEXT UNIQUE,
+              notion_url TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              completed_at DATETIME,
+              last_modified DATETIME,
+              FOREIGN KEY (project_id) REFERENCES projects(id)
+            );
+            
+            -- Copy data
+            INSERT INTO tasks_new SELECT * FROM tasks;
+            
+            -- Drop old table
+            DROP TABLE tasks;
+            
+            -- Rename new table
+            ALTER TABLE tasks_new RENAME TO tasks;
+            
+            -- Recreate indexes
+            CREATE INDEX idx_tasks_do_date ON tasks(do_date);
+            CREATE INDEX idx_tasks_status ON tasks(status);
+            CREATE INDEX idx_tasks_stage ON tasks(stage);
+            CREATE INDEX idx_tasks_project ON tasks(project_id);
+            CREATE INDEX idx_tasks_notion_id ON tasks(notion_id);
+            CREATE INDEX idx_tasks_completed_at ON tasks(completed_at);
+            CREATE INDEX idx_tasks_last_modified ON tasks(last_modified);
+            
+            -- Recreate triggers
+            CREATE TRIGGER update_task_timestamp
+              AFTER UPDATE ON tasks
+              BEGIN
+                UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+              END;
+              
+            CREATE TRIGGER update_task_last_modified 
+              AFTER UPDATE ON tasks 
+              FOR EACH ROW
+              WHEN NEW.last_modified = OLD.last_modified OR NEW.last_modified IS NULL
+              BEGIN
+                UPDATE tasks SET last_modified = datetime('now', 'localtime') WHERE id = NEW.id;
+              END;
+          `);
+          
+          console.log('    Updated default status to 🗂️ To File');
+          
+          // Update status_groups_cache to reflect new structure
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️ To File", "🚀 1st Priority", "2nd Priority", "3rd Priority", "4th Priority", "5th Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["Waiting", "Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️ To File", color: "orange", description: null},
+              {id: "NEU`", name: "🚀 1st Priority", color: "orange", description: null},
+              {id: "|^g]", name: "2nd Priority", color: "blue", description: null},
+              {id: "A=xG", name: "3rd Priority", color: "purple", description: null},
+              {id: "{iZK", name: "4th Priority", color: "default", description: null},
+              {id: "I;iQ", name: "5th Priority", color: "default", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "Waiting", color: "red", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "Paused", color: "yellow", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Updated status_groups_cache with consolidated statuses');
+        }
+      },
+      {
+        version: 12,
+        description: 'Remove Next Up status',
+        fn: (db) => {
+          console.log('    Removing Next Up status...');
+          
+          // Migrate all 'Next Up' tasks to '🗂️ To File'
+          const result = db.prepare("UPDATE tasks SET status = '🗂️ To File' WHERE status = 'Next Up'").run();
+          console.log(`    Migrated ${result.changes} tasks from 'Next Up' to '🗂️ To File'`);
+          
+          // Update status_groups_cache to remove Next Up
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️ To File", "🚀 1st Priority", "2nd Priority", "3rd Priority", "4th Priority", "5th Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["Waiting", "Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️ To File", color: "orange", description: null},
+              {id: "NEU`", name: "🚀 1st Priority", color: "orange", description: null},
+              {id: "|^g]", name: "2nd Priority", color: "blue", description: null},
+              {id: "A=xG", name: "3rd Priority", color: "purple", description: null},
+              {id: "{iZK", name: "4th Priority", color: "default", description: null},
+              {id: "I;iQ", name: "5th Priority", color: "default", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "Waiting", color: "red", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "Paused", color: "yellow", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Updated status_groups_cache to remove Next Up');
+        }
+      },
+      {
+        version: 13,
+        description: 'Add emojis to priority statuses',
+        fn: (db) => {
+          console.log('    Adding emojis to priority statuses...');
+          
+          // Update tasks with new status names
+          const statusUpdates = [
+            { from: '2nd Priority', to: '🎯 2nd Priority' },
+            { from: '3rd Priority', to: '📌 3rd Priority' },
+            { from: '4th Priority', to: '🔄 4th Priority' },
+            { from: '5th Priority', to: '💡 5th Priority' },
+            { from: 'Waiting', to: '⏸️ Waiting' },
+            { from: 'Paused', to: '⏯️ Paused' }
+          ];
+          
+          for (const update of statusUpdates) {
+            const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(update.to, update.from);
+            if (result.changes > 0) {
+              console.log(`    Updated ${result.changes} tasks from '${update.from}' to '${update.to}'`);
+            }
+          }
+          
+          // Update status_groups_cache with new names
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️ To File", "🚀 1st Priority", "🎯 2nd Priority", "📌 3rd Priority", "🔄 4th Priority", "💡 5th Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["⏸️ Waiting", "⏯️ Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️ To File", color: "orange", description: null},
+              {id: "NEU`", name: "🚀 1st Priority", color: "orange", description: null},
+              {id: "|^g]", name: "🎯 2nd Priority", color: "blue", description: null},
+              {id: "A=xG", name: "📌 3rd Priority", color: "purple", description: null},
+              {id: "{iZK", name: "🔄 4th Priority", color: "default", description: null},
+              {id: "I;iQ", name: "💡 5th Priority", color: "default", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "⏸️ Waiting", color: "red", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "⏯️ Paused", color: "yellow", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Added emojis to all priority statuses');
+        }
+      },
+      {
+        version: 14,
+        description: 'Refine statuses: remove 4th/5th priorities, update emojis',
+        fn: (db) => {
+          console.log('    Refining task statuses...');
+          
+          // Update existing statuses with new names
+          const statusUpdates = [
+            // Remove 4th and 5th priorities by moving to To File
+            { from: '🔄 4th Priority', to: '🗂️ To File' },
+            { from: '💡 5th Priority', to: '🗂️ To File' },
+            { from: '4th Priority', to: '🗂️ To File' },
+            { from: '5th Priority', to: '🗂️ To File' },
+            // Update priority emojis to numbers
+            { from: '🚀 1st Priority', to: '1️⃣ Priority' },
+            { from: '🎯 2nd Priority', to: '2️⃣ Priority' },
+            { from: '📌 3rd Priority', to: '3️⃣ Priority' },
+            { from: '1st Priority', to: '1️⃣ Priority' },
+            { from: '2nd Priority', to: '2️⃣ Priority' },
+            { from: '3rd Priority', to: '3️⃣ Priority' },
+            // Update waiting and paused emojis
+            { from: '⏸️ Waiting', to: '🤔 Waiting' },
+            { from: '⏯️ Paused', to: '⏸️ Paused' },
+            { from: 'Waiting', to: '🤔 Waiting' },
+            { from: 'Paused', to: '⏸️ Paused' }
+          ];
+          
+          for (const update of statusUpdates) {
+            const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(update.to, update.from);
+            if (result.changes > 0) {
+              console.log(`    Updated ${result.changes} tasks from '${update.from}' to '${update.to}'`);
+            }
+          }
+          
+          // Update status_groups_cache with refined structure
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️ To File", "1️⃣ Priority", "2️⃣ Priority", "3️⃣ Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["🤔 Waiting", "⏸️ Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️ To File", color: "orange", description: null},
+              {id: "NEU`", name: "1️⃣ Priority", color: "red", description: null},
+              {id: "|^g]", name: "2️⃣ Priority", color: "orange", description: null},
+              {id: "A=xG", name: "3️⃣ Priority", color: "yellow", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "🤔 Waiting", color: "purple", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "⏸️ Paused", color: "gray", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Refined statuses: removed 4th/5th priorities, updated emojis');
+        }
+      },
+      {
+        version: 15,
+        description: 'Fix status names: keep original names, ensure spaces after emojis',
+        fn: (db) => {
+          console.log('    Fixing status names with proper spacing...');
+          
+          // Update statuses to correct format
+          const statusUpdates = [
+            { from: '1️⃣ Priority', to: '1️⃣ 1st Priority' },
+            { from: '2️⃣ Priority', to: '2️⃣ 2nd Priority' },
+            { from: '3️⃣ Priority', to: '3️⃣ 3rd Priority' },
+            { from: '🤔 Waiting', to: '🤔 Waiting' },  // Already has space
+            { from: '⏸️ Paused', to: '⏸️ Paused' },  // Already has space
+            { from: '🗂️ To File', to: '🗂️ To File' },  // Already has space
+            { from: '✅ Done', to: '✅ Done' }  // Already has space
+          ];
+          
+          for (const update of statusUpdates) {
+            if (update.from !== update.to) {
+              const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(update.to, update.from);
+              if (result.changes > 0) {
+                console.log(`    Updated ${result.changes} tasks from '${update.from}' to '${update.to}'`);
+              }
+            }
+          }
+          
+          // Update status_groups_cache with correct names
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️ To File", "1️⃣ 1st Priority", "2️⃣ 2nd Priority", "3️⃣ 3rd Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["🤔 Waiting", "⏸️ Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️ To File", color: "orange", description: null},
+              {id: "NEU`", name: "1️⃣ 1st Priority", color: "red", description: null},
+              {id: "|^g]", name: "2️⃣ 2nd Priority", color: "orange", description: null},
+              {id: "A=xG", name: "3️⃣ 3rd Priority", color: "yellow", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "🤔 Waiting", color: "purple", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "⏸️ Paused", color: "gray", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Fixed status names with proper emoji spacing');
+        }
+      },
+      {
+        version: 16,
+        description: 'Ensure proper spacing after all emojis',
+        fn: (db) => {
+          console.log('    Ensuring proper spacing after all emojis...');
+          
+          // Update statuses to ensure spacing
+          const statusUpdates = [
+            { from: '1️⃣ 1st Priority', to: '1️⃣  1st Priority' },  // Add extra space
+            { from: '2️⃣ 2nd Priority', to: '2️⃣  2nd Priority' },  // Add extra space
+            { from: '3️⃣ 3rd Priority', to: '3️⃣  3rd Priority' },  // Add extra space
+            { from: '⏸️ Paused', to: '⏸️  Paused' },  // Add extra space
+            { from: '🤔 Waiting', to: '🤔  Waiting' },  // Add extra space
+            { from: '🗂️ To File', to: '🗂️  To File' },  // Add extra space
+            { from: '✅ Done', to: '✅  Done' }  // Add extra space
+          ];
+          
+          for (const update of statusUpdates) {
+            const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(update.to, update.from);
+            if (result.changes > 0) {
+              console.log(`    Updated ${result.changes} tasks from '${update.from}' to '${update.to}'`);
+            }
+          }
+          
+          // Update status_groups_cache with double spaces for better visual separation
+          const statusGroups = {
+            completeStatuses: ["✅  Done"],
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️  To File", "1️⃣  1st Priority", "2️⃣  2nd Priority", "3️⃣  3rd Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["🤔  Waiting", "⏸️  Paused"]
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅  Done"]
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️  To File", color: "orange", description: null},
+              {id: "NEU`", name: "1️⃣  1st Priority", color: "red", description: null},
+              {id: "|^g]", name: "2️⃣  2nd Priority", color: "orange", description: null},
+              {id: "A=xG", name: "3️⃣  3rd Priority", color: "yellow", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "🤔  Waiting", color: "purple", description: null},
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "⏸️  Paused", color: "gray", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅  Done", color: "green", description: null}
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Added double spacing after emojis for better visibility');
+        }
+      },
+      {
+        version: 17,
+        description: 'Fix spacing: single space for Waiting and Done for compatibility',
+        fn: (db) => {
+          console.log('    Fixing spacing for Waiting and Done statuses...');
+          
+          // Update to single space for these statuses
+          const statusUpdates = [
+            { from: '🤔  Waiting', to: '🤔 Waiting' },  // Single space
+            { from: '✅  Done', to: '✅ Done' }  // Single space for compatibility
+          ];
+          
+          for (const update of statusUpdates) {
+            const result = db.prepare("UPDATE tasks SET status = ? WHERE status = ?").run(update.to, update.from);
+            if (result.changes > 0) {
+              console.log(`    Updated ${result.changes} tasks from '${update.from}' to '${update.to}'`);
+            }
+          }
+          
+          // Update status_groups_cache with correct spacing
+          const statusGroups = {
+            completeStatuses: ["✅ Done"],  // Single space for compatibility
+            allGroups: [
+              {
+                name: "To-do",
+                color: "gray",
+                statuses: ["🗂️  To File", "1️⃣  1st Priority", "2️⃣  2nd Priority", "3️⃣  3rd Priority"]
+              },
+              {
+                name: "In progress",
+                color: "blue",
+                statuses: ["🤔 Waiting", "⏸️  Paused"]  // Single space for Waiting
+              },
+              {
+                name: "Complete",
+                color: "green",
+                statuses: ["✅ Done"]  // Single space for compatibility
+              }
+            ],
+            options: [
+              {id: "Y@is", name: "🗂️  To File", color: "orange", description: null},
+              {id: "NEU`", name: "1️⃣  1st Priority", color: "red", description: null},
+              {id: "|^g]", name: "2️⃣  2nd Priority", color: "orange", description: null},
+              {id: "A=xG", name: "3️⃣  3rd Priority", color: "yellow", description: null},
+              {id: "baef7a23-0323-4593-9bcd-71f7c9bf13a7", name: "🤔 Waiting", color: "purple", description: null},  // Single space
+              {id: "e39cf1f3-937f-4836-b1e4-36bab92ee845", name: "⏸️  Paused", color: "gray", description: null},
+              {id: "c7ecae0d-7571-4b0f-b639-d12b21f8792a", name: "✅ Done", color: "green", description: null}  // Single space for compatibility
+            ]
+          };
+          
+          // Update the status_groups_cache
+          db.prepare("UPDATE status_groups_cache SET status_groups = ? WHERE database_id = ?").run(
+            JSON.stringify(statusGroups),
+            'de1740b0-2421-43a1-8bda-f177cec69e11'
+          );
+          
+          console.log('    Fixed spacing: single space for Waiting and Done for code compatibility');
+        }
       }
     ];
 

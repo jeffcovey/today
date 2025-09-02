@@ -7,7 +7,8 @@
       "Bash(env bin/ogm-sync:*)",
       "Bash(node:*)",
       "Bash(bin/db-query:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:theprimetimersww.com)"
     ],
     "deny": [],
     "ask": []

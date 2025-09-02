@@ -78,7 +78,8 @@ Respond with ONLY one of: "Front Stage", "Back Stage", or "Off Stage"`;
   async classifyWithClaude(tasks) {
     // Process in smaller batches to avoid timeouts - only one batch per invocation
     const BATCH_SIZE = 40; // Process 40 tasks at a time
-    const allClassifications = [];
+    let totalClassified = 0;
+    let totalFailed = 0;
     
     // Only process the first batch per invocation
     const batch = tasks.slice(0, Math.min(BATCH_SIZE, tasks.length));
@@ -119,23 +120,41 @@ Respond with a JSON array containing the classification for each task.`;
       const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
         encoding: 'utf8',
         maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-        timeout: 60000 // 60 second timeout per batch
+        timeout: 300000 // 5 minute timeout
       });
 
       // Extract JSON from Claude's response
       const jsonMatch = result.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const classifications = JSON.parse(jsonMatch[0]);
-        allClassifications.push(...classifications);
-        console.log(`  Classified ${classifications.length} tasks in this batch`);
+        
+        // Apply classifications immediately
+        for (const classification of classifications) {
+          const task = batch.find(t => t.id === classification.id);
+          if (task && classification.stage) {
+            try {
+              this.tm.updateTask(task.id, { stage: classification.stage });
+              console.log(`    ${task.title.substring(0, 50)}... → ${classification.stage}`);
+              totalClassified++;
+            } catch (error) {
+              console.error(`  Failed to update stage for task ${task.id}:`, error.message);
+              totalFailed++;
+            }
+          } else {
+            totalFailed++;
+          }
+        }
+        console.log(`  Classified ${totalClassified} tasks in this batch`);
       } else {
-        console.error(`Could not parse Claude response for batch`);
+        console.error(`  Could not parse Claude response for batch`);
+        totalFailed += batch.length;
       }
     } catch (err) {
-      console.error(`Failed to classify batch with Claude:`, err.message);
+      console.error(`  Failed to classify batch with Claude:`, err.message);
+      totalFailed += batch.length;
     }
     
-    return allClassifications;
+    return { classified: totalClassified, failed: totalFailed };
   }
 
   extractStage(text) {
@@ -200,18 +219,9 @@ Respond with a JSON array containing the classification for each task.`;
     } else {
       // Process with Claude in batch
       console.log('Sending batch to Claude for classification...');
-      const classifications = await this.classifyWithClaude(tasks);
-      
-      for (const classification of classifications) {
-        const task = tasks.find(t => t.id === classification.id);
-        if (task && classification.stage) {
-          this.tm.updateTask(task.id, { stage: classification.stage });
-          console.log(`  ${task.title.substring(0, 50)}... → ${classification.stage}`);
-          classified++;
-        } else {
-          failed++;
-        }
-      }
+      const result = await this.classifyWithClaude(tasks);
+      classified = result.classified;
+      failed = result.failed;
     }
 
     // Show summary by stage

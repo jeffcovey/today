@@ -627,6 +627,72 @@ program
     }
   });
 
+// Add topics command
+program
+  .command('add-topics')
+  .description('Automatically assign topics to tasks using AI')
+  .option('--all', 'Reassign topics to all tasks (not just unassigned)')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options) => {
+    const { TaskTopicClassifier } = await import('../src/task-topic-classifier.js');
+    const classifier = new TaskTopicClassifier();
+    
+    try {
+      if (options.verbose) {
+        console.log(chalk.bold('🏷️  Task Topic Classification'));
+        console.log(chalk.gray('────────────────────────────'));
+        console.log('AI will analyze tasks and assign relevant topics');
+        console.log('');
+      }
+      
+      const result = await classifier.classifyTasks(!options.all, options.verbose);
+      
+      if (result.classified === 0 && result.failed === 0) {
+        console.log(chalk.gray('All tasks already have topics assigned'));
+      } else {
+        console.log(chalk.green(`✓ Successfully assigned topics to ${result.classified} task(s)`));
+        if (result.failed > 0) {
+          console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Error assigning topics:'), error.message);
+      process.exit(1);
+    } finally {
+      classifier.close();
+    }
+  });
+
+// Prioritize status command
+program
+  .command('prioritize-status')
+  .description('Automatically prioritize tasks in "To File" status using AI')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options) => {
+    const { TaskStatusClassifier } = await import('../src/task-status-classifier.js');
+    const classifier = new TaskStatusClassifier('.data/today.db');
+    
+    try {
+      const result = await classifier.classifyTasks(options.verbose);
+      
+      if (result.classified === 0 && result.failed === 0) {
+        console.log(chalk.gray('No tasks to prioritize'));
+      } else {
+        console.log(chalk.green(`✓ Prioritized ${result.classified} tasks from "To File" status`));
+        if (result.failed > 0) {
+          console.log(chalk.red(`✗ Failed to classify ${result.failed} tasks`));
+        }
+      }
+      
+      process.exit(0);
+    } catch (error) {
+      console.error(chalk.red('Error prioritizing tasks:'), error.message);
+      process.exit(1);
+    } finally {
+      classifier.close();
+    }
+  });
+
 // Search command
 program
   .command('search <query>')
