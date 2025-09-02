@@ -156,20 +156,28 @@ ${JSON.stringify(taskList, null, 2)}`;
     let query;
     if (onlyUnclassified) {
       // Get tasks that have no topics assigned
+      // Sort tasks with do_date first
       query = `
         SELECT t.id, t.title, t.description 
         FROM tasks t
         WHERE t.status != '✅ Done'
           AND t.id NOT IN (SELECT DISTINCT task_id FROM task_topics)
-        ORDER BY t.created_at DESC
+        ORDER BY 
+          CASE WHEN t.do_date IS NOT NULL THEN 0 ELSE 1 END,
+          t.do_date ASC,
+          t.created_at DESC
       `;
     } else {
       // Get all active tasks
+      // Sort tasks with do_date first
       query = `
         SELECT id, title, description 
         FROM tasks 
         WHERE status != '✅ Done'
-        ORDER BY created_at DESC
+        ORDER BY 
+          CASE WHEN do_date IS NOT NULL THEN 0 ELSE 1 END,
+          do_date ASC,
+          created_at DESC
       `;
     }
 

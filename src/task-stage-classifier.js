@@ -174,17 +174,24 @@ Respond with a JSON array containing the classification for each task.`;
 
   async classifyTasks(onlyUnclassified = true) {
     // Get tasks that need classification
+    // Sort tasks with do_date first, then by date, then by status
     const tasks = onlyUnclassified ?
       this.tm.db.prepare(`
         SELECT * FROM tasks 
         WHERE stage IS NULL 
           AND status != '✅ Done'
-        ORDER BY do_date ASC, status ASC
+        ORDER BY 
+          CASE WHEN do_date IS NOT NULL THEN 0 ELSE 1 END,
+          do_date ASC, 
+          status ASC
       `).all() :
       this.tm.db.prepare(`
         SELECT * FROM tasks 
         WHERE status != '✅ Done'
-        ORDER BY do_date ASC, status ASC
+        ORDER BY 
+          CASE WHEN do_date IS NOT NULL THEN 0 ELSE 1 END,
+          do_date ASC, 
+          status ASC
       `).all();
 
     if (tasks.length === 0) {

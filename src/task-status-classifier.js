@@ -136,11 +136,15 @@ ${JSON.stringify(taskList, null, 2)}`;
     }
 
     // Get tasks that are in "To File" status
+    // Sort tasks with do_date first
     const query = `
       SELECT id, title, description, stage 
       FROM tasks 
       WHERE status = '🗂️  To File'
-      ORDER BY created_at DESC
+      ORDER BY 
+        CASE WHEN do_date IS NOT NULL THEN 0 ELSE 1 END,
+        do_date ASC,
+        created_at DESC
     `;
 
     const tasks = this.db.prepare(query).all();
