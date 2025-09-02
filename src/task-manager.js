@@ -98,10 +98,6 @@ export class TaskManager {
       'Communication': '💬',
       'Social': '👥',
       
-      // Default
-      'Other': '📌',
-      'Misc': '📌',
-      'General': '📌'
     };
   }
   
@@ -127,8 +123,8 @@ export class TaskManager {
       }
     }
     
-    // Default emoji for unknown topics
-    return '📌';
+    // No emoji for unknown topics
+    return '';
   }
   
   // Format topics as emoji string
