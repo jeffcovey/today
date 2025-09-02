@@ -1,0 +1,74 @@
+#!/bin/bash
+# Syncthing Monitor - Ensures Syncthing stays running in development container
+# This script checks if Syncthing is running and restarts it if needed
+
+SYNCTHING_HOME="${SYNCTHING_HOME:-$HOME/.config/syncthing}"
+CHECK_INTERVAL="${CHECK_INTERVAL:-60}"  # Check every 60 seconds by default
+LOG_FILE="/tmp/syncthing-monitor.log"
+
+# Function to log messages
+log_message() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Function to check if Syncthing is running
+is_syncthing_running() {
+    pgrep -f "syncthing" > /dev/null 2>&1
+}
+
+# Function to start Syncthing
+start_syncthing() {
+    log_message "Starting Syncthing..."
+    if [ -f "bin/syncthing-headless" ]; then
+        bash bin/syncthing-headless start > /dev/null 2>&1
+        sleep 5
+        if is_syncthing_running; then
+            log_message "✓ Syncthing started successfully"
+            return 0
+        else
+            log_message "✗ Failed to start Syncthing"
+            return 1
+        fi
+    else
+        log_message "✗ syncthing-headless script not found"
+        return 1
+    fi
+}
+
+# Main monitoring loop
+main() {
+    log_message "Syncthing monitor started (PID: $$)"
+    log_message "Monitoring interval: ${CHECK_INTERVAL} seconds"
+    
+    # Initial check and start if needed
+    if ! is_syncthing_running; then
+        log_message "Syncthing not running on startup"
+        start_syncthing
+    else
+        log_message "Syncthing is already running"
+    fi
+    
+    # Continuous monitoring loop
+    while true; do
+        sleep "$CHECK_INTERVAL"
+        
+        if ! is_syncthing_running; then
+            log_message "⚠ Syncthing not running! Attempting restart..."
+            start_syncthing
+        fi
+    done
+}
+
+# Handle script termination gracefully
+trap 'log_message "Monitor stopped"; exit 0' SIGTERM SIGINT
+
+# Check if already running
+if pgrep -f "syncthing-monitor" | grep -v $$ > /dev/null 2>&1; then
+    echo "Syncthing monitor is already running"
+    exit 0
+fi
+
+# Start monitoring
+main &
+echo "Syncthing monitor started in background (PID: $!)"
+echo "Log file: $LOG_FILE"
