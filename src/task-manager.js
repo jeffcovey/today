@@ -1228,60 +1228,34 @@ export class TaskManager {
       // File doesn't exist yet, continue with generation
     }
 
-    // Get today's date in both formats
+    // Get today's date
     const today = new Date().toISOString().split('T')[0];
-    const todayParts = today.split('-');
-    const year = todayParts[0];
-    const month = todayParts[1];
-    const day = todayParts[2];
-    const quarter = Math.ceil(parseInt(month) / 3);
-    const weekOfYear = Math.ceil((new Date() - new Date(year + '-01-01')) / (7 * 24 * 60 * 60 * 1000));
-    const todayAlt = `${year}_Q${quarter}_${month}_W${weekOfYear}_${day}`;
     
     // Get overdue tasks (before today, not done)
-    // Handle both date formats
     const overdueTasks = this.db.prepare(`
       SELECT * FROM tasks 
-      WHERE (do_date < ? OR do_date < ?)
+      WHERE do_date < ?
         AND do_date IS NOT NULL
         AND status != '✅ Done'
       ORDER BY do_date ASC, status ASC
-    `).all(today, todayAlt).map(task => ({
+    `).all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
     
     // Get active tasks for today (not done, not overdue)
-    // Handle both date formats
     const activeTasks = this.db.prepare(`
       SELECT * FROM tasks 
-      WHERE (do_date = ? OR do_date = ?)
+      WHERE do_date = ?
         AND status != '✅ Done'
       ORDER BY do_date ASC, status ASC
-    `).all(today, todayAlt).map(task => ({
+    `).all(today).map(task => ({
       ...task,
       topics: this.getTaskTopics(task.id)
     }));
     
-    // Get high-priority tasks without dates (1st, 2nd, and 3rd priority ONLY)
-    // Do NOT include '🗂️ To File' tasks - they should not appear in today.md without a date
-    const priorityTasksWithoutDates = this.db.prepare(`
-      SELECT * FROM tasks 
-      WHERE do_date IS NULL
-        AND status IN ('1️⃣  1st Priority', '2️⃣  2nd Priority', '3️⃣  3rd Priority')
-      ORDER BY 
-        CASE status
-          WHEN '1️⃣  1st Priority' THEN 1
-          WHEN '2️⃣  2nd Priority' THEN 2
-          WHEN '3️⃣  3rd Priority' THEN 3
-          ELSE 4
-        END,
-        updated_at DESC
-      LIMIT 20
-    `).all().map(task => ({
-      ...task,
-      topics: this.getTaskTopics(task.id)
-    }));
+    // Don't include priority tasks without dates - today.md is only for tasks due today or overdue
+    const priorityTasksWithoutDates = [];
     
     // Get tasks completed today using completed_at from tasks table
     // IMPORTANT: Only show tasks that have BOTH status='✅ Done' AND completed_at is today

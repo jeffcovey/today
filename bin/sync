@@ -86,6 +86,7 @@ main() {
     SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
+    run_sync_step "📁 Sync Project Tasks" sync_project_tasks "Project tasks synced" "Project tasks"
     
     # Run additional operations synchronously (no background jobs)
     print_header "⚡ Additional Sync Operations"
@@ -1430,6 +1431,186 @@ process_inbox() {
     return 0
 }
 
+# Sync tasks to their project markdown files
+sync_project_tasks() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    print_info "Syncing tasks to project markdown files..."
+    
+    # Get all active tasks with projects
+    TASKS_WITH_PROJECTS=$(sqlite3 .data/today.db "
+        SELECT 
+            t.id,
+            t.title,
+            t.status,
+            t.description,
+            p.name as project_name,
+            p.file_path
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        WHERE t.status <> 'done'
+        ORDER BY p.file_path, t.title;
+    " 2>/dev/null || echo "")
+    
+    if [[ -z "$TASKS_WITH_PROJECTS" ]]; then
+        print_info "No tasks with projects to sync"
+        return 0
+    fi
+    
+    # Count unique projects
+    PROJECT_COUNT=$(echo "$TASKS_WITH_PROJECTS" | cut -d'|' -f6 | sort -u | wc -l | tr -d ' ')
+    TASK_COUNT=$(echo "$TASKS_WITH_PROJECTS" | wc -l | tr -d ' ')
+    print_info "Found $TASK_COUNT task(s) across $PROJECT_COUNT project(s)"
+    
+    # Process each project's tasks
+    CURRENT_PROJECT=""
+    PROJECT_TASKS=""
+    SYNCED_COUNT=0
+    
+    while IFS='|' read -r task_id title status description project_name file_path; do
+        # Skip if no file path
+        if [[ -z "$file_path" ]]; then
+            continue
+        fi
+        
+        # Ensure file path starts with vault/ if it doesn't already
+        if [[ ! "$file_path" =~ ^vault/ ]] && [[ ! "$file_path" =~ ^/ ]]; then
+            file_path="vault/$file_path"
+        fi
+        
+        # When we hit a new project, process the previous one
+        if [[ "$file_path" != "$CURRENT_PROJECT" ]] && [[ -n "$CURRENT_PROJECT" ]]; then
+            # Process the accumulated tasks for the previous project
+            _sync_tasks_to_project_file "$CURRENT_PROJECT" "$PROJECT_TASKS"
+            PROJECT_TASKS=""
+        fi
+        
+        CURRENT_PROJECT="$file_path"
+        
+        # Format task with checkbox and task-id
+        TASK_LINE="- [ ] $title <!-- task-id: $task_id -->"
+        if [[ -n "$PROJECT_TASKS" ]]; then
+            PROJECT_TASKS="$PROJECT_TASKS"$'\n'"$TASK_LINE"
+        else
+            PROJECT_TASKS="$TASK_LINE"
+        fi
+    done <<< "$TASKS_WITH_PROJECTS"
+    
+    # Process the last project
+    if [[ -n "$CURRENT_PROJECT" ]] && [[ -n "$PROJECT_TASKS" ]]; then
+        _sync_tasks_to_project_file "$CURRENT_PROJECT" "$PROJECT_TASKS"
+    fi
+    
+    print_info "Synced tasks to $PROJECT_COUNT project file(s)"
+    return 0
+}
+
+# Helper function to sync tasks to a single project file
+_sync_tasks_to_project_file() {
+    local project_file="$1"
+    local tasks_to_add="$2"
+    
+    # Check if project file exists
+    if [[ ! -f "$project_file" ]]; then
+        print_info "  Creating project file: $project_file"
+        mkdir -p "$(dirname "$project_file")" 2>/dev/null
+        
+        # Extract project name from file path
+        local project_name=$(basename "$project_file" .md | tr '-' ' ' | sed 's/\b\(.\)/\u\1/g')
+        
+        # Create file with title and tasks
+        {
+            echo "# $project_name"
+            echo ""
+            echo "## Tasks"
+            echo ""
+            echo "$tasks_to_add"
+        } > "$project_file"
+        
+        SYNCED_COUNT=$((SYNCED_COUNT + 1))
+        return 0
+    fi
+    
+    # File exists - check which tasks are already present
+    local tasks_added=0
+    local temp_file=$(mktemp)
+    
+    # Read the file and find where to insert tasks
+    local in_header=true
+    local found_tasks_section=false
+    local tasks_to_insert=""
+    
+    # Check each task to see if it's already in the file
+    while IFS= read -r task_line; do
+        # Extract task ID from the line
+        local task_id=$(echo "$task_line" | grep -oE 'task-id: [a-f0-9]{32}' | cut -d' ' -f2)
+        if [[ -n "$task_id" ]]; then
+            # Check if this task ID already exists in the file
+            if ! grep -q "task-id: $task_id" "$project_file" 2>/dev/null; then
+                if [[ -n "$tasks_to_insert" ]]; then
+                    tasks_to_insert="$tasks_to_insert"$'\n'"$task_line"
+                else
+                    tasks_to_insert="$task_line"
+                fi
+                tasks_added=$((tasks_added + 1))
+            fi
+        fi
+    done <<< "$tasks_to_add"
+    
+    # If no new tasks to add, skip
+    if [[ $tasks_added -eq 0 ]]; then
+        return 0
+    fi
+    
+    print_info "  Adding $tasks_added task(s) to $(basename "$project_file")"
+    
+    # Process the file to insert tasks
+    local inserted=false
+    local line_count=0
+    
+    while IFS= read -r line; do
+        line_count=$((line_count + 1))
+        
+        # Check if we're past the header (first heading)
+        if [[ "$line" =~ ^# ]] && [[ $line_count -gt 1 ]]; then
+            in_header=false
+        fi
+        
+        # If we find a ## Tasks section, insert after it
+        if [[ "$line" =~ ^##\ Tasks ]] || [[ "$line" =~ ^##\ Active\ Tasks ]]; then
+            echo "$line" >> "$temp_file"
+            echo "" >> "$temp_file"
+            echo "$tasks_to_insert" >> "$temp_file"
+            echo "" >> "$temp_file"
+            inserted=true
+            found_tasks_section=true
+        # If we're past the title and haven't inserted yet, insert here
+        elif [[ "$in_header" == false ]] && [[ "$inserted" == false ]] && [[ ! "$line" =~ ^# ]]; then
+            # Insert tasks section before any other content
+            echo "## Tasks" >> "$temp_file"
+            echo "" >> "$temp_file"
+            echo "$tasks_to_insert" >> "$temp_file"
+            echo "" >> "$temp_file"
+            echo "$line" >> "$temp_file"
+            inserted=true
+        else
+            echo "$line" >> "$temp_file"
+        fi
+    done < "$project_file"
+    
+    # If we never found a place to insert (empty file or just title), append at end
+    if [[ "$inserted" == false ]]; then
+        echo "" >> "$temp_file"
+        echo "## Tasks" >> "$temp_file"
+        echo "" >> "$temp_file"
+        echo "$tasks_to_insert" >> "$temp_file"
+    fi
+    
+    # Replace the original file
+    mv "$temp_file" "$project_file"
+    SYNCED_COUNT=$((SYNCED_COUNT + 1))
+}
+
 # Archive completed tasks in tasks.md
 archive_completed_tasks() {
     cd "$(dirname "$0")/.." || return 1
@@ -1699,6 +1880,7 @@ case "${1:-}" in
         clean_database_task_titles
         process_inbox
         SKIP_CLASSIFICATION=1 sync_tasks
+        sync_project_tasks
         check_task_consistency
         
         # NOTE: Final vault push removed - Syncthing handles this
