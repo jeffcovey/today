@@ -1914,6 +1914,7 @@ export class MigrationManager {
           
           console.log(`    Converted ${updated} invalid date formats`);
         }
+      }
     ];
 
     // Apply migrations in order
