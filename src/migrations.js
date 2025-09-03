@@ -1844,6 +1844,43 @@ export class MigrationManager {
             console.log(`    Fixed ${fixMalformed.changes} malformed dates`);
           }
         }
+      },
+      
+      {
+        version: 22,
+        description: 'Clean up weekly/quarterly date formats and underscore dates',
+        fn: (db) => {
+          console.log('Migration v22: Cleaning up invalid date formats');
+          
+          // Fix dates with underscores, Q (quarter), or W (week) patterns
+          const invalidPatterns = db.prepare(`
+            SELECT id, do_date FROM tasks 
+            WHERE do_date IS NOT NULL 
+              AND (
+                do_date LIKE '%_%'
+                OR do_date LIKE '%Q%' 
+                OR do_date LIKE '%W%'
+              )
+          `).all();
+          
+          console.log(`    Found ${invalidPatterns.length} tasks with invalid date patterns`);
+          
+          if (invalidPatterns.length > 0) {
+            // Clear these invalid dates
+            const clearInvalid = db.prepare(`
+              UPDATE tasks 
+              SET do_date = NULL 
+              WHERE do_date IS NOT NULL 
+                AND (
+                  do_date LIKE '%_%'
+                  OR do_date LIKE '%Q%' 
+                  OR do_date LIKE '%W%'
+                )
+            `).run();
+            
+            console.log(`    Cleared ${clearInvalid.changes} invalid date formats`);
+          }
+        }
       }
     ];
 
