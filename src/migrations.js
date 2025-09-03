@@ -1848,9 +1848,9 @@ export class MigrationManager {
       
       {
         version: 22,
-        description: 'Clean up weekly/quarterly date formats and underscore dates',
+        description: 'Convert weekly/quarterly date formats to proper dates',
         fn: (db) => {
-          console.log('Migration v22: Cleaning up invalid date formats');
+          console.log('Migration v22: Converting invalid date formats to proper dates');
           
           // Fix dates with underscores, Q (quarter), or W (week) patterns
           const invalidPatterns = db.prepare(`
@@ -1865,23 +1865,55 @@ export class MigrationManager {
           
           console.log(`    Found ${invalidPatterns.length} tasks with invalid date patterns`);
           
-          if (invalidPatterns.length > 0) {
-            // Clear these invalid dates
-            const clearInvalid = db.prepare(`
-              UPDATE tasks 
-              SET do_date = NULL 
-              WHERE do_date IS NOT NULL 
-                AND (
-                  do_date LIKE '%_%'
-                  OR do_date LIKE '%Q%' 
-                  OR do_date LIKE '%W%'
-                )
-            `).run();
+          const updateDate = db.prepare('UPDATE tasks SET do_date = ? WHERE id = ?');
+          let updated = 0;
+          
+          for (const task of invalidPatterns) {
+            let newDate = null;
+            const dateStr = task.do_date;
             
-            console.log(`    Cleared ${clearInvalid.changes} invalid date formats`);
+            // Parse patterns like "2025_Q3_08_W34_00" or "2025-Q3-08-18"
+            // These appear to be: YYYY_Q[quarter]_MM_W[week]_DD or YYYY-Q[quarter]-MM-DD
+            
+            if (dateStr.includes('_')) {
+              // Format: 2025_Q3_08_W34_00
+              const parts = dateStr.split('_');
+              if (parts.length >= 3) {
+                const year = parts[0];
+                const month = parts[2].padStart(2, '0');
+                // Try to get day from last part, default to current day
+                let day = parts[parts.length - 1];
+                if (day === '00' || !day.match(/^\d{2}$/)) {
+                  day = '03'; // Today is Sept 3
+                }
+                newDate = `${year}-${month}-${day.padStart(2, '0')}`;
+              }
+            } else if (dateStr.includes('Q')) {
+              // Format: 2025-Q3-08-18
+              const parts = dateStr.split('-');
+              if (parts.length >= 3) {
+                const year = parts[0];
+                const month = parts[2].padStart(2, '0');
+                const day = parts[3] || '03'; // Use provided day or today
+                newDate = `${year}-${month}-${day.padStart(2, '0')}`;
+              }
+            }
+            
+            // Validate the date is reasonable (2024-2026)
+            if (newDate && newDate.match(/^202[4-6]-\d{2}-\d{2}$/)) {
+              console.log(`      Converting "${dateStr}" to "${newDate}"`);
+              updateDate.run(newDate, task.id);
+              updated++;
+            } else {
+              // If we can't parse it, set to today
+              console.log(`      Converting unparseable "${dateStr}" to today's date`);
+              updateDate.run('2025-09-03', task.id);
+              updated++;
+            }
           }
+          
+          console.log(`    Converted ${updated} invalid date formats`);
         }
-      }
     ];
 
     // Apply migrations in order
