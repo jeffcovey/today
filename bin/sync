@@ -1564,47 +1564,19 @@ _sync_tasks_to_project_file() {
     
     print_info "  Adding $tasks_added task(s) to $(basename "$project_file")"
     
-    # Process the file to insert tasks
-    local inserted=false
-    local line_count=0
+    # Simply append the new tasks to the end of the file 
+    # Since we already verified these task IDs don't exist in the file,
+    # we can safely append them without worrying about duplication
     
-    while IFS= read -r line; do
-        line_count=$((line_count + 1))
-        
-        # Check if we're past the header (first heading)
-        if [[ "$line" =~ ^# ]] && [[ $line_count -gt 1 ]]; then
-            in_header=false
-        fi
-        
-        # If we find a ## Tasks section, insert after it
-        if [[ "$line" =~ ^##\ Tasks ]] || [[ "$line" =~ ^##\ Active\ Tasks ]]; then
-            echo "$line" >> "$temp_file"
-            echo "" >> "$temp_file"
-            echo "$tasks_to_insert" >> "$temp_file"
-            echo "" >> "$temp_file"
-            inserted=true
-            found_tasks_section=true
-        # If we're past the title and haven't inserted yet, insert here
-        elif [[ "$in_header" == false ]] && [[ "$inserted" == false ]] && [[ ! "$line" =~ ^# ]]; then
-            # Insert tasks section before any other content
-            echo "## Tasks" >> "$temp_file"
-            echo "" >> "$temp_file"
-            echo "$tasks_to_insert" >> "$temp_file"
-            echo "" >> "$temp_file"
-            echo "$line" >> "$temp_file"
-            inserted=true
-        else
-            echo "$line" >> "$temp_file"
-        fi
-    done < "$project_file"
-    
-    # If we never found a place to insert (empty file or just title), append at end
-    if [[ "$inserted" == false ]]; then
-        echo "" >> "$temp_file"
-        echo "## Tasks" >> "$temp_file"
-        echo "" >> "$temp_file"
-        echo "$tasks_to_insert" >> "$temp_file"
-    fi
+    # Append tasks to the end of the file
+    {
+        cat "$project_file"
+        echo ""
+        echo "## Tasks"
+        echo ""
+        echo "$tasks_to_insert"
+        echo ""
+    } > "$temp_file"
     
     # Replace the original file
     mv "$temp_file" "$project_file"
