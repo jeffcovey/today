@@ -1564,19 +1564,35 @@ _sync_tasks_to_project_file() {
     
     print_info "  Adding $tasks_added task(s) to $(basename "$project_file")"
     
-    # Simply append the new tasks to the end of the file 
-    # Since we already verified these task IDs don't exist in the file,
-    # we can safely append them without worrying about duplication
+    # Add new tasks at the top of the file, right after the title
+    # This ensures they're visible for processing
     
-    # Append tasks to the end of the file
-    {
-        cat "$project_file"
-        echo ""
-        echo "## Tasks"
-        echo ""
-        echo "$tasks_to_insert"
-        echo ""
-    } > "$temp_file"
+    local title_found=false
+    local tasks_inserted=false
+    
+    while IFS= read -r line; do
+        echo "$line" >> "$temp_file"
+        
+        # After we've found and written the title (# heading), insert tasks
+        if [[ "$line" =~ ^#\  ]] && [[ "$title_found" == false ]]; then
+            title_found=true
+            # Add a blank line after title, then the new tasks
+            echo "" >> "$temp_file"
+            echo "$tasks_to_insert" >> "$temp_file"
+            echo "" >> "$temp_file"
+            tasks_inserted=true
+        fi
+    done < "$project_file"
+    
+    # If no title was found, just prepend the tasks at the very beginning
+    if [[ "$tasks_inserted" == false ]]; then
+        {
+            echo "$tasks_to_insert"
+            echo ""
+            cat "$project_file"
+        } > "$temp_file.new"
+        mv "$temp_file.new" "$temp_file"
+    fi
     
     # Replace the original file
     mv "$temp_file" "$project_file"
