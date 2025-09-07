@@ -578,6 +578,234 @@ class CalendarSync {
       return [];
     }
   }
+
+  // Add event to Google Calendar
+  async addGoogleEvent(eventDetails) {
+    try {
+      // Check for calendar configuration
+      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      
+      if (!calendarId) {
+        throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
+      }
+
+      // Get service account credentials
+      let auth;
+      
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+        
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+        
+        auth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else {
+        throw new Error('No Google service account credentials found');
+      }
+
+      const calendar = google.calendar({ version: 'v3', auth });
+      
+      // Create the event
+      const event = {
+        summary: eventDetails.title,
+        location: eventDetails.location,
+        description: eventDetails.description,
+        start: {
+          dateTime: eventDetails.startDateTime,
+          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+        },
+        end: {
+          dateTime: eventDetails.endDateTime,
+          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+        },
+      };
+
+      const response = await calendar.events.insert({
+        calendarId: calendarId,
+        resource: event,
+      });
+
+      console.log(`✅ Event created: ${response.data.htmlLink}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error creating event:', error.message);
+      throw error;
+    }
+  }
+
+  // Delete event from Google Calendar
+  async deleteGoogleEvent(eventId) {
+    try {
+      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      
+      if (!calendarId) {
+        throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
+      }
+
+      // Get service account credentials
+      let auth;
+      
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+        
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+        
+        auth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else {
+        throw new Error('No Google service account credentials found');
+      }
+
+      const calendar = google.calendar({ version: 'v3', auth });
+      
+      await calendar.events.delete({
+        calendarId: calendarId,
+        eventId: eventId,
+      });
+
+      console.log(`✅ Event deleted: ${eventId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error deleting event:', error.message);
+      throw error;
+    }
+  }
+
+  // Update event in Google Calendar
+  async updateGoogleEvent(eventId, eventDetails) {
+    try {
+      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      
+      if (!calendarId) {
+        throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
+      }
+
+      // Get service account credentials
+      let auth;
+      
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+        
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+        
+        auth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else {
+        throw new Error('No Google service account credentials found');
+      }
+
+      const calendar = google.calendar({ version: 'v3', auth });
+      
+      // Build the update object
+      const event = {};
+      if (eventDetails.title) event.summary = eventDetails.title;
+      if (eventDetails.location) event.location = eventDetails.location;
+      if (eventDetails.description !== undefined) event.description = eventDetails.description;
+      
+      if (eventDetails.startDateTime) {
+        event.start = {
+          dateTime: eventDetails.startDateTime,
+          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+        };
+      }
+      
+      if (eventDetails.endDateTime) {
+        event.end = {
+          dateTime: eventDetails.endDateTime,
+          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+        };
+      }
+
+      const response = await calendar.events.patch({
+        calendarId: calendarId,
+        eventId: eventId,
+        resource: event,
+      });
+
+      console.log(`✅ Event updated: ${response.data.htmlLink}`);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error updating event:', error.message);
+      throw error;
+    }
+  }
+
+  // Parse event details from command line arguments
+  parseEventArgs(args) {
+    const event = {
+      title: '',
+      startDateTime: '',
+      endDateTime: '',
+      location: '',
+      description: '',
+      timeZone: 'America/Los_Angeles'
+    };
+
+    let i = 0;
+    while (i < args.length) {
+      const arg = args[i];
+      
+      if (arg === '--title' || arg === '-t') {
+        event.title = args[++i];
+      } else if (arg === '--date' || arg === '-d') {
+        const dateStr = args[++i];
+        const timeStr = args[++i] || '09:00';
+        const endTimeStr = args[++i] || '10:00';
+        
+        // Create date strings in YYYY-MM-DDTHH:MM:SS format (without timezone)
+        // Google Calendar API will apply the timezone specified in the event
+        const [startHour, startMin] = timeStr.split(':');
+        const [endHour, endMin] = endTimeStr.split(':');
+        
+        // Format: YYYY-MM-DDTHH:MM:SS (local time in the specified timezone)
+        event.startDateTime = `${dateStr}T${startHour.padStart(2, '0')}:${startMin.padStart(2, '0')}:00`;
+        event.endDateTime = `${dateStr}T${endHour.padStart(2, '0')}:${endMin.padStart(2, '0')}:00`;
+      } else if (arg === '--start') {
+        event.startDateTime = args[++i];
+      } else if (arg === '--end') {
+        event.endDateTime = args[++i];
+      } else if (arg === '--location' || arg === '-l') {
+        event.location = args[++i];
+      } else if (arg === '--description' || arg === '--desc') {
+        event.description = args[++i];
+      } else if (arg === '--timezone' || arg === '--tz') {
+        event.timeZone = args[++i];
+      } else if (!event.title) {
+        // First non-flag argument is the title
+        event.title = arg;
+      }
+      i++;
+    }
+
+    return event;
+  }
 }
 
 // Command line interface
@@ -609,6 +837,107 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     case 'week':
       const weekEvents = await calSync.getEventsForSummary();
       console.log(JSON.stringify(weekEvents, null, 2));
+      break;
+    
+    case 'add':
+      // Parse event details from command line
+      const eventArgs = process.argv.slice(3);
+      
+      if (eventArgs.length === 0 || eventArgs.includes('--help')) {
+        console.log(`
+Usage: calendar add [options]
+
+Options:
+  --title, -t <title>         Event title (required)
+  --date, -d <date> <start> <end>  Date and times (e.g., "2025-09-05" "20:00" "21:00")
+  --start <datetime>          Start datetime (ISO format)
+  --end <datetime>            End datetime (ISO format)
+  --location, -l <location>   Event location
+  --description <desc>        Event description
+  --timezone, --tz <tz>       Timezone (default: America/Los_Angeles)
+
+Examples:
+  calendar add --title "Quadz Bar Showtunes" --date "2025-09-05" "20:00" "21:00" --location "Quadz Bar, Palm Springs"
+  calendar add "Team Meeting" --start "2025-09-08T10:00:00" --end "2025-09-08T11:00:00"
+        `);
+        break;
+      }
+      
+      const eventDetails = calSync.parseEventArgs(eventArgs);
+      
+      if (!eventDetails.title) {
+        console.error('❌ Error: Event title is required');
+        process.exit(1);
+      }
+      
+      if (!eventDetails.startDateTime || !eventDetails.endDateTime) {
+        console.error('❌ Error: Start and end times are required');
+        console.log('Use --date followed by date and times, or --start and --end with full datetime');
+        process.exit(1);
+      }
+      
+      console.log('📅 Creating event...');
+      console.log(`  Title: ${eventDetails.title}`);
+      console.log(`  Start: ${new Date(eventDetails.startDateTime).toLocaleString()}`);
+      console.log(`  End: ${new Date(eventDetails.endDateTime).toLocaleString()}`);
+      if (eventDetails.location) console.log(`  Location: ${eventDetails.location}`);
+      if (eventDetails.description) console.log(`  Description: ${eventDetails.description}`);
+      
+      await calSync.addGoogleEvent(eventDetails);
+      break;
+      
+    case 'delete':
+      const deleteEventId = process.argv[3];
+      
+      if (!deleteEventId || deleteEventId === '--help') {
+        console.log(`
+Usage: calendar delete <event-id>
+
+Delete an event from Google Calendar by its ID.
+
+Example:
+  calendar delete pvu3qkdo96orhscs2nbpm44kq0
+        `);
+        break;
+      }
+      
+      console.log(`🗑️  Deleting event ${deleteEventId}...`);
+      await calSync.deleteGoogleEvent(deleteEventId);
+      break;
+      
+    case 'update':
+      const updateEventId = process.argv[3];
+      const updateArgs = process.argv.slice(4);
+      
+      if (!updateEventId || updateEventId === '--help' || updateArgs.length === 0) {
+        console.log(`
+Usage: calendar update <event-id> [options]
+
+Options (all optional, only specified fields will be updated):
+  --title, -t <title>         New event title
+  --date, -d <date> <start> <end>  New date and times
+  --start <datetime>          New start datetime
+  --end <datetime>            New end datetime
+  --location, -l <location>   New location
+  --description <desc>        New description
+  --timezone, --tz <tz>       Timezone for date/time updates
+
+Example:
+  calendar update pvu3qkdo96orhscs2nbpm44kq0 --date "2025-09-07" "17:00" "19:00"
+        `);
+        break;
+      }
+      
+      const updateDetails = calSync.parseEventArgs(updateArgs);
+      
+      console.log(`📝 Updating event ${updateEventId}...`);
+      if (updateDetails.title) console.log(`  New title: ${updateDetails.title}`);
+      if (updateDetails.startDateTime) console.log(`  New start: ${new Date(updateDetails.startDateTime).toLocaleString()}`);
+      if (updateDetails.endDateTime) console.log(`  New end: ${new Date(updateDetails.endDateTime).toLocaleString()}`);
+      if (updateDetails.location) console.log(`  New location: ${updateDetails.location}`);
+      if (updateDetails.description !== undefined) console.log(`  New description: ${updateDetails.description}`);
+      
+      await calSync.updateGoogleEvent(updateEventId, updateDetails);
       break;
       
     case 'setup':
@@ -661,9 +990,15 @@ Commands:
   sync    - Sync all configured calendars
   today   - Show today's events
   week    - Show this week's events
+  add     - Add a new event to Google Calendar
+  update  - Update an existing Google Calendar event
+  delete  - Delete a Google Calendar event
   setup   - Show setup instructions
 
 Calendar data is stored in SQLite database (.data/today.db)
+
+For detailed help on any command:
+  calendar <command> --help
       `);
     }
     process.exit(0);

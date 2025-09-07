@@ -9,7 +9,8 @@
       "Bash(bin/db-query:*)",
       "Bash(python:*)",
       "WebFetch(domain:theprimetimersww.com)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(bin/calendar:*)"
     ],
     "deny": [],
     "ask": []
