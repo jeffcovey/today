@@ -37,7 +37,18 @@ cd "$VAULT_DIR" || exit 1
 
 # Check if it's a git repository
 if [ ! -d ".git" ]; then
-    error "Vault directory is not a git repository"
+    warning "Vault directory is not a git repository yet"
+    echo ""
+    echo "To initialize vault as a git repository, run:"
+    echo "  cd $VAULT_DIR"
+    echo "  git init"
+    echo "  git branch -m main"
+    echo "  git add ."
+    echo "  git commit -m 'Initial commit'"
+    echo ""
+    echo "Then set up a remote repository:"
+    echo "  $0 setup-remote git@github.com:yourusername/vault.git"
+    echo ""
     exit 1
 fi
 
