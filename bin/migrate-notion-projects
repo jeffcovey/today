@@ -58,7 +58,10 @@ async function migrateProjects(options = {}) {
   }
 
   const notion = new NotionAPI(notionToken);
-  const outputDir = options.outputDir || '/workspaces/today/vault/projects';
+  // Get the directory where this script lives, then go to parent (project root)
+  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  const projectDir = path.resolve(scriptDir, '..');
+  const outputDir = options.outputDir || path.join(projectDir, 'vault', 'projects');
   const archiveDir = path.join(outputDir, 'archive');
   const dryRun = options.dryRun || false;
   const limit = options.limit || null;

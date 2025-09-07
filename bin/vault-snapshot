@@ -3,7 +3,10 @@
 # Create Time Machine-style incremental backups using hard links
 # Very space-efficient for unchanged files
 
-VAULT_DIR="/workspaces/today/vault"
+# Get the directory where this script lives, then go to parent (project root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VAULT_DIR="$PROJECT_DIR/vault"
 BACKUP_ROOT="${HOME}/vault-snapshots"
 DATE=$(date +%Y%m%d-%H%M%S)
 LATEST_LINK="${BACKUP_ROOT}/latest"

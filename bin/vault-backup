@@ -3,8 +3,12 @@
 # Create daily backups of vault directory
 # Keeps last 7 days of backups
 
+# Get the directory where this script lives, then go to parent (project root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 BACKUP_DIR="${HOME}/vault-backups"
-VAULT_DIR="/workspaces/today/vault"
+VAULT_DIR="$PROJECT_DIR/vault"
 DATE=$(date +%Y%m%d-%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/vault-${DATE}.tar.gz"
 

@@ -11,17 +11,14 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Syncthing Conflict Cleanup ===${NC}"
 
-# Check if we're in a vault directory or its parent
-if [ -d "vault" ]; then
-    VAULT_DIR="vault"
-elif [ -d "../vault" ]; then
-    VAULT_DIR="../vault"
-elif [ -d "/opt/today/vault" ]; then
-    VAULT_DIR="/opt/today/vault"
-elif [ "$(basename $PWD)" = "vault" ]; then
-    VAULT_DIR="."
-else
-    echo -e "${RED}Error: Cannot find vault directory${NC}"
+# Get the directory where this script lives, then go to parent (project root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VAULT_DIR="$PROJECT_DIR/vault"
+
+# Check if vault directory exists
+if [ ! -d "$VAULT_DIR" ]; then
+    echo -e "${RED}Error: Cannot find vault directory at $VAULT_DIR${NC}"
     exit 1
 fi
 

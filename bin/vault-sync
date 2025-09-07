@@ -3,7 +3,10 @@
 # Vault Git Sync Script
 # Automatically syncs the vault/ directory with its remote repository
 
-VAULT_DIR="/workspaces/today/vault"
+# Get the directory where this script lives, then go to parent (project root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VAULT_DIR="$PROJECT_DIR/vault"
 SCRIPT_NAME="vault-sync"
 
 # Colors for output

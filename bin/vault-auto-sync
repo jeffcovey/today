@@ -4,8 +4,12 @@
 # Runs periodically to keep vault synchronized
 # Can be added to cron or systemd timer
 
-VAULT_SYNC="/workspaces/today/bin/vault-sync"
-LOG_FILE="/workspaces/today/vault/.sync.log"
+# Get the directory where this script lives, then go to parent (project root)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+VAULT_SYNC="$PROJECT_DIR/bin/vault-sync"
+LOG_FILE="$PROJECT_DIR/vault/.sync.log"
 LOCK_FILE="/tmp/vault-sync.lock"
 
 # Ensure only one instance runs at a time
