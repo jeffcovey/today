@@ -10,7 +10,10 @@
       "Bash(python:*)",
       "WebFetch(domain:theprimetimersww.com)",
       "Bash(grep:*)",
-      "Bash(bin/calendar:*)"
+      "Bash(bin/calendar:*)",
+      "WebSearch",
+      "WebFetch(domain:ptod.us)",
+      "WebFetch(domain:oldergay.men)"
     ],
     "deny": [],
     "ask": []

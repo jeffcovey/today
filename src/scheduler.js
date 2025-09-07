@@ -80,14 +80,8 @@ const jobs = [
     },
     {
         schedule: '*/5 * * * *', // Every 5 minutes
-        command: '/opt/today/bin/syncthing-health-check check >> /var/log/syncthing-health.log 2>&1 || true',
-        description: 'Syncthing health check and auto-recovery'
-    },
-    {
-        schedule: '0 3 * * *', // Daily at 3 AM
-        command: 'systemctl restart syncthing >> /var/log/syncthing-health.log 2>&1 || true',
-        description: 'Daily Syncthing restart to clear issues',
-        timezone: true
+        command: 'bin/vault-auto-sync || true',
+        description: 'Vault git sync'
     },
     {
         schedule: '0 * * * *', // Every hour

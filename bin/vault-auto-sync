@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Vault Auto-Sync Script
+# Runs periodically to keep vault synchronized
+# Can be added to cron or systemd timer
+
+VAULT_SYNC="/workspaces/today/bin/vault-sync"
+LOG_FILE="/workspaces/today/vault/.sync.log"
+LOCK_FILE="/tmp/vault-sync.lock"
+
+# Ensure only one instance runs at a time
+if [ -f "$LOCK_FILE" ]; then
+    # Check if the process is still running
+    PID=$(cat "$LOCK_FILE")
+    if ps -p "$PID" > /dev/null 2>&1; then
+        echo "Sync already in progress (PID: $PID)"
+        exit 0
+    else
+        # Stale lock file, remove it
+        rm "$LOCK_FILE"
+    fi
+fi
+
+# Create lock file
+echo $$ > "$LOCK_FILE"
+
+# Ensure lock file is removed on exit
+trap "rm -f $LOCK_FILE" EXIT
+
+# Run sync and log output
+{
+    echo "=== Auto-sync started at $(date) ==="
+    "$VAULT_SYNC" sync
+    echo "=== Auto-sync completed at $(date) ==="
+    echo ""
+} >> "$LOG_FILE" 2>&1
+
+# Keep log file size manageable (keep last 1000 lines)
+if [ -f "$LOG_FILE" ]; then
+    tail -n 1000 "$LOG_FILE" > "$LOG_FILE.tmp"
+    mv "$LOG_FILE.tmp" "$LOG_FILE"
+fi

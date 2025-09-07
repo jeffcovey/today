@@ -76,8 +76,8 @@ main() {
     # Critical path operations (fast, important)
     # Single bidirectional Turso sync (replaces separate pull and push)
     run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
-    # NOTE: Vault sync removed - now using Syncthing for real-time sync
-    # run_sync_step "📝 GitHub Vault" sync_github_vault "GitHub vault synced" "GitHub vault"
+    # Vault sync using git instead of Syncthing
+    run_sync_step "📝 Vault Git Sync" sync_vault_git "Vault synced via git" "Vault sync"
     run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
@@ -190,12 +190,55 @@ main() {
     echo "Next step: Run 'bin/today' to get AI suggestions on what to do today"
 }
 
-# Sync GitHub vault
+# Sync vault using git
+sync_vault_git() {
+    cd "$(dirname "$0")/.." || return 1
+    
+    # Check if vault directory exists
+    if [[ ! -d vault ]]; then
+        print_error "Vault directory not found"
+        return 1
+    fi
+    
+    # Check if vault is a git repository
+    if [[ ! -d vault/.git ]]; then
+        print_error "Vault is not a git repository. Run setup instructions in vault/README.md"
+        return 1
+    fi
+    
+    # Change to vault directory
+    cd vault || return 1
+    
+    # Check if remote is configured
+    if ! git remote -v | grep -q origin; then
+        print_info "No remote configured for vault. Run: bin/vault-sync setup-remote <url>"
+        return 1
+    fi
+    
+    print_info "Syncing vault with git..."
+    
+    # Use the vault-sync script
+    if [[ -f ../bin/vault-sync ]]; then
+        ../bin/vault-sync sync 2>&1 | while IFS= read -r line; do
+            if [[ "$line" == *"[vault-sync]"* ]]; then
+                # Strip the [vault-sync] prefix for cleaner output
+                echo "$line" | sed 's/\[vault-sync\] //'
+            else
+                echo "$line"
+            fi
+        done
+        return ${PIPESTATUS[0]}
+    else
+        print_error "vault-sync script not found"
+        return 1
+    fi
+}
+
+# Legacy GitHub vault function (kept for compatibility)
 sync_github_vault() {
-    # DEPRECATED: Vault is now synced via Syncthing, not GitHub
-    # This function is kept for backwards compatibility but does nothing
-    print_info "Vault sync skipped - using Syncthing for real-time sync"
-    return 0
+    # Now just calls the git sync function
+    sync_vault_git
+    return $?
 }
 
 sync_github_vault_original() {
@@ -1861,8 +1904,8 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - GitHub vault, tasks, inbox, and consistency check"
-        # NOTE: sync_github_vault removed - using Syncthing
+        print_info "Quick sync mode - vault, tasks, inbox, and consistency check"
+        sync_vault_git
         cleanup_sync_conflicts
         clean_markdown_files
         clean_database_task_titles
@@ -1870,9 +1913,7 @@ case "${1:-}" in
         SKIP_CLASSIFICATION=1 sync_tasks
         sync_project_tasks
         check_task_consistency
-        
-        # NOTE: Final vault push removed - Syncthing handles this
-        # sync_github_vault
+        sync_vault_git  # Final push of any changes
         ;;
     --force)
         # Force full sync - bypasses smart caching
