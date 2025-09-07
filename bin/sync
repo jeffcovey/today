@@ -217,7 +217,7 @@ sync_vault_git() {
     
     print_info "Syncing vault with git..."
     
-    # Use the vault-sync script
+    # Use the vault-sync script for full bidirectional sync
     if [[ -f ../bin/vault-sync ]]; then
         ../bin/vault-sync sync 2>&1 | while IFS= read -r line; do
             if [[ "$line" == *"[vault-sync]"* ]]; then

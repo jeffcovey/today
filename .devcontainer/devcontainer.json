@@ -29,7 +29,7 @@
 	"remoteEnv": {
 		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
 	},
-	"forwardPorts": [2222, 8081, 8384],
+	"forwardPorts": [2222, 8081],
 	"portsAttributes": {
 		"2222": {
 			"label": "SSH",
@@ -37,10 +37,6 @@
 		},
 		"8081": {
 			"label": "Code Server",
-			"onAutoForward": "notify"
-		},
-		"8384": {
-			"label": "Syncthing",
 			"onAutoForward": "notify"
 		}
 	},

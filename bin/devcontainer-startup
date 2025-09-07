@@ -16,16 +16,20 @@ if [ -f "bin/setup" ]; then
 fi
 
 
-# Start Syncthing for vault sync with monitoring
-if [ -f "bin/syncthing-headless" ]; then
-    echo "Starting Syncthing..."
-    bash bin/syncthing-headless start || echo "Syncthing startup failed"
+# Start vault git sync instead of Syncthing
+if [ -f "bin/vault-sync-daemon" ] && [ -d "vault/.git" ]; then
+    echo "Setting up vault git sync..."
+    # Run initial pull to get latest
+    echo "Pulling latest vault changes..."
+    (cd vault && git pull --quiet) || echo "Initial vault pull failed - may need to resolve conflicts"
     
-    # Start the monitor to keep Syncthing running
-    if [ -f "bin/syncthing-monitor" ]; then
-        echo "Starting Syncthing monitor..."
-        bash bin/syncthing-monitor
-    fi
+    # Start the sync daemon for periodic syncing
+    echo "Starting vault sync daemon (syncs every 5 minutes)..."
+    nohup bin/vault-sync-daemon > /dev/null 2>&1 &
+    echo "Vault sync daemon started"
+    echo "To sync manually, run: bin/vault-sync"
+else
+    echo "Vault git sync not configured - run bin/vault-sync setup-remote"
 fi
 
 # Start code-server
