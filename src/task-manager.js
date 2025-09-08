@@ -927,12 +927,12 @@ export class TaskManager {
             project_id: projectId
           };
           
-          // Set do_date from extracted date tag, review date, or neither
-          if (extractedDate && !reviewDate) {
+          // Set do_date from extracted date tag only (not from plan file names)
+          if (extractedDate) {
             taskData.do_date = extractedDate;
-          } else if (reviewDate && !isCompleted) {
-            taskData.do_date = reviewDate;
           }
+          // DISABLED: Don't auto-assign dates from plan file names
+          // Plan files are for organizing/reviewing tasks, not setting due dates
           
           taskId = this.createTask(taskData);
           
