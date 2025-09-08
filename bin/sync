@@ -1904,7 +1904,7 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - vault, tasks, inbox, and consistency check"
+        print_info "Quick sync mode - vault, tasks, inbox, consistency check, and Turso"
         sync_vault_git
         cleanup_sync_conflicts
         clean_markdown_files
@@ -1913,6 +1913,7 @@ case "${1:-}" in
         SKIP_CLASSIFICATION=1 sync_tasks
         sync_project_tasks
         check_task_consistency
+        sync_turso_bidirectional  # Sync with Turso
         sync_vault_git  # Final push of any changes
         ;;
     --force)
