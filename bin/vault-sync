@@ -92,19 +92,90 @@ case "$ACTION" in
     sync)
         log "Starting full sync..."
         
+        # Check for merge conflicts first
+        if git status | grep -q "Unmerged paths"; then
+            warning "Detected unmerged files from previous sync attempt"
+            
+            # Get list of conflicted files
+            CONFLICTED_FILES=$(git diff --name-only --diff-filter=U)
+            
+            # Check if all conflicts are in auto-generated files
+            AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md)"
+            ALL_AUTO_GEN=true
+            
+            for file in $CONFLICTED_FILES; do
+                if ! echo "$file" | grep -qE "$AUTO_GEN_PATTERN"; then
+                    ALL_AUTO_GEN=false
+                    break
+                fi
+            done
+            
+            if [ "$ALL_AUTO_GEN" = true ]; then
+                log "All conflicts are in auto-generated files, accepting remote versions..."
+                for file in $CONFLICTED_FILES; do
+                    git checkout --theirs "$file"
+                    git add "$file"
+                done
+                
+                # If we're in a rebase, continue it
+                if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
+                    git rebase --continue || git rebase --skip
+                fi
+            else
+                error "Manual conflicts detected in non-auto-generated files"
+                error "Please resolve conflicts manually and run sync again"
+                exit 1
+            fi
+        fi
+        
         # First, pull any remote changes
         log "Pulling remote changes..."
         git pull --rebase || {
             warning "Pull failed, attempting to resolve..."
             
-            # If pull fails, stash local changes, pull, then reapply
-            git stash
-            git pull
-            git stash pop || {
-                error "Conflict detected! Manual intervention required."
-                error "Your changes are saved in git stash"
-                exit 1
-            }
+            # Check if it's just auto-generated files
+            CONFLICTED_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null)
+            if [ -n "$CONFLICTED_FILES" ]; then
+                AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md)"
+                ALL_AUTO_GEN=true
+                
+                for file in $CONFLICTED_FILES; do
+                    if ! echo "$file" | grep -qE "$AUTO_GEN_PATTERN"; then
+                        ALL_AUTO_GEN=false
+                        break
+                    fi
+                done
+                
+                if [ "$ALL_AUTO_GEN" = true ]; then
+                    log "Auto-generated file conflicts detected, accepting remote versions..."
+                    for file in $CONFLICTED_FILES; do
+                        git checkout --theirs "$file" 2>/dev/null
+                        git add "$file" 2>/dev/null
+                    done
+                    
+                    # Try to continue rebase
+                    git rebase --continue 2>/dev/null || git rebase --skip 2>/dev/null
+                else
+                    # Fall back to stash approach for manual files
+                    git rebase --abort 2>/dev/null
+                    git stash
+                    git pull
+                    git stash pop || {
+                        error "Conflict detected! Manual intervention required."
+                        error "Your changes are saved in git stash"
+                        exit 1
+                    }
+                fi
+            else
+                # If pull fails for other reasons, try stash
+                git stash
+                git pull
+                git stash pop || {
+                    error "Conflict detected! Manual intervention required."
+                    error "Your changes are saved in git stash"
+                    exit 1
+                }
+            fi
         }
         
         # Check for local changes and commit them

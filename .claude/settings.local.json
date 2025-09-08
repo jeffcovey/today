@@ -14,7 +14,8 @@
       "WebSearch",
       "WebFetch(domain:ptod.us)",
       "WebFetch(domain:oldergay.men)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git diff:*)"
     ],
     "deny": [],
     "ask": []
