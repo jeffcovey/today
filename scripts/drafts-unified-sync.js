@@ -1,34 +1,35 @@
 // Unified Drafts ↔ Today Sync System
-// Syncs with vault via droplet APIs
+// Syncs with vault via GitHub repository
 //
 // Setup:
 // 1. In Drafts, create a new Action called "Today Sync"
 // 2. Add a "Script" step and paste this entire code
-// 3. The script will show a menu to choose operation
+// 3. Run the action and enter your GitHub token when prompted
+// 4. The script will show a menu to choose sync operation
 
 // ============ CONFIGURATION ============
 const CONFIG = {
-    // Droplet API
-    dropletUrl: 'https://today.jeffcovey.net',
-    dropletApiKey: null, // Will be set from credentials
+    // GitHub repository settings
+    owner: 'jeffcovey',  // Your GitHub username
+    repo: 'vault',       // Your vault repository name
+    branch: 'main',
+    githubToken: null,   // Will be set from credentials
     
     lastSyncKey: 'today_sync_last_timestamp' // Key for storing last sync time
 };
 
 // ============ CREDENTIAL SETUP ============
 function setupCredentials() {
-    const credential = Credential.create("Today Sync Credentials", "Configure sync credentials");
-    credential.addPasswordField("dropletApiKey", "Droplet API Key");
+    const credential = Credential.create("GitHub Vault Sync", "Configure GitHub access token");
+    credential.addPasswordField("githubToken", "GitHub Personal Access Token");
     
     if (!credential.authorize()) {
         return false;
     }
     
-    CONFIG.dropletApiKey = credential.getValue("dropletApiKey");
-    
-    // API key is required
-    if (!CONFIG.dropletApiKey || CONFIG.dropletApiKey.trim() === '') {
-        app.displayErrorMessage("Droplet API Key is required");
+    CONFIG.githubToken = credential.getValue("githubToken");
+    if (!CONFIG.githubToken || CONFIG.githubToken.trim() === '') {
+        app.displayErrorMessage("GitHub Token is required");
         return false;
     }
     
@@ -165,17 +166,19 @@ function updateMetadata(content, updates) {
 
 // Convert vault path to Drafts tags
 function pathToTags(filePath) {
-    const parts = filePath.split('/').filter(p => p && p !== 'vault');
+    // Remove 'vault/' prefix if present
+    const cleanPath = filePath.replace(/^vault\//, '');
+    const parts = cleanPath.split('/').filter(p => p);
     const tags = [];
     
     // Add vault base tag
     tags.push('today-sync');
     
-    // Add parent directories as tags
-    for (let i = 0; i < parts.length - 1; i++) {
-        const tag = parts.slice(0, i + 1).join('-').replace('.md', '').toLowerCase();
-        if (tag && !tags.includes(tag)) {
-            tags.push(tag);
+    // Add folder tag based on first directory
+    if (parts.length > 0) {
+        const folder = parts[0].toLowerCase();
+        if (!tags.includes(folder)) {
+            tags.push(folder);
         }
     }
     
@@ -213,17 +216,21 @@ function generateTodayPath(draft) {
         .replace(/^-+|-+$/g, '')
         .substring(0, 50) || 'untitled';
     
-    // Determine base path from tags
-    let basePath = 'vault/notes';
+    // Determine base path from tags (no 'vault/' prefix for GitHub)
+    let basePath = 'notes';
     
     // Check for folder-specific tags
     const tags = draft.tags || [];
-    if (tags.includes('projects')) {
-        basePath = 'vault/projects';
+    if (tags.includes('tasks')) {
+        basePath = 'tasks';
+    } else if (tags.includes('projects')) {
+        basePath = 'projects';
+    } else if (tags.includes('plans')) {
+        basePath = 'plans';
     } else if (tags.includes('daily') || tags.includes('journal')) {
-        basePath = 'vault/daily';
+        basePath = 'daily';
     } else if (tags.includes('reference')) {
-        basePath = 'vault/reference';
+        basePath = 'reference';
     }
     
     // Add timestamp for uniqueness
@@ -232,132 +239,161 @@ function generateTodayPath(draft) {
     return `${basePath}/${date}-${title}.md`;
 }
 
-// ============ DROPLET API FUNCTIONS ============
 
-// Fetch file list from droplet vault API
-function fetchDropletFileList() {
+// ============ GITHUB API FUNCTIONS ============
+
+// Fetch file list from GitHub repository
+function fetchGitHubFileList() {
     try {
         const http = HTTP.create();
         const response = http.request({
-            "url": `${CONFIG.dropletUrl}/api/vault/list`,
+            "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/git/trees/${CONFIG.branch}?recursive=1`,
             "method": "GET",
             "headers": {
-                "X-API-Key": CONFIG.dropletApiKey,
-                "Accept": "application/json"
+                "Authorization": `Bearer ${CONFIG.githubToken}`,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Drafts-Vault-Sync"
             },
             timeout: 30
         });
         
         if (response.success) {
             const data = JSON.parse(response.responseText);
-            return data.files || [];
+            // Filter for .md files only, exclude hidden directories
+            const files = data.tree
+                .filter(item => {
+                    // Must be a blob (file) and end with .md
+                    if (item.type !== 'blob' || !item.path.endsWith('.md')) {
+                        return false;
+                    }
+                    // Exclude paths that contain hidden directories (starting with .)
+                    const pathParts = item.path.split('/');
+                    for (const part of pathParts) {
+                        if (part.startsWith('.')) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
+                .map(item => ({
+                    path: item.path,
+                    sha: item.sha,
+                    size: item.size
+                }));
+            return files;
         } else {
-            console.log(`Failed to fetch file list: ${response.statusCode} ${response.error}`);
+            console.log(`Failed to fetch GitHub file list: ${response.statusCode} ${response.error}`);
             return null;
         }
     } catch (error) {
-        console.log(`Error fetching file list: ${error}`);
+        console.log(`Error fetching GitHub file list: ${error}`);
         return null;
     }
 }
 
-// Fetch single file from droplet
-function fetchDropletFile(path) {
+// Fetch single file from GitHub
+function fetchGitHubFile(path) {
     try {
-        // Remove 'vault/' prefix if present since the API endpoint already includes /vault/
-        const cleanPath = path.replace(/^vault\//, '');
-        
         const http = HTTP.create();
         const response = http.request({
-            "url": `${CONFIG.dropletUrl}/api/vault/file/${encodeURIComponent(cleanPath)}`,
+            "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${encodeURIComponent(path)}?ref=${CONFIG.branch}`,
             "method": "GET",
             "headers": {
-                "X-API-Key": CONFIG.dropletApiKey,
-                "Accept": "application/json"
+                "Authorization": `Bearer ${CONFIG.githubToken}`,
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "Drafts-Vault-Sync"
             },
             timeout: 30
         });
         
         if (response.success) {
             const data = JSON.parse(response.responseText);
-            // Decode Base64 content if encoded
-            const content = data.contentEncoding === 'base64' 
-                ? decodeBase64(data.content) 
-                : data.content;
+            // GitHub returns content as Base64 with newlines, strip them first
+            const cleanBase64 = data.content.replace(/\n/g, '');
+            const content = decodeBase64(cleanBase64);
             
             return {
                 exists: true,
                 content: content,
                 sha: data.sha,
-                lastModified: data.lastModified
+                lastModified: data.last_modified || new Date().toISOString()
             };
         } else if (response.statusCode === 404) {
             return { exists: false };
         } else {
-            console.log(`Failed to fetch file ${path}: ${response.statusCode} ${response.error}`);
+            console.log(`Failed to fetch GitHub file ${path}: ${response.statusCode} ${response.error}`);
             return null;
         }
     } catch (error) {
-        console.log(`Error fetching file ${path}: ${error}`);
+        console.log(`Error fetching GitHub file ${path}: ${error}`);
         return null;
     }
 }
 
-// Upload file to droplet inbox
-function uploadToDropletInbox(filename, content) {
+// Upload file to GitHub
+function uploadToGitHub(path, content, sha = null) {
     try {
+        // Prepare the commit message
+        const title = path.split('/').pop().replace('.md', '');
+        const message = sha ? `Update ${title}` : `Create ${title}`;
+        
+        const requestData = {
+            "message": message,
+            "content": encodeBase64(content),
+            "branch": CONFIG.branch
+        };
+        
+        // Include SHA if updating existing file
+        if (sha) {
+            requestData.sha = sha;
+        }
+        
         const http = HTTP.create();
         const response = http.request({
-            "url": `${CONFIG.dropletUrl}/api/inbox/upload`,
-            "method": "POST",
+            "url": `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${encodeURIComponent(path)}`,
+            "method": "PUT",
             "headers": {
-                "X-API-Key": CONFIG.dropletApiKey,
-                "Content-Type": "application/json"
+                "Authorization": `Bearer ${CONFIG.githubToken}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json",
+                "User-Agent": "Drafts-Vault-Sync"
             },
-            "data": {
-                "filename": filename,
-                "content": content
-            },
+            "data": requestData,
             timeout: 30
         });
         
         if (response.success) {
             const data = JSON.parse(response.responseText);
-            return { success: true, path: data.path };
+            return { success: true, sha: data.content.sha };
         } else {
-            console.log(`Failed to upload ${filename}: ${response.statusCode} ${response.error}`);
+            console.log(`Failed to upload to GitHub ${path}: ${response.statusCode} ${response.responseText}`);
             return { success: false, error: response.statusCode };
         }
     } catch (error) {
-        console.log(`Error uploading ${filename}: ${error}`);
+        console.log(`Error uploading to GitHub ${path}: ${error}`);
         return { success: false, error: error.message };
     }
 }
 
 // ============ SYNC FUNCTIONS ============
 
-// Pull from droplet to Drafts
+// Pull from GitHub to Drafts
 function pullFromSource(incrementalSync = true) {
     const stats = { created: 0, updated: 0, deleted: 0, errors: 0 };
     
-    console.log(incrementalSync ? "Starting incremental pull..." : "Starting full pull...");
+    console.log(`${incrementalSync ? "Incremental" : "Full"} pull from GitHub...`);
     
-    // Fetch files from droplet
-    console.log("Fetching files from droplet...");
-    const dropletFiles = fetchDropletFileList();
+    // Fetch files from GitHub
+    console.log("Fetching files from GitHub...");
+    const sourceFiles = fetchGitHubFileList();
     
-    if (!dropletFiles || dropletFiles.length === 0) {
-        throw new Error("Failed to fetch files from droplet");
+    if (!sourceFiles || sourceFiles.length === 0) {
+        throw new Error("Failed to fetch files from GitHub");
     }
     
-    // Filter out inbox files
-    let noteFiles = dropletFiles.filter(item => 
-        !item.path.includes("/inbox/")
-    );
+    console.log(`Found ${sourceFiles.length} files from GitHub`);
     
-    console.log(`Found ${noteFiles.length} files from droplet`);
-    
-    for (const file of noteFiles) {
+    for (const file of sourceFiles) {
         try {
             // Find existing draft
             let draft = findDraftByPath(file.path);
@@ -371,7 +407,7 @@ function pullFromSource(incrementalSync = true) {
             }
             
             // Fetch file content
-            const fileData = fetchDropletFile(file.path);
+            const fileData = fetchGitHubFile(file.path);
             
             if (!fileData || !fileData.exists) {
                 stats.errors++;
@@ -382,7 +418,7 @@ function pullFromSource(incrementalSync = true) {
                 // Update existing draft
                 draft.content = updateMetadata(fileData.content, {
                     today_path: file.path,
-                    today_sha: fileData.sha,
+                    today_sha: fileData.sha || file.sha,
                     last_sync: new Date().toISOString(),
                     sync_status: "synced"
                 });
@@ -395,7 +431,7 @@ function pullFromSource(incrementalSync = true) {
                 draft = Draft.create();
                 draft.content = updateMetadata(fileData.content, {
                     today_path: file.path,
-                    today_sha: fileData.sha,
+                    today_sha: fileData.sha || file.sha,
                     last_sync: new Date().toISOString(),
                     sync_status: "synced"
                 });
@@ -421,11 +457,11 @@ function pullFromSource(incrementalSync = true) {
     return stats;
 }
 
-// Push from Drafts to droplet
+// Push from Drafts to GitHub
 function pushToSource(onlyModified = true) {
     const stats = { created: 0, updated: 0, deleted: 0, errors: 0 };
     
-    console.log(onlyModified ? "Starting push of modified drafts..." : "Starting full push...");
+    console.log(`${onlyModified ? "Modified" : "Full"} push to GitHub...`);
     
     // Get all sync-enabled drafts
     const syncDrafts = Draft.query("", "all", ["today-sync"], [], "modified", false, false);
@@ -454,32 +490,33 @@ function pushToSource(onlyModified = true) {
                 }
             }
             
-            // Determine filename from existing path or generate new one
+            // Determine path from existing metadata or generate new one
             let todayPath = metadata.today_path;
             if (!todayPath) {
                 todayPath = generateTodayPath(draft);
             }
             
-            // Generate filename for inbox upload
-            const pathParts = todayPath.split('/');
-            const filename = pathParts[pathParts.length - 1];
+            // Check if file exists to get its SHA
+            const existingFile = fetchGitHubFile(todayPath);
+            const sha = existingFile && existingFile.exists ? existingFile.sha : null;
             
-            // Upload to inbox
-            const uploadResult = uploadToDropletInbox(filename, content);
+            // Upload to GitHub
+            const uploadResult = uploadToGitHub(todayPath, content, sha);
             
             if (uploadResult.success) {
                 // Update draft with sync metadata
                 draft.content = updateMetadata(content, {
                     today_path: todayPath,
+                    today_sha: uploadResult.sha || metadata.today_sha,
                     last_sync: new Date().toISOString(),
                     sync_status: "synced"
                 });
                 draft.update();
                 
                 stats.updated++;
-                console.log(`Uploaded: ${filename}`);
+                console.log(`Uploaded: ${todayPath}`);
             } else {
-                console.log(`Failed to upload: ${filename}`);
+                console.log(`Failed to upload: ${todayPath}`);
                 stats.errors++;
             }
             
@@ -500,7 +537,7 @@ if (!setupCredentials()) {
 
 const prompt = Prompt.create();
 prompt.title = "Today Sync";
-prompt.message = "Choose sync operation:";
+prompt.message = "GitHub Vault Sync";
 prompt.addButton("📥 Pull from Vault", "pull");
 prompt.addButton("📤 Push to Vault", "push");
 prompt.addButton("🔄 Two-Way Sync", "sync");
@@ -522,7 +559,6 @@ if (prompt.show()) {
         } else if (action === "sync") {
             const pullStats = pullFromSource(true);
             const pushStats = pushToSource(true);
-            const total = pullStats.created + pullStats.updated + pushStats.updated;
             app.displaySuccessMessage(`Two-way sync complete!\n\n📥 From vault: ${pullStats.created + pullStats.updated}\n📤 To vault: ${pushStats.updated}\n❌ Errors: ${pullStats.errors + pushStats.errors}`);
             
         } else if (action === "full") {

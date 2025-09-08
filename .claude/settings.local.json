@@ -13,7 +13,8 @@
       "Bash(bin/calendar:*)",
       "WebSearch",
       "WebFetch(domain:ptod.us)",
-      "WebFetch(domain:oldergay.men)"
+      "WebFetch(domain:oldergay.men)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
