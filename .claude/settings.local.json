@@ -15,7 +15,13 @@
       "WebFetch(domain:ptod.us)",
       "WebFetch(domain:oldergay.men)",
       "Bash(bin/get-config:*)",
-      "Bash(TZ:*)"
+      "Bash(TZ:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Read(path:vault/*)",
+      "Write(path:vault/*)",
+      "Edit(path:vault/*)",
+      "MultiEdit(path:vault/*)"
     ],
     "deny": [],
     "ask": []
