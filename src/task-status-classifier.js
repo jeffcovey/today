@@ -146,11 +146,12 @@ ${JSON.stringify(taskList, null, 2)}`;
     }
 
     // Get tasks that are in "To File" status
+    // Use LIKE pattern to handle any amount of whitespace
     // Sort tasks with do_date first
     const query = `
       SELECT id, title, description, stage 
       FROM tasks 
-      WHERE status = '🗂️  To File'
+      WHERE status LIKE '🗂️%To File'
       ORDER BY 
         CASE WHEN do_date IS NOT NULL THEN 0 ELSE 1 END,
         do_date ASC,
@@ -188,7 +189,7 @@ ${JSON.stringify(taskList, null, 2)}`;
             WHEN '3️⃣  3rd Priority' THEN 3
             WHEN '🤔 Waiting' THEN 4
             WHEN '⏸️  Paused' THEN 5
-            WHEN '🗂️  To File' THEN 6
+            WHEN status LIKE '🗂️%To File' THEN 6
             ELSE 7
           END
       `).all();
