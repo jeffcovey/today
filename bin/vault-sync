@@ -100,7 +100,8 @@ case "$ACTION" in
             CONFLICTED_FILES=$(git diff --name-only --diff-filter=U)
             
             # Check if all conflicts are in auto-generated files
-            AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md)"
+            # Include plan files since Claude updates them with task IDs
+            AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md|plans/.*\.md)"
             ALL_AUTO_GEN=true
             
             for file in $CONFLICTED_FILES; do
@@ -136,7 +137,7 @@ case "$ACTION" in
             # Check if it's just auto-generated files
             CONFLICTED_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null)
             if [ -n "$CONFLICTED_FILES" ]; then
-                AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md)"
+                AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md|plans/.*\.md)"
                 ALL_AUTO_GEN=true
                 
                 for file in $CONFLICTED_FILES; do
