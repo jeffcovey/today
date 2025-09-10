@@ -749,6 +749,12 @@ export class TaskManager {
       return 0;
     }
     
+    // Skip plan files - these are daily reviews and shouldn't add tasks to the database
+    // Tasks in plan files are already in the database from their original sources
+    if (filePath.startsWith('vault/plans/')) {
+      return 0;
+    }
+    
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
     const updates = [];

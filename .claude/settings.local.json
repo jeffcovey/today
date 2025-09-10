@@ -19,7 +19,9 @@
       "Read(path:vault/*)",
       "Write(path:vault/*)",
       "Edit(path:vault/*)",
-      "MultiEdit(path:vault/*)"
+      "MultiEdit(path:vault/*)",
+      "WebFetch(domain:cruisesheet.com)",
+      "WebFetch(domain:www.icruise.com)"
     ],
     "deny": [],
     "ask": []
