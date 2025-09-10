@@ -89,6 +89,7 @@ The `_00` suffix for aggregates ensures they sort before child items.
 - **REQUIRED TEMPLATES:**
   - Morning: Insert `vault/templates/morning-routine.md` after day's focus
   - Evening: Insert `vault/templates/evening-routine.md` before evening tasks
+  - Hip Exercises: Insert `vault/templates/hip_workout.md` in the health/movement section
 
 ### Incremental Updates (Performance)
 

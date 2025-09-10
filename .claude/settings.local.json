@@ -14,6 +14,8 @@
       "WebSearch",
       "WebFetch(domain:ptod.us)",
       "WebFetch(domain:oldergay.men)",
+      "Bash(bin/get-config:*)",
+      "Bash(TZ:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",
       "Read(path:vault/*)",
