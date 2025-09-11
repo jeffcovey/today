@@ -192,7 +192,8 @@ main() {
 
 # Sync vault using git
 sync_vault_git() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if vault directory exists
     if [[ ! -d vault ]]; then
@@ -244,7 +245,8 @@ sync_github_vault() {
 sync_github_vault_original() {
     # Original implementation kept for reference
     # Change to project directory
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # ALWAYS pull first to get latest changes before trying to push
     # This prevents push failures when remote has changes
@@ -370,7 +372,9 @@ sync_github_vault_original() {
 
 # Clean up Syncthing sync-conflict files
 cleanup_sync_conflicts() {
-    cd "$(dirname "$0")/.." || return 1
+    # Get the actual project root directory
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     print_info "Checking for Syncthing sync-conflict files..."
     
@@ -443,7 +447,8 @@ cleanup_sync_conflicts() {
 
 # Clean markdown files with markdownlint
 clean_markdown_files() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     print_info "Cleaning markdown files with markdownlint..."
     
@@ -583,7 +588,8 @@ clean_markdown_files() {
 
 # Clean malformed task titles in database
 clean_database_task_titles() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Find and fix task titles that contain incomplete task-id comments
     # This happens when tasks get duplicated with malformed titles
@@ -605,7 +611,8 @@ clean_database_task_titles() {
 
 # Check task consistency across all markdown files
 check_task_consistency() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     print_info "Checking task consistency across markdown files..."
     
@@ -632,7 +639,8 @@ check_task_consistency() {
 
 # Sync task manager (includes stage classification)
 sync_tasks() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     print_info "Syncing task database with markdown files..."
     
@@ -663,7 +671,8 @@ sync_tasks() {
 
 # Bidirectional sync with Turso cloud database
 sync_turso_bidirectional() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if Turso is configured
     if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
@@ -700,7 +709,8 @@ sync_turso_bidirectional() {
 # Sync Notion database
 sync_notion() {
     # Use the notion CLI to refresh cache
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if NOTION_TOKEN is configured
     if ! grep -q "NOTION_TOKEN=" .env 2>/dev/null || grep -q "NOTION_TOKEN=your_notion" .env 2>/dev/null; then
@@ -748,7 +758,8 @@ sync_notion() {
 
 # Sync email
 sync_email() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if email-cli/email binary exists
     EMAIL_BIN=""
@@ -889,7 +900,8 @@ sync_email() {
 
 # Sync Pobox sent emails
 sync_pobox() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if Pobox credentials are configured
     if ! grep -q "POBOX_ACCOUNT=" .env 2>/dev/null || ! grep -q "POBOX_PASSWORD=" .env 2>/dev/null; then
@@ -955,7 +967,8 @@ sync_pobox() {
 
 # Sync calendar events
 sync_calendar() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Run calendar sync
     print_info "Syncing calendar events..."
@@ -985,7 +998,8 @@ sync_calendar() {
 
 # Sync Toggl time tracking
 sync_toggl() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if toggl binary exists
     if [[ ! -f bin/toggl ]]; then
@@ -1025,7 +1039,8 @@ sync_toggl() {
 
 # Sync contacts
 sync_contacts() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if contacts binary exists
     if [[ ! -f bin/contacts ]]; then
@@ -1083,7 +1098,8 @@ sync_contacts() {
 
 # Sync contact tracking between database and vault/logs/every_six_weeks.md
 sync_contact_tracking() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if contacts database exists
     if [[ ! -f .data/today.db ]]; then
@@ -1128,7 +1144,8 @@ sync_contact_tracking() {
 
 # Sync Day One diary entries to database
 sync_diary() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if diary-sync script exists
     if [[ ! -f bin/diary-sync.cjs ]]; then
@@ -1176,7 +1193,8 @@ sync_diary() {
 
 # Sync OlderGay.Men monitoring data
 sync_ogm_monitoring() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if ogm-sync script exists
     if [[ ! -f bin/ogm-sync ]]; then
@@ -1218,7 +1236,8 @@ sync_ogm_monitoring() {
 
 # Process inbox notes (from Drafts uploads)
 process_inbox() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Create inbox directory if it doesn't exist
     mkdir -p vault/notes/inbox 2>/dev/null
@@ -1476,7 +1495,8 @@ process_inbox() {
 
 # Sync tasks to their project markdown files
 sync_project_tasks() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     print_info "Syncing tasks to project markdown files..."
     
@@ -1644,7 +1664,8 @@ _sync_tasks_to_project_file() {
 
 # Archive completed tasks in tasks.md
 archive_completed_tasks() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     TASKS_FILE="vault/tasks/tasks.md"
     
@@ -1771,7 +1792,8 @@ archive_completed_tasks() {
 
 # Update cache statistics
 update_cache_stats() {
-    cd "$(dirname "$0")/.." || return 1
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
     
     # Check if cache database exists
     CACHE_DB=".data/today.db"
