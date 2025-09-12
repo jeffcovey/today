@@ -48,7 +48,7 @@ fi
 
 # Check if Claude CLI is authenticated by testing actual functionality
 echo "🔐 Checking Claude authentication..."
-TEST_RESPONSE=$(claude --print "Say 'ok'" 2>&1)
+TEST_RESPONSE=$(claude -p "Say 'ok'" 2>&1)
 if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
     echo ""
     echo "⚠️  Claude CLI is not authenticated!"
@@ -70,8 +70,8 @@ echo ""
 
 # Check dependencies once per day (quietly) - skip in container if CI env var is set
 LAST_DEP_CHECK_FILE=".last-dep-check"
-# Use timezone from config.toml
-TODAY_DATE=$(TZ=$(bin/get-config timezone) date +%Y-%m-%d)
+# Simple date for dependency check
+TODAY_DATE=$(date +%Y-%m-%d)
 
 # Skip dependency check if running in container with limited network
 if [ "$SKIP_DEP_CHECK" != "true" ]; then
@@ -113,19 +113,69 @@ if [ -n "$LAST_SYNC" ]; then
     echo "✅ Database ready (last sync: $LAST_SYNC)"
     echo ""
     
-    # Show the user what will happen
-    # Get date components for new naming scheme
+    # ============================================
+    # PRE-COMPUTE ALL CONTEXT DATA
+    # ============================================
+    
+    # Get timezone from config
+    TIMEZONE=$(bin/get-config timezone 2>/dev/null || echo "America/New_York")
+    
+    # 1. Date/Time Information
+    CURRENT_TIME=$(TZ=$TIMEZONE date '+%A, %B %d, %Y at %I:%M %p %Z')
+    CURRENT_DATE=$(TZ=$TIMEZONE date '+%Y-%m-%d')
+    DAY_OF_WEEK=$(TZ=$TIMEZONE date '+%A')
     YEAR=$(date +%Y)
-    MONTH=$(date +%m)  
+    MONTH=$(date +%m)
     DAY=$(date +%d)
     WEEK=$(date +%V)  # ISO week number
+    
     # Determine quarter from month
     if [ $MONTH -le 3 ]; then Q="Q1"
     elif [ $MONTH -le 6 ]; then Q="Q2"
     elif [ $MONTH -le 9 ]; then Q="Q3"
     else Q="Q4"
     fi
+    
+    # 2. Calculate Stage Theme
+    case $DAY_OF_WEEK in
+        Monday|Wednesday|Saturday)
+            STAGE_THEME="Front Stage"
+            STAGE_FOCUS="Meetings, calls, support, emails"
+            ;;
+        Thursday|Sunday)
+            STAGE_THEME="Back Stage"
+            STAGE_FOCUS="Maintenance, bills, bug fixes, organizing"
+            ;;
+        Tuesday|Friday)
+            STAGE_THEME="Off Stage"
+            STAGE_FOCUS="Personal time, nature, friends, reading"
+            ;;
+    esac
+    
+    # 3. Plan File Paths
+    YEAR_PLAN="vault/plans/${YEAR}_00.md"
+    QUARTER_PLAN="vault/plans/${YEAR}_${Q}_00.md"
+    MONTH_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_00.md"
+    WEEK_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_00.md"
     REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+    
+    # Check which plans exist
+    EXISTING_PLANS=""
+    [ -f "$YEAR_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Year plan: $YEAR_PLAN\n"
+    [ -f "$QUARTER_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Quarter plan: $QUARTER_PLAN\n"
+    [ -f "$MONTH_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Month plan: $MONTH_PLAN\n"
+    [ -f "$WEEK_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Week plan: $WEEK_PLAN\n"
+    
+    # Check if today's review exists
+    REVIEW_STATUS="new"
+    if [ -f "$REVIEW_FILE" ]; then
+        REVIEW_STATUS="exists"
+    fi
+    
+    # 4. Database Quick Stats (optional - can be slow)
+    # Keeping minimal for speed
+    TASK_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks WHERE status != '✅ Done'" 2>/dev/null || echo "?")
+    OVERDUE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks WHERE due_date < DATE('now') AND status != '✅ Done'" 2>/dev/null || echo "?")
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review
@@ -146,17 +196,12 @@ if [ -n "$LAST_SYNC" ]; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
-        # Start Claude session (interactive or non-interactive based on flag)
-        if [ "$NON_INTERACTIVE" = true ]; then
-            echo "🤖 Running Claude in non-interactive mode..."
-        else
-            echo "🤖 Starting Claude focused session..."
-        fi
-        
         # Create a prompt that includes context but focuses on the request
         if [ "$NON_INTERACTIVE" = true ]; then
-            # Non-interactive mode - use --no-interactive flag
-            claude --print "$(cat <<EOF
+            echo "🤖 Running Claude in non-interactive mode..."
+            # Non-interactive mode - use -p flag
+            # Create prompt in a variable first to avoid heredoc issues
+            PROMPT="$(cat <<EOF
 # Focused Work Session - NON-INTERACTIVE MODE
 
 ## CRITICAL: You are in NON-INTERACTIVE mode
@@ -165,12 +210,16 @@ if [ -n "$LAST_SYNC" ]; then
 - The user ran this command specifically requesting: "${DIRECT_REQUEST}"
 - Complete the task WITHOUT asking for confirmation
 
-You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
+## Pre-Computed Context
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
 
 ## Context Available
 - SQLite database at .data/today.db with all current data
-- Today's date: ${TODAY_DATE}
-- Review file location: ${REVIEW_FILE}
 
 ## Database Tables Available:
 - task_cache: Tasks with titles, stages, due dates
@@ -194,17 +243,27 @@ You have access to today's synchronized data in the SQLite database at .data/tod
 Execute the request NOW without asking for permission!
 EOF
 )"
+            # Run Claude with the prompt
+            claude -p "$PROMPT"
         else
+            echo "🤖 Starting Claude focused session..."
             # Interactive mode - normal claude command
             claude "$(cat <<EOF
 # Focused Work Session
 
-You have access to today's synchronized data in the SQLite database at .data/today.db. You can check the review file at ${REVIEW_FILE} if it exists.
+## Pre-Computed Context
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
 
 ## Context Available
 - SQLite database at .data/today.db with all current data
-- Today's date: ${TODAY_DATE}
-- Review file location: ${REVIEW_FILE}
 
 ## Database Tables Available:
 - task_cache: Tasks with titles, stages, due dates
@@ -251,7 +310,7 @@ EOF
         if [ "$NON_INTERACTIVE" = true ]; then
             echo "🤖 Running Claude in non-interactive mode..."
             # Add explicit permission for file operations in non-interactive mode
-            claude --print "$(cat <<EOF
+            PROMPT="$(cat <<EOF
 ## NON-INTERACTIVE MODE - FULL PERMISSIONS GRANTED
 
 You are running in non-interactive mode. This means:
@@ -260,12 +319,41 @@ You are running in non-interactive mode. This means:
 - Complete all tasks without waiting for user confirmation
 - When instructed to update the review file, UPDATE IT immediately
 
-$(cat TODAY.md)
+## Pre-Computed Context (No calculations needed!)
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
+
+$(cat TODAY.md | sed '/^### 🔴 CRITICAL FIRST STEPS 🔴/,/^3\. \*\*Query Database/d')
 EOF
 )"
+            # Run Claude with the prompt
+            claude -p "$PROMPT"
         else
             echo "🤖 Starting Claude interactive session..."
-            claude "$(cat TODAY.md)"
+            claude "$(cat <<EOF
+# Daily Review Session
+
+## Pre-Computed Context (No calculations needed!)
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
+
+$(cat TODAY.md | sed '1,/^## Session Instructions for Claude/d' | sed '/^### 🔴 CRITICAL FIRST STEPS 🔴/,/^3\. \*\*Query Database/d')
+EOF
+)"
         fi
     fi
     
