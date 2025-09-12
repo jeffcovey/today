@@ -243,8 +243,9 @@ if [ -n "$LAST_SYNC" ]; then
 Execute the request NOW without asking for permission!
 EOF
 )"
-            # Run Claude with the prompt
-            claude -p "$PROMPT"
+            # Run Claude with the prompt, allowing file operations
+            # Using dangerously-skip-permissions since this is a controlled environment
+            claude -p --dangerously-skip-permissions "$PROMPT"
         else
             echo "🤖 Starting Claude focused session..."
             # Interactive mode - normal claude command
@@ -333,8 +334,9 @@ $(echo -e "$EXISTING_PLANS")
 $(cat TODAY.md | sed '/^### 🔴 CRITICAL FIRST STEPS 🔴/,/^3\. \*\*Query Database/d')
 EOF
 )"
-            # Run Claude with the prompt
-            claude -p "$PROMPT"
+            # Run Claude with the prompt, allowing file operations
+            # Using dangerously-skip-permissions since this is a controlled environment
+            claude -p --dangerously-skip-permissions "$PROMPT"
         else
             echo "🤖 Starting Claude interactive session..."
             claude "$(cat <<EOF
