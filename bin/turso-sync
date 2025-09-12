@@ -119,10 +119,12 @@ class TursoSync {
   }
 
   async pull(options = {}) {
-    const { full = false, batchSize = 500 } = options;
+    const { full = false, force = false, batchSize = 500 } = options;
     
-    if (full) {
-      console.log(chalk.blue('🔄 Full pull from Turso (batched for large tables)...\n'));
+    if (force) {
+      console.log(chalk.yellow('⚠️  Force pull - will OVERWRITE all local changes...\n'));
+    } else if (full) {
+      console.log(chalk.blue('🔄 Smart merge from Turso (preserving local changes)...\n'));
     } else {
       console.log(chalk.blue('📥 Pulling from Turso to local...\n'));
     }
@@ -150,9 +152,12 @@ class TursoSync {
     
     const startTime = Date.now();
     
-    if (full) {
-      // Full batched pull - gets ALL data
+    if (force) {
+      // Destructive pull - overwrites everything
       await this.fullPullBatched(batchSize);
+    } else if (full) {
+      // Smart merge - preserves local changes
+      await this.smartPullWithMerge(batchSize);
     } else {
       // Use DatabaseService's incremental pull method
       console.log(chalk.gray('   Checking for updates...'));
@@ -167,6 +172,7 @@ class TursoSync {
     this.saveSyncState();
   }
 
+  // Old destructive pull method - kept for --force option
   async fullPullBatched(batchSize = 500) {
     console.log(chalk.cyan('Step 1: Getting table list from Turso...'));
     
@@ -182,14 +188,22 @@ class TursoSync {
     const tables = tablesResult.rows.map(row => row.name);
     console.log(chalk.gray(`   Found ${tables.length} tables\n`));
     
-    console.log(chalk.cyan('Step 2: Pulling ALL data from each table (in batches)...'));
+    console.log(chalk.cyan('Step 2: Merging data from each table (preserving newer local changes)...'));
     
     let totalRows = 0;
+    let mergedRows = 0;
+    let preservedLocalRows = 0;
+    
     for (const tableName of tables) {
       process.stdout.write(chalk.gray(`   ${tableName}... `));
       
       try {
-        // First, get the total count
+        // Check if table has updated_at column
+        const schemaResult = await this.db.tursoClient.execute(`PRAGMA table_info(${tableName})`);
+        const hasUpdatedAt = schemaResult.rows.some(row => row.name === 'updated_at');
+        const primaryKeyCol = schemaResult.rows.find(row => row.pk === 1)?.name || 'id';
+        
+        // Get total count from Turso
         const countResult = await this.db.tursoClient.execute(`SELECT COUNT(*) as count FROM ${tableName}`);
         const totalCount = countResult.rows[0].count;
         
@@ -198,56 +212,129 @@ class TursoSync {
           continue;
         }
         
-        // Clear local table first
-        this.db.exec(`DELETE FROM ${tableName}`);
-        
         // Use smaller batch size for emails table to avoid OOM
         const actualBatchSize = tableName === 'emails' ? 50 : batchSize;
         
-        // Pull data in batches
-        let offset = 0;
-        let rowsPulled = 0;
-        let columns = null;
-        let stmt = null;
-        
-        while (offset < totalCount) {
-          // Get batch of rows
-          const dataResult = await this.db.tursoClient.execute(`
-            SELECT * FROM ${tableName} 
-            LIMIT ${actualBatchSize} 
-            OFFSET ${offset}
-          `);
-          
-          if (dataResult.rows.length === 0) break;
-          
-          // Setup insert statement on first batch
-          if (!columns) {
-            columns = Object.keys(dataResult.rows[0]);
-            const placeholders = columns.map(() => '?').join(', ');
-            const insertSQL = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-            stmt = this.db.localDb.prepare(insertSQL);
+        // If table has updated_at, do smart merge. Otherwise, fall back to full replace
+        if (hasUpdatedAt) {
+          // Create a map of local records with their updated_at times
+          const localRecords = new Map();
+          const localResult = this.db.localDb.prepare(`SELECT ${primaryKeyCol}, updated_at FROM ${tableName}`).all();
+          for (const row of localResult) {
+            localRecords.set(row[primaryKeyCol], row.updated_at);
           }
           
-          // Insert batch in a transaction
-          const transaction = this.db.localDb.transaction(() => {
-            for (const row of dataResult.rows) {
-              const values = columns.map(col => row[col]);
-              stmt.run(...values);
+          // Pull data in batches and merge
+          let offset = 0;
+          let rowsPulled = 0;
+          let skippedRows = 0;
+          let columns = null;
+          let stmt = null;
+          
+          while (offset < totalCount) {
+            // Get batch of rows from Turso
+            const dataResult = await this.db.tursoClient.execute(`
+              SELECT * FROM ${tableName} 
+              LIMIT ${actualBatchSize} 
+              OFFSET ${offset}
+            `);
+            
+            if (dataResult.rows.length === 0) break;
+            
+            // Setup insert statement on first batch
+            if (!columns) {
+              columns = Object.keys(dataResult.rows[0]);
+              const placeholders = columns.map(() => '?').join(', ');
+              const insertSQL = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+              stmt = this.db.localDb.prepare(insertSQL);
             }
-          });
-          
-          transaction();
-          rowsPulled += dataResult.rows.length;
-          offset += actualBatchSize;
-          
-          // Show progress for large tables
-          if (totalCount > actualBatchSize * 2) {
-            process.stdout.write(chalk.gray(`${Math.round(rowsPulled / totalCount * 100)}%... `));
+            
+            // Insert batch in a transaction, but skip if local is newer
+            const transaction = this.db.localDb.transaction(() => {
+              for (const row of dataResult.rows) {
+                const recordId = row[primaryKeyCol];
+                const tursoUpdatedAt = row.updated_at;
+                const localUpdatedAt = localRecords.get(recordId);
+                
+                // Only update if Turso version is newer or record doesn't exist locally
+                if (!localUpdatedAt || tursoUpdatedAt > localUpdatedAt) {
+                  const values = columns.map(col => row[col]);
+                  stmt.run(...values);
+                  rowsPulled++;
+                } else {
+                  skippedRows++;
+                }
+              }
+            });
+            
+            transaction();
+            offset += actualBatchSize;
+            
+            // Show progress for large tables
+            if (totalCount > actualBatchSize * 2) {
+              process.stdout.write(chalk.gray(`${Math.round(offset / totalCount * 100)}%... `));
+            }
           }
+          
+          totalRows += rowsPulled;
+          preservedLocalRows += skippedRows;
+          mergedRows += rowsPulled;
+          
+          if (skippedRows > 0) {
+            console.log(chalk.green(`merged ${rowsPulled} rows, preserved ${skippedRows} local changes`));
+          } else {
+            console.log(chalk.gray(`${rowsPulled} rows`));
+          }
+        } else {
+          // Table doesn't have updated_at, fall back to full replace
+          // Clear local table first
+          this.db.exec(`DELETE FROM ${tableName}`);
+          
+          // Pull data in batches
+          let offset = 0;
+          let rowsPulled = 0;
+          let columns = null;
+          let stmt = null;
+          
+          while (offset < totalCount) {
+            // Get batch of rows
+            const dataResult = await this.db.tursoClient.execute(`
+              SELECT * FROM ${tableName} 
+              LIMIT ${actualBatchSize} 
+              OFFSET ${offset}
+            `);
+            
+            if (dataResult.rows.length === 0) break;
+            
+            // Setup insert statement on first batch
+            if (!columns) {
+              columns = Object.keys(dataResult.rows[0]);
+              const placeholders = columns.map(() => '?').join(', ');
+              const insertSQL = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+              stmt = this.db.localDb.prepare(insertSQL);
+            }
+            
+            // Insert batch in a transaction
+            const transaction = this.db.localDb.transaction(() => {
+              for (const row of dataResult.rows) {
+                const values = columns.map(col => row[col]);
+                stmt.run(...values);
+              }
+            });
+            
+            transaction();
+            rowsPulled += dataResult.rows.length;
+            offset += actualBatchSize;
+            
+            // Show progress for large tables
+            if (totalCount > actualBatchSize * 2) {
+              process.stdout.write(chalk.gray(`${Math.round(rowsPulled / totalCount * 100)}%... `));
+            }
+          }
+          
+          totalRows += rowsPulled;
+          console.log(chalk.green(`${rowsPulled} rows`));
         }
-        
-        totalRows += rowsPulled;
-        console.log(chalk.green(`${rowsPulled} rows`));
         
       } catch (error) {
         console.log(chalk.yellow(`failed: ${error.message}`));
@@ -296,6 +383,138 @@ class TursoSync {
     
     this.syncState.lastSync = new Date().toISOString();
     this.saveSyncState();
+  }
+
+  // Smart merge method that preserves local changes
+  async smartPullWithMerge(batchSize = 500) {
+    console.log(chalk.cyan('Step 1: Getting table list from Turso...'));
+    
+    // Get all tables from Turso
+    const tablesResult = await this.db.tursoClient.execute(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' 
+      AND name NOT LIKE 'sqlite_%'
+      AND name NOT LIKE '_litestream_%'
+      ORDER BY name
+    `);
+    
+    const tables = tablesResult.rows.map(row => row.name);
+    console.log(chalk.gray(`   Found ${tables.length} tables\n`));
+    
+    console.log(chalk.cyan('Step 2: Merging data (preserving newer local changes)...'));
+    
+    let totalRows = 0;
+    let preservedLocalRows = 0;
+    
+    for (const tableName of tables) {
+      process.stdout.write(chalk.gray(`   ${tableName}... `));
+      
+      try {
+        // Check if table has updated_at column
+        const schemaResult = await this.db.tursoClient.execute(`PRAGMA table_info(${tableName})`);
+        const hasUpdatedAt = schemaResult.rows.some(row => row.name === 'updated_at');
+        const primaryKeyCol = schemaResult.rows.find(row => row.pk === 1)?.name || 'id';
+        
+        // Get all records from Turso
+        const tursoResult = await this.db.tursoClient.execute(`SELECT * FROM ${tableName}`);
+        
+        if (tursoResult.rows.length === 0) {
+          console.log(chalk.gray('empty'));
+          continue;
+        }
+        
+        if (hasUpdatedAt && tableName === 'tasks') {
+          // For tasks table with updated_at, do smart merge
+          let merged = 0;
+          let preserved = 0;
+          
+          // Get local records map
+          const localRecords = new Map();
+          const localResult = this.db.localDb.prepare(`SELECT ${primaryKeyCol}, updated_at, content FROM ${tableName}`).all();
+          for (const row of localResult) {
+            localRecords.set(row[primaryKeyCol], { 
+              updated_at: row.updated_at,
+              content: row.content 
+            });
+          }
+          
+          // Prepare insert statement
+          const columns = Object.keys(tursoResult.rows[0]);
+          const placeholders = columns.map(() => '?').join(', ');
+          const insertSQL = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+          const stmt = this.db.localDb.prepare(insertSQL);
+          
+          // Merge records
+          const transaction = this.db.localDb.transaction(() => {
+            for (const row of tursoResult.rows) {
+              const recordId = row[primaryKeyCol];
+              const localRecord = localRecords.get(recordId);
+              
+              if (!localRecord) {
+                // New record from Turso
+                const values = columns.map(col => row[col]);
+                stmt.run(...values);
+                merged++;
+              } else {
+                // Check if local has content that Turso doesn't
+                const tursoHasContent = row.content && row.content.trim() !== '';
+                const localHasContent = localRecord.content && localRecord.content.trim() !== '';
+                
+                if (localHasContent && !tursoHasContent) {
+                  // Preserve local content - don't overwrite
+                  preserved++;
+                } else if (row.updated_at > localRecord.updated_at) {
+                  // Turso is newer, update
+                  const values = columns.map(col => row[col]);
+                  stmt.run(...values);
+                  merged++;
+                } else {
+                  // Local is newer or same, keep local
+                  preserved++;
+                }
+              }
+            }
+          });
+          
+          transaction();
+          totalRows += merged;
+          preservedLocalRows += preserved;
+          
+          if (preserved > 0) {
+            console.log(chalk.green(`merged ${merged}, preserved ${preserved} local`));
+          } else {
+            console.log(chalk.gray(`${merged} rows`));
+          }
+        } else {
+          // For other tables, do full replace
+          this.db.exec(`DELETE FROM ${tableName}`);
+          
+          const columns = Object.keys(tursoResult.rows[0]);
+          const placeholders = columns.map(() => '?').join(', ');
+          const insertSQL = `INSERT OR REPLACE INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+          const stmt = this.db.localDb.prepare(insertSQL);
+          
+          const transaction = this.db.localDb.transaction(() => {
+            for (const row of tursoResult.rows) {
+              const values = columns.map(col => row[col]);
+              stmt.run(...values);
+            }
+          });
+          
+          transaction();
+          totalRows += tursoResult.rows.length;
+          console.log(chalk.gray(`${tursoResult.rows.length} rows`));
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`failed: ${error.message}`));
+      }
+    }
+    
+    console.log(chalk.green(`\n✅ Smart merge complete: ${totalRows} merged, ${preservedLocalRows} preserved`));
+    
+    // Show final status
+    const taskCount = this.db.get('SELECT COUNT(*) as count FROM tasks')?.count || 0;
+    console.log(chalk.cyan(`\nLocal database now has ${taskCount} tasks`));
   }
 
   async manualPush() {
@@ -573,9 +792,10 @@ async function main() {
         break;
         
       case 'pull':
-        // Check for --full flag
+        // Check for flags
         const fullPull = args.includes('--full');
-        await sync.pull({ full: fullPull });
+        const forcePull = args.includes('--force');
+        await sync.pull({ full: fullPull, force: forcePull });
         break;
         
       case 'push':
@@ -603,8 +823,9 @@ async function main() {
         console.log('  watch     - Auto-sync every 60 seconds');
         console.log('  help      - Show this help');
         console.log('\nOptions:');
-        console.log('  pull --full  - Full pull of ALL data (batched for large tables)');
-        console.log('               - Use for initial setup or recovery from 502 errors');
+        console.log('  pull --full   - Smart merge: pulls all data but preserves local changes');
+        console.log('  pull --force  - Force pull: OVERWRITES all local data (destructive!)');
+        console.log('                - Only use --force if you need to reset to Turso state');
         console.log('\nNote:');
         console.log('  This utility uses DatabaseService for all operations.');
         console.log('  The sync is incremental and handles all tables automatically.');
