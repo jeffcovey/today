@@ -1410,6 +1410,68 @@ export class TaskManager {
       lines.push('');
     }
 
+    // Add upcoming tasks section (next 14 days)
+    const twoWeeksFromNow = new Date();
+    twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+    const twoWeeksDate = twoWeeksFromNow.toISOString().split('T')[0];
+    
+    const upcomingTasks = this.db.prepare(`
+      SELECT * FROM tasks 
+      WHERE do_date > ?
+        AND do_date <= ?
+        AND do_date IS NOT NULL
+        AND status != '✅ Done'
+      ORDER BY do_date ASC, status ASC
+    `).all(today, twoWeeksDate).map(task => ({
+      ...task,
+      topics: this.getTaskTopics(task.id)
+    }));
+    
+    // Add upcoming tasks in a collapsible section
+    if (upcomingTasks.length > 0) {
+      lines.push('<details>');
+      lines.push(`<summary><strong>📅 Upcoming</strong> (${upcomingTasks.length} tasks in next 2 weeks)</summary>`);
+      lines.push('');
+      
+      // Group upcoming tasks by date
+      const upcomingByDate = {};
+      for (const task of upcomingTasks) {
+        if (!upcomingByDate[task.do_date]) {
+          upcomingByDate[task.do_date] = [];
+        }
+        upcomingByDate[task.do_date].push(task);
+      }
+      
+      // Sort dates
+      const sortedUpcomingDates = Object.keys(upcomingByDate).sort();
+      
+      for (const date of sortedUpcomingDates) {
+        // Format date nicely
+        const dateObj = new Date(date + 'T00:00:00');
+        const daysFromNow = Math.ceil((dateObj - new Date()) / (1000 * 60 * 60 * 24));
+        const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        const daysStr = daysFromNow === 1 ? 'tomorrow' : `in ${daysFromNow} days`;
+        
+        lines.push(`### ${dateStr} (${daysStr})`, '');
+        
+        // Sort tasks by status priority
+        const sortedTasks = upcomingByDate[date].sort((a, b) => 
+          this.getStatusOrder(a.status) - this.getStatusOrder(b.status)
+        );
+        
+        for (const task of sortedTasks) {
+          const topics = this.formatTopicsAsEmojis(task.topics);
+          const statusIcon = this.getStatusIcon(task.status);
+          const iconPrefix = statusIcon ? `${statusIcon} ` : '';
+          lines.push(`- [ ] ${iconPrefix}${task.title}${topics} <!-- task-id: ${task.id} -->`);
+        }
+        lines.push('');
+      }
+      
+      lines.push('</details>');
+      lines.push('');
+    }
+
     await fs.writeFile(outputPath, lines.join('\n'));
     return activeTasks.length + overdueTasks.length + completedTasks.length;
   }
