@@ -1,6 +1,6 @@
 #!/bin/bash
 # OlderGay.Men Data Sync Script
-# Fetches monitoring data from GitHub, HoneyBadger, and Scout APM
+# Fetches monitoring data from GitHub, Sentry, and Scout APM
 # and stores it in the local SQLite database for bin/today to use
 
 set -e
@@ -60,16 +60,17 @@ CREATE TABLE IF NOT EXISTS ogm_github_issues (
     synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- HoneyBadger Faults table
-CREATE TABLE IF NOT EXISTS ogm_honeybadger_faults (
-    id INTEGER PRIMARY KEY,
-    error_class TEXT NOT NULL,
-    error_message TEXT,
-    environment TEXT,
-    resolved BOOLEAN DEFAULT 0,
-    notices_count INTEGER DEFAULT 0,
-    created_at DATETIME NOT NULL,
-    last_notice_at DATETIME,
+-- Sentry Issues table
+CREATE TABLE IF NOT EXISTS ogm_sentry_issues (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    culprit TEXT,
+    level TEXT,
+    status TEXT,
+    count INTEGER DEFAULT 0,
+    user_count INTEGER DEFAULT 0,
+    first_seen DATETIME NOT NULL,
+    last_seen DATETIME,
     synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -89,11 +90,11 @@ CREATE TABLE IF NOT EXISTS ogm_scout_metrics (
 CREATE TABLE IF NOT EXISTS ogm_correlations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     github_issue INTEGER,
-    honeybadger_fault INTEGER,
+    sentry_issue TEXT,
     correlation_type TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (github_issue) REFERENCES ogm_github_issues(number),
-    FOREIGN KEY (honeybadger_fault) REFERENCES ogm_honeybadger_faults(id)
+    FOREIGN KEY (sentry_issue) REFERENCES ogm_sentry_issues(id)
 );
 
 -- Summary statistics table
@@ -113,8 +114,8 @@ CREATE TABLE IF NOT EXISTS ogm_summary_stats (
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_issues_state ON ogm_github_issues(state);
 CREATE INDEX IF NOT EXISTS idx_issues_updated ON ogm_github_issues(updated_at);
-CREATE INDEX IF NOT EXISTS idx_faults_resolved ON ogm_honeybadger_faults(resolved);
-CREATE INDEX IF NOT EXISTS idx_faults_notices ON ogm_honeybadger_faults(last_notice_at);
+CREATE INDEX IF NOT EXISTS idx_sentry_status ON ogm_sentry_issues(status);
+CREATE INDEX IF NOT EXISTS idx_sentry_last_seen ON ogm_sentry_issues(last_seen);
 CREATE INDEX IF NOT EXISTS idx_metrics_type ON ogm_scout_metrics(metric_type, timestamp);
 CREATE INDEX IF NOT EXISTS idx_summary_date ON ogm_summary_stats(stat_date);
 EOF
@@ -239,92 +240,95 @@ EOF
     print_info "Total open issues in database: $total_count"
 }
 
-# Sync HoneyBadger faults using direct API calls
-sync_honeybadger_faults() {
-    print_header "🐝 Syncing HoneyBadger Faults"
+# Sync Sentry issues using direct API calls
+sync_sentry_issues() {
+    print_header "🔍 Syncing Sentry Issues"
     
-    # Check for HoneyBadger token
-    HONEYBADGER_TOKEN="${HONEYBADGER_AUTH_TOKEN:-$HONEYBADGER_API_KEY}"
-    if [[ -z "$HONEYBADGER_TOKEN" ]]; then
-        print_error "HONEYBADGER_AUTH_TOKEN or HONEYBADGER_API_KEY not configured"
-        print_info "Get your token at: https://app.honeybadger.io/users/sign_in"
+    # Check for Sentry token
+    SENTRY_TOKEN="${SENTRY_AUTH_TOKEN:-$SENTRY_API_KEY}"
+    if [[ -z "$SENTRY_TOKEN" ]]; then
+        print_error "SENTRY_AUTH_TOKEN not configured"
+        print_info "Get your token at: https://sentry.io/settings/account/api/auth-tokens/"
         return 1
     fi
     
-    print_info "Fetching unresolved faults from HoneyBadger..."
-    print_info "Using HoneyBadger token: ${HONEYBADGER_TOKEN:0:10}..."
+    print_info "Fetching unresolved issues from Sentry..."
+    print_info "Using Sentry token: ${SENTRY_TOKEN:0:10}..."
     
-    # HoneyBadger API v2 endpoint
-    PROJECT_ID="76830"
-    response=$(curl -s --max-time 10 -u "$HONEYBADGER_TOKEN:" \
+    # Sentry API endpoint
+    ORG="${SENTRY_ORG:-oldergaymen}"  # Note: no hyphen in the org slug
+    PROJECT="${SENTRY_PROJECT:-rails}"
+    response=$(curl -s --max-time 10 -H "Authorization: Bearer $SENTRY_TOKEN" \
                     -H "Accept: application/json" \
-                    "https://app.honeybadger.io/v2/projects/$PROJECT_ID/faults?limit=5&resolved=false" 2>/dev/null)
+                    "https://sentry.io/api/0/projects/$ORG/$PROJECT/issues/?query=is:unresolved&limit=5" 2>/dev/null)
     
-    print_info "HoneyBadger API response received, size: ${#response} characters"
+    print_info "Sentry API response received, size: ${#response} characters"
     
     # Check response size and validate accordingly
     response_size=${#response}
     if [[ -z "$response" ]]; then
-        print_error "Empty response from HoneyBadger API"
+        print_error "Empty response from Sentry API"
         return 1
     fi
     
     # Skip JSON validation for large responses to avoid performance issues
     if [[ $response_size -le 10000 ]]; then
         if ! echo "$response" | timeout 3 jq -e . >/dev/null 2>&1; then
-            print_error "Failed to fetch HoneyBadger faults - invalid response"
+            print_error "Failed to fetch Sentry issues - invalid response"
             return 1
         fi
         
         # Check for API errors
         if echo "$response" | timeout 3 jq -e '.error' >/dev/null 2>&1; then
             error_msg=$(echo "$response" | timeout 3 jq -r '.error')
-            print_error "HoneyBadger API error: $error_msg"
+            print_error "Sentry API error: $error_msg"
             return 1
         fi
     fi
     
-    # Parse and insert faults into database
-    fault_count=0
-    while IFS= read -r fault; do
+    # Parse and insert issues into database
+    issue_count=0
+    while IFS= read -r issue; do
         # Extract fields
-        id=$(echo "$fault" | jq -r '.id')
-        error_class=$(echo "$fault" | jq -r '.klass // "Unknown"' | sed "s/'/''/g")
-        error_message=$(echo "$fault" | jq -r '.message // ""' | sed "s/'/''/g")
-        environment=$(echo "$fault" | jq -r '.environment // "production"' | sed "s/'/''/g")
-        resolved=$(echo "$fault" | jq -r '.resolved // false' | sed 's/false/0/;s/true/1/')
-        notices_count=$(echo "$fault" | jq -r '.notices_count // 0')
-        created_at=$(echo "$fault" | jq -r '.created_at // "now()"')
-        last_notice_at=$(echo "$fault" | jq -r '.last_notice_at // .created_at // "now()"')
+        id=$(echo "$issue" | jq -r '.id' | sed "s/'/''/g")
+        title=$(echo "$issue" | jq -r '.title // "Unknown"' | sed "s/'/''/g")
+        culprit=$(echo "$issue" | jq -r '.culprit // ""' | sed "s/'/''/g")
+        level=$(echo "$issue" | jq -r '.level // "error"' | sed "s/'/''/g")
+        status=$(echo "$issue" | jq -r '.status // "unresolved"' | sed "s/'/''/g")
+        count=$(echo "$issue" | jq -r '.count // 0')
+        user_count=$(echo "$issue" | jq -r '.userCount // 0')
+        first_seen=$(echo "$issue" | jq -r '.firstSeen // "now()"')
+        last_seen=$(echo "$issue" | jq -r '.lastSeen // .firstSeen // "now()"')
         
         # Insert into database
         sqlite3 "$DB_PATH" <<EOF
-INSERT OR REPLACE INTO ogm_honeybadger_faults
-(fault_id, error_class, error_message, environment, resolved, notices_count, created_at, last_notice_at)
+INSERT OR REPLACE INTO ogm_sentry_issues
+(id, title, culprit, level, status, count, user_count, first_seen, last_seen)
 VALUES (
-    $id,
-    '$error_class',
-    '$error_message',
-    '$environment',
-    $resolved,
-    $notices_count,
-    '$created_at',
-    '$last_notice_at'
+    '$id',
+    '$title',
+    '$culprit',
+    '$level',
+    '$status',
+    $count,
+    $user_count,
+    '$first_seen',
+    '$last_seen'
 );
 EOF
-        ((fault_count++))
-    print_info "Processing HoneyBadger faults..."
-    done < <(echo "$response" | timeout 20 jq -c '.results[]?' 2>/dev/null)
+        ((issue_count++))
+    print_info "Processing Sentry issues..."
+    done < <(echo "$response" | timeout 20 jq -c '.[]?' 2>/dev/null)
     
-    if [[ $fault_count -gt 0 ]]; then
-        print_status "Synced $fault_count HoneyBadger faults"
+    if [[ $issue_count -gt 0 ]]; then
+        print_status "Synced $issue_count Sentry issues"
     else
-        print_info "No unresolved faults found"
+        print_info "No unresolved issues found"
     fi
     
-    # Get fault count
-    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
-    print_info "Total unresolved faults in database: $total_count"
+    # Get issue count
+    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_sentry_issues WHERE status='unresolved'" 2>/dev/null || echo 0)
+    print_info "Total unresolved issues in database: $total_count"
 }
 
 # Sync Scout performance metrics using direct API calls
@@ -422,7 +426,7 @@ generate_summary() {
     # Calculate metrics
     open_issues=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
     closed_today=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)='$today'" 2>/dev/null || echo 0)
-    active_errors=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
+    active_errors=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_sentry_issues WHERE status='unresolved'" 2>/dev/null || echo 0)
     
     # Insert metrics using the correct schema
     sqlite3 "$DB_PATH" <<EOF
@@ -433,9 +437,9 @@ VALUES ('$today', 'github', 'open_issues', $open_issues, 'count', '$today');
 INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
 VALUES ('$today', 'github', 'closed_today', $closed_today, 'count', '$today');
 
--- HoneyBadger metrics
+-- Sentry metrics
 INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
-VALUES ('$today', 'honeybadger', 'active_errors', $active_errors, 'count', '$today');
+VALUES ('$today', 'sentry', 'active_errors', $active_errors, 'count', '$today');
 EOF
     
     # Display summary
@@ -444,7 +448,7 @@ EOF
     echo "───────────────────────────────"
     echo "GitHub Issues:     $open_issues open"
     echo "Closed Today:      $closed_today"
-    echo "HoneyBadger Errors: $active_errors active"
+    echo "Sentry Errors:     $active_errors active"
     echo ""
     
     print_status "Summary statistics generated"
@@ -460,8 +464,8 @@ main() {
     
     # Sync each data source
     sync_github_issues
-    # TODO: Fix HoneyBadger jq performance issue with large responses
-    # sync_honeybadger_faults
+    # TODO: Fix Sentry jq performance issue with large responses
+    # sync_sentry_issues
     # sync_scout_metrics
     
     # Generate summary
@@ -472,7 +476,7 @@ main() {
     # Show what will be available to bin/today
     print_info "Data now available for bin/today planning:"
     echo "  • GitHub open issues and recent activity"
-    echo "  • HoneyBadger unresolved errors and patterns"
+    echo "  • Sentry unresolved errors and patterns"
     echo "  • Scout performance metrics and slow endpoints"
     echo "  • Summary statistics and trends"
     echo ""
@@ -487,7 +491,7 @@ case "${1:-}" in
         ;;
     errors)
         init_database
-        sync_honeybadger_faults
+        sync_sentry_issues
         ;;
     performance)
         init_database

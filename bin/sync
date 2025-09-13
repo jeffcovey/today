@@ -157,7 +157,7 @@ main() {
     fi
     
     # OlderGay.Men monitoring sync (if configured)
-    if grep -q "GITHUB_ACCESS_TOKEN=" .env 2>/dev/null || grep -q "HONEYBADGER_AUTH_TOKEN=" .env 2>/dev/null || grep -q "SCOUT_API_KEY=" .env 2>/dev/null; then
+    if grep -q "GITHUB_ACCESS_TOKEN=" .env 2>/dev/null || grep -q "SENTRY_AUTH_TOKEN=" .env 2>/dev/null || grep -q "SCOUT_API_KEY=" .env 2>/dev/null; then
         run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
     fi
     
@@ -1217,7 +1217,7 @@ sync_ogm_monitoring() {
                 print_info "GitHub open issues: $open_issues"
             fi
             if [[ -n "$active_errors" ]]; then
-                print_info "HoneyBadger active errors: $active_errors"
+                print_info "Sentry active errors: $active_errors"
             fi
         fi
         

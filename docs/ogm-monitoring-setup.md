@@ -12,10 +12,10 @@ Add the following to your `.env` file:
 # GitHub (required for issue tracking)
 GITHUB_ACCESS_TOKEN=your_github_personal_access_token
 
-# HoneyBadger (optional - for error tracking)
-HONEYBADGER_AUTH_TOKEN=your_honeybadger_auth_token
-# or
-HONEYBADGER_API_KEY=your_honeybadger_api_key
+# Sentry (optional - for error tracking)
+SENTRY_AUTH_TOKEN=your_sentry_auth_token
+SENTRY_ORG=your_organization_slug  # default: oldergay-men
+SENTRY_PROJECT=your_project_slug    # default: rails
 
 # Scout APM (optional - for performance metrics)
 SCOUT_API_KEY=your_scout_api_key
@@ -27,8 +27,8 @@ SCOUT_APP_ID=76830  # OlderGay.Men app ID
 - **GitHub**: Create a personal access token at https://github.com/settings/tokens
   - Needs `repo` scope for private repositories
   
-- **HoneyBadger**: Get your auth token from https://app.honeybadger.io/users/sign_in
-  - After logging in, go to your profile page
+- **Sentry**: Get your auth token from https://sentry.io/settings/account/api/auth-tokens/
+  - The token needs at least 'project:read' and 'event:read' scopes
   
 - **Scout APM**: Get your API key from https://scoutapm.com/apps
   - Look for API keys in account settings
@@ -39,7 +39,7 @@ SCOUT_APP_ID=76830  # OlderGay.Men app ID
 # Test GitHub issues sync
 bin/ogm-sync issues
 
-# Test HoneyBadger errors sync
+# Test Sentry errors sync
 bin/ogm-sync errors
 
 # Test Scout performance sync
@@ -72,7 +72,7 @@ After syncing, the following data is available in the SQLite database for AI pla
 ### Tables Created
 
 1. **ogm_github_issues**: Open issues, recent activity, labels, comments
-2. **ogm_honeybadger_faults**: Unresolved errors, frequency, last occurrence
+2. **ogm_sentry_issues**: Unresolved errors, frequency, last occurrence
 3. **ogm_scout_metrics**: Response times, throughput, error rates
 4. **ogm_correlations**: Links between GitHub issues and errors
 5. **ogm_summary_stats**: Daily aggregated statistics
@@ -97,10 +97,10 @@ WHERE state='open'
 ORDER BY updated_at DESC;
 
 -- Find frequently occurring errors
-SELECT klass, message, notices_count 
-FROM ogm_honeybadger_faults 
-WHERE resolved=0 
-ORDER BY notices_count DESC;
+SELECT title, culprit, count 
+FROM ogm_sentry_issues 
+WHERE status='unresolved' 
+ORDER BY count DESC;
 
 -- Check recent performance metrics
 SELECT metric_type, value 
@@ -119,10 +119,10 @@ tmp/github-issues list open 50
 tmp/github-issues get 4304
 tmp/github-issues search "slow database"
 
-# HoneyBadger errors
-tmp/honeybadger list 20
-tmp/honeybadger 121311876 notices
-tmp/honeybadger resolve 121311876
+# Sentry errors
+bin/sentry list 20
+bin/sentry show 121311876
+bin/sentry events 121311876
 
 # Scout performance
 tmp/scout slow 24

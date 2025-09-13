@@ -586,20 +586,20 @@ export class MigrationManager {
               CREATE INDEX IF NOT EXISTS idx_ogm_github_issues_number ON ogm_github_issues(number);
               CREATE INDEX IF NOT EXISTS idx_ogm_github_issues_state ON ogm_github_issues(state);
               
-              CREATE TABLE IF NOT EXISTS ogm_honeybadger_faults (
-                id INTEGER PRIMARY KEY,
-                fault_id INTEGER UNIQUE NOT NULL,
-                error_class TEXT,
-                error_message TEXT,
-                occurrences INTEGER,
-                created_at DATETIME,
-                last_occurred_at DATETIME,
-                resolved BOOLEAN DEFAULT 0,
-                environment TEXT,
+              CREATE TABLE IF NOT EXISTS ogm_sentry_issues (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                culprit TEXT,
+                level TEXT,
+                status TEXT,
+                count INTEGER DEFAULT 0,
+                user_count INTEGER DEFAULT 0,
+                first_seen DATETIME NOT NULL,
+                last_seen DATETIME,
                 synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
               );
-              CREATE INDEX IF NOT EXISTS idx_ogm_honeybadger_faults_fault_id ON ogm_honeybadger_faults(fault_id);
-              CREATE INDEX IF NOT EXISTS idx_ogm_honeybadger_faults_resolved ON ogm_honeybadger_faults(resolved);
+              CREATE INDEX IF NOT EXISTS idx_ogm_sentry_issues_status ON ogm_sentry_issues(status);
+              CREATE INDEX IF NOT EXISTS idx_ogm_sentry_issues_last_seen ON ogm_sentry_issues(last_seen);
               
               CREATE TABLE IF NOT EXISTS ogm_scout_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -646,7 +646,7 @@ export class MigrationManager {
               'summary_metrics', 'summary_recommendations', 'people_to_contact', 'sync_log',
               'sync_metadata', 'temporal_sync', 'time_entries_sync', 'todoist_sync_mapping',
               'streaks_data', 'project_pillar_mapping', 'diary', 'ogm_correlations',
-              'ogm_github_issues', 'ogm_honeybadger_faults', 'ogm_scout_metrics', 'ogm_summary_stats'
+              'ogm_github_issues', 'ogm_sentry_issues', 'ogm_scout_metrics', 'ogm_summary_stats'
             ];
             
             // Check which tables are missing
@@ -1003,12 +1003,12 @@ export class MigrationManager {
         fn: (db) => {
           // Check and add missing columns to OGM tables
           
-          // Add last_notice_at to ogm_honeybadger_faults if missing
-          const faultsColumns = db.prepare('PRAGMA table_info(ogm_honeybadger_faults)').all();
-          const hasLastNoticeAt = faultsColumns.some(c => c.name === 'last_notice_at');
-          if (!hasLastNoticeAt && faultsColumns.length > 0) {
-            db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN last_notice_at DATETIME');
-            console.log('    Added last_notice_at to ogm_honeybadger_faults');
+          // Add last_seen to ogm_sentry_issues if missing
+          const sentryColumns = db.prepare('PRAGMA table_info(ogm_sentry_issues)').all();
+          const hasLastSeen = sentryColumns.some(c => c.name === 'last_seen');
+          if (!hasLastSeen && sentryColumns.length > 0) {
+            db.exec('ALTER TABLE ogm_sentry_issues ADD COLUMN last_seen DATETIME');
+            console.log('    Added last_seen to ogm_sentry_issues');
           }
           
           // Add metric_type to ogm_scout_metrics if missing
@@ -1057,30 +1057,26 @@ export class MigrationManager {
             }
           }
           
-          // Add missing columns to ogm_honeybadger_faults
-          const faultsColumns = db.prepare('PRAGMA table_info(ogm_honeybadger_faults)').all();
-          const faultColumnNames = faultsColumns.map(c => c.name);
+          // Add missing columns to ogm_sentry_issues
+          const sentryColumns = db.prepare('PRAGMA table_info(ogm_sentry_issues)').all();
+          const sentryColumnNames = sentryColumns.map(c => c.name);
           
-          if (faultsColumns.length > 0) {
-            if (!faultColumnNames.includes('notices_count')) {
-              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN notices_count INTEGER DEFAULT 0');
-              console.log('    Added notices_count to ogm_honeybadger_faults');
+          if (sentryColumns.length > 0) {
+            if (!sentryColumnNames.includes('count')) {
+              db.exec('ALTER TABLE ogm_sentry_issues ADD COLUMN count INTEGER DEFAULT 0');
+              console.log('    Added count to ogm_sentry_issues');
             }
-            if (!faultColumnNames.includes('project_id')) {
-              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN project_id INTEGER');
-              console.log('    Added project_id to ogm_honeybadger_faults');
+            if (!sentryColumnNames.includes('user_count')) {
+              db.exec('ALTER TABLE ogm_sentry_issues ADD COLUMN user_count INTEGER DEFAULT 0');
+              console.log('    Added user_count to ogm_sentry_issues');
             }
-            if (!faultColumnNames.includes('component')) {
-              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN component TEXT');
-              console.log('    Added component to ogm_honeybadger_faults');
+            if (!sentryColumnNames.includes('metadata')) {
+              db.exec('ALTER TABLE ogm_sentry_issues ADD COLUMN metadata TEXT');
+              console.log('    Added metadata to ogm_sentry_issues');
             }
-            if (!faultColumnNames.includes('action')) {
-              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN action TEXT');
-              console.log('    Added action to ogm_honeybadger_faults');
-            }
-            if (!faultColumnNames.includes('tags')) {
-              db.exec('ALTER TABLE ogm_honeybadger_faults ADD COLUMN tags TEXT');
-              console.log('    Added tags to ogm_honeybadger_faults');
+            if (!sentryColumnNames.includes('tags')) {
+              db.exec('ALTER TABLE ogm_sentry_issues ADD COLUMN tags TEXT');
+              console.log('    Added tags to ogm_sentry_issues');
             }
           }
           

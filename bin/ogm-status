@@ -58,9 +58,9 @@ else
 fi
 echo ""
 
-# HoneyBadger Errors Status
-echo -e "${YELLOW}🐝 HoneyBadger Errors${NC}"
-error_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_honeybadger_faults WHERE resolved=0" 2>/dev/null || echo 0)
+# Sentry Errors Status
+echo -e "${YELLOW}🔍 Sentry Errors${NC}"
+error_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_sentry_issues WHERE status='unresolved'" 2>/dev/null || echo 0)
 if [[ $error_count -gt 0 ]]; then
     echo -e "  ${GREEN}✓${NC} $error_count unresolved errors tracked"
     
@@ -68,16 +68,16 @@ if [[ $error_count -gt 0 ]]; then
     echo "  Most frequent:"
     sqlite3 "$DB_PATH" -column <<EOF 2>/dev/null || echo "    No data"
 SELECT 
-    SUBSTR(klass, 1, 30) as error_class,
-    notices_count as count
-FROM ogm_honeybadger_faults 
-WHERE resolved=0 
-ORDER BY notices_count DESC 
+    SUBSTR(title, 1, 30) as error_title,
+    count as count
+FROM ogm_sentry_issues 
+WHERE status='unresolved' 
+ORDER BY count DESC 
 LIMIT 3;
 EOF
 else
-    echo -e "  ${YELLOW}⚠${NC}  No HoneyBadger error data"
-    echo "     Configure HONEYBADGER_AUTH_TOKEN in .env"
+    echo -e "  ${YELLOW}⚠${NC}  No Sentry error data"
+    echo "     Configure SENTRY_AUTH_TOKEN in .env"
 fi
 echo ""
 

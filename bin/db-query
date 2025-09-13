@@ -159,10 +159,10 @@ LIMIT 20;
         # OGM monitoring data
         run_query "
 SELECT '=== OGM ERRORS ===' as section;
-SELECT klass, notices_count, last_notice_at
-FROM ogm_honeybadger_faults 
-WHERE resolved = 0 AND notices_count > 100
-ORDER BY notices_count DESC
+SELECT title, count, last_seen
+FROM ogm_sentry_issues 
+WHERE status = 'unresolved' AND count > 100
+ORDER BY count DESC
 LIMIT 10;
 SELECT '---';
 
