@@ -22,6 +22,46 @@ const VAULT_PATH = path.join(__dirname, '..', 'vault');
 // Initialize TaskManager for direct database updates
 const taskManager = new TaskManager(path.join(__dirname, '..', '.data', 'today.db'));
 
+// Track pending markdown regenerations
+const pendingMarkdownUpdates = new Map();
+const MARKDOWN_UPDATE_DELAY = 3000; // 3 seconds
+
+// Function to regenerate markdown file sections
+async function regenerateMarkdownSections(filePath) {
+  try {
+    console.log(`Regenerating markdown sections for: ${filePath}`);
+    const { execSync } = await import('child_process');
+    
+    // Run the tasks sync command to regenerate the markdown
+    execSync('bin/tasks sync --quick', {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+    
+    console.log(`Markdown sections regenerated for: ${filePath}`);
+  } catch (error) {
+    console.error(`Failed to regenerate markdown for ${filePath}:`, error.message);
+  }
+}
+
+// Debounced markdown update
+function scheduleMarkdownUpdate(filePath) {
+  // Clear any existing timeout for this file
+  if (pendingMarkdownUpdates.has(filePath)) {
+    clearTimeout(pendingMarkdownUpdates.get(filePath));
+  }
+  
+  // Schedule a new update
+  const timeoutId = setTimeout(() => {
+    pendingMarkdownUpdates.delete(filePath);
+    regenerateMarkdownSections(filePath);
+  }, MARKDOWN_UPDATE_DELAY);
+  
+  pendingMarkdownUpdates.set(filePath, timeoutId);
+  console.log(`Scheduled markdown update for ${filePath} in ${MARKDOWN_UPDATE_DELAY}ms`);
+}
+
 // Cache for rendered Markdown
 const renderCache = new Map();
 const fileStatsCache = new Map();
@@ -3832,6 +3872,11 @@ app.post('/toggle-checkbox/*path', async (req, res) => {
           // Log error but don't fail the request - file was still updated
           console.error(`Failed to update task ${taskId} in database:`, dbError);
         }
+      }
+      
+      // Schedule markdown regeneration to move completed tasks to proper sections
+      if (urlPath.includes('tasks/') || urlPath.includes('projects/')) {
+        scheduleMarkdownUpdate(fullPath);
       }
       
       console.log(`Checkbox toggled in: ${fullPath}, line ${targetLineNumber}${taskId ? ` (task: ${taskId})` : ''}`);
