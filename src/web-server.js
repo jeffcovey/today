@@ -2362,10 +2362,45 @@ async function renderMarkdownUncached(filePath, urlPath) {
       // Extract the task text (remove status icons if present)
       let cleanTaskContent = taskContent.trim();
       
-      // Create a link around the task text, but not the checkbox
-      return `<li>${before}${checkbox} <a href="/task/${taskId1}" style="text-decoration: none; color: inherit;" 
-                onmouseover="this.style.textDecoration='underline'" 
-                onmouseout="this.style.textDecoration='none'">${cleanTaskContent}</a><!-- task-id: ${taskId2} --></li>`;
+      // Check if the task content already contains anchor tags (from marked parsing)
+      // If it does, we need to handle it differently to avoid nested links
+      if (cleanTaskContent.includes('<a href=')) {
+        // Extract the main task text and any URLs
+        // First, temporarily replace existing anchor tags with placeholders
+        const anchorMatches = [];
+        let tempContent = cleanTaskContent.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (anchorMatch, href, linkText) => {
+          anchorMatches.push({ href, linkText, anchorMatch });
+          return `__ANCHOR_${anchorMatches.length - 1}__`;
+        });
+        
+        // Now wrap the non-link text in the task link
+        let wrappedContent = `<a href="/task/${taskId1}" style="text-decoration: none; color: inherit;" 
+                  onmouseover="this.style.textDecoration='underline'" 
+                  onmouseout="this.style.textDecoration='none'">${tempContent}</a>`;
+        
+        // Replace the placeholders with the original links (outside the task link)
+        anchorMatches.forEach((anchor, index) => {
+          // For external links, ensure they open in new tab
+          const isExternal = /^https?:\/\//.test(anchor.href);
+          const targetAttr = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+          wrappedContent = wrappedContent.replace(
+            `__ANCHOR_${index}__`,
+            `</a><a href="${anchor.href}"${targetAttr}>${anchor.linkText}</a><a href="/task/${taskId1}" style="text-decoration: none; color: inherit;" 
+                  onmouseover="this.style.textDecoration='underline'" 
+                  onmouseout="this.style.textDecoration='none'">`
+          );
+        });
+        
+        // Clean up any empty task links that might have been created
+        wrappedContent = wrappedContent.replace(/<a[^>]*href="\/task\/[^"]*"[^>]*><\/a>/g, '');
+        
+        return `<li>${before}${checkbox} ${wrappedContent}<!-- task-id: ${taskId2} --></li>`;
+      } else {
+        // No existing links, wrap the entire content
+        return `<li>${before}${checkbox} <a href="/task/${taskId1}" style="text-decoration: none; color: inherit;" 
+                  onmouseover="this.style.textDecoration='underline'" 
+                  onmouseout="this.style.textDecoration='none'">${cleanTaskContent}</a><!-- task-id: ${taskId2} --></li>`;
+      }
     }
   );
   
