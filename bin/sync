@@ -76,7 +76,7 @@ main() {
     # Critical path operations (fast, important)
     # Single bidirectional Turso sync (replaces separate pull and push)
     run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
-    # Vault sync using git instead of Syncthing
+    # Vault sync using git
     run_sync_step "📝 Vault Git Sync" sync_vault_git "Vault synced via git" "Vault sync"
     run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
@@ -161,7 +161,7 @@ main() {
         run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
     fi
     
-    # NOTE: Final vault push removed - Syncthing handles vault sync now
+    # NOTE: Final vault push handled by vault-sync script
     # run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
     
     print_status "All sync operations completed (classification running in background)."
@@ -370,13 +370,13 @@ sync_github_vault_original() {
     return 0
 }
 
-# Clean up Syncthing sync-conflict files
+# Clean up sync-conflict files
 cleanup_sync_conflicts() {
     # Get the actual project root directory
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
     
-    print_info "Checking for Syncthing sync-conflict files..."
+    print_info "Checking for sync-conflict files..."
     
     # Find all sync-conflict files
     CONFLICT_FILES=$(find vault -name "*sync-conflict-*" -type f 2>/dev/null)
@@ -580,7 +580,7 @@ clean_markdown_files() {
     # This ensures files we just modified won't be re-processed next time
     mv "$TEMP_MARKER" "$LINT_MARKER"
     
-    # NOTE: No longer committing vault changes - Syncthing handles synchronization
+    # NOTE: Vault changes handled by vault-sync script
     # Files are cleaned in-place and will sync automatically
     
     return 0
@@ -1974,14 +1974,14 @@ case "${1:-}" in
         echo ""
         echo "Options:"
         echo "  --cleanup-conflicts  Remove duplicate sync-conflict files"
-        echo "  --vault             (Deprecated - vault now uses Syncthing)"
+        echo "  --vault             Sync vault files using git"
         echo "  --quick             Quick sync (tasks and inbox only)"
         echo "  --force             Force full refresh (bypass cache)"
         echo "  --quick-email       Download last 24 hours of email"
         echo "  --help              Show this help message"
         echo ""
         echo "Data sources synced:"
-        echo "  • Vault files (via Syncthing - real-time sync)"
+        echo "  • Vault files (via git)"
         echo "  • Markdown formatting cleanup (via markdownlint)"
         echo "  • Local task manager"
         echo "  • Email inbox (cached for 4 hours)"

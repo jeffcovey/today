@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules, curl, sqlite, bash, git, and syncthing
-RUN apk add --no-cache python3 make g++ curl sqlite bash git syncthing
+# Install build dependencies for native modules, curl, sqlite, bash, and git
+RUN apk add --no-cache python3 make g++ curl sqlite bash git
 
 # Install Turso CLI
 RUN curl -sSfL https://get.tur.so/install.sh | bash && \

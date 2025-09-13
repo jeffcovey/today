@@ -744,7 +744,7 @@ export class TaskManager {
 
   // Parse markdown file and sync tasks
   async syncMarkdownFile(filePath) {
-    // Skip sync-conflict files from Syncthing
+    // Skip sync-conflict files
     if (filePath.includes('sync-conflict')) {
       return 0;
     }

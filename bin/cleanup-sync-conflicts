@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clean up Syncthing conflict files and store backups centrally
+# Clean up sync conflict files and store backups centrally
 
 set -e
 
@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}=== Syncthing Conflict Cleanup ===${NC}"
+echo -e "${GREEN}=== Sync Conflict Cleanup ===${NC}"
 
 # Get the directory where this script lives, then go to parent (project root)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -60,7 +60,7 @@ echo -e "${GREEN}✓ Moved ${CONFLICT_COUNT} conflict files to backup${NC}"
 echo -e "Backup location: ${BACKUP_DIR}"
 echo ""
 echo "Backups are stored in: ${VAULT_DIR}/.backups/conflict-backups/"
-echo "These backups are excluded from Syncthing and processing scripts."
+echo "These backups are excluded from processing scripts."
 echo ""
 echo "To restore specific files: mv '${BACKUP_DIR}/path/to/file' '${VAULT_DIR}/path/to/file'"
 echo "To remove old backups after review: rm -rf '${VAULT_DIR}/.backups/conflict-backups/backup-*'"

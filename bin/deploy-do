@@ -125,24 +125,11 @@ case "$ACTION" in
             ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
         fi
         
-        # Ensure Syncthing is properly configured
-        if [ -f config/syncthing.service ]; then
-            print_info "Updating Syncthing configuration..."
-            # Copy health check script
-            scp -i "$SSH_KEY" bin/syncthing-health-check ${DROPLET_USER}@${DROPLET_IP}:/opt/today/bin/ 2>/dev/null || true
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod +x /opt/today/bin/syncthing-health-check" 2>/dev/null || true
-            
-            # Update service file if needed
-            scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/syncthing.service 2>/dev/null || true
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -f /etc/systemd/system/syncthing.service ]; then if ! cmp -s /tmp/syncthing.service /etc/systemd/system/syncthing.service 2>/dev/null; then sudo cp /tmp/syncthing.service /etc/systemd/system/syncthing.service && sudo systemctl daemon-reload && echo 'Updated Syncthing service file'; fi; fi" || true
-        fi
         
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-watcher || true"
-        # Only restart Syncthing if it's not healthy
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "if [ -x /opt/today/bin/syncthing-health-check ]; then /opt/today/bin/syncthing-health-check check || systemctl restart syncthing; else systemctl restart syncthing; fi || true"
         
         print_status "Deployment complete!"
         ;;
@@ -547,107 +534,6 @@ EOF
         print_info "Add OLLAMA_HOST=http://localhost:11434 to your .env"
         ;;
         
-    syncthing-setup)
-        echo "📂 Setting up Syncthing for vault sync..."
-        check_config
-        
-        print_info "Copying health check script..."
-        scp -i "$SSH_KEY" bin/syncthing-health-check ${DROPLET_USER}@${DROPLET_IP}:/opt/today/bin/
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "chmod +x /opt/today/bin/syncthing-health-check"
-        
-        print_info "Copying Syncthing systemd service..."
-        scp -i "$SSH_KEY" config/syncthing.service ${DROPLET_USER}@${DROPLET_IP}:/tmp/
-        
-        print_info "Installing systemd service..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp /tmp/syncthing.service /etc/systemd/system/ && sudo systemctl daemon-reload"
-        
-        print_info "Creating Syncthing directories..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/.config/syncthing /opt/today/vault"
-        
-        # Only generate config if it doesn't exist
-        print_info "Checking for existing configuration..."
-        if ! ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ -f /opt/today/.config/syncthing/config.xml ]"; then
-            print_info "Generating Syncthing configuration..."
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd /opt/today && HOME=/opt/today STHOME=/opt/today/.config/syncthing syncthing generate"
-        else
-            print_info "Using existing Syncthing configuration"
-        fi
-        
-        print_info "Starting Syncthing service..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl enable syncthing && sudo systemctl restart syncthing"
-        
-        print_info "Waiting for Syncthing to start..."
-        sleep 5
-        
-        print_info "Running headless setup..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && HOME=/opt/today STHOME=/opt/today/.config/syncthing bin/syncthing-headless add-vault || true"
-        
-        print_info "Getting device ID..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "journalctl -u syncthing --since '10 seconds ago' | grep 'My ID' | tail -1 || echo 'Check logs for device ID'"
-        
-        print_info "Running health check..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check status"
-        
-        print_status "Syncthing setup complete!"
-        echo "Access Syncthing at: http://${DROPLET_IP}:8384"
-        ;;
-        
-    syncthing-fix)
-        echo "🔧 Fixing Syncthing..."
-        check_config
-        
-        print_info "Running health check and auto-fix..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check fix"
-        
-        print_info "Waiting for service to stabilize..."
-        sleep 5
-        
-        print_info "Checking status..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "/opt/today/bin/syncthing-health-check status"
-        
-        print_status "Syncthing fix complete!"
-        ;;
-        
-    syncthing-backup)
-        echo "💾 Backing up Syncthing device ID..."
-        check_config
-        
-        print_info "Backing up Syncthing keys and config..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "mkdir -p /opt/today/backups/syncthing && cp -r /opt/today/.config/syncthing/*.pem /opt/today/.config/syncthing/config.xml /opt/today/backups/syncthing/ 2>/dev/null && ls -la /opt/today/backups/syncthing/"
-        
-        print_info "Getting device ID..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "grep 'My ID' /var/log/syslog | grep syncthing | tail -1 || journalctl -u syncthing | grep 'My ID' | tail -1"
-        
-        print_status "Backup complete!"
-        echo "Keys backed up to /opt/today/backups/syncthing/"
-        ;;
-        
-    syncthing-restore)
-        echo "♻️ Restoring Syncthing device ID..."
-        check_config
-        
-        print_info "Checking for backup..."
-        if ! ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "test -f /opt/today/backups/syncthing/key.pem"; then
-            print_error "No backup found at /opt/today/backups/syncthing/"
-            exit 1
-        fi
-        
-        print_info "Stopping Syncthing..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl stop syncthing"
-        
-        print_info "Restoring keys..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cp /opt/today/backups/syncthing/*.pem /opt/today/.config/syncthing/"
-        
-        print_info "Starting Syncthing..."
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl start syncthing"
-        
-        print_info "Verifying device ID..."
-        sleep 3
-        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "journalctl -u syncthing --since '10 seconds ago' | grep 'My ID'"
-        
-        print_status "Restore complete!"
-        ;;
-        
     ollama)
         echo "🤖 Managing Ollama models..."
         check_config
@@ -710,10 +596,6 @@ EOF
         echo "  db-init     - Initialize database"
         echo "  db-upload   - Upload local database to droplet"
         echo "  git-setup   - Manually setup git repository"
-        echo "  syncthing-setup - Setup Syncthing for vault sync"
-        echo "  syncthing-fix - Fix Syncthing config location issue"
-        echo "  syncthing-backup - Backup Syncthing device ID and keys"
-        echo "  syncthing-restore - Restore Syncthing device ID from backup"
         echo "  vault-watcher-setup - Setup vault file watcher service"
         echo "  vault-watcher - Control vault watcher (start|stop|restart|status)"
         echo "  inbox-api-setup - Setup inbox upload API for Drafts"
@@ -739,7 +621,6 @@ EOF
         echo "  4. bin/deploy-do secrets     # Copy encrypted secrets"
         echo "  5. bin/deploy-do deploy      # Deploy code (includes .git)"
         echo "  6. bin/deploy-do db-upload   # Upload your local database"
-        echo "  7. bin/deploy-do syncthing-setup # Setup Syncthing for vault sync"
         echo "  8. bin/deploy-do ollama-setup # Install Ollama with phi3-mini model"
         echo ""
         echo "Note: deploy now includes .git for sync operations"

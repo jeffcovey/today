@@ -19,10 +19,8 @@ google-calendar-key.json
 # Turso client cache
 .turso-cache/
 
-# Vault files - now synced with Syncthing instead of git
+# Vault files
 vault/
-# Keep the .stignore file for Syncthing configuration
-!vault/.stignore
 .config/
 .inbox-api-key
 .local/

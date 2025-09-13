@@ -336,7 +336,7 @@ code tunnel user login --provider microsoft
 ## Documentation
 
 - [Notion Migration Guide](docs/notion-migration.md) - Complete guide for migrating tasks from Notion to Today
-- [Notes System](vault/notes/README.md) - Syncthing-based real-time notes synchronization
+- [Notes System](vault/notes/README.md) - Real-time notes synchronization
 
 ## Development
 

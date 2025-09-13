@@ -16,7 +16,7 @@ if [ -f "bin/setup" ]; then
 fi
 
 
-# Start vault git sync instead of Syncthing
+# Start vault git sync
 if [ -f "bin/vault-sync-daemon" ] && [ -d "vault/.git" ]; then
     echo "Setting up vault git sync..."
     # Run initial pull to get latest
