@@ -814,6 +814,26 @@ export class TaskManager {
         title = title.replace(/<!--.*$/g, '').trim();
         title = title.replace(/<!-.*$/g, '').trim();
         title = title.replace(/\s+task-id:.*$/g, '').trim();
+        
+        // CRITICAL: Remove status emojis from the title to prevent accumulation
+        // These should only be in markdown display, never in the database title
+        const statusEmojis = [
+          '🎭', '🗂️', '1️⃣', '2️⃣', '3️⃣', '📋', '✅', '⏳', '🔄', '❌', '✉️', 'Next'
+        ];
+        
+        // Keep removing status prefixes until none are left
+        let previousTitle;
+        do {
+          previousTitle = title;
+          for (const emoji of statusEmojis) {
+            if (title.startsWith(emoji + ' ')) {
+              title = title.substring(emoji.length + 1).trim();
+            } else if (title.startsWith(emoji)) {
+              title = title.substring(emoji.length).trim();
+            }
+          }
+        } while (title !== previousTitle);
+        
         const existingId = taskMatch[3];
 
         // Skip tasks marked with task-id: none (template/routine tasks)

@@ -1914,6 +1914,79 @@ export class MigrationManager {
           
           console.log(`    Converted ${updated} invalid date formats`);
         }
+      },
+      {
+        version: 23,
+        description: 'Fix corrupted task titles with accumulated status emojis and remove duplicates',
+        fn: (db) => {
+          console.log('Migration v23: Fixing corrupted task titles and removing duplicates');
+          
+          // Define all status emojis/prefixes that should be removed from titles
+          const statusPrefixes = [
+            '🎭', '🗂️', '1️⃣', '2️⃣', '3️⃣', '📋', '✅', '⏳', '🔄', '❌', '✉️', 'Next'
+          ];
+          
+          // Get all tasks with potentially corrupted titles
+          const allTasks = db.prepare(`
+            SELECT id, title, status, created_at 
+            FROM tasks 
+            ORDER BY title, created_at
+          `).all();
+          
+          console.log(`    Checking ${allTasks.length} tasks for corrupted titles`);
+          
+          const updateTitle = db.prepare('UPDATE tasks SET title = ? WHERE id = ?');
+          const deleteTask = db.prepare('DELETE FROM tasks WHERE id = ?');
+          let fixedCount = 0;
+          let deletedCount = 0;
+          const cleanTitles = new Map(); // Map of clean title -> first task ID
+          
+          for (const task of allTasks) {
+            let cleanTitle = task.title;
+            
+            // Keep removing status prefixes until none are left
+            let previousTitle;
+            do {
+              previousTitle = cleanTitle;
+              for (const prefix of statusPrefixes) {
+                // Handle both "prefix " and just "prefix"
+                if (cleanTitle.startsWith(prefix + ' ')) {
+                  cleanTitle = cleanTitle.substring(prefix.length + 1).trim();
+                } else if (cleanTitle.startsWith(prefix)) {
+                  cleanTitle = cleanTitle.substring(prefix.length).trim();
+                }
+              }
+            } while (cleanTitle !== previousTitle);
+            
+            // Also clean up duplicated topics (e.g., "👤 👤 👤" -> "👤")
+            cleanTitle = cleanTitle.replace(/(\s*[👤💻🏠💪❤️✈️🧠📌🏥🌳💰🗂️]+)\s+\1+/g, '$1');
+            
+            // Check if this is a duplicate task (same clean title, not completed)
+            const isDuplicate = cleanTitles.has(cleanTitle) && task.status !== '✅ Done';
+            
+            if (isDuplicate) {
+              // This is a duplicate - delete it
+              console.log(`        Deleting duplicate: "${task.title}" (ID: ${task.id.substring(0, 8)}...)`);
+              deleteTask.run(task.id);
+              deletedCount++;
+            } else {
+              // Mark this clean title as seen
+              if (task.status !== '✅ Done') {
+                cleanTitles.set(cleanTitle, task.id);
+              }
+              
+              // Update the title if it was corrupted
+              if (cleanTitle !== task.title) {
+                console.log(`        Fixing: "${task.title}" -> "${cleanTitle}"`);
+                updateTitle.run(cleanTitle, task.id);
+                fixedCount++;
+              }
+            }
+          }
+          
+          console.log(`    Fixed ${fixedCount} corrupted titles`);
+          console.log(`    Deleted ${deletedCount} duplicate tasks`);
+        }
       }
     ];
 

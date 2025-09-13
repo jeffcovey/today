@@ -52,13 +52,34 @@ if [ ! -d ".git" ]; then
     exit 1
 fi
 
+# Check if we're in a detached HEAD state or not on a branch
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ -z "$CURRENT_BRANCH" ]; then
+    warning "Not currently on a branch (detached HEAD state)"
+    log "Checking out main branch..."
+    git checkout main || {
+        error "Failed to checkout main branch"
+        exit 1
+    }
+fi
+
+# Ensure we're on the main branch
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    warning "Currently on branch '$CURRENT_BRANCH', switching to main..."
+    git checkout main || {
+        error "Failed to checkout main branch"
+        exit 1
+    }
+fi
+
 # Parse command line arguments
 ACTION="${1:-sync}"
 
 case "$ACTION" in
     pull)
         log "Pulling latest changes from remote..."
-        git pull --rebase || {
+        git pull --rebase origin main || {
             error "Failed to pull changes"
             exit 1
         }
@@ -91,6 +112,10 @@ case "$ACTION" in
         
     sync)
         log "Starting full sync..."
+        
+        # Abort any ongoing rebase or merge
+        git rebase --abort 2>/dev/null
+        git merge --abort 2>/dev/null
         
         # Check for merge conflicts first
         if git status | grep -q "Unmerged paths"; then
@@ -131,7 +156,7 @@ case "$ACTION" in
         
         # First, pull any remote changes
         log "Pulling remote changes..."
-        git pull --rebase || {
+        git pull --rebase origin main || {
             warning "Pull failed, attempting to resolve..."
             
             # Check if it's just auto-generated files
@@ -160,7 +185,7 @@ case "$ACTION" in
                     # Fall back to stash approach for manual files
                     git rebase --abort 2>/dev/null
                     git stash
-                    git pull
+                    git pull origin main
                     git stash pop || {
                         error "Conflict detected! Manual intervention required."
                         error "Your changes are saved in git stash"
@@ -170,7 +195,7 @@ case "$ACTION" in
             else
                 # If pull fails for other reasons, try stash
                 git stash
-                git pull
+                git pull origin main
                 git stash pop || {
                     error "Conflict detected! Manual intervention required."
                     error "Your changes are saved in git stash"
