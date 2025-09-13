@@ -87,6 +87,12 @@ const jobs = [
         schedule: '0 * * * *', // Every hour
         command: 'journalctl --vacuum-time=24h > /dev/null 2>&1 || true',
         description: 'Clean up old systemd logs'
+    },
+    {
+        schedule: '0 4 * * *', // Daily at 4 AM
+        command: 'systemctl restart vault-watcher || true',
+        description: 'Restart vault-watcher to ensure latest code',
+        timezone: true
     }
 ];
 
