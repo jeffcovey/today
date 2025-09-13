@@ -2257,7 +2257,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const renderer = createExternalLinkRenderer();
   
   // Render the markdown with custom renderer (with IDs added to headings)
-  let htmlContent = marked(contentToRender, { renderer });
+  let htmlContent = marked.parse(contentToRender, { renderer });
   
   // Don't prepend TOC to content - we'll add it to the header instead
   
