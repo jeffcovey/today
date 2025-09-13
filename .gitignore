@@ -23,3 +23,8 @@ google-calendar-key.json
 vault/
 # Keep the .stignore file for Syncthing configuration
 !vault/.stignore
+.config/
+.inbox-api-key
+.local/
+.npm/
+backups/
