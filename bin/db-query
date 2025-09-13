@@ -26,18 +26,18 @@ case "${1:-daily}" in
 SELECT 'Current Time: ' || datetime('now', 'localtime');
 SELECT '---';
 
--- Urgent tasks
+-- Urgent tasks (from actual tasks table, not legacy cache)
 SELECT '=== URGENT TASKS ===' as section;
 SELECT 
     title,
-    json_extract(properties, '$.stage') as stage,
-    json_extract(properties, '$.due_date') as due_date,
-    json_extract(properties, '$.category') as category,
+    status,
+    do_date,
+    project_id,
     id
-FROM task_cache 
-WHERE json_extract(properties, '$.stage') IN ('🔥 Immediate', '🚀 1st Priority')
-   OR DATE(json_extract(properties, '$.due_date')) <= DATE('now', '+1 day')
-ORDER BY json_extract(properties, '$.due_date');
+FROM tasks 
+WHERE status IN ('🔥 Immediate', '🚀 1st Priority')
+   OR (do_date IS NOT NULL AND DATE(do_date) <= DATE('now', '+1 day'))
+ORDER BY do_date;
 SELECT '---';
 
 -- Today's calendar events  
@@ -100,20 +100,20 @@ GROUP BY p.name;
         run_query "
 SELECT 
     title,
-    json_extract(properties, '$.stage') as stage,
-    json_extract(properties, '$.due_date') as due_date,
-    json_extract(properties, '$.category') as category,
+    status,
+    do_date,
+    project_id,
     id
-FROM task_cache 
-WHERE json_extract(properties, '$.stage') IN ('🔥 Immediate', '🚀 1st Priority', '🎯 2nd Priority')
+FROM tasks 
+WHERE status IN ('🔥 Immediate', '🚀 1st Priority', '🎯 2nd Priority')
 ORDER BY 
-    CASE json_extract(properties, '$.stage')
+    CASE status
         WHEN '🔥 Immediate' THEN 1
         WHEN '🚀 1st Priority' THEN 2
         WHEN '🎯 2nd Priority' THEN 3
         ELSE 4
     END,
-    json_extract(properties, '$.due_date');
+    do_date;
 "
         ;;
         

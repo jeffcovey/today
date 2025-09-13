@@ -1983,6 +1983,38 @@ export class MigrationManager {
           console.log(`    Fixed ${fixedCount} corrupted titles`);
           console.log(`    Deleted ${deletedCount} duplicate tasks`);
         }
+      },
+      {
+        version: 24,
+        description: 'Drop legacy task_cache table - no longer used since August 2025',
+        fn: (db) => {
+          console.log('    Dropping legacy task_cache table...');
+          
+          // Check if table exists
+          const tableExists = db.prepare(`
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='task_cache'
+          `).get();
+          
+          if (tableExists) {
+            // Drop the table
+            db.exec('DROP TABLE task_cache');
+            console.log('    ✓ Dropped task_cache table');
+            
+            // Also clean up any related cache metadata
+            const cacheMetaExists = db.prepare(`
+              SELECT name FROM sqlite_master 
+              WHERE type='table' AND name='cache_metadata'
+            `).get();
+            
+            if (cacheMetaExists) {
+              db.prepare("DELETE FROM cache_metadata WHERE cache_type = 'tasks'").run();
+              console.log('    ✓ Cleaned up cache_metadata entries');
+            }
+          } else {
+            console.log('    task_cache table already removed');
+          }
+        }
       }
     ];
 
