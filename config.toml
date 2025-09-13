@@ -9,4 +9,4 @@
 #   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
 #
 # The system will automatically resolve these to proper timezone IDs.
-timezone = "America/Los_Angeles"
+timezone = "America/New_York"
