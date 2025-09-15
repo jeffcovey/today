@@ -20,6 +20,7 @@ google-calendar-key.json
 .turso-cache/
 
 # Vault files
+vault
 vault/
 .config/
 .inbox-api-key
