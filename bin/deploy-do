@@ -335,6 +335,96 @@ EOF
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION vault-watcher && sudo systemctl status vault-watcher --no-pager"
         ;;
     
+    resilio-sync)
+        # Manage Resilio Sync for vault synchronization
+        check_config
+        ACTION="${2:-status}"
+        
+        case "$ACTION" in
+            setup)
+                print_info "Setting up Resilio Sync..."
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+                    # Create config directory
+                    sudo mkdir -p /etc/resilio-sync
+                    
+                    # Create basic config file
+                    sudo tee /etc/resilio-sync/config.json > /dev/null << 'CONFIG'
+{
+    "device_name": "Today Droplet",
+    "listening_port": 8888,
+    "storage_path": "/var/lib/resilio-sync/",
+    "pid_file": "/var/run/resilio-sync/sync.pid",
+    "use_upnp": true,
+    "download_limit": 0,
+    "upload_limit": 0,
+    "webui": {
+        "listen": "0.0.0.0:8889",
+        "login": "admin",
+        "password": "admin"
+    },
+    "shared_folders": [
+        {
+            "dir": "/opt/today/vault",
+            "use_relay_server": true,
+            "use_tracker": true,
+            "search_lan": true,
+            "use_sync_trash": true,
+            "overwrite_changes": false
+        }
+    ]
+}
+CONFIG
+                    
+                    # Set permissions
+                    sudo chown -R rslsync:rslsync /opt/today/vault
+                    sudo chmod 755 /opt/today/vault
+                    
+                    # Create systemd service
+                    sudo tee /etc/systemd/system/resilio-sync.service > /dev/null << 'SERVICE'
+[Unit]
+Description=Resilio Sync
+Documentation=https://help.resilio.com
+After=network.target
+
+[Service]
+Type=simple
+User=rslsync
+Group=rslsync
+ExecStart=/usr/bin/rslsync --config /etc/resilio-sync/config.json --nodaemon
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+                    
+                    # Start service
+                    sudo systemctl daemon-reload
+                    sudo systemctl enable resilio-sync
+                    sudo systemctl restart resilio-sync
+                    
+                    echo "✅ Resilio Sync configured and started"
+                    echo "📌 Web UI available at: http://$(hostname -I | awk '{print $1}'):8889"
+                    echo "   Default login: admin / admin"
+EOF
+                ;;
+            
+            start|stop|restart|status)
+                print_info "Resilio Sync: $ACTION"
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION resilio-sync && sudo systemctl status resilio-sync --no-pager"
+                ;;
+            
+            key)
+                print_info "Getting sync key for vault folder..."
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "echo 'Visit Web UI at http://$(hostname -I | awk '{print $1}'):8889 to get the sync key'"
+                ;;
+            
+            *)
+                echo "Usage: bin/deploy-do resilio-sync [setup|start|stop|restart|status|key]"
+                ;;
+        esac
+        ;;
+    
     inbox-api-setup)
         echo "📮 Setting up inbox upload API..."
         check_config
@@ -598,6 +688,7 @@ EOF
         echo "  git-setup   - Manually setup git repository"
         echo "  vault-watcher-setup - Setup vault file watcher service"
         echo "  vault-watcher - Control vault watcher (start|stop|restart|status)"
+        echo "  resilio-sync - Manage Resilio Sync (setup|start|stop|restart|status|key)"
         echo "  inbox-api-setup - Setup inbox upload API for Drafts"
         echo "  inbox-api   - Control inbox API (start|stop|restart|status)"
         echo "  vault-api-setup - Setup vault read API for Drafts sync"

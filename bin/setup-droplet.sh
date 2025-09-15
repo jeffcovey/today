@@ -36,6 +36,24 @@ npm install -g @anthropic-ai/claude-code
 echo "📦 Installing dotenvx..."
 npm install -g @dotenvx/dotenvx
 
+# Install Resilio Sync for vault synchronization
+echo "📦 Installing Resilio Sync..."
+# Add repository key
+wget -qO - https://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor | tee /usr/share/keyrings/resilio-sync-archive-keyring.gpg >/dev/null
+# Add repository
+echo "deb [signed-by=/usr/share/keyrings/resilio-sync-archive-keyring.gpg] https://linux-packages.resilio.com/resilio-sync/deb resilio-sync non-free" | tee /etc/apt/sources.list.d/resilio-sync.list
+# Update and install
+apt-get update
+apt-get install -y resilio-sync
+# Create sync user and directories
+useradd -r -s /bin/false rslsync || true
+mkdir -p /opt/today/vault
+chown -R rslsync:rslsync /opt/today/vault
+# Stop the default service (we'll configure it later)
+systemctl stop resilio-sync || true
+systemctl disable resilio-sync || true
+echo "✅ Resilio Sync installed"
+
 # Create deployment directory
 echo "📁 Creating deployment directory..."
 mkdir -p /opt/today
