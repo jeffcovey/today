@@ -126,6 +126,28 @@ case "$ACTION" in
         fi
         
         
+        # Ensure Resilio Sync is installed and running
+        print_info "Checking Resilio Sync..."
+        if ! ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "command -v rslsync >/dev/null 2>&1"; then
+            print_warning "Resilio Sync not installed, installing now..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+                # Add repository key
+                wget -qO - https://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor | sudo tee /usr/share/keyrings/resilio-sync-archive-keyring.gpg >/dev/null
+                # Add repository
+                echo "deb [signed-by=/usr/share/keyrings/resilio-sync-archive-keyring.gpg] https://linux-packages.resilio.com/resilio-sync/deb resilio-sync non-free" | sudo tee /etc/apt/sources.list.d/resilio-sync.list
+                # Update and install
+                sudo apt-get update
+                sudo apt-get install -y resilio-sync
+                # Create sync user
+                sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
+EOF
+            # Run the setup
+            $0 resilio-sync setup
+        else
+            # Just ensure the service is running
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl start resilio-sync 2>/dev/null || true"
+        fi
+        
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
