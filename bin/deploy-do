@@ -366,11 +366,31 @@ EOF
             setup)
                 print_info "Setting up Resilio Sync..."
                 ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
-                    # Create config directory
-                    sudo mkdir -p /etc/resilio-sync
+                    # Ensure user exists
+                    sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
                     
-                    # Create basic config file
-                    sudo tee /etc/resilio-sync/config.json > /dev/null << 'CONFIG'
+                    # Create required directories
+                    sudo mkdir -p /etc/resilio-sync
+                    sudo mkdir -p /var/lib/resilio-sync
+                    sudo mkdir -p /var/run/resilio-sync
+                    sudo mkdir -p /opt/today/vault
+                    
+                    # IMPORTANT: Fix vault permissions - rslsync needs write access
+                    sudo chown -R rslsync:rslsync /opt/today/vault
+                    sudo chmod -R 775 /opt/today/vault
+                    
+                    # Set permissions for other directories
+                    sudo chown rslsync:rslsync /var/lib/resilio-sync
+                    sudo chown rslsync:rslsync /var/run/resilio-sync
+                    
+                    # Only create config if it doesn't exist (preserve existing config)
+                    if [ ! -f /etc/resilio-sync/config.json ]; then
+                        # Generate a random password if this is first setup
+                        RESILIO_PASSWORD=$(openssl rand -base64 12)
+                        echo "RESILIO_PASSWORD=$RESILIO_PASSWORD" > /opt/today/.resilio-password
+                        chmod 600 /opt/today/.resilio-password
+                        
+                        sudo tee /etc/resilio-sync/config.json > /dev/null << CONFIG
 {
     "device_name": "Today Droplet",
     "listening_port": 8888,
@@ -382,26 +402,25 @@ EOF
     "webui": {
         "listen": "0.0.0.0:8889",
         "login": "admin",
-        "password": "admin"
-    },
-    "shared_folders": [
-        {
-            "dir": "/opt/today/vault",
-            "use_relay_server": true,
-            "use_tracker": true,
-            "search_lan": true,
-            "use_sync_trash": true,
-            "overwrite_changes": false
-        }
-    ]
+        "password": "$RESILIO_PASSWORD"
+    }
 }
 CONFIG
+                        echo "Generated new password: $RESILIO_PASSWORD"
+                        echo "(Saved to /opt/today/.resilio-password)"
+                    else
+                        echo "Using existing Resilio Sync configuration"
+                        if [ -f /opt/today/.resilio-password ]; then
+                            source /opt/today/.resilio-password
+                            echo "Current password: $RESILIO_PASSWORD"
+                        fi
+                    fi
                     
-                    # Set permissions
-                    sudo chown -R rslsync:rslsync /opt/today/vault
-                    sudo chmod 755 /opt/today/vault
+                    # Ensure config has correct permissions
+                    sudo chown rslsync:rslsync /etc/resilio-sync/config.json
+                    sudo chmod 600 /etc/resilio-sync/config.json
                     
-                    # Create systemd service
+                    # Create systemd service with RuntimeDirectory
                     sudo tee /etc/systemd/system/resilio-sync.service > /dev/null << 'SERVICE'
 [Unit]
 Description=Resilio Sync
@@ -412,6 +431,10 @@ After=network.target
 Type=simple
 User=rslsync
 Group=rslsync
+RuntimeDirectory=resilio-sync
+RuntimeDirectoryMode=0755
+ExecStartPre=/bin/mkdir -p /var/run/resilio-sync
+ExecStartPre=/bin/chown rslsync:rslsync /var/run/resilio-sync
 ExecStart=/usr/bin/rslsync --config /etc/resilio-sync/config.json --nodaemon
 Restart=always
 RestartSec=5
@@ -425,9 +448,56 @@ SERVICE
                     sudo systemctl enable resilio-sync
                     sudo systemctl restart resilio-sync
                     
+                    # Setup nginx subdomain for Resilio Sync
+                    if [ ! -f /etc/nginx/sites-available/sync.today.jeffcovey.net ]; then
+                        sudo tee /etc/nginx/sites-available/sync.today.jeffcovey.net > /dev/null << 'NGINX'
+server {
+    server_name sync.today.jeffcovey.net;
+    
+    location / {
+        proxy_pass http://127.0.0.1:8889;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support for Resilio Sync
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+    }
+
+    listen 80;
+}
+NGINX
+                        sudo ln -sf /etc/nginx/sites-available/sync.today.jeffcovey.net /etc/nginx/sites-enabled/
+                        sudo nginx -t && sudo systemctl reload nginx
+                        
+                        # Setup SSL with certbot
+                        sudo certbot --nginx -d sync.today.jeffcovey.net --non-interactive --agree-tos --email admin@jeffcovey.net --redirect
+                        
+                        echo "✅ Nginx subdomain configured with HTTPS"
+                    fi
+                    
                     echo "✅ Resilio Sync configured and started"
-                    echo "📌 Web UI available at: http://$(hostname -I | awk '{print $1}'):8889"
-                    echo "   Default login: admin / admin"
+                    echo "📌 Web UI available at:"
+                    echo "   🔒 HTTPS: https://sync.today.jeffcovey.net"
+                    echo "   Direct: http://$(hostname -I | awk '{print $1}'):8889"
+                    if [ -f /opt/today/.resilio-password ]; then
+                        source /opt/today/.resilio-password
+                        echo "   Username: admin"
+                        echo "   Password: $RESILIO_PASSWORD"
+                    else
+                        echo "   Username: admin"
+                        echo "   Password: admin (default)"
+                    fi
+                    echo ""
+                    echo "Note: You may need to add sync.today.jeffcovey.net to your DNS records"
+                    echo "Point it to the same IP as today.jeffcovey.net (167.71.106.64)"
 EOF
                 ;;
             
@@ -436,13 +506,93 @@ EOF
                 ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl $ACTION resilio-sync && sudo systemctl status resilio-sync --no-pager"
                 ;;
             
-            key)
-                print_info "Getting sync key for vault folder..."
-                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "echo 'Visit Web UI at http://$(hostname -I | awk '{print $1}'):8889 to get the sync key'"
+            set-password)
+                print_info "Setting new Resilio Sync password..."
+                # If no password provided, generate a random one
+                if [ -z "$3" ]; then
+                    print_info "Generating random password..."
+                    NEW_PASSWORD=$(openssl rand -base64 16)
+                else
+                    NEW_PASSWORD="$3"
+                fi
+                
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << EOF
+                    # Update the password in config
+                    sudo jq '.webui.password = "$NEW_PASSWORD"' /etc/resilio-sync/config.json > /tmp/config.json
+                    sudo mv /tmp/config.json /etc/resilio-sync/config.json
+                    sudo chown rslsync:rslsync /etc/resilio-sync/config.json
+                    sudo chmod 600 /etc/resilio-sync/config.json
+                    
+                    # Save password for reference
+                    echo "RESILIO_PASSWORD=$NEW_PASSWORD" > /opt/today/.resilio-password
+                    chmod 600 /opt/today/.resilio-password
+                    
+                    # Restart service to apply
+                    sudo systemctl restart resilio-sync
+                    
+                    echo "✅ Password updated successfully!"
+                    echo ""
+                    echo "========================================="
+                    echo "New password: $NEW_PASSWORD"
+                    echo "========================================="
+                    echo ""
+                    echo "URL: https://sync.today.jeffcovey.net"
+                    echo "Username: admin"
+                    echo "Password: $NEW_PASSWORD"
+                    echo ""
+                    echo "Service restarting..."
+EOF
+                ;;
+            
+            fix-permissions)
+                print_info "Fixing vault folder permissions..."
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+                    sudo chown -R rslsync:rslsync /opt/today/vault
+                    sudo chmod -R 775 /opt/today/vault
+                    echo "✅ Permissions fixed for /opt/today/vault"
+                    ls -la /opt/today/vault | head -5
+EOF
+                ;;
+            
+            key|info)
+                print_info "Resilio Sync information..."
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+                    echo "📌 Web UI Access:"
+                    if [ -f /etc/nginx/sites-enabled/sync.today.jeffcovey.net ]; then
+                        echo "   🔒 HTTPS: https://sync.today.jeffcovey.net"
+                    fi
+                    echo "   Direct: http://$(hostname -I | awk '{print $1}'):8889"
+                    
+                    if [ -f /opt/today/.resilio-password ]; then
+                        source /opt/today/.resilio-password
+                        echo ""
+                        echo "Credentials:"
+                        echo "   Username: admin"
+                        echo "   Password: $RESILIO_PASSWORD"
+                    else
+                        echo ""
+                        echo "Credentials:"
+                        echo "   Username: admin"
+                        echo "   Password: admin (default)"
+                    fi
+                    echo ""
+                    echo "To get sync keys, visit the Web UI and check your folders"
+                    
+                    # Check if DNS is configured
+                    if ! host sync.today.jeffcovey.net >/dev/null 2>&1; then
+                        echo ""
+                        echo "⚠️  DNS not configured yet!"
+                        echo "Add an A record for sync.today.jeffcovey.net pointing to $(hostname -I | awk '{print $1}')"
+                    fi
+EOF
                 ;;
             
             *)
-                echo "Usage: bin/deploy-do resilio-sync [setup|start|stop|restart|status|key]"
+                echo "Usage: bin/deploy-do resilio-sync [setup|start|stop|restart|status|set-password|fix-permissions|info]"
+                echo ""
+                echo "  set-password [password]  - Set new password (generates random if not provided)"
+                echo "  fix-permissions          - Fix vault folder permissions"
+                echo "  info                     - Show access info and current password"
                 ;;
         esac
         ;;

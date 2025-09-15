@@ -16,21 +16,24 @@ if [ -f "bin/setup" ]; then
 fi
 
 
-# Start vault git sync
-if [ -f "bin/vault-sync-daemon" ] && [ -d "vault/.git" ]; then
-    echo "Setting up vault git sync..."
-    # Run initial pull to get latest
-    echo "Pulling latest vault changes..."
-    (cd vault && git pull --quiet) || echo "Initial vault pull failed - may need to resolve conflicts"
-    
-    # Start the sync daemon for periodic syncing
-    echo "Starting vault sync daemon (syncs every 5 minutes)..."
-    nohup bin/vault-sync-daemon > /dev/null 2>&1 &
-    echo "Vault sync daemon started"
-    echo "To sync manually, run: bin/vault-sync"
+# Check vault mount status
+if [ -d "/workspaces/today/vault" ]; then
+    if [ -n "$(ls -A /workspaces/today/vault 2>/dev/null)" ]; then
+        echo "✅ Vault mounted from host ($(ls /workspaces/today/vault | wc -l) items)"
+        echo "   Using host's iCloud vault - no sync needed in container"
+    else
+        echo "⚠️  Vault directory exists but appears empty"
+        echo "   Check if iCloud vault exists at: ~/Library/Mobile Documents/com~apple~CloudDocs/today-vault"
+    fi
 else
-    echo "Vault git sync not configured - run bin/vault-sync setup-remote"
+    echo "❌ Vault not mounted - mount failed or iCloud vault doesn't exist"
+    echo "   Expected location: ~/Library/Mobile Documents/com~apple~CloudDocs/today-vault"
+    echo "   Creating empty vault directory..."
+    mkdir -p /workspaces/today/vault
 fi
+
+# Skip Resilio Sync in container since we're using mounted vault
+echo "ℹ️  Skipping Resilio Sync in container - using mounted iCloud vault"
 
 # Start code-server
 if [ -f "bin/start-code-server" ]; then

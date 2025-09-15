@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Vault Git Sync Script
-# Automatically syncs the vault/ directory with its remote repository
+# Vault Sync Script - Now using Resilio Sync instead of Git
+# This script is kept for backwards compatibility and information
 
 # Get the directory where this script lives, then go to parent (project root)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -27,241 +27,26 @@ warning() {
     echo -e "${YELLOW}[${SCRIPT_NAME} WARNING]${NC} $1"
 }
 
-# Check if vault directory exists
-if [ ! -d "$VAULT_DIR" ]; then
-    error "Vault directory not found at $VAULT_DIR"
-    exit 1
+# Main message
+log "Vault synchronization has been migrated to Resilio Sync"
+echo ""
+echo "The vault directory is now synchronized using Resilio Sync, which provides:"
+echo "  • Real-time synchronization"
+echo "  • Better handling of large files (4.7GB vault)"
+echo "  • No commit/push workflow needed"
+echo "  • Automatic conflict resolution with versioning"
+echo ""
+echo "Resilio Sync Web UI:"
+echo "  • Local (if running): http://localhost:8888"
+echo "  • Droplet: http://167.71.106.64:8889"
+echo ""
+echo "For more information, see: docs/resilio-sync-setup.md"
+echo ""
+
+# If user provided any arguments, inform them about the change
+if [ $# -gt 0 ]; then
+    warning "Git-based sync commands are no longer available"
+    echo "Synchronization now happens automatically through Resilio Sync"
 fi
 
-cd "$VAULT_DIR" || exit 1
-
-# Check if it's a git repository
-if [ ! -d ".git" ]; then
-    warning "Vault directory is not a git repository yet"
-    echo ""
-    echo "To initialize vault as a git repository, run:"
-    echo "  cd $VAULT_DIR"
-    echo "  git init"
-    echo "  git branch -m main"
-    echo "  git add ."
-    echo "  git commit -m 'Initial commit'"
-    echo ""
-    echo "Then set up a remote repository:"
-    echo "  $0 setup-remote git@github.com:yourusername/vault.git"
-    echo ""
-    exit 1
-fi
-
-# Check if we're in a detached HEAD state or not on a branch
-CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
-if [ -z "$CURRENT_BRANCH" ]; then
-    warning "Not currently on a branch (detached HEAD state)"
-    log "Checking out main branch..."
-    git checkout main || {
-        error "Failed to checkout main branch"
-        exit 1
-    }
-fi
-
-# Ensure we're on the main branch
-CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
-if [ "$CURRENT_BRANCH" != "main" ]; then
-    warning "Currently on branch '$CURRENT_BRANCH', switching to main..."
-    git checkout main || {
-        error "Failed to checkout main branch"
-        exit 1
-    }
-fi
-
-# Parse command line arguments
-ACTION="${1:-sync}"
-
-case "$ACTION" in
-    pull)
-        log "Pulling latest changes from remote..."
-        git pull --rebase origin main || {
-            error "Failed to pull changes"
-            exit 1
-        }
-        log "Pull completed successfully"
-        ;;
-        
-    push)
-        log "Checking for local changes..."
-        
-        # Check if there are any changes to commit
-        if [ -n "$(git status --porcelain)" ]; then
-            log "Found local changes, committing..."
-            git add .
-            git commit -m "Vault sync: $(date '+%Y-%m-%d %H:%M:%S')" || {
-                error "Failed to commit changes"
-                exit 1
-            }
-        else
-            log "No local changes to commit"
-        fi
-        
-        # Push changes to remote
-        log "Pushing to remote..."
-        git push || {
-            error "Failed to push changes"
-            exit 1
-        }
-        log "Push completed successfully"
-        ;;
-        
-    sync)
-        log "Starting full sync..."
-        
-        # Abort any ongoing rebase or merge
-        git rebase --abort 2>/dev/null
-        git merge --abort 2>/dev/null
-        
-        # Check for merge conflicts first
-        if git status | grep -q "Unmerged paths"; then
-            warning "Detected unmerged files from previous sync attempt"
-            
-            # Get list of conflicted files
-            CONFLICTED_FILES=$(git diff --name-only --diff-filter=U)
-            
-            # Check if all conflicts are in auto-generated files
-            # Include plan files since Claude updates them with task IDs
-            # Include logs since they often have task ID conflicts
-            AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md|plans/.*\.md|logs/.*\.md)"
-            ALL_AUTO_GEN=true
-            
-            for file in $CONFLICTED_FILES; do
-                if ! echo "$file" | grep -qE "$AUTO_GEN_PATTERN"; then
-                    ALL_AUTO_GEN=false
-                    break
-                fi
-            done
-            
-            if [ "$ALL_AUTO_GEN" = true ]; then
-                log "All conflicts are in auto-generated files, accepting remote versions..."
-                for file in $CONFLICTED_FILES; do
-                    git checkout --theirs "$file"
-                    git add "$file"
-                done
-                
-                # If we're in a rebase, continue it
-                if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
-                    git rebase --continue || git rebase --skip
-                fi
-            else
-                error "Manual conflicts detected in non-auto-generated files"
-                error "Please resolve conflicts manually and run sync again"
-                exit 1
-            fi
-        fi
-        
-        # First, pull any remote changes
-        log "Pulling remote changes..."
-        git pull --rebase origin main || {
-            warning "Pull failed, attempting to resolve..."
-            
-            # Check if it's just auto-generated files
-            CONFLICTED_FILES=$(git diff --name-only --diff-filter=U 2>/dev/null)
-            if [ -n "$CONFLICTED_FILES" ]; then
-                AUTO_GEN_PATTERN="(tasks/(today|stages|tasks)\.md|topics/.*\.md|plans/.*\.md|logs/.*\.md)"
-                ALL_AUTO_GEN=true
-                
-                for file in $CONFLICTED_FILES; do
-                    if ! echo "$file" | grep -qE "$AUTO_GEN_PATTERN"; then
-                        ALL_AUTO_GEN=false
-                        break
-                    fi
-                done
-                
-                if [ "$ALL_AUTO_GEN" = true ]; then
-                    log "Auto-generated file conflicts detected, accepting remote versions..."
-                    for file in $CONFLICTED_FILES; do
-                        git checkout --theirs "$file" 2>/dev/null
-                        git add "$file" 2>/dev/null
-                    done
-                    
-                    # Try to continue rebase
-                    git rebase --continue 2>/dev/null || git rebase --skip 2>/dev/null
-                else
-                    # Fall back to stash approach for manual files
-                    git rebase --abort 2>/dev/null
-                    git stash
-                    git pull origin main
-                    git stash pop || {
-                        error "Conflict detected! Manual intervention required."
-                        error "Your changes are saved in git stash"
-                        exit 1
-                    }
-                fi
-            else
-                # If pull fails for other reasons, try stash
-                git stash
-                git pull origin main
-                git stash pop || {
-                    error "Conflict detected! Manual intervention required."
-                    error "Your changes are saved in git stash"
-                    exit 1
-                }
-            fi
-        }
-        
-        # Check for local changes and commit them
-        if [ -n "$(git status --porcelain)" ]; then
-            log "Committing local changes..."
-            git add .
-            git commit -m "Vault sync: $(date '+%Y-%m-%d %H:%M:%S')"
-        fi
-        
-        # Push to remote
-        log "Pushing to remote..."
-        git push || {
-            error "Failed to push changes"
-            exit 1
-        }
-        
-        log "Sync completed successfully"
-        ;;
-        
-    status)
-        log "Vault repository status:"
-        git status
-        echo ""
-        log "Recent commits:"
-        git log --oneline -5
-        ;;
-        
-    setup-remote)
-        REMOTE_URL="${2}"
-        if [ -z "$REMOTE_URL" ]; then
-            error "Please provide a remote repository URL"
-            echo "Usage: $0 setup-remote <repository-url>"
-            exit 1
-        fi
-        
-        log "Setting up remote repository..."
-        git remote remove origin 2>/dev/null
-        git remote add origin "$REMOTE_URL"
-        log "Remote repository set to: $REMOTE_URL"
-        
-        # Set upstream branch
-        git push -u origin main || {
-            error "Failed to push to remote. Make sure the repository exists and you have access."
-            exit 1
-        }
-        log "Remote setup completed successfully"
-        ;;
-        
-    *)
-        echo "Usage: $0 [pull|push|sync|status|setup-remote <url>]"
-        echo ""
-        echo "Commands:"
-        echo "  pull          - Pull latest changes from remote"
-        echo "  push          - Commit and push local changes"
-        echo "  sync          - Full sync (pull, commit, push)"
-        echo "  status        - Show repository status"
-        echo "  setup-remote  - Configure remote repository"
-        echo ""
-        echo "Default action is 'sync' if no command is specified"
-        exit 0
-        ;;
-esac
+exit 0

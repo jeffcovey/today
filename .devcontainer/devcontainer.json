@@ -29,7 +29,17 @@
 	"remoteEnv": {
 		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
 	},
-	"forwardPorts": [2222, 8081],
+	"mounts": [
+		{
+			"source": "${localEnv:HOME}/Library/Mobile Documents/com~apple~CloudDocs/vault",
+			"target": "/workspaces/today/vault",
+			"type": "bind"
+		}
+	],
+	"forwardPorts": [
+		2222,
+		8081
+	],
 	"portsAttributes": {
 		"2222": {
 			"label": "SSH",
