@@ -25,7 +25,11 @@
       "WebFetch(domain:cruisesheet.com)",
       "WebFetch(domain:www.icruise.com)",
       "Bash(git rev-list:*)",
-      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/.sync/**)"
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/.sync/**)",
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/notes/**)",
+      "WebFetch(domain:archive.org)",
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/plans/**)",
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/topics/**)"
     ],
     "deny": [],
     "ask": []
