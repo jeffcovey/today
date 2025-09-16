@@ -31,7 +31,7 @@
 	},
 	"mounts": [
 		{
-			"source": "${localEnv:HOME}/Library/Mobile Documents/com~apple~CloudDocs/vault",
+			"source": "${localEnv:HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/vault",
 			"target": "/workspaces/today/vault",
 			"type": "bind"
 		}
