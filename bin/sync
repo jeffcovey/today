@@ -673,16 +673,85 @@ sync_tasks() {
 sync_turso_bidirectional() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # Check if Turso is configured
     if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
         print_info "Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)"
         return 1
     fi
-    
-    # Use the turso-sync script with sync action for bidirectional sync
+
+    # Check if database exists and has required tables
+    DB_PATH=".data/today.db"
+    DB_MISSING=false
+    TABLES_MISSING=false
+
+    if [[ ! -f "$DB_PATH" ]]; then
+        print_info "Database not found at $DB_PATH"
+        DB_MISSING=true
+    else
+        # Check if critical tables exist
+        REQUIRED_TABLES="tasks projects"
+        for table in $REQUIRED_TABLES; do
+            if ! sqlite3 "$DB_PATH" "SELECT name FROM sqlite_master WHERE type='table' AND name='$table'" 2>/dev/null | grep -q "$table"; then
+                print_info "Required table '$table' not found in database"
+                TABLES_MISSING=true
+                break
+            fi
+        done
+    fi
+
+    # If database is missing or corrupted, create it and pull from Turso
+    if [[ "$DB_MISSING" == "true" ]] || [[ "$TABLES_MISSING" == "true" ]]; then
+        print_info "Database missing or incomplete - creating fresh database..."
+
+        # Create .data directory if it doesn't exist
+        mkdir -p .data
+
+        # Create a new database and run migrations first
+        print_info "Creating database and running migrations..."
+        if node -e "
+            import('./src/migrations.js').then(async ({MigrationManager}) => {
+                const Database = (await import('better-sqlite3')).default;
+                const db = new Database('.data/today.db');
+                const manager = new MigrationManager(db);
+                await manager.runMigrations();
+                db.close();
+                console.log('✅ Database created and migrations applied');
+            }).catch(err => {
+                console.error('Failed to create database:', err.message);
+                process.exit(1);
+            });
+        " 2>&1 | while IFS= read -r line; do
+            print_info "    $line"
+        done; then
+            print_status "Database created with schema"
+        else
+            print_error "Failed to create database"
+            return 1
+        fi
+
+        # Now pull data from Turso
+        print_info "Pulling data from Turso..."
+        if timeout 60 bin/turso-sync pull 2>&1 | while IFS= read -r line; do
+            if [[ "$line" == *"✅"* ]] || [[ "$line" == *"✓"* ]] || [[ "$line" == *"successfully"* ]]; then
+                print_info "$line"
+            elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
+                print_error "$line"
+            else
+                print_info "$line"
+            fi
+        done; then
+            print_status "Successfully pulled data from Turso"
+            return 0
+        else
+            print_error "Failed to pull data from Turso"
+            return 1
+        fi
+    fi
+
+    # Normal bidirectional sync if database exists and is healthy
     print_info "Performing bidirectional sync with Turso..."
-    
+
     # Run the turso-sync script with sync action (newest data wins)
     if timeout 45 bin/turso-sync sync 2>&1 | while IFS= read -r line; do
         if [[ "$line" == *"✅"* ]] || [[ "$line" == *"✓"* ]] || [[ "$line" == *"Bidirectional sync complete"* ]]; then

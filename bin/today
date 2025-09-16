@@ -99,19 +99,104 @@ if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
     echo ""
 fi
 
-# Check if database exists and has data
+# Check if database exists and has required tables
 DB_PATH=".data/today.db"
+DB_MISSING=false
+TABLES_MISSING=false
+
 if [ ! -f "$DB_PATH" ]; then
-    echo "❌ Database not found at $DB_PATH"
-    echo "Please run bin/sync to create and populate the database"
-    exit 1
+    echo "⚠️  Database not found at $DB_PATH"
+    DB_MISSING=true
+else
+    # Check if critical tables exist
+    TABLES_EXIST=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')" 2>/dev/null || echo "0")
+    if [ "$TABLES_EXIST" != "2" ]; then
+        echo "⚠️  Database missing required tables"
+        TABLES_MISSING=true
+    fi
 fi
 
-# Quick check that database has recent data
+# If database is missing or incomplete, attempt to recover from Turso
+if [ "$DB_MISSING" = "true" ] || [ "$TABLES_MISSING" = "true" ]; then
+    echo "🔄 Database missing or incomplete - recovering from Turso..."
+    echo ""
+
+    # Create .data directory if needed
+    mkdir -p .data
+
+    # First create database with migrations if it doesn't exist
+    if [ "$DB_MISSING" = "true" ]; then
+        echo "🔨 Creating database and running migrations..."
+        node -e "
+            import('./src/migrations.js').then(async ({MigrationManager}) => {
+                const Database = (await import('better-sqlite3')).default;
+                const db = new Database('.data/today.db');
+                const manager = new MigrationManager(db);
+                await manager.runMigrations();
+                db.close();
+                console.log('✅ Database created with schema');
+            }).catch(err => {
+                console.error('❌ Failed to create database:', err.message);
+                process.exit(1);
+            });
+        " || exit 1
+        echo ""
+    fi
+
+    # Now pull data from Turso (without running full sync)
+    echo "📥 Pulling data from Turso..."
+    if bin/turso-sync pull 2>&1 | grep -v "^\[38;5;142m" | head -20; then
+        echo "✅ Database recovered successfully"
+        echo ""
+
+        # Verify database now exists and has tables
+        if [ -f "$DB_PATH" ]; then
+            TABLES_EXIST=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')" 2>/dev/null || echo "0")
+            if [ "$TABLES_EXIST" != "2" ]; then
+                echo "❌ Database recovery incomplete - tables still missing"
+                echo "Please check your Turso configuration"
+                exit 1
+            fi
+        else
+            echo "❌ Database recovery failed"
+            echo "Please check your Turso configuration in .env"
+            exit 1
+        fi
+    else
+        echo "❌ Failed to sync data from Turso"
+        echo "Please ensure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set in .env"
+        exit 1
+    fi
+fi
+
+# Quick check that database has data
 LAST_SYNC=$(sqlite3 "$DB_PATH" "SELECT MAX(created_at) FROM sync_log" 2>/dev/null || echo "")
 if [ -n "$LAST_SYNC" ]; then
     echo "✅ Database ready (last sync: $LAST_SYNC)"
     echo ""
+else
+    # No sync log entries yet, but check if we have other data
+    TASK_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks" 2>/dev/null || echo "0")
+    if [ "$TASK_COUNT" != "0" ]; then
+        echo "✅ Database ready ($TASK_COUNT tasks found)"
+        echo ""
+    else
+        # Database exists but is empty - add initial sync log entry
+        echo "📝 Initializing sync log..."
+        sqlite3 "$DB_PATH" "INSERT INTO sync_log (timestamp, sync_type, success, source_system, target_system, created_at) VALUES (datetime('now'), 'initial', 1, 'local', 'turso', datetime('now'))" 2>/dev/null || true
+        echo "✅ Database ready (initialized)"
+        echo ""
+    fi
+    # Set LAST_SYNC to a valid value for the rest of the script
+    LAST_SYNC="initialized"
+fi
+
+# Only proceed if we have a valid database state
+if [ -z "$LAST_SYNC" ]; then
+    echo "❌ Database check failed"
+    echo "Please check bin/sync for errors"
+    exit 1
+fi
     
     # ============================================
     # PRE-COMPUTE ALL CONTEXT DATA
@@ -371,8 +456,3 @@ EOF
     echo "   bin/progress 'note'"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-else
-    echo "❌ Database check failed"
-    echo "Please check bin/sync for errors"
-    exit 1
-fi
