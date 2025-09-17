@@ -82,31 +82,36 @@ The `_00` suffix for aggregates ensures they sort before child items.
 
 ### Review File Format
 
-- Daily priorities and recommendations
-- Tasks: `- [ ] Task description` or `1. **Task name** (time)`
-- Track completed: `- [x]` or ✓
-- Collapse outdated sections with `<details><summary>` tags
-- **REQUIRED TEMPLATES:**
-  - Morning: Insert `vault/templates/morning-routine.md` after day's focus
-  - Evening: Insert `vault/templates/evening-routine.md` before evening tasks
-  - Hip Exercises: Insert `vault/templates/hip_workout.md` in the health/movement section
+- **USE DAILY PLAN TEMPLATE**: Start with `vault/templates/daily-plan.md` as base
+- Template includes:
+  - Task query callouts (Due/Scheduled, Plan Tasks, Completed)
+  - Morning & Evening routines as collapsible callouts
+  - Flexible time blocks for AI to fill
+- Template placeholders are auto-replaced by `bin/today`:
+  - Date variables: `{{DAY_OF_WEEK}}`, `{{MONTH_NAME}}`, `{{DAY}}`, `{{YEAR}}`, `{{FULL_DATE}}`
+  - Stage variables: `{{STAGE_THEME}}`, `{{STAGE_FOCUS}}`
+- Time blocks left empty for manual/AI filling:
+  - Morning, afternoon, evening sections ready for planning
+  - Top priorities section has empty checkboxes to fill
+- For incremental updates: Use `<details><summary>` tags to collapse old content
 
-### Incremental Updates (Performance)
+### Daily Plan Updates
 
-For existing reviews:
-- Query only recent changes (compare timestamps)
-- Focus on: new emails, modified tasks, updated events, new notes
-- Append updates with timestamp: `### Update (2:30 PM)`
+For existing daily plans:
+- Tasks update automatically via Obsidian Tasks queries
+- Add progress notes with timestamps: `### Update (2:30 PM)`
+- Check off completed tasks directly in Obsidian
+- Evening reflection section for end-of-day review
 
 ### Available Commands
 
 ```bash
-# Task management
-bin/tasks sync                         # Sync all tasks and projects
-bin/tasks list --today                 # Show today's tasks  
-bin/tasks add "New task" --date 2025-08-14 --priority 4
-bin/tasks done <id>                    # Mark task as complete
-bin/tasks projects --detailed          # Show detailed project info
+# Task management (Obsidian-based)
+bin/today                              # Create daily plan from template
+bin/tasks sync                         # NO LONGER syncs to database (disabled)
+# Tasks are now managed directly in markdown files with Obsidian Tasks plugin:
+# - [ ] Task title 🔺 ⏳ 2025-09-20    # Priority + scheduled date
+# - [ ] Task title 📅 2025-09-21 🔁 every week  # Due date + recurrence
 
 # Review tracking
 bin/mark-done "Task description"       # Mark specific task as done

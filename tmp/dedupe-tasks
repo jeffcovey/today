@@ -1,0 +1,264 @@
+#!/usr/bin/env node
+
+import fs from 'fs';
+import { glob } from 'glob';
+import { execSync } from 'child_process';
+
+// Safety: Create backup before any changes
+function createBackup() {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupDir = `vault-backup-${timestamp}`;
+    console.log(`📦 Creating backup: ${backupDir}`);
+
+    // Simple copy command for safety
+    execSync(`cp -r vault ${backupDir}`);
+    console.log(`✅ Backup created`);
+    return backupDir;
+}
+
+// Natural home priority (higher number = higher priority)
+const HOME_PRIORITY = {
+    'vault/projects/': 100,
+    'vault/plans/': 90,
+    'vault/meetings/': 80,
+    'vault/topics/': 70,
+    'vault/tasks/': 10,  // Lowest priority
+    'vault/': 50  // Other vault files
+};
+
+function getHomePriority(filePath) {
+    for (const [prefix, priority] of Object.entries(HOME_PRIORITY)) {
+        if (filePath.startsWith(prefix)) {
+            return priority;
+        }
+    }
+    return 0; // Unknown location
+}
+
+async function findAllTasksWithIds() {
+    console.log('🔍 Finding all tasks with task-ids...');
+
+    const files = await glob('vault/**/*.md', {
+        ignore: ['vault/.stversions/**', 'vault/.sync/**']
+    });
+
+    const taskMap = new Map(); // task-id -> [{file, line, content, priority}]
+
+    for (const file of files) {
+        const content = fs.readFileSync(file, 'utf-8');
+        const lines = content.split('\n');
+
+        lines.forEach((line, index) => {
+            // Match task lines with task-id (excluding "task-id: none")
+            const taskMatch = line.match(/^- \[[ x]\].*<!-- task-id: ([a-f0-9]{32}) -->/);
+            if (taskMatch && !line.includes('task-id: none')) {
+                const taskId = taskMatch[1];
+                const priority = getHomePriority(file);
+
+                if (!taskMap.has(taskId)) {
+                    taskMap.set(taskId, []);
+                }
+
+                taskMap.get(taskId).push({
+                    file,
+                    line: index,
+                    content: line,
+                    priority
+                });
+            }
+        });
+    }
+
+    console.log(`📊 Found ${taskMap.size} unique tasks across ${files.length} files`);
+    return taskMap;
+}
+
+function analyzeDuplicates(taskMap) {
+    console.log('\n📈 Analyzing duplicates...');
+
+    let totalDuplicates = 0;
+    let tasksWithNaturalHomes = 0;
+    let orphanedTasks = 0;
+
+    const duplicateReport = [];
+
+    for (const [taskId, locations] of taskMap.entries()) {
+        if (locations.length > 1) {
+            totalDuplicates += locations.length - 1; // -1 because we keep one copy
+
+            // Find natural home (highest priority)
+            const sortedLocations = locations.sort((a, b) => b.priority - a.priority);
+            const naturalHome = sortedLocations[0];
+            const duplicates = sortedLocations.slice(1);
+
+            if (naturalHome.priority >= 70) { // Has a good natural home
+                tasksWithNaturalHomes++;
+            } else {
+                orphanedTasks++;
+            }
+
+            duplicateReport.push({
+                taskId,
+                taskTitle: naturalHome.content.match(/^- \[[ x]\]\s*(.+?)\s*<!--/)?.[1] || 'Unknown',
+                naturalHome: naturalHome.file,
+                duplicates: duplicates.map(d => d.file),
+                duplicateCount: duplicates.length
+            });
+        }
+    }
+
+    console.log(`📊 Summary:`);
+    console.log(`   • ${totalDuplicates} duplicate task instances to remove`);
+    console.log(`   • ${tasksWithNaturalHomes} tasks have natural homes`);
+    console.log(`   • ${orphanedTasks} tasks need to go to vault/tasks.md`);
+
+    return duplicateReport;
+}
+
+function previewChanges(duplicateReport, limit = 10) {
+    console.log(`\n👀 Preview of changes (showing first ${limit}):`);
+
+    duplicateReport.slice(0, limit).forEach((task, i) => {
+        console.log(`\n${i + 1}. ${task.taskTitle}`);
+        console.log(`   Keep in: ${task.naturalHome}`);
+        console.log(`   Remove from: ${task.duplicates.join(', ')}`);
+    });
+
+    if (duplicateReport.length > limit) {
+        console.log(`\n... and ${duplicateReport.length - limit} more tasks`);
+    }
+}
+
+async function performDeduplication(taskMap, dryRun = true) {
+    console.log(`\n${dryRun ? '🧪 DRY RUN:' : '🚀 EXECUTING:'} Task deduplication...`);
+
+    const filesToModify = new Map(); // file -> {originalContent, newContent}
+    let tasksToMove = []; // Tasks that need to go to vault/tasks.md
+
+    for (const [taskId, locations] of taskMap.entries()) {
+        if (locations.length > 1) {
+            // Find natural home (highest priority)
+            const sortedLocations = locations.sort((a, b) => b.priority - a.priority);
+            const naturalHome = sortedLocations[0];
+            const duplicates = sortedLocations.slice(1);
+
+            // If no good natural home, move to vault/tasks.md
+            if (naturalHome.priority < 70) {
+                tasksToMove.push({
+                    taskId,
+                    content: naturalHome.content,
+                    allLocations: locations
+                });
+            } else {
+                // Queue duplicates for removal
+                for (const duplicate of duplicates) {
+                    if (!filesToModify.has(duplicate.file)) {
+                        const content = fs.readFileSync(duplicate.file, 'utf-8');
+                        filesToModify.set(duplicate.file, {
+                            originalContent: content,
+                            newContent: content,
+                            linesToRemove: []
+                        });
+                    }
+
+                    // Add line to removal queue
+                    filesToModify.get(duplicate.file).linesToRemove.push({
+                        line: duplicate.line,
+                        content: duplicate.content,
+                        taskId
+                    });
+                }
+            }
+        }
+    }
+
+    // Handle orphaned tasks
+    if (tasksToMove.length > 0) {
+        console.log(`\n📝 ${dryRun ? 'Would move' : 'Moving'} ${tasksToMove.length} orphaned tasks to vault/tasks.md`);
+
+        const tasksContent = tasksToMove.map(task => task.content).join('\n');
+
+        if (!dryRun) {
+            // Create or append to vault/tasks.md
+            const tasksFile = 'vault/tasks.md';
+            const existingContent = fs.existsSync(tasksFile) ? fs.readFileSync(tasksFile, 'utf-8') : '';
+            const newContent = existingContent + '\n\n# Migrated Tasks\n\n' + tasksContent;
+            fs.writeFileSync(tasksFile, newContent);
+        }
+
+        // Remove from all original locations
+        for (const task of tasksToMove) {
+            for (const location of task.allLocations) {
+                if (!filesToModify.has(location.file)) {
+                    const content = fs.readFileSync(location.file, 'utf-8');
+                    filesToModify.set(location.file, {
+                        originalContent: content,
+                        newContent: content
+                    });
+                }
+
+                const fileData = filesToModify.get(location.file);
+                const lines = fileData.newContent.split('\n');
+
+                if (lines[location.line] === location.content) {
+                    lines.splice(location.line, 1);
+                    fileData.newContent = lines.join('\n');
+                    console.log(`${dryRun ? 'Would remove' : 'Removing'}: ${location.file}:${location.line + 1}`);
+                }
+            }
+        }
+    }
+
+    // Apply file changes
+    if (!dryRun) {
+        console.log(`\n💾 Writing changes to ${filesToModify.size} files...`);
+        for (const [file, data] of filesToModify.entries()) {
+            fs.writeFileSync(file, data.newContent);
+        }
+        console.log('✅ Changes applied');
+    } else {
+        console.log(`\n📊 Summary: Would modify ${filesToModify.size} files`);
+    }
+}
+
+async function main() {
+    const args = process.argv.slice(2);
+    const dryRun = !args.includes('--execute');
+
+    console.log('🧹 Task Deduplication Tool');
+    console.log('=' .repeat(50));
+
+    if (dryRun) {
+        console.log('🧪 Running in DRY RUN mode. Use --execute to apply changes.');
+    } else {
+        console.log('🚀 EXECUTING mode - changes will be applied!');
+        createBackup();
+    }
+
+    try {
+        // Step 1: Find all tasks
+        const taskMap = await findAllTasksWithIds();
+
+        // Step 2: Analyze duplicates
+        const duplicateReport = analyzeDuplicates(taskMap);
+
+        // Step 3: Preview changes
+        previewChanges(duplicateReport);
+
+        // Step 4: Apply changes
+        await performDeduplication(taskMap, dryRun);
+
+        console.log('\n✅ Task deduplication complete!');
+        if (dryRun) {
+            console.log('Run with --execute to apply changes.');
+        }
+
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+        process.exit(1);
+    }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+    main();
+}
