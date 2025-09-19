@@ -2319,13 +2319,19 @@ async function executeTasksQuery(query) {
   // Apply filters
   let filtered = tasks;
   for (const filter of filters) {
+    const beforeCount = filtered.length;
     if (filter === 'not done') {
       filtered = filtered.filter(t => !t.isDone);
     } else if (filter === 'done') {
       filtered = filtered.filter(t => t.isDone);
     } else if (filter === 'done today') {
-      filtered = filtered.filter(t => t.isDone && t.doneDate &&
-        t.doneDate.toDateString() === today.toDateString());
+      // Only include tasks that have a done date AND it's today
+      // Tasks without done dates should NOT be included
+      filtered = filtered.filter(t => {
+        if (!t.doneDate) return false; // No done date = not done today
+        return t.isDone && t.doneDate.toDateString() === today.toDateString();
+      });
+      console.log(`[DEBUG] "done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${today.toDateString()})`);
     } else if (filter.includes('OR')) {
       // Handle OR conditions
       const conditions = filter.split('OR').map(c => c.replace(/[()]/g, '').trim());
