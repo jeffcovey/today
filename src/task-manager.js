@@ -845,14 +845,88 @@ export class TaskManager {
         // These are stored separately in the database and shouldn't be in the title
         title = title.replace(/\s*\[[^\]]+\]/g, '').trim();
 
-        // Parse date topics from title
-        let extractedDate = null;
-        const dateTags = this.dateParser.extractDateTags(title);
-        if (dateTags.length > 0) {
-          // Use the first date tag found
-          extractedDate = dateTags[0].parsed;
-          // Remove all date topics from the title
-          title = this.dateParser.removeTagsFromText(title, dateTags);
+        // Parse Obsidian Tasks plugin date syntax
+        let scheduledDate = null;
+        let dueDate = null;
+
+        // Look for scheduled date (⏳ YYYY-MM-DD)
+        const scheduledMatch = title.match(/⏳\s*(\d{4}-\d{2}-\d{2})/);
+        if (scheduledMatch) {
+          scheduledDate = scheduledMatch[1];
+          // Remove from title
+          title = title.replace(/\s*⏳\s*\d{4}-\d{2}-\d{2}/g, '').trim();
+        }
+
+        // Look for due date (📅 YYYY-MM-DD)
+        const dueMatch = title.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+        if (dueMatch) {
+          dueDate = dueMatch[1];
+          // Remove from title
+          title = title.replace(/\s*📅\s*\d{4}-\d{2}-\d{2}/g, '').trim();
+        }
+
+        // Parse priority (🔺 high, 🔼 medium, ⏫ low)
+        let priority = null;
+        if (title.includes('🔺')) {
+          priority = 'high';
+          title = title.replace(/\s*🔺/g, '').trim();
+        } else if (title.includes('🔼')) {
+          priority = 'medium';
+          title = title.replace(/\s*🔼/g, '').trim();
+        } else if (title.includes('⏫')) {
+          priority = 'low';
+          title = title.replace(/\s*⏫/g, '').trim();
+        }
+
+        // Parse recurrence (🔁 every day/week/month/year) and convert to days
+        let repeatInterval = null;
+        const recurrenceMatch = title.match(/🔁\s*(every\s+(?:day|week|month|year|\d+\s*(?:days?|weeks?|months?|years?)))/i);
+        if (recurrenceMatch) {
+          const recurrenceText = recurrenceMatch[1].toLowerCase();
+
+          // Convert to days
+          if (recurrenceText === 'every day') {
+            repeatInterval = 1;
+          } else if (recurrenceText === 'every week') {
+            repeatInterval = 7;
+          } else if (recurrenceText === 'every month') {
+            repeatInterval = 30; // Approximate
+          } else if (recurrenceText === 'every year') {
+            repeatInterval = 365;
+          } else {
+            // Parse numeric intervals like "every 3 days" or "every 2 weeks"
+            const numMatch = recurrenceText.match(/every\s+(\d+)\s*(days?|weeks?|months?|years?)/);
+            if (numMatch) {
+              const num = parseInt(numMatch[1]);
+              const unit = numMatch[2];
+              if (unit.startsWith('day')) {
+                repeatInterval = num;
+              } else if (unit.startsWith('week')) {
+                repeatInterval = num * 7;
+              } else if (unit.startsWith('month')) {
+                repeatInterval = num * 30; // Approximate
+              } else if (unit.startsWith('year')) {
+                repeatInterval = num * 365;
+              }
+            }
+          }
+
+          // Remove from title
+          title = title.replace(/\s*🔁\s*every\s+(?:day|week|month|year|\d+\s*(?:days?|weeks?|months?|years?))/gi, '').trim();
+        }
+
+        // Use scheduled date or due date as the do_date (prefer scheduled)
+        let extractedDate = scheduledDate || dueDate;
+
+        // Also support legacy date tags if no Obsidian Tasks dates found
+        if (!extractedDate) {
+          const dateTags = this.dateParser.extractDateTags(title);
+          if (dateTags.length > 0) {
+            // Use the first date tag found
+            extractedDate = dateTags[0].parsed;
+            // Remove all date topics from the title
+            title = this.dateParser.removeTagsFromText(title, dateTags);
+          }
         }
 
         let taskId;
@@ -899,6 +973,7 @@ export class TaskManager {
               
               if (task.status !== newStatus) updates.status = newStatus;
               if (projectId && task.project_id !== projectId) updates.project_id = projectId;
+              if (repeatInterval !== null && task.repeat_interval !== repeatInterval) updates.repeat_interval = repeatInterval;
               
               // DISABLED: Don't auto-assign dates from plan files
               // Plan files are for organizing/reviewing tasks, not setting due dates
@@ -922,7 +997,8 @@ export class TaskManager {
               id: taskId,  // Use the existing ID
               title,
               status: isCompleted ? '✅ Done' : '🗂️ To File',
-              project_id: projectId
+              project_id: projectId,
+              repeat_interval: repeatInterval
             };
             
             // Set do_date from extracted date tag only (not from plan file names)
@@ -950,7 +1026,8 @@ export class TaskManager {
           const taskData = {
             title,
             status: isCompleted ? '✅ Done' : '🗂️ To File',
-            project_id: projectId
+            project_id: projectId,
+            repeat_interval: repeatInterval
           };
           
           // Set do_date from extracted date tag only (not from plan file names)

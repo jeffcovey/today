@@ -242,6 +242,45 @@ const pageStyle = `
   .collapse-header {
     transition: all 0.3s ease;
   }
+
+  /* Styles for collapsible task sections */
+  details.task-section {
+    margin: 1rem 0;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: white;
+    padding: 0.75rem;
+  }
+
+  details.task-section summary {
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: -0.75rem;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+    user-select: none;
+  }
+
+  details.task-section summary:hover {
+    background-color: #f8f9fa;
+  }
+
+  details.task-section[open] summary {
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 0.75rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+
+  details.task-section .section-content {
+    padding-top: 0.75rem;
+  }
+
+  /* Style the summary arrow */
+  details.task-section summary::-webkit-details-marker {
+    margin-right: 0.5rem;
+  }
+
   body {
     background-color: #f5f5f5;
     min-height: 100vh;
@@ -2536,10 +2575,66 @@ async function processTasksCodeBlocks(content) {
   return processedContent;
 }
 
+// Process collapsible sections (bullet lists with nested code blocks)
+function processCollapsibleSections(content) {
+  // Match bullet points with bold text followed by indented content
+  // Pattern: - emoji **text** followed by indented lines
+  const sectionRegex = /^- (.+?)\*\*(.+?)\*\*\s*\n((?:  .+\n?)+)/gm;
+
+  let processedContent = content;
+  let match;
+  const replacements = [];
+
+  while ((match = sectionRegex.exec(content)) !== null) {
+    const emoji = match[1].trim();
+    const title = match[2].trim();
+    const indentedContent = match[3];
+
+    // Remove the leading spaces (2 spaces) from each line of indented content
+    const cleanContent = indentedContent
+      .split('\n')
+      .map(line => line.replace(/^  /, ''))
+      .join('\n');
+
+    // Check if this is one of our special sections
+    const isMainSection = title === 'Due or Scheduled';
+    const isUpcoming = title === 'Upcoming';
+    const isCompleted = title === 'Completed Today';
+
+    if (isMainSection || isUpcoming || isCompleted) {
+      // Create collapsible section with details/summary
+      // Main section (Due or Scheduled) should be open by default
+      const openAttr = isMainSection ? ' open' : '';
+
+      const replacement = `<details${openAttr} class="task-section">
+<summary>${emoji} <strong>${title}</strong></summary>
+<div class="section-content">
+${cleanContent}
+</div>
+</details>`;
+
+      replacements.push({
+        original: match[0],
+        replacement: replacement
+      });
+    }
+  }
+
+  // Apply all replacements
+  for (const { original, replacement } of replacements) {
+    processedContent = processedContent.replace(original, replacement);
+  }
+
+  return processedContent;
+}
+
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
+
+  // Process collapsible sections before tasks code blocks
+  content = processCollapsibleSections(content);
 
   // Process tasks code blocks before rendering
   content = await processTasksCodeBlocks(content);
