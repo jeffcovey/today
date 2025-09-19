@@ -2310,9 +2310,9 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Build grep command to find all tasks - search vault but exclude system directories
-  // Exclude @inbox, node_modules, .git, and other non-content directories
-  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" --exclude-dir="@inbox" --exclude-dir="node_modules" --exclude-dir=".git" --exclude-dir=".obsidian" --exclude-dir=".trash" 2>/dev/null || true';
+  // Build grep command to find all tasks - search vault but exclude hidden and system directories
+  // Exclude ALL directories starting with . to avoid backups, .sync, .stfolder, etc.
+  let grepCmd = 'find vault/ -type f -name "*.md" ! -path "*/.*" ! -path "*/@inbox/*" ! -path "*/node_modules/*" -exec grep -H "^- \\[[ x]\\]" {} + 2>/dev/null || true';
 
   let taskLines;
   try {
