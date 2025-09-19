@@ -2312,12 +2312,13 @@ async function executeTasksQuery(query) {
 
   // Build grep command to find all tasks - search vault but exclude system directories
   // Exclude @inbox, node_modules, .git, and other non-content directories
-  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" --exclude-dir="@inbox" --exclude-dir="node_modules" --exclude-dir=".git" --exclude-dir=".obsidian" --exclude-dir=".trash" 2>/dev/null | head -2000 || true';
+  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" --exclude-dir="@inbox" --exclude-dir="node_modules" --exclude-dir=".git" --exclude-dir=".obsidian" --exclude-dir=".trash" 2>/dev/null || true';
 
   let taskLines;
   try {
-    const output = execSync(grepCmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 5 }); // 5MB max
+    const output = execSync(grepCmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 50 }); // 50MB max for large vaults
     taskLines = output.split('\n').filter(Boolean);
+    console.log(`[DEBUG] Found ${taskLines.length} total task lines from grep`);
   } catch (error) {
     console.error('[DEBUG] Error executing grep:', error.message);
     taskLines = [];
