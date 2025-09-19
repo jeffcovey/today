@@ -2247,9 +2247,18 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Build grep command to find all tasks
-  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" 2>/dev/null || true';
-  const taskLines = execSync(grepCmd, { encoding: 'utf8' }).split('\n').filter(Boolean);
+  // Build grep command to find all tasks - limit to specific directories and max lines
+  // Focus on main task directories and limit output to prevent memory issues
+  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/tasks/ vault/notes/ vault/projects/ --include="*.md" 2>/dev/null | head -1000 || true';
+
+  let taskLines;
+  try {
+    const output = execSync(grepCmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 5 }); // 5MB max
+    taskLines = output.split('\n').filter(Boolean);
+  } catch (error) {
+    console.error('[DEBUG] Error executing grep:', error.message);
+    taskLines = [];
+  }
 
   // Parse each task line
   const tasks = [];
