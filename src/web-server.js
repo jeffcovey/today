@@ -4448,6 +4448,7 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 app.post('/task/complete', authMiddleware, async (req, res) => {
   try {
     const { filePath: file, lineNumber: line, completed } = req.body;
+    console.log(`[TASK] Updating task - file: ${file}, line: ${line}, completed: ${completed}`);
     const filePath = path.join(VAULT_PATH, file);
 
     // Read the file
@@ -4481,10 +4482,12 @@ app.post('/task/complete', authMiddleware, async (req, res) => {
     lines[line - 1] = updatedLine;
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 
+    console.log(`[TASK] Successfully updated task at line ${line}`);
     res.json({ success: true, updatedLine });
   } catch (error) {
     console.error('Error updating task:', error);
-    res.status(500).json({ error: 'Failed to update task' });
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: 'Failed to update task', details: error.message });
   }
 });
 
