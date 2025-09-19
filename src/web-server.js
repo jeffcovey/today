@@ -2327,11 +2327,16 @@ async function executeTasksQuery(query) {
     } else if (filter === 'done today') {
       // Only include tasks that have a done date AND it's today
       // Tasks without done dates should NOT be included
+      const todayStr = today.toDateString();
       filtered = filtered.filter(t => {
-        if (!t.doneDate) return false; // No done date = not done today
-        return t.isDone && t.doneDate.toDateString() === today.toDateString();
+        if (!t.doneDate) {
+          return false; // No done date = not done today
+        }
+        const taskDateStr = t.doneDate.toDateString();
+        const matches = taskDateStr === todayStr;
+        return t.isDone && matches;
       });
-      console.log(`[DEBUG] "done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${today.toDateString()})`);
+      console.log(`[DEBUG] "done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${todayStr})`);
     } else if (filter.includes('OR')) {
       // Handle OR conditions
       const conditions = filter.split('OR').map(c => c.replace(/[()]/g, '').trim());
