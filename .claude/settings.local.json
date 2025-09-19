@@ -29,7 +29,9 @@
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/notes/**)",
       "WebFetch(domain:archive.org)",
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/plans/**)",
-      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/topics/**)"
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/topics/**)",
+      "WebFetch(domain:publish.obsidian.md)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
