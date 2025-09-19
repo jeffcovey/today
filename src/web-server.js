@@ -2247,9 +2247,9 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Build grep command to find all tasks - limit to specific directories and max lines
-  // Focus on main task directories and limit output to prevent memory issues
-  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/tasks/ vault/notes/ vault/projects/ --include="*.md" 2>/dev/null | head -1000 || true';
+  // Build grep command to find all tasks - search entire vault but limit output
+  // Include all .md files in vault, not just specific subdirectories
+  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" 2>/dev/null | head -2000 || true';
 
   let taskLines;
   try {
