@@ -30,7 +30,8 @@
       "WebFetch(domain:archive.org)",
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/plans/**)",
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/topics/**)",
-      "WebFetch(domain:publish.obsidian.md)"
+      "WebFetch(domain:publish.obsidian.md)",
+      "Bash(bin/email list:*)"
     ],
     "deny": [],
     "ask": []
