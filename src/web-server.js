@@ -3551,18 +3551,21 @@ async function renderMarkdownUncached(filePath, urlPath) {
           });
         }
         
-        // Add interactivity to task checkboxes
+        // Add interactivity to task checkboxes using event delegation
         document.addEventListener('DOMContentLoaded', function() {
-          const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+          // Use event delegation to handle dynamically added checkboxes
+          document.addEventListener('change', async function(event) {
+            if (!event.target.classList.contains('task-checkbox')) {
+              return;
+            }
 
-          taskCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', async function() {
-              const filePath = this.dataset.file;
-              const lineNumber = this.dataset.line;
-              const isChecked = this.checked;
+            const checkbox = event.target;
+            const filePath = checkbox.dataset.file;
+            const lineNumber = checkbox.dataset.line;
+            const isChecked = checkbox.checked;
 
-              // Disable checkbox during update
-              this.disabled = true;
+            // Disable checkbox during update
+            checkbox.disabled = true;
 
               try {
                 const response = await fetch('/task/complete', {
@@ -3584,7 +3587,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
                 const result = await response.json();
 
                 // Visual feedback
-                const listItem = this.closest('li');
+                const listItem = checkbox.closest('li');
                 if (listItem) {
                   listItem.style.transition = 'opacity 0.3s';
                   listItem.style.opacity = '0.5';
@@ -3596,7 +3599,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
                 // If task was marked complete, update the display
                 if (isChecked && result.updatedLine) {
                   // Find the text after the checkbox and update it to include the completion date
-                  const textNode = this.nextSibling;
+                  const textNode = checkbox.nextSibling;
                   if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     const today = new Date().toISOString().split('T')[0];
                     // Add completion date if not already present
@@ -3608,13 +3611,12 @@ async function renderMarkdownUncached(filePath, urlPath) {
               } catch (error) {
                 console.error('Error updating task:', error);
                 // Revert checkbox state on error
-                this.checked = !isChecked;
+                checkbox.checked = !isChecked;
                 alert('Failed to update task. Please try again.');
               } finally {
                 // Re-enable checkbox
-                this.disabled = false;
+                checkbox.disabled = false;
               }
-            });
           });
         });
 
