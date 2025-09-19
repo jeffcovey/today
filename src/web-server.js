@@ -2225,7 +2225,10 @@ function generateTableOfContents(content) {
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
   const { execSync } = await import('child_process');
-  const lines = query.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  // Remove blockquote markers (>) from query lines
+  const lines = query.trim().split('\n')
+    .map(l => l.replace(/^>\s*/, '').trim())
+    .filter(Boolean);
 
   // Parse query components
   let filters = [];
