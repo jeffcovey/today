@@ -2351,7 +2351,8 @@ async function executeTasksQuery(query) {
 
   // Build grep command to find all tasks - search vault but exclude hidden and system directories
   // Exclude ALL directories starting with . to avoid backups, .sync, .stfolder, etc.
-  let grepCmd = 'find vault/ -type f -name "*.md" ! -path "*/.*" ! -path "*/@inbox/*" ! -path "*/node_modules/*" -exec grep -H "^- \\[[ x]\\]" {} + 2>/dev/null || true';
+  // Use -n flag to include line numbers in format: file:line:content
+  let grepCmd = 'find vault/ -type f -name "*.md" ! -path "*/.*" ! -path "*/@inbox/*" ! -path "*/node_modules/*" -exec grep -Hn "^- \\[[ x]\\]" {} + 2>/dev/null || true';
 
   let taskLines;
   try {
@@ -2371,8 +2372,11 @@ async function executeTasksQuery(query) {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   for (const line of taskLines) {
-    const [filePath, ...contentParts] = line.split(':');
-    const content = contentParts.join(':').trim();
+    // Parse format: filepath:linenumber:content
+    const parts = line.split(':');
+    const filePath = parts[0];
+    const lineNumber = parseInt(parts[1], 10);
+    const content = parts.slice(2).join(':').trim();
 
     // Parse task checkbox state
     const isDone = /^- \[[xX]\]/.test(content);
@@ -2408,6 +2412,7 @@ async function executeTasksQuery(query) {
 
     tasks.push({
       filePath: filePath.replace('vault/', ''),
+      lineNumber: lineNumber,
       text: cleanText,
       originalText: taskText,
       isDone,
@@ -2547,7 +2552,12 @@ async function processTasksCodeBlocks(content) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           const displayText = replaceTagsWithEmoji(task.text);
-          replacement += `<li><input type="checkbox" ${checkbox} disabled> ${priorityIcon}${displayText}</li>\n`;
+          // Add data attributes with file path and line number for future actions
+          replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
+          replacement += `${priorityIcon}${displayText}`;
+          replacement += `<span class="task-location" style="font-size: 0.8em; color: #6c757d; margin-left: 0.5em;">(${task.filePath}:${task.lineNumber})</span>`;
+          replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
       }
@@ -2559,7 +2569,12 @@ async function processTasksCodeBlocks(content) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           const displayText = replaceTagsWithEmoji(task.text);
-          replacement += `<li><input type="checkbox" ${checkbox} disabled> ${priorityIcon}${displayText}</li>\n`;
+          // Add data attributes with file path and line number for future actions
+          replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
+          replacement += `${priorityIcon}${displayText}`;
+          replacement += `<span class="task-location" style="font-size: 0.8em; color: #6c757d; margin-left: 0.5em;">(${task.filePath}:${task.lineNumber})</span>`;
+          replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
       } else {
@@ -3503,14 +3518,81 @@ async function renderMarkdownUncached(filePath, urlPath) {
           });
         }
         
+        // Add interactivity to task checkboxes
+        document.addEventListener('DOMContentLoaded', function() {
+          const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+
+          taskCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', async function() {
+              const filePath = this.dataset.file;
+              const lineNumber = this.dataset.line;
+              const isChecked = this.checked;
+
+              // Disable checkbox during update
+              this.disabled = true;
+
+              try {
+                const response = await fetch('/task/complete', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    filePath: filePath,
+                    lineNumber: parseInt(lineNumber, 10),
+                    completed: isChecked
+                  })
+                });
+
+                if (!response.ok) {
+                  throw new Error('Failed to update task');
+                }
+
+                const result = await response.json();
+
+                // Visual feedback
+                const listItem = this.closest('li');
+                if (listItem) {
+                  listItem.style.transition = 'opacity 0.3s';
+                  listItem.style.opacity = '0.5';
+                  setTimeout(() => {
+                    listItem.style.opacity = '1';
+                  }, 300);
+                }
+
+                // If task was marked complete, update the display
+                if (isChecked && result.updatedLine) {
+                  // Find the text after the checkbox and update it to include the completion date
+                  const textNode = this.nextSibling;
+                  if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                    const today = new Date().toISOString().split('T')[0];
+                    // Add completion date if not already present
+                    if (!textNode.textContent.includes('✅')) {
+                      textNode.textContent = textNode.textContent.trim() + ' ✅ ' + today;
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error updating task:', error);
+                // Revert checkbox state on error
+                this.checked = !isChecked;
+                alert('Failed to update task. Please try again.');
+              } finally {
+                // Re-enable checkbox
+                this.disabled = false;
+              }
+            });
+          });
+        });
+
         // Track page visits for recents
         const currentPath = window.location.pathname;
         if (currentPath !== '/' && currentPath !== '') {
           let recentPages = JSON.parse(localStorage.getItem('recentPages') || '[]');
-          
+
           // Remove current page if it exists in the list
           recentPages = recentPages.filter(page => page.path !== currentPath);
-          
+
           // Add current page to the beginning
           const pageTitle = document.title;
           recentPages.unshift({
@@ -3518,10 +3600,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
             title: pageTitle,
             timestamp: new Date().toISOString()
           });
-          
+
           // Keep only the 10 most recent
           recentPages = recentPages.slice(0, 10);
-          
+
           localStorage.setItem('recentPages', JSON.stringify(recentPages));
         }
       </script>
@@ -4329,6 +4411,50 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 });
 
 // Save route handler
+// Handle Obsidian-style task completion
+app.post('/task/complete', authMiddleware, async (req, res) => {
+  try {
+    const { file, line, completed } = req.body;
+    const filePath = path.join(VAULT_PATH, file);
+
+    // Read the file
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+
+    // Get the task line (line numbers are 1-based from grep)
+    const taskLine = lines[line - 1];
+
+    if (!taskLine) {
+      return res.status(400).json({ error: 'Task line not found' });
+    }
+
+    // Update the task
+    let updatedLine;
+    if (completed) {
+      // Mark as done and add completion date
+      const today = new Date().toISOString().split('T')[0];
+      updatedLine = taskLine
+        .replace(/^(\s*)- \[ \]/, '$1- [x]')
+        .replace(/✅ \d{4}-\d{2}-\d{2}/, '') // Remove old completion date if exists
+        + ` ✅ ${today}`;
+    } else {
+      // Mark as not done and remove completion date
+      updatedLine = taskLine
+        .replace(/^(\s*)- \[x\]/i, '$1- [ ]')
+        .replace(/ ✅ \d{4}-\d{2}-\d{2}/, '');
+    }
+
+    // Update the file
+    lines[line - 1] = updatedLine;
+    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+
+    res.json({ success: true, updatedLine });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
 app.post('/save/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
