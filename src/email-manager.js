@@ -251,14 +251,19 @@ export class EmailManager {
   // Natural language conversation about emails
   async conversationMode() {
     this.inConversationMode = true;
-    
+
     console.log(chalk.blue('\n💬 Email Conversation Mode'));
     console.log(chalk.gray('Ask questions about your emails or request actions.'));
     console.log(chalk.gray('Type "exit" to return to main menu.'));
     console.log(chalk.gray('Use ↑↓ arrow keys to navigate command history.\n'));
 
-    // Start background download
-    this.startBackgroundDownload();
+    // Check if we're in an interactive terminal
+    const isInteractive = process.stdin.isTTY;
+
+    // Start background download only in interactive mode
+    if (isInteractive) {
+      this.startBackgroundDownload();
+    }
 
     // Setup readline interface with history
     const rl = readline.createInterface({
@@ -266,8 +271,12 @@ export class EmailManager {
       output: process.stdout,
       prompt: chalk.blue('You: '),
       historySize: 100,
-      removeHistoryDuplicates: true
+      removeHistoryDuplicates: true,
+      terminal: true  // Ensure terminal mode is enabled for arrow keys
     });
+
+    // Store reference to readline for restoration after inquirer
+    this.currentReadline = rl;
 
     // Load command history from file
     const historyFile = path.join(os.homedir(), '.email-cli-history');
@@ -349,15 +358,18 @@ export class EmailManager {
       }
     });
 
-    // Handle close event
-    rl.on('close', async () => {
-      console.log(chalk.gray('\nExiting conversation mode...'));
-      // Save history on any close event (including Ctrl+C)
-      try {
-        await fs.writeFile(historyFile, commandHistory.join('\n'));
-      } catch (error) {
-        // Ignore history save errors
-      }
+    // Create a promise that will resolve when the interface closes
+    const closePromise = new Promise(resolve => {
+      rl.on('close', async () => {
+        console.log(chalk.gray('\nExiting conversation mode...'));
+        // Save history on any close event (including Ctrl+C)
+        try {
+          await fs.writeFile(historyFile, commandHistory.join('\n'));
+        } catch (error) {
+          // Ignore history save errors
+        }
+        resolve();
+      });
     });
 
     // Save history on process exit signals
@@ -378,18 +390,389 @@ export class EmailManager {
 
     // Start the prompt
     rl.prompt();
-    
+
     // Wait for the interface to close
-    await new Promise(resolve => rl.on('close', resolve));
-    
+    await closePromise;
+
     // Clean up
     this.inConversationMode = false;
+    this.currentReadline = null;
+  }
+
+  // Helper method to restore readline after inquirer prompts
+  async restoreReadlineAfterInquirer() {
+    if (!this.currentReadline || !process.stdin.isTTY) {
+      return;
+    }
+
+    // Clear any buffered input
+    while (process.stdin.read() !== null) {
+      // Keep reading until buffer is empty
+    }
+
+    // Inquirer leaves stdin in a weird state, restore it for readline
+    if (typeof process.stdin.setRawMode === 'function') {
+      // First disable raw mode completely
+      process.stdin.setRawMode(false);
+
+      // Small delay to let the terminal settle
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Re-enable terminal mode for readline (this is what readline expects)
+      // Readline will manage raw mode itself when needed
+      process.stdin.resume();
+    }
+
+    // Give readline a moment to re-establish control
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
 
   async handleConversation(query) {
+    const lowerQuery = query.toLowerCase();
+
+    // Handle simple count queries
+    if (lowerQuery.includes('how many') || lowerQuery === 'count') {
+      const emails = await this.getLocalEmails({
+        folder: 'INBOX',
+        limit: 10000
+      });
+      console.log(chalk.blue(`\n📊 You have ${emails.length} emails in your INBOX\n`));
+      return;
+    }
+
+    // Handle archive commands directly
+    if (lowerQuery.startsWith('archive') || lowerQuery.includes('archive all')) {
+      // Extract email address or sender from query
+      const fromMatch = lowerQuery.match(/from\s+([^\s]+)/i) ||
+                        lowerQuery.match(/messages from\s+([^\s]+)/i) ||
+                        lowerQuery.match(/emails from\s+([^\s]+)/i);
+
+      if (fromMatch) {
+        const fromAddress = fromMatch[1];
+        const emails = await this.getLocalEmails({
+          from: fromAddress,
+          limit: 1000
+        });
+
+        if (emails.length === 0) {
+          console.log(chalk.yellow(`No emails found from ${fromAddress}`));
+          return;
+        }
+
+        const { confirm } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirm',
+          message: `Archive ${emails.length} emails from ${fromAddress}?`,
+          default: false
+        }]);
+
+        if (confirm) {
+          await this.connect(process.env.EMAIL_ACCOUNT);
+
+          // Group by folder
+          const byFolder = {};
+          emails.forEach(email => {
+            const folder = email.folder || 'INBOX';
+            if (!byFolder[folder]) byFolder[folder] = [];
+            byFolder[folder].push(email.uid);
+          });
+
+          // Move to Archive folder
+          for (const [folder, uids] of Object.entries(byFolder)) {
+            await this.moveEmailsFromFolder(uids, folder, 'Archive');
+          }
+
+          await this.disconnect();
+          console.log(chalk.green(`✅ Successfully archived ${emails.length} emails\n`));
+        }
+
+        // Restore readline after inquirer
+        await this.restoreReadlineAfterInquirer();
+        return;
+      }
+    }
+
+    // Handle "delete these" with specific subjects
+    if (lowerQuery.startsWith('delete these:') || (lowerQuery.includes('delete these') && query.includes(':'))) {
+      // Extract the subjects from the query
+      const colonIndex = query.indexOf(':');
+      const subjectsText = colonIndex > -1 ? query.substring(colonIndex + 1).trim() : '';
+
+      // Parse the subjects - they might be quoted or comma/newline separated
+      const subjects = subjectsText
+        .split(/[,\n]/)
+        .map(s => s.trim().replace(/^["']|["']$/g, '')) // Remove quotes
+        .filter(s => s.length > 0);
+
+      if (subjects.length === 0) {
+        console.log(chalk.yellow('No email subjects specified'));
+        return;
+      }
+
+      console.log(chalk.gray(`Looking for emails with subjects: ${subjects.join(', ')}...`));
+
+      // Get all recent emails to search through
+      const allEmails = await this.getLocalEmails({
+        folder: 'INBOX',
+        limit: 1000
+      });
+
+      // Find emails matching the specified subjects
+      const matchingEmails = allEmails.filter(email => {
+        if (!email.subject) return false;
+        return subjects.some(subject =>
+          email.subject.toLowerCase().includes(subject.toLowerCase())
+        );
+      });
+
+      if (matchingEmails.length === 0) {
+        console.log(chalk.yellow('No emails found matching those subjects'));
+        return;
+      }
+
+      console.log(chalk.blue(`\nFound ${matchingEmails.length} emails to delete:`));
+      matchingEmails.forEach(email => {
+        console.log(`  • ${email.subject}`);
+      });
+
+      const { confirm } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirm',
+        message: chalk.red(`⚠️  Delete these ${matchingEmails.length} emails?`),
+        default: false
+      }]);
+
+      if (confirm) {
+        try {
+          await this.connect(process.env.EMAIL_ACCOUNT);
+          console.log(chalk.yellow(`Deleting ${matchingEmails.length} emails...`));
+
+          const uids = matchingEmails.map(e => e.uid).filter(uid => uid);
+          if (uids.length > 0) {
+            await this.deleteEmails(uids);
+            console.log(chalk.green(`✅ Deleted ${uids.length} emails\n`));
+          }
+
+          await this.disconnect();
+        } catch (error) {
+          console.error(chalk.red('Error deleting emails:'), error.message);
+        }
+      } else {
+        console.log(chalk.gray('Deletion cancelled\n'));
+      }
+
+      // Restore readline after inquirer
+      await this.restoreReadlineAfterInquirer();
+      return;
+    }
+
+    // Handle delete commands directly
+    if (lowerQuery.startsWith('delete') || lowerQuery.includes('delete all') || lowerQuery.includes('remove')) {
+      // Extract email address or sender from query
+      const fromMatch = lowerQuery.match(/from\s+([^\s]+@[^\s]+)/i) ||
+                        lowerQuery.match(/messages from\s+([^\s]+)/i) ||
+                        lowerQuery.match(/emails from\s+([^\s]+)/i);
+
+      if (fromMatch) {
+        const fromAddress = fromMatch[1];
+        const emails = await this.getLocalEmails({
+          from: fromAddress,
+          limit: 1000
+        });
+
+        if (emails.length === 0) {
+          console.log(chalk.yellow(`No emails found from ${fromAddress}`));
+          return;
+        }
+
+        const { confirm } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirm',
+          message: `Delete ${emails.length} emails from ${fromAddress}?`,
+          default: false
+        }]);
+
+        if (confirm) {
+          await this.connect(process.env.EMAIL_ACCOUNT);
+
+          // Group by folder
+          const byFolder = {};
+          emails.forEach(email => {
+            const folder = email.folder || 'INBOX';
+            if (!byFolder[folder]) byFolder[folder] = [];
+            byFolder[folder].push(email.uid);
+          });
+
+          // Delete from each folder
+          for (const [folder, uids] of Object.entries(byFolder)) {
+            await this.deleteEmailsFromFolder(uids, folder);
+          }
+
+          await this.disconnect();
+          console.log(chalk.green(`✅ Successfully deleted ${emails.length} emails\n`));
+        }
+
+        // Restore readline after inquirer
+        await this.restoreReadlineAfterInquirer();
+        return;
+      }
+    }
+
+    // Handle "show subjects" or "list subjects" queries
+    if ((lowerQuery.includes('show') || lowerQuery.includes('list')) && lowerQuery.includes('subject')) {
+      // Extract sender if mentioned - look for email addresses or domain patterns
+      const fromMatch = lowerQuery.match(/from\s+([^\s]+@[^\s]+)/i) ||  // Full email
+                       lowerQuery.match(/from\s+([^\s]+\.[^\s]+)/i) ||   // Domain
+                       lowerQuery.match(/from\s+(\S+)$/i);                // Last word after "from"
+      let emails;
+
+      if (fromMatch) {
+        const sender = fromMatch[1];
+        emails = await this.getLocalEmails({
+          from: sender,
+          limit: 50
+        });
+
+        if (emails.length === 0) {
+          console.log(chalk.yellow(`No emails found from ${sender}`));
+          return;
+        }
+
+        console.log(chalk.green(`\n📧 Subjects of emails from ${sender}:\n`));
+      } else {
+        emails = await this.getLocalEmails({ limit: 20 });
+        console.log(chalk.green(`\n📧 Recent email subjects:\n`));
+      }
+
+      emails.forEach((email, i) => {
+        const date = new Date(email.date).toLocaleDateString();
+        const subject = email.subject || '(no subject)';
+        const from = email.from_name || email.from_address;
+        console.log(`${i + 1}. ${chalk.bold(subject)}`);
+        console.log(`   From: ${chalk.gray(from)} | Date: ${date}\n`);
+      });
+
+      return;
+    }
+
+    // Handle "emails from" queries directly
+    if (lowerQuery.includes('email from') || lowerQuery.includes('emails from') || lowerQuery.includes('mail from') || lowerQuery.includes('messages from')) {
+      // Extract sender from query
+      const fromMatch = lowerQuery.match(/from\s+([^\s]+)/i);
+
+      if (fromMatch) {
+        const sender = fromMatch[1];
+        const emails = await this.getLocalEmails({
+          from: sender,
+          limit: 20
+        });
+
+        if (emails.length === 0) {
+          console.log(chalk.yellow(`No emails found from ${sender}`));
+          return;
+        }
+
+        console.log(chalk.green(`\n📧 Found ${emails.length} emails from ${sender}:\n`));
+
+        emails.forEach((email, i) => {
+          const date = new Date(email.date).toLocaleDateString();
+          const subject = email.subject || '(no subject)';
+
+          console.log(`${i + 1}. ${chalk.bold(subject)}`);
+          console.log(`   Date: ${date}\n`);
+        });
+
+        return;
+      }
+    }
+
+    // Handle "most messages" or "top senders" queries
+    if (lowerQuery.includes('most message') || lowerQuery.includes('most email') ||
+        lowerQuery.includes('top sender') || lowerQuery.includes('sent the most')) {
+      const emails = await this.getLocalEmails({
+        folder: 'INBOX',
+        limit: 10000
+      });
+
+      // Count emails per sender
+      const senderCounts = new Map();
+      emails.forEach(email => {
+        const key = `${email.from_name || email.from_address}|||${email.from_address}`;
+        senderCounts.set(key, (senderCounts.get(key) || 0) + 1);
+      });
+
+      // Sort by count
+      const sorted = Array.from(senderCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10); // Top 10
+
+      if (sorted.length === 0) {
+        console.log(chalk.yellow('No emails found in INBOX'));
+        return;
+      }
+
+      console.log(chalk.blue(`\n📊 Top senders by message count:\n`));
+
+      sorted.forEach(([key, count], i) => {
+        const [name, address] = key.split('|||');
+        console.log(`${i + 1}. ${chalk.bold(name)} - ${chalk.cyan(count + ' messages')}`);
+        if (name !== address) {
+          console.log(`   ${chalk.gray(address)}`);
+        }
+        console.log();
+      });
+
+      return;
+    }
+
+    // Handle "unique senders" query directly
+    if (lowerQuery.includes('unique sender') || lowerQuery.includes('who sent') || lowerQuery.includes('senders')) {
+      const emails = await this.getLocalEmails({
+        folder: 'INBOX',
+        limit: 10000
+      });
+
+      // Extract unique senders
+      const senderMap = new Map();
+      emails.forEach(email => {
+        const address = email.from_address || 'Unknown';
+        const name = email.from_name || '';
+        if (!senderMap.has(address)) {
+          senderMap.set(address, name);
+        }
+      });
+
+      if (senderMap.size === 0) {
+        console.log(chalk.yellow('No emails found in INBOX'));
+        return;
+      }
+
+      console.log(chalk.blue(`\n📧 Unique senders in INBOX (${senderMap.size} total):\n`));
+
+      let count = 0;
+      senderMap.forEach((name, address) => {
+        count++;
+        if (count <= 20) { // Show first 20
+          // Format based on whether we have a separate name
+          if (name && name !== address && !name.includes(address)) {
+            console.log(`  ${count}. ${chalk.bold(name)} <${chalk.gray(address)}>`);
+          } else {
+            console.log(`  ${count}. ${chalk.gray(address)}`);
+          }
+        }
+      });
+
+      if (senderMap.size > 20) {
+        console.log(chalk.gray(`\n  ... and ${senderMap.size - 20} more`));
+      }
+      console.log(); // Add final newline
+
+      return;
+    }
+
     // For search-like queries, try using Claude to filter emails directly
     const searchKeywords = ['show', 'find', 'search', 'list', 'personal', 'important', 'from', 'about'];
-    const isSearchQuery = searchKeywords.some(keyword => query.toLowerCase().includes(keyword));
+    const isSearchQuery = searchKeywords.some(keyword => lowerQuery.includes(keyword));
     
     if (isSearchQuery && this.nlSearch.client) {
       try {
@@ -548,12 +931,29 @@ User query: "${query}"`;
   async handleSearch(params, preFilteredEmails = null) {
     // Use pre-filtered emails if provided (from Claude), otherwise do local search
     const emails = preFilteredEmails || await this.getLocalEmails({ ...this.buildFilter(params), limit: 10 });
-    
+
     if (emails.length === 0) {
       console.log(chalk.yellow('No emails found matching your criteria.'));
       return;
     }
 
+    // In conversation mode, just display the emails without interactive selection
+    if (this.inConversationMode) {
+      console.log(chalk.green(`\n📧 Found ${emails.length} matching emails:\n`));
+
+      emails.forEach((email, i) => {
+        const date = new Date(email.date).toLocaleDateString();
+        const subject = email.subject || '(no subject)';
+        const from = email.from_name || email.from_address;
+
+        console.log(`${i + 1}. ${chalk.bold(subject)}`);
+        console.log(`   From: ${from} | Date: ${date}\n`);
+      });
+
+      return;
+    }
+
+    // For non-conversation mode, show interactive selection
     console.log(chalk.green(`\nFound ${emails.length} emails:`));
 
     // Create choices for checkbox selection

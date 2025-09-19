@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import chalk from 'chalk';
+import { ClaudeCLIAdapter } from './claude-cli-adapter.js';
 
 export class NaturalLanguageSearch {
   constructor() {
@@ -8,14 +9,21 @@ export class NaturalLanguageSearch {
     if (anthropicKey) {
       this.client = new Anthropic({ apiKey: anthropicKey });
       this.searchMethod = 'anthropic';
+      this.cliAdapter = null;
     } else {
       this.client = null;
-      this.searchMethod = 'ollama';
+      this.searchMethod = 'claude-cli';
+      this.cliAdapter = new ClaudeCLIAdapter();
     }
   }
 
   // Generic method to ask Claude a question
   async askClaude(systemPrompt, userQuery, options = {}) {
+    // Use CLI adapter if no API client
+    if (this.cliAdapter) {
+      return await this.cliAdapter.askClaude(systemPrompt, userQuery, options);
+    }
+
     if (!this.client) {
       throw new Error('Claude API not configured');
     }
@@ -40,6 +48,11 @@ export class NaturalLanguageSearch {
 
   // Enhanced method to filter data using Claude's understanding
   async filterWithClaude(items, query, itemType = 'emails') {
+    // Use CLI adapter if available
+    if (this.cliAdapter) {
+      return await this.cliAdapter.filterWithClaude(items, query, itemType);
+    }
+
     if (!this.client) {
       throw new Error('Claude API not configured');
     }

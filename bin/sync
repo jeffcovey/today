@@ -82,17 +82,18 @@ main() {
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
     
-    # Task sync without classification
-    SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
+    # DISABLED: Task sync now handled by Obsidian Tasks plugin
+    # SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
     run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
-    run_sync_step "📁 Sync Project Tasks" sync_project_tasks "Project tasks synced" "Project tasks"
+    # DISABLED: Project tasks now in markdown files only
+    # run_sync_step "📁 Sync Project Tasks" sync_project_tasks "Project tasks synced" "Project tasks"
     
     # Run additional operations synchronously (no background jobs)
     print_header "⚡ Additional Sync Operations"
     
-    # Task classification in background (it's slow and non-critical)
-    print_info "🔍 Starting task classification in background..."
+    # Task classification for markdown files (works with Obsidian Tasks plugin)
+    print_info "🔍 Starting task classification for markdown files..."
     {
         # Run stage classification
         echo "Starting stage classification..." > /tmp/classify-$$.log
@@ -102,7 +103,7 @@ main() {
         else
             echo "❌ Stage classification failed" >> /tmp/classify-$$.log
         fi
-        
+
         # Run topic assignment
         echo "" >> /tmp/classify-$$.log
         echo "Starting topic assignment..." >> /tmp/classify-$$.log
@@ -112,19 +113,19 @@ main() {
         else
             echo "❌ Topic assignment failed" >> /tmp/classify-$$.log
         fi
-        
-        # Run status prioritization
+
+        # Run priority assignment
         echo "" >> /tmp/classify-$$.log
-        echo "Starting status prioritization..." >> /tmp/classify-$$.log
+        echo "Starting priority assignment..." >> /tmp/classify-$$.log
         bin/tasks prioritize-status >> /tmp/classify-$$.log 2>&1
         if [ $? -eq 0 ]; then
-            echo "✅ Status prioritization completed successfully" >> /tmp/classify-$$.log
+            echo "✅ Priority assignment completed successfully" >> /tmp/classify-$$.log
         else
-            echo "❌ Status prioritization failed" >> /tmp/classify-$$.log
+            echo "❌ Priority assignment failed" >> /tmp/classify-$$.log
         fi
     } &
     CLASSIFY_PID=$!
-    print_info "   Classification, topics & status prioritization running in background (PID: $CLASSIFY_PID)"
+    print_info "   Classification running in background (PID: $CLASSIFY_PID)"
     print_info "   Check progress: tail -f /tmp/classify-$$.log"
     
     # Email sync (if configured)
@@ -1342,8 +1343,8 @@ process_inbox() {
             # Convert Streaks items to TaskPaper format with task-id: none
             CONVERTED_CONTENT=$(echo "$CONTENT" | awk '
                 NR==1 {print; next}  # Keep header
-                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0 " <!-- task-id: none -->"; next}  # Add checkbox and task-id: none
-                /^- \[[ x]\]/ && !/task-id:/ {print $0 " <!-- task-id: none -->"; next}  # Add task-id: none if missing
+                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0; next}  # Add checkbox only
+                /^- \[[ x]\]/ {print; next}  # Keep tasks as-is (no task-id needed)
                 {print}  # Keep other lines as-is
             ')
             DEST_DIR="vault/tasks"
@@ -1995,15 +1996,16 @@ case "${1:-}" in
         ;;
     --quick)
         # Quick sync - only critical sources
-        print_info "Quick sync mode - vault, tasks, inbox, consistency check, and Turso"
+        print_info "Quick sync mode - vault, inbox, and Turso"
         sync_vault_git
         cleanup_sync_conflicts
         clean_markdown_files
         clean_database_task_titles
         process_inbox
-        SKIP_CLASSIFICATION=1 sync_tasks
-        sync_project_tasks
-        check_task_consistency
+        # DISABLED: Tasks now managed by Obsidian
+        # SKIP_CLASSIFICATION=1 sync_tasks
+        # sync_project_tasks
+        # check_task_consistency
         sync_turso_bidirectional  # Sync with Turso
         sync_vault_git  # Final push of any changes
         ;;

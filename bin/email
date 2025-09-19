@@ -118,6 +118,7 @@ Promise.all([
             console.log(`   From: ${email.from_address} | Date: ${date}`);
           });
         }
+        process.exit(0); // Explicitly exit after listing emails
       } catch (error) {
         console.error(chalk.red('Error listing emails:'), error.message);
         process.exit(1);

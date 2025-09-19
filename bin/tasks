@@ -61,7 +61,7 @@ program
           try {
             // Use find command to get recently modified files
             const changedFiles = execSync(
-              `find vault -name "*.md" -type f -mmin -${minutesAgo + 1} -not -path "*/templates/*" -not -path "*/.stversions/*" 2>/dev/null | grep -v node_modules | grep -v .git`, 
+              `find "vault/" -name "*.md" -type f -mmin -${minutesAgo + 1} -not -path "*/templates/*" -not -path "*/.stversions/*" 2>/dev/null | grep -v node_modules | grep -v .git`, 
               { encoding: 'utf8' }
             ).split('\n')
               .filter(f => f)
@@ -74,7 +74,7 @@ program
             } else {
               console.log(chalk.gray(`  No files modified since last sync`));
               // Still scan project files in case they need initial setup
-              allMarkdownFiles = execSync('find vault/projects -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+              allMarkdownFiles = execSync('find "vault/projects" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
                 .split('\n')
                 .filter(f => f)
                 .map(f => f.replace(/^\.\//, ''));
@@ -88,7 +88,7 @@ program
         // If we don't have changed files or no last sync time, do full scan
         if (!onlyChangedFiles && !lastSyncTime) {
           console.log(chalk.blue('Finding all markdown files (first sync)...'));
-          allMarkdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
+          allMarkdownFiles = execSync('find "vault/" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
             .map(f => f.replace(/^\.\//, ''));
@@ -98,7 +98,7 @@ program
         // Always include review files (even if not modified recently)
         // This ensures tasks in review files get their do_date set properly
         try {
-          const reviewFiles = execSync('find vault/plans -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const reviewFiles = execSync('find "vault/plans" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -133,7 +133,7 @@ program
         
         // Always include topic files to sync new tasks and checkbox changes
         try {
-          const topicFiles = execSync('find vault/topics -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const topicFiles = execSync('find "vault/topics" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -153,46 +153,10 @@ program
           // Topic files not found, continue without them
         }
         
-        // First sync project files to establish project records
-        const projectFiles = allMarkdownFiles.filter(f => f.includes('/projects/'));
-        if (projectFiles.length > 0) {
-          console.log(chalk.blue('Syncing project files...'));
-          for (const filePath of projectFiles) {
-            if (fs.existsSync(filePath)) {
-              const result = await tm.syncProjectFile(filePath);
-              const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(result.projectId);
-              if (project) {
-                console.log(chalk.gray(`  • ${project.name}: ${result.updates ? 'updated' : 'synced'}`));
-              }
-            }
-          }
-        }
-        
-        // Then sync markdown files for tasks
-        if (allMarkdownFiles.length > 0) {
-          console.log(chalk.blue(`Syncing tasks from ${onlyChangedFiles ? 'changed' : 'all'} markdown files...`));
-          let totalUpdates = 0;
-          let filesWithUpdates = 0;
-          
-          for (const filePath of allMarkdownFiles) {
-            // Process ALL markdown files including vault/tasks/
-            // The syncMarkdownFile method will handle "latest change wins" logic
-            if (fs.existsSync(filePath)) {
-              const updates = await tm.syncMarkdownFile(filePath);
-              totalUpdates += updates;
-              if (updates > 0) {
-                filesWithUpdates++;
-                console.log(chalk.gray(`  • ${filePath}: ${updates} updates`));
-              }
-            }
-          }
-          
-          console.log(chalk.green(`✓ Scanned ${allMarkdownFiles.length} files, updated ${filesWithUpdates} files (${totalUpdates} total updates)`));
-        } else {
-          console.log(chalk.gray('✓ No files to sync'));
-        }
-        
-        // Save sync state
+        // DISABLED: No longer syncing to database - using Obsidian Tasks plugin
+        console.log(chalk.green('✓ Database sync disabled - using Obsidian Tasks plugin'));
+
+        // Save sync state (still needed for change tracking)
         const newState = { lastSyncTime: new Date().toISOString() };
         try {
           const path = await import('path');
@@ -206,29 +170,94 @@ program
         }
       }
 
-      // Process repeating tasks
-      const repeated = tm.processRepeatingTasks();
-      if (repeated > 0) {
-        console.log(chalk.blue(`✓ Created ${repeated} recurring task instances`));
+      // DISABLED: Repeating tasks now handled by Obsidian Tasks plugin recurrence syntax
+
+      // Disabled - now using static today.md with Obsidian Tasks plugin queries
+      // const todayCount = await tm.generateTodayFile();
+      // console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
+
+
+      // Disabled - now using static tasks.md with Obsidian Tasks plugin queries
+      // const allCount = await tm.generateAllTasksFile();
+      // console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
+      
+      // Disabled - now using static stages.md with Obsidian Tasks plugin queries
+      // const stagesCount = await tm.generateStagesFile();
+      // console.log(chalk.green(`✓ Generated stages.md with ${stagesCount} staged tasks`));
+      
+      // Disabled - replaced with static topic files using Obsidian Tasks queries
+      // console.log(chalk.blue('Generating topic files...'));
+      // const topicCount = await tm.generateTopicFiles();
+      // if (topicCount > 0) {
+      //   console.log(chalk.green(`✓ Generated ${topicCount} topic files`));
+      // } else {
+      //   console.log(chalk.gray('  • No topics with tasks to generate'));
+      // }
+
+      // Create topic files for all #topic/ tags found in vault
+      console.log(chalk.blue('Creating topic query files...'));
+
+      // Function to create topic query files
+      async function createTopicQueryFiles() {
+        const fs = (await import('fs')).default;
+        const path = await import('path');
+        const { execSync } = (await import('child_process')).default || await import('child_process');
+
+        // Find all #topic/ tags in vault files
+        const findTopicsCmd = `grep -r "#topic/" vault --include="*.md" | grep -o "#topic/[a-z0-9._-]*" | sort -u`;
+        let topics = [];
+
+        try {
+          const output = execSync(findTopicsCmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+          topics = output.trim().split('\n').filter(t => t && t !== '#topic/');
+        } catch (e) {
+          // No topics found
+          return 0;
+        }
+
+        let created = 0;
+        const topicsDir = path.default.join('vault', 'topics');
+
+        // Ensure topics directory exists
+        if (!fs.existsSync(topicsDir)) {
+          fs.mkdirSync(topicsDir, { recursive: true });
+        }
+
+        // Template from vault/Topics.md
+        const template = `\`\`\`tasks
+not done
+has tags
+tags include TOPIC_TAG
+path does not include templates/
+sort by happens
+sort by priority
+group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')
+\`\`\`
+`;
+
+        for (const topicTag of topics) {
+          // Extract topic name from tag (e.g., #topic/health -> health)
+          const topicName = topicTag.replace('#topic/', '');
+          const fileName = `${topicName}.md`;
+          const filePath = path.default.join(topicsDir, fileName);
+
+          // Create file if it doesn't exist
+          if (!fs.existsSync(filePath)) {
+            const content = template.replace('TOPIC_TAG', topicTag);
+            fs.writeFileSync(filePath, content, 'utf8');
+            created++;
+            console.log(chalk.gray(`  • Created ${fileName}`));
+          }
+        }
+
+        return created;
       }
 
-      // Generate the files fresh from database state
-      const todayCount = await tm.generateTodayFile();
-      console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
-      
-      const allCount = await tm.generateAllTasksFile();
-      console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
-      
-      const stagesCount = await tm.generateStagesFile();
-      console.log(chalk.green(`✓ Generated stages.md with ${stagesCount} staged tasks`));
-      
-      // Generate topic files
-      console.log(chalk.blue('Generating topic files...'));
-      const topicCount = await tm.generateTopicFiles();
-      if (topicCount > 0) {
-        console.log(chalk.green(`✓ Generated ${topicCount} topic files`));
+      const topicFilesCreated = await createTopicQueryFiles();
+      if (topicFilesCreated > 0) {
+        console.log(chalk.green(`✓ Created ${topicFilesCreated} new topic query files`));
       } else {
-        console.log(chalk.gray('  • No topics with tasks to generate'));
+        console.log(chalk.gray('  • All topic files already exist'));
       }
       
       // Classify stages for tasks without them in background
@@ -570,109 +599,254 @@ program
     }
   });
 
-// Classify stages command
+// Classify stages command - works with markdown files
 program
   .command('classify-stages')
-  .description('Classify tasks into Front/Back/Off Stage categories')
+  .description('Add stage tags to tasks in markdown files (#stage/front-stage, etc.)')
   .option('--all', 'Reclassify all tasks (not just unclassified)')
   .option('-v, --verbose', 'Show detailed output')
   .action(async (options) => {
-    const classifier = new TaskStageClassifier();
-    
-    try {
-      if (options.verbose) {
-        console.log(chalk.bold('🎭 Task Stage Classification'));
-        console.log(chalk.gray('───────────────────────────'));
-        console.log('Front Stage: Tasks with other people');
-        console.log('Back Stage:  Behind-the-scenes work');
-        console.log('Off Stage:   Personal time & self-care');
-        console.log('');
-      }
-      
-      const result = await classifier.classifyTasks(!options.all);
-      
-      if (result.classified === 0 && result.failed === 0) {
-        console.log(chalk.gray('All tasks already have stages assigned'));
-      } else {
-        console.log(chalk.green(`✓ Successfully classified ${result.classified} task(s)`));
-        if (result.failed > 0) {
-          console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
+    console.log(chalk.blue('🎭 Classifying task stages in markdown files...'));
+
+    // Find all markdown files with tasks
+    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
+      .split('\n')
+      .filter(f => f);
+
+    if (files.length === 0) {
+      console.log(chalk.gray('No task files found'));
+      process.exit(0);
+    }
+
+    let totalClassified = 0;
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n');
+      let modified = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Match tasks without stage tags (or all tasks if --all)
+        if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
+          // Extract task title for classification
+          let title = line.replace(/^- \[ \] /, '')
+            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove priority emojis
+            .replace(/#\w+\/[\w-]+/g, '') // Remove existing tags
+            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
+            .replace(/🔁 .+$/g, '') // Remove recurrence
+            .trim();
+
+          // Simple keyword-based classification (can be enhanced with AI)
+          let stage = '';
+          if (title.match(/\b(meeting|call|email|support|customer|present|interview)\b/i)) {
+            stage = '#stage/front-stage';
+          } else if (title.match(/\b(fix|bug|maintain|organize|plan|bill|document|setup)\b/i)) {
+            stage = '#stage/back-stage';
+          } else if (title.match(/\b(personal|health|exercise|read|friend|family|relax|self)\b/i)) {
+            stage = '#stage/off-stage';
+          } else {
+            // Default based on context
+            stage = '#stage/back-stage';
+          }
+
+          // Add stage tag if not present
+          if (!lines[i].includes(stage)) {
+            // Insert stage after priority emoji if present, otherwise after task title
+            const priorityMatch = line.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
+            if (priorityMatch) {
+              lines[i] = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
+            } else {
+              // Insert before any dates or at end
+              const dateMatch = line.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+              if (dateMatch) {
+                lines[i] = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
+              } else {
+                lines[i] = `${line} ${stage}`;
+              }
+            }
+            modified = true;
+            totalClassified++;
+          }
         }
       }
-      await classifier.close();
-      process.exit(0);
-    } catch (error) {
-      console.error(chalk.red('Error classifying stages:'), error.message);
-      await classifier.close();
-      process.exit(1);
+
+      if (modified) {
+        fs.writeFileSync(file, lines.join('\n'));
+        if (options.verbose) {
+          console.log(chalk.gray(`  Updated: ${file}`));
+        }
+      }
     }
+
+    console.log(chalk.green(`✓ Classified ${totalClassified} task(s) with stage tags`));
+    process.exit(0);
   });
 
-// Add topics command
+// Add topics command - works with markdown files
 program
   .command('add-topics')
-  .description('Automatically assign topics to tasks using AI')
+  .description('Add topic tags to tasks in markdown files (#topic/health, etc.)')
   .option('--all', 'Reassign topics to all tasks (not just unassigned)')
   .option('-v, --verbose', 'Show detailed output')
   .action(async (options) => {
-    const { TaskTopicClassifier } = await import('../src/task-topic-classifier.js');
-    const classifier = new TaskTopicClassifier();
-    
-    try {
-      if (options.verbose) {
-        console.log(chalk.bold('🏷️  Task Topic Classification'));
-        console.log(chalk.gray('────────────────────────────'));
-        console.log('AI will analyze tasks and assign relevant topics');
-        console.log('');
-      }
-      
-      const result = await classifier.classifyTasks(!options.all, options.verbose);
-      
-      if (result.classified === 0 && result.failed === 0) {
-        console.log(chalk.gray('All tasks already have topics assigned'));
-      } else {
-        console.log(chalk.green(`✓ Successfully assigned topics to ${result.classified} task(s)`));
-        if (result.failed > 0) {
-          console.log(chalk.yellow(`⚠️  Failed to classify ${result.failed} task(s)`));
+    console.log(chalk.blue('🏷️  Adding topic tags to tasks in markdown files...'));
+
+    // Find all markdown files with tasks
+    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
+      .split('\n')
+      .filter(f => f);
+
+    if (files.length === 0) {
+      console.log(chalk.gray('No task files found'));
+      process.exit(0);
+    }
+
+    let totalTopicsAdded = 0;
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n');
+      let modified = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Match tasks without topic tags (or all tasks if --all)
+        if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
+          // Extract task title for classification
+          let title = line.replace(/^- \[ \] /, '')
+            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove priority emojis
+            .replace(/#\w+\/[\w-]+/g, '') // Remove existing tags
+            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
+            .replace(/🔁 .+$/g, '') // Remove recurrence
+            .trim();
+
+          // Simple keyword-based topic assignment (can be enhanced with AI)
+          const topics = [];
+          if (title.match(/\b(health|exercise|doctor|medical|diet|wellness)\b/i)) topics.push('#topic/health');
+          if (title.match(/\b(code|program|debug|fix|develop|git|api)\b/i)) topics.push('#topic/programming');
+          if (title.match(/\b(oldergay|ogm|website|discourse|forum)\b/i)) topics.push('#topic/ogm');
+          if (title.match(/\b(ai|claude|gpt|chatgpt|llm|machine learning)\b/i)) topics.push('#topic/ai');
+          if (title.match(/\b(money|bill|tax|payment|finance|invest)\b/i)) topics.push('#topic/finance');
+          if (title.match(/\b(house|home|clean|repair|maintenance|chore)\b/i)) topics.push('#topic/home');
+          if (title.match(/\b(friend|family|social|meet|relationship)\b/i)) topics.push('#topic/social');
+          if (title.match(/\b(learn|read|course|study|research|book)\b/i)) topics.push('#topic/learning');
+          if (title.match(/\b(travel|trip|flight|hotel|vacation)\b/i)) topics.push('#topic/travel');
+          if (title.match(/\b(buy|shop|order|purchase|amazon)\b/i)) topics.push('#topic/shopping');
+
+          // Add topics if found and not already present
+          if (topics.length > 0) {
+            let newLine = line;
+            for (const topic of topics) {
+              if (!newLine.includes(topic)) {
+                // Insert topics after stage tag if present, otherwise after priority/title
+                const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
+                if (stageMatch) {
+                  newLine = `${stageMatch[1]} ${topic}${stageMatch[2]}`;
+                } else {
+                  const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                  if (dateMatch) {
+                    newLine = `${dateMatch[1]} ${topic} ${dateMatch[2]}`;
+                  } else {
+                    newLine = `${newLine} ${topic}`;
+                  }
+                }
+                totalTopicsAdded++;
+              }
+            }
+            if (newLine !== line) {
+              lines[i] = newLine;
+              modified = true;
+            }
+          }
         }
       }
-      await classifier.close();
-      process.exit(0);
-    } catch (error) {
-      console.error(chalk.red('Error assigning topics:'), error.message);
-      await classifier.close();
-      process.exit(1);
+
+      if (modified) {
+        fs.writeFileSync(file, lines.join('\n'));
+        if (options.verbose) {
+          console.log(chalk.gray(`  Updated: ${file}`));
+        }
+      }
     }
+
+    console.log(chalk.green(`✓ Added ${totalTopicsAdded} topic tag(s) to tasks`));
+    process.exit(0);
   });
 
-// Prioritize status command
+// Prioritize status command - works with markdown files
 program
   .command('prioritize-status')
-  .description('Automatically prioritize tasks in "To File" status using AI')
+  .description('Add priority emojis to tasks in markdown files')
+  .option('--all', 'Reprioritize all tasks (not just unprioritized)')
   .option('-v, --verbose', 'Show detailed output')
   .action(async (options) => {
-    const { TaskStatusClassifier } = await import('../src/task-status-classifier.js');
-    const classifier = new TaskStatusClassifier('.data/today.db');
-    
-    try {
-      const result = await classifier.classifyTasks(options.verbose);
-      
-      if (result.classified === 0 && result.failed === 0) {
-        console.log(chalk.gray('No tasks to prioritize'));
-      } else {
-        console.log(chalk.green(`✓ Prioritized ${result.classified} tasks from "To File" status`));
-        if (result.failed > 0) {
-          console.log(chalk.red(`✗ Failed to classify ${result.failed} tasks`));
+    console.log(chalk.blue('🎯 Adding priority emojis to tasks in markdown files...'));
+
+    // Find all markdown files with tasks
+    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
+      .split('\n')
+      .filter(f => f);
+
+    if (files.length === 0) {
+      console.log(chalk.gray('No task files found'));
+      process.exit(0);
+    }
+
+    let totalPrioritized = 0;
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n');
+      let modified = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Match tasks without priority emojis (or all tasks if --all)
+        if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
+          // Extract task title for prioritization
+          let title = line.replace(/^- \[ \] /, '')
+            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove existing priority
+            .replace(/#\w+\/[\w-]+/g, '') // Remove tags
+            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
+            .replace(/🔁 .+$/g, '') // Remove recurrence
+            .trim();
+
+          // Simple keyword-based prioritization (can be enhanced with AI)
+          let priority = '';
+          if (title.match(/\b(urgent|critical|emergency|asap|immediately|blocker)\b/i)) {
+            priority = '🔺'; // Highest
+          } else if (title.match(/\b(important|high|soon|priority|deadline)\b/i)) {
+            priority = '⏫'; // High
+          } else if (title.match(/\b(someday|maybe|consider|explore|research)\b/i)) {
+            priority = '🔽'; // Low
+          } else if (title.match(/\b(due|scheduled|meeting|call|appointment)\b/i)) {
+            priority = '⏫'; // High (time-sensitive)
+          } else {
+            priority = '🔼'; // Medium (default)
+          }
+
+          // Add priority emoji after task title
+          const cleanLine = line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
+          const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
+          if (taskMatch) {
+            lines[i] = `${taskMatch[1].trim()} ${priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
+            modified = true;
+            totalPrioritized++;
+          }
         }
       }
-      
-      await classifier.close();
-      process.exit(0);
-    } catch (error) {
-      console.error(chalk.red('Error prioritizing tasks:'), error.message);
-      await classifier.close();
-      process.exit(1);
+
+      if (modified) {
+        fs.writeFileSync(file, lines.join('\n'));
+        if (options.verbose) {
+          console.log(chalk.gray(`  Updated: ${file}`));
+        }
+      }
     }
+
+    console.log(chalk.green(`✓ Prioritized ${totalPrioritized} task(s) with emoji indicators`));
+    process.exit(0);
   });
 
 // Search command
@@ -929,7 +1103,7 @@ program
       }
       
       // Find all markdown files (including vault/tasks/ for proper consistency)
-      const markdownFiles = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
+      const markdownFiles = execSync('find "vault/" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
         .split('\n')
         .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
         .map(f => f.replace(/^\.\//, ''));

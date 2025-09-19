@@ -243,6 +243,53 @@ fi
     MONTH_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_00.md"
     WEEK_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_00.md"
     REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+    # Create daily plan from template if it doesn't exist
+    if [ ! -f "$REVIEW_FILE" ]; then
+        TEMPLATE_FILE="vault/templates/daily-plan.md"
+        if [ -f "$TEMPLATE_FILE" ]; then
+            echo "📝 Creating daily plan from template..."
+            mkdir -p "$(dirname "$REVIEW_FILE")"
+
+            # Get additional date variables for template
+            MONTH_NAME=$(TZ=$TIMEZONE date '+%B')
+            FULL_DATE="$(TZ=$TIMEZONE date '+%B %d, %Y')"
+
+            # Copy template and replace variables
+            cp "$TEMPLATE_FILE" "$REVIEW_FILE"
+
+            # Replace template variables
+            sed -i '' \
+                -e "s/{{DAY_OF_WEEK}}/$DAY_OF_WEEK/g" \
+                -e "s/{{MONTH_NAME}}/$MONTH_NAME/g" \
+                -e "s/{{DAY}}/$DAY/g" \
+                -e "s/{{YEAR}}/$YEAR/g" \
+                -e "s/{{FULL_DATE}}/$FULL_DATE/g" \
+                -e "s/{{STAGE_THEME}}/$STAGE_THEME/g" \
+                -e "s/{{STAGE_FOCUS}}/$STAGE_FOCUS/g" \
+                -e 's/{{PRIORITIES_FROM_DATABASE}}//g' \
+                -e 's/{{MORNING_TIME_BLOCKS}}//g' \
+                -e 's/{{AFTERNOON_TIME_BLOCKS}}//g' \
+                -e 's/{{EVENING_TIME_BLOCKS}}//g' \
+                "$REVIEW_FILE" 2>/dev/null || \
+            sed -i \
+                -e "s/{{DAY_OF_WEEK}}/$DAY_OF_WEEK/g" \
+                -e "s/{{MONTH_NAME}}/$MONTH_NAME/g" \
+                -e "s/{{DAY}}/$DAY/g" \
+                -e "s/{{YEAR}}/$YEAR/g" \
+                -e "s/{{FULL_DATE}}/$FULL_DATE/g" \
+                -e "s/{{STAGE_THEME}}/$STAGE_THEME/g" \
+                -e "s/{{STAGE_FOCUS}}/$STAGE_FOCUS/g" \
+                -e 's/{{PRIORITIES_FROM_DATABASE}}//g' \
+                -e 's/{{MORNING_TIME_BLOCKS}}//g' \
+                -e 's/{{AFTERNOON_TIME_BLOCKS}}//g' \
+                -e 's/{{EVENING_TIME_BLOCKS}}//g' \
+                "$REVIEW_FILE"
+
+            echo "✅ Created daily plan: $REVIEW_FILE"
+            echo ""
+        fi
+    fi
     
     # Check which plans exist
     EXISTING_PLANS=""
@@ -257,10 +304,22 @@ fi
         REVIEW_STATUS="exists"
     fi
     
-    # 4. Database Quick Stats (optional - can be slow)
-    # Keeping minimal for speed
-    TASK_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks WHERE status != '✅ Done'" 2>/dev/null || echo "?")
-    OVERDUE_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks WHERE due_date < DATE('now') AND status != '✅ Done'" 2>/dev/null || echo "?")
+    # 4. Task Stats from markdown files
+    # Count tasks directly from markdown files
+    TASK_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -h "^- \[ \]" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    # Count overdue tasks (with 📅 due or ⏳ scheduled dates before today)
+    TODAY_DATE=$(date +%Y-%m-%d)
+    OVERDUE_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(📅|⏳)" 2>/dev/null | while read line; do
+        # Extract date from line (either due 📅 or scheduled ⏳)
+        DATE=$(echo "$line" | grep -oE "(📅|⏳) [0-9]{4}-[0-9]{2}-[0-9]{2}" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
+        if [[ -n "$DATE" ]] && [[ "$DATE" < "$TODAY_DATE" ]]; then
+            echo "1"
+        fi
+    done | wc -l | tr -d ' ' || echo "0")
+
+    # Count high priority tasks (🔺 or ⏫)
+    HIGH_PRIORITY_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(🔺|⏫)" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review
@@ -270,8 +329,13 @@ fi
         echo "Starting focused Claude session..."
         echo "Request: $DIRECT_REQUEST"
         echo ""
+        echo "📊 Task Statistics from markdown:"
+        echo "  • Active tasks: $TASK_COUNT"
+        echo "  • Overdue: $OVERDUE_COUNT"
+        echo "  • High priority: $HIGH_PRIORITY_COUNT"
+        echo ""
         echo "Claude will:"
-        echo "  • Query the SQLite database for context"
+        echo "  • Review your markdown task files"
         echo "  • Check today's review if it exists"
         echo "  • Focus on your specific request"
         echo ""
@@ -301,7 +365,7 @@ fi
 - **Stage**: $STAGE_THEME - $STAGE_FOCUS
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
-- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
 
 ## Context Available
 - SQLite database at .data/today.db with all current data
@@ -343,7 +407,7 @@ EOF
 - **Stage**: $STAGE_THEME - $STAGE_FOCUS
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
-- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
 
 ## Existing Plans
 $(echo -e "$EXISTING_PLANS")
@@ -380,8 +444,14 @@ EOF
         echo "📝 Review file: $REVIEW_FILE"
         echo ""
         echo "Starting interactive Claude session..."
+        echo ""
+        echo "📊 Task Statistics from markdown:"
+        echo "  • Active tasks: $TASK_COUNT"
+        echo "  • Overdue: $OVERDUE_COUNT"
+        echo "  • High priority: $HIGH_PRIORITY_COUNT"
+        echo ""
         echo "Claude will:"
-        echo "  • Query the SQLite database for all data"
+        echo "  • Review your markdown task files"
         echo "  • Create or update today's review file"
         echo "  • Provide recommendations"
         echo "  • Continue working with you as needed"
@@ -411,7 +481,7 @@ You are running in non-interactive mode. This means:
 - **Stage**: $STAGE_THEME - $STAGE_FOCUS
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
-- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
 
 ## Existing Plans
 $(echo -e "$EXISTING_PLANS")
@@ -433,7 +503,7 @@ EOF
 - **Stage**: $STAGE_THEME - $STAGE_FOCUS
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
-- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
 
 ## Existing Plans
 $(echo -e "$EXISTING_PLANS")
