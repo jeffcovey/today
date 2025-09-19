@@ -2449,6 +2449,16 @@ async function executeTasksQuery(query) {
         return t.isDone && matches;
       });
       console.log(`[DEBUG] "done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${todayStr})`);
+    } else if (filter.startsWith('path includes ')) {
+      const pathPattern = filter.replace('path includes ', '').trim();
+      filtered = filtered.filter(t => t.filePath.includes(pathPattern));
+    } else if (filter.startsWith('path does not include ')) {
+      const pathPattern = filter.replace('path does not include ', '').trim();
+      filtered = filtered.filter(t => !t.filePath.includes(pathPattern));
+    } else if (filter === 'no scheduled date') {
+      filtered = filtered.filter(t => !t.scheduledDate);
+    } else if (filter === 'no due date') {
+      filtered = filtered.filter(t => !t.dueDate);
     } else if (filter.includes('OR')) {
       // Handle OR conditions
       const conditions = filter.split('OR').map(c => c.replace(/[()]/g, '').trim());
