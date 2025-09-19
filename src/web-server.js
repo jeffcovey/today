@@ -2588,8 +2588,10 @@ async function processTasksCodeBlocks(content) {
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           const displayText = replaceTagsWithEmoji(task.text);
           // Add data attributes with file path and line number for future actions
-          replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
+          // Store full path in data-file and line number in data-line
+          const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
@@ -2604,8 +2606,10 @@ async function processTasksCodeBlocks(content) {
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           const displayText = replaceTagsWithEmoji(task.text);
           // Add data attributes with file path and line number for future actions
-          replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
+          // Store full path in data-file and line number in data-line
+          const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
