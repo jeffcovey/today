@@ -60,54 +60,20 @@ async function updateMarkdownTasksCache(filePath) {
     // Delete existing tasks for this file
     db.prepare('DELETE FROM markdown_tasks WHERE file_path = ?').run(filePath);
 
-    // Parse and insert tasks
+    // Insert tasks (simple - just store raw line text)
     const insertStmt = db.prepare(`
-      INSERT INTO markdown_tasks (
-        file_path, line_number, line_text, is_done,
-        scheduled_date, due_date, done_date, priority, tags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO markdown_tasks (file_path, line_number, line_text)
+      VALUES (?, ?, ?)
     `);
 
-    const taskRegex = /^- \[[ x]\] (.+)$/i;
+    const taskRegex = /^- \[[ x]\] /i;
     let insertCount = 0;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const match = line.match(taskRegex);
-
-      if (match) {
+      if (taskRegex.test(line)) {
         const lineNumber = i + 1; // 1-based line numbers
-        const taskText = match[1];
-        const isDone = line.toLowerCase().includes('[x]');
-
-        // Parse dates
-        let scheduledDate = null;
-        let dueDate = null;
-        let doneDate = null;
-
-        const scheduledMatch = taskText.match(/⏳ (\d{4}-\d{2}-\d{2})/);
-        if (scheduledMatch) scheduledDate = scheduledMatch[1];
-
-        const dueMatch = taskText.match(/📅 (\d{4}-\d{2}-\d{2})/);
-        if (dueMatch) dueDate = dueMatch[1];
-
-        const doneMatch = taskText.match(/✅ (\d{4}-\d{2}-\d{2})/);
-        if (doneMatch) doneDate = doneMatch[1];
-
-        // Parse priority
-        let priority = 0;
-        if (taskText.includes('🔺')) priority = 3;
-        else if (taskText.includes('🔼')) priority = 2;
-        else if (taskText.includes('⏫')) priority = 1;
-
-        // Extract tags
-        const tagMatches = taskText.match(/#[\w/-]+/g) || [];
-        const tags = tagMatches.join(' ');
-
-        insertStmt.run(
-          filePath, lineNumber, line, isDone ? 1 : 0,
-          scheduledDate, dueDate, doneDate, priority, tags
-        );
+        insertStmt.run(filePath, lineNumber, line);
         insertCount++;
       }
     }

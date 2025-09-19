@@ -2058,6 +2058,50 @@ export class MigrationManager {
 
           console.log('    ✓ Created markdown_tasks cache table with indexes');
         }
+      },
+      {
+        version: 26,
+        description: 'Simplify markdown_tasks table - remove parsing fields',
+        fn: (db) => {
+          console.log('    Simplifying markdown_tasks table...');
+
+          // Drop the old table and recreate with simpler schema
+          db.exec(`
+            -- Drop existing indexes and triggers
+            DROP TRIGGER IF EXISTS update_markdown_tasks_timestamp;
+            DROP INDEX IF EXISTS idx_markdown_tasks_file;
+            DROP INDEX IF EXISTS idx_markdown_tasks_done;
+            DROP INDEX IF EXISTS idx_markdown_tasks_scheduled;
+            DROP INDEX IF EXISTS idx_markdown_tasks_due;
+            DROP INDEX IF EXISTS idx_markdown_tasks_done_date;
+            DROP INDEX IF EXISTS idx_markdown_tasks_priority;
+
+            -- Drop and recreate the table with simpler schema
+            DROP TABLE IF EXISTS markdown_tasks;
+
+            CREATE TABLE markdown_tasks (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              file_path TEXT NOT NULL,
+              line_number INTEGER NOT NULL,
+              line_text TEXT NOT NULL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(file_path, line_number)
+            );
+
+            -- Single index for file-based queries
+            CREATE INDEX idx_markdown_tasks_file ON markdown_tasks(file_path);
+
+            -- Trigger to update updated_at
+            CREATE TRIGGER update_markdown_tasks_timestamp
+              AFTER UPDATE ON markdown_tasks
+              BEGIN
+                UPDATE markdown_tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+              END;
+          `);
+
+          console.log('    ✓ Simplified markdown_tasks table');
+        }
       }
     ];
 
