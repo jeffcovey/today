@@ -2556,7 +2556,6 @@ async function processTasksCodeBlocks(content) {
           replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
-          replacement += `<span class="task-location" style="font-size: 0.8em; color: #6c757d; margin-left: 0.5em;">(${task.filePath}:${task.lineNumber})</span>`;
           replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
@@ -2573,7 +2572,6 @@ async function processTasksCodeBlocks(content) {
           replacement += `<li data-file="${task.filePath}" data-line="${task.lineNumber}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${task.filePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
-          replacement += `<span class="task-location" style="font-size: 0.8em; color: #6c757d; margin-left: 0.5em;">(${task.filePath}:${task.lineNumber})</span>`;
           replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
