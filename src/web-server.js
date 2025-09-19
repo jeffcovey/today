@@ -9,7 +9,6 @@ import fs from 'fs/promises';
 import { marked } from 'marked';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { TaskManager } from './task-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,9 +17,6 @@ const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
 const VAULT_PATH = path.join(__dirname, '..', 'vault');
-
-// Initialize TaskManager for direct database updates
-const taskManager = new TaskManager(path.join(__dirname, '..', '.data', 'today.db'));
 
 // Track pending markdown regenerations
 const pendingMarkdownUpdates = new Map();
@@ -995,12 +991,20 @@ async function renderDirectory(dirPath, urlPath) {
     const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
     const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
     
-    // Get task count for today
+    // Get task count for today by scanning markdown files
     let taskCount = 0;
     try {
-      const taskManager = new TaskManager(path.join(__dirname, '..', '.data', 'today.db'), { readOnly: true });
-      const todayTasks = taskManager.getTodayTasks();
-      taskCount = todayTasks.length;
+      const { execSync } = await import('child_process');
+      const todayISO = today.toISOString().split('T')[0];
+
+      // Find all markdown files with tasks that have scheduled or due dates for today
+      // Using grep to find tasks with ⏳ YYYY-MM-DD or 📅 YYYY-MM-DD
+      const grepCommand = `grep -r "^- \\[ \\].*[⏳📅] ${todayISO}" vault/ --include="*.md" 2>/dev/null || true`;
+      const taskLines = execSync(grepCommand, { encoding: 'utf8' })
+        .split('\n')
+        .filter(line => line.trim());
+
+      taskCount = taskLines.length;
     } catch (error) {
       console.error('Error getting task count:', error);
     }
@@ -1044,7 +1048,7 @@ async function renderDirectory(dirPath, urlPath) {
                     <div>
                       <strong>Today's Tasks</strong>
                       <br>
-                      <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} due/overdue` : 'No tasks due'}</small>
+                      <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today` : 'No tasks scheduled for today'}</small>
                     </div>
                   </div>
                   ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
@@ -2218,10 +2222,242 @@ function generateTableOfContents(content) {
   return { toc: tocHtml, contentWithIds };
 }
 
+// Execute Obsidian Tasks query and return matching tasks
+async function executeTasksQuery(query) {
+  const { execSync } = await import('child_process');
+  const lines = query.trim().split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Parse query components
+  let filters = [];
+  let sortBy = null;
+  let sortReverse = false;
+  let groupBy = null;
+
+  for (const line of lines) {
+    if (line.startsWith('sort by')) {
+      const sortMatch = line.match(/sort by (\w+)( reverse)?/);
+      if (sortMatch) {
+        sortBy = sortMatch[1];
+        sortReverse = !!sortMatch[2];
+      }
+    } else if (line.startsWith('group by')) {
+      groupBy = line.replace('group by ', '').trim();
+    } else {
+      filters.push(line);
+    }
+  }
+
+  // Build grep command to find all tasks
+  let grepCmd = 'grep -r "^- \\[[ x]\\]" vault/ --include="*.md" 2>/dev/null || true';
+  const taskLines = execSync(grepCmd, { encoding: 'utf8' }).split('\n').filter(Boolean);
+
+  // Parse each task line
+  const tasks = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  for (const line of taskLines) {
+    const [filePath, ...contentParts] = line.split(':');
+    const content = contentParts.join(':').trim();
+
+    // Parse task checkbox state
+    const isDone = /^- \[[xX]\]/.test(content);
+    const taskText = content.replace(/^- \[[ xX]\] /, '');
+
+    // Parse dates
+    let scheduledDate = null;
+    let dueDate = null;
+    let doneDate = null;
+
+    const scheduledMatch = taskText.match(/⏳ (\d{4}-\d{2}-\d{2})/);
+    if (scheduledMatch) scheduledDate = new Date(scheduledMatch[1] + 'T00:00:00');
+
+    const dueMatch = taskText.match(/📅 (\d{4}-\d{2}-\d{2})/);
+    if (dueMatch) dueDate = new Date(dueMatch[1] + 'T00:00:00');
+
+    const doneMatch = taskText.match(/✅ (\d{4}-\d{2}-\d{2})/);
+    if (doneMatch) doneDate = new Date(doneMatch[1] + 'T00:00:00');
+
+    // Parse priority
+    let priority = 0;
+    if (taskText.includes('🔺')) priority = 3;
+    else if (taskText.includes('🔼')) priority = 2;
+    else if (taskText.includes('⏫')) priority = 1;
+
+    // Clean task text for display
+    let cleanText = taskText
+      .replace(/[⏳📅✅] \d{4}-\d{2}-\d{2}/g, '')
+      .replace(/🔺|🔼|⏫/g, '')
+      .replace(/🔁 .+/g, '')
+      .replace(/<!--.*?-->/g, '')
+      .trim();
+
+    tasks.push({
+      filePath: filePath.replace('vault/', ''),
+      text: cleanText,
+      originalText: taskText,
+      isDone,
+      scheduledDate,
+      dueDate,
+      doneDate,
+      priority,
+      happens: scheduledDate || dueDate
+    });
+  }
+
+  // Apply filters
+  let filtered = tasks;
+  for (const filter of filters) {
+    if (filter === 'not done') {
+      filtered = filtered.filter(t => !t.isDone);
+    } else if (filter === 'done') {
+      filtered = filtered.filter(t => t.isDone);
+    } else if (filter === 'done today') {
+      filtered = filtered.filter(t => t.isDone && t.doneDate &&
+        t.doneDate.toDateString() === today.toDateString());
+    } else if (filter.includes('OR')) {
+      // Handle OR conditions
+      const conditions = filter.split('OR').map(c => c.replace(/[()]/g, '').trim());
+      filtered = filtered.filter(task => {
+        return conditions.some(cond => {
+          if (cond === 'scheduled before tomorrow') {
+            return task.scheduledDate && task.scheduledDate < tomorrow;
+          } else if (cond === 'due before tomorrow') {
+            return task.dueDate && task.dueDate < tomorrow;
+          } else if (cond === 'scheduled after today') {
+            return task.scheduledDate && task.scheduledDate > today;
+          } else if (cond === 'due after tomorrow') {
+            return task.dueDate && task.dueDate > tomorrow;
+          }
+          return false;
+        });
+      });
+    }
+  }
+
+  // Sort
+  if (sortBy === 'priority') {
+    filtered.sort((a, b) => sortReverse ? a.priority - b.priority : b.priority - a.priority);
+  } else if (sortBy === 'done') {
+    filtered.sort((a, b) => {
+      const aTime = a.doneDate ? a.doneDate.getTime() : 0;
+      const bTime = b.doneDate ? b.doneDate.getTime() : 0;
+      return sortReverse ? bTime - aTime : aTime - bTime;
+    });
+  }
+
+  // Group
+  if (groupBy === 'happens') {
+    const grouped = new Map();
+    for (const task of filtered) {
+      const date = task.happens;
+      const key = date ? date.toISOString().split('T')[0] : 'No date';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(task);
+    }
+
+    // Sort groups by date
+    const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
+      if (a[0] === 'No date') return 1;
+      if (b[0] === 'No date') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return { grouped: sortedGroups };
+  }
+
+  return { tasks: filtered };
+}
+
+// Process tasks code blocks in markdown content
+async function processTasksCodeBlocks(content) {
+  // Match both with and without newlines, and handle different line endings
+  const codeBlockRegex = /```tasks\s*([\s\S]*?)```/g;
+  let processedContent = content;
+  const matches = [];
+  let match;
+
+  // Collect all matches first to avoid regex index issues
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      query: match[1]
+    });
+  }
+
+  console.log(`[DEBUG] Found ${matches.length} tasks code blocks to process`);
+
+  // Process each match
+  for (const { fullMatch, query } of matches) {
+    console.log(`[DEBUG] Processing query:`, query);
+    const result = await executeTasksQuery(query);
+
+    let replacement = '<div class="tasks-query-result">\n';
+
+    if (result.grouped) {
+      // Render grouped results
+      for (const [date, tasks] of result.grouped) {
+        if (tasks.length === 0) continue;
+
+        // Format date header
+        let dateHeader = date;
+        if (date !== 'No date') {
+          const d = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+
+          if (d.toDateString() === today.toDateString()) {
+            dateHeader = 'Today';
+          } else if (d.toDateString() === tomorrow.toDateString()) {
+            dateHeader = 'Tomorrow';
+          } else {
+            dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          }
+        }
+
+        replacement += `<h4>${dateHeader}</h4>\n<ul>\n`;
+        for (const task of tasks) {
+          const checkbox = task.isDone ? 'checked' : '';
+          const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+          replacement += `<li><input type="checkbox" ${checkbox} disabled> ${priorityIcon}${task.text}</li>\n`;
+        }
+        replacement += '</ul>\n';
+      }
+    } else {
+      // Render ungrouped results
+      if (result.tasks.length > 0) {
+        replacement += '<ul>\n';
+        for (const task of result.tasks) {
+          const checkbox = task.isDone ? 'checked' : '';
+          const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+          replacement += `<li><input type="checkbox" ${checkbox} disabled> ${priorityIcon}${task.text}</li>\n`;
+        }
+        replacement += '</ul>\n';
+      } else {
+        replacement += '<p class="text-muted">No matching tasks</p>\n';
+      }
+    }
+
+    replacement += '</div>';
+
+    processedContent = processedContent.replace(fullMatch, replacement);
+  }
+
+  return processedContent;
+}
+
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
-  const content = await fs.readFile(filePath, 'utf-8');
+  let content = await fs.readFile(filePath, 'utf-8');
+
+  // Process tasks code blocks before rendering
+  content = await processTasksCodeBlocks(content);
+
   const lines = content.split('\n');
   
   // Extract title from first H1 if it exists
@@ -3892,22 +4128,8 @@ app.post('/toggle-checkbox/*path', async (req, res) => {
       content = lines.join('\n');
       await fs.writeFile(fullPath, content, 'utf-8');
       
-      // If task has an ID, update it directly in the database
-      if (taskId) {
-        try {
-          const task = taskManager.getTask(taskId);
-          if (task) {
-            const newStatus = checked ? '✅ Done' : 
-                            (task.status === '✅ Done' ? '🗂️ To File' : task.status);
-            
-            taskManager.updateTask(taskId, { status: newStatus });
-            console.log(`Task ${taskId} status updated: ${task.status} → ${newStatus}`);
-          }
-        } catch (dbError) {
-          // Log error but don't fail the request - file was still updated
-          console.error(`Failed to update task ${taskId} in database:`, dbError);
-        }
-      }
+      // Task updates are now handled directly in markdown files
+      // No database update needed with Obsidian Tasks approach
       
       // Schedule markdown regeneration to move completed tasks to proper sections
       if (urlPath.includes('tasks/') || urlPath.includes('projects/')) {
@@ -3954,7 +4176,8 @@ app.post('/save/*path', async (req, res) => {
   }
 });
 
-// Task detail/edit page route
+// Task detail/edit page route - DISABLED (database removed, using Obsidian Tasks in markdown)
+/*
 app.get('/task/:taskId', authMiddleware, async (req, res) => {
   try {
     const taskId = req.params.taskId;
@@ -4186,16 +4409,17 @@ app.post('/task/:taskId/update', authMiddleware, async (req, res) => {
   try {
     const taskId = req.params.taskId;
     const updates = req.body;
-    
+
     // Update the task
     taskManager.updateTask(taskId, updates);
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
+*/
 
 // Main route handler for root
 app.get('/', async (req, res) => {
