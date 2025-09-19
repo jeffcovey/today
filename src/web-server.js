@@ -3462,8 +3462,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
               // Restore scroll position
               currentContent.scrollTop = scrollTop;
               
-              // Re-attach checkbox handlers
-              currentContent.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+              // Re-attach checkbox handlers (but not for task-checkbox which uses event delegation)
+              currentContent.querySelectorAll('input[type="checkbox"]:not(.task-checkbox)').forEach(checkbox => {
                 checkbox.onchange = function(e) {
                   toggleCheckbox(this, parseInt(this.dataset.line), e);
                 };
