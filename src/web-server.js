@@ -1031,22 +1031,24 @@ async function renderDirectory(dirPath, urlPath) {
     const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
     const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
     
-    // Get task count for today by scanning markdown files
+    // Get task count for today from database cache
     let taskCount = 0;
     try {
-      const { execSync } = await import('child_process');
+      const db = getDatabase();
       const todayISO = today.toISOString().split('T')[0];
 
-      // Find all markdown files with tasks that have scheduled or due dates for today
-      // Using grep to find tasks with ⏳ YYYY-MM-DD or 📅 YYYY-MM-DD
-      const grepCommand = `grep -r "^- \\[ \\].*[⏳📅] ${todayISO}" vault/ --include="*.md" 2>/dev/null || true`;
-      const taskLines = execSync(grepCommand, { encoding: 'utf8' })
-        .split('\n')
-        .filter(line => line.trim());
+      // Query database for tasks with scheduled or due dates for today
+      // Looking for tasks with ⏳ YYYY-MM-DD or 📅 YYYY-MM-DD that are not done
+      const taskRows = db.prepare(`
+        SELECT COUNT(*) as count
+        FROM markdown_tasks
+        WHERE line_text LIKE '- [ ] %'
+          AND (line_text LIKE '%⏳ ${todayISO}%' OR line_text LIKE '%📅 ${todayISO}%')
+      `).get();
 
-      taskCount = taskLines.length;
+      taskCount = taskRows.count;
     } catch (error) {
-      console.error('Error getting task count:', error);
+      console.error('Error getting task count from database:', error);
     }
     
     // Check for other plan files
