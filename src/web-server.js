@@ -4412,7 +4412,7 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 // Handle Obsidian-style task completion
 app.post('/task/complete', authMiddleware, async (req, res) => {
   try {
-    const { file, line, completed } = req.body;
+    const { filePath: file, lineNumber: line, completed } = req.body;
     const filePath = path.join(VAULT_PATH, file);
 
     // Read the file
