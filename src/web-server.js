@@ -2508,6 +2508,27 @@ async function executeTasksQuery(query) {
     });
 
     return { grouped: sortedGroups };
+  } else if (groupBy && groupBy.includes('function')) {
+    // Simple implementation for grouping by file path
+    // This handles "group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')"
+    const grouped = new Map();
+    for (const task of filtered) {
+      // Group by file path, removing common prefixes
+      let key = task.filePath.toUpperCase();
+      // Remove common folder prefixes like "plans/" if present
+      if (key.includes('PLANS/')) {
+        key = key.replace('PLANS/', '');
+      }
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(task);
+    }
+
+    // Sort groups alphabetically
+    const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
+      return a[0].localeCompare(b[0]);
+    });
+
+    return { grouped: sortedGroups };
   }
 
   return { tasks: filtered };
