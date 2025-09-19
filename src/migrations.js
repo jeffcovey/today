@@ -2015,6 +2015,49 @@ export class MigrationManager {
             console.log('    task_cache table already removed');
           }
         }
+      },
+      {
+        version: 25,
+        description: 'Create markdown_tasks cache table for Obsidian Tasks',
+        fn: (db) => {
+          console.log('    Creating markdown_tasks cache table...');
+
+          // Create a new table for caching markdown tasks
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS markdown_tasks (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              file_path TEXT NOT NULL,
+              line_number INTEGER NOT NULL,
+              line_text TEXT NOT NULL,
+              is_done BOOLEAN DEFAULT 0,
+              scheduled_date DATE,
+              due_date DATE,
+              done_date DATE,
+              priority INTEGER DEFAULT 0,
+              tags TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(file_path, line_number)
+            );
+
+            -- Indexes for fast querying
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_file ON markdown_tasks(file_path);
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_done ON markdown_tasks(is_done);
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_scheduled ON markdown_tasks(scheduled_date);
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_due ON markdown_tasks(due_date);
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_done_date ON markdown_tasks(done_date);
+            CREATE INDEX IF NOT EXISTS idx_markdown_tasks_priority ON markdown_tasks(priority);
+
+            -- Trigger to update updated_at
+            CREATE TRIGGER IF NOT EXISTS update_markdown_tasks_timestamp
+              AFTER UPDATE ON markdown_tasks
+              BEGIN
+                UPDATE markdown_tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+              END;
+          `);
+
+          console.log('    ✓ Created markdown_tasks cache table with indexes');
+        }
       }
     ];
 

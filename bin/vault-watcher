@@ -23,6 +23,7 @@ let lastSyncTime = Date.now();
 
 // Import fs at the top level
 import fs from 'fs';
+import { getDatabase } from '../src/database-service.js';
 
 // Logging
 function log(message, type = 'info') {
@@ -44,6 +45,78 @@ function log(message, type = 'info') {
     fs.appendFileSync(LOG_FILE, logMessage + '\n');
   } catch (e) {
     // Ignore log file errors
+  }
+}
+
+// Update markdown tasks cache for a file
+async function updateMarkdownTasksCache(filePath) {
+  try {
+    const db = getDatabase();
+
+    // Read file content
+    const content = await fs.promises.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+
+    // Delete existing tasks for this file
+    db.prepare('DELETE FROM markdown_tasks WHERE file_path = ?').run(filePath);
+
+    // Parse and insert tasks
+    const insertStmt = db.prepare(`
+      INSERT INTO markdown_tasks (
+        file_path, line_number, line_text, is_done,
+        scheduled_date, due_date, done_date, priority, tags
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const taskRegex = /^- \[[ x]\] (.+)$/i;
+    let insertCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(taskRegex);
+
+      if (match) {
+        const lineNumber = i + 1; // 1-based line numbers
+        const taskText = match[1];
+        const isDone = line.toLowerCase().includes('[x]');
+
+        // Parse dates
+        let scheduledDate = null;
+        let dueDate = null;
+        let doneDate = null;
+
+        const scheduledMatch = taskText.match(/⏳ (\d{4}-\d{2}-\d{2})/);
+        if (scheduledMatch) scheduledDate = scheduledMatch[1];
+
+        const dueMatch = taskText.match(/📅 (\d{4}-\d{2}-\d{2})/);
+        if (dueMatch) dueDate = dueMatch[1];
+
+        const doneMatch = taskText.match(/✅ (\d{4}-\d{2}-\d{2})/);
+        if (doneMatch) doneDate = doneMatch[1];
+
+        // Parse priority
+        let priority = 0;
+        if (taskText.includes('🔺')) priority = 3;
+        else if (taskText.includes('🔼')) priority = 2;
+        else if (taskText.includes('⏫')) priority = 1;
+
+        // Extract tags
+        const tagMatches = taskText.match(/#[\w/-]+/g) || [];
+        const tags = tagMatches.join(' ');
+
+        insertStmt.run(
+          filePath, lineNumber, line, isDone ? 1 : 0,
+          scheduledDate, dueDate, doneDate, priority, tags
+        );
+        insertCount++;
+      }
+    }
+
+    if (insertCount > 0) {
+      log(`Updated cache: ${insertCount} tasks from ${path.basename(filePath)}`);
+    }
+  } catch (error) {
+    log(`Failed to update cache for ${filePath}: ${error.message}`, 'error');
   }
 }
 
@@ -116,6 +189,15 @@ async function processChanges() {
       }
     }
     
+    // Update markdown tasks cache
+    if (markdownFiles.length > 0) {
+      log('Updating markdown tasks cache...', 'info');
+      for (const file of markdownFiles) {
+        await updateMarkdownTasksCache(file);
+      }
+      log('Markdown tasks cache updated', 'success');
+    }
+
     // Always clean markdown files
     if (markdownFiles.length > 0) {
       log('Cleaning markdown formatting...', 'info');
@@ -174,11 +256,42 @@ function debounce(func, delay) {
 // Debounced version of processChanges
 const debouncedProcess = debounce(processChanges, DEBOUNCE_DELAY);
 
+// Initial scan to populate cache
+async function initialCacheScan() {
+  log('Performing initial scan to populate task cache...', 'info');
+  try {
+    const { execSync } = await import('child_process');
+    // Find all markdown files in vault
+    const findCmd = `find ${VAULT_DIR} -name "*.md" -type f ! -path "*/.*" ! -path "*/@inbox/*" 2>/dev/null || true`;
+    const output = execSync(findCmd, { encoding: 'utf8' });
+    const files = output.split('\n').filter(Boolean);
+
+    log(`Found ${files.length} markdown files to scan`);
+
+    // Process files in batches
+    const batchSize = 20;
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize);
+      await Promise.all(batch.map(file => updateMarkdownTasksCache(file)));
+    }
+
+    // Get total task count
+    const db = getDatabase();
+    const count = db.prepare('SELECT COUNT(*) as count FROM markdown_tasks').get();
+    log(`Initial scan complete: ${count.count} tasks cached from ${files.length} files`, 'success');
+  } catch (error) {
+    log(`Initial cache scan failed: ${error.message}`, 'error');
+  }
+}
+
 // Watch for changes
-function startWatching() {
+async function startWatching() {
   log('Vault watcher started', 'success');
   log(`Watching for changes in: ${VAULT_DIR}`);
   log(`Debounce delay: ${DEBOUNCE_DELAY}ms`);
+
+  // Perform initial scan
+  await initialCacheScan();
   
   // Recursive watch
   const watcher = watch(VAULT_DIR, { recursive: true }, (eventType, filename) => {
@@ -282,7 +395,7 @@ async function main() {
   }
   
   // Start watching
-  startWatching();
+  await startWatching();
 }
 
 // Handle command line arguments
