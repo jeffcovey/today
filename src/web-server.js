@@ -9,6 +9,7 @@ import fs from 'fs/promises';
 import { marked } from 'marked';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { getDatabase } from './database-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -2323,7 +2324,8 @@ function replaceTagsWithEmoji(text) {
 
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
-  const { execSync } = await import('child_process');
+  const db = getDatabase();
+
   // Remove blockquote markers (>) from query lines
   const lines = query.trim().split('\n')
     .map(l => l.replace(/^>\s*/, '').trim())
@@ -2349,19 +2351,21 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Build grep command to find all tasks - search vault but exclude hidden and system directories
-  // Exclude ALL directories starting with . to avoid backups, .sync, .stfolder, etc.
-  // Use -n flag to include line numbers in format: file:line:content
-  let grepCmd = 'find vault/ -type f -name "*.md" ! -path "*/.*" ! -path "*/@inbox/*" ! -path "*/node_modules/*" -exec grep -Hn "^- \\[[ x]\\]" {} + 2>/dev/null || true';
-
-  let taskLines;
+  // Get all tasks from database cache
+  let taskRows;
   try {
-    const output = execSync(grepCmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 50 }); // 50MB max for large vaults
-    taskLines = output.split('\n').filter(Boolean);
-    console.log(`[DEBUG] Found ${taskLines.length} total task lines from grep`);
+    // Exclude hidden directories and @inbox from results
+    taskRows = db.prepare(`
+      SELECT file_path, line_number, line_text
+      FROM markdown_tasks
+      WHERE file_path NOT LIKE '%/.%'
+        AND file_path NOT LIKE '%/@inbox/%'
+        AND file_path NOT LIKE '%/node_modules/%'
+    `).all();
+    console.log(`[DEBUG] Found ${taskRows.length} total task lines from database`);
   } catch (error) {
-    console.error('[DEBUG] Error executing grep:', error.message);
-    taskLines = [];
+    console.error('[DEBUG] Error querying database:', error.message);
+    taskRows = [];
   }
 
   // Parse each task line
@@ -2371,12 +2375,10 @@ async function executeTasksQuery(query) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  for (const line of taskLines) {
-    // Parse format: filepath:linenumber:content
-    const parts = line.split(':');
-    const filePath = parts[0];
-    const lineNumber = parseInt(parts[1], 10);
-    const content = parts.slice(2).join(':').trim();
+  for (const row of taskRows) {
+    const filePath = row.file_path;
+    const lineNumber = row.line_number;
+    const content = row.line_text;
 
     // Parse task checkbox state
     const isDone = /^- \[[xX]\]/.test(content);
@@ -2411,7 +2413,7 @@ async function executeTasksQuery(query) {
       .trim();
 
     tasks.push({
-      filePath: filePath.replace('vault/', ''),
+      filePath: filePath.replace('/opt/today/vault/', '').replace('vault/', ''),
       lineNumber: lineNumber,
       text: cleanText,
       originalText: taskText,
