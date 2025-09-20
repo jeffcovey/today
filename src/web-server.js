@@ -2594,7 +2594,7 @@ async function processTasksCodeBlocks(content) {
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}" onclick="toggleCheckbox(this, ${task.lineNumber}, null, event)"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
@@ -2612,7 +2612,7 @@ async function processTasksCodeBlocks(content) {
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}" onclick="toggleCheckbox(this, ${task.lineNumber}, null, event)"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
