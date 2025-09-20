@@ -2748,10 +2748,63 @@ async function renderMarkdownUncached(filePath, urlPath) {
     }
   });
   
-  // Use custom renderer for external links
+  // Create a custom renderer that tracks line numbers for checkboxes
   const renderer = createExternalLinkRenderer();
-  
-  // Render the markdown with custom renderer (with IDs added to headings)
+
+  // Override the list item renderer to add data attributes to checkboxes
+  const originalListItem = renderer.listitem.bind(renderer);
+  const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+
+  renderer.listitem = function(text, task, checked) {
+    // Call the original renderer to get the base HTML
+    let html = originalListItem(text, task, checked);
+
+    // If this is a task item, we need to find its line number
+    if (task) {
+      // Extract the task text (without checkbox) for matching
+      const taskTextMatch = text.match(/^(.+)$/);
+      const taskText = taskTextMatch ? taskTextMatch[1].trim() : text;
+
+      // Look up this task in our checkboxLines array to find its line number
+      // We need to match by content since marked doesn't preserve line numbers
+      for (const checkboxData of checkboxLines) {
+        const lineNum = checkboxData.lineNumber + 1; // Convert to 1-based
+        const originalLine = originalContent.split('\n')[checkboxData.lineNumber];
+
+        // Extract just the task text from the original line (remove checkbox part)
+        const originalTaskText = originalLine.replace(/^\s*- \[[ xX]\]\s*/, '').trim();
+
+        // If the task text matches (or is similar enough), use this line number
+        // This is a heuristic match - not perfect but better than index matching
+        if (originalTaskText && (
+          taskText.includes(originalTaskText) ||
+          originalTaskText.includes(taskText) ||
+          taskText.replace(/<[^>]*>/g, '').includes(originalTaskText) // Remove HTML tags for comparison
+        )) {
+          // Add data attributes to the checkbox input
+          html = html.replace(
+            /<input[^>]*type="checkbox"[^>]*>/i,
+            `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNum}"${checked ? ' checked' : ''} style="cursor: pointer;">`
+          );
+          console.log(`[DEBUG] Matched checkbox for line ${lineNum}: "${originalTaskText.substring(0, 50)}..."`);
+          break;
+        }
+      }
+
+      // If we couldn't match, just enable the checkbox without data attributes
+      if (!html.includes('data-line=')) {
+        html = html.replace(
+          /<input[^>]*type="checkbox"[^>]*>/i,
+          `<input type="checkbox" class="task-checkbox" style="cursor: pointer;"${checked ? ' checked' : ''}>`
+        );
+        console.log(`[DEBUG] Could not match checkbox text: "${taskText.substring(0, 50)}..."`);
+      }
+    }
+
+    return html;
+  };
+
+  // Render the markdown with our custom renderer
   let htmlContent = marked.parse(contentToRender, { renderer });
   
   // Don't prepend TOC to content - we'll add it to the header instead
@@ -2830,27 +2883,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
     `;
   });
   
-  // Replace checkboxes with ones that have the correct line numbers
-  console.log(`[DEBUG] Processing ${checkboxLines.length} checkbox lines for ${urlPath}`);
-  let checkboxIndex = 0;
-  htmlContent = htmlContent.replace(
-    /<input[^>]*type="checkbox"[^>]*>/gi,
-    (match) => {
-      const checkboxData = checkboxLines[checkboxIndex];
-      if (checkboxData) {
-        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-        const lineNumber = checkboxData.lineNumber + 1; // Convert 0-based to 1-based
-        const checked = checkboxData.isChecked ? ' checked' : '';
-        console.log(`[DEBUG] Adding data-file="${relativeFilePath}" data-line="${lineNumber}" to checkbox ${checkboxIndex}`);
-        checkboxIndex++;
-        return `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked} style="cursor: pointer;">`;
-      }
-      console.log(`[DEBUG] No checkbox data for index ${checkboxIndex}, enabling without data attributes`);
-      checkboxIndex++;
-      // If no data, just enable the checkbox
-      return match.replace(/\s*disabled="?"?/gi, '').replace('>', ' style="cursor: pointer;">');
-    }
-  );
+  // The checkboxes have already been processed by the custom renderer above
+  // No need for additional post-processing
   
   // Make tasks with IDs clickable - wrap the task text in a link
   htmlContent = htmlContent.replace(
