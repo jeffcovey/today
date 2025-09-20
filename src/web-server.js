@@ -2594,7 +2594,7 @@ async function processTasksCodeBlocks(content) {
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}" onclick="toggleCheckbox(this, ${task.lineNumber}, null, event)"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
@@ -2612,7 +2612,7 @@ async function processTasksCodeBlocks(content) {
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}" onclick="toggleCheckbox(this, ${task.lineNumber}, null, event)"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
         }
@@ -3510,54 +3510,99 @@ async function renderMarkdownUncached(filePath, urlPath) {
         
         function toggleCheckbox(checkbox, lineNumber, taskId, event) {
           const isChecked = checkbox.checked;
-          
+
           // Prevent the details element from toggling when clicking checkbox
           if (event) {
             event.stopPropagation();
           }
-          
-          // Disable the checkbox while saving
-          checkbox.disabled = true;
-          
-          fetch(\`/toggle-checkbox/${urlPath}\`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              lineNumber: lineNumber,
-              taskId: taskId,
-              checked: isChecked 
+
+          // Check if this is a query block checkbox (has data-file and data-line attributes)
+          if (checkbox.dataset.file && checkbox.dataset.line) {
+            // This is a task from a query block - use the /task/complete endpoint
+            checkbox.disabled = true;
+
+            fetch('/task/complete', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filePath: checkbox.dataset.file,
+                lineNumber: parseInt(checkbox.dataset.line, 10),
+                completed: isChecked
+              })
             })
-          })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Failed to toggle checkbox');
-            }
-            return response.json();
-          })
-          .then(data => {
-            // Re-enable the checkbox
-            checkbox.disabled = false;
-            
-            // Add a brief visual feedback
-            // Only modify the immediate parent if it's not a details element
-            const parent = checkbox.parentElement;
-            if (parent && !parent.closest('details')) {
-              const originalColor = parent.style.color;
-              parent.style.color = '#4caf50';
-              setTimeout(() => {
-                parent.style.color = originalColor;
-              }, 500);
-            }
-          })
-          .catch(error => {
-            console.error('Error toggling checkbox:', error);
-            // Revert the checkbox state on error
-            checkbox.checked = !isChecked;
-            checkbox.disabled = false;
-            alert('Failed to save checkbox state');
-          });
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to update task');
+              }
+              return response.json();
+            })
+            .then(data => {
+              // Re-enable the checkbox
+              checkbox.disabled = false;
+
+              // Add visual feedback
+              const parent = checkbox.parentElement;
+              if (parent) {
+                parent.style.transition = 'opacity 0.3s';
+                parent.style.opacity = '0.5';
+                setTimeout(() => {
+                  parent.style.opacity = '1';
+                }, 300);
+              }
+            })
+            .catch(error => {
+              console.error('Error updating task:', error);
+              // Revert the checkbox state on error
+              checkbox.checked = !isChecked;
+              checkbox.disabled = false;
+              alert('Failed to update task');
+            });
+          } else {
+            // Regular checkbox - use the original /toggle-checkbox endpoint
+            checkbox.disabled = true;
+
+            fetch(\`/toggle-checkbox/${urlPath}\`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                lineNumber: lineNumber,
+                taskId: taskId,
+                checked: isChecked
+              })
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to toggle checkbox');
+              }
+              return response.json();
+            })
+            .then(data => {
+              // Re-enable the checkbox
+              checkbox.disabled = false;
+
+              // Add a brief visual feedback
+              // Only modify the immediate parent if it's not a details element
+              const parent = checkbox.parentElement;
+              if (parent && !parent.closest('details')) {
+                const originalColor = parent.style.color;
+                parent.style.color = '#4caf50';
+                setTimeout(() => {
+                  parent.style.color = originalColor;
+                }, 500);
+              }
+            })
+            .catch(error => {
+              console.error('Error toggling checkbox:', error);
+              // Revert the checkbox state on error
+              checkbox.checked = !isChecked;
+              checkbox.disabled = false;
+              alert('Failed to save checkbox state');
+            });
+          }
         }
         
         // Add interactivity to task checkboxes using event delegation
