@@ -2698,6 +2698,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
 
+  // IMPORTANT: Save the original content BEFORE any modifications
+  // This is needed for accurate line tracking when mapping checkboxes
+  const originalContent = content;
+
   // Process collapsible sections before tasks code blocks
   content = processCollapsibleSections(content);
 
@@ -2705,7 +2709,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   content = await processTasksCodeBlocks(content);
 
   const lines = content.split('\n');
-  
+
   // Extract title from first H1 if it exists
   let pageTitle = path.basename(urlPath, '.md');
   let contentToRender = content;
@@ -2715,15 +2719,15 @@ async function renderMarkdownUncached(filePath, urlPath) {
     // Remove the title from content so it's not duplicated
     contentToRender = content.replace(/^# .+\n?/m, '');
   }
-  
+
   // Generate table of contents
   const { toc, contentWithIds } = generateTableOfContents(contentToRender);
   contentToRender = contentWithIds;
-  
-  // Find all checkbox lines in the original content that will be rendered by marked.js
+
+  // Find all checkbox lines in the ORIGINAL content (before modifications)
   // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
   const checkboxLines = [];
-  const originalLines = content.split('\n');
+  const originalLines = originalContent.split('\n');
   let inTasksBlock = false;
 
   originalLines.forEach((line, index) => {
