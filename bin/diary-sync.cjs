@@ -7,6 +7,7 @@ const sqlite3 = require('sqlite3').verbose();
 // Database path
 const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
 const JOURNAL_PATH = path.join(__dirname, '..', 'vault', 'logs', 'Journal.json');
+const JOURNAL_BACKUP_PATH = path.join(__dirname, '..', 'vault', 'logs', 'Journal.json.backup');
 
 // Colors for output
 const colors = {
@@ -103,13 +104,179 @@ async function needsSync(db) {
   });
 }
 
+// Validate and repair JSON if needed
+function validateAndRepairJSON(jsonString) {
+  try {
+    // First attempt: parse as-is
+    return JSON.parse(jsonString);
+  } catch (error) {
+    printInfo('JSON parse error detected, attempting to repair...');
+
+    // Check for common truncation issues
+    let repairedJSON = jsonString;
+
+    // Count opening and closing braces/brackets
+    const openBraces = (jsonString.match(/{/g) || []).length;
+    const closeBraces = (jsonString.match(/}/g) || []).length;
+    const openBrackets = (jsonString.match(/\[/g) || []).length;
+    const closeBrackets = (jsonString.match(/]/g) || []).length;
+
+    // If JSON appears truncated (missing closing braces/brackets)
+    if (openBraces > closeBraces || openBrackets > closeBrackets) {
+      printInfo(`Detected truncated JSON: ${openBraces} { vs ${closeBraces} }, ${openBrackets} [ vs ${closeBrackets} ]`);
+
+      // Try to find the last complete entry
+      const entriesMatch = jsonString.match(/"entries"\s*:\s*\[/);
+      if (entriesMatch) {
+        // Find the last complete object before truncation
+        const lastCompleteEntry = jsonString.lastIndexOf('},\n    {');
+
+        if (lastCompleteEntry > -1) {
+          // Truncate at the last complete entry
+          repairedJSON = jsonString.substring(0, lastCompleteEntry + 1);
+        } else {
+          // No complete entries found, look for any valid JSON object
+          // Find the position of the entries array start
+          const entriesArrayStart = jsonString.indexOf('[', entriesMatch.index);
+
+          // Look for last properly closed object
+          let lastValidClose = -1;
+          let depth = 0;
+          let inString = false;
+          let escaped = false;
+
+          for (let i = entriesArrayStart + 1; i < jsonString.length; i++) {
+            const char = jsonString[i];
+
+            if (escaped) {
+              escaped = false;
+              continue;
+            }
+
+            if (char === '\\') {
+              escaped = true;
+              continue;
+            }
+
+            if (char === '"' && !inString) {
+              inString = true;
+            } else if (char === '"' && inString) {
+              inString = false;
+            } else if (!inString) {
+              if (char === '{') depth++;
+              else if (char === '}') {
+                depth--;
+                if (depth === 0) {
+                  // Found a complete object at top level
+                  lastValidClose = i;
+                }
+              }
+            }
+          }
+
+          if (lastValidClose > -1) {
+            repairedJSON = jsonString.substring(0, lastValidClose + 1);
+            // Remove any trailing comma if present
+            if (repairedJSON.endsWith(',')) {
+              repairedJSON = repairedJSON.slice(0, -1);
+            }
+          }
+        }
+      }
+
+      // Add closing braces/brackets as needed
+      const missingBraces = openBraces - closeBraces;
+      const missingBrackets = openBrackets - closeBrackets;
+
+      // Ensure proper structure closure
+      if (missingBrackets > 0 && !repairedJSON.trim().endsWith(']')) {
+        repairedJSON = repairedJSON.trim();
+        // Remove trailing incomplete data
+        if (repairedJSON.endsWith(',')) {
+          repairedJSON = repairedJSON.slice(0, -1);
+        }
+        repairedJSON += '\n  ]';
+      }
+
+      if (missingBraces > 0) {
+        repairedJSON += '\n}';
+      }
+
+      // Add any additional missing closures
+      for (let i = 1; i < missingBrackets; i++) {
+        repairedJSON += ']';
+      }
+      for (let i = 1; i < missingBraces; i++) {
+        repairedJSON += '}';
+      }
+    }
+
+    // Try parsing the repaired JSON
+    try {
+      const repaired = JSON.parse(repairedJSON);
+      printSuccess('JSON repaired successfully');
+      return repaired;
+    } catch (repairError) {
+      // If repair failed, try more aggressive fixes
+      printInfo('Standard repair failed, attempting deep repair...');
+
+      // Remove any incomplete entries at the end
+      const lastValidEntry = repairedJSON.lastIndexOf('},');
+      if (lastValidEntry > -1) {
+        const beforeLastEntry = repairedJSON.substring(0, lastValidEntry + 1);
+        const afterLastEntry = repairedJSON.substring(lastValidEntry + 1);
+
+        // Check if there's an incomplete entry after the last valid one
+        if (afterLastEntry.includes('"uuid"') && !afterLastEntry.includes('}')) {
+          // Remove incomplete entry
+          repairedJSON = beforeLastEntry + '\n  ]\n}';
+
+          try {
+            const deepRepaired = JSON.parse(repairedJSON);
+            printSuccess('JSON deep repair successful');
+            return deepRepaired;
+          } catch (e) {
+            // Fall through to error
+          }
+        }
+      }
+
+      throw new Error(`Unable to repair JSON: ${error.message}`);
+    }
+  }
+}
+
 // Sync journal entries to database
 async function syncJournal(db, journalModified) {
   printInfo('Reading Day One journal export...');
-  
-  const journalData = JSON.parse(fs.readFileSync(JOURNAL_PATH, 'utf8'));
+
+  // Read the raw JSON file
+  const rawJSON = fs.readFileSync(JOURNAL_PATH, 'utf8');
+
+  // Create backup before any modifications
+  if (fs.existsSync(JOURNAL_PATH)) {
+    fs.copyFileSync(JOURNAL_PATH, JOURNAL_BACKUP_PATH);
+    printInfo('Created backup at Journal.json.backup');
+  }
+
+  // Validate and repair JSON if needed
+  let journalData;
+  try {
+    journalData = validateAndRepairJSON(rawJSON);
+
+    // If repair was needed, save the repaired version
+    if (JSON.stringify(journalData) !== rawJSON) {
+      fs.writeFileSync(JOURNAL_PATH, JSON.stringify(journalData, null, 2));
+      printInfo('Saved repaired JSON to Journal.json');
+    }
+  } catch (error) {
+    printError(`Failed to parse or repair journal JSON: ${error.message}`);
+    printInfo('Backup preserved at Journal.json.backup');
+    throw error;
+  }
+
   const entries = journalData.entries || [];
-  
+
   printInfo(`Found ${entries.length} total entries in journal`);
   
   // Prepare insert/update statement
@@ -266,6 +433,13 @@ async function main() {
     
   } catch (error) {
     printError(`Sync failed: ${error.message}`);
+
+    // Offer to restore from backup if available
+    if (fs.existsSync(JOURNAL_BACKUP_PATH)) {
+      printInfo('A backup of the journal exists at Journal.json.backup');
+      printInfo('You can restore it manually if needed');
+    }
+
     process.exit(1);
   } finally {
     db.close(() => {});
