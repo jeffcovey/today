@@ -389,13 +389,19 @@ const pageStyle = `
   
   /* When AI assistant is collapsed, expand main content */
   @media (min-width: 992px) {
-    .ai-collapsed #chat-column {
-      display: none;
+    .ai-assistant-wrapper.collapsed ~ .col-lg-7,
+    .col-lg-7:has(~ .ai-assistant-wrapper.collapsed) {
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
+      transition: all 0.3s ease;
     }
 
-    .ai-collapsed #content-column {
-      flex: 0 0 100%;
-      max-width: 100%;
+    /* Hide the collapsed column */
+    .ai-assistant-wrapper.collapsed {
+      flex: 0 0 0 !important;
+      max-width: 0 !important;
+      overflow: hidden;
+      padding: 0 !important;
     }
   }
   
@@ -407,11 +413,21 @@ const pageStyle = `
       max-height: calc(100vh - 2rem);
     }
     
-    /* Floating toggle button when collapsed */
-    .floating-toggle-btn {
-      display: none;
+    /* When collapsed, show floating toggle button */
+    .ai-assistant-wrapper.collapsed .card {
       position: fixed;
-      right: 20px;
+      right: -450px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 450px;
+      z-index: 1050;
+      transition: right 0.3s ease;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.15);
+    }
+
+    .ai-assistant-wrapper.collapsed .toggle-btn {
+      position: fixed;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
       width: 40px;
@@ -421,18 +437,16 @@ const pageStyle = `
       color: white;
       border: none;
       cursor: pointer;
+      display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
       z-index: 1051;
     }
 
-    .ai-collapsed .floating-toggle-btn {
-      display: flex;
-    }
-
-    .floating-toggle-btn:hover {
-      background: #0056b3;
+    /* Show card on hover */
+    .ai-assistant-wrapper.collapsed:hover .card {
+      right: 0;
     }
   }
   
@@ -1011,7 +1025,7 @@ async function renderDirectory(dirPath, urlPath) {
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3" id="content-column">
+          <div class="col-12 col-lg-7 mb-3">
   `;
   
   // Special homepage content
@@ -2637,7 +2651,7 @@ async function processTasksCodeBlocks(content) {
 // Process collapsible sections (bullet lists with nested code blocks)
 function processCollapsibleSections(content) {
   // First handle simple nested lists (- text with indented items)
-  const nestedListRegex = /^- (🌅 Morning Routine|🌄 Evening Routine|🏃 Hip Mobility.*?)\n((?:  (?:- |\w).*\n?)+)/gm;
+  const nestedListRegex = /^- (.*?)(?:\n((?:  (?:- |\w).*\n?)+))/gm;
 
   let processedContent = content;
   let match;
@@ -2651,18 +2665,27 @@ function processCollapsibleSections(content) {
     // Skip if this is a ```tasks block or already a details element
     if (title.includes('```') || title.includes('<details>')) continue;
 
-    // Create collapsible section for these special lists
-    const replacement = `<details class="task-section" open>
+    // Make collapsible sections for specific list items
+    const shouldCollapse = title.includes('Morning Routine') ||
+                          title.includes('Evening Routine') ||
+                          title.includes('Hip Mobility') ||
+                          title.includes('Clear All Inboxes') ||
+                          title.includes('Check OGM systems') ||
+                          title.includes('Core Morning Practices');
+
+    if (shouldCollapse) {
+      const replacement = `<details class="task-section">
 <summary>${title}</summary>
 <div class="section-content">
 ${nestedContent}
 </div>
 </details>`;
 
-    nestedReplacements.push({
-      original: match[0],
-      replacement: replacement
-    });
+      nestedReplacements.push({
+        original: match[0],
+        replacement: replacement
+      });
+    }
   }
 
   // Apply nested list replacements
@@ -2670,28 +2693,47 @@ ${nestedContent}
     processedContent = processedContent.replace(original, replacement);
   }
 
-  // Also handle the "Completed Today" section and other sub-sections with nested lists
-  const completedRegex = /^- (✅ Completed Tasks)\n\n(  ```tasks[\s\S]*?  ```)/gm;
+  // Then handle bold text sections
+  const sectionRegex = /^- (.+?)\*\*(.+?)\*\*\s*\n((?:  .+\n?)+)/gm;
+  const replacements = [];
 
-  while ((match = completedRegex.exec(content)) !== null) {
-    const title = match[1].trim();
-    const tasksBlock = match[2];
+  while ((match = sectionRegex.exec(content)) !== null) {
+    const emoji = match[1].trim();
+    const title = match[2].trim();
+    const indentedContent = match[3];
 
-    const replacement = `<details class="task-section">
-<summary>${title}</summary>
+    // Remove the leading spaces (2 spaces) from each line of indented content
+    const cleanContent = indentedContent
+      .split('\n')
+      .map(line => line.replace(/^  /, ''))
+      .join('\n');
+
+    // Check if this is one of our special sections
+    const isMainSection = title === 'Due or Scheduled';
+    const isUpcoming = title === 'Upcoming';
+    const isCompleted = title === 'Completed Today';
+
+    if (isMainSection || isUpcoming || isCompleted) {
+      // Create collapsible section with details/summary
+      // Main section (Due or Scheduled) should be open by default
+      const openAttr = isMainSection ? ' open' : '';
+
+      const replacement = `<details${openAttr} class="task-section">
+<summary>${emoji} <strong>${title}</strong></summary>
 <div class="section-content">
-${tasksBlock.replace(/^  /gm, '')}
+${cleanContent}
 </div>
 </details>`;
 
-    nestedReplacements.push({
-      original: match[0],
-      replacement: replacement
-    });
+      replacements.push({
+        original: match[0],
+        replacement: replacement
+      });
+    }
   }
 
   // Apply all replacements
-  for (const { original, replacement } of nestedReplacements) {
+  for (const { original, replacement } of replacements) {
     processedContent = processedContent.replace(original, replacement);
   }
 
@@ -3003,7 +3045,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3" id="content-column">
+          <div class="col-12 col-lg-7 mb-3">
             <div class="card shadow-sm h-100">
               <div class="card-header bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
@@ -3021,7 +3063,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
           </div>
           
           <!-- Chat column -->
-          <div class="col-12 col-lg-5 mb-3" id="chat-column">
+          <div class="col-12 col-lg-5 mb-3">
             <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
             <div class="card shadow-sm">
               <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
