@@ -3582,13 +3582,51 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
                 // If task was marked complete, update the display
                 if (isChecked && result.updatedLine) {
-                  // Find the text after the checkbox and update it to include the completion date
-                  const textNode = checkbox.nextSibling;
-                  if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                  // Find the parent li element and update its text content
+                  const listItem = checkbox.closest('li');
+                  if (listItem) {
                     const today = new Date().toISOString().split('T')[0];
-                    // Add completion date if not already present
-                    if (!textNode.textContent.includes('✅')) {
-                      textNode.textContent = textNode.textContent.trim() + ' ✅ ' + today;
+                    // Get all the text content after the checkbox
+                    const allText = Array.from(listItem.childNodes)
+                      .filter(node => node !== checkbox && node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
+                      .map(node => node.textContent)
+                      .join('')
+                      .trim();
+
+                    // If there's no completion date, add it
+                    if (!allText.includes('✅')) {
+                      // Clear the list item except for the checkbox
+                      while (listItem.lastChild && listItem.lastChild !== checkbox) {
+                        listItem.removeChild(listItem.lastChild);
+                      }
+                      // Add a space after the checkbox
+                      listItem.appendChild(document.createTextNode(' '));
+                      // Add the text with completion date
+                      listItem.appendChild(document.createTextNode(allText + ' ✅ ' + today));
+                    }
+                  }
+                } else if (!isChecked) {
+                  // If unchecking, remove the completion date
+                  const listItem = checkbox.closest('li');
+                  if (listItem) {
+                    // Get all the text content after the checkbox
+                    const allText = Array.from(listItem.childNodes)
+                      .filter(node => node !== checkbox && node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
+                      .map(node => node.textContent)
+                      .join('')
+                      .trim();
+
+                    // Remove completion date if present
+                    const cleanedText = allText.replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '');
+                    if (cleanedText !== allText) {
+                      // Clear the list item except for the checkbox
+                      while (listItem.lastChild && listItem.lastChild !== checkbox) {
+                        listItem.removeChild(listItem.lastChild);
+                      }
+                      // Add a space after the checkbox
+                      listItem.appendChild(document.createTextNode(' '));
+                      // Add the cleaned text
+                      listItem.appendChild(document.createTextNode(cleanedText));
                     }
                   }
                 }
