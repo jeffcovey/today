@@ -389,10 +389,19 @@ const pageStyle = `
   
   /* When AI assistant is collapsed, expand main content */
   @media (min-width: 992px) {
-    .row:has(.ai-assistant-wrapper.collapsed) .col-lg-7 {
-      flex: 0 0 100%;
-      max-width: 100%;
+    .ai-assistant-wrapper.collapsed ~ .col-lg-7,
+    .col-lg-7:has(~ .ai-assistant-wrapper.collapsed) {
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
       transition: all 0.3s ease;
+    }
+
+    /* Hide the collapsed column */
+    .ai-assistant-wrapper.collapsed {
+      flex: 0 0 0 !important;
+      max-width: 0 !important;
+      overflow: hidden;
+      padding: 0 !important;
     }
   }
   
@@ -404,28 +413,26 @@ const pageStyle = `
       max-height: calc(100vh - 2rem);
     }
     
-    /* Collapsed state - slides to the right */
-    .ai-assistant-wrapper.collapsed {
+    /* When collapsed, show floating toggle button */
+    .ai-assistant-wrapper.collapsed .card {
       position: fixed;
-      right: -400px;
+      right: -450px;
       top: 50%;
       transform: translateY(-50%);
       width: 450px;
       z-index: 1050;
-    }
-    
-    .ai-assistant-wrapper.collapsed .card {
+      transition: right 0.3s ease;
       box-shadow: -2px 0 10px rgba(0,0,0,0.15);
     }
-    
+
     .ai-assistant-wrapper.collapsed .toggle-btn {
-      position: absolute;
-      left: -40px;
+      position: fixed;
+      right: 10px;
       top: 50%;
-      transform: translateY(-50%) rotate(180deg);
+      transform: translateY(-50%);
       width: 40px;
       height: 80px;
-      border-radius: 8px 0 0 8px;
+      border-radius: 8px;
       background: #007bff;
       color: white;
       border: none;
@@ -434,6 +441,12 @@ const pageStyle = `
       align-items: center;
       justify-content: center;
       box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+      z-index: 1051;
+    }
+
+    /* Show card on hover */
+    .ai-assistant-wrapper.collapsed:hover .card {
+      right: 0;
     }
   }
   
@@ -1337,12 +1350,10 @@ async function renderDirectory(dirPath, urlPath) {
             isCollapsed = isMobile;
           }
           
-          const wrapper = document.getElementById('aiAssistantWrapper');
-          if (wrapper) {
-            if (isCollapsed) {
-              wrapper.classList.add('collapsed');
-              updateToggleIcon();
-            }
+          if (isCollapsed) {
+            document.body.classList.add('ai-collapsed');
+            updateToggleIcon();
+          }
             
             // Add click handler for mobile header
             if (isMobile) {
@@ -1354,17 +1365,14 @@ async function renderDirectory(dirPath, urlPath) {
         }
         
         function toggleAIAssistant() {
-          const wrapper = document.getElementById('aiAssistantWrapper');
-          if (!wrapper) return;
-          
           isCollapsed = !isCollapsed;
-          
+
           if (isCollapsed) {
-            wrapper.classList.add('collapsed');
+            document.body.classList.add('ai-collapsed');
           } else {
-            wrapper.classList.remove('collapsed');
+            document.body.classList.remove('ai-collapsed');
           }
-          
+
           updateToggleIcon();
           localStorage.setItem('aiAssistantCollapsed', isCollapsed);
         }
@@ -2642,12 +2650,51 @@ async function processTasksCodeBlocks(content) {
 
 // Process collapsible sections (bullet lists with nested code blocks)
 function processCollapsibleSections(content) {
-  // Match bullet points with bold text followed by indented content
-  // Pattern: - emoji **text** followed by indented lines
-  const sectionRegex = /^- (.+?)\*\*(.+?)\*\*\s*\n((?:  .+\n?)+)/gm;
+  // First handle simple nested lists (- text with indented items)
+  const nestedListRegex = /^- (.*?)(?:\n((?:  (?:- |\w).*\n?)+))/gm;
 
   let processedContent = content;
   let match;
+  const nestedReplacements = [];
+
+  // Process nested lists first
+  while ((match = nestedListRegex.exec(content)) !== null) {
+    const title = match[1].trim();
+    const nestedContent = match[2];
+
+    // Skip if this is a ```tasks block or already a details element
+    if (title.includes('```') || title.includes('<details>')) continue;
+
+    // Make collapsible sections for specific list items
+    const shouldCollapse = title.includes('Morning Routine') ||
+                          title.includes('Evening Routine') ||
+                          title.includes('Hip Mobility') ||
+                          title.includes('Clear All Inboxes') ||
+                          title.includes('Check OGM systems') ||
+                          title.includes('Core Morning Practices');
+
+    if (shouldCollapse) {
+      const replacement = `<details class="task-section">
+<summary>${title}</summary>
+<div class="section-content">
+${nestedContent}
+</div>
+</details>`;
+
+      nestedReplacements.push({
+        original: match[0],
+        replacement: replacement
+      });
+    }
+  }
+
+  // Apply nested list replacements
+  for (const { original, replacement } of nestedReplacements.reverse()) {
+    processedContent = processedContent.replace(original, replacement);
+  }
+
+  // Then handle bold text sections
+  const sectionRegex = /^- (.+?)\*\*(.+?)\*\*\s*\n((?:  .+\n?)+)/gm;
   const replacements = [];
 
   while ((match = sectionRegex.exec(content)) !== null) {
@@ -3052,6 +3099,11 @@ async function renderMarkdownUncached(filePath, urlPath) {
         </div>
       </div>
 
+      <!-- Floating toggle button to restore AI assistant -->
+      <button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+
       <!-- Marked.js for markdown rendering -->
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
       
@@ -3083,12 +3135,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
             isCollapsed = isMobile;
           }
           
-          const wrapper = document.getElementById('aiAssistantWrapper');
-          if (wrapper) {
-            if (isCollapsed) {
-              wrapper.classList.add('collapsed');
-              updateToggleIcon();
-            }
+          if (isCollapsed) {
+            document.body.classList.add('ai-collapsed');
+            updateToggleIcon();
+          }
             
             // Add click handler for mobile header
             if (isMobile) {
@@ -3100,17 +3150,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
         }
         
         function toggleAIAssistant() {
-          const wrapper = document.getElementById('aiAssistantWrapper');
-          if (!wrapper) return;
-          
           isCollapsed = !isCollapsed;
-          
+
           if (isCollapsed) {
-            wrapper.classList.add('collapsed');
+            document.body.classList.add('ai-collapsed');
           } else {
-            wrapper.classList.remove('collapsed');
+            document.body.classList.remove('ai-collapsed');
           }
-          
+
           updateToggleIcon();
           localStorage.setItem('aiAssistantCollapsed', isCollapsed);
         }
