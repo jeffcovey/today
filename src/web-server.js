@@ -2815,12 +2815,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
       if (replacementIndex < checkboxLines.length) {
         const checkbox = checkboxLines[replacementIndex];
         replacementIndex++;
-        return `<input type="checkbox" class="form-check-input me-2" 
-          data-line="${checkbox.lineNumber}"
+        // Get the relative file path from the URL
+        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+        return `<input type="checkbox" class="form-check-input me-2 task-checkbox"
+          data-file="${relativeFilePath}"
+          data-line="${checkbox.lineNumber + 1}"
           ${checkbox.taskId ? `data-task-id="${checkbox.taskId}"` : ''}
-          ${checkbox.isChecked ? 'checked' : ''} 
-          onchange="toggleCheckbox(this, ${checkbox.lineNumber}, '${checkbox.taskId || ''}', event)" 
-          onclick="event.stopPropagation();" 
+          ${checkbox.isChecked ? 'checked' : ''}
           style="cursor: pointer;">`;
       }
       return match;
@@ -3508,101 +3509,11 @@ async function renderMarkdownUncached(filePath, urlPath) {
         
         // No longer needed - using inline onclick handlers
         
+        // This function is now deprecated - event delegation handles all checkboxes
+        // Kept only for backwards compatibility during transition
         function toggleCheckbox(checkbox, lineNumber, taskId, event) {
-          const isChecked = checkbox.checked;
-
-          // Prevent the details element from toggling when clicking checkbox
-          if (event) {
-            event.stopPropagation();
-          }
-
-          // Check if this is a query block checkbox (has data-file and data-line attributes)
-          if (checkbox.dataset.file && checkbox.dataset.line) {
-            // This is a task from a query block - use the /task/complete endpoint
-            checkbox.disabled = true;
-
-            fetch('/task/complete', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                filePath: checkbox.dataset.file,
-                lineNumber: parseInt(checkbox.dataset.line, 10),
-                completed: isChecked
-              })
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Failed to update task');
-              }
-              return response.json();
-            })
-            .then(data => {
-              // Re-enable the checkbox
-              checkbox.disabled = false;
-
-              // Add visual feedback
-              const parent = checkbox.parentElement;
-              if (parent) {
-                parent.style.transition = 'opacity 0.3s';
-                parent.style.opacity = '0.5';
-                setTimeout(() => {
-                  parent.style.opacity = '1';
-                }, 300);
-              }
-            })
-            .catch(error => {
-              console.error('Error updating task:', error);
-              // Revert the checkbox state on error
-              checkbox.checked = !isChecked;
-              checkbox.disabled = false;
-              alert('Failed to update task');
-            });
-          } else {
-            // Regular checkbox - use the original /toggle-checkbox endpoint
-            checkbox.disabled = true;
-
-            fetch(\`/toggle-checkbox/${urlPath}\`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                lineNumber: lineNumber,
-                taskId: taskId,
-                checked: isChecked
-              })
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Failed to toggle checkbox');
-              }
-              return response.json();
-            })
-            .then(data => {
-              // Re-enable the checkbox
-              checkbox.disabled = false;
-
-              // Add a brief visual feedback
-              // Only modify the immediate parent if it's not a details element
-              const parent = checkbox.parentElement;
-              if (parent && !parent.closest('details')) {
-                const originalColor = parent.style.color;
-                parent.style.color = '#4caf50';
-                setTimeout(() => {
-                  parent.style.color = originalColor;
-                }, 500);
-              }
-            })
-            .catch(error => {
-              console.error('Error toggling checkbox:', error);
-              // Revert the checkbox state on error
-              checkbox.checked = !isChecked;
-              checkbox.disabled = false;
-              alert('Failed to save checkbox state');
-            });
-          }
+          // Do nothing - let event delegation handle it
+          return;
         }
         
         // Add interactivity to task checkboxes using event delegation
@@ -3622,7 +3533,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
             checkbox.disabled = true;
 
               try {
-                const response = await fetch('/task/complete', {
+                const response = await fetch('/task/toggle', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -4500,11 +4411,11 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 });
 
 // Save route handler
-// Handle Obsidian-style task completion
-app.post('/task/complete', authMiddleware, async (req, res) => {
+// Handle task checkbox toggling
+app.post('/task/toggle', authMiddleware, async (req, res) => {
   try {
     const { filePath: file, lineNumber: line, completed } = req.body;
-    console.log(`[TASK] Updating task - file: ${file}, line: ${line}, completed: ${completed}`);
+    console.log(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
     const filePath = path.join(VAULT_PATH, file);
 
     // Read the file
