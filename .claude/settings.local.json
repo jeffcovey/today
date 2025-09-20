@@ -33,7 +33,8 @@
       "WebFetch(domain:publish.obsidian.md)",
       "WebFetch(domain:github.com)",
       "Bash(bin/email list:*)",
-      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/logs/**)"
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/logs/**)",
+      "WebFetch(domain:marked.js.org)"
     ],
     "deny": [],
     "ask": []

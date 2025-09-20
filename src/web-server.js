@@ -2702,6 +2702,27 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // This is needed for accurate line tracking when mapping checkboxes
   const originalContent = content;
 
+  // Insert HTML comments with task metadata BEFORE any processing
+  // This preserves the line numbers from the original file
+  const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+  const taskRegex = /^(\s*)- \[[ x]\] (.+)$/i;
+  const originalLines = originalContent.split('\n');
+
+  for (let i = 0; i < originalLines.length; i++) {
+    const line = originalLines[i];
+    const match = line.match(taskRegex);
+    if (match) {
+      const lineNumber = i + 1; // 1-based line numbers
+      const indent = match[1];
+      const isChecked = line.includes('[x]') || line.includes('[X]');
+      const taskText = match[2];
+
+      // Insert HTML comment with metadata right before the task
+      originalLines[i] = `${indent}<!-- TASK_META file="${relativeFilePath}" line="${lineNumber}" -->- [${isChecked ? 'x' : ' '}] ${taskText}`;
+    }
+  }
+  content = originalLines.join('\n');
+
   // Process collapsible sections before tasks code blocks
   content = processCollapsibleSections(content);
 
@@ -2750,7 +2771,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
   
   // Use custom renderer for external links
   const renderer = createExternalLinkRenderer();
-  
+
+  // Override the checkbox renderer to make checkboxes enabled (not disabled by default)
+  renderer.checkbox = function(checked) {
+    // Return enabled checkboxes without the disabled attribute
+    return `<input type="checkbox" class="task-checkbox"${checked ? ' checked' : ''}>`;
+  };
+
   // Render the markdown with custom renderer (with IDs added to headings)
   let htmlContent = marked.parse(contentToRender, { renderer });
   
@@ -2830,25 +2857,34 @@ async function renderMarkdownUncached(filePath, urlPath) {
     `;
   });
   
-  // Replace checkboxes with ones that have the correct line numbers
-  console.log(`[DEBUG] Processing ${checkboxLines.length} checkbox lines for ${urlPath}`);
-  let checkboxIndex = 0;
+  // Process HTML comments with task metadata and convert them into data attributes
+  // The comments were inserted before marked.js processing to preserve line numbers
+
+  // Look for patterns like: <!-- TASK_META ... --> followed by list items with checkboxes
+  htmlContent = htmlContent.replace(
+    /<!-- TASK_META file="([^"]+)" line="(\d+)" -->([\s\S]*?)(<input[^>]*type="checkbox"[^>]*>)/gi,
+    (match, file, line, between, checkbox) => {
+      // If this checkbox already has data attributes (from ```tasks block), keep them
+      if (checkbox.includes('data-file=') && checkbox.includes('data-line=')) {
+        // Just enable it and return without the comment
+        return between + checkbox.replace(/\s*disabled="?"?/gi, '');
+      }
+
+      // Add our data attributes from the HTML comment
+      const isChecked = checkbox.includes('checked');
+      return between + `<input type="checkbox" class="task-checkbox" data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>`;
+    }
+  );
+
+  // Clean up any remaining HTML comments
+  htmlContent = htmlContent.replace(/<!-- TASK_META[^>]*-->/g, '');
+
+  // Enable any remaining checkboxes (from ```tasks blocks that already have data attributes)
   htmlContent = htmlContent.replace(
     /<input[^>]*type="checkbox"[^>]*>/gi,
     (match) => {
-      const checkboxData = checkboxLines[checkboxIndex];
-      if (checkboxData) {
-        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-        const lineNumber = checkboxData.lineNumber + 1; // Convert 0-based to 1-based
-        const checked = checkboxData.isChecked ? ' checked' : '';
-        console.log(`[DEBUG] Adding data-file="${relativeFilePath}" data-line="${lineNumber}" to checkbox ${checkboxIndex}`);
-        checkboxIndex++;
-        return `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked} style="cursor: pointer;">`;
-      }
-      console.log(`[DEBUG] No checkbox data for index ${checkboxIndex}, enabling without data attributes`);
-      checkboxIndex++;
-      // If no data, just enable the checkbox
-      return match.replace(/\s*disabled="?"?/gi, '').replace('>', ' style="cursor: pointer;">');
+      // Just enable all checkboxes
+      return match.replace(/\s*disabled="?"?/gi, '');
     }
   );
   
