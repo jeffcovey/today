@@ -2827,22 +2827,44 @@ async function renderMarkdownUncached(filePath, urlPath) {
   });
   
   // Replace the checkboxes that marked generated with our interactive ones
-  let replacementIndex = 0;
+  // For each checkbox, we need to find its actual line number in the source file
+  const db = getDatabase();
+  const fullFilePath = path.join(VAULT_PATH, urlPath);
+
   htmlContent = htmlContent.replace(
     /<input\s+(?:checked=""\s+)?(?:disabled=""\s+)?type="checkbox"(?:\s+disabled="")?>/gi,
-    (match) => {
-      if (replacementIndex < checkboxLines.length) {
-        const checkbox = checkboxLines[replacementIndex];
-        replacementIndex++;
-        // Get the relative file path from the URL
-        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-        return `<input type="checkbox" class="task-checkbox"
-          data-file="${relativeFilePath}"
-          data-line="${checkbox.lineNumber + 1}"
-          ${checkbox.taskId ? `data-task-id="${checkbox.taskId}"` : ''}
-          ${checkbox.isChecked ? 'checked' : ''}
-          style="cursor: pointer;">`;
+    (match, offset) => {
+      // Find the text content after this checkbox to identify which task it is
+      const afterCheckbox = htmlContent.substring(offset + match.length, offset + match.length + 200);
+      const textMatch = afterCheckbox.match(/^\s*([^<\n]+)/);
+
+      if (textMatch) {
+        const taskText = textMatch[1].trim();
+
+        // Look up this task in the database to get its actual line number
+        const taskRow = db.prepare(`
+          SELECT line_number, line_text
+          FROM markdown_tasks
+          WHERE file_path = ?
+          AND line_text LIKE ?
+          ORDER BY line_number
+          LIMIT 1
+        `).get(fullFilePath, `%${taskText}%`);
+
+        if (taskRow) {
+          // Get the relative file path from the URL
+          const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+          const isChecked = /^\s*- \[[xX]\]/.test(taskRow.line_text);
+
+          return `<input type="checkbox" class="task-checkbox"
+            data-file="${relativeFilePath}"
+            data-line="${taskRow.line_number}"
+            ${isChecked ? 'checked' : ''}
+            style="cursor: pointer;">`;
+        }
       }
+
+      // If we can't find it, return the original (disabled)
       return match;
     }
   );
