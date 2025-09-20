@@ -389,14 +389,13 @@ const pageStyle = `
   
   /* When AI assistant is collapsed, expand main content */
   @media (min-width: 992px) {
-    body.ai-collapsed #content-column {
-      flex: 0 0 100% !important;
-      max-width: 100% !important;
-      transition: all 0.3s ease;
+    .ai-collapsed #chat-column {
+      display: none;
     }
 
-    body.ai-collapsed #chat-column {
-      display: none;
+    .ai-collapsed #content-column {
+      flex: 0 0 100%;
+      max-width: 100%;
     }
   }
   
@@ -428,7 +427,7 @@ const pageStyle = `
       z-index: 1051;
     }
 
-    body.ai-collapsed .floating-toggle-btn {
+    .ai-collapsed .floating-toggle-btn {
       display: flex;
     }
 
@@ -2638,7 +2637,7 @@ async function processTasksCodeBlocks(content) {
 // Process collapsible sections (bullet lists with nested code blocks)
 function processCollapsibleSections(content) {
   // First handle simple nested lists (- text with indented items)
-  const nestedListRegex = /^- (.*?)(?:\n((?:  (?:- |\w).*\n?)+))/gm;
+  const nestedListRegex = /^- (🌅 Morning Routine|🌄 Evening Routine|🏃 Hip Mobility.*?)\n((?:  (?:- |\w).*\n?)+)/gm;
 
   let processedContent = content;
   let match;
@@ -2652,27 +2651,18 @@ function processCollapsibleSections(content) {
     // Skip if this is a ```tasks block or already a details element
     if (title.includes('```') || title.includes('<details>')) continue;
 
-    // Make collapsible sections for specific list items
-    const shouldCollapse = title.includes('Morning Routine') ||
-                          title.includes('Evening Routine') ||
-                          title.includes('Hip Mobility') ||
-                          title.includes('Clear All Inboxes') ||
-                          title.includes('Check OGM systems') ||
-                          title.includes('Core Morning Practices');
-
-    if (shouldCollapse) {
-      const replacement = `<details class="task-section">
+    // Create collapsible section for these special lists
+    const replacement = `<details class="task-section" open>
 <summary>${title}</summary>
 <div class="section-content">
 ${nestedContent}
 </div>
 </details>`;
 
-      nestedReplacements.push({
-        original: match[0],
-        replacement: replacement
-      });
-    }
+    nestedReplacements.push({
+      original: match[0],
+      replacement: replacement
+    });
   }
 
   // Apply nested list replacements
@@ -2680,43 +2670,24 @@ ${nestedContent}
     processedContent = processedContent.replace(original, replacement);
   }
 
-  // Then handle bold text sections
-  const sectionRegex = /^- (.+?)\*\*(.+?)\*\*\s*\n((?:  .+\n?)+)/gm;
-  const replacements = [];
+  // Also handle the "Completed Today" section and other sub-sections with nested lists
+  const completedRegex = /^- (✅ Completed Tasks)\n\n(  ```tasks[\s\S]*?  ```)/gm;
 
-  while ((match = sectionRegex.exec(content)) !== null) {
-    const emoji = match[1].trim();
-    const title = match[2].trim();
-    const indentedContent = match[3];
+  while ((match = completedRegex.exec(content)) !== null) {
+    const title = match[1].trim();
+    const tasksBlock = match[2];
 
-    // Remove the leading spaces (2 spaces) from each line of indented content
-    const cleanContent = indentedContent
-      .split('\n')
-      .map(line => line.replace(/^  /, ''))
-      .join('\n');
-
-    // Check if this is one of our special sections
-    const isMainSection = title === 'Due or Scheduled';
-    const isUpcoming = title === 'Upcoming';
-    const isCompleted = title === 'Completed Today';
-
-    if (isMainSection || isUpcoming || isCompleted) {
-      // Create collapsible section with details/summary
-      // Main section (Due or Scheduled) should be open by default
-      const openAttr = isMainSection ? ' open' : '';
-
-      const replacement = `<details${openAttr} class="task-section">
-<summary>${emoji} <strong>${title}</strong></summary>
+    const replacement = `<details class="task-section">
+<summary>${title}</summary>
 <div class="section-content">
-${cleanContent}
+${tasksBlock.replace(/^  /gm, '')}
 </div>
 </details>`;
 
-      replacements.push({
-        original: match[0],
-        replacement: replacement
-      });
-    }
+    nestedReplacements.push({
+      original: match[0],
+      replacement: replacement
+    });
   }
 
   // Apply all replacements

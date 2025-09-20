@@ -34,7 +34,8 @@
       "WebFetch(domain:github.com)",
       "Bash(bin/email list:*)",
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/logs/**)",
-      "WebFetch(domain:marked.js.org)"
+      "WebFetch(domain:marked.js.org)",
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/Bear/**)"
     ],
     "deny": [],
     "ask": []
