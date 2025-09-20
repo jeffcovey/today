@@ -2772,9 +2772,11 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const renderer = createExternalLinkRenderer();
 
   // Override the checkbox renderer to make checkboxes enabled (not disabled by default)
-  renderer.checkbox = function(checked) {
+  renderer.checkbox = function(checkedObj) {
+    // The parameter is an object with a 'checked' property, not a boolean
+    const isChecked = checkedObj && checkedObj.checked;
     // Return enabled checkboxes without the disabled attribute
-    return `<input type="checkbox" class="task-checkbox"${checked ? ' checked' : ''}>`;
+    return `<input type="checkbox" class="task-checkbox"${isChecked ? ' checked' : ''}>`;
   };
 
   // Render the markdown with custom renderer (with IDs added to headings)
