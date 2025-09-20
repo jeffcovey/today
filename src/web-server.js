@@ -4427,6 +4427,11 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     console.log(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
     const filePath = path.join(VAULT_PATH, file);
 
+    // First check our database cache to verify this is the expected task
+    const db = getDatabase();
+    const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
+      .get(filePath, line);
+
     // Read the file
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
@@ -4443,6 +4448,28 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     if (!taskLine.match(/^\s*- \[[ xX]\]/)) {
       console.error(`[TASK] Line ${line} is not a task: "${taskLine}"`);
       return res.status(400).json({ error: 'Not a task line' });
+    }
+
+    // If we have a cached task, verify it matches (ignoring completion status and date)
+    if (cachedTask) {
+      // Strip completion markers for comparison
+      const normalizeTask = (text) => text
+        .replace(/^\s*- \[[xX]\]/, '- [ ]')  // Normalize checkbox to unchecked
+        .replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '');  // Remove completion date
+
+      const normalizedCache = normalizeTask(cachedTask.line_text);
+      const normalizedFile = normalizeTask(taskLine);
+
+      if (normalizedCache !== normalizedFile) {
+        console.error(`[TASK] Line ${line} content mismatch!`);
+        console.error(`  Expected (from cache): "${cachedTask.line_text}"`);
+        console.error(`  Found (in file):       "${taskLine}"`);
+        return res.status(400).json({
+          error: 'Task line content mismatch',
+          expected: cachedTask.line_text,
+          found: taskLine
+        });
+      }
     }
 
     // Update the task
