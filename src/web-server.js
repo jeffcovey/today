@@ -2691,7 +2691,7 @@ ${tasksBlock.replace(/^  /gm, '')}
   }
 
   // Apply all replacements
-  for (const { original, replacement } of replacements) {
+  for (const { original, replacement } of nestedReplacements) {
     processedContent = processedContent.replace(original, replacement);
   }
 
