@@ -2589,7 +2589,12 @@ async function processTasksCodeBlocks(content) {
         for (const task of tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          const displayText = replaceTagsWithEmoji(task.text);
+          let displayText = replaceTagsWithEmoji(task.text);
+          // Add completion date if task is done
+          if (task.isDone && task.doneDate) {
+            const dateStr = task.doneDate.toISOString().split('T')[0];
+            displayText += ` ✅ ${dateStr}`;
+          }
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
@@ -2607,7 +2612,12 @@ async function processTasksCodeBlocks(content) {
         for (const task of result.tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          const displayText = replaceTagsWithEmoji(task.text);
+          let displayText = replaceTagsWithEmoji(task.text);
+          // Add completion date if task is done
+          if (task.isDone && task.doneDate) {
+            const dateStr = task.doneDate.toISOString().split('T')[0];
+            displayText += ` ✅ ${dateStr}`;
+          }
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
