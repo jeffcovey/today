@@ -2748,7 +2748,6 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // Find all checkbox lines in the ORIGINAL content (before modifications)
   // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
   const checkboxLines = [];
-  const originalLines = originalContent.split('\n');
   let inTasksBlock = false;
 
   originalLines.forEach((line, index) => {

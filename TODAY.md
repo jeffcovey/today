@@ -153,6 +153,18 @@ Retired, devoted to https://oldergay.men/ - a website for older gay men and thei
 
 `vault/tasks/streaks-today.md` - daily habits for long-term health goals.
 
+### Apple Health Data
+
+Health metrics are automatically extracted from `vault/logs/HealthAutoExport.zip` if present:
+- Daily step counts and weekly averages
+- Weight tracking trends
+- Workout history (type, duration, calories)
+- Alcohol consumption patterns
+- Sleep analysis and breathing disturbances
+- Heart rate variability and resting heart rate
+
+The `bin/today` script now extracts key health metrics and includes them in the daily review context.
+
 ### Hosting
 
 Two guest rooms via Airbnb/MisterB&B:
@@ -302,6 +314,7 @@ Based on database queries AND hierarchical plan alignment:
 6. **Evening Planning** - Review and prepare
 7. **Self-Care** - Check journal entries for wellbeing patterns
 8. **Time Tracking** - Analyze tracked vs planned, alignment with priorities
+9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
 
 ## Your First Steps
 

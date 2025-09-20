@@ -320,6 +320,94 @@ fi
 
     # Count high priority tasks (🔺 or ⏫)
     HIGH_PRIORITY_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(🔺|⏫)" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    # 5. Health Metrics from Apple Health Export (if available)
+    HEALTH_EXPORT="vault/logs/HealthAutoExport.zip"
+    HEALTH_METRICS=""
+    if [ -f "$HEALTH_EXPORT" ]; then
+        # Extract and analyze health data
+        HEALTH_DATA=$(cd vault/logs && unzip -qo HealthAutoExport.zip "HealthAutoExport*.json" 2>/dev/null && python3 -c "
+import json
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+try:
+    with open([f for f in __import__('glob').glob('HealthAutoExport*.json')][0], 'r') as f:
+        data = json.load(f)
+
+        # Get yesterday's date for comparison
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        last_week_avg_steps = 0
+        yesterday_steps = 0
+        recent_weight = 'N/A'
+        recent_drinks = []
+        recent_workouts = []
+
+        for metric in data['data']['metrics']:
+            if metric.get('name') == 'step_count':
+                daily_steps = defaultdict(float)
+                for entry in metric.get('data', []):
+                    date_str = entry['date'].split()[0]
+                    steps = entry.get('qty', 0)
+                    daily_steps[date_str] += steps
+
+                # Get last 7 days average
+                recent_dates = sorted(daily_steps.keys())[-7:]
+                if recent_dates:
+                    last_week_avg_steps = sum(daily_steps[d] for d in recent_dates) / len(recent_dates)
+                    if yesterday in daily_steps:
+                        yesterday_steps = daily_steps[yesterday]
+
+            elif metric.get('name') == 'weight_body_mass':
+                weights = [(e['date'].split()[0], e.get('qty', 0)) for e in metric.get('data', [])]
+                if weights:
+                    weights.sort()
+                    recent_weight = f\"{weights[-1][1]:.1f} lbs\"
+
+            elif metric.get('name') == 'alcohol_consumption':
+                for entry in metric.get('data', [])[-7:]:  # Last week
+                    date_str = entry['date'].split()[0]
+                    drinks = entry.get('qty', 0)
+                    if drinks > 0:
+                        recent_drinks.append((date_str, drinks))
+
+        # Get recent workouts
+        if 'workouts' in data['data']:
+            for workout in data['data']['workouts'][-5:]:  # Last 5 workouts
+                name = workout.get('name', 'Unknown')
+                start = workout.get('start', '')[:10] if workout.get('start') else 'N/A'
+                recent_workouts.append((start, name))
+
+        # Format output
+        print(f'avg_steps:{int(last_week_avg_steps)}')
+        print(f'yesterday_steps:{int(yesterday_steps)}')
+        print(f'recent_weight:{recent_weight}')
+        print(f'recent_drinks:{len(recent_drinks)}')
+        if recent_workouts:
+            last_workout = recent_workouts[-1]
+            print(f'last_workout:{last_workout[1]} on {last_workout[0]}')
+
+except Exception as e:
+    pass
+finally:
+    # Clean up
+    __import__('os').system('rm -f HealthAutoExport*.json 2>/dev/null')
+" 2>/dev/null || echo "")
+
+        if [ -n "$HEALTH_DATA" ]; then
+            HEALTH_METRICS="
+## Health Metrics (Last 7 days)
+$(echo "$HEALTH_DATA" | while IFS=: read key value; do
+    case $key in
+        avg_steps) echo "- **Average Steps**: $value/day";;
+        yesterday_steps) [ "$value" != "0" ] && echo "- **Yesterday**: $value steps";;
+        recent_weight) [ "$value" != "N/A" ] && echo "- **Weight**: $value";;
+        recent_drinks) [ "$value" != "0" ] && echo "- **Alcohol days**: $value in last week";;
+        last_workout) [ -n "$value" ] && echo "- **Last workout**: $value";;
+    esac
+done)"
+        fi
+    fi
     
     if [ -n "$DIRECT_REQUEST" ]; then
         # Direct request mode - skip the full review
@@ -366,6 +454,7 @@ fi
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
 - **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+$HEALTH_METRICS
 
 ## Context Available
 - SQLite database at .data/today.db with all current data
@@ -408,6 +497,7 @@ EOF
 - **Timezone**: $TIMEZONE
 - **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
 - **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+$HEALTH_METRICS
 
 ## Existing Plans
 $(echo -e "$EXISTING_PLANS")
