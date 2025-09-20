@@ -2763,7 +2763,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
         result = result.replace(
           /<input[^>]*type="checkbox"[^>]*>/,
-          `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked ? ' checked' : ''} style="cursor: pointer;">`
+          `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked ? ' checked' : ''}>`
         );
       }
       checkboxIndex++;
@@ -2851,8 +2851,15 @@ async function renderMarkdownUncached(filePath, urlPath) {
     `;
   });
   
-  // The checkboxes now already have data-file and data-line attributes from the custom renderer
-  // No need for database lookups or replacements here
+  // Enable the checkboxes that marked.js created (they're disabled by default)
+  // and ensure they have the correct data attributes
+  htmlContent = htmlContent.replace(
+    /<input[^>]*type="checkbox"[^>]*>/gi,
+    (match) => {
+      // Remove disabled attribute and ensure style is set
+      return match.replace(/\s*disabled="?"?/gi, '').replace('>', ' style="cursor: pointer;">');
+    }
+  );
   
   // Make tasks with IDs clickable - wrap the task text in a link
   htmlContent = htmlContent.replace(
