@@ -129,54 +129,62 @@ async function syncJournal(db, journalModified) {
   
   return new Promise((resolve, reject) => {
     db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
-      
-      entries.forEach(entry => {
-        try {
-          // Skip entries without text
-          if (!entry.text) {
-            console.log(`Skipping entry ${entry.uuid}: no text content`);
-            return;
-          }
-          
-          const location = entry.location || {};
-          const weather = entry.weather || {};
-          const tags = entry.tags ? JSON.stringify(entry.tags) : null;
-          
-          stmt.run(
-            entry.uuid,
-            entry.creationDate,
-            entry.modifiedDate || entry.creationDate,
-            entry.text,
-            entry.starred ? 1 : 0,
-            location.localityName || null,
-            location.latitude || null,
-            location.longitude || null,
-            weather.temperatureCelsius || null,
-            weather.conditionsDescription || null,
-            tags,
-            journalModified
-          );
-          processed++;
-        } catch (e) {
-          console.error(`Error processing entry ${entry.uuid}:`, e.message);
-          errors++;
-        }
-      });
-      
-      stmt.finalize((err) => {
+      db.run('BEGIN TRANSACTION', (err) => {
         if (err) {
-          db.run('ROLLBACK');
           reject(err);
-        } else {
-          db.run('COMMIT', (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve({ processed, errors, total: entries.length });
-            }
-          });
+          return;
         }
+
+        entries.forEach(entry => {
+          try {
+            // Skip entries without text
+            if (!entry.text) {
+              console.log(`Skipping entry ${entry.uuid}: no text content`);
+              return;
+            }
+
+            const location = entry.location || {};
+            const weather = entry.weather || {};
+            const tags = entry.tags ? JSON.stringify(entry.tags) : null;
+
+            stmt.run(
+              entry.uuid,
+              entry.creationDate,
+              entry.modifiedDate || entry.creationDate,
+              entry.text,
+              entry.starred ? 1 : 0,
+              location.localityName || null,
+              location.latitude || null,
+              location.longitude || null,
+              weather.temperatureCelsius || null,
+              weather.conditionsDescription || null,
+              tags,
+              journalModified
+            );
+            processed++;
+          } catch (e) {
+            console.error(`Error processing entry ${entry.uuid}:`, e.message);
+            errors++;
+          }
+        });
+
+        stmt.finalize((err) => {
+          if (err) {
+            db.run('ROLLBACK', () => {
+              reject(err);
+            });
+          } else {
+            db.run('COMMIT', (err) => {
+              if (err) {
+                db.run('ROLLBACK', () => {
+                  reject(err);
+                });
+              } else {
+                resolve({ processed, errors, total: entries.length });
+              }
+            });
+          }
+        });
       });
     });
   });
