@@ -2382,9 +2382,9 @@ async function executeTasksQuery(query) {
     const lineNumber = row.line_number;
     const content = row.line_text;
 
-    // Parse task checkbox state
-    const isDone = /^- \[[xX]\]/.test(content);
-    const taskText = content.replace(/^- \[[ xX]\] /, '');
+    // Parse task checkbox state (accounting for indentation)
+    const isDone = /^\s*- \[[xX]\]/.test(content);
+    const taskText = content.replace(/^\s*- \[[ xX]\] /, '');
 
     // Parse dates
     let scheduledDate = null;
@@ -2528,7 +2528,7 @@ async function executeTasksQuery(query) {
       return a[0].localeCompare(b[0]);
     });
 
-    return { grouped: sortedGroups };
+    return { grouped: sortedGroups, groupType: 'custom' };
   }
 
   return { tasks: filtered };
@@ -2561,24 +2561,27 @@ async function processTasksCodeBlocks(content) {
 
     if (result.grouped) {
       // Render grouped results
-      for (const [date, tasks] of result.grouped) {
+      for (const [groupKey, tasks] of result.grouped) {
         if (tasks.length === 0) continue;
 
-        // Format date header
-        let dateHeader = date;
-        if (date !== 'No date') {
-          const d = new Date(date + 'T00:00:00');
+        // Format header based on group type
+        let dateHeader = groupKey;
+        if (result.groupType !== 'custom' && groupKey !== 'No date') {
+          // Only parse as date if we're grouping by date
+          const d = new Date(groupKey + 'T00:00:00');
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const tomorrow = new Date(today);
           tomorrow.setDate(tomorrow.getDate() + 1);
 
-          if (d.toDateString() === today.toDateString()) {
-            dateHeader = 'Today';
-          } else if (d.toDateString() === tomorrow.toDateString()) {
-            dateHeader = 'Tomorrow';
-          } else {
-            dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          if (!isNaN(d.getTime())) {
+            if (d.toDateString() === today.toDateString()) {
+              dateHeader = 'Today';
+            } else if (d.toDateString() === tomorrow.toDateString()) {
+              dateHeader = 'Tomorrow';
+            } else {
+              dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            }
           }
         }
 
