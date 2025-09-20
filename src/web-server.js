@@ -389,19 +389,14 @@ const pageStyle = `
   
   /* When AI assistant is collapsed, expand main content */
   @media (min-width: 992px) {
-    .ai-assistant-wrapper.collapsed ~ .col-lg-7,
-    .col-lg-7:has(~ .ai-assistant-wrapper.collapsed) {
+    body.ai-collapsed #content-column {
       flex: 0 0 100% !important;
       max-width: 100% !important;
       transition: all 0.3s ease;
     }
 
-    /* Hide the collapsed column */
-    .ai-assistant-wrapper.collapsed {
-      flex: 0 0 0 !important;
-      max-width: 0 !important;
-      overflow: hidden;
-      padding: 0 !important;
+    body.ai-collapsed #chat-column {
+      display: none;
     }
   }
   
@@ -413,21 +408,11 @@ const pageStyle = `
       max-height: calc(100vh - 2rem);
     }
     
-    /* When collapsed, show floating toggle button */
-    .ai-assistant-wrapper.collapsed .card {
+    /* Floating toggle button when collapsed */
+    .floating-toggle-btn {
+      display: none;
       position: fixed;
-      right: -450px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 450px;
-      z-index: 1050;
-      transition: right 0.3s ease;
-      box-shadow: -2px 0 10px rgba(0,0,0,0.15);
-    }
-
-    .ai-assistant-wrapper.collapsed .toggle-btn {
-      position: fixed;
-      right: 10px;
+      right: 20px;
       top: 50%;
       transform: translateY(-50%);
       width: 40px;
@@ -437,16 +422,18 @@ const pageStyle = `
       color: white;
       border: none;
       cursor: pointer;
-      display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       z-index: 1051;
     }
 
-    /* Show card on hover */
-    .ai-assistant-wrapper.collapsed:hover .card {
-      right: 0;
+    body.ai-collapsed .floating-toggle-btn {
+      display: flex;
+    }
+
+    .floating-toggle-btn:hover {
+      background: #0056b3;
     }
   }
   
@@ -1025,7 +1012,7 @@ async function renderDirectory(dirPath, urlPath) {
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3">
+          <div class="col-12 col-lg-7 mb-3" id="content-column">
   `;
   
   // Special homepage content
@@ -3045,7 +3032,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3">
+          <div class="col-12 col-lg-7 mb-3" id="content-column">
             <div class="card shadow-sm h-100">
               <div class="card-header bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
@@ -3063,7 +3050,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
           </div>
           
           <!-- Chat column -->
-          <div class="col-12 col-lg-5 mb-3">
+          <div class="col-12 col-lg-5 mb-3" id="chat-column">
             <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
             <div class="card shadow-sm">
               <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">

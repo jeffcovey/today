@@ -76,8 +76,8 @@ main() {
     # Critical path operations (fast, important)
     # Single bidirectional Turso sync (replaces separate pull and push)
     run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
-    # Vault sync using git
-    run_sync_step "📝 Vault Git Sync" sync_vault_git "Vault synced via git" "Vault sync"
+    # Vault sync handled by Resilio Sync - just verify directory exists
+    run_sync_step "📝 Vault Check" check_vault_exists "Vault directory verified" "Vault check"
     run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
@@ -162,8 +162,8 @@ main() {
         run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
     fi
     
-    # NOTE: Final vault push handled by vault-sync script
-    # run_sync_step "📝 Final Vault Push" sync_github_vault "Vault changes pushed" "Final vault push"
+    # NOTE: Vault sync handled automatically by Resilio Sync
+    # No final push needed
     
     print_status "All sync operations completed (classification running in background)."
     
@@ -191,173 +191,39 @@ main() {
     echo "Next step: Run 'bin/today' to get AI suggestions on what to do today"
 }
 
-# Sync vault using git
-sync_vault_git() {
+# Check vault directory exists (Resilio Sync handles the actual sync)
+check_vault_exists() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # Check if vault directory exists
     if [[ ! -d vault ]]; then
         print_error "Vault directory not found"
         return 1
     fi
-    
-    # Check if vault is a git repository
-    if [[ ! -d vault/.git ]]; then
-        print_error "Vault is not a git repository. Run setup instructions in vault/README.md"
-        return 1
-    fi
-    
-    # Change to vault directory
-    cd vault || return 1
-    
-    # Check if remote is configured
-    if ! git remote -v | grep -q origin; then
-        print_info "No remote configured for vault. Run: bin/vault-sync setup-remote <url>"
-        return 1
-    fi
-    
-    print_info "Syncing vault with git..."
-    
-    # Use the vault-sync script for full bidirectional sync
-    if [[ -f ../bin/vault-sync ]]; then
-        ../bin/vault-sync sync 2>&1 | while IFS= read -r line; do
-            if [[ "$line" == *"[vault-sync]"* ]]; then
-                # Strip the [vault-sync] prefix for cleaner output
-                echo "$line" | sed 's/\[vault-sync\] //'
-            else
-                echo "$line"
-            fi
-        done
-        return ${PIPESTATUS[0]}
-    else
-        print_error "vault-sync script not found"
-        return 1
-    fi
-}
 
-# Legacy GitHub vault function (kept for compatibility)
-sync_github_vault() {
-    # Now just calls the git sync function
-    sync_vault_git
-    return $?
-}
+    print_info "Vault directory exists - Resilio Sync handles synchronization"
 
-sync_github_vault_original() {
-    # Original implementation kept for reference
-    # Change to project directory
-    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/.." || return 1
-    
-    # ALWAYS pull first to get latest changes before trying to push
-    # This prevents push failures when remote has changes
-    print_info "Fetching latest changes from GitHub..."
-    git fetch origin main --quiet 2>/dev/null
-    
-    # Check if we're behind and need to pull
-    LOCAL=$(git rev-parse HEAD)
-    REMOTE=$(git rev-parse origin/main)
-    
-    if [[ "$LOCAL" != "$REMOTE" ]]; then
-        # We're behind - need to handle any local changes first
-        if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
-            print_info "Stashing local changes before pull..."
-            git stash push --quiet -m "sync-auto-stash-pre-pull" 2>/dev/null
-            PRE_PULL_STASH=true
-        fi
-        
-        print_info "Pulling latest changes from GitHub..."
-        if git pull origin main --quiet --no-edit 2>/dev/null; then
-            print_status "Pulled latest changes from GitHub"
-        else
-            print_error "Pull failed - manual resolution needed"
-            return 1
-        fi
-        
-        # Restore stashed changes
-        if [[ "${PRE_PULL_STASH:-false}" == "true" ]]; then
-            print_info "Restoring local changes..."
-            git stash pop --quiet 2>/dev/null || true
-        fi
-    fi
-    
-    # Now check if we have local changes to commit and push
-    if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
-        # Check if there are changes ONLY in vault/ (no other staged or unstaged changes)
-        CONTENT_CHANGES=$(git status vault/ --porcelain 2>/dev/null)
-        OTHER_CHANGES=$(git status --porcelain 2>/dev/null | grep -v "^.. vault/" || true)
-        
-        if [[ -n "$CONTENT_CHANGES" ]] && [[ -z "$OTHER_CHANGES" ]]; then
-            # Only content changes, safe to commit
-            print_info "Pushing local content changes..."
-            git add vault/ 2>/dev/null
-            git commit -m "Sync vault content" --quiet 2>/dev/null
-            git push origin main --quiet 2>/dev/null
-        elif [[ -n "$CONTENT_CHANGES" ]]; then
-            # We have both content changes and other changes
-            # First, stash any staged changes outside of vault/
-            if [[ -n $(git diff --cached --name-only | grep -v "^vault/" || true) ]]; then
-                print_info "Saving staged changes outside vault..."
-                # Create a temporary commit to preserve staged state
-                git commit --quiet -m "temp: staged changes" -- ':!vault/' 2>/dev/null || true
-                TEMP_COMMIT=true
-            fi
-            
-            # Now commit just the content
-            print_info "Pushing local content changes..."
-            git add vault/ 2>/dev/null
-            git commit -m "Sync vault content" --quiet 2>/dev/null
-            git push origin main --quiet 2>/dev/null
-            
-            # Restore the temporary commit if we made one
-            if [[ "${TEMP_COMMIT:-false}" == "true" ]]; then
-                print_info "Restoring staged changes..."
-                git reset --soft HEAD~1 2>/dev/null
-            fi
-        else
-            # Changes in other files but not content - stash them temporarily
-            print_info "Stashing local changes outside content directories..."
-            git stash push --quiet -m "sync-auto-stash" -- ':!vault/' 2>/dev/null
-            STASHED=true
-        fi
-    fi
-    
-    # Restore stashed changes if we stashed them
-    if [[ "${STASHED:-false}" == "true" ]]; then
-        print_info "Restoring stashed changes..."
-        git stash pop --quiet 2>/dev/null || true
-    fi
-    
-    # Clean up empty files in all content directories
-    find vault -type f -empty -delete 2>/dev/null
-    deleted_count=$(git status --porcelain vault/ | grep -c "^ D " || true)
-    if [[ $deleted_count -gt 0 ]]; then
-        print_info "Removed $deleted_count empty file(s)"
-        git add vault/
-        git commit -m "Clean up empty vault files" --quiet 2>/dev/null
-        git push origin main --quiet 2>/dev/null
-    fi
-    
     # Show content counts
     note_count=$(find vault/notes -type f -name "*.md" 2>/dev/null | wc -l)
     plan_count=$(find vault/plans -type f -name "*.md" 2>/dev/null | wc -l)
     project_count=$(find vault/projects -type f -name "*.md" 2>/dev/null | wc -l)
     topic_count=$(find vault/topics -type f -name "*.md" 2>/dev/null | wc -l)
     print_info "Total notes: $note_count, plans: $plan_count, projects: $project_count, topics: $topic_count"
-    
+
     # Count OGM work files
     ogm_count=$(find vault/logs/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
     if [[ $ogm_count -gt 0 ]]; then
         print_info "OlderGay.Men work summaries: $ogm_count"
     fi
-    
+
     # Show recent content (last 7 days) across all directories
     recent_notes=$(find vault/notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
     recent_plans=$(find vault/plans -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
     recent_projects=$(find vault/projects -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
     recent_topics=$(find vault/topics -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
     recent_count=$((recent_notes + recent_plans + recent_projects + recent_topics))
-    
+
     if [[ $recent_count -gt 0 ]]; then
         print_info "Content from last 7 days: $recent_count files (notes: $recent_notes, plans: $recent_plans, projects: $recent_projects, topics: $recent_topics)"
         # Show up to 5 most recent files across all directories
@@ -367,8 +233,21 @@ sync_github_vault_original() {
             echo "  • $(basename "$file") ($(dirname "$file"))"
         done
     fi
-    
+
     return 0
+}
+
+# Legacy function names kept for compatibility
+sync_github_vault() {
+    # Now just checks vault exists (Resilio handles sync)
+    check_vault_exists
+    return $?
+}
+
+sync_vault_git() {
+    # Alias for backward compatibility
+    check_vault_exists
+    return $?
 }
 
 # Clean up sync-conflict files
@@ -581,7 +460,7 @@ clean_markdown_files() {
     # This ensures files we just modified won't be re-processed next time
     mv "$TEMP_MARKER" "$LINT_MARKER"
     
-    # NOTE: Vault changes handled by vault-sync script
+    # NOTE: Vault changes handled by Resilio Sync
     # Files are cleaned in-place and will sync automatically
     
     return 0
@@ -1552,13 +1431,8 @@ process_inbox() {
         fi
     done <<< "$INBOX_FILES"
     
-    # Commit any moved files
-    if [[ -n $(git status --porcelain vault/ 2>/dev/null) ]]; then
-        print_info "Committing filed notes..."
-        git add vault/ 2>/dev/null
-        git commit -m "Process inbox: file notes to appropriate directories" --quiet 2>/dev/null
-        git push origin main --quiet 2>/dev/null
-    fi
+    # Files are automatically synced by Resilio Sync
+    # No need to commit or push
     
     return 0
 }
@@ -1962,12 +1836,12 @@ case "${1:-}" in
         exit 0
         ;;
     --vault)
-        # Sync only GitHub vault and process inbox
-        print_header "📝 GitHub Vault"
-        if sync_github_vault; then
-            print_status "Vault synced successfully!"
+        # Check vault directory and process inbox
+        print_header "📝 Vault Check"
+        if check_vault_exists; then
+            print_status "Vault directory verified!"
         else
-            print_error "Notes sync failed"
+            print_error "Vault check failed"
         fi
         
         # Clean markdown files after syncing (unless SKIP_MARKDOWN_CLEAN is set)
@@ -1980,7 +1854,7 @@ case "${1:-}" in
             fi
         fi
         
-        # Also process inbox when syncing vault
+        # Also process inbox
         print_header "📥 Process Inbox"
         if process_inbox; then
             print_status "Inbox processed successfully!"
@@ -1997,7 +1871,7 @@ case "${1:-}" in
     --quick)
         # Quick sync - only critical sources
         print_info "Quick sync mode - vault, inbox, and Turso"
-        sync_vault_git
+        check_vault_exists
         cleanup_sync_conflicts
         clean_markdown_files
         clean_database_task_titles
@@ -2007,7 +1881,7 @@ case "${1:-}" in
         # sync_project_tasks
         # check_task_consistency
         sync_turso_bidirectional  # Sync with Turso
-        sync_vault_git  # Final push of any changes
+        # Resilio Sync handles vault synchronization automatically
         ;;
     --force)
         # Force full sync - bypasses smart caching
@@ -2045,14 +1919,14 @@ case "${1:-}" in
         echo ""
         echo "Options:"
         echo "  --cleanup-conflicts  Remove duplicate sync-conflict files"
-        echo "  --vault             Sync vault files using git"
+        echo "  --vault             Check vault directory (Resilio handles sync)"
         echo "  --quick             Quick sync (tasks and inbox only)"
         echo "  --force             Force full refresh (bypass cache)"
         echo "  --quick-email       Download last 24 hours of email"
         echo "  --help              Show this help message"
         echo ""
         echo "Data sources synced:"
-        echo "  • Vault files (via git)"
+        echo "  • Vault files (via Resilio Sync)"
         echo "  • Markdown formatting cleanup (via markdownlint)"
         echo "  • Local task manager"
         echo "  • Email inbox (cached for 4 hours)"
