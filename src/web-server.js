@@ -2710,11 +2710,20 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const { toc, contentWithIds } = generateTableOfContents(contentToRender);
   contentToRender = contentWithIds;
   
-  // Find all checkbox lines in the original content (use original content for correct line numbers)
+  // Find all checkbox lines in the original content that will be rendered by marked.js
+  // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
   const checkboxLines = [];
   const originalLines = content.split('\n');
+  let inTasksBlock = false;
+
   originalLines.forEach((line, index) => {
-    if (line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
+    // Check if we're entering or leaving a ```tasks block
+    if (line.match(/^```tasks/)) {
+      inTasksBlock = true;
+    } else if (inTasksBlock && line === '```') {
+      inTasksBlock = false;
+    } else if (!inTasksBlock && line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
+      // Only include checkboxes that are NOT inside ```tasks blocks
       // Extract task ID if present
       const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
       checkboxLines.push({
@@ -2817,7 +2826,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
         replacementIndex++;
         // Get the relative file path from the URL
         const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-        return `<input type="checkbox" class="form-check-input me-2 task-checkbox"
+        return `<input type="checkbox" class="task-checkbox"
           data-file="${relativeFilePath}"
           data-line="${checkbox.lineNumber + 1}"
           ${checkbox.taskId ? `data-task-id="${checkbox.taskId}"` : ''}
