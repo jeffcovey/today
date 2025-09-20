@@ -3472,7 +3472,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
               // Re-attach checkbox handlers (but not for task-checkbox which uses event delegation)
               currentContent.querySelectorAll('input[type="checkbox"]:not(.task-checkbox)').forEach(checkbox => {
                 checkbox.onchange = function(e) {
-                  toggleCheckbox(this, parseInt(this.dataset.line), e);
+                  // Get taskId from dataset if available
+                  const taskId = this.dataset.taskId || null;
+                  toggleCheckbox(this, parseInt(this.dataset.line), taskId, e);
                 };
               });
               
@@ -4464,11 +4466,18 @@ app.post('/task/complete', authMiddleware, async (req, res) => {
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
 
-    // Get the task line (line numbers are 1-based from grep)
+    // Get the task line (line numbers are 1-based from database)
     const taskLine = lines[line - 1];
 
     if (!taskLine) {
+      console.error(`[TASK] Line ${line} not found in file with ${lines.length} lines`);
       return res.status(400).json({ error: 'Task line not found' });
+    }
+
+    // Validate that this is actually a task line
+    if (!taskLine.match(/^\s*- \[[ xX]\]/)) {
+      console.error(`[TASK] Line ${line} is not a task: "${taskLine}"`);
+      return res.status(400).json({ error: 'Not a task line' });
     }
 
     // Update the task
