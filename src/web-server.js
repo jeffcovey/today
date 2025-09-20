@@ -2744,33 +2744,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
     }
   });
   
-  // Use custom renderer for external links and checkboxes with line tracking
+  // Use custom renderer for external links
   const renderer = createExternalLinkRenderer();
-
-  // Add checkbox tracking to the renderer
-  let checkboxIndex = 0;
-  const originalListItemRenderer = renderer.listitem.bind(renderer);
-  renderer.listitem = function(text, task, checked) {
-    let result = originalListItemRenderer(text, task, checked);
-
-    // If this is a task item (has a checkbox), add data attributes
-    if (task) {
-      const checkboxData = checkboxLines[checkboxIndex];
-      if (checkboxData) {
-        // Replace the checkbox input with one that has data attributes
-        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-        const lineNumber = checkboxData.lineNumber + 1; // Convert 0-based to 1-based
-
-        result = result.replace(
-          /<input[^>]*type="checkbox"[^>]*>/,
-          `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked ? ' checked' : ''}>`
-        );
-      }
-      checkboxIndex++;
-    }
-
-    return result;
-  };
   
   // Render the markdown with custom renderer (with IDs added to headings)
   let htmlContent = marked.parse(contentToRender, { renderer });
@@ -2851,12 +2826,24 @@ async function renderMarkdownUncached(filePath, urlPath) {
     `;
   });
   
-  // Enable the checkboxes that marked.js created (they're disabled by default)
-  // and ensure they have the correct data attributes
+  // Replace checkboxes with ones that have the correct line numbers
+  console.log(`[DEBUG] Processing ${checkboxLines.length} checkbox lines for ${urlPath}`);
+  let checkboxIndex = 0;
   htmlContent = htmlContent.replace(
     /<input[^>]*type="checkbox"[^>]*>/gi,
     (match) => {
-      // Remove disabled attribute and ensure style is set
+      const checkboxData = checkboxLines[checkboxIndex];
+      if (checkboxData) {
+        const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+        const lineNumber = checkboxData.lineNumber + 1; // Convert 0-based to 1-based
+        const checked = checkboxData.isChecked ? ' checked' : '';
+        console.log(`[DEBUG] Adding data-file="${relativeFilePath}" data-line="${lineNumber}" to checkbox ${checkboxIndex}`);
+        checkboxIndex++;
+        return `<input type="checkbox" class="task-checkbox" data-file="${relativeFilePath}" data-line="${lineNumber}"${checked} style="cursor: pointer;">`;
+      }
+      console.log(`[DEBUG] No checkbox data for index ${checkboxIndex}, enabling without data attributes`);
+      checkboxIndex++;
+      // If no data, just enable the checkbox
       return match.replace(/\s*disabled="?"?/gi, '').replace('>', ' style="cursor: pointer;">');
     }
   );
