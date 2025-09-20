@@ -2701,10 +2701,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // IMPORTANT: Save the original content BEFORE any modifications
   // This is needed for accurate line tracking when mapping checkboxes
   const originalContent = content;
-
-  // Insert HTML comments with task metadata BEFORE any processing
-  // This preserves the line numbers from the original file
   const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+
+  // Insert metadata markers that won't break marked.js checkbox detection
+  // We'll use {data-file="..." data-line="..."} which marked.js will pass through
   const taskRegex = /^(\s*)- \[[ x]\] (.+)$/i;
   const originalLines = originalContent.split('\n');
 
@@ -2717,8 +2717,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
       const isChecked = line.includes('[x]') || line.includes('[X]');
       const taskText = match[2];
 
-      // Insert HTML comment with metadata right before the task
-      originalLines[i] = `${indent}<!-- TASK_META file="${relativeFilePath}" line="${lineNumber}" -->- [${isChecked ? 'x' : ' '}] ${taskText}`;
+      // Add metadata as a suffix that marked.js will preserve
+      originalLines[i] = `${indent}- [${isChecked ? 'x' : ' '}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
     }
   }
   content = originalLines.join('\n');
@@ -2856,27 +2856,36 @@ async function renderMarkdownUncached(filePath, urlPath) {
     `;
   });
   
-  // Process HTML comments with task metadata and convert them into data attributes
-  // The comments were inserted before marked.js processing to preserve line numbers
+  // Process metadata markers and add them to checkboxes
+  // The markers look like {data-file="..." data-line="..."} and were added before marked.js
 
-  // Look for patterns like: <!-- TASK_META ... --> followed by list items with checkboxes
+  // Find checkboxes followed by metadata markers and add the metadata as actual attributes
+  // Handle both regular quotes and HTML entities (&quot;)
   htmlContent = htmlContent.replace(
-    /<!-- TASK_META file="([^"]+)" line="(\d+)" -->([\s\S]*?)(<input[^>]*type="checkbox"[^>]*>)/gi,
-    (match, file, line, between, checkbox) => {
-      // If this checkbox already has data attributes (from ```tasks block), keep them
-      if (checkbox.includes('data-file=') && checkbox.includes('data-line=')) {
-        // Just enable it and return without the comment
-        return between + checkbox.replace(/\s*disabled="?"?/gi, '');
+    /<input([^>]*type="checkbox"[^>]*)>(.*?)\{data-file=(&quot;|")([^"&]+)(&quot;|")\s+data-line=(&quot;|")(\d+)(&quot;|")\}/gi,
+    (match, checkboxAttrs, textBetween, q1, file, q2, q3, line, q4) => {
+      // Check if checkbox already has data attributes (from ```tasks block)
+      if (checkboxAttrs.includes('data-file=') && checkboxAttrs.includes('data-line=')) {
+        // Remove the metadata marker but keep existing attributes
+        return `<input${checkboxAttrs}>${textBetween}`;
       }
 
-      // Add our data attributes from the HTML comment
-      const isChecked = checkbox.includes('checked');
-      return between + `<input type="checkbox" class="task-checkbox" data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>`;
+      // Add data attributes to the checkbox
+      const isChecked = checkboxAttrs.includes('checked');
+      return `<input type="checkbox" class="task-checkbox" data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${textBetween}`;
     }
   );
 
-  // Clean up any remaining HTML comments
-  htmlContent = htmlContent.replace(/<!-- TASK_META[^>]*-->/g, '');
+  // Also add data attributes to the parent <li> for easier targeting
+  htmlContent = htmlContent.replace(
+    /<li>([\s\S]*?)<input([^>]*data-file="([^"]+)"[^>]*data-line="(\d+)"[^>]*)>/gi,
+    (match, before, checkboxAttrs, file, line) => {
+      return `<li data-file="${file}" data-line="${line}">${before}<input${checkboxAttrs}>`;
+    }
+  );
+
+  // Clean up any remaining metadata markers that weren't processed (handle both " and &quot;)
+  htmlContent = htmlContent.replace(/\{data-file=(&quot;|")[^"&]+(&quot;|")\s+data-line=(&quot;|")\d+(&quot;|")\}/g, '');
 
   // Enable any remaining checkboxes (from ```tasks blocks that already have data attributes)
   htmlContent = htmlContent.replace(
