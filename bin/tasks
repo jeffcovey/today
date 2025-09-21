@@ -584,61 +584,96 @@ program
       }
     })();
 
-    // Find files to process
-    const files = file ? [file] : findMarkdownFilesWithTasks();
+    // Get tasks from cache that need stage classification
+    console.log(chalk.gray('  Finding tasks needing stage classification from cache...'));
+    const db = getDatabase();
 
-    if (files.length === 0) {
-      console.log(chalk.gray('No task files found'));
+    let query = `
+      SELECT file_path, line_number, line_text
+      FROM markdown_tasks
+      WHERE line_text LIKE '- [ ]%'
+        AND file_path NOT LIKE 'vault/.%'
+        AND file_path NOT LIKE '%/templates/%'
+    `;
+
+    if (file) {
+      query += ` AND file_path = ?`;
+    }
+
+    if (!options.all) {
+      query += ` AND line_text NOT LIKE '%#stage/%'`;
+    }
+
+    query += ` ORDER BY file_path, line_number`;
+
+    const tasksFromCache = file ? db.all(query, file) : db.all(query);
+    db.close();
+
+    if (tasksFromCache.length === 0) {
+      console.log(chalk.gray('No tasks needing stage classification found'));
       process.exit(0);
     }
 
+    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing stage classification`));
+
     let totalClassified = 0;
     let globalTasksProcessed = 0;
+
+    // Apply global limit if specified
+    let tasksToProcess = tasksFromCache;
+    if (options.limit && tasksFromCache.length > options.limit) {
+      console.log(chalk.yellow(`  Limiting to first ${options.limit} tasks (found ${tasksFromCache.length})`));
+      tasksToProcess = tasksFromCache.slice(0, options.limit);
+    }
 
     if (useAI) {
       // AI-powered stage classification
       const BATCH_SIZE = 20;
 
-      for (const file of files) {
+      // Group tasks by file for efficient file operations
+      const tasksByFile = new Map();
+      for (const task of tasksToProcess) {
+        if (!tasksByFile.has(task.file_path)) {
+          tasksByFile.set(task.file_path, []);
+        }
+        tasksByFile.get(task.file_path).push(task);
+      }
+
+      for (const [filePath, fileTasks] of tasksByFile) {
         // Check global limit
         if (options.limit && globalTasksProcessed >= options.limit) {
           console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks, stopping.`));
           break;
         }
-        const content = fsSync.readFileSync(file, 'utf8');
+
+        console.log(chalk.gray(`  Processing ${fileTasks.length} tasks in ${filePath}`));
+
+        // Read file once
+        const content = fsSync.readFileSync(filePath, 'utf8');
         const lines = content.split('\n');
         let modified = false;
 
-        // Collect tasks needing classification
-        const tasksToClassify = [];
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
-            const title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-            tasksToClassify.push({ lineIndex: i, title, line });
-          }
-        }
-
-        if (tasksToClassify.length === 0) continue;
-
-        // Apply global limit if specified
-        if (options.limit) {
-          const remainingSlots = options.limit - globalTasksProcessed;
-          if (remainingSlots <= 0) continue;
-
-          if (tasksToClassify.length > remainingSlots) {
-            console.log(chalk.yellow(`  Limiting to ${remainingSlots} tasks (found ${tasksToClassify.length}, ${globalTasksProcessed}/${options.limit} processed so far)`));
-            tasksToClassify.splice(remainingSlots);
-          }
-        }
+        // Prepare tasks for classification
+        const tasksToClassify = fileTasks.map(task => ({
+          dbTask: task,
+          lineIndex: task.line_number - 1, // Convert to 0-based
+          title: task.line_text.replace(/^- \[ \] /, '')
+            .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+            .replace(/#\w+\/[\w-]+/g, '')
+            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+            .replace(/🔁 .+$/g, '')
+            .trim(),
+          line: task.line_text
+        }));
 
         // Process in batches
         for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
+          // Check global limit before processing each batch
+          if (options.limit && globalTasksProcessed >= options.limit) {
+            console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks during batch processing, stopping.`));
+            break;
+          }
+
           const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
 
           const prompt = `Analyze these tasks and classify them into one of three stages based on their nature.
@@ -703,22 +738,46 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
         }
 
         if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
+          fsSync.writeFileSync(filePath, lines.join('\n'));
           if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
+            console.log(chalk.gray(`  Updated: ${filePath}`));
           }
+
+          // Update cache with modified lines
+          const db2 = getDatabase();
+          for (const task of tasksToClassify) {
+            if (lines[task.lineIndex] !== task.line) {
+              db2.run(
+                'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
+                lines[task.lineIndex],
+                filePath,
+                task.lineIndex + 1
+              );
+            }
+          }
+          db2.close();
         }
       }
     } else {
-      // Fallback to keyword-based classification
-      for (const file of files) {
-        const content = fsSync.readFileSync(file, 'utf8');
+      // Fallback to keyword-based classification using cache
+      const tasksByFile = new Map();
+      for (const task of tasksToProcess) {
+        if (!tasksByFile.has(task.file_path)) {
+          tasksByFile.set(task.file_path, []);
+        }
+        tasksByFile.get(task.file_path).push(task);
+      }
+
+      for (const [filePath, fileTasks] of tasksByFile) {
+        const content = fsSync.readFileSync(filePath, 'utf8');
         const lines = content.split('\n');
         let modified = false;
 
-        for (let i = 0; i < lines.length; i++) {
+        // Process only the tasks from cache for this file
+        for (const task of fileTasks) {
+          const i = task.line_number - 1; // Convert to 0-based
           const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
+          if (line && line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
             let title = line.replace(/^- \[ \] /, '')
               .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
               .replace(/#\w+\/[\w-]+/g, '')
@@ -756,10 +815,25 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
         }
 
         if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
+          fsSync.writeFileSync(filePath, lines.join('\n'));
           if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
+            console.log(chalk.gray(`  Updated: ${filePath}`));
           }
+
+          // Update cache with modified lines
+          const db2 = getDatabase();
+          for (const task of fileTasks) {
+            const i = task.line_number - 1;
+            if (lines[i] !== task.line_text) {
+              db2.run(
+                'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
+                lines[i],
+                filePath,
+                task.line_number
+              );
+            }
+          }
+          db2.close();
         }
       }
     }
@@ -790,14 +864,6 @@ program
       }
     })();
 
-    // Find files to process
-    const files = file ? [file] : findMarkdownFilesWithTasks();
-
-    if (files.length === 0) {
-      console.log(chalk.gray('No task files found'));
-      process.exit(0);
-    }
-
     // Dynamically extract available topics from markdown_tasks database
     console.log(chalk.gray('  Extracting available topics from database...'));
     const db = getDatabase();
@@ -820,58 +886,71 @@ program
 
     const availableTopics = Array.from(topicSet).sort();
     console.log(chalk.gray(`  Found ${availableTopics.length} unique topics in database`));
+
+    // Get tasks from cache that need topic classification
+    console.log(chalk.gray('  Finding tasks needing topic classification from cache...'));
+
+    let query = `
+      SELECT file_path, line_number, line_text
+      FROM markdown_tasks
+      WHERE line_text LIKE '- [ ]%'
+        AND file_path NOT LIKE 'vault/.%'
+        AND file_path NOT LIKE '%/templates/%'
+    `;
+
+    if (file) {
+      query += ` AND file_path = ?`;
+    }
+
+    if (!options.all) {
+      query += ` AND line_text NOT LIKE '%#topic/%'`;
+    }
+
+    query += ` ORDER BY file_path, line_number`;
+
+    const tasksFromCache = file ? db.all(query, file) : db.all(query);
     db.close();
+
+    if (tasksFromCache.length === 0) {
+      console.log(chalk.gray('No tasks needing topic classification found'));
+      process.exit(0);
+    }
+
+    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing topic classification`));
 
     let totalTopicsAdded = 0;
     let globalTasksProcessed = 0;
 
+    // Apply global limit if specified
+    let tasksToProcess = tasksFromCache;
+    if (options.limit && tasksFromCache.length > options.limit) {
+      console.log(chalk.yellow(`  Limiting to first ${options.limit} tasks (found ${tasksFromCache.length})`));
+      tasksToProcess = tasksFromCache.slice(0, options.limit);
+    }
+
     if (useAI) {
-      // AI-powered topic classification
-      const BATCH_SIZE = 15;
+      // AI-powered topic classification with global batching
+      const BATCH_SIZE = 30; // Larger batches for efficiency
 
-      for (const file of files) {
-        // Check global limit
-        if (options.limit && globalTasksProcessed >= options.limit) {
-          console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks, stopping.`));
-          break;
-        }
-        const content = fsSync.readFileSync(file, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
+      // Prepare all tasks for classification at once
+      console.log(chalk.gray('  Preparing all tasks for AI classification...'));
+      const allTasksToClassify = tasksToProcess.map(task => ({
+        dbTask: task,
+        lineIndex: task.line_number - 1, // Convert to 0-based
+        title: task.line_text.replace(/^- \[ \] /, '')
+          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+          .replace(/#\w+\/[\w-]+/g, '')
+          .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+          .replace(/🔁 .+$/g, '')
+          .trim(),
+        line: task.line_text
+      }));
 
-        // Collect tasks needing topics
-        const tasksToClassify = [];
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
-            const title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-            tasksToClassify.push({ lineIndex: i, title, line });
-          }
-        }
+      // Process all tasks in large batches (global batching for efficiency)
+      for (let i = 0; i < allTasksToClassify.length; i += BATCH_SIZE) {
+        const batch = allTasksToClassify.slice(i, Math.min(i + BATCH_SIZE, allTasksToClassify.length));
 
-        if (tasksToClassify.length === 0) continue;
-
-        // Apply global limit if specified
-        if (options.limit) {
-          const remainingSlots = options.limit - globalTasksProcessed;
-          if (remainingSlots <= 0) continue;
-
-          if (tasksToClassify.length > remainingSlots) {
-            console.log(chalk.yellow(`  Limiting to ${remainingSlots} tasks (found ${tasksToClassify.length}, ${globalTasksProcessed}/${options.limit} processed so far)`));
-            tasksToClassify.splice(remainingSlots);
-          }
-        }
-
-        // Process in batches
-        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
-          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
-
-          const prompt = `Analyze these tasks and suggest 1-2 relevant topics for each from the available list.
+        const prompt = `Analyze these tasks and suggest 1-2 relevant topics for each from the available list.
 
 Available topics: ${availableTopics.join(', ')}
 
@@ -889,69 +968,117 @@ Only use topics from the available list.
 Tasks:
 ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
 
-          try {
-            if (options.verbose) {
-              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
-            }
+        try {
+          if (options.verbose) {
+            console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(allTasksToClassify.length/BATCH_SIZE)} (${batch.length} tasks)...`);
+          }
 
-            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+          const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
               encoding: 'utf8',
               maxBuffer: 1024 * 1024 * 10,
               timeout: 60000
             });
 
-            const jsonMatch = result.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              const classifications = JSON.parse(jsonMatch[0]);
+          const jsonMatch = result.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const classifications = JSON.parse(jsonMatch[0]);
 
-              for (const cls of classifications) {
-                const task = tasksToClassify[cls.index];
-                globalTasksProcessed++; // Count each task processed
+            // Apply results to tasks (store changes for later file updates)
+            for (const cls of classifications) {
+              const task = batch[cls.index];
+              globalTasksProcessed++; // Count each task processed
 
-                if (cls.topics && cls.topics.length > 0) {
-                  let newLine = task.line;
+              if (cls.topics && cls.topics.length > 0) {
+                let newLine = task.line;
 
-                  // Add topics
-                  for (const topic of cls.topics.slice(0, 2)) { // Max 2 topics
-                    if (availableTopics.includes(topic) && !newLine.includes(`#topic/${topic}`)) {
-                      const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
-                      if (stageMatch) {
-                        newLine = `${stageMatch[1]} #topic/${topic}${stageMatch[2]}`;
+                // Add topics
+                for (const topic of cls.topics.slice(0, 2)) { // Max 2 topics
+                  if (availableTopics.includes(topic) && !newLine.includes(`#topic/${topic}`)) {
+                    const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
+                    if (stageMatch) {
+                      newLine = `${stageMatch[1]} #topic/${topic}${stageMatch[2]}`;
+                    } else {
+                      const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                      if (dateMatch) {
+                        newLine = `${dateMatch[1]} #topic/${topic} ${dateMatch[2]}`;
                       } else {
-                        const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                        if (dateMatch) {
-                          newLine = `${dateMatch[1]} #topic/${topic} ${dateMatch[2]}`;
-                        } else {
-                          newLine = `${newLine} #topic/${topic}`;
-                        }
+                        newLine = `${newLine} #topic/${topic}`;
                       }
-                      totalTopicsAdded++;
                     }
+                    totalTopicsAdded++;
                   }
+                }
 
-                  if (newLine !== task.line) {
-                    lines[task.lineIndex] = newLine;
-                    modified = true;
-                  }
+                // Store the updated line in the task for later file processing
+                if (newLine !== task.line) {
+                  task.updatedLine = newLine;
                 }
               }
             }
-          } catch (error) {
+          }
+        } catch (error) {
             console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
           }
         }
 
-        if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
+      // After all AI processing, update files with changes
+      console.log(chalk.gray('  Applying changes to files...'));
+      const fileChanges = new Map();
+
+      // Group updated tasks by file
+      for (const task of allTasksToClassify) {
+        if (task.updatedLine) {
+          if (!fileChanges.has(task.dbTask.file_path)) {
+            fileChanges.set(task.dbTask.file_path, []);
           }
+          fileChanges.get(task.dbTask.file_path).push(task);
         }
       }
+
+      // Apply changes to each file
+      const db2 = getDatabase();
+      for (const [filePath, tasksWithChanges] of fileChanges) {
+        try {
+          const content = fsSync.readFileSync(filePath, 'utf8');
+          const lines = content.split('\n');
+          let modified = false;
+
+          for (const task of tasksWithChanges) {
+            lines[task.lineIndex] = task.updatedLine;
+            modified = true;
+
+            // Update cache
+            db2.run(
+              'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
+              task.updatedLine,
+              filePath,
+              task.lineIndex + 1
+            );
+          }
+
+          if (modified) {
+            fsSync.writeFileSync(filePath, lines.join('\n'));
+            if (options.verbose) {
+              console.log(chalk.gray(`  Updated: ${filePath} (${tasksWithChanges.length} tasks)`));
+            }
+          }
+        } catch (error) {
+          console.error(chalk.yellow(`  Failed to update file ${filePath}: ${error.message}`));
+        }
+      }
+      db2.close();
     } else {
-      // Fallback to keyword-based classification
-      for (const file of files) {
-        const content = fsSync.readFileSync(file, 'utf8');
+      // Fallback to keyword-based classification using cache
+      const tasksByFile = new Map();
+      for (const task of tasksToProcess) {
+        if (!tasksByFile.has(task.file_path)) {
+          tasksByFile.set(task.file_path, []);
+        }
+        tasksByFile.get(task.file_path).push(task);
+      }
+
+      for (const [filePath, fileTasks] of tasksByFile) {
+        const content = fsSync.readFileSync(filePath, 'utf8');
         const lines = content.split('\n');
         let modified = false;
 
