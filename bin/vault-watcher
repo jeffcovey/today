@@ -293,14 +293,25 @@ async function startWatching() {
   });
   
   // Keep process alive
-  process.stdin.resume();
+  // When running as a service, stdin might not be available
+  if (process.stdin.isTTY) {
+    process.stdin.resume();
+  } else {
+    // For non-TTY environments (like systemd), use setInterval to keep alive
+    setInterval(() => {}, 1000 * 60 * 60); // Keep alive check every hour
+  }
 }
 
 // Check if we're already running
 async function checkAlreadyRunning() {
+  // Skip PID check if running under systemd
+  if (process.env.INVOCATION_ID || process.env.SYSTEMD_EXEC_PID) {
+    return false; // Let systemd handle process management
+  }
+
   try {
     const pidFile = path.join(projectRoot, '.data/vault-watcher.pid');
-    
+
     if (fs.existsSync(pidFile)) {
       const pid = fs.readFileSync(pidFile, 'utf8').trim();
       try {
@@ -312,10 +323,10 @@ async function checkAlreadyRunning() {
         fs.unlinkSync(pidFile);
       }
     }
-    
+
     // Write our PID
     fs.writeFileSync(pidFile, process.pid.toString());
-    
+
     // Clean up PID file on exit
     process.on('exit', () => {
       try {
@@ -324,7 +335,7 @@ async function checkAlreadyRunning() {
         // Ignore
       }
     });
-    
+
     return false;
   } catch (e) {
     return false;
