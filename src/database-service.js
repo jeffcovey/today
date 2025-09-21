@@ -400,12 +400,17 @@ export class DatabaseService {
    */
   queuePush(sql, params) {
     if (!this.tursoClient || this.readOnly) return;
-    
+
     // Don't queue transaction statements
     if (sql.includes('BEGIN') || sql.includes('COMMIT') || sql.includes('ROLLBACK')) {
       return;
     }
-    
+
+    // Don't sync markdown_tasks table - it's a local cache only
+    if (sql.toLowerCase().includes('markdown_tasks')) {
+      return;
+    }
+
     this.pushQueue.push({ sql, args: params || [] });
     
     // Debounce pushes
