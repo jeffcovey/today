@@ -86,25 +86,91 @@ async function updateMarkdownTasksCache(filePath) {
   }
 }
 
+// Track files being processed for task enrichment to avoid loops
+const filesBeingEnriched = new Set();
+let enrichmentQueue = [];
+let isEnriching = false;
+
+// Process task enrichment queue (runs separately from main processing)
+async function processEnrichmentQueue() {
+  if (isEnriching || enrichmentQueue.length === 0) {
+    return;
+  }
+
+  isEnriching = true;
+  const filesToEnrich = enrichmentQueue.splice(0, 5); // Process up to 5 files at a time
+
+  try {
+    for (const file of filesToEnrich) {
+      if (filesBeingEnriched.has(file)) {
+        continue; // Skip if already being processed
+      }
+
+      filesBeingEnriched.add(file);
+
+      try {
+        // Use bin/tasks commands to enrich the file
+        // Run all three enrichment commands for the file
+        const commands = [
+          `bin/tasks prioritize-status "${file}"`,
+          `bin/tasks add-topics "${file}"`,
+          `bin/tasks classify-stages "${file}"`
+        ];
+
+        for (const cmd of commands) {
+          try {
+            execSync(cmd, {
+              cwd: projectRoot,
+              encoding: 'utf8',
+              stdio: 'pipe' // Suppress output
+            });
+          } catch (error) {
+            // Individual command failure shouldn't stop other enrichments
+            log(`Enrichment command failed for ${path.basename(file)}: ${error.message}`, 'warn');
+          }
+        }
+
+        log(`Enriched tasks in ${path.basename(file)}`, 'success');
+      } catch (error) {
+        log(`Failed to enrich ${path.basename(file)}: ${error.message}`, 'warn');
+      } finally {
+        // Remove from tracking after a delay to prevent immediate re-processing
+        setTimeout(() => {
+          filesBeingEnriched.delete(file);
+        }, 30000); // 30 second cooldown
+      }
+    }
+  } catch (error) {
+    log(`Enrichment error: ${error.message}`, 'error');
+  } finally {
+    isEnriching = false;
+
+    // Process more if queue has items
+    if (enrichmentQueue.length > 0) {
+      setTimeout(processEnrichmentQueue, 2000); // Process more after 2 seconds
+    }
+  }
+}
+
 // Process changed files
 async function processChanges() {
   if (isProcessing || changedFiles.size === 0) {
     return;
   }
-  
+
   isProcessing = true;
   const filesToProcess = Array.from(changedFiles);
   changedFiles.clear();
-  
+
   try {
     // Filter for markdown files only
     const markdownFiles = filesToProcess.filter(f => f.endsWith('.md'));
-    
+
     if (markdownFiles.length === 0) {
       isProcessing = false;
       return;
     }
-    
+
     log(`Processing ${markdownFiles.length} changed file(s)...`);
     
     // Determine what type of sync to run
@@ -181,7 +247,23 @@ async function processChanges() {
         }
       }
     }
-    
+
+    // Queue files for task enrichment (but not files we're already tracking)
+    // This runs after main processing to avoid delays
+    for (const file of markdownFiles) {
+      // Skip files that are being or were recently enriched
+      if (!filesBeingEnriched.has(file) && !enrichmentQueue.includes(file)) {
+        // Queue all markdown files - any could have tasks
+        enrichmentQueue.push(file);
+      }
+    }
+
+    // Start enrichment process if not already running
+    if (enrichmentQueue.length > 0 && !isEnriching) {
+      // Run enrichment after a delay so it doesn't interfere with main processing
+      setTimeout(processEnrichmentQueue, 5000); // 5 second delay
+    }
+
     lastSyncTime = Date.now();
     
   } catch (error) {

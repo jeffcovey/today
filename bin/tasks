@@ -8,6 +8,15 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
+
+// Helper function to find markdown files containing tasks
+function findMarkdownFilesWithTasks() {
+  // Use -exec instead of xargs to handle large number of files
+  return execSync('find vault/ -name "*.md" -type f -not -path "*/templates/*" -exec grep -l "^- \\[ \\]" {} \\; 2>/dev/null || true', { encoding: 'utf8' })
+    .split('\n')
+    .filter(f => f);
+}
 
 program
   .name('tasks')
@@ -21,7 +30,7 @@ program
   .option('-f, --full', 'Force full scan of all files')
   .action(async (file, options) => {
     const tm = new TaskManager();
-    
+
     try {
       if (file) {
         // Sync specific file
@@ -31,11 +40,11 @@ program
         // Sync all markdown files in the entire repository
         const fs = await import('fs');
         const { execSync } = await import('child_process');
-        
+
         // Load last sync state (unless --full flag is used)
         const syncStateFile = '.data/task-sync-state.json';
         let lastSyncTime = null;
-        
+
         if (!options.full) {
           try {
             if (fs.existsSync(syncStateFile)) {
@@ -48,25 +57,25 @@ program
         } else {
           console.log(chalk.yellow('Full scan requested (--full flag)'));
         }
-        
+
         // Find markdown files
         let allMarkdownFiles;
         let onlyChangedFiles = false;
-        
+
         if (lastSyncTime) {
           // Try to get only changed files since last sync
           const minutesAgo = Math.ceil((Date.now() - new Date(lastSyncTime).getTime()) / 60000);
           console.log(chalk.blue(`Finding markdown files changed in last ${minutesAgo} minutes...`));
-          
+
           try {
             // Use find command to get recently modified files
             const changedFiles = execSync(
-              `find "vault/" -name "*.md" -type f -mmin -${minutesAgo + 1} -not -path "*/templates/*" -not -path "*/.stversions/*" 2>/dev/null | grep -v node_modules | grep -v .git`, 
+              `find "vault/" -name "*.md" -type f -mmin -${minutesAgo + 1} -not -path "*/templates/*" -not -path "*/.stversions/*" 2>/dev/null | grep -v node_modules | grep -v .git`,
               { encoding: 'utf8' }
             ).split('\n')
               .filter(f => f)
               .map(f => f.replace(/^\.\//, ''));
-            
+
             if (changedFiles.length > 0) {
               allMarkdownFiles = changedFiles;
               onlyChangedFiles = true;
@@ -84,7 +93,7 @@ program
             onlyChangedFiles = false;
           }
         }
-        
+
         // If we don't have changed files or no last sync time, do full scan
         if (!onlyChangedFiles && !lastSyncTime) {
           console.log(chalk.blue('Finding all markdown files (first sync)...'));
@@ -94,7 +103,7 @@ program
             .map(f => f.replace(/^\.\//, ''));
           console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
         }
-        
+
         // Always include review files (even if not modified recently)
         // This ensures tasks in review files get their do_date set properly
         try {
@@ -102,7 +111,7 @@ program
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
-          
+
           let addedReviewFiles = 0;
           for (const reviewFile of reviewFiles) {
             if (!allMarkdownFiles.includes(reviewFile)) {
@@ -110,7 +119,7 @@ program
               addedReviewFiles++;
             }
           }
-          
+
           if (addedReviewFiles > 0) {
             console.log(chalk.gray(`  Added ${addedReviewFiles} review file(s) to ensure proper date assignment`));
           }
@@ -130,14 +139,14 @@ program
             console.log(chalk.gray(`  Added today's review file: ${todayReviewFile}`));
           }
         }
-        
+
         // Always include topic files to sync new tasks and checkbox changes
         try {
           const topicFiles = execSync('find "vault/topics" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
-          
+
           let addedTopicFiles = 0;
           for (const topicFile of topicFiles) {
             if (!allMarkdownFiles.includes(topicFile)) {
@@ -145,14 +154,14 @@ program
               addedTopicFiles++;
             }
           }
-          
+
           if (addedTopicFiles > 0) {
             console.log(chalk.gray(`  Added ${addedTopicFiles} topic file(s) for task sync`));
           }
         } catch (e) {
           // Topic files not found, continue without them
         }
-        
+
         // DISABLED: No longer syncing to database - using Obsidian Tasks plugin
         console.log(chalk.green('✓ Database sync disabled - using Obsidian Tasks plugin'));
 
@@ -180,11 +189,11 @@ program
       // Disabled - now using static tasks.md with Obsidian Tasks plugin queries
       // const allCount = await tm.generateAllTasksFile();
       // console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
-      
+
       // Disabled - now using static stages.md with Obsidian Tasks plugin queries
       // const stagesCount = await tm.generateStagesFile();
       // console.log(chalk.green(`✓ Generated stages.md with ${stagesCount} staged tasks`));
-      
+
       // Disabled - replaced with static topic files using Obsidian Tasks queries
       // console.log(chalk.blue('Generating topic files...'));
       // const topicCount = await tm.generateTopicFiles();
@@ -259,7 +268,7 @@ group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')
       } else {
         console.log(chalk.gray('  • All topic files already exist'));
       }
-      
+
       // Classify stages for tasks without them in background
       // This prevents the sync from hanging while waiting for AI
       if (process.env.SKIP_CLASSIFICATION) {
@@ -271,10 +280,10 @@ group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')
           WHERE stage IS NULL 
           AND status != '✅ Done'
         `).get().count;
-        
+
         if (unclassifiedCount > 0) {
           console.log(chalk.blue(`⚡ Launching background classification for ${unclassifiedCount} tasks...`));
-          
+
           // Spawn classification in background
           const { spawn } = await import('child_process');
           const classifyProcess = spawn('node', [
@@ -299,7 +308,7 @@ group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')
             stdio: 'ignore',
             cwd: process.cwd()
           });
-          
+
           // Detach the child process so it continues after parent exits
           classifyProcess.unref();
         } else {
@@ -312,20 +321,20 @@ group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')
     } finally {
       // Close task manager first
       tm.close();
-      
+
       // Push any pending changes to Turso before exiting
       try {
         const db = getDatabase();
         await Promise.race([
           db.forcePush(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('forcePush timeout')), 5000)
           )
         ]);
       } catch (err) {
         console.error(chalk.yellow('Warning: Could not push to Turso:', err.message));
       }
-      
+
       // Exit cleanly
       process.exit(0);
     }
@@ -356,7 +365,7 @@ program
       return;
     }
     const tm = new TaskManager('.data/today.db', { readOnly: true });
-    
+
     try {
       let tasks;
       if (options.withNotion) {
@@ -394,7 +403,7 @@ program
         // Ultra-compact display without table
         console.log(chalk.gray('ID       S P  Title'));
         console.log(chalk.gray('─'.repeat(60)));
-        
+
         const prioritySymbols = {
           5: '🔴', 4: '🟠', 3: '🟡', 2: '🔵', 1: '⚪'
         };
@@ -407,7 +416,7 @@ program
           '⏸️  Paused': '⏸️',
           '✅ Done': '✅'
         };
-        
+
         for (const task of tasks) {
           const id = task.id.substring(0, 8);
           const status = statusDisplay[task.status] || task.status.substring(0, 3);
@@ -452,7 +461,7 @@ program
           const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
           projectName = project ? project.name : '-';
         }
-        
+
         table.push([
           task.id.substring(0, 8),
           task.title,
@@ -465,7 +474,7 @@ program
 
       console.log(table.toString());
       console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
-      
+
       // Show stage distribution if stages are set
       const stageCounts = {};
       for (const task of tasks) {
@@ -476,8 +485,8 @@ program
       if (Object.keys(stageCounts).length > 0) {
         console.log(chalk.gray('\nBy Stage:'));
         for (const [stage, count] of Object.entries(stageCounts)) {
-          const emoji = stage === 'Front Stage' ? '👥' : 
-                       stage === 'Back Stage' ? '🔧' : '🌴';
+          const emoji = stage === 'Front Stage' ? '👥' :
+            stage === 'Back Stage' ? '🔧' : '🌴';
           console.log(chalk.gray(`  ${emoji} ${stage}: ${count}`));
         }
       }
@@ -498,7 +507,7 @@ program
   .option('--project <name>', 'Assign to project')
   .action((title, options) => {
     const tm = new TaskManager();
-    
+
     try {
       const data = {
         title,
@@ -536,12 +545,12 @@ program
   .option('--topics <topics>', 'Update topics (comma-separated)')
   .action((id, options) => {
     const tm = new TaskManager();
-    
+
     try {
       // Find task by partial ID
       const tasks = tm.getActiveTasks();
       const task = tasks.find(t => t.id.startsWith(id));
-      
+
       if (!task) {
         console.error(chalk.red(`Task not found: ${id}`));
         process.exit(1);
@@ -571,11 +580,11 @@ program
   .description('Mark a task as done')
   .action((id) => {
     const tm = new TaskManager();
-    
+
     try {
       const tasks = tm.getActiveTasks();
       const task = tasks.find(t => t.id.startsWith(id));
-      
+
       if (!task) {
         console.error(chalk.red(`Task not found: ${id}`));
         process.exit(1);
@@ -601,17 +610,27 @@ program
 
 // Classify stages command - works with markdown files
 program
-  .command('classify-stages')
-  .description('Add stage tags to tasks in markdown files (#stage/front-stage, etc.)')
+  .command('classify-stages [file]')
+  .description('Add stage tags to tasks using AI analysis')
   .option('--all', 'Reclassify all tasks (not just unclassified)')
   .option('-v, --verbose', 'Show detailed output')
-  .action(async (options) => {
+  .option('--no-ai', 'Use simple keyword matching instead of AI')
+  .action(async (file, options) => {
     console.log(chalk.blue('🎭 Classifying task stages in markdown files...'));
 
-    // Find all markdown files with tasks
-    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
-      .split('\n')
-      .filter(f => f);
+    // Check if AI is available and desired
+    const useAI = !options.noAi && (() => {
+      try {
+        execSync('which claude', { encoding: 'utf8' });
+        return true;
+      } catch {
+        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
+        return false;
+      }
+    })();
+
+    // Find files to process
+    const files = file ? [file] : findMarkdownFilesWithTasks();
 
     if (files.length === 0) {
       console.log(chalk.gray('No task files found'));
@@ -620,61 +639,154 @@ program
 
     let totalClassified = 0;
 
-    for (const file of files) {
-      const content = fs.readFileSync(file, 'utf8');
-      const lines = content.split('\n');
-      let modified = false;
+    if (useAI) {
+      // AI-powered stage classification
+      const BATCH_SIZE = 20;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Match tasks without stage tags (or all tasks if --all)
-        if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
-          // Extract task title for classification
-          let title = line.replace(/^- \[ \] /, '')
-            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove priority emojis
-            .replace(/#\w+\/[\w-]+/g, '') // Remove existing tags
-            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
-            .replace(/🔁 .+$/g, '') // Remove recurrence
-            .trim();
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-          // Simple keyword-based classification (can be enhanced with AI)
-          let stage = '';
-          if (title.match(/\b(meeting|call|email|support|customer|present|interview)\b/i)) {
-            stage = '#stage/front-stage';
-          } else if (title.match(/\b(fix|bug|maintain|organize|plan|bill|document|setup)\b/i)) {
-            stage = '#stage/back-stage';
-          } else if (title.match(/\b(personal|health|exercise|read|friend|family|relax|self)\b/i)) {
-            stage = '#stage/off-stage';
-          } else {
-            // Default based on context
-            stage = '#stage/back-stage';
+        // Collect tasks needing classification
+        const tasksToClassify = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
+            const title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+            tasksToClassify.push({ lineIndex: i, title, line });
           }
+        }
 
-          // Add stage tag if not present
-          if (!lines[i].includes(stage)) {
-            // Insert stage after priority emoji if present, otherwise after task title
-            const priorityMatch = line.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
-            if (priorityMatch) {
-              lines[i] = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
-            } else {
-              // Insert before any dates or at end
-              const dateMatch = line.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-              if (dateMatch) {
-                lines[i] = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
-              } else {
-                lines[i] = `${line} ${stage}`;
+        if (tasksToClassify.length === 0) continue;
+
+        // Process in batches
+        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
+          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
+
+          const prompt = `Analyze these tasks and classify them into one of three stages based on their nature.
+
+The three stages are:
+- front-stage: Tasks involving direct interaction with others (meetings, calls, emails, presentations, customer support, networking)
+- back-stage: Solo work tasks (planning, coding, organizing, maintenance, documentation, research, analysis)
+- off-stage: Personal time tasks (self-care, health, exercise, relaxation, hobbies, personal relationships)
+
+Respond with a JSON array where each has:
+{"index": task_index, "stage": "front-stage|back-stage|off-stage"}
+
+Tasks:
+${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
+
+          try {
+            if (options.verbose) {
+              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
+            }
+
+            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+              encoding: 'utf8',
+              maxBuffer: 1024 * 1024 * 10,
+              timeout: 60000
+            });
+
+            const jsonMatch = result.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              const classifications = JSON.parse(jsonMatch[0]);
+
+              for (const cls of classifications) {
+                const task = tasksToClassify[cls.index];
+                const stage = `#stage/${cls.stage}`;
+
+                if (!task.line.includes(stage)) {
+                  let newLine = task.line;
+
+                  // Insert stage after priority emoji if present
+                  const priorityMatch = newLine.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
+                  if (priorityMatch) {
+                    newLine = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
+                  } else {
+                    // Insert before dates or at end
+                    const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                    if (dateMatch) {
+                      newLine = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
+                    } else {
+                      newLine = `${newLine} ${stage}`;
+                    }
+                  }
+
+                  lines[task.lineIndex] = newLine;
+                  modified = true;
+                  totalClassified++;
+                }
               }
             }
-            modified = true;
-            totalClassified++;
+          } catch (error) {
+            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
           }
         }
       }
+    } else {
+      // Fallback to keyword-based classification
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-      if (modified) {
-        fs.writeFileSync(file, lines.join('\n'));
-        if (options.verbose) {
-          console.log(chalk.gray(`  Updated: ${file}`));
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
+            let title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+
+            let stage = '';
+            if (title.match(/\b(meeting|call|email|support|customer|present|interview)\b/i)) {
+              stage = '#stage/front-stage';
+            } else if (title.match(/\b(fix|bug|maintain|organize|plan|bill|document|setup)\b/i)) {
+              stage = '#stage/back-stage';
+            } else if (title.match(/\b(personal|health|exercise|read|friend|family|relax|self)\b/i)) {
+              stage = '#stage/off-stage';
+            } else {
+              stage = '#stage/back-stage';
+            }
+
+            if (!lines[i].includes(stage)) {
+              const priorityMatch = line.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
+              if (priorityMatch) {
+                lines[i] = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
+              } else {
+                const dateMatch = line.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                if (dateMatch) {
+                  lines[i] = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
+                } else {
+                  lines[i] = `${line} ${stage}`;
+                }
+              }
+              modified = true;
+              totalClassified++;
+            }
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
+          }
         }
       }
     }
@@ -685,87 +797,207 @@ program
 
 // Add topics command - works with markdown files
 program
-  .command('add-topics')
-  .description('Add topic tags to tasks in markdown files (#topic/health, etc.)')
+  .command('add-topics [file]')
+  .description('Add topic tags to tasks using AI analysis')
   .option('--all', 'Reassign topics to all tasks (not just unassigned)')
   .option('-v, --verbose', 'Show detailed output')
-  .action(async (options) => {
+  .option('--no-ai', 'Use simple keyword matching instead of AI')
+  .action(async (file, options) => {
     console.log(chalk.blue('🏷️  Adding topic tags to tasks in markdown files...'));
 
-    // Find all markdown files with tasks
-    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
-      .split('\n')
-      .filter(f => f);
+    // Check if AI is available and desired
+    const useAI = !options.noAi && (() => {
+      try {
+        execSync('which claude', { encoding: 'utf8' });
+        return true;
+      } catch {
+        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
+        return false;
+      }
+    })();
+
+    // Find files to process
+    const files = file ? [file] : findMarkdownFilesWithTasks();
 
     if (files.length === 0) {
       console.log(chalk.gray('No task files found'));
       process.exit(0);
     }
 
+    // Available topics (based on existing patterns in the codebase)
+    const availableTopics = [
+      'ai', 'career', 'finance', 'health', 'home', 'ogm',
+      'social', 'technology', 'travel', 'programming', 'learning',
+      'shopping', 'security'
+    ];
+
     let totalTopicsAdded = 0;
 
-    for (const file of files) {
-      const content = fs.readFileSync(file, 'utf8');
-      const lines = content.split('\n');
-      let modified = false;
+    if (useAI) {
+      // AI-powered topic classification
+      const BATCH_SIZE = 15;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Match tasks without topic tags (or all tasks if --all)
-        if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
-          // Extract task title for classification
-          let title = line.replace(/^- \[ \] /, '')
-            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove priority emojis
-            .replace(/#\w+\/[\w-]+/g, '') // Remove existing tags
-            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
-            .replace(/🔁 .+$/g, '') // Remove recurrence
-            .trim();
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-          // Simple keyword-based topic assignment (can be enhanced with AI)
-          const topics = [];
-          if (title.match(/\b(health|exercise|doctor|medical|diet|wellness)\b/i)) topics.push('#topic/health');
-          if (title.match(/\b(code|program|debug|fix|develop|git|api)\b/i)) topics.push('#topic/programming');
-          if (title.match(/\b(oldergay|ogm|website|discourse|forum)\b/i)) topics.push('#topic/ogm');
-          if (title.match(/\b(ai|claude|gpt|chatgpt|llm|machine learning)\b/i)) topics.push('#topic/ai');
-          if (title.match(/\b(money|bill|tax|payment|finance|invest)\b/i)) topics.push('#topic/finance');
-          if (title.match(/\b(house|home|clean|repair|maintenance|chore)\b/i)) topics.push('#topic/home');
-          if (title.match(/\b(friend|family|social|meet|relationship)\b/i)) topics.push('#topic/social');
-          if (title.match(/\b(learn|read|course|study|research|book)\b/i)) topics.push('#topic/learning');
-          if (title.match(/\b(travel|trip|flight|hotel|vacation)\b/i)) topics.push('#topic/travel');
-          if (title.match(/\b(buy|shop|order|purchase|amazon)\b/i)) topics.push('#topic/shopping');
+        // Collect tasks needing topics
+        const tasksToClassify = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
+            const title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+            tasksToClassify.push({ lineIndex: i, title, line });
+          }
+        }
 
-          // Add topics if found and not already present
-          if (topics.length > 0) {
-            let newLine = line;
-            for (const topic of topics) {
-              if (!newLine.includes(topic)) {
-                // Insert topics after stage tag if present, otherwise after priority/title
-                const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
-                if (stageMatch) {
-                  newLine = `${stageMatch[1]} ${topic}${stageMatch[2]}`;
-                } else {
-                  const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                  if (dateMatch) {
-                    newLine = `${dateMatch[1]} ${topic} ${dateMatch[2]}`;
-                  } else {
-                    newLine = `${newLine} ${topic}`;
+        if (tasksToClassify.length === 0) continue;
+
+        // Process in batches
+        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
+          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
+
+          const prompt = `Analyze these tasks and suggest 1-2 relevant topics for each from the available list.
+
+Available topics: ${availableTopics.join(', ')}
+
+For each task, choose the most relevant topic(s) based on:
+- Keywords that match topic areas
+- The nature of the work (technical, personal, organizational)
+- Related areas involved
+
+Respond with a JSON array where each has:
+{"index": task_index, "topics": ["topic1", "topic2"]}
+
+If no topics clearly apply, use an empty array.
+Only use topics from the available list.
+
+Tasks:
+${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
+
+          try {
+            if (options.verbose) {
+              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
+            }
+
+            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+              encoding: 'utf8',
+              maxBuffer: 1024 * 1024 * 10,
+              timeout: 60000
+            });
+
+            const jsonMatch = result.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              const classifications = JSON.parse(jsonMatch[0]);
+
+              for (const cls of classifications) {
+                const task = tasksToClassify[cls.index];
+                if (cls.topics && cls.topics.length > 0) {
+                  let newLine = task.line;
+
+                  // Add topics
+                  for (const topic of cls.topics.slice(0, 2)) { // Max 2 topics
+                    if (availableTopics.includes(topic) && !newLine.includes(`#topic/${topic}`)) {
+                      const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
+                      if (stageMatch) {
+                        newLine = `${stageMatch[1]} #topic/${topic}${stageMatch[2]}`;
+                      } else {
+                        const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                        if (dateMatch) {
+                          newLine = `${dateMatch[1]} #topic/${topic} ${dateMatch[2]}`;
+                        } else {
+                          newLine = `${newLine} #topic/${topic}`;
+                        }
+                      }
+                      totalTopicsAdded++;
+                    }
+                  }
+
+                  if (newLine !== task.line) {
+                    lines[task.lineIndex] = newLine;
+                    modified = true;
                   }
                 }
-                totalTopicsAdded++;
               }
             }
-            if (newLine !== line) {
-              lines[i] = newLine;
-              modified = true;
-            }
+          } catch (error) {
+            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
           }
         }
       }
+    } else {
+      // Fallback to keyword-based classification
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-      if (modified) {
-        fs.writeFileSync(file, lines.join('\n'));
-        if (options.verbose) {
-          console.log(chalk.gray(`  Updated: ${file}`));
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
+            let title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+
+            const topics = [];
+            if (title.match(/\b(health|exercise|doctor|medical|diet|wellness)\b/i)) topics.push('#topic/health');
+            if (title.match(/\b(code|program|debug|fix|develop|git|api)\b/i)) topics.push('#topic/programming');
+            if (title.match(/\b(oldergay|ogm|website|discourse|forum)\b/i)) topics.push('#topic/ogm');
+            if (title.match(/\b(ai|claude|gpt|chatgpt|llm|machine learning)\b/i)) topics.push('#topic/ai');
+            if (title.match(/\b(money|bill|tax|payment|finance|invest)\b/i)) topics.push('#topic/finance');
+            if (title.match(/\b(house|home|clean|repair|maintenance|chore)\b/i)) topics.push('#topic/home');
+            if (title.match(/\b(friend|family|social|meet|relationship)\b/i)) topics.push('#topic/social');
+            if (title.match(/\b(learn|read|course|study|research|book)\b/i)) topics.push('#topic/learning');
+            if (title.match(/\b(travel|trip|flight|hotel|vacation)\b/i)) topics.push('#topic/travel');
+            if (title.match(/\b(buy|shop|order|purchase|amazon)\b/i)) topics.push('#topic/shopping');
+
+            if (topics.length > 0) {
+              let newLine = line;
+              for (const topic of topics) {
+                if (!newLine.includes(topic)) {
+                  const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
+                  if (stageMatch) {
+                    newLine = `${stageMatch[1]} ${topic}${stageMatch[2]}`;
+                  } else {
+                    const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                    if (dateMatch) {
+                      newLine = `${dateMatch[1]} ${topic} ${dateMatch[2]}`;
+                    } else {
+                      newLine = `${newLine} ${topic}`;
+                    }
+                  }
+                  totalTopicsAdded++;
+                }
+              }
+              if (newLine !== line) {
+                lines[i] = newLine;
+                modified = true;
+              }
+            }
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
+          }
         }
       }
     }
@@ -776,17 +1008,27 @@ program
 
 // Prioritize status command - works with markdown files
 program
-  .command('prioritize-status')
-  .description('Add priority emojis to tasks in markdown files')
+  .command('prioritize-status [file]')
+  .description('Add priority emojis to tasks using AI analysis')
   .option('--all', 'Reprioritize all tasks (not just unprioritized)')
   .option('-v, --verbose', 'Show detailed output')
-  .action(async (options) => {
+  .option('--no-ai', 'Use simple keyword matching instead of AI')
+  .action(async (file, options) => {
     console.log(chalk.blue('🎯 Adding priority emojis to tasks in markdown files...'));
 
-    // Find all markdown files with tasks
-    const files = execSync('find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -l "^- \\[ \\]" 2>/dev/null || true', { encoding: 'utf8' })
-      .split('\n')
-      .filter(f => f);
+    // Check if AI is available and desired
+    const useAI = !options.noAi && (() => {
+      try {
+        execSync('which claude', { encoding: 'utf8' });
+        return true;
+      } catch {
+        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
+        return false;
+      }
+    })();
+
+    // Find files to process
+    const files = file ? [file] : findMarkdownFilesWithTasks();
 
     if (files.length === 0) {
       console.log(chalk.gray('No task files found'));
@@ -795,52 +1037,134 @@ program
 
     let totalPrioritized = 0;
 
-    for (const file of files) {
-      const content = fs.readFileSync(file, 'utf8');
-      const lines = content.split('\n');
-      let modified = false;
+    if (useAI) {
+      // AI-powered prioritization
+      const BATCH_SIZE = 20;
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Match tasks without priority emojis (or all tasks if --all)
-        if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
-          // Extract task title for prioritization
-          let title = line.replace(/^- \[ \] /, '')
-            .replace(/🔺|⏫|🔼|🔽|⏬/g, '') // Remove existing priority
-            .replace(/#\w+\/[\w-]+/g, '') // Remove tags
-            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
-            .replace(/🔁 .+$/g, '') // Remove recurrence
-            .trim();
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-          // Simple keyword-based prioritization (can be enhanced with AI)
-          let priority = '';
-          if (title.match(/\b(urgent|critical|emergency|asap|immediately|blocker)\b/i)) {
-            priority = '🔺'; // Highest
-          } else if (title.match(/\b(important|high|soon|priority|deadline)\b/i)) {
-            priority = '⏫'; // High
-          } else if (title.match(/\b(someday|maybe|consider|explore|research)\b/i)) {
-            priority = '🔽'; // Low
-          } else if (title.match(/\b(due|scheduled|meeting|call|appointment)\b/i)) {
-            priority = '⏫'; // High (time-sensitive)
-          } else {
-            priority = '🔼'; // Medium (default)
+        // Collect tasks needing prioritization
+        const tasksToClassify = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
+            const title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+            tasksToClassify.push({ lineIndex: i, title, line });
           }
+        }
 
-          // Add priority emoji after task title
-          const cleanLine = line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
-          const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
-          if (taskMatch) {
-            lines[i] = `${taskMatch[1].trim()} ${priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
-            modified = true;
-            totalPrioritized++;
+        if (tasksToClassify.length === 0) continue;
+
+        // Process in batches
+        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
+          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
+
+          const prompt = `Analyze these tasks and assign priority emojis based on urgency and importance.
+
+Use EXACTLY these priority emojis:
+- 🔺 (Highest) - Urgent and critical (health emergencies, critical deadlines, system failures)
+- ⏫ (High) - Important and time-sensitive (upcoming deadlines, scheduled meetings, important fixes)
+- 🔼 (Medium) - Regular priority (most daily tasks, routine work)
+- 🔽 (Low) - Nice to have (someday/maybe items, research, exploration)
+- ⏬ (Lowest) - Reference or optional (archived ideas, distant future)
+
+Respond with a JSON array where each has:
+{"index": task_index, "priority": "emoji"}
+
+Tasks:
+${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
+
+          try {
+            if (options.verbose) {
+              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
+            }
+
+            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+              encoding: 'utf8',
+              maxBuffer: 1024 * 1024 * 10,
+              timeout: 60000 // 1 minute timeout per batch
+            });
+
+            const jsonMatch = result.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              const classifications = JSON.parse(jsonMatch[0]);
+
+              for (const cls of classifications) {
+                const task = tasksToClassify[cls.index];
+                const cleanLine = task.line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
+                const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
+                if (taskMatch) {
+                  lines[task.lineIndex] = `${taskMatch[1].trim()} ${cls.priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
+                  modified = true;
+                  totalPrioritized++;
+                }
+              }
+            }
+          } catch (error) {
+            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
           }
         }
       }
+    } else {
+      // Fallback to keyword-based prioritization
+      for (const file of files) {
+        const content = fs.readFileSync(file, 'utf8');
+        const lines = content.split('\n');
+        let modified = false;
 
-      if (modified) {
-        fs.writeFileSync(file, lines.join('\n'));
-        if (options.verbose) {
-          console.log(chalk.gray(`  Updated: ${file}`));
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
+            let title = line.replace(/^- \[ \] /, '')
+              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+              .replace(/#\w+\/[\w-]+/g, '')
+              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
+              .replace(/🔁 .+$/g, '')
+              .trim();
+
+            let priority = '';
+            if (title.match(/\b(urgent|critical|emergency|asap|immediately|blocker)\b/i)) {
+              priority = '🔺';
+            } else if (title.match(/\b(important|high|soon|priority|deadline)\b/i)) {
+              priority = '⏫';
+            } else if (title.match(/\b(someday|maybe|consider|explore|research)\b/i)) {
+              priority = '🔽';
+            } else if (title.match(/\b(due|scheduled|meeting|call|appointment)\b/i)) {
+              priority = '⏫';
+            } else {
+              priority = '🔼';
+            }
+
+            const cleanLine = line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
+            const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
+            if (taskMatch) {
+              lines[i] = `${taskMatch[1].trim()} ${priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
+              modified = true;
+              totalPrioritized++;
+            }
+          }
+        }
+
+        if (modified) {
+          fs.writeFileSync(file, lines.join('\n'));
+          if (options.verbose) {
+            console.log(chalk.gray(`  Updated: ${file}`));
+          }
         }
       }
     }
@@ -857,28 +1181,28 @@ program
   .option('-v, --verbose', 'Show all available fields')
   .action((query, options) => {
     const tm = new TaskManager('.data/today.db', { readOnly: true });
-    
+
     try {
       // Search in all tasks if --all, otherwise just active
-      let sql = options.all ? 
+      let sql = options.all ?
         'SELECT * FROM tasks WHERE title LIKE ? OR description LIKE ? OR content LIKE ?' :
         "SELECT * FROM tasks WHERE (title LIKE ? OR description LIKE ? OR content LIKE ?) AND status != '✅ Done'";
-      
+
       const searchPattern = `%${query}%`;
       const tasks = tm.db.prepare(sql).all(searchPattern, searchPattern, searchPattern);
-      
+
       if (tasks.length === 0) {
         console.log(chalk.yellow(`No tasks found matching "${query}"`));
         return;
       }
-      
+
       console.log(chalk.blue(`\nFound ${tasks.length} task(s) matching "${query}":\n`));
-      
+
       for (const task of tasks) {
         console.log(chalk.bold('═'.repeat(60)));
         console.log(chalk.bold.cyan(`📋 ${task.title}`));
         console.log(chalk.gray('─'.repeat(60)));
-        
+
         // Basic info
         console.log(`ID:              ${chalk.yellow(task.id)}`);
         console.log(`Status:          ${task.status || chalk.gray('Not set')}`);
@@ -886,17 +1210,17 @@ program
         console.log(`Do Date:         ${task.do_date || chalk.gray('Not set')}`);
         console.log(`Created:         ${new Date(task.created_at).toLocaleString()}`);
         console.log(`Updated:         ${new Date(task.updated_at).toLocaleString()}`);
-        
+
         if (task.completed_at) {
           console.log(`Completed:       ${new Date(task.completed_at).toLocaleString()}`);
         }
-        
+
         // Project info
         if (task.project_id) {
           const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
           console.log(`Project:         ${project ? project.name : task.project_id}`);
         }
-        
+
         // Repeat info
         if (task.repeat_interval) {
           console.log(`Repeat:          Every ${task.repeat_interval} days`);
@@ -904,7 +1228,7 @@ program
             console.log(`Next Due:        ${task.repeat_next_date}`);
           }
         }
-        
+
         // Notion info
         if (task.notion_id) {
           console.log(`Notion ID:       ${task.notion_id}`);
@@ -912,7 +1236,7 @@ program
             console.log(`Notion URL:      ${task.notion_url}`);
           }
         }
-        
+
         // Topics
         try {
           const topics = tm.db.prepare(`
@@ -920,26 +1244,26 @@ program
             JOIN task_topics tt ON t.id = tt.topic_id
             WHERE tt.task_id = ?
           `).all(task.id);
-          
+
           if (topics.length > 0) {
             console.log(`Topics:          ${topics.map(t => t.name).join(', ')}`);
           }
         } catch (e) {
           // Topics table might not exist in some databases
         }
-        
+
         // Description - Always show if exists
         if (task.description) {
           console.log('');
           console.log(chalk.bold('Description:'));
           console.log(chalk.gray(task.description));
         }
-        
+
         if (task.content) {
           console.log(`\nContent:`);
           console.log(chalk.gray(task.content));
         }
-        
+
         // Verbose mode - show ALL fields
         if (options.verbose) {
           console.log(chalk.gray('\n' + '─'.repeat(60)));
@@ -950,7 +1274,7 @@ program
             }
           }
         }
-        
+
         console.log('');
       }
     } catch (error) {
@@ -968,10 +1292,10 @@ program
   .option('-d, --detailed', 'Show detailed project information')
   .action((options) => {
     const tm = new TaskManager();
-    
+
     try {
       const projects = tm.db.prepare('SELECT * FROM projects ORDER BY start_date DESC, name').all();
-      
+
       if (projects.length === 0) {
         console.log(chalk.gray('No projects found'));
         return;
@@ -983,7 +1307,7 @@ program
             .get(project.id).count;
           const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
             .get(project.id).count;
-          
+
           console.log(chalk.bold(`\n${project.name}`));
           console.log(chalk.gray('─'.repeat(40)));
           console.log(`ID:       ${project.id.substring(0, 8)}`);
@@ -1013,14 +1337,14 @@ program
             .get(project.id).count;
           const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
             .get(project.id).count;
-          
+
           let dates = '-';
           if (project.start_date && project.end_date) {
             const start = new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const end = new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             dates = `${start} - ${end}`;
           }
-          
+
           table.push([
             project.id.substring(0, 8),
             project.name,
@@ -1044,7 +1368,7 @@ program
   .option('--force', 'Skip confirmation prompt')
   .action(async (options) => {
     const tm = new TaskManager();
-    
+
     try {
       // Count tasks with Notion IDs
       const tasksWithNotion = tm.db.prepare(`
@@ -1052,14 +1376,14 @@ program
         FROM tasks 
         WHERE notion_id IS NOT NULL
       `).get();
-      
+
       if (tasksWithNotion.count === 0) {
         console.log(chalk.gray('No tasks with Notion IDs found'));
         return;
       }
-      
+
       console.log(chalk.yellow(`Found ${tasksWithNotion.count} tasks with Notion IDs`));
-      
+
       if (!options.force) {
         console.log(chalk.bold('\n⚠️  This will remove all Notion IDs from the database'));
         console.log(chalk.gray('This action cannot be undone'));
@@ -1067,16 +1391,16 @@ program
         console.log(chalk.gray('\nTo proceed, run with --force flag'));
         process.exit(0);
       }
-      
+
       // Clear Notion IDs
       const result = tm.db.prepare(`
         UPDATE tasks 
         SET notion_id = NULL, notion_url = NULL 
         WHERE notion_id IS NOT NULL
       `).run();
-      
+
       console.log(chalk.green(`✓ Cleared Notion IDs from ${result.changes} tasks`));
-      
+
     } catch (error) {
       console.error(chalk.red('Error clearing Notion IDs:'), error.message);
       process.exit(1);
@@ -1095,55 +1419,55 @@ program
     const { execSync } = await import('child_process');
     const { promises: fs } = await import('fs');
     const tm = new TaskManager();
-    
+
     try {
       if (options.verbose) {
         console.log(chalk.blue('Checking task consistency across all markdown files...'));
         console.log(chalk.gray('Using latest modification time to determine correct state'));
       }
-      
+
       // Find all markdown files (including vault/tasks/ for proper consistency)
       const markdownFiles = execSync('find "vault/" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
         .split('\n')
         .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
         .map(f => f.replace(/^\.\//, ''));
-      
+
       if (options.verbose) {
         console.log(chalk.gray(`Scanning ${markdownFiles.length} markdown files...`));
       }
-      
+
       // Collect all task statuses from all files with modification times
       const taskStatuses = new Map(); // taskId -> { states: Map<filePath, {completed, mtime}> }
       const taskTitles = new Map(); // taskId -> title
-      
+
       for (const filePath of markdownFiles) {
         // Process ALL files including vault/tasks/ to check consistency
         // The "latest modification wins" logic will determine the correct state
-        
+
         try {
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
           const stats = await fs.stat(filePath);
           const mtime = stats.mtime;
-          
+
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             // Match task lines with IDs - handle both normal and corrupted formats
             // Also matches "task-id: none" for proper handling
             const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|none) [-—]+>|<!-- task-id: ([a-f0-9]{32}|none) -->)/);
-            
+
             if (taskMatch) {
               const isCompleted = taskMatch[1] === 'x';
               const title = taskMatch[2].trim();
               const taskId = taskMatch[3] || taskMatch[4];
-              
+
               // Skip tasks marked with task-id: none (template/routine tasks)
               if (taskId === 'none') {
                 continue;
               }
-              
+
               if (!taskStatuses.has(taskId)) {
-                taskStatuses.set(taskId, { 
+                taskStatuses.set(taskId, {
                   states: new Map([[filePath, { completed: isCompleted, mtime }]])
                 });
                 taskTitles.set(taskId, title);
@@ -1157,21 +1481,21 @@ program
           // File doesn't exist or can't be read
         }
       }
-      
+
       // Find inconsistent tasks and determine correct state based on latest change
       const inconsistentTasks = [];
       for (const [taskId, status] of taskStatuses) {
         const states = Array.from(status.states.entries());
         const completedStates = states.filter(([_, state]) => state.completed);
         const notCompletedStates = states.filter(([_, state]) => !state.completed);
-        
+
         // Only inconsistent if we have both completed and not completed states
         if (completedStates.length > 0 && notCompletedStates.length > 0) {
           // Find the most recent modification
           let latestFile = null;
           let latestMtime = new Date(0);
           let latestCompleted = false;
-          
+
           for (const [file, state] of status.states) {
             if (state.mtime > latestMtime) {
               latestMtime = state.mtime;
@@ -1179,7 +1503,7 @@ program
               latestCompleted = state.completed;
             }
           }
-          
+
           inconsistentTasks.push({
             id: taskId,
             title: taskTitles.get(taskId),
@@ -1191,39 +1515,39 @@ program
           });
         }
       }
-      
+
       if (inconsistentTasks.length === 0) {
         console.log(chalk.green('✓ All tasks are consistent across files!'));
         return;
       }
-      
+
       console.log(chalk.yellow(`Found ${inconsistentTasks.length} inconsistent task(s):\n`));
-      
+
       // Display inconsistencies
       const table = new Table({
         head: ['Task', 'Status', 'Files'],
         colWidths: [40, 15, 40],
         wordWrap: true
       });
-      
+
       for (const task of inconsistentTasks) {
         const taskTitle = task.title.length > 37 ? task.title.substring(0, 34) + '...' : task.title;
         const status = task.shouldBeCompleted ? '→ Done' : '→ Not Done';
         const latestInfo = `Latest: ${path.basename(task.latestFile)}\n${task.latestMtime.toLocaleString()}`;
         table.push([taskTitle, status, latestInfo]);
       }
-      
+
       console.log(table.toString());
-      
+
       if (!options.fix) {
         console.log(chalk.yellow('\nRun with --fix to automatically resolve inconsistencies'));
         console.log(chalk.gray('(Latest change wins strategy)'));
         return;
       }
-      
+
       // Fix inconsistencies
       console.log(chalk.blue('\nFixing inconsistencies...'));
-      
+
       // Update database
       for (const task of inconsistentTasks) {
         const newStatus = task.shouldBeCompleted ? '✅ Done' : '🗂️ To File';
@@ -1232,18 +1556,18 @@ program
           console.log(chalk.green(`  ✓ Updated ${task.title.substring(0, 50)}... to ${newStatus}`));
         }
       }
-      
+
       // Update markdown files
       for (const task of inconsistentTasks) {
         const filesToUpdate = task.shouldBeCompleted ? task.notCompletedIn : task.completedIn;
-        
+
         for (const filePath of filesToUpdate) {
           // Update ALL files to maintain consistency
           // Even auto-generated files should reflect the latest state
           const content = await fs.readFile(filePath, 'utf-8');
           const lines = content.split('\n');
           let updated = false;
-          
+
           for (let i = 0; i < lines.length; i++) {
             if (lines[i].includes(`task-id: ${task.id}`)) {
               // Update the checkbox
@@ -1255,7 +1579,7 @@ program
               updated = true;
             }
           }
-          
+
           if (updated) {
             await fs.writeFile(filePath, lines.join('\n'));
             if (options.verbose) {
@@ -1264,10 +1588,10 @@ program
           }
         }
       }
-      
+
       console.log(chalk.green(`\n✓ Fixed ${inconsistentTasks.length} inconsistent task(s)`));
       console.log(chalk.gray('Run "bin/sync" to regenerate task files with consistent data'));
-      
+
     } catch (error) {
       console.error(chalk.red('Error checking consistency:'), error.message);
       process.exit(1);
