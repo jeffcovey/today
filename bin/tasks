@@ -13,7 +13,7 @@ import { execSync } from 'child_process';
 // Helper function to find markdown files containing tasks
 function findMarkdownFilesWithTasks() {
   // Use -exec instead of xargs to handle large number of files
-  return execSync('find vault/ -name "*.md" -type f -not -path "*/templates/*" -exec grep -l "^- \\[ \\]" {} \\; 2>/dev/null || true', { encoding: 'utf8' })
+  return execSync('find vault/ -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -exec grep -l "^- \\[ \\]" {} \\; 2>/dev/null || true', { encoding: 'utf8' })
     .split('\n')
     .filter(f => f);
 }
@@ -70,7 +70,7 @@ program
           try {
             // Use find command to get recently modified files
             const changedFiles = execSync(
-              `find "vault/" -name "*.md" -type f -mmin -${minutesAgo + 1} -not -path "*/templates/*" -not -path "*/.stversions/*" 2>/dev/null | grep -v node_modules | grep -v .git`,
+              `find "vault/" -name "*.md" -type f ! -path "*/.*" -mmin -${minutesAgo + 1} -not -path "*/templates/*" 2>/dev/null`,
               { encoding: 'utf8' }
             ).split('\n')
               .filter(f => f)
@@ -83,7 +83,7 @@ program
             } else {
               console.log(chalk.gray(`  No files modified since last sync`));
               // Still scan project files in case they need initial setup
-              allMarkdownFiles = execSync('find "vault/projects" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+              allMarkdownFiles = execSync('find "vault/projects" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
                 .split('\n')
                 .filter(f => f)
                 .map(f => f.replace(/^\.\//, ''));
@@ -97,7 +97,7 @@ program
         // If we don't have changed files or no last sync time, do full scan
         if (!onlyChangedFiles && !lastSyncTime) {
           console.log(chalk.blue('Finding all markdown files (first sync)...'));
-          allMarkdownFiles = execSync('find "vault/" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
+          allMarkdownFiles = execSync('find "vault/" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
             .map(f => f.replace(/^\.\//, ''));
@@ -107,7 +107,7 @@ program
         // Always include review files (even if not modified recently)
         // This ensures tasks in review files get their do_date set properly
         try {
-          const reviewFiles = execSync('find "vault/plans" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const reviewFiles = execSync('find "vault/plans" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -142,7 +142,7 @@ program
 
         // Always include topic files to sync new tasks and checkbox changes
         try {
-          const topicFiles = execSync('find "vault/topics" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
+          const topicFiles = execSync('find "vault/topics" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
             .split('\n')
             .filter(f => f)
             .map(f => f.replace(/^\.\//, ''));
@@ -213,7 +213,7 @@ program
         const { execSync } = (await import('child_process')).default || await import('child_process');
 
         // Find all #topic/ tags in vault files
-        const findTopicsCmd = `grep -r "#topic/" vault --include="*.md" | grep -o "#topic/[a-z0-9._-]*" | sort -u`;
+        const findTopicsCmd = `grep -r "#topic/" vault --include="*.md" --exclude-dir=".*" | grep -o "#topic/[a-z0-9._-]*" | sort -u`;
         let topics = [];
 
         try {
@@ -1427,7 +1427,7 @@ program
       }
 
       // Find all markdown files (including vault/tasks/ for proper consistency)
-      const markdownFiles = execSync('find "vault/" -name "*.md" -type f -not -path "*/templates/*" -not -path "*/.stversions/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
+      const markdownFiles = execSync('find "vault/" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
         .split('\n')
         .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
         .map(f => f.replace(/^\.\//, ''));

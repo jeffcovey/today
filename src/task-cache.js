@@ -5,7 +5,7 @@ import { watch } from 'chokidar';
 import { execSync } from 'child_process';
 
 class TaskCache {
-  constructor(vaultPath = './vault') {
+  constructor(vaultPath = './vault/') {
     this.vaultPath = vaultPath;
     this.cache = new Map(); // filename -> tasks array
     this.watcher = null;
@@ -29,7 +29,7 @@ class TaskCache {
     const startTime = Date.now();
 
     // Use find to get all .md files, excluding system directories
-    const findCmd = `find ${this.vaultPath} -name "*.md" -type f ! -path "*/@inbox/*" ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/.obsidian/*" ! -path "*/.trash/*" 2>/dev/null || true`;
+    const findCmd = `find ${this.vaultPath} -name "*.md" -type f ! -path "*/.*" 2>/dev/null || true`;
 
     try {
       const output = execSync(findCmd, { encoding: 'utf8' });

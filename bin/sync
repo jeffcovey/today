@@ -228,7 +228,7 @@ check_vault_exists() {
         print_info "Content from last 7 days: $recent_count files (notes: $recent_notes, plans: $recent_plans, projects: $recent_projects, topics: $recent_topics)"
         # Show up to 5 most recent files across all directories
         print_info "Most recent content:"
-        find vault -type f -name "*.md" -mtime -7 2>/dev/null | \
+        find vault/ -type f -name "*.md" ! -path "*/.*" -mtime -7 2>/dev/null | \
             xargs ls -t 2>/dev/null | head -5 | while read -r file; do
             echo "  • $(basename "$file") ($(dirname "$file"))"
         done

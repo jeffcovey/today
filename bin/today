@@ -306,11 +306,11 @@ fi
     
     # 4. Task Stats from markdown files
     # Count tasks directly from markdown files
-    TASK_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -h "^- \[ \]" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    TASK_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -h "^- \[ \]" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 
     # Count overdue tasks (with 📅 due or ⏳ scheduled dates before today)
     TODAY_DATE=$(date +%Y-%m-%d)
-    OVERDUE_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(📅|⏳)" 2>/dev/null | while read line; do
+    OVERDUE_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(📅|⏳)" 2>/dev/null | while read line; do
         # Extract date from line (either due 📅 or scheduled ⏳)
         DATE=$(echo "$line" | grep -oE "(📅|⏳) [0-9]{4}-[0-9]{2}-[0-9]{2}" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
         if [[ -n "$DATE" ]] && [[ "$DATE" < "$TODAY_DATE" ]]; then
@@ -319,7 +319,7 @@ fi
     done | wc -l | tr -d ' ' || echo "0")
 
     # Count high priority tasks (🔺 or ⏫)
-    HIGH_PRIORITY_COUNT=$(find vault -name "*.md" -type f -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(🔺|⏫)" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    HIGH_PRIORITY_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(🔺|⏫)" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 
     # 5. Health Metrics from Apple Health Export (if available)
     HEALTH_EXPORT="vault/logs/HealthAutoExport.zip"
