@@ -1287,7 +1287,7 @@ process_inbox() {
                 continue  # Skip the normal file move logic but keep the file
             fi
         
-        # Special case: Progress note - append to today's review
+        # Special case: Progress note - save to progress/ and append to today's review
         elif [[ "$TITLE" == "Progress" ]]; then
             # Get date components for new naming scheme
             YEAR=$(date +%Y)
@@ -1302,40 +1302,68 @@ process_inbox() {
             fi
             REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
             TIMESTAMP=$(date +"%H:%M")
-            
-            # Extract content (everything after first line)
-            PROGRESS_CONTENT=$(echo "$CONTENT" | tail -n +2 | sed '/^$/d')
-            
+
+            # Remove title line and subsequent blank lines (like concerns)
+            CLEANED_CONTENT=$(echo "$CONTENT" | awk '
+                NR==1 && /^#.*[Pp]rogress/ {next}  # Skip title line if it contains "progress"
+                /^$/ && !started {next}            # Skip leading blank lines
+                {started=1; print}                 # Print everything else
+            ')
+
+            # Save to progress directory
+            echo "$CLEANED_CONTENT" > "$file"  # Update content for move
+            DEST_DIR="vault/notes/progress"
+            DEST_FILE="$BASENAME"
+            print_info "  • Progress file → progress/$BASENAME"
+
+            # Also append to review file if it exists
             if [[ -f "$REVIEW_FILE" ]]; then
-                # Append to review file
                 echo "" >> "$REVIEW_FILE"
                 echo "### Progress Update ($TIMESTAMP)" >> "$REVIEW_FILE"
-                echo "$PROGRESS_CONTENT" >> "$REVIEW_FILE"
-                print_info "  • Progress note → Added to today's review"
-                print_info "    $TIMESTAMP: $(echo "$PROGRESS_CONTENT" | head -1)"
-                
-                # Delete the progress note from inbox only after successful append
-                rm "$file"
-                continue  # Skip the normal file move logic
+                echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
+                print_info "    Also added to today's review at $TIMESTAMP"
             else
-                print_error "  • No review file for today. Run 'bin/today' first"
-                print_info "    Progress note kept in inbox for next sync"
-                # Don't delete the file - leave it in inbox for next sync attempt
-                continue  # Skip the normal file move logic but keep the file
+                print_info "    No review file for today - will be added when 'bin/today' is run"
             fi
-        
-        # Special case: Concerns file
+
+        # Special case: Concerns file - save to concerns/ and append to today's review
         elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
+            # Get date components for new naming scheme
+            YEAR=$(date +%Y)
+            MONTH=$(date +%m)
+            DAY=$(date +%d)
+            WEEK=$(date +%V)  # ISO week number
+            # Determine quarter from month
+            if [ $MONTH -le 3 ]; then Q="Q1"
+            elif [ $MONTH -le 6 ]; then Q="Q2"
+            elif [ $MONTH -le 9 ]; then Q="Q3"
+            else Q="Q4"
+            fi
+            REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+            TIMESTAMP=$(date +"%H:%M")
+
             # Remove title line and subsequent blank lines
             CLEANED_CONTENT=$(echo "$CONTENT" | awk '
                 NR==1 && /^#.*[Cc]oncerns/ {next}  # Skip title line if it contains "concerns"
                 /^$/ && !started {next}            # Skip leading blank lines
                 {started=1; print}                 # Print everything else
             ')
+
+            # Save to concerns directory
             echo "$CLEANED_CONTENT" > "$file"  # Update content for move
             DEST_DIR="vault/notes/concerns"
             DEST_FILE="$BASENAME"
             print_info "  • Concerns file → concerns/$BASENAME"
+
+            # Also append to review file if it exists
+            if [[ -f "$REVIEW_FILE" ]]; then
+                echo "" >> "$REVIEW_FILE"
+                echo "### Concerns ($TIMESTAMP)" >> "$REVIEW_FILE"
+                echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
+                print_info "    Also added to today's review at $TIMESTAMP"
+            else
+                print_info "    No review file for today - will be added when 'bin/today' is run"
+            fi
         
         # Task files (contains checkboxes)
         elif echo "$CONTENT" | grep -qE "^-\s*\[[ x]\]"; then
@@ -1355,8 +1383,8 @@ process_inbox() {
             
             if [[ "$TASK_ONLY" == "true" ]]; then
                 # Append to consolidated tasks.md file
-                TASKS_FILE="vault/tasks/tasks.md"
-                mkdir -p vault/tasks 2>/dev/null
+                TASKS_FILE="vault/tasks.md"
+                mkdir -p vault 2>/dev/null
                 
                 # Insert tasks before Archive section (or at end if no Archive)
                 if [[ -f "$TASKS_FILE" ]]; then
@@ -1393,24 +1421,24 @@ process_inbox() {
                     echo "$CONTENT" > "$TASKS_FILE"
                 fi
                 
-                print_info "  • Task-only file → Added to tasks/tasks.md"
+                print_info "  • Task-only file → Added to tasks.md"
                 print_info "    Added $(echo "$CONTENT" | grep -c "^-\s*\[[ x]\]") task(s)"
                 
                 # Delete the original file from inbox
                 rm "$file"
                 continue  # Skip the normal file move logic
             else
-                # Mixed content - keep as separate file
-                DEST_DIR="vault/tasks"
+                # Mixed content - move to vault root for visibility
+                DEST_DIR="vault"
                 DEST_FILE="$BASENAME"
-                print_info "  • Mixed task file → tasks/$BASENAME"
+                print_info "  • Mixed content with tasks → vault/$BASENAME"
             fi
-        
-        # Daily notes (default)
+
+        # Default - move to vault root for manual processing
         else
-            DEST_DIR="vault/notes/daily"
+            DEST_DIR="vault"
             DEST_FILE="$BASENAME"
-            print_info "  • Daily note → daily/$BASENAME"
+            print_info "  • Note → vault/$BASENAME (for manual processing)"
         fi
         
         # Create destination directory if needed

@@ -182,20 +182,6 @@ async function processChanges() {
       }
     }
     
-    // Sync vault changes to git
-    log('Syncing vault to git...', 'info');
-    try {
-      const syncOutput = execSync('bin/vault-sync push', {
-        cwd: projectRoot,
-        encoding: 'utf8'
-      });
-      if (syncOutput.includes('Push completed successfully') || syncOutput.includes('No local changes')) {
-        log('Vault synced to git', 'success');
-      }
-    } catch (error) {
-      log(`Vault git sync failed: ${error.message}`, 'warn');
-    }
-    
     lastSyncTime = Date.now();
     
   } catch (error) {
