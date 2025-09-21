@@ -91,6 +91,10 @@ main() {
     
     # Run additional operations synchronously (no background jobs)
     print_header "⚡ Additional Sync Operations"
+
+    # Update markdown tasks cache and regenerate topic files
+    run_sync_step "🗄️ Update Task Cache" update_markdown_cache "Task cache updated" "Task cache update"
+    run_sync_step "📂 Generate Topics" generate_topic_files "Topic files generated" "Topic files"
     
     # Task classification for markdown files (works with Obsidian Tasks plugin)
     print_info "🔍 Starting task classification for markdown files..."
@@ -235,6 +239,50 @@ check_vault_exists() {
     fi
 
     return 0
+}
+
+# Update markdown tasks cache
+update_markdown_cache() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Updating markdown tasks cache from .md files..."
+
+    # Run the cache update command
+    if node bin/tasks update-cache 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"📊"* ]] || [[ "$line" == *"🏷️"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"Error"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        print_error "Cache update failed"
+        return 1
+    fi
+}
+
+# Generate topic files from cache
+generate_topic_files() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Generating topic files from cache..."
+
+    # Run the topic generation command
+    if node bin/tasks generate-topics 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"🗑️"* ]] || [[ "$line" == *"Generated"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"Error"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        print_error "Topic generation failed"
+        return 1
+    fi
 }
 
 # Legacy function names kept for compatibility
