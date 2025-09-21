@@ -1627,25 +1627,36 @@ export class TaskManager {
     return created;
   }
 
-  // Generate topic files with their associated tasks
+  // Generate topic files with Obsidian Tasks query blocks
   async generateTopicFiles() {
     const fs = await import('fs').then(m => m.promises);
     const path = await import('path');
-    
-    // Get all topics with active tasks
-    const topicsWithTasks = this.db.prepare(`
-      SELECT DISTINCT t.id, t.name
-      FROM topics t
-      JOIN task_topics tt ON t.id = tt.topic_id
-      JOIN tasks tk ON tt.task_id = tk.id
-      WHERE tk.status != '✅ Done'
-      ORDER BY t.name
+
+    // Get all task lines with topic tags from the markdown_tasks cache
+    const tasksWithTopics = this.db.prepare(`
+      SELECT DISTINCT line_text
+      FROM markdown_tasks
+      WHERE line_text LIKE '%#topic/%'
+        AND is_done = 0
     `).all();
-    
-    if (topicsWithTasks.length === 0) {
+
+    // Extract unique topics from the task lines
+    const topicSet = new Set();
+    const topicRegex = /#topic\/([a-zA-Z0-9_-]+)/g;
+
+    for (const task of tasksWithTopics) {
+      const matches = task.line_text.matchAll(topicRegex);
+      for (const match of matches) {
+        topicSet.add(match[1]);
+      }
+    }
+
+    const topics = Array.from(topicSet).sort();
+
+    if (topics.length === 0) {
       return 0;
     }
-    
+
     // Ensure topics directory exists
     const topicsDir = 'vault/topics';
     try {
@@ -1653,117 +1664,28 @@ export class TaskManager {
     } catch (e) {
       // Directory may already exist
     }
-    
+
     let generatedCount = 0;
-    
-    for (const topic of topicsWithTasks) {
-      // Convert topic name to filename (lowercase, replace spaces with hyphens)
-      const filename = topic.name.toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-        .replace(/\s+/g, '-')          // Replace spaces with hyphens
-        .replace(/-+/g, '-')           // Replace multiple hyphens with single
-        .replace(/^-|-$/g, '');        // Remove leading/trailing hyphens
-      
+
+    for (const topicTag of topics) {
+      // topicTag is already in the format we need (e.g., "health", "ogm", etc.)
+      const filename = topicTag;
+
+      // Convert to readable name for the title (e.g., "health" -> "Health", "ogm" -> "Ogm")
+      const topicName = topicTag
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
       const filePath = path.join(topicsDir, `${filename}.md`);
-      
-      // Get tasks for this topic
-      const tasks = this.db.prepare(`
-        SELECT tk.*
-        FROM tasks tk
-        JOIN task_topics tt ON tk.id = tt.task_id
-        WHERE tt.topic_id = ?
-          AND tk.status != '✅ Done'
-        ORDER BY tk.do_date ASC, tk.status ASC, tk.title ASC
-      `).all(topic.id);
-      
-      // Check if file exists and has custom content
-      let hasCustomContent = false;
-      let existingContent = '';
-      try {
-        existingContent = await fs.readFile(filePath, 'utf-8');
-        // Check if this is a generated file or has custom content
-        const tasksMarker = '## Tasks';
-        const markerIndex = existingContent.indexOf(tasksMarker);
-        if (markerIndex > 0) {
-          // Keep everything before the Tasks section
-          existingContent = existingContent.substring(0, markerIndex).trimEnd();
-          // Remove any trailing horizontal rules that would duplicate
-          existingContent = existingContent.replace(/(\n---\s*)+$/, '');
-          hasCustomContent = true;
-        }
-      } catch (e) {
-        // File doesn't exist, will create new one
-      }
-      
+
+      // Create file content with Obsidian Tasks query block
       const lines = [];
-      
-      if (hasCustomContent) {
-        // Use existing content
-        lines.push(existingContent);
-      } else {
-        // Create default structure
-        lines.push(`# ${topic.name}`);
-        lines.push('');
-        lines.push('## Overview');
-        lines.push('');
-        lines.push(`Tasks and projects related to ${topic.name}.`);
-        lines.push('');
-      }
-      
-      // Add the tasks section
-      lines.push('---');
+      lines.push(`# ${topicName}`);
       lines.push('');
-      lines.push('## Tasks');
-      lines.push('');
-      lines.push('<!-- Tasks for this topic will be automatically populated by bin/tasks sync -->');
-      lines.push('<!-- Do not edit below this line - tasks are managed by the sync system -->');
-      lines.push('');
-      
-      // Group tasks by date
-      const tasksByDate = {};
-      const noDateTasks = [];
-      
-      for (const task of tasks) {
-        if (task.do_date) {
-          if (!tasksByDate[task.do_date]) {
-            tasksByDate[task.do_date] = [];
-          }
-          tasksByDate[task.do_date].push(task);
-        } else {
-          noDateTasks.push(task);
-        }
-      }
-      
-      // Add tasks with dates
-      const sortedDates = Object.keys(tasksByDate).sort();
-      for (const date of sortedDates) {
-        const dateObj = new Date(date + 'T00:00:00');
-        const dateStr = dateObj.toLocaleDateString('en-US', { 
-          weekday: 'short', 
-          month: 'short', 
-          day: 'numeric' 
-        });
-        lines.push(`### ${dateStr}`);
-        lines.push('');
-        
-        for (const task of tasksByDate[date]) {
-          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          // Don't add topic tags in topic files - they're redundant
-          lines.push(`- [${checkbox}] ${task.title} <!-- task-id: ${task.id} -->`);
-        }
-        lines.push('');
-      }
-      
-      // Add tasks without dates
-      if (noDateTasks.length > 0) {
-        lines.push('### No Date Set');
-        lines.push('');
-        for (const task of noDateTasks) {
-          const checkbox = task.status === '✅ Done' ? 'x' : ' ';
-          lines.push(`- [${checkbox}] ${task.title} <!-- task-id: ${task.id} -->`);
-        }
-        lines.push('');
-      }
+      lines.push('```tasks');
+      lines.push(`filter by function task.tags.join(',').includes('#topic/${filename}')`);
+      lines.push('```');
       
       // Remove trailing empty lines
       while (lines.length > 0 && lines[lines.length - 1] === '') {
@@ -1773,7 +1695,25 @@ export class TaskManager {
       await fs.writeFile(filePath, lines.join('\n'));
       generatedCount++;
     }
-    
+
+    // Clean up topic files that no longer have any tasks
+    try {
+      const existingTopicFiles = await fs.readdir(topicsDir);
+      for (const file of existingTopicFiles) {
+        if (file.endsWith('.md')) {
+          const topicFromFile = file.slice(0, -3); // Remove .md extension
+          if (!topics.includes(topicFromFile)) {
+            // This topic no longer has any active tasks, remove the file
+            await fs.unlink(path.join(topicsDir, file));
+            console.log(`  Removed obsolete topic file: ${file}`);
+          }
+        }
+      }
+    } catch (e) {
+      // Directory might not exist or other error
+      console.error('Error cleaning up topic files:', e.message);
+    }
+
     return generatedCount;
   }
 
