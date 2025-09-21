@@ -36,6 +36,11 @@ npm install -g @anthropic-ai/claude-code
 echo "📦 Installing dotenvx..."
 npm install -g @dotenvx/dotenvx
 
+# Increase inotify watch limit for vault watcher (vault has many files)
+echo "🔧 Configuring inotify limits for vault watcher..."
+echo "fs.inotify.max_user_watches=524288" >> /etc/sysctl.conf
+sysctl -p
+
 # Install Resilio Sync for vault synchronization
 echo "📦 Installing Resilio Sync..."
 # Add repository key
