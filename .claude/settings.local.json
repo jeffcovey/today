@@ -36,7 +36,8 @@
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/logs/**)",
       "WebFetch(domain:marked.js.org)",
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/Bear/**)",
-      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/**)"
+      "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/**)",
+      "Read(//workspaces/today/vault/topics/**)"
     ],
     "deny": [],
     "ask": []
