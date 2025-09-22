@@ -705,7 +705,7 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
               const classifications = JSON.parse(jsonMatch[0]);
 
               for (const cls of classifications) {
-                const task = tasksToClassify[cls.index];
+                const task = batch[cls.index - i]; // Use batch index, not global index
                 globalTasksProcessed++; // Count each task processed
                 const stage = `#stage/${cls.stage}`;
 
@@ -985,7 +985,7 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
 
             // Apply results to tasks (store changes for later file updates)
             for (const cls of classifications) {
-              const task = batch[cls.index];
+              const task = batch[cls.index - i]; // Use batch index, not global index
               globalTasksProcessed++; // Count each task processed
 
               if (cls.topics && cls.topics.length > 0) {
