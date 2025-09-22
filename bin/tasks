@@ -1608,30 +1608,10 @@ program
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            // Match task lines with IDs - handle both normal and corrupted formats
-            // Also matches "task-id: none" for proper handling
-            const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:<![-—]+ task-id: ([a-f0-9]{32}|none) [-—]+>|<!-- task-id: ([a-f0-9]{32}|none) -->)/);
-
-            if (taskMatch) {
-              const isCompleted = taskMatch[1] === 'x';
-              const title = taskMatch[2].trim();
-              const taskId = taskMatch[3] || taskMatch[4];
-
-              // Skip tasks marked with task-id: none (template/routine tasks)
-              if (taskId === 'none') {
-                continue;
-              }
-
-              if (!taskStatuses.has(taskId)) {
-                taskStatuses.set(taskId, {
-                  states: new Map([[filePath, { completed: isCompleted, mtime }]])
-                });
-                taskTitles.set(taskId, title);
-              } else {
-                const status = taskStatuses.get(taskId);
-                status.states.set(filePath, { completed: isCompleted, mtime });
-              }
-            }
+            // DISABLED: task-id based sync no longer used with Obsidian Tasks
+            // Tasks are now managed through markdown_tasks cache table
+            // Skip processing tasks with old task-id format
+            continue;
           }
         } catch (err) {
           // File doesn't exist or can't be read
@@ -1724,8 +1704,10 @@ program
           const lines = content.split('\n');
           let updated = false;
 
+          // DISABLED: task-id based updates no longer used
+          // Tasks are now managed through Obsidian Tasks plugin
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes(`task-id: ${task.id}`)) {
+            if (false) {  // Never true - disabled task-id updates
               // Update the checkbox
               if (task.shouldBeCompleted) {
                 lines[i] = lines[i].replace(/^- \[ \]/, '- [x]');
