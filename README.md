@@ -140,12 +140,6 @@ bin/tasks list                         # List all active tasks
 bin/tasks list --today                 # Show today's tasks
 bin/tasks list --with-notion           # Show tasks imported from Notion
 bin/tasks add "New task" --date 2025-08-14
-bin/tasks done <id>                    # Mark task as complete
-
-# Notion migration tools (DEPRECATED - using Obsidian Tasks now)
-# bin/notion-mark-done                  # DEPRECATED - no longer using task-id
-# bin/notion-mark-done --all            # DEPRECATED
-# bin/tasks clear-notion-ids --force    # DEPRECATED
 ```
 
 #### Daily Automation (Perfect for Cron/Docker)
