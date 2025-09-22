@@ -2470,7 +2470,8 @@ export class CLIInterface {
               console.log(chalk.green(`✅ Verified: Tags successfully applied to task "${firstTask.title}"`));
             } else {
               console.log(chalk.yellow(`⚠️  Warning: Tag assignment may not have been applied to task "${firstTask.title}"`));
-              console.log(chalk.gray(`Debug task with: node src/index.js debug --task-id ${firstTask.id}`));
+              // DEPRECATED: task-id debugging no longer used with Obsidian Tasks
+              console.log(chalk.gray(`Debug task in database with ID: ${firstTask.id}`));
             }
           }
         } catch (error) {

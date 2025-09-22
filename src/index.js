@@ -438,7 +438,7 @@ program
   .command('debug')
   .description('Debug database items to examine status property structure')
   .option('--task <title>', 'Debug a specific task by title')
-  .option('--task-id <id>', 'Debug a specific task by ID')
+  .option('--task-id <id>', 'Debug a specific task by database ID (DEPRECATED - uses old system)')
   .option('--test-tag-assignment <taskId,tagId>', 'Test tag assignment with specific task and tag IDs')
   .option('--check-schema', 'Check Action Items database schema for Tag/Knowledge Vault property')
   .option('--check-tag-db', 'Check Tag/Knowledge Vault database directly')

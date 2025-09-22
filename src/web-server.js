@@ -2805,7 +2805,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
       inTasksBlock = false;
     } else if (!inTasksBlock && line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
       // Only include checkboxes that are NOT inside ```tasks blocks
-      // Extract task ID if present
+      // DEPRECATED: Extract task ID if present (old task-id system, keeping for compatibility)
       const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
       checkboxLines.push({
         lineNumber: index,
