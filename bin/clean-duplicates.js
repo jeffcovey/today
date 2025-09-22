@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// DEPRECATED: This script uses task-id which is no longer used
+// We've transitioned to Obsidian Tasks syntax
+// Duplicate detection should now be handled differently
+
 import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 

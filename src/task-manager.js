@@ -1,3 +1,8 @@
+// DEPRECATED: This entire TaskManager class uses task-id HTML comments
+// We're transitioning to Obsidian Tasks syntax without task-id
+// New task management is handled through markdown_tasks cache table
+// This file is kept for backwards compatibility but should not be used for new features
+
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { getDatabase } from './database-service.js';

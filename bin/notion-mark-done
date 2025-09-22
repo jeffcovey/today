@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// DEPRECATED: This script uses task-id which is no longer used
+// We've transitioned to Obsidian Tasks syntax
+// This script is kept for backwards compatibility only
+
 // Auto-use dotenvx if available
 import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();

@@ -142,10 +142,10 @@ bin/tasks list --with-notion           # Show tasks imported from Notion
 bin/tasks add "New task" --date 2025-08-14
 bin/tasks done <id>                    # Mark task as complete
 
-# Notion migration tools
-bin/notion-mark-done <task-id>         # Mark task as done in Notion
-bin/notion-mark-done --all             # Mark all tasks as done in Notion
-bin/tasks clear-notion-ids --force     # Remove Notion IDs after migration
+# Notion migration tools (DEPRECATED - using Obsidian Tasks now)
+# bin/notion-mark-done                  # DEPRECATED - no longer using task-id
+# bin/notion-mark-done --all            # DEPRECATED
+# bin/tasks clear-notion-ids --force    # DEPRECATED
 ```
 
 #### Daily Automation (Perfect for Cron/Docker)

@@ -296,7 +296,9 @@ bin/tasks add "Task title" --date YYYY-MM-DD --status "🚀 1st Priority"
 bin/tasks sync
 ```
 
-Copy task WITH ID (`<!-- task-id: xxx -->`) from today.md to review file.
+## DEPRECATED: No longer using task-id with Obsidian Tasks
+
+Tasks are now managed with Obsidian Tasks syntax
 
 ### Project files in `vault/projects/`
 
