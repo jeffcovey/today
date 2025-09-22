@@ -282,6 +282,27 @@ const pageStyle = `
     margin-right: 0.5rem;
   }
 
+  /* Obsidian-style callout variations */
+  details.callout-note {
+    border-left: 4px solid #007bff;
+  }
+
+  details.callout-tip {
+    border-left: 4px solid #28a745;
+  }
+
+  details.callout-warning {
+    border-left: 4px solid #ffc107;
+  }
+
+  details.callout-danger {
+    border-left: 4px solid #dc3545;
+  }
+
+  details.callout-info {
+    border-left: 4px solid #17a2b8;
+  }
+
   body {
     background-color: #f5f5f5;
     min-height: 100vh;
@@ -2648,11 +2669,37 @@ async function processTasksCodeBlocks(content) {
 
 // Process collapsible sections (bullet lists with nested code blocks)
 function processCollapsibleSections(content) {
-  // First handle simple nested lists (- text with indented items)
-  const nestedListRegex = /^- (.*?)(?:\n((?:  (?:- |\w).*\n?)+))/gm;
-
+  // Handle Obsidian-style callouts first (> [!note], > [!warning], etc.)
+  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)\]([^\n]*)\n((?:>.*\n?)*)/gim;
   let processedContent = content;
+
+  // Process Obsidian callouts
   let match;
+  while ((match = calloutRegex.exec(content)) !== null) {
+    const calloutType = match[1].toLowerCase();
+    const calloutTitle = match[2].trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
+    const calloutContent = match[3]
+      .split('\n')
+      .map(line => line.replace(/^>\s?/, '')) // Remove > prefix from each line
+      .join('\n')
+      .trim();
+
+    // Callouts should be closed by default
+    const openAttr = '';
+
+    // Create collapsible section
+    const replacement = `<details${openAttr} class="task-section callout-${calloutType}">
+<summary>${calloutTitle}</summary>
+<div class="section-content">
+${calloutContent}
+</div>
+</details>`;
+
+    processedContent = processedContent.replace(match[0], replacement);
+  }
+
+  // Then handle simple nested lists (- text with indented items)
+  const nestedListRegex = /^- (.*?)(?:\n((?:  (?:- |\w).*\n?)+))/gm;
   const nestedReplacements = [];
 
   // Process nested lists first
