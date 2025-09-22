@@ -750,10 +750,9 @@ const pageStyle = `
     align-self: stretch;
   }
   
-  /* Card body with markdown content has scrolling */
+  /* Card body with markdown content - natural flow */
   .card-body.markdown-content {
-    height: calc(100vh - 200px);
-    overflow-y: auto;
+    /* Remove fixed height to allow natural flow */
     padding: 1.5rem;
   }
   
@@ -779,8 +778,7 @@ const pageStyle = `
     }
     
     .card-body.markdown-content {
-      height: auto;
-      max-height: 50vh;
+      /* Natural flow on mobile too */
     }
   }
 </style>
