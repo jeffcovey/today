@@ -1,7 +1,11 @@
 FROM mcr.microsoft.com/devcontainers/javascript-node:20
 
 # Install build dependencies for native modules (better-sqlite3) and sqlite3 CLI
-RUN apt-get update && apt-get install -y python3 make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 python3-pip make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements.txt and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt --break-system-packages
 
 # Install Turso CLI manually (avoid auto-auth issues)
 RUN ARCH=$(uname -m) && \

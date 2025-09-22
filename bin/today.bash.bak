@@ -1,0 +1,757 @@
+#!/bin/bash
+
+# Quick review script that syncs, updates summary, and starts interactive Claude session
+# Usage: bin/today [--no-sync] [optional direct request]
+# Examples: 
+#   bin/today "Let's work on the PS trip project"
+#   bin/today --no-sync "Quick session without sync"
+#   bin/today --no-sync
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+# Parse arguments
+SKIP_SYNC=false
+DIRECT_REQUEST=""
+NON_INTERACTIVE=false
+COMMAND=""
+
+# Check for subcommands first
+if [ "$1" = "update" ]; then
+    COMMAND="update"
+    shift
+    # Update command always runs non-interactively
+    NON_INTERACTIVE=true
+    SKIP_SYNC=false  # We DO want to sync to get latest data!
+    # Direct request will be set later after we know the file path
+fi
+
+# Check for flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --no-sync)
+            SKIP_SYNC=true
+            shift
+            ;;
+        --non-interactive)
+            NON_INTERACTIVE=true
+            shift
+            ;;
+        *)
+            if [ -z "$DIRECT_REQUEST" ] && [ -z "$COMMAND" ]; then
+                DIRECT_REQUEST="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Handle update command immediately if specified
+if [ "$COMMAND" = "update" ]; then
+    echo "📊 Running automated review update..."
+
+    # Calculate the review file path
+    YEAR=$(date +%Y)
+    MONTH=$(date +%m)
+    DAY=$(date +%d)
+    WEEK=$(date +%V)
+    if [ $MONTH -le 3 ]; then Q="Q1"
+    elif [ $MONTH -le 6 ]; then Q="Q2"
+    elif [ $MONTH -le 9 ]; then Q="Q3"
+    else Q="Q4"
+    fi
+    REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+    # Sync first if not skipped
+    if [ "$SKIP_SYNC" != true ]; then
+        echo "🔄 Syncing data sources..."
+        bin/sync
+    fi
+
+    echo "📊 Updating review file..."
+
+    # Get current database data
+    DAILY_DATA=$(bin/db-query daily 2>&1)
+
+    # Read current review file
+    if [ ! -f "$REVIEW_FILE" ]; then
+        echo "❌ Review file not found: $REVIEW_FILE"
+        exit 1
+    fi
+
+    # Export variables for Python to access
+    export REVIEW_FILE
+    export DAILY_DATA
+    export CURRENT_TIME="$(date '+%I:%M %p %Z')"
+
+    # Use Python to call Claude API directly
+    python3 << 'PYTHON_SCRIPT'
+import os
+import sys
+import anthropic
+
+api_key = os.environ.get('TODAY_ANTHROPIC_KEY')
+if not api_key:
+    print('❌ TODAY_ANTHROPIC_KEY not found')
+    sys.exit(1)
+
+review_file = os.environ.get('REVIEW_FILE')
+daily_data = os.environ.get('DAILY_DATA', '')
+current_time = os.environ.get('CURRENT_TIME', '')
+
+# Read the review file
+try:
+    with open(review_file, 'r') as f:
+        current_content = f.read()
+except Exception as e:
+    print(f'❌ Could not read {review_file}: {e}')
+    sys.exit(1)
+
+prompt = f"""You are updating a daily review file.
+
+CURRENT FILE CONTENT:
+{current_content}
+
+CURRENT DATABASE DATA:
+{daily_data}
+
+CURRENT TIME: {current_time}
+
+YOUR TASK:
+1. Find the existing Update section in the file (usually starts with ### Update)
+2. Replace ONLY that section with a new update containing:
+   - Current time
+   - 3-5 bullet points of key changes/status
+3. Keep it concise (5-6 lines max)
+4. Return ONLY the complete updated file content, nothing else
+
+Do not add new sections. Just update the existing Update section."""
+
+client = anthropic.Anthropic(api_key=api_key)
+try:
+    response = client.messages.create(
+        model='claude-3-5-sonnet-20241022',
+        max_tokens=4000,
+        temperature=0,
+        messages=[{'role': 'user', 'content': prompt}]
+    )
+
+    updated_content = response.content[0].text
+
+    # Write updated content to file
+    with open(review_file, 'w') as f:
+        f.write(updated_content)
+
+    print(f'✅ Updated {review_file}')
+
+except Exception as e:
+    print(f'❌ Error: {e}', file=sys.stderr)
+    sys.exit(1)
+PYTHON_SCRIPT
+
+    exit $?
+fi
+
+# Display message for other modes
+if [ -n "$DIRECT_REQUEST" ]; then
+    echo "📊 Starting focused session: $DIRECT_REQUEST"
+else
+    echo "📊 Starting daily review process..."
+fi
+
+if [ "$SKIP_SYNC" = true ]; then
+    echo "⚠️  Skipping sync (--no-sync flag provided)"
+fi
+
+# Check if Claude CLI is authenticated by testing actual functionality
+echo "🔐 Checking Claude authentication..."
+TEST_RESPONSE=$(claude -p "Say 'ok'" 2>&1)
+if echo "$TEST_RESPONSE" | grep -q "Invalid API key\|Please run /login\|not authenticated"; then
+    echo ""
+    echo "⚠️  Claude CLI is not authenticated!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Claude is essential for daily reviews."
+    echo "Please authenticate now by running:"
+    echo ""
+    echo "  claude"
+    echo ""
+    echo "Then follow the browser prompt to login."
+    echo "After authentication, run 'bin/today' again."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    exit 1
+fi
+echo "✅ Claude is authenticated"
+echo ""
+
+# Check dependencies once per day (quietly) - skip in container if CI env var is set
+LAST_DEP_CHECK_FILE=".last-dep-check"
+# Simple date for dependency check
+TODAY_DATE=$(date +%Y-%m-%d)
+
+# Skip dependency check if running in container with limited network
+if [ "$SKIP_DEP_CHECK" != "true" ]; then
+    if [ ! -f "$LAST_DEP_CHECK_FILE" ] || [ "$(cat $LAST_DEP_CHECK_FILE 2>/dev/null)" != "$TODAY_DATE" ]; then
+        echo "🔍 Checking for dependency updates (timeout in 10s)..."
+        timeout 10 bin/update-deps --quiet || echo "⚠️  Dependency check timed out, continuing..."
+        echo "$TODAY_DATE" > "$LAST_DEP_CHECK_FILE"
+        echo ""
+    fi
+fi
+
+# Run sync to update all data sources (unless --no-sync flag provided)
+if [ "$SKIP_SYNC" != true ]; then
+    echo "🔄 Syncing data sources..."
+    bin/sync
+else
+    echo "⏭️  Skipping sync step"
+fi
+
+# Quick markdown lint check (non-blocking)
+if command -v npx &> /dev/null && [ -f ".markdownlint.json" ]; then
+    echo "📝 Checking markdown formatting..."
+    # Run lint but don't block on errors, just show warnings
+    npx markdownlint-cli2 'vault/plans/*.md' 2>&1 | head -10 || true
+    echo ""
+fi
+
+# Check if database exists and has required tables
+DB_PATH=".data/today.db"
+DB_MISSING=false
+TABLES_MISSING=false
+
+if [ ! -f "$DB_PATH" ]; then
+    echo "⚠️  Database not found at $DB_PATH"
+    DB_MISSING=true
+else
+    # Check if critical tables exist
+    TABLES_EXIST=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')" 2>/dev/null || echo "0")
+    if [ "$TABLES_EXIST" != "2" ]; then
+        echo "⚠️  Database missing required tables"
+        TABLES_MISSING=true
+    fi
+fi
+
+# If database is missing or incomplete, attempt to recover from Turso
+if [ "$DB_MISSING" = "true" ] || [ "$TABLES_MISSING" = "true" ]; then
+    echo "🔄 Database missing or incomplete - recovering from Turso..."
+    echo ""
+
+    # Create .data directory if needed
+    mkdir -p .data
+
+    # First create database with migrations if it doesn't exist
+    if [ "$DB_MISSING" = "true" ]; then
+        echo "🔨 Creating database and running migrations..."
+        node -e "
+            import('./src/migrations.js').then(async ({MigrationManager}) => {
+                const Database = (await import('better-sqlite3')).default;
+                const db = new Database('.data/today.db');
+                const manager = new MigrationManager(db);
+                await manager.runMigrations();
+                db.close();
+                console.log('✅ Database created with schema');
+            }).catch(err => {
+                console.error('❌ Failed to create database:', err.message);
+                process.exit(1);
+            });
+        " || exit 1
+        echo ""
+    fi
+
+    # Now pull data from Turso (without running full sync)
+    echo "📥 Pulling data from Turso..."
+    if bin/turso-sync pull 2>&1 | grep -v "^\[38;5;142m" | head -20; then
+        echo "✅ Database recovered successfully"
+        echo ""
+
+        # Verify database now exists and has tables
+        if [ -f "$DB_PATH" ]; then
+            TABLES_EXIST=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')" 2>/dev/null || echo "0")
+            if [ "$TABLES_EXIST" != "2" ]; then
+                echo "❌ Database recovery incomplete - tables still missing"
+                echo "Please check your Turso configuration"
+                exit 1
+            fi
+        else
+            echo "❌ Database recovery failed"
+            echo "Please check your Turso configuration in .env"
+            exit 1
+        fi
+    else
+        echo "❌ Failed to sync data from Turso"
+        echo "Please ensure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set in .env"
+        exit 1
+    fi
+fi
+
+# Quick check that database has data
+LAST_SYNC=$(sqlite3 "$DB_PATH" "SELECT MAX(created_at) FROM sync_log" 2>/dev/null || echo "")
+if [ -n "$LAST_SYNC" ]; then
+    echo "✅ Database ready (last sync: $LAST_SYNC)"
+    echo ""
+else
+    # No sync log entries yet, but check if we have other data
+    TASK_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM tasks" 2>/dev/null || echo "0")
+    if [ "$TASK_COUNT" != "0" ]; then
+        echo "✅ Database ready ($TASK_COUNT tasks found)"
+        echo ""
+    else
+        # Database exists but is empty - add initial sync log entry
+        echo "📝 Initializing sync log..."
+        sqlite3 "$DB_PATH" "INSERT INTO sync_log (timestamp, sync_type, success, source_system, target_system, created_at) VALUES (datetime('now'), 'initial', 1, 'local', 'turso', datetime('now'))" 2>/dev/null || true
+        echo "✅ Database ready (initialized)"
+        echo ""
+    fi
+    # Set LAST_SYNC to a valid value for the rest of the script
+    LAST_SYNC="initialized"
+fi
+
+# Only proceed if we have a valid database state
+if [ -z "$LAST_SYNC" ]; then
+    echo "❌ Database check failed"
+    echo "Please check bin/sync for errors"
+    exit 1
+fi
+    
+    # ============================================
+    # PRE-COMPUTE ALL CONTEXT DATA
+    # ============================================
+    
+    # Get timezone from config
+    TIMEZONE=$(bin/get-config timezone 2>/dev/null || echo "America/New_York")
+    
+    # 1. Date/Time Information
+    CURRENT_TIME=$(TZ=$TIMEZONE date '+%A, %B %d, %Y at %I:%M %p %Z')
+    CURRENT_DATE=$(TZ=$TIMEZONE date '+%Y-%m-%d')
+    DAY_OF_WEEK=$(TZ=$TIMEZONE date '+%A')
+    YEAR=$(date +%Y)
+    MONTH=$(date +%m)
+    DAY=$(date +%d)
+    WEEK=$(date +%V)  # ISO week number
+    
+    # Determine quarter from month
+    if [ $MONTH -le 3 ]; then Q="Q1"
+    elif [ $MONTH -le 6 ]; then Q="Q2"
+    elif [ $MONTH -le 9 ]; then Q="Q3"
+    else Q="Q4"
+    fi
+    
+    # 2. Calculate Stage Theme
+    case $DAY_OF_WEEK in
+        Monday|Wednesday|Saturday)
+            STAGE_THEME="Front Stage"
+            STAGE_FOCUS="Meetings, calls, support, emails"
+            ;;
+        Thursday|Sunday)
+            STAGE_THEME="Back Stage"
+            STAGE_FOCUS="Maintenance, bills, bug fixes, organizing"
+            ;;
+        Tuesday|Friday)
+            STAGE_THEME="Off Stage"
+            STAGE_FOCUS="Personal time, nature, friends, reading"
+            ;;
+    esac
+    
+    # 3. Plan File Paths
+    YEAR_PLAN="vault/plans/${YEAR}_00.md"
+    QUARTER_PLAN="vault/plans/${YEAR}_${Q}_00.md"
+    MONTH_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_00.md"
+    WEEK_PLAN="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_00.md"
+    REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+
+    # Create daily plan from template if it doesn't exist
+    if [ ! -f "$REVIEW_FILE" ]; then
+        TEMPLATE_FILE="vault/templates/daily-plan.md"
+        if [ -f "$TEMPLATE_FILE" ]; then
+            echo "📝 Creating daily plan from template..."
+            mkdir -p "$(dirname "$REVIEW_FILE")"
+
+            # Get additional date variables for template
+            MONTH_NAME=$(TZ=$TIMEZONE date '+%B')
+            FULL_DATE="$(TZ=$TIMEZONE date '+%B %d, %Y')"
+
+            # Copy template and replace variables
+            cp "$TEMPLATE_FILE" "$REVIEW_FILE"
+
+            # Replace template variables
+            sed -i '' \
+                -e "s/{{DAY_OF_WEEK}}/$DAY_OF_WEEK/g" \
+                -e "s/{{MONTH_NAME}}/$MONTH_NAME/g" \
+                -e "s/{{DAY}}/$DAY/g" \
+                -e "s/{{YEAR}}/$YEAR/g" \
+                -e "s/{{FULL_DATE}}/$FULL_DATE/g" \
+                -e "s/{{STAGE_THEME}}/$STAGE_THEME/g" \
+                -e "s/{{STAGE_FOCUS}}/$STAGE_FOCUS/g" \
+                -e 's/{{PRIORITIES_FROM_DATABASE}}//g' \
+                -e 's/{{MORNING_TIME_BLOCKS}}//g' \
+                -e 's/{{AFTERNOON_TIME_BLOCKS}}//g' \
+                -e 's/{{EVENING_TIME_BLOCKS}}//g' \
+                "$REVIEW_FILE" 2>/dev/null || \
+            sed -i \
+                -e "s/{{DAY_OF_WEEK}}/$DAY_OF_WEEK/g" \
+                -e "s/{{MONTH_NAME}}/$MONTH_NAME/g" \
+                -e "s/{{DAY}}/$DAY/g" \
+                -e "s/{{YEAR}}/$YEAR/g" \
+                -e "s/{{FULL_DATE}}/$FULL_DATE/g" \
+                -e "s/{{STAGE_THEME}}/$STAGE_THEME/g" \
+                -e "s/{{STAGE_FOCUS}}/$STAGE_FOCUS/g" \
+                -e 's/{{PRIORITIES_FROM_DATABASE}}//g' \
+                -e 's/{{MORNING_TIME_BLOCKS}}//g' \
+                -e 's/{{AFTERNOON_TIME_BLOCKS}}//g' \
+                -e 's/{{EVENING_TIME_BLOCKS}}//g' \
+                "$REVIEW_FILE"
+
+            echo "✅ Created daily plan: $REVIEW_FILE"
+            echo ""
+        fi
+    fi
+    
+    # Check which plans exist
+    EXISTING_PLANS=""
+    [ -f "$YEAR_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Year plan: $YEAR_PLAN\n"
+    [ -f "$QUARTER_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Quarter plan: $QUARTER_PLAN\n"
+    [ -f "$MONTH_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Month plan: $MONTH_PLAN\n"
+    [ -f "$WEEK_PLAN" ] && EXISTING_PLANS="${EXISTING_PLANS}- Week plan: $WEEK_PLAN\n"
+    
+    # Check if today's review exists
+    REVIEW_STATUS="new"
+    if [ -f "$REVIEW_FILE" ]; then
+        REVIEW_STATUS="exists"
+    fi
+    
+    # 4. Task Stats from markdown files
+    # Count tasks directly from markdown files
+    TASK_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -h "^- \[ \]" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    # Count overdue tasks (with 📅 due or ⏳ scheduled dates before today)
+    TODAY_DATE=$(date +%Y-%m-%d)
+    OVERDUE_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(📅|⏳)" 2>/dev/null | while read line; do
+        # Extract date from line (either due 📅 or scheduled ⏳)
+        DATE=$(echo "$line" | grep -oE "(📅|⏳) [0-9]{4}-[0-9]{2}-[0-9]{2}" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1)
+        if [[ -n "$DATE" ]] && [[ "$DATE" < "$TODAY_DATE" ]]; then
+            echo "1"
+        fi
+    done | wc -l | tr -d ' ' || echo "0")
+
+    # Count high priority tasks (🔺 or ⏫)
+    HIGH_PRIORITY_COUNT=$(find vault -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" 2>/dev/null | xargs grep -hE "^- \[ \].*(🔺|⏫)" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    # 5. Health Metrics from Apple Health Export (if available)
+    HEALTH_EXPORT="vault/logs/HealthAutoExport.zip"
+    HEALTH_METRICS=""
+    if [ -f "$HEALTH_EXPORT" ]; then
+        # Extract and analyze health data
+        HEALTH_DATA=$(cd vault/logs && unzip -qo HealthAutoExport.zip "HealthAutoExport*.json" 2>/dev/null && python3 -c "
+import json
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+try:
+    with open([f for f in __import__('glob').glob('HealthAutoExport*.json')][0], 'r') as f:
+        data = json.load(f)
+
+        # Get yesterday's date for comparison
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        last_week_avg_steps = 0
+        yesterday_steps = 0
+        recent_weight = 'N/A'
+        recent_drinks = []
+        recent_workouts = []
+
+        for metric in data['data']['metrics']:
+            if metric.get('name') == 'step_count':
+                daily_steps = defaultdict(float)
+                for entry in metric.get('data', []):
+                    date_str = entry['date'].split()[0]
+                    steps = entry.get('qty', 0)
+                    daily_steps[date_str] += steps
+
+                # Get last 7 days average
+                recent_dates = sorted(daily_steps.keys())[-7:]
+                if recent_dates:
+                    last_week_avg_steps = sum(daily_steps[d] for d in recent_dates) / len(recent_dates)
+                    if yesterday in daily_steps:
+                        yesterday_steps = daily_steps[yesterday]
+
+            elif metric.get('name') == 'weight_body_mass':
+                weights = [(e['date'].split()[0], e.get('qty', 0)) for e in metric.get('data', [])]
+                if weights:
+                    weights.sort()
+                    recent_weight = f\"{weights[-1][1]:.1f} lbs\"
+
+            elif metric.get('name') == 'alcohol_consumption':
+                for entry in metric.get('data', [])[-7:]:  # Last week
+                    date_str = entry['date'].split()[0]
+                    drinks = entry.get('qty', 0)
+                    if drinks > 0:
+                        recent_drinks.append((date_str, drinks))
+
+        # Get recent workouts
+        if 'workouts' in data['data']:
+            for workout in data['data']['workouts'][-5:]:  # Last 5 workouts
+                name = workout.get('name', 'Unknown')
+                start = workout.get('start', '')[:10] if workout.get('start') else 'N/A'
+                recent_workouts.append((start, name))
+
+        # Format output
+        print(f'avg_steps:{int(last_week_avg_steps)}')
+        print(f'yesterday_steps:{int(yesterday_steps)}')
+        print(f'recent_weight:{recent_weight}')
+        print(f'recent_drinks:{len(recent_drinks)}')
+        if recent_workouts:
+            last_workout = recent_workouts[-1]
+            print(f'last_workout:{last_workout[1]} on {last_workout[0]}')
+
+except Exception as e:
+    pass
+finally:
+    # Clean up
+    __import__('os').system('rm -f HealthAutoExport*.json 2>/dev/null')
+" 2>/dev/null || echo "")
+
+        if [ -n "$HEALTH_DATA" ]; then
+            HEALTH_METRICS="
+## Health Metrics (Last 7 days)
+$(echo "$HEALTH_DATA" | while IFS=: read key value; do
+    case $key in
+        avg_steps) echo "- **Average Steps**: $value/day";;
+        yesterday_steps) [ "$value" != "0" ] && echo "- **Yesterday**: $value steps";;
+        recent_weight) [ "$value" != "N/A" ] && echo "- **Weight**: $value";;
+        recent_drinks) [ "$value" != "0" ] && echo "- **Alcohol days**: $value in last week";;
+        last_workout) [ -n "$value" ] && echo "- **Last workout**: $value";;
+    esac
+done)"
+        fi
+    fi
+    
+    if [ -n "$DIRECT_REQUEST" ]; then
+        # Direct request mode - skip the full review
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Review file: $REVIEW_FILE"
+        echo ""
+        echo "Starting focused Claude session..."
+        echo "Request: $DIRECT_REQUEST"
+        echo ""
+        echo "📊 Task Statistics from markdown:"
+        echo "  • Active tasks: $TASK_COUNT"
+        echo "  • Overdue: $OVERDUE_COUNT"
+        echo "  • High priority: $HIGH_PRIORITY_COUNT"
+        echo ""
+        echo "Claude will:"
+        echo "  • Review your markdown task files"
+        echo "  • Check today's review if it exists"
+        echo "  • Focus on your specific request"
+        echo ""
+        echo "💡 Useful commands during the session:"
+        echo "  bin/mark-done 'task'  # Mark task complete"
+        echo "  bin/progress 'note'   # Add progress note"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Create a prompt that includes context but focuses on the request
+        if [ "$NON_INTERACTIVE" = true ]; then
+            echo "🤖 Running Claude in non-interactive mode..."
+            # Non-interactive mode - use -p flag
+            # Create prompt in a variable first to avoid heredoc issues
+            PROMPT="$(cat <<EOF
+# Focused Work Session - NON-INTERACTIVE MODE
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- The user ran this command specifically requesting: "${DIRECT_REQUEST}"
+- Complete the task WITHOUT asking for confirmation
+
+## Pre-Computed Context
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+$HEALTH_METRICS
+
+## Context Available
+- SQLite database at .data/today.db with all current data
+- **IMPORTANT**: Use `bin/db-query daily` to get comprehensive data (pre-approved command)
+- Available queries: `bin/db-query tasks`, `bin/db-query events`, `bin/db-query emails`, etc.
+
+## Database Access
+**ALWAYS use bin/db-query for database queries!** This is pre-approved and has correct schemas.
+
+CORRECT usage:
+- `bin/db-query daily` - Get comprehensive daily review data
+- `bin/db-query tasks` - Get priority tasks
+- `bin/db-query events` - Get calendar events
+- `bin/db-query custom "SELECT ..."` - For ANY custom SQL query
+
+WRONG: `bin/db-query "SELECT ..."`
+RIGHT: `bin/db-query custom "SELECT ..."`
+
+## Direct Request from User
+"${DIRECT_REQUEST}"
+
+## YOUR TASK:
+1. Use `bin/db-query daily` to get current context (this is PRE-APPROVED, no permission needed)
+2. Check if today's review exists and read it
+3. Update the EXISTING "Update" section with current time and 3-5 key changes
+4. Do NOT add new sections - just update the existing Update section
+5. Complete the task and exit (this is non-interactive)
+
+IMPORTANT: These commands are PRE-APPROVED and need no permission:
+- bin/db-query daily
+- bin/db-query tasks
+- bin/db-query events
+- bin/db-query emails
+- bin/db-query contacts
+- bin/db-query ogm
+- bin/db-query journal
+- bin/db-query custom "SELECT ..."  (for any custom queries)
+
+Execute the request NOW without asking for permission!
+EOF
+)"
+            # Run Claude with the prompt, allowing file operations
+            # Using print for non-interactive output and skip permissions for automation
+            claude --print --dangerously-skip-permissions "$PROMPT"
+        else
+            echo "🤖 Starting Claude focused session..."
+            # Interactive mode - normal claude command
+            claude "$(cat <<EOF
+# Focused Work Session
+
+## Pre-Computed Context
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+$HEALTH_METRICS
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
+
+## Context Available
+- SQLite database at .data/today.db with all current data
+- **IMPORTANT**: Use `bin/db-query daily` to get comprehensive data (pre-approved command)
+- Available queries: `bin/db-query tasks`, `bin/db-query events`, `bin/db-query emails`, etc.
+
+## Database Access
+**ALWAYS use bin/db-query for database queries!** This is pre-approved and has correct schemas.
+
+CORRECT usage:
+- `bin/db-query daily` - Get comprehensive daily review data
+- `bin/db-query tasks` - Get priority tasks
+- `bin/db-query events` - Get calendar events
+- `bin/db-query custom "SELECT ..."` - For ANY custom SQL query
+
+WRONG: `bin/db-query "SELECT ..."`
+RIGHT: `bin/db-query custom "SELECT ..."`
+
+## Direct Request from User
+"${DIRECT_REQUEST}"
+
+Please:
+1. Query the database to understand current context
+2. Check if today's review exists to understand what's been done
+3. Focus on helping with the specific request above
+4. You can reference relevant tasks, projects, or information from the database
+5. This is an interactive session - continue helping as needed
+
+Let's get started with the request!
+EOF
+)"
+        fi
+    else
+        # Normal review mode
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📝 Review file: $REVIEW_FILE"
+        echo ""
+        echo "Starting interactive Claude session..."
+        echo ""
+        echo "📊 Task Statistics from markdown:"
+        echo "  • Active tasks: $TASK_COUNT"
+        echo "  • Overdue: $OVERDUE_COUNT"
+        echo "  • High priority: $HIGH_PRIORITY_COUNT"
+        echo ""
+        echo "Claude will:"
+        echo "  • Review your markdown task files"
+        echo "  • Create or update today's review file"
+        echo "  • Provide recommendations"
+        echo "  • Continue working with you as needed"
+        echo ""
+        echo "💡 Useful commands during the session:"
+        echo "  bin/mark-done 'task'  # Mark task complete"
+        echo "  bin/progress 'note'   # Add progress note"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        # Start Claude session with TODAY.md
+        if [ "$NON_INTERACTIVE" = true ]; then
+            echo "🤖 Running Claude in non-interactive mode..."
+            # Add explicit permission for file operations in non-interactive mode
+            PROMPT="$(cat <<EOF
+## NON-INTERACTIVE MODE - FULL PERMISSIONS GRANTED
+
+You are running in non-interactive mode. This means:
+- You have FULL PERMISSION to create and update all files
+- Do NOT ask for permission - just perform the requested actions
+- Complete all tasks without waiting for user confirmation
+- When instructed to update the review file, UPDATE IT immediately
+
+## Pre-Computed Context (No calculations needed!)
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
+
+$(cat TODAY.md | sed '/^### 🔴 CRITICAL FIRST STEPS 🔴/,/^3\. \*\*Query Database/d')
+EOF
+)"
+            # Run Claude with the prompt, allowing file operations
+            # Using print for non-interactive output and skip permissions for automation
+            claude --print --dangerously-skip-permissions "$PROMPT"
+        else
+            echo "🤖 Starting Claude interactive session..."
+            claude "$(cat <<EOF
+# Daily Review Session
+
+## Pre-Computed Context (No calculations needed!)
+- **Current Time**: $CURRENT_TIME
+- **Date**: $CURRENT_DATE ($DAY_OF_WEEK)
+- **Stage**: $STAGE_THEME - $STAGE_FOCUS
+- **Timezone**: $TIMEZONE
+- **Review File**: $REVIEW_FILE ($REVIEW_STATUS)
+- **Active Tasks**: $TASK_COUNT (Overdue: $OVERDUE_COUNT, High Priority: $HIGH_PRIORITY_COUNT)
+
+## Existing Plans
+$(echo -e "$EXISTING_PLANS")
+
+$(cat TODAY.md | sed '1,/^## Session Instructions for Claude/d' | sed '/^### 🔴 CRITICAL FIRST STEPS 🔴/,/^3\. \*\*Query Database/d')
+EOF
+)"
+        fi
+    fi
+    
+    # After Claude session ends
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "✅ Claude session ended"
+    echo ""
+    echo "📝 Your review should be in: $REVIEW_FILE"
+    echo ""
+    echo "💡 Continue tracking progress with:"
+    echo "   bin/mark-done 'task description'"
+    echo "   bin/progress 'note'"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""

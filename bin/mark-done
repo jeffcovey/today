@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Script to mark tasks as done in today's review file
+# Script to mark tasks as done using Obsidian Tasks syntax
+# Updates both the markdown file and the markdown_tasks cache
 
 # Load common dotenvx handler
 source "$(dirname "$0")/lib/dotenvx-loader.sh"
 auto_dotenvx "$@"
 
-# Get date components for new naming scheme
+# Get date components for review file
 YEAR=$(date +%Y)
 MONTH=$(date +%m)
 DAY=$(date +%d)
@@ -18,91 +19,129 @@ elif [ $MONTH -le 9 ]; then Q="Q3"
 else Q="Q4"
 fi
 REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
-TIMESTAMP=$(date +"%H:%M")
-
-# Check if review file exists
-if [ ! -f "$REVIEW_FILE" ]; then
-    echo "❌ No review file for today. Run 'bin/today' first to create one."
-    exit 1
-fi
+COMPLETION_DATE=$(date +"%Y-%m-%d")
 
 if [ $# -eq 0 ]; then
-    echo "Usage: bin/mark-done <task description or number>"
+    echo "Usage: bin/mark-done <task description or number> [file]"
     echo ""
     echo "Examples:"
     echo "  bin/mark-done 'Take a 20-minute walk'"
-    echo "  bin/mark-done 1  # marks first task as done"
+    echo "  bin/mark-done 1  # marks first task in today's review"
+    echo "  bin/mark-done 'Review emails' vault/tasks.md"
+    echo ""
+    echo "Uses Obsidian Tasks syntax: adds ✅ YYYY-MM-DD"
+    exit 1
+fi
+
+# Determine target file
+if [ $# -ge 2 ]; then
+    # File specified
+    TARGET_FILE="${@: -1}"
+    SEARCH_ARGS="${@:1:$#-1}"
+else
+    # Default to review file
+    TARGET_FILE="$REVIEW_FILE"
+    SEARCH_ARGS="$1"
+fi
+
+# Check if target file exists
+if [ ! -f "$TARGET_FILE" ]; then
+    echo "❌ File not found: $TARGET_FILE"
+    if [[ "$TARGET_FILE" == "$REVIEW_FILE" ]]; then
+        echo "   Run 'bin/today' first to create today's review."
+    fi
     exit 1
 fi
 
 # Create a temporary file
 TEMP_FILE=$(mktemp)
 
-# Process the review file and mark tasks as done
-if [[ "$1" =~ ^[0-9]+$ ]]; then
+# Process the file and mark tasks as done
+if [[ "$SEARCH_ARGS" =~ ^[0-9]+$ ]]; then
     # Mark by task number
-    TASK_NUM=$1
+    TASK_NUM=$SEARCH_ARGS
     COUNTER=0
     FOUND=false
-    
+
     while IFS= read -r line; do
-        # Look for task patterns (lines starting with - [ ] or numbered items)
-        if [[ "$line" =~ ^-\ \[\ \] ]] || [[ "$line" =~ ^[0-9]+\.\ .*\*\*.* ]]; then
+        # Look for unchecked task patterns
+        if [[ "$line" =~ ^[[:space:]]*-[[:space:]]\[[[:space:]]\] ]] && [[ ! "$line" =~ ✅ ]]; then
             COUNTER=$((COUNTER + 1))
             if [ $COUNTER -eq $TASK_NUM ]; then
-                if [[ "$line" =~ ^-\ \[\ \] ]]; then
-                    # Checkbox format
-                    echo "${line/- \[ \]/- [x]} ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
-                else
-                    # Numbered format
-                    echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
-                fi
+                # Check the task using Obsidian syntax
+                # Replace - [ ] with - [x] and add completion date
+                CHECKED_LINE="${line//- \[ \]/- [x]}"
+                echo "$CHECKED_LINE ✅ $COMPLETION_DATE" >> "$TEMP_FILE"
                 FOUND=true
-                COMPLETED_TASK="${line#- \[ \] }"
-                COMPLETED_TASK="${COMPLETED_TASK#[0-9]. }"
+                # Extract task description for confirmation
+                COMPLETED_TASK=$(echo "$line" | sed 's/^[[:space:]]*- \[ \] //')
             else
                 echo "$line" >> "$TEMP_FILE"
             fi
         else
             echo "$line" >> "$TEMP_FILE"
         fi
-    done < "$REVIEW_FILE"
+    done < "$TARGET_FILE"
 else
     # Mark by matching text
-    SEARCH_TEXT="$*"
+    SEARCH_TEXT="$SEARCH_ARGS"
     FOUND=false
-    
+
     while IFS= read -r line; do
-        # Check if this line contains the search text
-        if [[ "$line" == *"$SEARCH_TEXT"* ]] && [[ "$line" != *"✓"* ]]; then
-            if [[ "$line" =~ ^-\ \[\ \] ]]; then
-                # Checkbox format
-                echo "${line/- \[ \]/- [x]} ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
-            elif [[ "$line" =~ ^[0-9]+\. ]]; then
-                # Numbered format
-                echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
-            else
-                # Other format - just append checkmark
-                echo "$line ✓ ($TIMESTAMP)" >> "$TEMP_FILE"
-            fi
+        # Check if this is an unchecked task containing the search text
+        if [[ "$line" =~ ^[[:space:]]*-[[:space:]]\[[[:space:]]\] ]] && \
+           [[ "$line" == *"$SEARCH_TEXT"* ]] && \
+           [[ ! "$line" =~ ✅ ]]; then
+            # Check the task using Obsidian syntax
+            CHECKED_LINE="${line//- \[ \]/- [x]}"
+            echo "$CHECKED_LINE ✅ $COMPLETION_DATE" >> "$TEMP_FILE"
             FOUND=true
             COMPLETED_TASK="$SEARCH_TEXT"
         else
             echo "$line" >> "$TEMP_FILE"
         fi
-    done < "$REVIEW_FILE"
+    done < "$TARGET_FILE"
 fi
 
 if [ "$FOUND" = true ]; then
     # Replace the original file
-    mv "$TEMP_FILE" "$REVIEW_FILE"
+    mv "$TEMP_FILE" "$TARGET_FILE"
+
+    # Update the markdown_tasks cache if database exists
+    if [ -f ".data/today.db" ]; then
+        # Clear old entries for this file
+        sqlite3 .data/today.db "DELETE FROM markdown_tasks WHERE file_path = '$TARGET_FILE';" 2>/dev/null
+
+        # Re-scan the file for tasks
+        LINE_NUM=0
+        while IFS= read -r line; do
+            LINE_NUM=$((LINE_NUM + 1))
+            if [[ "$line" =~ ^[[:space:]]*-[[:space:]]\[.\] ]]; then
+                # Escape single quotes in line text for SQL
+                ESCAPED_LINE="${line//\'/\'\'}"
+                sqlite3 .data/today.db "INSERT INTO markdown_tasks (file_path, line_number, line_text) VALUES ('$TARGET_FILE', $LINE_NUM, '$ESCAPED_LINE');" 2>/dev/null
+            fi
+        done < "$TARGET_FILE"
+    fi
+
     echo "✅ Marked as done: $COMPLETED_TASK"
-    echo "   Timestamp: $TIMESTAMP"
-    echo "   File: $REVIEW_FILE"
+    echo "   File: $TARGET_FILE"
+    echo "   Date: $COMPLETION_DATE"
+
+    # Log completion if it's a task from tasks.md or a project file
+    if [[ "$TARGET_FILE" == *"tasks.md" ]] || [[ "$TARGET_FILE" == *"projects/"* ]]; then
+        bin/progress "Completed: $COMPLETED_TASK" 2>/dev/null || true
+    fi
 else
-    rm "$TEMP_FILE"
-    echo "❌ Task not found. Current tasks in review:"
-    echo ""
-    # Show current uncompleted tasks
-    grep -E "^- \[ \]|^[0-9]+\." "$REVIEW_FILE" | grep -v "✓" | head -10
+    # Clean up temp file
+    rm -f "$TEMP_FILE"
+
+    if [[ "$SEARCH_ARGS" =~ ^[0-9]+$ ]]; then
+        echo "❌ Task #$TASK_NUM not found in $TARGET_FILE"
+        TASK_COUNT=$(grep -c "^[[:space:]]*- \[ \]" "$TARGET_FILE" 2>/dev/null || echo "0")
+        echo "   Found $TASK_COUNT unchecked task(s) in file"
+    else
+        echo "❌ No unchecked task containing '$SEARCH_TEXT' found in $TARGET_FILE"
+    fi
+    exit 1
 fi
