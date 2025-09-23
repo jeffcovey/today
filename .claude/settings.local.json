@@ -41,7 +41,9 @@
       "Bash(chmod:*)",
       "Read(//workspaces/today/vault/**)",
       "Bash(bin/deploy-do fetch:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(curl:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

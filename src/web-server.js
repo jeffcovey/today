@@ -2674,6 +2674,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const { toc, contentWithIds } = generateTableOfContents(contentToRender);
   contentToRender = contentWithIds;
 
+  // Replace tags with emojis in the markdown content
+  contentToRender = replaceTagsWithEmojis(contentToRender);
+
   // Find all checkbox lines in the ORIGINAL content (before modifications)
   // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
   const checkboxLines = [];
