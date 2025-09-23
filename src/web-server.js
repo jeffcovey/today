@@ -10,6 +10,7 @@ import { marked } from 'marked';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
+import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -2291,65 +2292,7 @@ function generateTableOfContents(content) {
   return { toc: tocHtml, contentWithIds };
 }
 
-// Map tags to emojis for display
-function replaceTagsWithEmojis(text) {
-  const tagMappings = {
-    // Stages
-    '#stage/front-stage': '🎭',
-    '#stage/back-stage': '🔧',
-    '#stage/off-stage': '🕰️',
-    '#stage/filed': '📂',
-
-    // Topics (based on task-manager.js mappings)
-    '#topic/health': '🏥',
-    '#topic/mental_health': '🧠',
-    '#topic/fitness': '💪',
-    '#topic/home': '🏠',
-    '#topic/household': '🏠',
-    '#topic/cleaning': '🧹',
-    '#topic/maintenance': '🔧',
-    '#topic/yard': '🌳',
-    '#topic/finance': '💰',
-    '#topic/money': '💵',
-    '#topic/business': '💼',
-    '#topic/work': '💼',
-    '#topic/personal': '👤',
-    '#topic/family': '👨‍👩‍👧‍👦',
-    '#topic/relationships': '❤️',
-    '#topic/pets': '🐾',
-    '#topic/projects': '📁',
-    '#topic/programming': '💻',
-    '#topic/development': '💻',
-    '#topic/admin': '📋',
-    '#topic/personal_admin': '📋',
-    '#topic/organization': '🗂️',
-    '#topic/planning': '📅',
-    '#topic/shopping': '🛒',
-    '#topic/travel': '✈️',
-    '#topic/entertainment': '🎬',
-    '#topic/hobbies': '🎨',
-    '#topic/technology': '🖥️',
-    '#topic/email': '📧',
-    '#topic/communication': '💬',
-    '#topic/social': '👥',
-    '#topic/friends_socializing': '👥',
-    '#topic/focus': '🎯',
-    '#topic/meditation_mindfulness': '🧘',
-    '#topic/mindset': '🧠',
-  };
-
-  let result = text;
-  // Replace tags with emojis
-  for (const [tag, emoji] of Object.entries(tagMappings)) {
-    const regex = new RegExp(tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    result = result.replace(regex, emoji);
-  }
-
-  // Remove any remaining #stage/ or #topic/ tags that don't have mappings
-  result = result.replace(/#(stage|topic)\/[\w-]+/g, '');
-
-  return result;
-}
+// The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
 
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {

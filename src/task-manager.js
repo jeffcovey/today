@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import { getDatabase } from './database-service.js';
 import { DateParser } from './date-parser.js';
+import { getTopicEmoji } from './tag-emoji-mappings.js';
 
 export class TaskManager {
   constructor(dbPath = '.data/today.db', options = {}) {
@@ -16,7 +17,8 @@ export class TaskManager {
     // DO NOT recreate schema - database already exists with correct schema from Turso
     // Schema is managed by migrations and Turso sync, not by this module
     
-    // Topic to emoji mapping
+    // Topic to emoji mapping is now handled by tag-emoji-mappings.js
+    // Keeping this for backward compatibility
     this.topicEmojis = {
       // Home & Household
       'Home/Household': '🏠',
@@ -25,7 +27,7 @@ export class TaskManager {
       'Cleaning': '🧹',
       'Maintenance': '🔧',
       'Repairs': '🔨',
-      
+
       // Yard & Outdoor
       'Yard/Pool/Landscaping': '🌳',
       'Yard': '🌳',
@@ -107,11 +109,16 @@ export class TaskManager {
   
   // Get emoji for a topic name
   getTopicEmoji(topicName) {
+    // Use the shared getTopicEmoji function from tag-emoji-mappings.js
+    const emoji = getTopicEmoji(topicName);
+    if (emoji) return emoji;
+
+    // Fall back to legacy mappings if needed
     // Try exact match first
     if (this.topicEmojis[topicName]) {
       return this.topicEmojis[topicName];
     }
-    
+
     // Try case-insensitive match
     const lowerName = topicName.toLowerCase();
     for (const [key, emoji] of Object.entries(this.topicEmojis)) {
@@ -119,14 +126,14 @@ export class TaskManager {
         return emoji;
       }
     }
-    
+
     // Try partial match (for compound topics like "Yard/Pool/Landscaping")
     for (const [key, emoji] of Object.entries(this.topicEmojis)) {
       if (topicName.includes(key) || key.includes(topicName)) {
         return emoji;
       }
     }
-    
+
     // No emoji for unknown topics
     return '';
   }
