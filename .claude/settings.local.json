@@ -39,7 +39,9 @@
       "Read(//Users/jeff/Library/Mobile Documents/com~apple~CloudDocs/vault/**)",
       "Read(//workspaces/today/vault/topics/**)",
       "Bash(chmod:*)",
-      "Read(//workspaces/today/vault/**)"
+      "Read(//workspaces/today/vault/**)",
+      "Bash(bin/deploy-do fetch:*)",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": []

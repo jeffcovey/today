@@ -2562,7 +2562,7 @@ async function executeTasksQuery(query) {
 }
 
 // Process tasks code blocks in markdown content
-async function processTasksCodeBlocks(content) {
+async function processTasksCodeBlocks(content, skipBlockquotes = false) {
   // Match both with and without newlines, and handle different line endings
   const codeBlockRegex = /```tasks\s*([\s\S]*?)```/g;
   let processedContent = content;
@@ -2571,6 +2571,18 @@ async function processTasksCodeBlocks(content) {
 
   // Collect all matches first to avoid regex index issues
   while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Check if this match is inside a blockquote by looking at the line it's on
+    const beforeMatch = content.substring(0, match.index);
+    const afterLastNewline = beforeMatch.lastIndexOf('\n');
+    const lineStart = beforeMatch.substring(afterLastNewline + 1);
+    const isInBlockquote = lineStart.startsWith('>');
+
+    // Skip blockquote tasks if requested
+    if (skipBlockquotes && isInBlockquote) {
+      console.log(`[DEBUG] Skipping tasks block in blockquote`);
+      continue;
+    }
+
     matches.push({
       fullMatch: match[0],
       query: match[1]
@@ -2698,8 +2710,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
   }
   content = originalLines.join('\n');
 
-  // Process tasks code blocks before rendering
-  content = await processTasksCodeBlocks(content);
+  // Process tasks code blocks before rendering (but skip ones in blockquotes)
+  content = await processTasksCodeBlocks(content, true);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
@@ -2765,6 +2777,123 @@ async function renderMarkdownUncached(filePath, urlPath) {
   htmlContent = htmlContent.replace(/<table>/g, '<table class="table table-hover table-striped">');
   
   // Process Obsidian callouts in rendered blockquotes
+  // First handle callouts that contain task queries (which appear as code blocks in the HTML)
+  htmlContent = await (async () => {
+    // Match blockquotes with Obsidian callout syntax that contain code blocks
+    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?<pre><code>tasks\s*([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
+
+    let result = htmlContent;
+    const matches = [];
+    let match;
+
+    // Collect all matches
+    while ((match = calloutWithCodeRegex.exec(htmlContent)) !== null) {
+      matches.push({
+        fullMatch: match[0],
+        type: match[1],
+        modifier: match[2],
+        title: match[3],
+        query: match[4],
+        additionalContent: match[5]
+      });
+    }
+
+    // Process each match
+    for (const { fullMatch, type, modifier, title, query, additionalContent } of matches) {
+      console.log(`[DEBUG] Processing Obsidian callout with tasks query`);
+
+      // Execute the tasks query
+      const queryResult = await executeTasksQuery(query);
+
+      // Build the tasks HTML
+      let tasksHtml = '';
+      if (queryResult.grouped) {
+        for (const [groupKey, tasks] of queryResult.grouped) {
+          if (tasks.length === 0) continue;
+
+          // Format header
+          let dateHeader = groupKey;
+          if (queryResult.groupType !== 'custom' && groupKey !== 'No date') {
+            const d = new Date(groupKey + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            if (!isNaN(d.getTime())) {
+              if (d.toDateString() === today.toDateString()) {
+                dateHeader = 'Today';
+              } else if (d.toDateString() === tomorrow.toDateString()) {
+                dateHeader = 'Tomorrow';
+              } else {
+                dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+              }
+            }
+          }
+
+          tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
+          for (const task of tasks) {
+            const checkbox = task.isDone ? 'checked' : '';
+            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+            let displayText = replaceTagsWithEmojis(task.text);
+            if (task.isDone && task.doneDate) {
+              const dateStr = task.doneDate.toISOString().split('T')[0];
+              displayText += ` ✅ ${dateStr}`;
+            }
+            const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+            tasksHtml += `${priorityIcon}${displayText}`;
+            tasksHtml += `</li>\n`;
+          }
+          tasksHtml += '</ul>\n';
+        }
+      } else {
+        if (queryResult.tasks.length > 0) {
+          tasksHtml += '<ul>\n';
+          for (const task of queryResult.tasks) {
+            const checkbox = task.isDone ? 'checked' : '';
+            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+            let displayText = replaceTagsWithEmojis(task.text);
+            if (task.isDone && task.doneDate) {
+              const dateStr = task.doneDate.toISOString().split('T')[0];
+              displayText += ` ✅ ${dateStr}`;
+            }
+            const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+            tasksHtml += `${priorityIcon}${displayText}`;
+            tasksHtml += `</li>\n`;
+          }
+          tasksHtml += '</ul>\n';
+        } else {
+          tasksHtml += '<p class="text-muted">No matching tasks</p>\n';
+        }
+      }
+
+      // Build the callout HTML
+      const calloutType = type.toLowerCase();
+      const isCollapsed = modifier === '-';
+      const openAttr = isCollapsed ? '' : ' open';
+      const calloutTitle = title.trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
+
+      const replacement = `<details${openAttr} class="task-section callout-${calloutType}">
+<summary>${calloutTitle}</summary>
+<div class="section-content">
+<div class="tasks-query-result">
+${tasksHtml}
+</div>
+${additionalContent.trim()}
+</div>
+</details>`;
+
+      result = result.replace(fullMatch, replacement);
+    }
+
+    return result;
+  })();
+
+  // Then handle regular Obsidian callouts without task queries
   htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>([\s\S]*?)<\/blockquote>/gi,
     (match, type, modifier, title, content) => {
       const calloutType = type.toLowerCase();
