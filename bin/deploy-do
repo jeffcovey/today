@@ -847,7 +847,154 @@ EOF
         echo "⚡ Executing: $*"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && $*"
         ;;
-        
+
+    fetch)
+        if [ -z "$2" ]; then
+            print_error "Usage: bin/deploy-do fetch <path> [options]"
+            echo ""
+            echo "Examples:"
+            echo "  bin/deploy-do fetch /                    # Fetch homepage"
+            echo "  bin/deploy-do fetch /tasks/today.md      # Fetch today's tasks"
+            echo "  bin/deploy-do fetch /plans/              # List plans directory"
+            echo "  bin/deploy-do fetch /api/health          # Check API health"
+            echo ""
+            echo "Options:"
+            echo "  --raw           Output raw HTML/content without processing"
+            echo "  --headers       Include response headers"
+            echo "  --no-auth       Skip authentication (for public endpoints)"
+            echo "  --output FILE   Save response to file"
+            exit 1
+        fi
+        check_config
+
+        # Parse arguments
+        URL_PATH="$2"
+        shift 2
+
+        RAW_OUTPUT=""
+        SHOW_HEADERS=""
+        SKIP_AUTH=""
+        OUTPUT_FILE=""
+        CURL_OPTS=""
+
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --raw)
+                    RAW_OUTPUT="1"
+                    shift
+                    ;;
+                --headers)
+                    SHOW_HEADERS="1"
+                    CURL_OPTS="$CURL_OPTS -i"
+                    shift
+                    ;;
+                --no-auth)
+                    SKIP_AUTH="1"
+                    shift
+                    ;;
+                --output)
+                    OUTPUT_FILE="$2"
+                    shift 2
+                    ;;
+                *)
+                    print_warning "Unknown option: $1"
+                    shift
+                    ;;
+            esac
+        done
+
+        print_info "Fetching: $URL_PATH"
+
+        # Build the full URL
+        FULL_URL="https://today.jeffcovey.net${URL_PATH}"
+
+        if [ -z "$SKIP_AUTH" ]; then
+            # Get credentials and authenticate
+            print_info "Authenticating..."
+
+            # Decrypt password locally
+            WEB_PASSWORD=$(npx dotenvx get WEB_PASSWORD --format shell 2>/dev/null)
+            if [ -z "$WEB_PASSWORD" ]; then
+                print_error "Failed to decrypt WEB_PASSWORD. Ensure .env.keys exists."
+                exit 1
+            fi
+
+            # Create temp cookie file
+            COOKIE_FILE="/tmp/deploy-do-cookies-$$"
+
+            # Authenticate and get session cookie
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "
+                curl -s -c $COOKIE_FILE -X POST \
+                    -d 'username=admin' \
+                    --data-urlencode 'password=$WEB_PASSWORD' \
+                    https://today.jeffcovey.net/auth/login \
+                    -o /dev/null -w '%{http_code}'
+            " > /tmp/auth-status-$$
+
+            AUTH_STATUS=$(cat /tmp/auth-status-$$)
+            rm -f /tmp/auth-status-$$
+
+            if [ "$AUTH_STATUS" != "302" ] && [ "$AUTH_STATUS" != "200" ]; then
+                print_error "Authentication failed (HTTP $AUTH_STATUS)"
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "rm -f $COOKIE_FILE"
+                exit 1
+            fi
+
+            print_status "Authenticated successfully"
+
+            # Fetch the requested URL with authentication
+            if [ -n "$OUTPUT_FILE" ]; then
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "
+                    curl -s -b $COOKIE_FILE $CURL_OPTS '$FULL_URL'
+                " > "$OUTPUT_FILE"
+                print_status "Saved to: $OUTPUT_FILE"
+            elif [ -n "$RAW_OUTPUT" ]; then
+                # Raw output without any processing
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "
+                    curl -s -b $COOKIE_FILE $CURL_OPTS '$FULL_URL'
+                "
+            else
+                # Process output for better readability
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "
+                    curl -s -b $COOKIE_FILE $CURL_OPTS '$FULL_URL' |
+                    if command -v lynx >/dev/null 2>&1; then
+                        lynx -stdin -dump -width=120 -nolist 2>/dev/null || cat
+                    elif command -v w3m >/dev/null 2>&1; then
+                        w3m -dump -cols 120 -T text/html 2>/dev/null || cat
+                    elif command -v html2text >/dev/null 2>&1; then
+                        html2text -width 120 2>/dev/null || cat
+                    else
+                        # Basic HTML stripping with sed
+                        sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g' | sed 's/&lt;/</g' | sed 's/&gt;/>/g' | sed 's/&amp;/\&/g' | fmt -w 120
+                    fi
+                "
+            fi
+
+            # Clean up cookie file
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "rm -f $COOKIE_FILE"
+
+        else
+            # No authentication needed
+            if [ -n "$OUTPUT_FILE" ]; then
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "curl -s $CURL_OPTS '$FULL_URL'" > "$OUTPUT_FILE"
+                print_status "Saved to: $OUTPUT_FILE"
+            elif [ -n "$RAW_OUTPUT" ]; then
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "curl -s $CURL_OPTS '$FULL_URL'"
+            else
+                ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "
+                    curl -s $CURL_OPTS '$FULL_URL' |
+                    if command -v lynx >/dev/null 2>&1; then
+                        lynx -stdin -dump -width=120 -nolist 2>/dev/null || cat
+                    elif command -v w3m >/dev/null 2>&1; then
+                        w3m -dump -cols 120 -T text/html 2>/dev/null || cat
+                    else
+                        sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g' | sed 's/&lt;/</g' | sed 's/&gt;/>/g' | sed 's/&amp;/\&/g' | fmt -w 120
+                    fi
+                "
+            fi
+        fi
+        ;;
+
     *)
         echo "Usage: bin/deploy-do [command]"
         echo ""
@@ -876,6 +1023,7 @@ EOF
         echo "  stop        - Stop scheduler"
         echo "  start       - Start scheduler"
         echo "  exec CMD    - Execute command in deploy directory"
+        echo "  fetch PATH  - Fetch authenticated web pages from the site"
         echo ""
         echo "First time setup:"
         echo "  1. Create a DigitalOcean droplet (Ubuntu 24.04)"
