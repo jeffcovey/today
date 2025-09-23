@@ -2667,45 +2667,6 @@ async function processTasksCodeBlocks(content) {
   return processedContent;
 }
 
-// Process collapsible sections (bullet lists with nested code blocks)
-function processCollapsibleSections(content) {
-  // Handle Obsidian-style callouts first (> [!note], > [!warning], etc.)
-  // The - suffix means collapsed, + suffix or no suffix means expanded
-  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)\]([-+])?([^\n]*)\n((?:>.*\n?)*)/gim;
-  let processedContent = content;
-
-  // Process Obsidian callouts
-  let match;
-  while ((match = calloutRegex.exec(content)) !== null) {
-    const calloutType = match[1].toLowerCase();
-    const collapsedModifier = match[2] || ''; // '-' for collapsed, '+' or '' for expanded
-    const calloutTitle = (match[3] || '').trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
-    const calloutContent = match[4]
-      .split('\n')
-      .map(line => line.replace(/^>\s?/, '')) // Remove > prefix from each line
-      .join('\n')
-      .trim();
-
-    // Respect the Obsidian modifier: - means collapsed, + or nothing means expanded
-    const isCollapsed = collapsedModifier === '-';
-    const openAttr = isCollapsed ? '' : ' open';
-
-    // Create collapsible section
-    const replacement = `<details${openAttr} class="task-section callout-${calloutType}">
-<summary>${calloutTitle}</summary>
-<div class="section-content">
-${calloutContent}
-</div>
-</details>`;
-
-    processedContent = processedContent.replace(match[0], replacement);
-  }
-
-  // Skip processing nested lists and bold text sections - let markdown handle them normally
-  // Only process Obsidian callouts which have proper markdown-to-HTML conversion
-
-  return processedContent;
-}
 
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
@@ -2737,11 +2698,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
   }
   content = originalLines.join('\n');
 
-  // Process collapsible sections before tasks code blocks
-  content = processCollapsibleSections(content);
-
   // Process tasks code blocks before rendering
   content = await processTasksCodeBlocks(content);
+
+  // Don't process collapsible sections here - we'll do it after markdown rendering
 
   const lines = content.split('\n');
 
@@ -2804,7 +2764,26 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // Enhance tables with MDBootstrap styling
   htmlContent = htmlContent.replace(/<table>/g, '<table class="table table-hover table-striped">');
   
-  // Enhance blockquotes with MDBootstrap styling
+  // Process Obsidian callouts in rendered blockquotes
+  htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?([\s\S]*?)<\/blockquote>/gi,
+    (match, type, modifier, title, content) => {
+      const calloutType = type.toLowerCase();
+      const isCollapsed = modifier === '-';
+      const openAttr = isCollapsed ? '' : ' open';
+      const calloutTitle = title.trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
+
+      // Clean up the content - remove extra <p> tags if present
+      const cleanContent = content.trim();
+
+      return `<details${openAttr} class="task-section callout-${calloutType}">
+<summary>${calloutTitle}</summary>
+<div class="section-content">
+${cleanContent}
+</div>
+</details>`;
+    });
+
+  // Enhance remaining blockquotes with MDBootstrap styling
   htmlContent = htmlContent.replace(/<blockquote>/g, '<blockquote class="blockquote border-start border-4 border-primary ps-3 my-3">');
   
   // Enhance code blocks with better styling - using inline styles to override
