@@ -2671,15 +2671,15 @@ async function processTasksCodeBlocks(content) {
 function processCollapsibleSections(content) {
   // Handle Obsidian-style callouts first (> [!note], > [!warning], etc.)
   // The - suffix means collapsed, + suffix or no suffix means expanded
-  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)([-+]?)\]([^\n]*)\n((?:>.*\n?)*)/gim;
+  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)\]([-+])?([^\n]*)\n((?:>.*\n?)*)/gim;
   let processedContent = content;
 
   // Process Obsidian callouts
   let match;
   while ((match = calloutRegex.exec(content)) !== null) {
     const calloutType = match[1].toLowerCase();
-    const collapsedModifier = match[2]; // '-' for collapsed, '+' or '' for expanded
-    const calloutTitle = match[3].trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
+    const collapsedModifier = match[2] || ''; // '-' for collapsed, '+' or '' for expanded
+    const calloutTitle = (match[3] || '').trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
     const calloutContent = match[4]
       .split('\n')
       .map(line => line.replace(/^>\s?/, '')) // Remove > prefix from each line
