@@ -3657,19 +3657,22 @@ ${cleanContent}
         
         // Add interactivity to task checkboxes using event delegation
         document.addEventListener('DOMContentLoaded', function() {
-          // Auto-collapse TOC when clicking a link
-          const tocHeader = document.querySelector('details.toc-header');
-          if (tocHeader) {
-            const tocLinks = tocHeader.querySelectorAll('a');
-            tocLinks.forEach(link => {
-              link.addEventListener('click', function() {
-                // Small delay to allow the navigation to start
-                setTimeout(() => {
+          // Auto-collapse TOC when clicking a link - use event delegation
+          document.addEventListener('click', function(event) {
+            // Check if the clicked element is a link inside the TOC
+            const link = event.target.closest('details.toc-header a');
+            if (link) {
+              // Find the parent details element
+              const tocHeader = link.closest('details.toc-header');
+              if (tocHeader) {
+                // Collapse the TOC immediately when link is clicked
+                // Use requestAnimationFrame to ensure it happens after the browser processes the click
+                requestAnimationFrame(() => {
                   tocHeader.open = false;
-                }, 100);
-              });
-            });
-          }
+                });
+              }
+            }
+          });
 
           // Use event delegation to handle dynamically added checkboxes
           document.addEventListener('change', async function(event) {
