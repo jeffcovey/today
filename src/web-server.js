@@ -3659,6 +3659,8 @@ ${cleanContent}
         
         // Add interactivity to task checkboxes using event delegation
         document.addEventListener('DOMContentLoaded', function() {
+          console.log('DOMContentLoaded - Setting up event handlers');
+
           // Auto-collapse TOC when clicking a link - use event delegation
           document.addEventListener('click', function(event) {
             // Check if the clicked element is a link inside the TOC
@@ -3677,8 +3679,11 @@ ${cleanContent}
           });
 
           // Use event delegation to handle dynamically added checkboxes
+          console.log('Adding change event listener');
           document.addEventListener('change', async function(event) {
+            console.log('Change event fired:', event.target.className, event.target);
             if (!event.target.classList.contains('task-checkbox')) {
+              console.log('Not a task checkbox, ignoring');
               return;
             }
 
@@ -3686,6 +3691,8 @@ ${cleanContent}
             const filePath = checkbox.dataset.file;
             const lineNumber = checkbox.dataset.line;
             const isChecked = checkbox.checked;
+
+            console.log('Task checkbox clicked:', { filePath, lineNumber, isChecked });
 
             // Disable checkbox during update
             checkbox.disabled = true;
