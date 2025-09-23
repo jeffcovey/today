@@ -2107,9 +2107,9 @@ export class MigrationManager {
       {
         version: 27,
         description: 'Clean up duplicate markdown_tasks with absolute paths',
-        fn: () => {
+        fn: function() {
           // Count duplicates before cleanup
-          const duplicateCount = db.prepare(`
+          const duplicateCount = this.db.prepare(`
             SELECT COUNT(*) as count
             FROM markdown_tasks
             WHERE file_path LIKE '/opt/today/%'
@@ -2119,7 +2119,7 @@ export class MigrationManager {
             console.log(`    Found ${duplicateCount} entries with absolute paths`);
 
             // Delete entries with absolute paths since relative paths are the standard
-            db.exec(`
+            this.db.exec(`
               DELETE FROM markdown_tasks
               WHERE file_path LIKE '/opt/today/%'
                  OR file_path LIKE '/workspaces/today/%'
