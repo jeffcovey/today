@@ -3696,6 +3696,7 @@ ${cleanContent}
                   headers: {
                     'Content-Type': 'application/json',
                   },
+                  credentials: 'same-origin',  // Include cookies for authentication
                   body: JSON.stringify({
                     filePath: filePath,
                     lineNumber: parseInt(lineNumber, 10),
