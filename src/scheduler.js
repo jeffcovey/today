@@ -93,6 +93,12 @@ const jobs = [
         command: 'systemctl restart vault-watcher || true',
         description: 'Restart vault-watcher to ensure latest code',
         timezone: true
+    },
+    {
+        schedule: '15 * * * *', // Every hour at :15 (quarter past)
+        command: 'bin/tasks update-cache || true',
+        description: 'Refresh markdown tasks cache',
+        timezone: false
     }
 ];
 
