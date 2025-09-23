@@ -2106,8 +2106,8 @@ export class MigrationManager {
 
       {
         version: 27,
-        name: 'Clean up duplicate markdown_tasks with absolute paths',
-        apply: () => {
+        description: 'Clean up duplicate markdown_tasks with absolute paths',
+        fn: () => {
           // Count duplicates before cleanup
           const duplicateCount = db.prepare(`
             SELECT COUNT(*) as count
