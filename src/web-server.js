@@ -2292,7 +2292,7 @@ function generateTableOfContents(content) {
 }
 
 // Map tags to emojis for display
-function replaceTagsWithEmoji(text) {
+function replaceTagsWithEmojis(text) {
   const tagMappings = {
     // Stages
     '#stage/front-stage': '🎭',
@@ -2616,7 +2616,7 @@ async function processTasksCodeBlocks(content) {
         for (const task of tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          let displayText = replaceTagsWithEmoji(task.text);
+          let displayText = replaceTagsWithEmojis(task.text);
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -2639,7 +2639,7 @@ async function processTasksCodeBlocks(content) {
         for (const task of result.tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          let displayText = replaceTagsWithEmoji(task.text);
+          let displayText = replaceTagsWithEmojis(task.text);
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
