@@ -4614,10 +4614,13 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     console.log(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
     const filePath = path.join(VAULT_PATH, file);
 
+    // For database queries, use relative path format (vault/...)
+    const dbFilePath = path.join('vault', file);
+
     // First check our database cache to verify this is the expected task
     const db = getDatabase();
     const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-      .get(filePath, line);
+      .get(dbFilePath, line);
 
     // Read the file
     const content = await fs.readFile(filePath, 'utf-8');
@@ -4678,6 +4681,24 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     // Update the file
     lines[line - 1] = updatedLine;
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+
+    // Update the database cache to reflect the change
+    try {
+      const updateStmt = db.prepare(`
+        UPDATE markdown_tasks
+        SET line_text = ?,
+            completed = ?,
+            completion_date = ?
+        WHERE file_path = ? AND line_number = ?
+      `);
+
+      const completionDate = completed ? new Date().toISOString().split('T')[0] : null;
+      updateStmt.run(updatedLine, completed ? 1 : 0, completionDate, dbFilePath, line);
+      console.log(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
+    } catch (dbError) {
+      console.error('[TASK] Failed to update database cache:', dbError);
+      // Don't fail the request since the file was updated successfully
+    }
 
     console.log(`[TASK] Successfully updated task at line ${line}`);
     res.json({ success: true, updatedLine });
