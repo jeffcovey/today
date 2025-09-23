@@ -4687,14 +4687,11 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     try {
       const updateStmt = db.prepare(`
         UPDATE markdown_tasks
-        SET line_text = ?,
-            completed = ?,
-            completion_date = ?
+        SET line_text = ?
         WHERE file_path = ? AND line_number = ?
       `);
 
-      const completionDate = completed ? new Date().toISOString().split('T')[0] : null;
-      updateStmt.run(updatedLine, completed ? 1 : 0, completionDate, dbFilePath, line);
+      updateStmt.run(updatedLine, dbFilePath, line);
       console.log(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
     } catch (dbError) {
       console.error('[TASK] Failed to update database cache:', dbError);
