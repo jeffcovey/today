@@ -2670,22 +2670,25 @@ async function processTasksCodeBlocks(content) {
 // Process collapsible sections (bullet lists with nested code blocks)
 function processCollapsibleSections(content) {
   // Handle Obsidian-style callouts first (> [!note], > [!warning], etc.)
-  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)\]([^\n]*)\n((?:>.*\n?)*)/gim;
+  // The - suffix means collapsed, + suffix or no suffix means expanded
+  const calloutRegex = /^> \[!(note|tip|warning|danger|info|example|quote|todo)([-+]?)\]([^\n]*)\n((?:>.*\n?)*)/gim;
   let processedContent = content;
 
   // Process Obsidian callouts
   let match;
   while ((match = calloutRegex.exec(content)) !== null) {
     const calloutType = match[1].toLowerCase();
-    const calloutTitle = match[2].trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
-    const calloutContent = match[3]
+    const collapsedModifier = match[2]; // '-' for collapsed, '+' or '' for expanded
+    const calloutTitle = match[3].trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
+    const calloutContent = match[4]
       .split('\n')
       .map(line => line.replace(/^>\s?/, '')) // Remove > prefix from each line
       .join('\n')
       .trim();
 
-    // Callouts should be closed by default
-    const openAttr = '';
+    // Respect the Obsidian modifier: - means collapsed, + or nothing means expanded
+    const isCollapsed = collapsedModifier === '-';
+    const openAttr = isCollapsed ? '' : ' open';
 
     // Create collapsible section
     const replacement = `<details${openAttr} class="task-section callout-${calloutType}">
