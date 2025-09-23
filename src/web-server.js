@@ -1376,13 +1376,12 @@ async function renderDirectory(dirPath, urlPath) {
             document.body.classList.add('ai-collapsed');
             updateToggleIcon();
           }
-            
-            // Add click handler for mobile header
-            if (isMobile) {
-              const header = document.getElementById('aiAssistantHeader');
-              header.style.cursor = 'pointer';
-              header.onclick = toggleAIAssistant;
-            }
+
+          // Add click handler for mobile header
+          if (isMobile) {
+            const header = document.getElementById('aiAssistantHeader');
+            header.style.cursor = 'pointer';
+            header.onclick = toggleAIAssistant;
           }
         }
         
@@ -3163,13 +3162,12 @@ ${cleanContent}
             document.body.classList.add('ai-collapsed');
             updateToggleIcon();
           }
-            
-            // Add click handler for mobile header
-            if (isMobile) {
-              const header = document.getElementById('aiAssistantHeader');
-              header.style.cursor = 'pointer';
-              header.onclick = toggleAIAssistant;
-            }
+
+          // Add click handler for mobile header
+          if (isMobile) {
+            const header = document.getElementById('aiAssistantHeader');
+            header.style.cursor = 'pointer';
+            header.onclick = toggleAIAssistant;
           }
         }
         
