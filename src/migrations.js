@@ -2102,6 +2102,34 @@ export class MigrationManager {
 
           console.log('    ✓ Simplified markdown_tasks table');
         }
+      },
+
+      {
+        version: 27,
+        name: 'Clean up duplicate markdown_tasks with absolute paths',
+        apply: () => {
+          // Count duplicates before cleanup
+          const duplicateCount = db.prepare(`
+            SELECT COUNT(*) as count
+            FROM markdown_tasks
+            WHERE file_path LIKE '/opt/today/%'
+          `).get().count;
+
+          if (duplicateCount > 0) {
+            console.log(`    Found ${duplicateCount} entries with absolute paths`);
+
+            // Delete entries with absolute paths since relative paths are the standard
+            db.exec(`
+              DELETE FROM markdown_tasks
+              WHERE file_path LIKE '/opt/today/%'
+                 OR file_path LIKE '/workspaces/today/%'
+            `);
+
+            console.log('    ✓ Removed duplicate entries with absolute paths');
+          } else {
+            console.log('    ✓ No duplicate entries found');
+          }
+        }
       }
     ];
 
