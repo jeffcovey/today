@@ -191,13 +191,13 @@ const pageStyle = `
   }
   
   .toc-header .toc-links {
-    max-height: 300px;
+    max-height: 200px;
     overflow-y: auto;
     border: 1px solid #dee2e6;
     border-radius: 0.25rem;
-    padding: 0.5rem;
+    padding: 0.25rem 0.5rem;
     background: #f8f9fa;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
   }
   
   .toc-links a {
@@ -205,8 +205,10 @@ const pageStyle = `
     text-decoration: none;
     transition: all 0.3s;
     display: inline-block;
-    padding: 0.25rem 0.5rem;
+    padding: 0.1rem 0.3rem;
     border-radius: 0.25rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
   }
   
   .toc-links a:hover {
@@ -2267,12 +2269,12 @@ function generateTableOfContents(content) {
   let tocHtml = '';
   tocHtml += '<details class="toc-header">\n';
   tocHtml += '<summary class="text-muted small" style="cursor: pointer; user-select: none;"><i class="fas fa-list me-1"></i>Table of Contents</summary>\n';
-  tocHtml += '<div class="toc-links mt-2">\n';
+  tocHtml += '<div class="toc-links mt-1">\n';
   tocHtml += '<ul class="list-unstyled small mb-0">\n';
-  
+
   headings.forEach(heading => {
-    const indent = (heading.level - 2) * 20; // Start from h2, each level adds 20px
-    tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.5rem;">`;
+    const indent = (heading.level - 2) * 15; // Start from h2, each level adds 15px (reduced from 20px)
+    tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.15rem; line-height: 1.3;">`;
     tocHtml += `<a href="#${heading.id}">`;
     tocHtml += heading.text;
     tocHtml += '</a></li>\n';
