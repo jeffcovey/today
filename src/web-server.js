@@ -2780,7 +2780,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // First handle callouts that contain task queries (which appear as code blocks in the HTML)
   htmlContent = await (async () => {
     // Match blockquotes with Obsidian callout syntax that contain code blocks
-    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?<pre><code>tasks\s*([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
+    // Marked.js adds class="language-tasks" to the code tag
+    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?<pre(?:[^>]*)><code(?:\s+class="language-tasks"[^>]*)?>([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
 
     let result = htmlContent;
     const matches = [];
