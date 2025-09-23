@@ -2765,14 +2765,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
   htmlContent = htmlContent.replace(/<table>/g, '<table class="table table-hover table-striped">');
   
   // Process Obsidian callouts in rendered blockquotes
-  htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?([\s\S]*?)<\/blockquote>/gi,
+  htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>([\s\S]*?)<\/blockquote>/gi,
     (match, type, modifier, title, content) => {
       const calloutType = type.toLowerCase();
       const isCollapsed = modifier === '-';
       const openAttr = isCollapsed ? '' : ' open';
       const calloutTitle = title.trim() || calloutType.charAt(0).toUpperCase() + calloutType.slice(1);
 
-      // Clean up the content - remove extra <p> tags if present
+      // Clean up the content - remove extra whitespace but keep the HTML structure
       const cleanContent = content.trim();
 
       return `<details${openAttr} class="task-section callout-${calloutType}">
