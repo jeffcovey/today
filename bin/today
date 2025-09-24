@@ -674,51 +674,21 @@ def run_interactive_session(direct_request=None, non_interactive=False):
     # Get existing plans
     existing_plans = get_existing_plans()
 
-    if direct_request:
-        if non_interactive:
-            print("🤖 Running Claude in non-interactive mode...")
-            prompt = f"""# Focused Work Session - NON-INTERACTIVE MODE
+    # Read TODAY.md for context - always include this, even for direct requests
+    today_context = ""
+    if Path('TODAY.md').exists():
+        with open('TODAY.md', 'r') as f:
+            today_content = f.read()
+            # Remove the critical first steps section
+            today_content = re.sub(r'### 🔴 CRITICAL FIRST STEPS 🔴.*?(?=##|$)', '',
+                                  today_content, flags=re.DOTALL)
+            # Get the session instructions part
+            match = re.search(r'## Session Instructions for Claude.*', today_content, re.DOTALL)
+            if match:
+                today_context = match.group(0)
 
-## CRITICAL: You are in NON-INTERACTIVE mode
-- You have FULL PERMISSION to create, update, and modify files
-- Do NOT ask for permission - execute the requested actions immediately
-- The user ran this command specifically requesting: "{direct_request}"
-- Complete the task WITHOUT asking for confirmation
-
-## Pre-Computed Context
-- **Current Time**: {current_time}
-- **Date**: {current_date} ({day_of_week})
-- **Stage**: {stage_theme} - {stage_focus}
-- **Review File**: {review_file}
-
-## Direct Request from User
-"{direct_request}"
-
-Execute the request NOW without asking for permission!"""
-
-            subprocess.run(['claude', '--print', '--dangerously-skip-permissions', prompt])
-        else:
-            print(f"📊 Starting focused session: {direct_request}\n")
-            print("🤖 Starting Claude focused session...")
-            subprocess.run(['claude', direct_request])
-    else:
-        # Read TODAY.md for context if it exists
-        today_context = ""
-        if Path('TODAY.md').exists():
-            with open('TODAY.md', 'r') as f:
-                today_content = f.read()
-                # Remove the critical first steps section
-                today_content = re.sub(r'### 🔴 CRITICAL FIRST STEPS 🔴.*?(?=##|$)', '',
-                                      today_content, flags=re.DOTALL)
-                # Get the session instructions part
-                match = re.search(r'## Session Instructions for Claude.*', today_content, re.DOTALL)
-                if match:
-                    today_context = match.group(0)
-
-        print("🤖 Starting Claude daily review session...")
-        prompt = f"""# Daily Review Session
-
-## Pre-Computed Context
+    # Build the common context that all sessions need
+    common_context = f"""## Pre-Computed Context
 - **Current Time**: {current_time}
 - **Date**: {current_date} ({day_of_week})
 - **Stage**: {stage_theme} - {stage_focus}
@@ -744,7 +714,46 @@ Execute the request NOW without asking for permission!"""
 - bin/mark-done 'task' - Mark a task as complete
 - bin/progress 'note' - Add a progress note
 
-{today_context}
+{today_context}"""
+
+    if direct_request:
+        if non_interactive:
+            print("🤖 Running Claude in non-interactive mode...")
+            prompt = f"""# Focused Work Session - NON-INTERACTIVE MODE
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- The user ran this command specifically requesting: "{direct_request}"
+- Complete the task WITHOUT asking for confirmation
+
+{common_context}
+
+## Direct Request from User
+"{direct_request}"
+
+Execute the request NOW without asking for permission!"""
+
+            subprocess.run(['claude', '--print', '--dangerously-skip-permissions', prompt])
+        else:
+            print(f"📊 Starting focused session: {direct_request}\n")
+            print("🤖 Starting Claude focused session...")
+
+            prompt = f"""# Focused Work Session
+
+{common_context}
+
+## User Request
+"{direct_request}"
+
+Please help me with this specific request."""
+
+            subprocess.run(['claude', prompt])
+    else:
+        print("🤖 Starting Claude daily review session...")
+        prompt = f"""# Daily Review Session
+
+{common_context}
 
 Please help me with my daily review."""
 
