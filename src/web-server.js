@@ -2636,7 +2636,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Insert metadata markers that won't break marked.js checkbox detection
   // We'll use {data-file="..." data-line="..."} which marked.js will pass through
-  const taskRegex = /^(\s*)- \[[ x]\] (.+)$/i;
+  // Updated regex to also match tasks inside blockquotes (lines starting with >)
+  const taskRegex = /^((?:\s*>)*\s*)- \[[ x]\] (.+)$/i;
   const originalLines = originalContent.split('\n');
 
   for (let i = 0; i < originalLines.length; i++) {
@@ -2644,12 +2645,12 @@ async function renderMarkdownUncached(filePath, urlPath) {
     const match = line.match(taskRegex);
     if (match) {
       const lineNumber = i + 1; // 1-based line numbers
-      const indent = match[1];
+      const prefix = match[1]; // This now includes any > prefixes
       const isChecked = line.includes('[x]') || line.includes('[X]');
       const taskText = match[2];
 
       // Add metadata as a suffix that marked.js will preserve
-      originalLines[i] = `${indent}- [${isChecked ? 'x' : ' '}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
+      originalLines[i] = `${prefix}- [${isChecked ? 'x' : ' '}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
     }
   }
   content = originalLines.join('\n');
@@ -4618,6 +4619,13 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
   try {
     const { filePath: file, lineNumber: line, completed } = req.body;
     console.log(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
+
+    // Validate required fields
+    if (!file || !line) {
+      console.error('[TASK] Missing required fields:', { file, line });
+      return res.status(400).json({ error: 'Missing file path or line number' });
+    }
+
     const filePath = path.join(VAULT_PATH, file);
 
     // For database queries, use relative path format (vault/...)
