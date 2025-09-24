@@ -74,7 +74,7 @@ async function updateMarkdownTasksCache(filePath) {
       VALUES (?, ?, ?)
     `);
 
-    const taskRegex = /^\s*- \[[ x]\] /i; // Match tasks with any indentation
+    const taskRegex = /^(?:\s*>)*\s*- \[[ x]\] /i; // Match tasks with any indentation, including blockquotes
     let insertCount = 0;
 
     for (let i = 0; i < lines.length; i++) {

@@ -4631,16 +4631,11 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     // For database queries, use relative path format (vault/...)
     const dbFilePath = path.join('vault', file);
 
-    // First check our database cache to verify this is the expected task
-    const db = getDatabase();
-    const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-      .get(dbFilePath, line);
-
-    // Read the file
+    // Read the file first
     const content = await fs.readFile(filePath, 'utf-8');
     const lines = content.split('\n');
 
-    // Get the task line (line numbers are 1-based from database)
+    // Get the task line (line numbers are 1-based)
     const taskLine = lines[line - 1];
 
     if (!taskLine) {
@@ -4649,31 +4644,35 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     }
 
     // Validate that this is actually a task line
-    if (!taskLine.match(/^\s*- \[[ xX]\]/)) {
+    // Updated regex to match tasks in blockquotes too
+    if (!taskLine.match(/^(?:\s*>)*\s*- \[[ xX]\]/)) {
       console.error(`[TASK] Line ${line} is not a task: "${taskLine}"`);
       return res.status(400).json({ error: 'Not a task line' });
     }
+
+    // Check database cache but don't fail if not found
+    const db = getDatabase();
+    const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
+      .get(dbFilePath, line);
 
     // If we have a cached task, verify it matches (ignoring completion status and date)
     if (cachedTask) {
       // Strip completion markers for comparison
       const normalizeTask = (text) => text
-        .replace(/^\s*- \[[xX]\]/, '- [ ]')  // Normalize checkbox to unchecked
+        .replace(/^(?:\s*>)*\s*- \[[xX]\]/, '- [ ]')  // Normalize checkbox to unchecked (including blockquote prefix)
         .replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '');  // Remove completion date
 
       const normalizedCache = normalizeTask(cachedTask.line_text);
       const normalizedFile = normalizeTask(taskLine);
 
       if (normalizedCache !== normalizedFile) {
-        console.error(`[TASK] Line ${line} content mismatch!`);
-        console.error(`  Expected (from cache): "${cachedTask.line_text}"`);
-        console.error(`  Found (in file):       "${taskLine}"`);
-        return res.status(400).json({
-          error: 'Task line content mismatch',
-          expected: cachedTask.line_text,
-          found: taskLine
-        });
+        console.log(`[TASK] Cache mismatch at line ${line}, using file version`);
+        console.log(`  Cache: "${cachedTask.line_text}"`);
+        console.log(`  File:  "${taskLine}"`);
+        // Don't fail - just proceed with the file version
       }
+    } else {
+      console.log(`[TASK] Task not in cache, proceeding with file version: "${taskLine}"`);
     }
 
     // Update the task
@@ -4682,13 +4681,13 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       // Mark as done and add completion date
       const today = new Date().toISOString().split('T')[0];
       updatedLine = taskLine
-        .replace(/^(\s*)- \[ \]/, '$1- [x]')
+        .replace(/^((?:\s*>)*\s*)- \[ \]/, '$1- [x]')  // Keep any blockquote prefix
         .replace(/✅ \d{4}-\d{2}-\d{2}/, '') // Remove old completion date if exists
         + ` ✅ ${today}`;
     } else {
       // Mark as not done and remove completion date
       updatedLine = taskLine
-        .replace(/^(\s*)- \[x\]/i, '$1- [ ]')
+        .replace(/^((?:\s*>)*\s*)- \[x\]/i, '$1- [ ]')  // Keep any blockquote prefix
         .replace(/ ✅ \d{4}-\d{2}-\d{2}/, '');
     }
 
@@ -4698,14 +4697,24 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 
     // Update the database cache to reflect the change
     try {
-      const updateStmt = db.prepare(`
-        UPDATE markdown_tasks
-        SET line_text = ?
-        WHERE file_path = ? AND line_number = ?
-      `);
-
-      updateStmt.run(updatedLine, dbFilePath, line);
-      console.log(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
+      if (cachedTask) {
+        // Update existing cache entry
+        const updateStmt = db.prepare(`
+          UPDATE markdown_tasks
+          SET line_text = ?
+          WHERE file_path = ? AND line_number = ?
+        `);
+        updateStmt.run(updatedLine, dbFilePath, line);
+        console.log(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
+      } else {
+        // Insert new cache entry if task wasn't cached
+        const insertStmt = db.prepare(`
+          INSERT OR REPLACE INTO markdown_tasks (file_path, line_number, line_text)
+          VALUES (?, ?, ?)
+        `);
+        insertStmt.run(dbFilePath, line, updatedLine);
+        console.log(`[TASK] Added to database cache: ${dbFilePath}:${line}`);
+      }
     } catch (dbError) {
       console.error('[TASK] Failed to update database cache:', dbError);
       // Don't fail the request since the file was updated successfully
