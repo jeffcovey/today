@@ -43,7 +43,8 @@
       "Bash(bin/deploy-do fetch:*)",
       "Read(//tmp/**)",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(jq:*)"
     ],
     "deny": [],
     "ask": []
