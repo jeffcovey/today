@@ -160,7 +160,7 @@ async function processEnrichmentQueue() {
   }
 }
 
-// Sort and deduplicate tasks.md (pending tasks first, completed last)
+// Sort and deduplicate tasks.md
 async function sortTasksFile(filePath) {
   try {
     if (!filePath.endsWith('tasks.md')) {
@@ -168,35 +168,19 @@ async function sortTasksFile(filePath) {
     }
 
     const content = await fs.promises.readFile(filePath, 'utf-8');
-    const lines = content.split('\n').filter(line => line.trim() !== '');
+    const lines = content.split('\n');
 
-    // Only process lines that are tasks
-    const tasks = lines.filter(line => line.startsWith('- [ ]') || line.startsWith('- [x]'));
+    // Deduplicate and sort
+    const uniqueLines = [...new Set(lines)];
+    uniqueLines.sort();
 
-    if (tasks.length === 0) {
-      return false;
-    }
-
-    // Separate and deduplicate
-    const pendingTasks = [...new Set(tasks.filter(line => line.startsWith('- [ ]')))];
-    const completedTasks = [...new Set(tasks.filter(line => line.startsWith('- [x]')))];
-
-    // Sort each group alphabetically
-    pendingTasks.sort();
-    completedTasks.sort();
-
-    // Combine: pending first, then completed
-    const sortedTasks = [...pendingTasks, ...completedTasks];
-    const newContent = sortedTasks.join('\n') + '\n';
+    const newContent = uniqueLines.join('\n');
 
     // Only write if content actually changed
     if (content !== newContent) {
-      const oldCount = tasks.length;
-      const newCount = sortedTasks.length;
-      const duplicatesRemoved = oldCount - newCount;
-
+      const duplicatesRemoved = lines.length - uniqueLines.length;
       await fs.promises.writeFile(filePath, newContent, 'utf-8');
-      log(`Sorted tasks.md: ${pendingTasks.length} pending, ${completedTasks.length} completed${duplicatesRemoved > 0 ? `, ${duplicatesRemoved} duplicates removed` : ''}`, 'success');
+      log(`Sorted tasks.md${duplicatesRemoved > 0 ? `, ${duplicatesRemoved} duplicates removed` : ''}`, 'success');
       return true;
     }
 
