@@ -160,6 +160,53 @@ async function processEnrichmentQueue() {
   }
 }
 
+// Sort and deduplicate tasks.md (pending tasks first, completed last)
+async function sortTasksFile(filePath) {
+  try {
+    if (!filePath.endsWith('tasks.md')) {
+      return false;
+    }
+
+    const content = await fs.promises.readFile(filePath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim() !== '');
+
+    // Only process lines that are tasks
+    const tasks = lines.filter(line => line.startsWith('- [ ]') || line.startsWith('- [x]'));
+
+    if (tasks.length === 0) {
+      return false;
+    }
+
+    // Separate and deduplicate
+    const pendingTasks = [...new Set(tasks.filter(line => line.startsWith('- [ ]')))];
+    const completedTasks = [...new Set(tasks.filter(line => line.startsWith('- [x]')))];
+
+    // Sort each group alphabetically
+    pendingTasks.sort();
+    completedTasks.sort();
+
+    // Combine: pending first, then completed
+    const sortedTasks = [...pendingTasks, ...completedTasks];
+    const newContent = sortedTasks.join('\n') + '\n';
+
+    // Only write if content actually changed
+    if (content !== newContent) {
+      const oldCount = tasks.length;
+      const newCount = sortedTasks.length;
+      const duplicatesRemoved = oldCount - newCount;
+
+      await fs.promises.writeFile(filePath, newContent, 'utf-8');
+      log(`Sorted tasks.md: ${pendingTasks.length} pending, ${completedTasks.length} completed${duplicatesRemoved > 0 ? `, ${duplicatesRemoved} duplicates removed` : ''}`, 'success');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    log(`Failed to sort tasks.md: ${error.message}`, 'error');
+    return false;
+  }
+}
+
 // Process changed files
 async function processChanges() {
   if (isProcessing || changedFiles.size === 0) {
@@ -229,6 +276,20 @@ async function processChanges() {
       }
     }
     
+    // Check if tasks.md needs sorting
+    const tasksFile = markdownFiles.find(f => f.endsWith('/tasks.md'));
+    if (tasksFile) {
+      log('Checking if tasks.md needs sorting...', 'info');
+      const wasSorted = await sortTasksFile(tasksFile);
+      if (wasSorted) {
+        // Remove from list to avoid double processing
+        const index = markdownFiles.indexOf(tasksFile);
+        if (index > -1) {
+          markdownFiles.splice(index, 1);
+        }
+      }
+    }
+
     // Update markdown tasks cache
     if (markdownFiles.length > 0) {
       log('Updating markdown tasks cache...', 'info');
