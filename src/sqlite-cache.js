@@ -32,16 +32,7 @@ export class SQLiteCache {
         cached_at INTEGER NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS task_cache (
-        id TEXT PRIMARY KEY,
-        database_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        properties TEXT NOT NULL,
-        url TEXT NOT NULL,
-        created_time TEXT NOT NULL,
-        last_edited_time TEXT,
-        cached_at INTEGER NOT NULL
-      );
+      -- task_cache table removed - use markdown_tasks instead
 
       CREATE TABLE IF NOT EXISTS project_cache (
         id TEXT PRIMARY KEY,
@@ -128,7 +119,7 @@ export class SQLiteCache {
         updated_at INTEGER
       );
 
-      CREATE INDEX IF NOT EXISTS idx_task_cache_database_id ON task_cache(database_id);
+      -- idx_task_cache_database_id index removed with task_cache table
       CREATE INDEX IF NOT EXISTS idx_project_cache_database_id ON project_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_tag_cache_database_id ON tag_cache(database_id);
       CREATE INDEX IF NOT EXISTS idx_cache_metadata_type ON cache_metadata(cache_type);
@@ -147,19 +138,7 @@ export class SQLiteCache {
         VALUES (?, ?, ?, ?)
       `),
 
-      // Task cache
-      getCachedTasks: this.db.prepare('SELECT * FROM task_cache WHERE database_id = ?'),
-      setCachedTask: this.db.prepare(`
-        INSERT OR REPLACE INTO task_cache 
-        (id, database_id, title, properties, url, created_time, last_edited_time, cached_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `),
-      deleteCachedTasks: this.db.prepare('DELETE FROM task_cache WHERE database_id = ?'),
-      getMostRecentTaskTime: this.db.prepare(`
-        SELECT MAX(last_edited_time) as max_time 
-        FROM task_cache 
-        WHERE database_id = ? AND last_edited_time IS NOT NULL
-      `),
+      // Task cache - removed, using markdown_tasks table instead
 
       // Project cache
       getCachedProjects: this.db.prepare('SELECT * FROM project_cache WHERE database_id = ?'),
@@ -199,78 +178,15 @@ export class SQLiteCache {
     };
   }
 
-  // Task caching methods
+  // Task caching methods - removed, using markdown_tasks table instead
   async getCachedTasks(databaseId) {
-    try {
-      // First try with the ID as given
-      let rows = this.statements.getCachedTasks.all(databaseId);
-      
-      // If no results and it looks like a UUID, try to find by database name
-      // This handles the transition from storing by name to storing by ID
-      if (rows.length === 0 && databaseId.includes('-')) {
-        // Try common database names that might match this ID
-        const possibleNames = ['Action Items', 'Day-End Chores', 'Evening Tasks', 
-                               'Morning Routine', 'Packing List/Trip Tasks', 
-                               'Tag/Knowledge Vault', "Today's Plan"];
-        for (const name of possibleNames) {
-          rows = this.statements.getCachedTasks.all(name);
-          if (rows.length > 0) {
-            console.log(`📋 Found cache under name '${name}' for ID ${databaseId}`);
-            break;
-          }
-        }
-      }
-      
-      if (rows.length === 0) return null;
-
-      const tasks = rows.map(row => ({
-        id: row.id,
-        title: row.title,
-        properties: JSON.parse(row.properties),
-        url: row.url,
-        created_time: row.created_time,
-        ...(row.last_edited_time && { last_edited_time: row.last_edited_time })
-      }));
-
-      // Get metadata to return with tasks
-      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tasks');
-      return {
-        tasks,
-        lastEditedTime: metadata?.last_edited_time,
-        cachedAt: new Date(metadata?.cached_at || 0).toISOString()
-      };
-    } catch (error) {
-      console.error('Error getting cached tasks:', error);
-      return null;
-    }
+    // Legacy method - task_cache table has been removed
+    return null;
   }
 
   async setCachedTasks(databaseId, tasks, lastEditedTime) {
-    const transaction = this.db.transaction((databaseId, tasks, lastEditedTime) => {
-      const now = Date.now();
-
-      // Update metadata first
-      this.statements.setCacheMetadata.run(databaseId, 'tasks', lastEditedTime, now);
-
-      // Delete existing cache for this database
-      this.statements.deleteCachedTasks.run(databaseId);
-
-      // Insert new tasks
-      for (const task of tasks) {
-        this.statements.setCachedTask.run(
-          task.id,
-          databaseId,
-          task.title,
-          JSON.stringify(task.properties),
-          task.url,
-          task.created_time,
-          task.last_edited_time || null,
-          now
-        );
-      }
-    });
-
-    transaction(databaseId, tasks, lastEditedTime);
+    // Legacy method - task_cache table has been removed
+    return;
   }
 
   async isTaskCacheValid(databaseId, currentLastEditedTime, checkRecentPages = false) {
@@ -554,7 +470,7 @@ export class SQLiteCache {
   // Utility methods
   async clearCache() {
     this.db.exec(`
-      DELETE FROM task_cache;
+      -- task_cache table removed
       DELETE FROM project_cache;
       DELETE FROM tag_cache;
       DELETE FROM status_groups_cache;
@@ -564,7 +480,7 @@ export class SQLiteCache {
   }
 
   async invalidateTaskCache() {
-    this.db.exec(`DELETE FROM task_cache; DELETE FROM cache_metadata WHERE cache_type = 'tasks';`);
+    this.db.exec(`DELETE FROM cache_metadata WHERE cache_type = 'tasks';`);
   }
 
   async invalidateProjectCache() {
@@ -577,7 +493,6 @@ export class SQLiteCache {
 
   async clearTasksCache(databaseId) {
     try {
-      this.statements.deleteCachedTasks.run(databaseId);
       this.db.prepare('DELETE FROM cache_metadata WHERE database_id = ? AND cache_type = ?').run(databaseId, 'tasks');
     } catch (error) {
       console.error('Error clearing tasks cache:', error);
@@ -586,58 +501,14 @@ export class SQLiteCache {
 
 
   async updateTasksInCache(databaseId, updatedTasks) {
-    try {
-      const now = Date.now();
-      
-      // Update specific tasks in the cache without invalidating everything
-      const updateTask = this.db.prepare(`
-        UPDATE task_cache 
-        SET title = ?, properties = ?, url = ?, last_edited_time = ?, cached_at = ?
-        WHERE id = ? AND database_id = ?
-      `);
-      
-      const transaction = this.db.transaction((tasks) => {
-        for (const task of tasks) {
-          updateTask.run(
-            task.title,
-            JSON.stringify(task.properties),
-            task.url,
-            task.last_edited_time || null,
-            now,
-            task.id,
-            databaseId
-          );
-        }
-      });
-      
-      transaction(updatedTasks);
-      
-      // Also update the metadata timestamp to reflect that we've updated the cache
-      const metadata = this.statements.getCacheMetadata.get(databaseId, 'tasks');
-      if (metadata) {
-        this.statements.setCacheMetadata.run(
-          databaseId, 
-          'tasks', 
-          metadata.last_edited_time, 
-          now
-        );
-      }
-    } catch (error) {
-      console.error('Error updating tasks in cache:', error);
-      // Only invalidate if update fails
-      await this.invalidateTaskCache();
-    }
+    // Legacy method - task_cache table has been removed
+    return;
   }
 
 
   async getMostRecentTaskTime(databaseId) {
-    try {
-      const result = this.statements.getMostRecentTaskTime.get(databaseId);
-      return result?.max_time || null;
-    } catch (error) {
-      console.error('Error getting most recent task time:', error);
-      return null;
-    }
+    // Legacy method - task_cache table has been removed
+    return null;
   }
 
   // Database caching methods

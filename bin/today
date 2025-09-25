@@ -700,7 +700,7 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 {existing_plans}
 
 ## Database Tables Available:
-- task_cache: Tasks with titles, stages, due dates
+- markdown_tasks: Current tasks stored directly from markdown files
 - emails: Recent emails with subjects, senders, reply status
 - calendar_events: Upcoming events with times, locations
 - contacts: Contact information
