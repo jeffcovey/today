@@ -44,7 +44,8 @@
       "Read(//tmp/**)",
       "Bash(curl:*)",
       "Bash(cat:*)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "Bash(bin/email download:*)"
     ],
     "deny": [],
     "ask": []
