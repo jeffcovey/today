@@ -430,8 +430,9 @@ export class EmailManager {
   async handleConversation(query) {
     const lowerQuery = query.toLowerCase();
 
-    // Handle simple count queries
-    if (lowerQuery.includes('how many') || lowerQuery === 'count') {
+    // Handle simple count queries - but only if it's JUST asking for a count with no filters
+    if ((lowerQuery === 'how many' || lowerQuery === 'count' || lowerQuery === 'how many emails') &&
+        !lowerQuery.includes('from') && !lowerQuery.includes('with') && !lowerQuery.includes('contain')) {
       const emails = await this.getLocalEmails({
         folder: 'INBOX',
         limit: 10000

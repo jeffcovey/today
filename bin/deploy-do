@@ -148,11 +148,17 @@ EOF
             ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl start resilio-sync 2>/dev/null || true"
         fi
         
+        # Install logrotate config if it exists
+        if [ -f "config/logrotate-today" ]; then
+            print_info "Installing logrotate configuration..."
+            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ -f ${DEPLOY_PATH}/config/logrotate-today ] && sudo cp ${DEPLOY_PATH}/config/logrotate-today /etc/logrotate.d/today && sudo chmod 644 /etc/logrotate.d/today && echo '✓ Logrotate configured' || true"
+        fi
+
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-web || true"
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart vault-watcher || true"
-        
+
         print_status "Deployment complete!"
         ;;
         
