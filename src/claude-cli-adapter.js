@@ -3,12 +3,25 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import Anthropic from '@anthropic-ai/sdk';
+import chalk from 'chalk';
 
 const execAsync = promisify(exec);
 
 export class ClaudeCLIAdapter {
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'claude-email');
+    // Try to create an API client as fallback
+    this.fallbackClient = null;
+    const apiKey = process.env.TODAY_ANTHROPIC_KEY;
+    if (apiKey) {
+      try {
+        this.fallbackClient = new Anthropic({ apiKey });
+      } catch (e) {
+        // API client creation failed, will use CLI only
+      }
+    }
+    this.cliTimeout = 30000; // 30 seconds default
   }
 
   async ensureTempDir() {
@@ -20,6 +33,46 @@ export class ClaudeCLIAdapter {
   }
 
   async askClaude(systemPrompt, userQuery, options = {}) {
+    // Try CLI first
+    try {
+      return await this.askClaudeCLI(systemPrompt, userQuery, options);
+    } catch (cliError) {
+      console.log(chalk.yellow('Claude CLI failed, attempting API fallback...'));
+
+      // Try API fallback if available
+      if (this.fallbackClient) {
+        try {
+          return await this.askClaudeAPI(systemPrompt, userQuery, options);
+        } catch (apiError) {
+          console.error(chalk.red('Both Claude CLI and API failed'));
+          throw new Error(`Claude access failed: CLI: ${cliError.message}, API: ${apiError.message}`);
+        }
+      }
+
+      // No fallback available
+      throw cliError;
+    }
+  }
+
+  async askClaudeAPI(systemPrompt, userQuery, options = {}) {
+    if (!this.fallbackClient) {
+      throw new Error('No API client available');
+    }
+
+    const response = await this.fallbackClient.messages.create({
+      model: options.model || 'claude-3-haiku-20240307',
+      max_tokens: options.maxTokens || 1000,
+      temperature: options.temperature || 0,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userQuery }
+      ]
+    });
+
+    return response.content[0].text;
+  }
+
+  async askClaudeCLI(systemPrompt, userQuery, options = {}) {
     // Combine system prompt and user query
     const fullPrompt = `${systemPrompt}
 
@@ -39,11 +92,12 @@ Please provide a concise, direct response.`;
       let stderr = '';
       let timeout;
 
-      // Set a timeout
+      // Set a timeout (use shorter timeout if we have API fallback)
+      const timeoutDuration = this.fallbackClient ? 15000 : this.cliTimeout;
       timeout = setTimeout(() => {
         claude.kill('SIGTERM');
-        reject(new Error('Claude CLI timed out after 30 seconds'));
-      }, 30000);
+        reject(new Error(`Claude CLI timed out after ${timeoutDuration / 1000} seconds`));
+      }, timeoutDuration);
 
       claude.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -99,20 +153,29 @@ ${JSON.stringify(items, null, 2)}
 
 Return ONLY the JSON array of matching items.`;
 
-    const response = await this.askClaude(systemPrompt, userPrompt);
-
-    // Try to extract JSON from the response
     try {
-      // Look for JSON array in the response
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const response = await this.askClaude(systemPrompt, userPrompt, {
+        maxTokens: 4000,
+        temperature: 0
+      });
+
+      // Try to extract JSON from the response
+      try {
+        // Look for JSON array in the response
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        // If no array found, try parsing the whole response
+        return JSON.parse(response);
+      } catch (parseError) {
+        console.error('Failed to parse Claude response as JSON:', response.substring(0, 200));
+        // Fall back to returning all items if parsing fails
+        return items;
       }
-      // If no array found, try parsing the whole response
-      return JSON.parse(response);
     } catch (error) {
-      console.error('Failed to parse Claude response as JSON:', response);
-      // Fall back to returning all items if parsing fails
+      console.error(chalk.red('filterWithClaude failed:'), error.message);
+      // Fall back to returning all items if Claude fails entirely
       return items;
     }
   }

@@ -734,7 +734,12 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 
 Execute the request NOW without asking for permission!"""
 
-            subprocess.run(['claude', '--print', '--dangerously-skip-permissions', prompt])
+            try:
+                subprocess.run(['timeout', '600', 'claude', '--print', '--dangerously-skip-permissions', prompt],
+                             check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"ERROR: Command timed out or failed after 10 minutes: {e}")
+                sys.exit(1)
         else:
             print(f"📊 Starting focused session: {direct_request}\n")
             print("🤖 Starting Claude focused session...")

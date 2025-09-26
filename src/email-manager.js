@@ -832,7 +832,7 @@ export class EmailManager {
       }
     }
     
-    // Original intent-based handling as fallback
+    // Original intent-based handling as fallback with retry logic
     const intentPrompt = `You are an email assistant. Analyze the user's query and determine their intent.
     
 Possible intents:
@@ -878,19 +878,37 @@ Examples:
 
 User query: "${query}"`;
 
-    const intentResponse = await this.nlSearch.askClaude(intentPrompt, query, {
-      model: 'claude-3-haiku-20240307',
-      maxTokens: 500
-    });
-
+    let intentResponse;
     let intent;
+
     try {
+      intentResponse = await this.nlSearch.askClaude(intentPrompt, query, {
+        model: 'claude-3-haiku-20240307',
+        maxTokens: 500
+      });
+
       // Extract JSON from response
       const jsonMatch = intentResponse.match(/\{[\s\S]*\}/);
       intent = JSON.parse(jsonMatch[0]);
     } catch (error) {
-      console.log(chalk.yellow('Could not parse intent, trying basic search...'));
-      intent = { intent: 'SEARCH', parameters: { content: query } };
+      console.log(chalk.yellow('Could not determine intent, using basic search fallback'));
+      console.log(chalk.gray(`Error: ${error.message}`));
+
+      // Fallback to simple keyword-based intent detection
+      const lowerQuery = query.toLowerCase();
+      if (lowerQuery.includes('delete') || lowerQuery.includes('remove') || lowerQuery.includes('trash')) {
+        intent = { intent: 'DELETE', parameters: { content: query } };
+      } else if (lowerQuery.includes('move')) {
+        intent = { intent: 'MOVE', parameters: { content: query } };
+      } else if (lowerQuery.includes('count') || lowerQuery.includes('how many')) {
+        intent = { intent: 'COUNT', parameters: { content: query } };
+      } else if (lowerQuery.includes('folder')) {
+        intent = { intent: 'LIST_FOLDERS', parameters: {} };
+      } else if (lowerQuery.includes('summar')) {
+        intent = { intent: 'SUMMARIZE', parameters: {} };
+      } else {
+        intent = { intent: 'SEARCH', parameters: { content: query } };
+      }
     }
 
     // Handle the intent

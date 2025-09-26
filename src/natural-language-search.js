@@ -4,8 +4,8 @@ import { ClaudeCLIAdapter } from './claude-cli-adapter.js';
 
 export class NaturalLanguageSearch {
   constructor() {
-    // Check for Anthropic API key first
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    // Check for TODAY_ANTHROPIC_KEY
+    const anthropicKey = process.env.TODAY_ANTHROPIC_KEY;
     if (anthropicKey) {
       this.client = new Anthropic({ apiKey: anthropicKey });
       this.searchMethod = 'anthropic';
@@ -87,22 +87,22 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
         temperature: 0,
         system: systemPrompt,
         messages: [
-          { 
-            role: 'user', 
+          {
+            role: 'user',
             content: `Query: "${query}"\n\nItems to filter:\n${JSON.stringify(items, null, 2)}`
           }
         ]
       });
 
       const responseText = response.content[0].text.trim();
-      
+
       // Try to extract JSON even if there's extra text
       let jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('Claude response was not JSON:', responseText.substring(0, 100) + '...');
         return items;
       }
-      
+
       const filteredItems = JSON.parse(jsonMatch[0]);
       return Array.isArray(filteredItems) ? filteredItems : [];
     } catch (error) {
@@ -131,7 +131,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
   getItemTitle(item) {
     // Try various common Notion title property names
     const titleProps = ['Name', 'Title', 'Task', 'Project', 'Item', 'Subject', 'Topic'];
-    
+
     for (const prop of titleProps) {
       if (item.properties?.[prop]) {
         const propData = item.properties[prop];
@@ -144,7 +144,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
         }
       }
     }
-    
+
     // Fallback to direct title property or 'Untitled'
     return item.title || 'Untitled';
   }
@@ -152,10 +152,10 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
   // Extract key properties from any database item
   getItemProperties(item, databaseType) {
     const props = {};
-    
+
     // Common properties across databases
     props.title = this.getItemTitle(item);
-    
+
     // Database-specific property extraction
     if (databaseType === 'tasks') {
       props.hasProject = item.properties?.['Projects (DB)']?.relation?.[0] ? 'Y' : 'N';
@@ -179,7 +179,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
         if (value.relation?.length > 0) props[key] = 'Y';
       }
     }
-    
+
     return props;
   }
 
@@ -199,7 +199,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
     // Prepare item summaries based on database type
     const itemSummaries = itemsToSearch.map((item, index) => {
       const props = this.getItemProperties(item, databaseType);
-      
+
       // Create a summary line based on database type
       if (databaseType === 'tasks') {
         return `${index}|${props.title}|P:${props.hasProject}|D:${props.hasDate}|S:${props.stage}`;
@@ -263,10 +263,10 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
 
       const result = await response.json();
       const content = result.response;
-      
+
       // Parse the response
       const indices = content.match(/\d+/g)?.map(n => parseInt(n)) || [];
-      
+
       // Return the selected items
       const results = indices
         .filter(i => i >= 0 && i < itemsToSearch.length)
@@ -289,7 +289,7 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
     try {
       const maxItems = 200;
       const itemsToSearch = items.slice(0, maxItems);
-      
+
       // Prepare item summaries
       const itemSummaries = itemsToSearch.map((item, index) => {
         const props = this.getItemProperties(item, databaseType);
@@ -323,7 +323,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
       });
 
       const content = response.content[0].text;
-      
+
       // Extract just the JSON array from the response
       // Claude sometimes adds explanation text
       let indices;
@@ -339,7 +339,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         }
         indices = JSON.parse(jsonMatch[0]);
       }
-      
+
       const results = indices
         .filter(i => i >= 0 && i < itemsToSearch.length)
         .map(i => itemsToSearch[i]);
@@ -361,7 +361,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
   basicSearch(items, query, databaseType = 'tasks') {
     const lowerQuery = query.toLowerCase();
     const words = lowerQuery.split(/\s+/).filter(w => w.length > 2);
-    
+
     // Enhanced keyword mappings for common queries
     const conceptMappings = {
       health: ['health', 'doctor', 'medical', 'vaccine', 'wellness', 'exercise', 'fitness', 'diet', 'nutrition', 'medicine', 'checkup', 'appointment', 'therapy', 'mental', 'physical', 'shingles', 'vitamin'],
@@ -370,7 +370,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
       maintenance: ['maintenance', 'repair', 'fix', 'clean', 'organize', 'update', 'check', 'review'],
       finance: ['money', 'bill', 'pay', 'financial', 'budget', 'expense', 'cost', 'invoice', 'tax']
     };
-    
+
     // Expand search terms based on concepts
     const expandedTerms = new Set(words);
     for (const [concept, keywords] of Object.entries(conceptMappings)) {
@@ -378,31 +378,31 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         keywords.forEach(kw => expandedTerms.add(kw));
       }
     }
-    
+
     // Score each item
     const scoredItems = items.map(item => {
       const title = this.getItemTitle(item).toLowerCase();
       let score = 0;
-      
+
       // Title matching
       if (title.includes(lowerQuery)) {
         score += 10;
       }
-      
+
       // Check expanded terms
       for (const term of expandedTerms) {
         if (title.includes(term)) {
           score += 3;
         }
       }
-      
+
       // Original word matching
       for (const word of words) {
         if (title.includes(word)) {
           score += 2;
         }
       }
-      
+
       // Check all text properties for matches
       for (const prop of Object.values(item.properties || {})) {
         const text = this.getPropertyText(prop).toLowerCase();
@@ -412,16 +412,16 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
           }
         }
       }
-      
+
       return { item, score };
     });
-    
+
     // Return items with any match
     const results = scoredItems
       .filter(item => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(item => item.item);
-    
+
     // If no matches, return random sample
     if (results.length === 0 && items.length > 0) {
       console.log(chalk.yellow('No keyword matches found, returning random items'));
@@ -433,7 +433,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         databaseType
       };
     }
-    
+
     return {
       results: results.slice(0, 10),
       totalFound: results.length,
@@ -445,22 +445,22 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
   // Helper to extract text from any property type
   getPropertyText(prop) {
     if (!prop) return '';
-    
+
     // Title/Rich text
     if (prop.title?.[0]?.text?.content) return prop.title[0].text.content;
     if (prop.rich_text?.[0]?.text?.content) return prop.rich_text[0].text.content;
-    
+
     // Select/Multi-select
     if (prop.select?.name) return prop.select.name;
     if (prop.multi_select) return prop.multi_select.map(s => s.name).join(' ');
-    
+
     // Other types
     if (prop.url) return prop.url;
     if (prop.email) return prop.email;
     if (prop.phone_number) return prop.phone_number;
     if (prop.number !== undefined) return String(prop.number);
     if (prop.checkbox !== undefined) return prop.checkbox ? 'yes' : 'no';
-    
+
     return '';
   }
 

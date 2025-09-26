@@ -99,6 +99,18 @@ const jobs = [
         command: 'bin/tasks update-cache || true',
         description: 'Refresh markdown tasks cache',
         timezone: false
+    },
+    {
+        schedule: '0 */6 * * *', // Every 6 hours
+        command: 'bin/droplet-maintenance || true',
+        description: 'Droplet maintenance (cleanup logs, check processes)',
+        timezone: false
+    },
+    {
+        schedule: '*/15 * * * *', // Every 15 minutes
+        command: 'bin/droplet-monitor || true',
+        description: 'Monitor droplet health',
+        timezone: false
     }
 ];
 
