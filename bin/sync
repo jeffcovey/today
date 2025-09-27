@@ -1371,7 +1371,7 @@ process_inbox() {
             
             if [[ "$TASK_ONLY" == "true" ]]; then
                 # Append to consolidated tasks.md file
-                TASKS_FILE="vault/tasks.md"
+                TASKS_FILE="vault/tasks/tasks.md"
                 mkdir -p vault 2>/dev/null
                 
                 # Insert tasks before Archive section (or at end if no Archive)

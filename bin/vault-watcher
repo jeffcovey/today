@@ -163,8 +163,8 @@ async function processEnrichmentQueue() {
 // Sort and deduplicate tasks.md
 async function sortTasksFile(filePath) {
   try {
-    // Only sort the main vault/tasks.md file, not vault/tasks/tasks.md
-    if (!filePath.endsWith('/vault/tasks.md')) {
+    // Only sort the main vault/tasks/tasks.md file
+    if (!filePath.endsWith('/vault/tasks/tasks.md')) {
       return false;
     }
 
@@ -262,7 +262,7 @@ async function processChanges() {
     }
     
     // Check if the main tasks.md needs sorting
-    const tasksFile = markdownFiles.find(f => f.endsWith('/vault/tasks.md'));
+    const tasksFile = markdownFiles.find(f => f.endsWith('/vault/tasks/tasks.md'));
     if (tasksFile) {
       log('Checking if tasks.md needs sorting...', 'info');
       const wasSorted = await sortTasksFile(tasksFile);
