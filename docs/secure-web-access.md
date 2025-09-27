@@ -50,7 +50,7 @@ curl -c cookies.txt -X POST \
   https://today.jeffcovey.net/auth/login
 
 # Access protected resources
-curl -b cookies.txt https://today.jeffcovey.net/tasks/today.md
+curl -b cookies.txt https://today.jeffcovey.net/tasks-today.md
 ```
 
 ### Method 4: Using deploy-do fetch (Recommended for CLI)
@@ -58,14 +58,14 @@ curl -b cookies.txt https://today.jeffcovey.net/tasks/today.md
 ```bash
 # Fetch pages with automatic authentication
 bin/deploy-do fetch /                        # Homepage
-bin/deploy-do fetch /tasks/today.md          # Today's tasks
+bin/deploy-do fetch /tasks-today.md          # Today's tasks
 bin/deploy-do fetch /plans/                  # Plans directory
 
 # Options:
-bin/deploy-do fetch /tasks/today.md --raw    # Get raw HTML
-bin/deploy-do fetch /tasks/today.md --output tasks.html  # Save to file
+bin/deploy-do fetch /tasks-today.md --raw    # Get raw HTML
+bin/deploy-do fetch /tasks-today.md --output tasks.html  # Save to file
 bin/deploy-do fetch /api/health --no-auth    # Skip auth for public endpoints
-bin/deploy-do fetch /tasks/today.md --headers  # Include HTTP headers
+bin/deploy-do fetch /tasks-today.md --headers  # Include HTTP headers
 ```
 
 ### Method 5: Manual Remote Access via deploy-do exec
@@ -81,7 +81,7 @@ bin/deploy-do exec "curl -X POST -d 'username=admin' \
 
 # Then use the cookie for authenticated requests
 bin/deploy-do exec "curl -b /tmp/auth-cookies.txt \
-  https://today.jeffcovey.net/tasks/today.md"
+  https://today.jeffcovey.net/tasks-today.md"
 ```
 
 ## Security Best Practices
