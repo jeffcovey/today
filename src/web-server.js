@@ -1118,7 +1118,7 @@ async function renderDirectory(dirPath, urlPath) {
     // Add Today's Tasks button (always show it)
     html += `
             <div class="card shadow-sm mb-3">
-              <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
+              <a href="/tasks-today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
                 <div class="d-flex align-items-center justify-content-between ps-2">
                   <div class="d-flex align-items-center">
                     <i class="fas fa-tasks me-2"></i>

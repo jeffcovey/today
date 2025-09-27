@@ -955,9 +955,9 @@ export class TaskManager {
             // For generated files in vault/tasks/, we need special handling:
             // Only sync checkbox changes if the file is newer AND checkbox state changed
             // This allows manual checking/unchecking while preventing re-applying old states
-            const isGeneratedFile = filePath === 'vault/tasks/today.md' || 
+            const isGeneratedFile = filePath === 'vault/tasks-today.md' ||
                                   filePath === 'vault/tasks/tasks.md' ||
-                                  filePath === 'vault/tasks/stages.md';
+                                  filePath === 'vault/tasks-stages.md';
             
             // Check if this is a checkbox state change
             const taskIsCompleted = task.status === '✅ Done';
@@ -1315,7 +1315,7 @@ export class TaskManager {
 
   // Generate today's task file
   // Note: Checkbox syncing is handled separately, not during generation
-  async generateTodayFile(outputPath = 'vault/tasks/today.md') {
+  async generateTodayFile(outputPath = 'vault/tasks-today.md') {
     // Check if file was recently modified (within last 30 seconds)
     // This prevents overwriting manual edits that just happened
     try {

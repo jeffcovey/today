@@ -860,7 +860,7 @@ EOF
             echo ""
             echo "Examples:"
             echo "  bin/deploy-do fetch /                    # Fetch homepage"
-            echo "  bin/deploy-do fetch /tasks/today.md      # Fetch today's tasks"
+            echo "  bin/deploy-do fetch /tasks-today.md      # Fetch today's tasks"
             echo "  bin/deploy-do fetch /plans/              # List plans directory"
             echo "  bin/deploy-do fetch /api/health          # Check API health"
             echo ""
