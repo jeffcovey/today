@@ -1738,13 +1738,13 @@ archive_completed_tasks() {
     
     # Replace the original file
     mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-    
-    # Clean up temp files
-    rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
-    
+
     # Count unique completed tasks archived
     UNIQUE_COUNT=$(wc -l < "$COMPLETED_NEW" 2>/dev/null | tr -d ' ' || echo 0)
     print_info "Archived $UNIQUE_COUNT completed task(s) to $TODAY section"
+
+    # Clean up temp files
+    rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
     
     return 0
 }
