@@ -4299,15 +4299,15 @@ app.get('/search', authMiddleware, async (req, res) => {
     const execAsync = promisify(exec);
     
     try {
-      // Search in file contents
+      // Search in file contents (excluding hidden directories)
       const { stdout: contentResults } = await execAsync(
-        `grep -r -i -l --include="*.md" "${searchQuery.replace(/"/g, '\\"')}" "${VAULT_PATH}" | head -100`,
+        `grep -r -i -l --include="*.md" --exclude-dir=".*" "${searchQuery.replace(/"/g, '\\"')}" "${VAULT_PATH}" | head -100`,
         { maxBuffer: 1024 * 1024 * 10 } // 10MB buffer
       );
-      
-      // Search in filenames
+
+      // Search in filenames (excluding hidden files and directories)
       const { stdout: filenameResults } = await execAsync(
-        `find "${VAULT_PATH}" -type f -name "*.md" -iname "*${searchQuery.replace(/"/g, '\\"')}*" | head -100`,
+        `find "${VAULT_PATH}" -type f -name "*.md" ! -path "*/.*" -iname "*${searchQuery.replace(/"/g, '\\"')}*" | head -100`,
         { maxBuffer: 1024 * 1024 * 10 }
       );
       
