@@ -4614,6 +4614,60 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 });
 
 // Save route handler
+// Helper function to calculate next recurrence date
+function calculateNextRecurrence(pattern, fromDate) {
+  // Parse patterns like:
+  // - "every day" / "every 2 days" / "every 0.6 days"
+  // - "every week" / "every 3 weeks"
+  // - "every month" / "every 6 months"
+  // - "every year" / "every 2 years"
+  // - "every day when done" / "every 5 days when done"
+
+  const baseDate = new Date(fromDate + 'T00:00:00');
+
+  // Remove "when done" if present - it doesn't affect the calculation
+  const cleanPattern = pattern.replace(/\s+when\s+done\s*$/i, '').trim();
+
+  // Match the pattern
+  const match = cleanPattern.match(/^every\s+(?:(\d+(?:\.\d+)?)\s+)?(day|days|week|weeks|month|months|year|years)$/i);
+
+  if (!match) {
+    console.error(`[TASK] Could not parse recurrence pattern: "${pattern}"`);
+    return null;
+  }
+
+  const quantity = parseFloat(match[1] || '1');
+  const unit = match[2].toLowerCase();
+
+  // Calculate the next date
+  const nextDate = new Date(baseDate);
+
+  switch (unit) {
+    case 'day':
+    case 'days':
+      nextDate.setDate(nextDate.getDate() + Math.round(quantity));
+      break;
+    case 'week':
+    case 'weeks':
+      nextDate.setDate(nextDate.getDate() + Math.round(quantity * 7));
+      break;
+    case 'month':
+    case 'months':
+      nextDate.setMonth(nextDate.getMonth() + Math.round(quantity));
+      break;
+    case 'year':
+    case 'years':
+      nextDate.setFullYear(nextDate.getFullYear() + Math.round(quantity));
+      break;
+    default:
+      console.error(`[TASK] Unsupported recurrence unit: "${unit}"`);
+      return null;
+  }
+
+  // Return in YYYY-MM-DD format
+  return nextDate.toISOString().split('T')[0];
+}
+
 // Handle task checkbox toggling
 app.post('/task/toggle', authMiddleware, async (req, res) => {
   try {
@@ -4675,6 +4729,11 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       console.log(`[TASK] Task not in cache, proceeding with file version: "${taskLine}"`);
     }
 
+    // Check if this is a recurring task (has 🔁 pattern)
+    const recurringMatch = taskLine.match(/🔁\s+(.+?)(?:\s+(?:⏳|📅|➕)|$)/);
+    const isRecurring = !!recurringMatch;
+    let newTaskLine = null;
+
     // Update the task
     let updatedLine;
     if (completed) {
@@ -4684,6 +4743,47 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
         .replace(/^((?:\s*>)*\s*)- \[ \]/, '$1- [x]')  // Keep any blockquote prefix
         .replace(/✅ \d{4}-\d{2}-\d{2}/, '') // Remove old completion date if exists
         + ` ✅ ${today}`;
+
+      // If this is a recurring task, create the new occurrence
+      if (isRecurring) {
+        const recurrencePattern = recurringMatch[1].trim();
+        console.log(`[TASK] Processing recurring task with pattern: ${recurrencePattern}`);
+
+        // Parse the recurrence pattern and calculate next date
+        const nextDate = calculateNextRecurrence(recurrencePattern, today);
+
+        if (nextDate) {
+          // Create new task line by copying the original but with:
+          // 1. Unchecked checkbox
+          // 2. Updated scheduled date (⏳)
+          // 3. No completion date
+          newTaskLine = taskLine
+            .replace(/^((?:\s*>)*\s*)- \[[ xX]\]/, '$1- [ ]')  // Unchecked
+            .replace(/✅ \d{4}-\d{2}-\d{2}/, '');  // Remove any completion date
+
+          // Update or add scheduled date (⏳)
+          if (newTaskLine.includes('⏳')) {
+            newTaskLine = newTaskLine.replace(/⏳ \d{4}-\d{2}-\d{2}/, `⏳ ${nextDate}`);
+          } else {
+            // Add scheduled date before any existing dates
+            if (newTaskLine.includes('📅')) {
+              newTaskLine = newTaskLine.replace(/📅/, `⏳ ${nextDate} 📅`);
+            } else if (newTaskLine.includes('➕')) {
+              newTaskLine = newTaskLine.replace(/➕/, `⏳ ${nextDate} ➕`);
+            } else {
+              newTaskLine = newTaskLine + ` ⏳ ${nextDate}`;
+            }
+          }
+
+          // Preserve creation date if original task doesn't have one
+          if (!newTaskLine.includes('➕') && !taskLine.includes('➕')) {
+            // Add today as creation date for the new task
+            newTaskLine = newTaskLine + ` ➕ ${today}`;
+          }
+
+          console.log(`[TASK] Created new recurring task: ${newTaskLine}`);
+        }
+      }
     } else {
       // Mark as not done and remove completion date
       updatedLine = taskLine
@@ -4693,6 +4793,12 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 
     // Update the file
     lines[line - 1] = updatedLine;
+
+    // If we have a new recurring task, insert it after the completed one
+    if (newTaskLine) {
+      lines.splice(line, 0, newTaskLine); // Insert at position line (after line-1)
+    }
+
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 
     // Update the database cache to reflect the change
@@ -4714,6 +4820,25 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
         `);
         insertStmt.run(dbFilePath, line, updatedLine);
         console.log(`[TASK] Added to database cache: ${dbFilePath}:${line}`);
+      }
+
+      // If we added a new recurring task, also add it to the cache
+      if (newTaskLine) {
+        const insertStmt = db.prepare(`
+          INSERT OR REPLACE INTO markdown_tasks (file_path, line_number, line_text)
+          VALUES (?, ?, ?)
+        `);
+        insertStmt.run(dbFilePath, line + 1, newTaskLine);
+        console.log(`[TASK] Added new recurring task to cache: ${dbFilePath}:${line + 1}`);
+
+        // We should also update line numbers for all tasks after this insertion
+        const updateStmt = db.prepare(`
+          UPDATE markdown_tasks
+          SET line_number = line_number + 1
+          WHERE file_path = ? AND line_number > ?
+        `);
+        updateStmt.run(dbFilePath, line);
+        console.log(`[TASK] Updated line numbers for subsequent tasks in cache`);
       }
     } catch (dbError) {
       console.error('[TASK] Failed to update database cache:', dbError);
