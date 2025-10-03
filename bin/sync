@@ -1422,11 +1422,11 @@ process_inbox() {
                 print_info "  • Mixed content with tasks → vault/$BASENAME"
             fi
 
-        # Default - move to vault root for manual processing
+        # Default - move to general notes directory
         else
-            DEST_DIR="vault"
+            DEST_DIR="vault/notes/general"
             DEST_FILE="$BASENAME"
-            print_info "  • Note → vault/$BASENAME (for manual processing)"
+            print_info "  • Note → notes/general/$BASENAME"
         fi
         
         # Create destination directory if needed
