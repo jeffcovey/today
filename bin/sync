@@ -85,7 +85,6 @@ main() {
     # DISABLED: Task sync now handled by Obsidian Tasks plugin
     # SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
-    run_sync_step "✅ Archive Tasks" archive_completed_tasks "Tasks archived" "Tasks archived"
     # DISABLED: Project tasks now in markdown files only
     # run_sync_step "📁 Sync Project Tasks" sync_project_tasks "Project tasks synced" "Project tasks"
     
@@ -1622,132 +1621,6 @@ _sync_tasks_to_project_file() {
     SYNCED_COUNT=$((SYNCED_COUNT + 1))
 }
 
-# Archive completed tasks in tasks.md
-archive_completed_tasks() {
-    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/.." || return 1
-    
-    TASKS_FILE="vault/tasks/tasks.md"
-    
-    # Check if tasks.md exists
-    if [[ ! -f "$TASKS_FILE" ]]; then
-        print_info "No tasks.md file found"
-        return 0
-    fi
-    
-    # Get today's date
-    TODAY=$(date +%Y-%m-%d)
-    
-    # Create temporary files
-    ACTIVE_TASKS=$(mktemp)
-    COMPLETED_NEW=$(mktemp)
-    ARCHIVE_CONTENT=$(mktemp)
-    
-    # Extract sections from the file
-    # 1. Active section - preserve ALL structure (headers, tasks, blank lines) except completed tasks
-    # This keeps project headers (## Project Name) intact
-    awk '
-        /^# Archive/ {exit}
-        /^- \[x\]/ {next}  # Skip completed tasks
-        {print}            # Keep everything else (headers, uncompleted tasks, blank lines)
-    ' "$TASKS_FILE" | sed '/^$/N;/^\n$/d' > "$ACTIVE_TASKS" || true
-    
-    # 2. NEW completed tasks from active section (to be archived)
-    awk '/^# Archive/ {exit} /^- \[x\]/ {print}' "$TASKS_FILE" > "$COMPLETED_NEW" || true
-    
-    # 3. Existing archive content (deduplicated)
-    if grep -q "^# Archive" "$TASKS_FILE"; then
-        awk '
-            /^# Archive/ {in_archive=1; next}
-            in_archive && /^## [0-9]{4}-[0-9]{2}-[0-9]{2}/ {
-                current_date = substr($0, 4)
-                print
-                next
-            }
-            in_archive && /^- \[x\]/ {
-                # Store task to check for duplicates
-                task = $0
-                if (!(task in seen)) {
-                    seen[task] = 1
-                    print
-                }
-                next
-            }
-            in_archive && /^- \[ \]/ {
-                # Move incomplete tasks back to active
-                next
-            }
-            in_archive {print}
-        ' "$TASKS_FILE" > "$ARCHIVE_CONTENT" || true
-    fi
-    
-    # Check if there are any new completed tasks to archive
-    NEW_COUNT=$(wc -l < "$COMPLETED_NEW" | tr -d ' ')
-    if [[ "$NEW_COUNT" -eq 0 ]]; then
-        # No new completed tasks, but still rebuild to clean duplicates
-        {
-            # Active tasks
-            if [[ -s "$ACTIVE_TASKS" ]]; then
-                cat "$ACTIVE_TASKS"
-            fi
-            
-            # Archive section
-            if [[ -s "$ARCHIVE_CONTENT" ]] || grep -q "^# Archive" "$TASKS_FILE"; then
-                echo ""
-                echo "# Archive"
-                echo ""
-                if [[ -s "$ARCHIVE_CONTENT" ]]; then
-                    cat "$ARCHIVE_CONTENT"
-                fi
-            fi
-        } > "${TASKS_FILE}.tmp"
-        
-        mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-        rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
-        
-        print_info "No new completed tasks to archive, cleaned duplicates"
-        return 0
-    fi
-    
-    # Deduplicate new completed tasks
-    sort -u "$COMPLETED_NEW" > "${COMPLETED_NEW}.dedup"
-    mv "${COMPLETED_NEW}.dedup" "$COMPLETED_NEW"
-    
-    # Build the new file
-    {
-        # Active tasks first
-        if [[ -s "$ACTIVE_TASKS" ]]; then
-            cat "$ACTIVE_TASKS"
-        fi
-        
-        # Archive section
-        echo ""
-        echo "# Archive"
-        echo ""
-        
-        # Add today's section with new completed tasks
-        echo "## $TODAY"
-        cat "$COMPLETED_NEW"
-        
-        # Add existing archive content (if any)
-        if [[ -s "$ARCHIVE_CONTENT" ]]; then
-            echo ""
-            cat "$ARCHIVE_CONTENT"
-        fi
-    } > "${TASKS_FILE}.tmp"
-    
-    # Replace the original file
-    mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-
-    # Count unique completed tasks archived
-    UNIQUE_COUNT=$(wc -l < "$COMPLETED_NEW" 2>/dev/null | tr -d ' ' || echo 0)
-    print_info "Archived $UNIQUE_COUNT completed task(s) to $TODAY section"
-
-    # Clean up temp files
-    rm -f "$ACTIVE_TASKS" "$COMPLETED_NEW" "$ARCHIVE_CONTENT"
-    
-    return 0
-}
 
 
 # Update cache statistics
@@ -1876,12 +1749,6 @@ case "${1:-}" in
             print_status "Inbox processed successfully!"
         else
             print_error "Inbox processing failed"
-        fi
-        
-        # Archive completed tasks
-        print_header "✅ Archive Tasks"
-        if archive_completed_tasks; then
-            print_status "Tasks archived successfully!"
         fi
         ;;
     --quick)
