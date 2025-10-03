@@ -19,26 +19,26 @@ async function runCommand(command, description) {
         console.log(`⚠️  Sync is disabled to prevent data loss. Check GitHub repository.`);
         return;
     }
-    
+
     const timestamp = new Date().toISOString();
     console.log(`\n[${timestamp}] Running: ${description}`);
-    
+
     try {
         // Use the correct working directory - /opt/today on DigitalOcean, /app on Fly
         const cwd = fs.existsSync('/opt/today') ? '/opt/today' : '/app';
-        
+
         const { stdout, stderr } = await execAsync(command, {
             cwd: cwd,
             env: process.env,
             shell: '/usr/bin/sh', // Explicitly use /usr/bin/sh instead of /bin/sh
             timeout: 10 * 60 * 1000 // 10 minute timeout
         });
-        
+
         if (stdout) {
             console.log(`✅ ${description} completed:`);
             console.log(stdout.trim().split('\n').slice(-5).join('\n')); // Last 5 lines
         }
-        
+
         if (stderr) {
             console.error(`⚠️ Warnings from ${description}:`);
             console.error(stderr);
@@ -78,11 +78,11 @@ const jobs = [
         description: 'Daily vault snapshot backup',
         timezone: true
     },
-    {
-        schedule: '*/5 * * * *', // Every 5 minutes
-        command: 'bin/vault-auto-sync || true',
-        description: 'Vault git sync'
-    },
+    // {
+    //     schedule: '*/5 * * * *', // Every 5 minutes
+    //     command: 'bin/vault-auto-sync || true',
+    //     description: 'Vault git sync'
+    // },
     {
         schedule: '0 * * * *', // Every hour
         command: 'journalctl --vacuum-time=24h > /dev/null 2>&1 || true',
@@ -118,9 +118,9 @@ import { getTimezone } from './config.js';
 
 jobs.forEach(job => {
     const options = job.timezone ? { timezone: process.env.TZ || getTimezone() } : {};
-    
+
     console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
-    
+
     cron.schedule(job.schedule, () => {
         runCommand(job.command, job.description);
     }, options);
