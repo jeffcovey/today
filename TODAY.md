@@ -103,6 +103,18 @@ For existing daily plans:
 - Check off completed tasks directly in Obsidian
 - Evening reflection section for end-of-day review
 
+### Time Blocking Workflow
+
+After creating or updating daily plans:
+1. **Identify Priority Tasks**: Select 3-5 most important tasks from the daily plan
+2. **Create Time Blocks**: Use `bin/calendar add` to create focused calendar events
+3. **Structure the Day**:
+   - Urgent tasks: 15-30 minute blocks
+   - Deep work: 1-2 hour focused blocks
+   - Routine tasks: 30-45 minute blocks
+   - Evening routine: 3+ hour wind-down block
+4. **Use Time Blocking Calendar**: Always specify `--calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"`
+
 ### Available Commands
 
 ```bash
@@ -112,6 +124,10 @@ bin/tasks sync                         # NO LONGER syncs to database (disabled)
 # Tasks are now managed directly in markdown files with Obsidian Tasks plugin:
 # - [ ] Task title 🔺 ⏳ 2025-09-20    # Priority + scheduled date
 # - [ ] Task title 📅 2025-09-21 🔁 every week  # Due date + recurrence
+
+# Calendar time blocking
+bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+bin/calendar list-calendars            # Show available calendars
 
 # Review tracking
 bin/mark-done "Task description"       # Mark specific task as done
@@ -180,6 +196,18 @@ Two guest rooms via Airbnb/MisterB&B:
 - Query: `SELECT * FROM contacts WHERE julianday('now') - julianday(last_contacted) > 42`
 - Update: `UPDATE contacts SET last_contacted = DATE('now') WHERE full_name = 'Name'`
 - Great "Off Stage" activity for Tue/Fri
+
+### Calendar Time Blocking
+
+**Time Blocking Calendar ID**: `e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com`
+
+Create focused time blocks for daily priorities:
+- **Urgent tasks**: 15-30 minute blocks
+- **Deep work**: 1-2 hour focused blocks
+- **Routine tasks**: 30-45 minute blocks
+- **Evening routine**: 3+ hour wind-down block
+
+**Usage**: After creating or updating daily plans, proactively create calendar events to structure the day with focused time blocks.
 
 ### Hierarchical Goal Alignment
 
@@ -320,6 +348,7 @@ Based on database queries AND hierarchical plan alignment:
 7. **Self-Care** - Check journal entries for wellbeing patterns
 8. **Time Tracking** - Analyze tracked vs planned, alignment with priorities
 9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
+10. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
 
 ## Your First Steps
 
@@ -328,8 +357,11 @@ Based on database queries AND hierarchical plan alignment:
 3. **Query database** at `.data/today.db`
 4. **Check/create plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`
 5. **Analyze and recommend** based on data, theme, and goals
-6. **Stay engaged** - this is an interactive session
+6. **Create time blocking events** for priorities using `bin/calendar add --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"`
+7. **Stay engaged** - this is an interactive session
 
 Please query the database and provide specific, actionable recommendations for today.
+
+**IMPORTANT**: After creating or updating daily plans, proactively suggest and create time blocking calendar events for the day's priorities. Use the Time Blocking calendar to structure focused work periods.
 
 Let's begin the daily review!

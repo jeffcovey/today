@@ -23,6 +23,14 @@ class CalendarSync {
     this.events = [];
     this.db = getDatabase();
     this.initDatabase();
+
+    // Get timezone from config.toml
+    try {
+      this.defaultTimezone = execSync('bin/get-config timezone', { encoding: 'utf-8' }).trim();
+    } catch (error) {
+      console.warn('Warning: Could not read timezone from config.toml, using America/New_York');
+      this.defaultTimezone = 'America/New_York';
+    }
   }
   
   initDatabase() {
@@ -582,9 +590,13 @@ class CalendarSync {
   // Add event to Google Calendar
   async addGoogleEvent(eventDetails) {
     try {
-      // Check for calendar configuration
-      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
-      
+      // Check for calendar configuration - use specified calendar or default
+      let calendarId = eventDetails.calendarId;
+
+      if (!calendarId) {
+        calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      }
+
       if (!calendarId) {
         throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
       }
@@ -621,11 +633,11 @@ class CalendarSync {
         description: eventDetails.description,
         start: {
           dateTime: eventDetails.startDateTime,
-          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+          timeZone: eventDetails.timeZone || this.defaultTimezone,
         },
         end: {
           dateTime: eventDetails.endDateTime,
-          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+          timeZone: eventDetails.timeZone || this.defaultTimezone,
         },
       };
 
@@ -643,10 +655,12 @@ class CalendarSync {
   }
 
   // Delete event from Google Calendar
-  async deleteGoogleEvent(eventId) {
+  async deleteGoogleEvent(eventId, calendarId = null) {
     try {
-      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
-      
+      if (!calendarId) {
+        calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      }
+
       if (!calendarId) {
         throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
       }
@@ -692,8 +706,12 @@ class CalendarSync {
   // Update event in Google Calendar
   async updateGoogleEvent(eventId, eventDetails) {
     try {
-      const calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
-      
+      let calendarId = eventDetails.calendarId;
+
+      if (!calendarId) {
+        calendarId = process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_CALENDAR_IDS?.split(',')[0];
+      }
+
       if (!calendarId) {
         throw new Error('Google Calendar not configured. Need GOOGLE_CALENDAR_ID in .env');
       }
@@ -732,14 +750,14 @@ class CalendarSync {
       if (eventDetails.startDateTime) {
         event.start = {
           dateTime: eventDetails.startDateTime,
-          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+          timeZone: eventDetails.timeZone || this.defaultTimezone,
         };
       }
-      
+
       if (eventDetails.endDateTime) {
         event.end = {
           dateTime: eventDetails.endDateTime,
-          timeZone: eventDetails.timeZone || 'America/Los_Angeles',
+          timeZone: eventDetails.timeZone || this.defaultTimezone,
         };
       }
 
@@ -765,7 +783,8 @@ class CalendarSync {
       endDateTime: '',
       location: '',
       description: '',
-      timeZone: 'America/Los_Angeles'
+      timeZone: this.defaultTimezone,
+      calendarId: null
     };
 
     let i = 0;
@@ -797,6 +816,8 @@ class CalendarSync {
         event.description = args[++i];
       } else if (arg === '--timezone' || arg === '--tz') {
         event.timeZone = args[++i];
+      } else if (arg === '--calendar' || arg === '-c') {
+        event.calendarId = args[++i];
       } else if (!event.title) {
         // First non-flag argument is the title
         event.title = arg;
@@ -854,11 +875,13 @@ Options:
   --end <datetime>            End datetime (ISO format)
   --location, -l <location>   Event location
   --description <desc>        Event description
-  --timezone, --tz <tz>       Timezone (default: America/Los_Angeles)
+  --timezone, --tz <tz>       Timezone (default: America/New_York)
+  --calendar, -c <calendar>   Calendar ID or name (defaults to primary calendar)
 
 Examples:
   calendar add --title "Quadz Bar Showtunes" --date "2025-09-05" "20:00" "21:00" --location "Quadz Bar, Palm Springs"
   calendar add "Team Meeting" --start "2025-09-08T10:00:00" --end "2025-09-08T11:00:00"
+  calendar add --title "Focus Block" --date "2025-10-04" "14:00" "16:00" --calendar "Time Blocking"
         `);
         break;
       }
@@ -921,6 +944,7 @@ Options (all optional, only specified fields will be updated):
   --location, -l <location>   New location
   --description <desc>        New description
   --timezone, --tz <tz>       Timezone for date/time updates
+  --calendar, -c <calendar>   Calendar ID or name (defaults to primary calendar)
 
 Example:
   calendar update pvu3qkdo96orhscs2nbpm44kq0 --date "2025-09-07" "17:00" "19:00"
@@ -939,7 +963,30 @@ Example:
       
       await calSync.updateGoogleEvent(updateEventId, updateDetails);
       break;
-      
+
+    case 'list-calendars':
+    case 'calendars':
+      // List available calendars
+      const calendarIds = process.env.GOOGLE_CALENDAR_IDS || process.env.GOOGLE_CALENDAR_ID;
+
+      if (!calendarIds) {
+        console.log('❌ No Google Calendar configured');
+        console.log('   Run "calendar setup" for configuration instructions');
+        break;
+      }
+
+      console.log('📅 Available Calendars:');
+      const calendars = calendarIds.split(',').map(id => id.trim()).filter(Boolean);
+
+      for (let i = 0; i < calendars.length; i++) {
+        const calId = calendars[i];
+        console.log(`  ${i + 1}. ${calId}${i === 0 ? ' (default)' : ''}`);
+      }
+
+      console.log('\n💡 Usage: Use the calendar ID with --calendar/-c option:');
+      console.log('   calendar add "Meeting" --calendar "Time Blocking" --date "2025-10-04" "14:00" "15:00"');
+      break;
+
     case 'setup':
       console.log(`
 📅 Calendar Setup Instructions
@@ -987,13 +1034,14 @@ For macOS Calendar:
 Usage: calendar [command]
 
 Commands:
-  sync    - Sync all configured calendars
-  today   - Show today's events
-  week    - Show this week's events
-  add     - Add a new event to Google Calendar
-  update  - Update an existing Google Calendar event
-  delete  - Delete a Google Calendar event
-  setup   - Show setup instructions
+  sync              - Sync all configured calendars
+  today             - Show today's events
+  week              - Show this week's events
+  add               - Add a new event to Google Calendar
+  update            - Update an existing Google Calendar event
+  delete            - Delete a Google Calendar event
+  list-calendars    - List available calendar IDs
+  setup             - Show setup instructions
 
 Calendar data is stored in SQLite database (.data/today.db)
 

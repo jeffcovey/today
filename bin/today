@@ -694,6 +694,7 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 - **Stage**: {stage_theme} - {stage_focus}
 - **Review File**: {review_file}
 - **Active Tasks**: {task_count} (Overdue: {overdue_count}, High Priority: {high_priority_count})
+- **Time Blocking Calendar**: e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com
 {health_metrics}
 
 ## Existing Plans
@@ -713,6 +714,7 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 - bin/db-query tasks - Get priority tasks
 - bin/mark-done 'task' - Mark a task as complete
 - bin/progress 'note' - Add a progress note
+- bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" - Create time blocking events
 
 {today_context}"""
 
