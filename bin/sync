@@ -1314,11 +1314,20 @@ process_inbox() {
                 {started=1; print}                 # Print everything else
             ')
 
-            # Save to progress directory
+            # Save to progress directory with date-based filename
             echo "$CLEANED_CONTENT" > "$file"  # Update content for move
             DEST_DIR="vault/notes/progress"
-            DEST_FILE="$BASENAME"
-            print_info "  • Progress file → progress/$BASENAME"
+
+            # Create filename based on the actual date from content
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Format: YYYY-MM-DD-HHMMSS-UTC-progress.md
+                TIME_FORMATTED=$(echo "$TIME_PART" | tr -d ':')
+                DEST_FILE="${YEAR}-${MONTH}-${DAY}-${TIME_FORMATTED}00-UTC-progress.md"
+                print_info "  • Progress file → progress/$DEST_FILE (using date from content)"
+            else
+                DEST_FILE="$BASENAME"
+                print_info "  • Progress file → progress/$BASENAME (no date found in content)"
+            fi
 
             # Also append to review file if it exists
             if [[ -f "$REVIEW_FILE" ]]; then
@@ -1370,11 +1379,20 @@ process_inbox() {
                 {started=1; print}                 # Print everything else
             ')
 
-            # Save to concerns directory
+            # Save to concerns directory with date-based filename
             echo "$CLEANED_CONTENT" > "$file"  # Update content for move
             DEST_DIR="vault/notes/concerns"
-            DEST_FILE="$BASENAME"
-            print_info "  • Concerns file → concerns/$BASENAME"
+
+            # Create filename based on the actual date from content
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Format: YYYY-MM-DD-HHMMSS-UTC-concerns.md
+                TIME_FORMATTED=$(echo "$TIME_PART" | tr -d ':')
+                DEST_FILE="${YEAR}-${MONTH}-${DAY}-${TIME_FORMATTED}00-UTC-concerns.md"
+                print_info "  • Concerns file → concerns/$DEST_FILE (using date from content)"
+            else
+                DEST_FILE="$BASENAME"
+                print_info "  • Concerns file → concerns/$BASENAME (no date found in content)"
+            fi
 
             # Also append to review file if it exists
             if [[ -f "$REVIEW_FILE" ]]; then
