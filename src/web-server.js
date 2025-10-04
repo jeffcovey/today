@@ -409,6 +409,13 @@ const pageStyle = `
     opacity: 1;
   }
 
+  /* Add "(cancelled)" text indicator to cancelled tasks */
+  .task-cancelled::after {
+    content: " (cancelled)";
+    font-style: italic;
+    color: #6c757d;
+  }
+
   /* Chat interface styles */
   .chat-container {
     height: calc(100vh - 250px);
@@ -2674,8 +2681,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
       const taskText = match[2];
 
       // Add metadata as a suffix that marked.js will preserve
-      const checkboxState = isCancelled ? '-' : (isChecked ? 'x' : ' ');
-      originalLines[i] = `${prefix}- [${checkboxState}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
+      // Convert cancelled tasks to unchecked for markdown parser, but preserve cancelled state in metadata
+      const checkboxState = isChecked ? 'x' : ' '; // Always use valid markdown checkbox states
+      const metadata = isCancelled ? `{data-file="${relativeFilePath}" data-line="${lineNumber}" data-cancelled="true"}` : `{data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
+      originalLines[i] = `${prefix}- [${checkboxState}] ${taskText} ${metadata}`;
     }
   }
   content = originalLines.join('\n');
@@ -2969,10 +2978,10 @@ ${cleanContent}
   // The markers look like {data-file="..." data-line="..."} and were added before marked.js
 
   // Find checkboxes followed by metadata markers and add the metadata as actual attributes
-  // Handle both regular quotes and HTML entities (&quot;)
+  // Handle both regular quotes and HTML entities (&quot;) and optional data-cancelled attribute
   htmlContent = htmlContent.replace(
-    /<input([^>]*type="checkbox"[^>]*)>(.*?)\{data-file=(&quot;|")([^"&]+)(&quot;|")\s+data-line=(&quot;|")(\d+)(&quot;|")\}/gi,
-    (match, checkboxAttrs, textBetween, q1, file, q2, q3, line, q4) => {
+    /<input([^>]*type="checkbox"[^>]*)>(.*?)\{data-file=(&quot;|")([^"&]+)(&quot;|")\s+data-line=(&quot;|")(\d+)(&quot;|")(?:\s+data-cancelled=(&quot;|")(true)(&quot;|"))?\}/gi,
+    (match, checkboxAttrs, textBetween, q1, file, q2, q3, line, q4, q5, cancelled, q6) => {
       // Check if checkbox already has data attributes (from ```tasks block)
       if (checkboxAttrs.includes('data-file=') && checkboxAttrs.includes('data-line=')) {
         // Remove the metadata marker but keep existing attributes
@@ -2981,7 +2990,9 @@ ${cleanContent}
 
       // Add data attributes to the checkbox
       const isChecked = checkboxAttrs.includes('checked');
-      return `<input type="checkbox" class="task-checkbox" data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${textBetween}`;
+      const isCancelled = cancelled === 'true';
+      const taskClass = isCancelled ? ' class="task-checkbox task-cancelled"' : ' class="task-checkbox"';
+      return `<input type="checkbox"${taskClass} data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${textBetween}`;
     }
   );
 
@@ -2989,12 +3000,15 @@ ${cleanContent}
   htmlContent = htmlContent.replace(
     /<li>([\s\S]*?)<input([^>]*data-file="([^"]+)"[^>]*data-line="(\d+)"[^>]*)>/gi,
     (match, before, checkboxAttrs, file, line) => {
-      return `<li data-file="${file}" data-line="${line}">${before}<input${checkboxAttrs}>`;
+      // Check if this is a cancelled task by looking at the checkbox class
+      const isCancelled = checkboxAttrs.includes('task-cancelled');
+      const liClass = isCancelled ? ` class="task-cancelled"` : '';
+      return `<li data-file="${file}" data-line="${line}"${liClass}>${before}<input${checkboxAttrs}>`;
     }
   );
 
   // Clean up any remaining metadata markers that weren't processed (handle both " and &quot;)
-  htmlContent = htmlContent.replace(/\{data-file=(&quot;|")[^"&]+(&quot;|")\s+data-line=(&quot;|")\d+(&quot;|")\}/g, '');
+  htmlContent = htmlContent.replace(/\{data-file=(&quot;|")[^"&]+(&quot;|")\s+data-line=(&quot;|")\d+(&quot;|")(?:\s+data-cancelled=(&quot;|")true(&quot;|"))?\}/g, '');
 
   // Enable any remaining checkboxes (from ```tasks blocks that already have data attributes)
   htmlContent = htmlContent.replace(
