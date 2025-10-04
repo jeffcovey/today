@@ -1276,11 +1276,29 @@ process_inbox() {
         
         # Special case: Progress note - save to progress/ and append to today's review
         elif [[ "$TITLE" == "Progress" ]]; then
-            # Get date components for new naming scheme
-            YEAR=$(date +%Y)
-            MONTH=$(date +%m)
-            DAY=$(date +%d)
-            WEEK=$(date +%V)  # ISO week number
+            # Parse the date from file content (format: "October 02, 2025 10:06 -0400")
+            CONTENT_DATE=$(echo "$CONTENT" | head -10 | grep -E "^[A-Za-z]+ [0-9]+, [0-9]+ [0-9]+:[0-9]+" | head -1)
+
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Parse the date components from content
+                PARSED_DATE=$(echo "$CONTENT_DATE" | awk '{print $2 " " $1 " " $3}' | tr ',' ' ')
+                TARGET_DATE=$(date -d "$PARSED_DATE" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+                YEAR=$(date -d "$TARGET_DATE" +%Y)
+                MONTH=$(date -d "$TARGET_DATE" +%m)
+                DAY=$(date -d "$TARGET_DATE" +%d)
+                WEEK=$(date -d "$TARGET_DATE" +%V)
+                # Parse time for timestamp
+                TIME_PART=$(echo "$CONTENT_DATE" | grep -oE "[0-9]+:[0-9]+" | head -1)
+                TIMESTAMP=${TIME_PART:-$(date +"%H:%M")}
+            else
+                # Fallback to current date if no date found in content
+                YEAR=$(date +%Y)
+                MONTH=$(date +%m)
+                DAY=$(date +%d)
+                WEEK=$(date +%V)
+                TIMESTAMP=$(date +"%H:%M")
+            fi
+
             # Determine quarter from month
             if [ $MONTH -le 3 ]; then Q="Q1"
             elif [ $MONTH -le 6 ]; then Q="Q2"
@@ -1288,7 +1306,6 @@ process_inbox() {
             else Q="Q4"
             fi
             REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
-            TIMESTAMP=$(date +"%H:%M")
 
             # Remove title line and subsequent blank lines (like concerns)
             CLEANED_CONTENT=$(echo "$CONTENT" | awk '
@@ -1315,11 +1332,29 @@ process_inbox() {
 
         # Special case: Concerns file - save to concerns/ and append to today's review
         elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
-            # Get date components for new naming scheme
-            YEAR=$(date +%Y)
-            MONTH=$(date +%m)
-            DAY=$(date +%d)
-            WEEK=$(date +%V)  # ISO week number
+            # Parse the date from file content (format: "October 02, 2025 10:06 -0400")
+            CONTENT_DATE=$(echo "$CONTENT" | head -10 | grep -E "^[A-Za-z]+ [0-9]+, [0-9]+ [0-9]+:[0-9]+" | head -1)
+
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Parse the date components from content
+                PARSED_DATE=$(echo "$CONTENT_DATE" | awk '{print $2 " " $1 " " $3}' | tr ',' ' ')
+                TARGET_DATE=$(date -d "$PARSED_DATE" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+                YEAR=$(date -d "$TARGET_DATE" +%Y)
+                MONTH=$(date -d "$TARGET_DATE" +%m)
+                DAY=$(date -d "$TARGET_DATE" +%d)
+                WEEK=$(date -d "$TARGET_DATE" +%V)
+                # Parse time for timestamp
+                TIME_PART=$(echo "$CONTENT_DATE" | grep -oE "[0-9]+:[0-9]+" | head -1)
+                TIMESTAMP=${TIME_PART:-$(date +"%H:%M")}
+            else
+                # Fallback to current date if no date found in content
+                YEAR=$(date +%Y)
+                MONTH=$(date +%m)
+                DAY=$(date +%d)
+                WEEK=$(date +%V)
+                TIMESTAMP=$(date +"%H:%M")
+            fi
+
             # Determine quarter from month
             if [ $MONTH -le 3 ]; then Q="Q1"
             elif [ $MONTH -le 6 ]; then Q="Q2"
@@ -1327,7 +1362,6 @@ process_inbox() {
             else Q="Q4"
             fi
             REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
-            TIMESTAMP=$(date +"%H:%M")
 
             # Remove title line and subsequent blank lines
             CLEANED_CONTENT=$(echo "$CONTENT" | awk '
