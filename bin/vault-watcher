@@ -168,19 +168,21 @@ async function sortTasksFile(filePath) {
       return false;
     }
 
-    const content = await fs.promises.readFile(filePath, 'utf-8');
-    const lines = content.split('\n');
+    const { execSync } = require('child_process');
 
-    // Deduplicate and sort
-    const uniqueLines = [...new Set(lines)];
-    uniqueLines.sort();
+    // Get original line count
+    const originalContent = await fs.promises.readFile(filePath, 'utf-8');
+    const originalLines = originalContent.split('\n').length;
 
-    const newContent = uniqueLines.join('\n');
+    // Use sort | uniq to deduplicate and sort
+    const result = execSync(`sort "${filePath}" | uniq`, { encoding: 'utf-8' });
 
     // Only write if content actually changed
-    if (content !== newContent) {
-      const duplicatesRemoved = lines.length - uniqueLines.length;
-      await fs.promises.writeFile(filePath, newContent, 'utf-8');
+    if (originalContent !== result) {
+      const newLines = result.split('\n').length;
+      const duplicatesRemoved = originalLines - newLines;
+
+      await fs.promises.writeFile(filePath, result, 'utf-8');
       log(`Sorted tasks.md${duplicatesRemoved > 0 ? `, ${duplicatesRemoved} duplicates removed` : ''}`, 'success');
       return true;
     }
