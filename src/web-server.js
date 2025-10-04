@@ -398,6 +398,17 @@ const pageStyle = `
     }
   }
   
+  /* Task styles */
+  .task-cancelled {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #6c757d;
+  }
+
+  .task-cancelled input[type="checkbox"] {
+    opacity: 1;
+  }
+
   /* Chat interface styles */
   .chat-container {
     height: calc(100vh - 250px);
@@ -2355,7 +2366,8 @@ async function executeTasksQuery(query) {
 
     // Parse task checkbox state (accounting for indentation)
     const isDone = /^\s*- \[[xX]\]/.test(content);
-    const taskText = content.replace(/^\s*- \[[ xX]\] /, '');
+    const isCancelled = /^\s*- \[-\]/.test(content);
+    const taskText = content.replace(/^\s*- \[[ xX-]\] /, '');
 
     // Parse dates
     let scheduledDate = null;
@@ -2391,6 +2403,7 @@ async function executeTasksQuery(query) {
       text: cleanText,
       originalText: taskText,
       isDone,
+      isCancelled,
       scheduledDate,
       dueDate,
       doneDate,
@@ -2571,6 +2584,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
         replacement += `<h4>${dateHeader}</h4>\n<ul>\n`;
         for (const task of tasks) {
           const checkbox = task.isDone ? 'checked' : '';
+          const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           let displayText = replaceTagsWithEmojis(task.text);
           // Add completion date if task is done
@@ -2578,10 +2592,14 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
             displayText += ` ✅ ${dateStr}`;
           }
+          // Add cancelled indicator if task is cancelled
+          if (task.isCancelled) {
+            displayText += ` <span class="text-muted">(cancelled)</span>`;
+          }
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
@@ -2594,6 +2612,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
         replacement += '<ul>\n';
         for (const task of result.tasks) {
           const checkbox = task.isDone ? 'checked' : '';
+          const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           let displayText = replaceTagsWithEmojis(task.text);
           // Add completion date if task is done
@@ -2601,10 +2620,14 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
             displayText += ` ✅ ${dateStr}`;
           }
+          // Add cancelled indicator if task is cancelled
+          if (task.isCancelled) {
+            displayText += ` <span class="text-muted">(cancelled)</span>`;
+          }
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
           replacement += `${priorityIcon}${displayText}`;
           replacement += `</li>\n`;
@@ -2636,8 +2659,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Insert metadata markers that won't break marked.js checkbox detection
   // We'll use {data-file="..." data-line="..."} which marked.js will pass through
-  // Updated regex to also match tasks inside blockquotes (lines starting with >)
-  const taskRegex = /^((?:\s*>)*\s*)- \[[ x]\] (.+)$/i;
+  // Updated regex to also match tasks inside blockquotes (lines starting with >) and cancelled tasks
+  const taskRegex = /^((?:\s*>)*\s*)- \[[ x-]\] (.+)$/i;
   const originalLines = originalContent.split('\n');
 
   for (let i = 0; i < originalLines.length; i++) {
@@ -2647,10 +2670,12 @@ async function renderMarkdownUncached(filePath, urlPath) {
       const lineNumber = i + 1; // 1-based line numbers
       const prefix = match[1]; // This now includes any > prefixes
       const isChecked = line.includes('[x]') || line.includes('[X]');
+      const isCancelled = line.includes('[-]');
       const taskText = match[2];
 
       // Add metadata as a suffix that marked.js will preserve
-      originalLines[i] = `${prefix}- [${isChecked ? 'x' : ' '}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
+      const checkboxState = isCancelled ? '-' : (isChecked ? 'x' : ' ');
+      originalLines[i] = `${prefix}- [${checkboxState}] ${taskText} {data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
     }
   }
   content = originalLines.join('\n');
@@ -2690,13 +2715,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
       inTasksBlock = true;
     } else if (inTasksBlock && line === '```') {
       inTasksBlock = false;
-    } else if (!inTasksBlock && line.match(/^(\s*)-\s*\[([x\s])\]\s*/i)) {
+    } else if (!inTasksBlock && line.match(/^(\s*)-\s*\[([x\s-])\]\s*/i)) {
       // Only include checkboxes that are NOT inside ```tasks blocks
       // DEPRECATED: Extract task ID if present (old task-id system, keeping for compatibility)
       const taskIdMatch = line.match(/<![-—]+ task-id: ([a-f0-9]{32}) [-—]+>/);
       checkboxLines.push({
         lineNumber: index,
         isChecked: line.match(/^(\s*)-\s*\[[xX]\]\s*/i) !== null,
+        isCancelled: line.match(/^(\s*)-\s*\[-\]\s*/i) !== null,
         taskId: taskIdMatch ? taskIdMatch[1] : null
       });
     }
@@ -2783,14 +2809,19 @@ async function renderMarkdownUncached(filePath, urlPath) {
           tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
           for (const task of tasks) {
             const checkbox = task.isDone ? 'checked' : '';
+            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
             let displayText = replaceTagsWithEmojis(task.text);
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
             }
+            // Add cancelled indicator if task is cancelled
+            if (task.isCancelled) {
+              displayText += ` <span class="text-muted">(cancelled)</span>`;
+            }
             const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
             tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
             tasksHtml += `${priorityIcon}${displayText}`;
             tasksHtml += `</li>\n`;
@@ -2802,14 +2833,19 @@ async function renderMarkdownUncached(filePath, urlPath) {
           tasksHtml += '<ul>\n';
           for (const task of queryResult.tasks) {
             const checkbox = task.isDone ? 'checked' : '';
+            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
             let displayText = replaceTagsWithEmojis(task.text);
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
             }
+            // Add cancelled indicator if task is cancelled
+            if (task.isCancelled) {
+              displayText += ` <span class="text-muted">(cancelled)</span>`;
+            }
             const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}">`;
+            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
             tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
             tasksHtml += `${priorityIcon}${displayText}`;
             tasksHtml += `</li>\n`;
