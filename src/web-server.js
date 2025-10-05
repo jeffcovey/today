@@ -2646,12 +2646,30 @@ class DataviewAPI {
     return new DataviewArray(allFiles);
   }
 
-  // Parse date string
+  // Parse date string and return a date with duration methods
   date(dateStr) {
-    if (dateStr === 'today') {
-      return new Date();
-    }
-    return new Date(dateStr);
+    const d = dateStr === 'today' ? new Date() : new Date(dateStr);
+
+    // Add duration methods like Luxon DateTime
+    d.minus = function(duration) {
+      const result = new Date(this);
+      if (duration.days) result.setDate(result.getDate() - duration.days);
+      if (duration.weeks) result.setDate(result.getDate() - (duration.weeks * 7));
+      if (duration.months) result.setMonth(result.getMonth() - duration.months);
+      if (duration.years) result.setFullYear(result.getFullYear() - duration.years);
+      return result;
+    };
+
+    d.plus = function(duration) {
+      const result = new Date(this);
+      if (duration.days) result.setDate(result.getDate() + duration.days);
+      if (duration.weeks) result.setDate(result.getDate() + (duration.weeks * 7));
+      if (duration.months) result.setMonth(result.getMonth() + duration.months);
+      if (duration.years) result.setFullYear(result.getFullYear() + duration.years);
+      return result;
+    };
+
+    return d;
   }
 
   // Create a file link
@@ -2825,7 +2843,12 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
 
   // Process matches in reverse order to preserve indices
   for (let i = matches.length - 1; i >= 0; i--) {
-    const { fullMatch, code } = matches[i];
+    const { fullMatch, code: rawCode } = matches[i];
+
+    // Remove blockquote markers (>) from code if it's inside a collapsible section
+    const code = rawCode.split('\n')
+      .map(line => line.replace(/^>\s*/, ''))
+      .join('\n');
 
     try {
       console.log(`[DEBUG] Executing dataviewjs block`);
@@ -2846,40 +2869,53 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
 }
 
 // Process inline dataview expressions ($= syntax)
-function processInlineDataview(content, properties) {
-  if (!properties) return content;
+async function processInlineDataview(content, properties, vaultPath, currentFilePath) {
+  // Match $= expressions inside backticks: `$= expression`
+  const inlineRegex = /`\$=\s*([^`]+?)`/g;
 
-  // Match $= expressions
-  const inlineRegex = /\$=\s*([^`\n]+?)(?=\s*[\n`]|$)/g;
+  const matches = [];
+  let match;
+  while ((match = inlineRegex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      expression: match[1].trim(),
+      index: match.index
+    });
+  }
 
-  return content.replace(inlineRegex, (match, expression) => {
+  // Process in reverse to maintain indices
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { fullMatch, expression } = matches[i];
+
     try {
-      // Simple property access like: dv.pages('"projects"').where(p => p.status == "active").length
-      // For now, just handle direct property references
-      const trimmed = expression.trim();
+      let result;
 
       // Handle this.property syntax
-      if (trimmed.startsWith('this.')) {
-        const propName = trimmed.substring(5);
-        const value = properties[propName];
-        if (value !== undefined) {
-          return value;
-        }
+      if (expression.startsWith('this.')) {
+        const propName = expression.substring(5);
+        result = properties?.[propName];
+      } else if (expression.includes('dv.pages')) {
+        // Execute the expression using DataviewAPI
+        const dv = new DataviewAPI(vaultPath, currentFilePath);
+        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+        const fn = new AsyncFunction('dv', `return ${expression}`);
+        result = await fn(dv);
+      } else {
+        result = fullMatch; // Keep original if we can't process
       }
 
-      // Handle dv.pages() expressions with basic aggregations
-      const lengthMatch = trimmed.match(/dv\.pages\(['"]([^'"]+)['"]\).*?\.length/);
-      if (lengthMatch) {
-        // Return placeholder - actual count would require async execution
-        return `<span class="dataview-inline" data-query="${trimmed}">...</span>`;
+      if (result !== undefined && result !== fullMatch) {
+        content = content.substring(0, matches[i].index) +
+                  result +
+                  content.substring(matches[i].index + fullMatch.length);
       }
-
-      return match;
     } catch (error) {
       console.error('[DEBUG] Error processing inline dataview:', error);
-      return match;
+      // Keep the original expression on error
     }
-  });
+  }
+
+  return content;
 }
 
 // Execute Obsidian Tasks query and return matching tasks
@@ -3270,7 +3306,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   content = await processDataviewJSBlocks(content, vaultPath, filePath);
 
   // Process inline dataview expressions
-  content = processInlineDataview(content, properties);
+  content = await processInlineDataview(content, properties, vaultPath, filePath);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
