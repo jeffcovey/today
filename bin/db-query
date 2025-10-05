@@ -17,13 +17,21 @@ run_query() {
     sqlite3 "$DB_PATH" "$1"
 }
 
+# Get configured timezone
+get_timezone() {
+    local script_dir="$(dirname "$0")"
+    "$script_dir/get-config" timezone 2>/dev/null || echo "America/New_York"
+}
+
 # Main query dispatcher
 case "${1:-daily}" in
     daily|review)
         # Comprehensive daily review queries
+        tz=$(get_timezone)
+        export TZ="$tz"
         run_query "
 -- Current day and time info
-SELECT 'Current Time: ' || datetime('now', 'localtime');
+SELECT 'Current Time: ' || datetime('now', 'localtime') || ' ($tz)';
 SELECT '---';
 
 -- Urgent tasks (from actual tasks table, not legacy cache)
