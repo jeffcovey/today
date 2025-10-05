@@ -2416,7 +2416,8 @@ function parseFrontmatter(content) {
     const contentWithoutFrontmatter = content.replace(frontmatterRegex, '');
     return { properties, contentWithoutFrontmatter };
   } catch (error) {
-    console.error('Error parsing YAML frontmatter:', error);
+    // Just log the message, not the full error object (too verbose for vault scanning)
+    console.error('Error parsing YAML frontmatter:', error.message || error);
     return { properties: null, contentWithoutFrontmatter: content };
   }
 }
@@ -2616,7 +2617,8 @@ class DataviewAPI {
               }
             });
           } catch (error) {
-            console.error(`Error reading file ${fullPath}:`, error);
+            // Silently skip files we can't read (error already logged in parseFrontmatter)
+            // This prevents flooding logs when scanning large vaults
           }
         }
       }
