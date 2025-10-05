@@ -2576,16 +2576,14 @@ function renderProperties(properties) {
 // Dataview API Implementation
 // Provides a subset of Obsidian Dataview functionality for rendering dashboards
 class DataviewAPI {
-  constructor(vaultPath, currentFilePath) {
+  constructor(vaultPath, currentFilePath, allFiles) {
     this.vaultPath = vaultPath;
     this.currentFilePath = currentFilePath;
-    this.filesCache = null;
+    this.allFiles = allFiles; // Pre-loaded files
   }
 
-  // Get all files in the vault with their frontmatter
-  async getAllFiles() {
-    if (this.filesCache) return this.filesCache;
-
+  // Get all files in the vault with their frontmatter (static method for initialization)
+  static async getAllFiles(vaultPath) {
     const files = [];
 
     async function walkDir(dir, relativePath = '') {
@@ -2624,14 +2622,13 @@ class DataviewAPI {
       }
     }
 
-    await walkDir(this.vaultPath);
-    this.filesCache = files;
+    await walkDir(vaultPath);
     return files;
   }
 
-  // Query pages by folder or tag
-  async pages(source) {
-    const allFiles = await this.getAllFiles();
+  // Query pages by folder or tag (now synchronous since files are pre-loaded)
+  pages(source) {
+    const allFiles = this.allFiles;
 
     // Handle folder queries like "projects" or '"projects"'
     const folderMatch = source.match(/^["']?([^"']+)["']?$/);
@@ -2784,7 +2781,9 @@ class DataviewArray extends Array {
 // Execute DataviewJS code block
 async function executeDataviewJS(code, vaultPath, currentFilePath) {
   try {
-    const dv = new DataviewAPI(vaultPath, currentFilePath);
+    // Pre-load all files so dv.pages() can be synchronous
+    const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
 
     // Create a safe sandbox context
     const context = {
@@ -2897,11 +2896,12 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
         const propName = expression.substring(5);
         result = properties?.[propName];
       } else if (expression.includes('dv.pages')) {
-        // Execute the expression using DataviewAPI
-        const dv = new DataviewAPI(vaultPath, currentFilePath);
-        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-        const fn = new AsyncFunction('dv', `return ${expression}`);
-        result = await fn(dv);
+        // Execute the expression using DataviewAPI (with pre-loaded files)
+        const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+        const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
+        // Inline expressions are synchronous, so we can just evaluate directly
+        const fn = new Function('dv', `return ${expression}`);
+        result = fn(dv);
       } else {
         result = fullMatch; // Keep original if we can't process
       }
