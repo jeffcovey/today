@@ -91,7 +91,7 @@ The task sync is automatically run when you execute `bin/sync`. It will:
 
 - `vault/tasks/tasks.md` - General task list
 - `vault/tasks-today.md` - Auto-generated daily tasks
-- `vault/tasks/streaks-today.md` - Streak tracking
+- `vault/logs/Streaks.md` - Uncompleted tasks from Streaks app
 - `vault/projects/*.md` - Project-specific tasks
 
 ## Notion Integration

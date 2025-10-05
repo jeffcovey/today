@@ -113,9 +113,6 @@ After initial sync, your drafts will have these tags:
 - Will append new tasks, not overwrite
 - Completed tasks are automatically archived
 
-**streaks-today.md:**
-- Always overwrites (it's regenerated daily)
-
 **Inbox notes:**
 - Use "⚡ Quick Upload to Inbox" for quick capture
 - They'll be processed by `bin/sync` on the server

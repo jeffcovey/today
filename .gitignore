@@ -19,6 +19,15 @@ google-calendar-key.json
 # Turso client cache
 .turso-cache/
 
+# Resilio Sync credentials
+.resilio-password
+Resilio Sync.btskey
+
+# Claude Code user settings and history
+.claude/
+.claude.json
+.claude.json.backup
+
 # Vault files
 vault
 vault/

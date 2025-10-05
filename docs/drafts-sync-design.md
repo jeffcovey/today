@@ -61,7 +61,7 @@ The actual content starts here...
    - If no path: Determine path from tags (tasks → vault/tasks/untitled.md)
    - Check GitHub for existing file
    - Upload/update if draft is newer
-3. Handle special files (tasks.md, streaks-today.md) with append logic
+3. Handle special files (tasks.md) with append logic
 ```
 
 ### 3. Conflict Resolution

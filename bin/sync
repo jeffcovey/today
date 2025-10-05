@@ -1157,22 +1157,8 @@ process_inbox() {
         DEST_DIR=""
         DEST_FILE=""
         
-        # Special case: Streaks file
-        if [[ "$TITLE" == "Streaks" ]]; then
-            # Convert Streaks items to Obsidian Tasks format
-            CONVERTED_CONTENT=$(echo "$CONTENT" | awk '
-                NR==1 {print; next}  # Keep header
-                /^[^-]/ && /[a-zA-Z]/ {print "- [ ] " $0; next}  # Add checkbox only
-                /^- \[[ x]\]/ {print; next}  # Keep tasks as-is
-                {print}  # Keep other lines as-is
-            ')
-            DEST_DIR="vault/tasks"
-            DEST_FILE="streaks-today.md"
-            echo "$CONVERTED_CONTENT" > "$file"  # Update content for move
-            print_info "  • Streaks file → tasks/streaks-today.md"
-        
         # Special case: Gratitude note - append to gratitude log
-        elif [[ "$TITLE" == "Gratitude" ]]; then
+        if [[ "$TITLE" == "Gratitude" ]]; then
             # Extract the gratitude line (everything after "I'm grateful for...")
             # First find the line, then get everything after it that's not empty
             GRATITUDE_LINE=$(echo "$CONTENT" | awk '/I.m grateful for/ {found=1; next} found && NF {print; exit}')
@@ -1438,8 +1424,8 @@ process_inbox() {
         
         # Move the file
         DEST_PATH="$DEST_DIR/$DEST_FILE"
-        if [[ -f "$DEST_PATH" ]] && [[ "$DEST_FILE" != "streaks-today.md" ]]; then
-            # File exists and it's not streaks (which we always overwrite)
+        if [[ -f "$DEST_PATH" ]]; then
+            # File exists, skip it
             print_info "    File exists, skipping: $DEST_FILE"
             rm "$file"  # Remove from inbox since it's a duplicate
         else

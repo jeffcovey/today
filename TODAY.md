@@ -167,7 +167,7 @@ Retired, devoted to https://oldergay.men/ - a website for older gay men and thei
 
 ### Streaks & Habits
 
-`vault/tasks/streaks-today.md` - daily habits for long-term health goals.
+`vault/logs/Streaks.md` - tracks uncompleted tasks from Streaks app for daily health and habit goals.
 
 ### Apple Health Data
 
