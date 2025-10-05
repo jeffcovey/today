@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
+import yaml from 'js-yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -414,6 +415,44 @@ const pageStyle = `
     content: " (cancelled)";
     font-style: italic;
     color: #6c757d;
+  }
+
+  /* Properties card styles */
+  .properties-card {
+    border-left: 4px solid #1266f1;
+  }
+
+  .properties-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  }
+
+  .properties-card .badge {
+    font-weight: normal;
+  }
+
+  .properties-card details summary {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+  }
+
+  .properties-card details summary:hover {
+    opacity: 0.8;
+  }
+
+  .properties-card .progress {
+    background-color: #e9ecef;
+  }
+
+  .properties-card .progress-bar {
+    background-color: #1266f1;
+    transition: width 0.6s ease;
+  }
+
+  .properties-card time {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #495057;
   }
 
   /* Chat interface styles */
@@ -2313,6 +2352,176 @@ function generateTableOfContents(content) {
 
 // The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
 
+// Parse YAML frontmatter from markdown content
+function parseFrontmatter(content) {
+  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
+  const match = content.match(frontmatterRegex);
+
+  if (!match) {
+    return { properties: null, contentWithoutFrontmatter: content };
+  }
+
+  try {
+    const properties = yaml.load(match[1]);
+    const contentWithoutFrontmatter = content.replace(frontmatterRegex, '');
+    return { properties, contentWithoutFrontmatter };
+  } catch (error) {
+    console.error('Error parsing YAML frontmatter:', error);
+    return { properties: null, contentWithoutFrontmatter: content };
+  }
+}
+
+// Render properties as a nice HTML card
+function renderProperties(properties) {
+  if (!properties || Object.keys(properties).length === 0) {
+    return '';
+  }
+
+  // Helper to format property values
+  function formatValue(value, key) {
+    // Handle cover images specially
+    if (key === 'cover_image' && typeof value === 'string' && value.match(/^https?:\/\//)) {
+      return `<img src="${value}" alt="Cover" class="img-fluid rounded mb-2" style="max-height: 200px; object-fit: cover;">`;
+    }
+
+    // Handle URLs
+    if (typeof value === 'string' && value.match(/^https?:\/\//)) {
+      return `<a href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
+    }
+
+    // Handle dates
+    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return `<time datetime="${value}">${value}</time>`;
+    }
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '<span class="text-muted">[]</span>';
+      if (value.length > 5) {
+        return `<span class="badge bg-secondary">${value.length} items</span>`;
+      }
+      return value.map(v => `<span class="badge bg-light text-dark me-1">${formatValue(v, key)}</span>`).join('');
+    }
+
+    // Handle objects (nested properties)
+    if (typeof value === 'object' && value !== null) {
+      return '<details class="mt-1"><summary class="text-muted small" style="cursor: pointer;">View nested properties</summary><pre class="mt-1 small">' +
+        JSON.stringify(value, null, 2) + '</pre></details>';
+    }
+
+    // Handle booleans
+    if (typeof value === 'boolean') {
+      return value ?
+        '<i class="fas fa-check-circle text-success"></i>' :
+        '<i class="fas fa-times-circle text-danger"></i>';
+    }
+
+    // Handle numbers
+    if (typeof value === 'number') {
+      // Check if it's a percentage (property name contains 'percent' or value is between 0-100)
+      if (key.includes('percent') || key.includes('progress')) {
+        return `<div class="progress" style="height: 20px; min-width: 100px;">
+          <div class="progress-bar" role="progressbar" style="width: ${value}%" aria-valuenow="${value}" aria-valuemin="0" aria-valuemax="100">${value}%</div>
+        </div>`;
+      }
+      return value.toLocaleString();
+    }
+
+    // Default: return as string
+    return String(value);
+  }
+
+  // Helper to format property keys (convert snake_case to Title Case)
+  function formatKey(key) {
+    return key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  // Separate important properties from the rest
+  const importantKeys = ['title', 'status', 'priority', 'category', 'goal', 'cover_image',
+                         'start_date', 'target_date', 'percent_done', 'progress_summary'];
+  const metricKeys = Object.keys(properties).filter(k => k === 'metrics' || k.includes('savings') || k.includes('next_'));
+
+  const important = {};
+  const metrics = {};
+  const other = {};
+
+  for (const [key, value] of Object.entries(properties)) {
+    // Skip notion_ prefixed properties (too many, not that useful)
+    if (key.startsWith('notion_')) continue;
+
+    if (importantKeys.includes(key)) {
+      important[key] = value;
+    } else if (metricKeys.includes(key)) {
+      metrics[key] = value;
+    } else {
+      other[key] = value;
+    }
+  }
+
+  let html = '<div class="properties-card card mb-3 shadow-sm">';
+  html += '<div class="card-header bg-light border-bottom">';
+  html += '<h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Properties</h6>';
+  html += '</div>';
+  html += '<div class="card-body">';
+
+  // Render cover image first if present
+  if (important.cover_image) {
+    html += '<div class="mb-3">' + formatValue(important.cover_image, 'cover_image') + '</div>';
+  }
+
+  // Render important properties
+  if (Object.keys(important).length > 0) {
+    html += '<div class="row g-2 mb-3">';
+    for (const [key, value] of Object.entries(important)) {
+      if (key === 'cover_image') continue; // Already rendered
+      const colSize = key === 'goal' || key === 'progress_summary' ? 'col-12' : 'col-md-6';
+      html += `<div class="${colSize}">`;
+      html += `<div class="d-flex flex-column">`;
+      html += `<small class="text-muted">${formatKey(key)}</small>`;
+      html += `<div>${formatValue(value, key)}</div>`;
+      html += `</div></div>`;
+    }
+    html += '</div>';
+  }
+
+  // Render metrics in a collapsible section
+  if (Object.keys(metrics).length > 0) {
+    html += '<details class="mb-2">';
+    html += '<summary class="text-primary fw-bold" style="cursor: pointer; user-select: none;"><i class="fas fa-chart-line me-2"></i>Metrics & Targets</summary>';
+    html += '<div class="mt-2 row g-2">';
+    for (const [key, value] of Object.entries(metrics)) {
+      html += `<div class="col-md-6">`;
+      html += `<div class="d-flex flex-column">`;
+      html += `<small class="text-muted">${formatKey(key)}</small>`;
+      html += `<div>${formatValue(value, key)}</div>`;
+      html += `</div></div>`;
+    }
+    html += '</div></details>';
+  }
+
+  // Render other properties in a collapsed section
+  if (Object.keys(other).length > 0) {
+    html += '<details>';
+    html += '<summary class="text-muted small" style="cursor: pointer; user-select: none;"><i class="fas fa-ellipsis-h me-2"></i>Additional Properties</summary>';
+    html += '<div class="mt-2 row g-2 small">';
+    for (const [key, value] of Object.entries(other)) {
+      html += `<div class="col-md-6">`;
+      html += `<div class="d-flex flex-column">`;
+      html += `<small class="text-muted">${formatKey(key)}</small>`;
+      html += `<div>${formatValue(value, key)}</div>`;
+      html += `</div></div>`;
+    }
+    html += '</div></details>';
+  }
+
+  html += '</div></div>';
+
+  return html;
+}
+
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
   const db = getDatabase();
@@ -2658,6 +2867,10 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
+
+  // Parse YAML frontmatter
+  const { properties, contentWithoutFrontmatter } = parseFrontmatter(content);
+  content = contentWithoutFrontmatter;
 
   // IMPORTANT: Save the original content BEFORE any modifications
   // This is needed for accurate line tracking when mapping checkboxes
@@ -3131,6 +3344,7 @@ ${cleanContent}
                 ${toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : ''}
               </div>
               <div class="card-body markdown-content">
+                ${renderProperties(properties)}
                 ${htmlContent}
               </div>
             </div>
