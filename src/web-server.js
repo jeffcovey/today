@@ -455,6 +455,56 @@ const pageStyle = `
     color: #495057;
   }
 
+  /* Dataview styles */
+  .dataview-table {
+    width: 100%;
+    margin: 1.5rem 0;
+    border-collapse: collapse;
+  }
+
+  .dataview-table thead {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #1266f1;
+  }
+
+  .dataview-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #212529;
+    border-bottom: 2px solid #dee2e6;
+  }
+
+  .dataview-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .dataview-table tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+
+  .dataview-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .dataview-list {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .dataview-list li {
+    margin: 0.5rem 0;
+  }
+
+  .dataview-inline {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.9em;
+    background-color: #f8f9fa;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+  }
+
   /* Chat interface styles */
   .chat-container {
     height: calc(100vh - 250px);
@@ -2522,6 +2572,316 @@ function renderProperties(properties) {
   return html;
 }
 
+// Dataview API Implementation
+// Provides a subset of Obsidian Dataview functionality for rendering dashboards
+class DataviewAPI {
+  constructor(vaultPath, currentFilePath) {
+    this.vaultPath = vaultPath;
+    this.currentFilePath = currentFilePath;
+    this.filesCache = null;
+  }
+
+  // Get all files in the vault with their frontmatter
+  async getAllFiles() {
+    if (this.filesCache) return this.filesCache;
+
+    const files = [];
+
+    async function walkDir(dir, relativePath = '') {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        // Skip hidden files and node_modules
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+        const fullPath = path.join(dir, entry.name);
+        const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+        if (entry.isDirectory()) {
+          await walkDir(fullPath, relPath);
+        } else if (entry.name.endsWith('.md')) {
+          try {
+            const content = await fs.readFile(fullPath, 'utf-8');
+            const { properties } = parseFrontmatter(content);
+
+            files.push({
+              path: relPath,
+              name: entry.name.replace('.md', ''),
+              folder: path.dirname(relPath),
+              frontmatter: properties || {},
+              file: {
+                path: relPath,
+                name: entry.name.replace('.md', ''),
+                folder: path.dirname(relPath)
+              }
+            });
+          } catch (error) {
+            console.error(`Error reading file ${fullPath}:`, error);
+          }
+        }
+      }
+    }
+
+    await walkDir(this.vaultPath);
+    this.filesCache = files;
+    return files;
+  }
+
+  // Query pages by folder or tag
+  async pages(source) {
+    const allFiles = await this.getAllFiles();
+
+    // Handle folder queries like "projects" or '"projects"'
+    const folderMatch = source.match(/^["']?([^"']+)["']?$/);
+    if (folderMatch) {
+      const folder = folderMatch[1];
+      const filtered = allFiles.filter(file => {
+        return file.folder === folder || file.path.startsWith(folder + '/');
+      });
+
+      return new DataviewArray(filtered);
+    }
+
+    // Default: return all files
+    return new DataviewArray(allFiles);
+  }
+
+  // Parse date string
+  date(dateStr) {
+    if (dateStr === 'today') {
+      return new Date();
+    }
+    return new Date(dateStr);
+  }
+
+  // Create a file link
+  fileLink(filePath, embed = false, alias = null) {
+    const displayText = alias || path.basename(filePath, '.md');
+    const linkPath = '/' + filePath.replace(/\.md$/, '');
+    return `<a href="${linkPath}">${displayText}</a>`;
+  }
+
+  // Render a table
+  table(headers, rows) {
+    let html = '<table class="dataview-table table table-striped table-hover">\n';
+    html += '<thead><tr>';
+    for (const header of headers) {
+      html += `<th>${header}</th>`;
+    }
+    html += '</tr></thead>\n<tbody>';
+
+    for (const row of rows) {
+      html += '<tr>';
+      for (const cell of row) {
+        const cellValue = cell === null || cell === undefined ? '-' : cell;
+        html += `<td>${cellValue}</td>`;
+      }
+      html += '</tr>\n';
+    }
+
+    html += '</tbody></table>';
+    return html;
+  }
+
+  // Render a list
+  list(items) {
+    let html = '<ul class="dataview-list">\n';
+    for (const item of items) {
+      html += `<li>${item}</li>\n`;
+    }
+    html += '</ul>';
+    return html;
+  }
+
+  // Render a paragraph
+  paragraph(text) {
+    return `<p>${text}</p>`;
+  }
+}
+
+// DataviewArray - wraps an array with Dataview query methods
+class DataviewArray extends Array {
+  where(predicate) {
+    const filtered = this.filter(item => {
+      // Make frontmatter properties available directly on item
+      const enrichedItem = { ...item, ...item.frontmatter };
+      return predicate(enrichedItem);
+    });
+    return new DataviewArray(...filtered);
+  }
+
+  sort(keyOrComparator, direction = 'asc') {
+    const sorted = [...this].sort((a, b) => {
+      const aEnriched = { ...a, ...a.frontmatter };
+      const bEnriched = { ...b, ...b.frontmatter };
+
+      let aVal, bVal;
+
+      if (typeof keyOrComparator === 'function') {
+        aVal = keyOrComparator(aEnriched);
+        bVal = keyOrComparator(bEnriched);
+      } else {
+        aVal = aEnriched[keyOrComparator];
+        bVal = bEnriched[keyOrComparator];
+      }
+
+      // Handle null/undefined
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+
+      // Handle dates
+      if (aVal instanceof Date && bVal instanceof Date) {
+        return direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      // Handle strings
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        const result = aVal.localeCompare(bVal);
+        return direction === 'asc' ? result : -result;
+      }
+
+      // Handle numbers
+      const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      return direction === 'asc' ? result : -result;
+    });
+
+    return new DataviewArray(...sorted);
+  }
+
+  map(fn) {
+    const mapped = Array.from(this).map((item, index) => {
+      const enrichedItem = { ...item, ...item.frontmatter };
+      return fn(enrichedItem, index, this);
+    });
+    return mapped;
+  }
+
+  get length() {
+    return Array.from(this).length;
+  }
+}
+
+// Execute DataviewJS code block
+async function executeDataviewJS(code, vaultPath, currentFilePath) {
+  try {
+    const dv = new DataviewAPI(vaultPath, currentFilePath);
+
+    // Create a safe sandbox context
+    const context = {
+      dv,
+      console: {
+        log: (...args) => console.log('[DataviewJS]', ...args),
+        error: (...args) => console.error('[DataviewJS]', ...args)
+      }
+    };
+
+    // Collect rendered output
+    let output = '';
+
+    // Override dv.table and dv.list to capture output
+    const originalTable = dv.table.bind(dv);
+    const originalList = dv.list.bind(dv);
+    const originalParagraph = dv.paragraph.bind(dv);
+
+    dv.table = (...args) => {
+      output += originalTable(...args);
+    };
+
+    dv.list = (...args) => {
+      output += originalList(...args);
+    };
+
+    dv.paragraph = (...args) => {
+      output += originalParagraph(...args);
+    };
+
+    // Create async function and execute
+    const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+    const fn = new AsyncFunction('dv', 'console', code);
+    await fn(dv, context.console);
+
+    return output;
+  } catch (error) {
+    console.error('DataviewJS execution error:', error);
+    return `<div class="alert alert-danger"><strong>DataviewJS Error:</strong> ${error.message}</div>`;
+  }
+}
+
+// Process dataviewjs code blocks in markdown content
+async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
+  const codeBlockRegex = /```dataviewjs\s*([\s\S]*?)```/g;
+  let processedContent = content;
+  const matches = [];
+  let match;
+
+  // Collect all matches first to avoid regex index issues
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      code: match[1],
+      index: match.index
+    });
+  }
+
+  // Process matches in reverse order to preserve indices
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { fullMatch, code } = matches[i];
+
+    try {
+      console.log(`[DEBUG] Executing dataviewjs block`);
+      const html = await executeDataviewJS(code, vaultPath, currentFilePath);
+
+      // Replace the code block with the rendered HTML
+      processedContent = processedContent.replace(fullMatch, html);
+    } catch (error) {
+      console.error('[DEBUG] Error executing dataviewjs block:', error);
+      const errorHtml = `<div class="alert alert-danger" role="alert">
+        <strong>Dataview Error:</strong> ${error.message}
+      </div>`;
+      processedContent = processedContent.replace(fullMatch, errorHtml);
+    }
+  }
+
+  return processedContent;
+}
+
+// Process inline dataview expressions ($= syntax)
+function processInlineDataview(content, properties) {
+  if (!properties) return content;
+
+  // Match $= expressions
+  const inlineRegex = /\$=\s*([^`\n]+?)(?=\s*[\n`]|$)/g;
+
+  return content.replace(inlineRegex, (match, expression) => {
+    try {
+      // Simple property access like: dv.pages('"projects"').where(p => p.status == "active").length
+      // For now, just handle direct property references
+      const trimmed = expression.trim();
+
+      // Handle this.property syntax
+      if (trimmed.startsWith('this.')) {
+        const propName = trimmed.substring(5);
+        const value = properties[propName];
+        if (value !== undefined) {
+          return value;
+        }
+      }
+
+      // Handle dv.pages() expressions with basic aggregations
+      const lengthMatch = trimmed.match(/dv\.pages\(['"]([^'"]+)['"]\).*?\.length/);
+      if (lengthMatch) {
+        // Return placeholder - actual count would require async execution
+        return `<span class="dataview-inline" data-query="${trimmed}">...</span>`;
+      }
+
+      return match;
+    } catch (error) {
+      console.error('[DEBUG] Error processing inline dataview:', error);
+      return match;
+    }
+  });
+}
+
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
   const db = getDatabase();
@@ -2904,6 +3264,13 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Process tasks code blocks before rendering (but skip ones in blockquotes)
   content = await processTasksCodeBlocks(content, true);
+
+  // Process dataviewjs code blocks before rendering
+  const vaultPath = path.join(process.cwd(), 'vault');
+  content = await processDataviewJSBlocks(content, vaultPath, filePath);
+
+  // Process inline dataview expressions
+  content = processInlineDataview(content, properties);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
