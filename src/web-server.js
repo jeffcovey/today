@@ -2638,11 +2638,11 @@ class DataviewAPI {
         return file.folder === folder || file.path.startsWith(folder + '/');
       });
 
-      return new DataviewArray(filtered);
+      return new DataviewArray(...filtered);
     }
 
     // Default: return all files
-    return new DataviewArray(allFiles);
+    return new DataviewArray(...allFiles);
   }
 
   // Parse date string and return a date with duration methods
