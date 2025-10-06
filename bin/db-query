@@ -34,18 +34,10 @@ case "${1:-daily}" in
 SELECT 'Current Time: ' || datetime('now', 'localtime') || ' ($tz)';
 SELECT '---';
 
--- Urgent tasks (from actual tasks table, not legacy cache)
-SELECT '=== URGENT TASKS ===' as section;
-SELECT 
-    title,
-    status,
-    do_date,
-    project_id,
-    id
-FROM tasks 
-WHERE status IN ('🔥 Immediate', '🚀 1st Priority')
-   OR (do_date IS NOT NULL AND DATE(do_date) <= DATE('now', '+1 day'))
-ORDER BY do_date;
+-- Note: Tasks are now tracked in markdown files via markdown_tasks table
+-- The old tasks table is no longer synced and will be dropped
+SELECT '=== TASKS ===' as section;
+SELECT 'Tasks are tracked in markdown files. Use markdown task queries or check vault files.' as info;
 SELECT '---';
 
 -- Today's calendar events  
@@ -104,25 +96,10 @@ GROUP BY p.name;
         ;;
         
     tasks)
-        # Just tasks
-        run_query "
-SELECT 
-    title,
-    status,
-    do_date,
-    project_id,
-    id
-FROM tasks 
-WHERE status IN ('🔥 Immediate', '🚀 1st Priority', '🎯 2nd Priority')
-ORDER BY 
-    CASE status
-        WHEN '🔥 Immediate' THEN 1
-        WHEN '🚀 1st Priority' THEN 2
-        WHEN '🎯 2nd Priority' THEN 3
-        ELSE 4
-    END,
-    do_date;
-"
+        # Tasks are now in markdown files
+        echo "Tasks are tracked in markdown files."
+        echo "Use: rg '- \[ \]' vault/ to see uncompleted tasks"
+        echo "Or check markdown_tasks table for cached data"
         ;;
         
     events)

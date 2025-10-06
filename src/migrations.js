@@ -2130,6 +2130,79 @@ export class MigrationManager {
             console.log('    ✓ No duplicate entries found');
           }
         }
+      },
+      {
+        version: 28,
+        description: 'Drop unused tables from legacy Notion sync system',
+        fn: (db) => {
+          console.log('    Dropping unused legacy tables...');
+
+          const tablesToDrop = [
+            'email_entity_mentions',
+            'event_attendees',
+            'ogm_honeybadger_faults',
+            'project_topics',
+            'summary_insights',
+            'summary_meta',
+            'summary_metrics',
+            'summary_recommendations',
+            'task_completions',
+            'task_event_links',
+            'task_projects',
+            'task_relationships',
+            'task_tags',
+            'toggl_clients',
+            'toggl_daily_summary',
+            'toggl_project_summary',
+            'toggl_tags'
+          ];
+
+          let droppedCount = 0;
+          for (const table of tablesToDrop) {
+            const exists = db.prepare(`
+              SELECT name FROM sqlite_master
+              WHERE type='table' AND name=?
+            `).get(table);
+
+            if (exists) {
+              db.exec(`DROP TABLE ${table}`);
+              console.log(`    ✓ Dropped ${table}`);
+              droppedCount++;
+            }
+          }
+
+          console.log(`    Dropped ${droppedCount} unused tables`);
+        }
+      },
+      {
+        version: 29,
+        description: 'Drop legacy tasks and task_topics tables - now using markdown_tasks',
+        fn: (db) => {
+          console.log('    Dropping legacy Notion tasks tables...');
+
+          const tablesToDrop = ['tasks', 'task_topics'];
+          let droppedCount = 0;
+
+          for (const table of tablesToDrop) {
+            const exists = db.prepare(`
+              SELECT name FROM sqlite_master
+              WHERE type='table' AND name=?
+            `).get(table);
+
+            if (exists) {
+              // Check if table has data
+              const count = db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get().count;
+              console.log(`    Found ${count} rows in ${table} (legacy data)`);
+
+              db.exec(`DROP TABLE ${table}`);
+              console.log(`    ✓ Dropped ${table}`);
+              droppedCount++;
+            }
+          }
+
+          console.log(`    Dropped ${droppedCount} legacy task tables`);
+          console.log('    ✓ Tasks are now tracked in markdown files via markdown_tasks table');
+        }
       }
     ];
 

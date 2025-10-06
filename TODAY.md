@@ -234,20 +234,19 @@ SQLite database at `.data/today.db` contains:
 
 ### Core Tables
 
-- **task_cache**: Tasks with stages, due dates, categories
+- **markdown_tasks**: Tasks cached from markdown files in vault/
 - **emails**: Received (iCloud) and sent (Pobox via `bin/pobox-sync`)
 - **calendar_events**: Events with timezone data
 - **contacts**: Contact info with normalized data
 - **diary**: Day One journal entries from `vault/logs/Journal.json`
 - **file_tracking**: Recently modified files
-- **notion_pages**: Notes and projects
-- **toggl_***: Time tracking data
+- **toggl_time_entries**: Time tracking data
 
 ### OGM Monitoring
 
 - **ogm_github_issues**: Bugs and features
-- **ogm_honeybadger_faults**: Production errors
 - **ogm_scout_metrics**: Performance data
+- **ogm_sentry_issues**: Error tracking
 - **ogm_summary_stats**: Daily aggregates
 
 <details>
@@ -256,12 +255,9 @@ SQLite database at `.data/today.db` contains:
 </summary>
 
 ```sql
--- Urgent tasks
-SELECT title, stage, due_date, category 
-FROM task_cache 
-WHERE stage IN ('🔥 Immediate', '🚀 1st Priority') 
-   OR due_date <= DATE('now', '+1 day')
-ORDER BY due_date;
+-- Tasks (tracked in markdown files)
+-- Use: rg '- \[ \]' vault/ to see uncompleted tasks
+-- Or query markdown_tasks table for cached data
 
 -- Unread emails
 SELECT subject, from_address, date
@@ -284,11 +280,11 @@ FROM contacts
 WHERE julianday('now') - julianday(last_contacted) > 42
 ORDER BY last_contacted;
 
--- OGM critical errors
-SELECT klass, notices_count, last_notice_at
-FROM ogm_honeybadger_faults 
-WHERE resolved = 0 AND notices_count > 1000
-ORDER BY notices_count DESC;
+-- OGM errors (from Sentry)
+SELECT title, count, last_seen
+FROM ogm_sentry_issues
+WHERE status = 'unresolved' AND count > 100
+ORDER BY count DESC;
 
 -- Today's time tracking
 SELECT COALESCE(p.name, 'No Project') as project,
@@ -313,15 +309,11 @@ ORDER BY creation_date DESC;
 
 ### For urgent tasks during review
 
-```bash
-# Critical tasks
-bin/tasks add "Task title" --date YYYY-MM-DD --status "🔥 Immediate"
+Tasks are managed directly in markdown files using Obsidian Tasks syntax:
 
-# High priority
-bin/tasks add "Task title" --date YYYY-MM-DD --status "🚀 1st Priority"
-
-# Then sync
-bin/tasks sync
+```markdown
+- [ ] Task title 📅 YYYY-MM-DD ⏫
+- [ ] Task title 📅 YYYY-MM-DD 🔼
 ```
 
 ## DEPRECATED: No longer using task-id with Obsidian Tasks
