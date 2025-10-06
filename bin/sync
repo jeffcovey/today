@@ -98,8 +98,18 @@ main() {
     # Task classification for markdown files (works with Obsidian Tasks plugin)
     print_info "🔍 Starting task classification for markdown files..."
     {
+        # Run date added marker assignment
+        echo "Starting date added marker assignment..." > /tmp/classify-$$.log
+        bin/tasks add-date-added >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Date added markers completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Date added markers failed" >> /tmp/classify-$$.log
+        fi
+
         # Run stage classification
-        echo "Starting stage classification..." > /tmp/classify-$$.log
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting stage classification..." >> /tmp/classify-$$.log
         bin/tasks classify-stages >> /tmp/classify-$$.log 2>&1
         if [ $? -eq 0 ]; then
             echo "✅ Stage classification completed successfully" >> /tmp/classify-$$.log

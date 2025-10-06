@@ -24,6 +24,44 @@ function findMarkdownFilesWithTasks() {
     .filter(f => f);
 }
 
+// Helper function to ensure task has date added marker
+function ensureDateAdded(line) {
+  // Check if line already has date added marker
+  if (/➕ \d{4}-\d{2}-\d{2}/.test(line)) {
+    return line;
+  }
+
+  // Get current date in YYYY-MM-DD format
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const dateAdded = `➕ ${year}-${month}-${day}`;
+
+  // Insert date added before priority markers if they exist
+  if (line.match(/🔺|⏫|🔼|🔽|⏬/)) {
+    return line.replace(/(🔺|⏫|🔼|🔽|⏬)/, `${dateAdded} $1`);
+  }
+
+  // Insert before tags if they exist
+  if (line.includes('#')) {
+    return line.replace(/#/, `${dateAdded} #`);
+  }
+
+  // Insert before scheduled/due dates if they exist
+  if (line.match(/[📅⏳✅] \d{4}-\d{2}-\d{2}/)) {
+    return line.replace(/([📅⏳✅] \d{4}-\d{2}-\d{2})/, `${dateAdded} $1`);
+  }
+
+  // Insert before recurring marker if it exists
+  if (line.includes('🔁')) {
+    return line.replace(/🔁/, `${dateAdded} 🔁`);
+  }
+
+  // Otherwise append to the end
+  return `${line.trimEnd()} ${dateAdded}`;
+}
+
 program
   .name('tasks')
   .description('Task management for Today system')
@@ -712,6 +750,9 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
                 if (!task.line.includes(stage)) {
                   let newLine = task.line;
 
+                  // Ensure date added marker exists first
+                  newLine = ensureDateAdded(newLine);
+
                   // Insert stage after priority emoji if present
                   const priorityMatch = newLine.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
                   if (priorityMatch) {
@@ -797,15 +838,20 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
             }
 
             if (!lines[i].includes(stage)) {
-              const priorityMatch = line.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
+              let newLine = line;
+
+              // Ensure date added marker exists first
+              newLine = ensureDateAdded(newLine);
+
+              const priorityMatch = newLine.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
               if (priorityMatch) {
                 lines[i] = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
               } else {
-                const dateMatch = line.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
+                const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
                 if (dateMatch) {
                   lines[i] = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
                 } else {
-                  lines[i] = `${line} ${stage}`;
+                  lines[i] = `${newLine} ${stage}`;
                 }
               }
               modified = true;
@@ -991,6 +1037,9 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
               if (cls.topics && cls.topics.length > 0) {
                 let newLine = task.line;
 
+                // Ensure date added marker exists first
+                newLine = ensureDateAdded(newLine);
+
                 // Add topics
                 for (const topic of cls.topics.slice(0, 2)) { // Max 2 topics
                   if (availableTopics.includes(topic) && !newLine.includes(`#topic/${topic}`)) {
@@ -1106,6 +1155,10 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
 
             if (topics.length > 0) {
               let newLine = line;
+
+              // Ensure date added marker exists first
+              newLine = ensureDateAdded(newLine);
+
               for (const topic of topics) {
                 if (!newLine.includes(topic)) {
                   const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
@@ -1140,6 +1193,100 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
     }
 
     console.log(chalk.green(`✓ Added ${totalTopicsAdded} topic tag(s) to tasks`));
+    process.exit(0);
+  });
+
+// Add date added command - works with markdown files
+program
+  .command('add-date-added [file]')
+  .description('Add date added markers (➕ YYYY-MM-DD) to tasks without them')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (file, options) => {
+    console.log(chalk.blue('📅 Adding date added markers to tasks...'));
+
+    // Get tasks from cache that need date added markers
+    console.log(chalk.gray('  Finding tasks needing date added markers from cache...'));
+    const db = getDatabase();
+
+    let query = `
+      SELECT file_path, line_number, line_text
+      FROM markdown_tasks
+      WHERE line_text LIKE '- [ ]%'
+        AND file_path NOT LIKE 'vault/.%'
+        AND file_path NOT LIKE '%/templates/%'
+        AND line_text NOT LIKE '%➕ ____-__-__%'
+    `;
+
+    if (file) {
+      query += ` AND file_path = ?`;
+    }
+
+    query += ` ORDER BY file_path, line_number`;
+
+    const tasksFromCache = file ? db.all(query, file) : db.all(query);
+    db.close();
+
+    if (tasksFromCache.length === 0) {
+      console.log(chalk.gray('No tasks needing date added markers found'));
+      process.exit(0);
+    }
+
+    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing date added markers`));
+
+    let totalAdded = 0;
+
+    // Group tasks by file for efficient file operations
+    const tasksByFile = new Map();
+    for (const task of tasksFromCache) {
+      if (!tasksByFile.has(task.file_path)) {
+        tasksByFile.set(task.file_path, []);
+      }
+      tasksByFile.get(task.file_path).push(task);
+    }
+
+    for (const [filePath, fileTasks] of tasksByFile) {
+      const content = fsSync.readFileSync(filePath, 'utf8');
+      const lines = content.split('\n');
+      let modified = false;
+
+      // Process only the tasks from cache for this file
+      for (const task of fileTasks) {
+        const i = task.line_number - 1; // Convert to 0-based
+        const line = lines[i];
+        if (line && line.match(/^- \[ \] /)) {
+          const newLine = ensureDateAdded(line);
+          if (newLine !== line) {
+            lines[i] = newLine;
+            modified = true;
+            totalAdded++;
+          }
+        }
+      }
+
+      if (modified) {
+        fsSync.writeFileSync(filePath, lines.join('\n'));
+        if (options.verbose) {
+          console.log(chalk.gray(`  Updated: ${filePath} (${fileTasks.filter((t, idx) => lines[t.line_number - 1] !== t.line_text).length} tasks)`));
+        }
+
+        // Update cache with modified lines
+        const db2 = getDatabase();
+        for (const task of fileTasks) {
+          const i = task.line_number - 1;
+          if (lines[i] !== task.line_text) {
+            db2.run(
+              'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
+              lines[i],
+              filePath,
+              task.line_number
+            );
+          }
+        }
+        db2.close();
+      }
+    }
+
+    console.log(chalk.green(`✓ Added date added markers to ${totalAdded} task(s)`));
     process.exit(0);
   });
 
@@ -1255,7 +1402,11 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
               for (const cls of classifications) {
                 const task = tasksToClassify[cls.index];
                 globalTasksProcessed++; // Count each task processed
-                const cleanLine = task.line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
+
+                // Ensure date added marker exists first
+                let lineWithDate = ensureDateAdded(task.line);
+
+                const cleanLine = lineWithDate.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
                 const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
                 if (taskMatch) {
                   lines[task.lineIndex] = `${taskMatch[1].trim()} ${cls.priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
@@ -1306,7 +1457,10 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
               priority = '🔼';
             }
 
-            const cleanLine = line.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
+            // Ensure date added marker exists first
+            let lineWithDate = ensureDateAdded(line);
+
+            const cleanLine = lineWithDate.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
             const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
             if (taskMatch) {
               lines[i] = `${taskMatch[1].trim()} ${priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;

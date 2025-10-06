@@ -3014,7 +3014,7 @@ async function executeTasksQuery(query) {
 
     // Clean task text for display
     let cleanText = taskText
-      .replace(/[⏳📅✅] \d{4}-\d{2}-\d{2}/g, '')
+      .replace(/[⏳📅✅➕] \d{4}-\d{2}-\d{2}/g, '')
       .replace(/🔺|🔼|⏫/g, '')
       .replace(/🔁 .+/g, '')
       .replace(/<!--.*?-->/g, '')
