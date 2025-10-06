@@ -2671,10 +2671,19 @@ class DataviewAPI {
     return d;
   }
 
-  // Create a file link
+  // Create a file link (Obsidian-style: strip .md extension from URLs)
   fileLink(filePath, embed = false, alias = null) {
+    // Extract display text from alias or filename
     const displayText = alias || path.basename(filePath, '.md');
-    const linkPath = '/' + filePath.replace(/\.md$/, '');
+
+    // Create clean URL path (strip .md extension, Obsidian-style)
+    let linkPath = filePath.replace(/\.md$/, '');
+
+    // Ensure it starts with /
+    if (!linkPath.startsWith('/')) {
+      linkPath = '/' + linkPath;
+    }
+
     return `<a href="${linkPath}">${displayText}</a>`;
   }
 
@@ -5820,15 +5829,37 @@ app.get('/', authMiddleware, async (req, res) => {
 app.get('/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    const fullPath = path.join(VAULT_PATH, urlPath);
-    
+    let fullPath = path.join(VAULT_PATH, urlPath);
+
     // Security: prevent directory traversal
     if (!fullPath.startsWith(VAULT_PATH)) {
       return res.status(403).send('Access denied');
     }
-    
-    const stats = await fs.stat(fullPath);
-    
+
+    // Obsidian behavior: if path has no extension, try as-is first, then try with .md
+    let stats;
+    try {
+      stats = await fs.stat(fullPath);
+    } catch (error) {
+      if (error.code === 'ENOENT' && !path.extname(urlPath)) {
+        // No extension and file not found - try adding .md
+        const mdPath = fullPath + '.md';
+        if (mdPath.startsWith(VAULT_PATH)) {
+          try {
+            stats = await fs.stat(mdPath);
+            fullPath = mdPath;
+          } catch {
+            // Both attempts failed, throw original error
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
+
     if (stats.isDirectory()) {
       const html = await renderDirectory(fullPath, urlPath);
       res.send(html);
