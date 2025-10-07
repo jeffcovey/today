@@ -3027,10 +3027,10 @@ async function executeTasksQuery(query) {
     const lineNumber = row.line_number;
     const content = row.line_text;
 
-    // Parse task checkbox state (accounting for indentation)
-    const isDone = /^\s*- \[[xX]\]/.test(content);
-    const isCancelled = /^\s*- \[-\]/.test(content);
-    const taskText = content.replace(/^\s*- \[[ xX-]\] /, '');
+    // Parse task checkbox state (accounting for indentation and blockquote markers)
+    const isDone = /^(?:>\s*)?-?\s*- \[[xX]\]/.test(content);
+    const isCancelled = /^(?:>\s*)?-?\s*- \[-\]/.test(content);
+    const taskText = content.replace(/^(?:>\s*)?-?\s*- \[[ xX-]\] /, '');
 
     // Parse dates
     let scheduledDate = null;
