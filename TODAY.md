@@ -6,11 +6,16 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 1. Checks Claude authentication
 2. Syncs all data sources
 3. Updates the SQLite database with comprehensive content
-4. Starts this interactive session where Claude will:
-   - Review all your data
-   - Create or update today's plan file in `vault/plans/YYYY_QQ_MM_W##_DD.md`
-   - Provide recommendations based on your schedule and priorities
-   - Continue working with you as long as needed
+4. Starts this interactive session where Claude will **IMMEDIATELY**:
+   - Query the database for comprehensive daily data
+   - Populate today's plan file at `vault/plans/YYYY_QQ_MM_W##_DD.md` with:
+     - Categorized priorities from database
+     - Time blocks scheduled around calendar events
+     - Status summary with urgent items
+   - Create calendar time blocking events for top 5-6 priorities
+   - Then remain available for follow-up questions and tasks
+
+**NO WAITING FOR APPROVAL** - Claude should complete all these steps automatically in the first response.
 
 <details>
 <summary>
@@ -342,18 +347,37 @@ Based on database queries AND hierarchical plan alignment:
 9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
 10. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
 
-## Your First Steps
+## Your First Steps - DO ALL IN FIRST RESPONSE
 
-1. **Calculate day of week** (see critical steps above)
-2. **Get current Eastern time** via bash command
-3. **Query database** at `.data/today.db`
-4. **Check/create plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`
-5. **Analyze and recommend** based on data, theme, and goals
-6. **Create time blocking events** for priorities using `bin/calendar add --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"`
-7. **Stay engaged** - this is an interactive session
+**CRITICAL:** All of these steps must be completed automatically in your FIRST response. Do NOT present analysis and wait for approval.
 
-Please query the database and provide specific, actionable recommendations for today.
+1. **Query database** - Use `bin/db-query daily` (pre-approved, no permission needed)
+2. **Calculate current time/day** - Already provided in pre-computed context
+3. **Populate the daily plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
+   - Fill in "Top Priorities" section with categorized tasks from database:
+     - 🚨 Critical (Do First) - High priority urgent items
+     - ⚡ Quick Wins (<15 min)
+     - 📞 Communications
+     - 🏠 Home & Hosting
+     - ⚠️ System Alerts
+   - Fill in time blocks (Morning/Afternoon/Evening) with:
+     - Calendar events from database
+     - Scheduled work blocks around those events
+   - Add status summary in Reflection section with:
+     - Stage theme focus
+     - Urgent items needing attention
+     - System health issues
+     - Wins/achievements
+4. **Create calendar time blocks** - Immediately run `bin/calendar add` for top 5-6 priorities:
+   - Schedule around existing calendar events
+   - Include evening routine block
+   - Use pre-approved calendar: `e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com`
+5. **Confirm completion** - Brief summary of what was done
+6. **Stay engaged** - Then remain available for follow-up questions
 
-**IMPORTANT**: After creating or updating daily plans, proactively suggest and create time blocking calendar events for the day's priorities. Use the Time Blocking calendar to structure focused work periods.
+**DO NOT:**
+- Present analysis and wait for permission
+- Ask if user wants time blocks created
+- Provide recommendations without taking action first
 
-Let's begin the daily review!
+**This is automation, not consultation.** Execute immediately, then be available for adjustments.
