@@ -3249,7 +3249,8 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          let displayText = replaceTagsWithEmojis(task.text);
+          // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+          let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -3277,7 +3278,8 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          let displayText = replaceTagsWithEmojis(task.text);
+          // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+          let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -3487,7 +3489,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            let displayText = replaceTagsWithEmojis(task.text);
+            // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
@@ -3511,7 +3514,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            let displayText = replaceTagsWithEmojis(task.text);
+            // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
