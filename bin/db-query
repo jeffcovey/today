@@ -1,213 +1,308 @@
-#!/bin/bash
+#!/usr/bin/env node
 
-# Database query wrapper for daily reviews
-# This script provides safe, read-only database queries that can be pre-approved
-# Usage: bin/db-query <query_type> [options]
+import Database from 'better-sqlite3';
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 
-DB_PATH=".data/today.db"
+const DB_PATH = '.data/today.db';
+const db = new Database(DB_PATH);
 
-# Ensure database exists
-if [ ! -f "$DB_PATH" ]; then
-    echo "❌ Database not found at $DB_PATH"
-    exit 1
-fi
-
-# Function to run a query
-run_query() {
-    sqlite3 "$DB_PATH" "$1"
+// Get timezone from config
+function getTimezone() {
+  try {
+    const tz = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
+    return tz || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
 }
 
-# Get configured timezone
-get_timezone() {
-    local script_dir="$(dirname "$0")"
-    "$script_dir/get-config" timezone 2>/dev/null || echo "America/New_York"
+// Get current date/time in timezone
+function getCurrentDateTime(tz) {
+  const result = execSync(`TZ=${tz} date "+%A, %B %d, %Y at %I:%M %p %Z"`, { encoding: 'utf8' });
+  return result.trim();
 }
 
-# Main query dispatcher
-case "${1:-daily}" in
-    daily|review)
-        # Comprehensive daily review queries
-        tz=$(get_timezone)
-        export TZ="$tz"
-        run_query "
--- Current day and time info
-SELECT 'Current Time: ' || datetime('now', 'localtime') || ' ($tz)';
-SELECT '---';
+// Sync markdown tasks before querying
+function syncMarkdownTasks() {
+  try {
+    // Get the most recent cache update time
+    const lastUpdate = db.prepare('SELECT MAX(updated_at) as last_update FROM markdown_tasks').get();
+    const lastUpdateTime = lastUpdate?.last_update;
 
--- Note: Tasks are now tracked in markdown files via markdown_tasks table
--- The old tasks table is no longer synced and will be dropped
-SELECT '=== TASKS ===' as section;
-SELECT 'Tasks are tracked in markdown files. Use markdown task queries or check vault files.' as info;
-SELECT '---';
+    if (!lastUpdateTime) {
+      // No cache yet, skip sync
+      return;
+    }
 
--- Today's calendar events  
-SELECT '=== TODAY''S EVENTS ===' as section;
-SELECT title, start_date, end_date, location, start_timezone
-FROM calendar_events
-WHERE DATE(start_date) = DATE('now')
-ORDER BY start_date;
-SELECT '---';
+    // Convert SQLite datetime to Unix timestamp for find command
+    const lastUpdateDate = new Date(lastUpdateTime);
+    const minutesAgo = Math.ceil((Date.now() - lastUpdateDate.getTime()) / 60000);
 
--- Recent unread emails (last 2 days)
-SELECT '=== RECENT EMAILS ===' as section;
-SELECT subject, from_address, date
-FROM emails
-WHERE folder != 'Sent'
-  AND date > datetime('now', '-2 days')
-ORDER BY date DESC
-LIMIT 15;
-SELECT '---';
+    // Find files modified since last cache update
+    const findCmd = `find vault/ -name "*.md" -type f ! -path "*/.*" -mmin -${minutesAgo + 1} 2>/dev/null`;
+    const filesOutput = execSync(findCmd, { encoding: 'utf8', timeout: 5000 });
+    const files = filesOutput.split('\n').filter(Boolean);
 
--- Guest room status
-SELECT '=== GUEST ROOM STATUS ===' as section;
-SELECT subject, from_address, date
-FROM emails
-WHERE (lower(subject) LIKE '%airbnb%' 
-   OR lower(subject) LIKE '%misterb%'
-   OR lower(from_address) LIKE '%airbnb%'
-   OR lower(from_address) LIKE '%misterb%')
-   AND date > datetime('now', '-7 days')
-ORDER BY date DESC
-LIMIT 5;
-SELECT '---';
+    if (files.length === 0) {
+      return; // Nothing to sync
+    }
 
--- Overdue contacts (6+ weeks)
-SELECT '=== OVERDUE CONTACTS ===' as section;
-SELECT 
-    full_name,
-    last_contacted,
-    CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago
-FROM contacts
-WHERE julianday('now') - julianday(last_contacted) > 42
-ORDER BY last_contacted
-LIMIT 10;
-SELECT '---';
+    // For each changed file, delete old entries and re-insert
+    const deleteStmt = db.prepare('DELETE FROM markdown_tasks WHERE file_path = ?');
+    const insertStmt = db.prepare('INSERT INTO markdown_tasks (file_path, line_number, line_text) VALUES (?, ?, ?)');
 
--- Time tracking today
-SELECT '=== TIME TRACKED TODAY ===' as section;
-SELECT 
-    COALESCE(p.name, 'No Project') as project,
-    printf('%.2f', SUM(te.duration) / 3600.0) as hours
-FROM toggl_time_entries te
-LEFT JOIN toggl_projects p ON te.pid = p.id
-WHERE DATE(te.start) = DATE('now', 'localtime')
-GROUP BY p.name;
-"
-        ;;
-        
-    tasks)
-        # Tasks are now in markdown files
-        echo "Tasks are tracked in markdown files."
-        echo "Use: rg '- \[ \]' vault/ to see uncompleted tasks"
-        echo "Or check markdown_tasks table for cached data"
-        ;;
-        
-    events)
-        # Calendar events for next 7 days
-        run_query "
-SELECT title, start_date, end_date, location
-FROM calendar_events
-WHERE DATE(start_date) <= DATE('now', '+7 days')
-  AND DATE(start_date) >= DATE('now')
-ORDER BY start_date;
-"
-        ;;
-        
-    emails)
-        # Recent emails
-        run_query "
-SELECT subject, from_address, date, 
-       CASE WHEN folder = 'Sent' THEN '→ SENT' ELSE '← RECEIVED' END as direction
-FROM emails
-WHERE date > datetime('now', '-3 days')
-ORDER BY date DESC
-LIMIT 30;
-"
-        ;;
-        
-    contacts)
-        # Contacts needing follow-up
-        run_query "
-SELECT 
-    full_name,
-    last_contacted,
-    CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago,
-    notes
-FROM contacts
-WHERE last_contacted IS NOT NULL
-ORDER BY last_contacted
-LIMIT 20;
-"
-        ;;
-        
-    ogm)
-        # OGM monitoring data
-        run_query "
-SELECT '=== OGM ERRORS ===' as section;
-SELECT title, count, last_seen
-FROM ogm_sentry_issues 
-WHERE status = 'unresolved' AND count > 100
-ORDER BY count DESC
-LIMIT 10;
-SELECT '---';
+    for (const filePath of files) {
+      try {
+        // Delete existing entries for this file
+        deleteStmt.run(filePath);
 
-SELECT '=== OGM GITHUB ISSUES ===' as section;
-SELECT title, state, created_at
-FROM ogm_github_issues
-WHERE state = 'open'
-ORDER BY created_at DESC
-LIMIT 10;
-"
-        ;;
-        
-    journal)
-        # Recent journal entries
-        run_query "
-SELECT 
-    DATE(creation_date) as date,
-    SUBSTR(text, 1, 200) as preview,
-    CASE WHEN starred = 1 THEN '⭐' ELSE '' END as starred
-FROM diary
-WHERE datetime(creation_date) >= datetime('now', '-7 days')
-ORDER BY creation_date DESC;
-"
-        ;;
-        
-    schema)
-        # Show all tables and their schemas
-        run_query ".tables"
-        echo "---"
-        run_query ".schema"
-        ;;
-        
-    custom)
-        # Run a custom query (must be passed as second argument)
-        if [ -z "$2" ]; then
-            echo "Error: Please provide a query as the second argument"
-            echo "Usage: bin/db-query custom \"SELECT * FROM table\""
-            exit 1
-        fi
-        run_query "$2"
-        ;;
-        
-    *)
-        echo "Usage: bin/db-query [query_type]"
-        echo ""
-        echo "Available query types:"
-        echo "  daily/review - Comprehensive daily review (default)"
-        echo "  tasks        - All priority tasks"
-        echo "  events       - Calendar events (next 7 days)"
-        echo "  emails       - Recent emails (last 3 days)"
-        echo "  contacts     - Contact follow-up status"
-        echo "  ogm          - OGM monitoring data"
-        echo "  journal      - Recent journal entries"
-        echo "  schema       - Database structure"
-        echo "  custom       - Run a custom query"
-        echo ""
-        echo "Examples:"
-        echo "  bin/db-query                    # Run daily review queries"
-        echo "  bin/db-query tasks               # Show priority tasks"
-        echo "  bin/db-query custom \"SELECT * FROM emails LIMIT 5\""
-        exit 1
-        ;;
-esac
+        // Read and re-insert tasks
+        const content = readFileSync(filePath, 'utf8');
+        const lines = content.split('\n');
+
+        for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+          const line = lines[lineNum];
+          // Match tasks including those in blockquotes: >   - [ ]
+          if (line.match(/^[>\s]*- \[[ x]\]/)) {
+            insertStmt.run(filePath, lineNum + 1, line);
+          }
+        }
+      } catch (err) {
+        // Ignore errors, file might have been deleted
+      }
+    }
+  } catch (error) {
+    // Silently fail - don't block db-query
+  }
+}
+
+// Query type handlers
+const queries = {
+  daily: () => {
+    // Sync markdown tasks first
+    syncMarkdownTasks();
+
+    const tz = getTimezone();
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    console.log(`Current Time: ${getCurrentDateTime(tz)}`);
+    console.log('---');
+    
+    // Tasks with 📅 or ⏳ dates today or earlier
+    console.log('=== TASKS DUE TODAY OR OVERDUE ===');
+    const tasks = db.prepare(`
+      SELECT line_text, file_path 
+      FROM markdown_tasks 
+      WHERE line_text LIKE '- [ ]%'
+        AND (line_text LIKE '%📅%' OR line_text LIKE '%⏳%')
+    `).all();
+    
+    const dueTasks = tasks.filter(task => {
+      // Extract date from line (format: 📅 2025-10-07 or ⏳ 2025-10-07)
+      const dateMatch = task.line_text.match(/[📅⏳]\s*(\d{4}-\d{2}-\d{2})/);
+      if (!dateMatch) return false;
+      const taskDate = dateMatch[1];
+      return taskDate <= today;
+    });
+    
+    // Add incomplete tasks from past daily plan files (format: YYYY_QN_MM_WWW_DD.md where DD != 00)
+    const allPlanTasks = db.prepare(`
+      SELECT line_text, file_path
+      FROM markdown_tasks
+      WHERE line_text LIKE '%- [ ]%'
+        AND file_path GLOB 'vault/plans/????_Q?_??_W??_??.md'
+        AND file_path NOT GLOB '*_00.md'
+    `).all();
+
+    const planTasks = allPlanTasks.filter(task => {
+      // Extract date from filename: 2025_Q4_10_W41_06.md -> 2025-10-06
+      const match = task.file_path.match(/(\d{4})_Q\d_(\d{2})_W\d+_(\d{2})\.md$/);
+      if (!match) return false;
+      const fileDate = `${match[1]}-${match[2]}-${match[3]}`;
+      return fileDate <= today;
+    });
+    
+    const allTasks = [...dueTasks, ...planTasks].slice(0, 50);
+    allTasks.forEach(t => console.log(`${t.line_text}|${t.file_path}`));
+    console.log('---');
+    
+    // Calendar events
+    console.log("=== TODAY'S EVENTS ===");
+    const events = db.prepare(`
+      SELECT title, start_date, end_date, location, start_timezone
+      FROM calendar_events
+      WHERE DATE(start_date) = DATE('now')
+      ORDER BY start_date
+    `).all();
+    events.forEach(e => console.log(`${e.title}|${e.start_date}|${e.end_date}|${e.location || ''}|${e.start_timezone || ''}`));
+    console.log('---');
+    
+    // Recent emails
+    console.log('=== RECENT EMAILS ===');
+    const emails = db.prepare(`
+      SELECT subject, from_address, date
+      FROM emails
+      WHERE folder != 'Sent'
+        AND date > datetime('now', '-2 days')
+      ORDER BY date DESC
+      LIMIT 15
+    `).all();
+    emails.forEach(e => console.log(`${e.subject}|${e.from_address}|${e.date}`));
+    console.log('---');
+    
+    // Guest room status
+    console.log('=== GUEST ROOM STATUS ===');
+    const guestEmails = db.prepare(`
+      SELECT subject, from_address, date
+      FROM emails
+      WHERE (lower(subject) LIKE '%airbnb%' 
+         OR lower(subject) LIKE '%misterb%'
+         OR lower(from_address) LIKE '%airbnb%'
+         OR lower(from_address) LIKE '%misterb%')
+         AND date > datetime('now', '-7 days')
+      ORDER BY date DESC
+      LIMIT 5
+    `).all();
+    guestEmails.forEach(e => console.log(`${e.subject}|${e.from_address}|${e.date}`));
+    console.log('---');
+    
+    // Contacts
+    console.log('=== CONTACTS ===');
+    const contactCount = db.prepare('SELECT COUNT(*) as count FROM contacts').get();
+    console.log(`${contactCount.count} contacts in database`);
+    console.log('---');
+    
+    // Time tracking
+    console.log('=== TIME TRACKED TODAY ===');
+    const timeEntries = db.prepare(`
+      SELECT 
+        COALESCE(p.name, 'No Project') as project,
+        printf('%.2f', SUM(te.duration) / 3600.0) as hours
+      FROM toggl_time_entries te
+      LEFT JOIN toggl_projects p ON te.pid = p.id
+      WHERE DATE(te.start) = DATE('now', 'localtime')
+      GROUP BY p.name
+    `).all();
+    timeEntries.forEach(e => console.log(`${e.project}|${e.hours}`));
+  },
+  
+  tasks: () => {
+    console.log('Tasks are tracked in markdown files.');
+    console.log('Use: rg \'- [ ]\' vault/ to see uncompleted tasks');
+    console.log('Or check markdown_tasks table for cached data');
+  },
+
+  events: () => {
+    // Calendar events for next 7 days
+    const events = db.prepare(`
+      SELECT title, start_date, end_date, location
+      FROM calendar_events
+      WHERE DATE(start_date) <= DATE('now', '+7 days')
+        AND DATE(start_date) >= DATE('now')
+      ORDER BY start_date
+    `).all();
+    events.forEach(e => console.log(`${e.title}|${e.start_date}|${e.end_date}|${e.location || ''}`));
+  },
+
+  emails: () => {
+    // Recent emails (last 3 days)
+    const emails = db.prepare(`
+      SELECT subject, from_address, date,
+             CASE WHEN folder = 'Sent' THEN '→ SENT' ELSE '← RECEIVED' END as direction
+      FROM emails
+      WHERE date > datetime('now', '-3 days')
+      ORDER BY date DESC
+      LIMIT 30
+    `).all();
+    emails.forEach(e => console.log(`${e.subject}|${e.from_address}|${e.date}|${e.direction}`));
+  },
+
+  contacts: () => {
+    // Contacts
+    const contacts = db.prepare(`
+      SELECT full_name, organization, notes
+      FROM contacts
+      WHERE full_name IS NOT NULL
+      ORDER BY full_name
+      LIMIT 20
+    `).all();
+    contacts.forEach(c => console.log(`${c.full_name}|${c.organization || ''}|${c.notes || ''}`));
+  },
+
+  ogm: () => {
+    // OGM monitoring data
+    console.log('=== OGM ERRORS ===');
+    const sentryIssues = db.prepare(`
+      SELECT title, count, last_seen
+      FROM ogm_sentry_issues
+      WHERE status = 'unresolved' AND count > 100
+      ORDER BY count DESC
+      LIMIT 10
+    `).all();
+    sentryIssues.forEach(i => console.log(`${i.title}|${i.count}|${i.last_seen}`));
+    console.log('---');
+
+    console.log('=== OGM GITHUB ISSUES ===');
+    const githubIssues = db.prepare(`
+      SELECT title, state, created_at
+      FROM ogm_github_issues
+      WHERE state = 'open'
+      ORDER BY created_at DESC
+      LIMIT 10
+    `).all();
+    githubIssues.forEach(i => console.log(`${i.title}|${i.state}|${i.created_at}`));
+  },
+
+  journal: () => {
+    // Recent journal entries
+    const entries = db.prepare(`
+      SELECT
+        DATE(creation_date) as date,
+        SUBSTR(text, 1, 200) as preview,
+        CASE WHEN starred = 1 THEN '⭐' ELSE '' END as starred
+      FROM diary
+      WHERE datetime(creation_date) >= datetime('now', '-7 days')
+      ORDER BY creation_date DESC
+    `).all();
+    entries.forEach(e => console.log(`${e.date}|${e.starred}${e.preview}`));
+  },
+
+  schema: () => {
+    // Show all tables
+    const tables = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table'
+      ORDER BY name
+    `).all();
+    console.log('=== DATABASE TABLES ===');
+    tables.forEach(t => console.log(t.name));
+  },
+
+  custom: () => {
+    // Run custom query (passed as second argument)
+    const query = process.argv[3];
+    if (!query) {
+      console.error('Error: Please provide a query as the second argument');
+      console.error('Usage: bin/db-query custom "SELECT * FROM table"');
+      process.exit(1);
+    }
+    const results = db.prepare(query).all();
+    console.log(JSON.stringify(results, null, 2));
+  }
+};
+
+// Main
+const command = process.argv[2] || 'daily';
+const handler = queries[command];
+
+if (handler) {
+  handler();
+} else {
+  console.error(`Unknown command: ${command}`);
+  console.error('Available commands: daily, tasks, events, emails, contacts, ogm, journal, schema, custom');
+  process.exit(1);
+}
+
+db.close();
