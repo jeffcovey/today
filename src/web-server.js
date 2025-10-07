@@ -307,6 +307,46 @@ const pageStyle = `
     border-left: 4px solid #17a2b8;
   }
 
+  details.callout-success,
+  details.callout-check,
+  details.callout-done {
+    border-left: 4px solid #28a745;
+  }
+
+  details.callout-abstract,
+  details.callout-summary,
+  details.callout-tldr {
+    border-left: 4px solid #00b0ff;
+  }
+
+  details.callout-hint,
+  details.callout-important {
+    border-left: 4px solid #00bcd4;
+  }
+
+  details.callout-question,
+  details.callout-help,
+  details.callout-faq {
+    border-left: 4px solid #ffc107;
+  }
+
+  details.callout-caution,
+  details.callout-attention {
+    border-left: 4px solid #ff9800;
+  }
+
+  details.callout-failure,
+  details.callout-fail,
+  details.callout-missing,
+  details.callout-error,
+  details.callout-bug {
+    border-left: 4px solid #f44336;
+  }
+
+  details.callout-cite {
+    border-left: 4px solid #9e9e9e;
+  }
+
   body {
     background-color: #f5f5f5;
     min-height: 100vh;
@@ -3391,7 +3431,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   htmlContent = await (async () => {
     // Match blockquotes with Obsidian callout syntax that contain code blocks
     // Marked.js adds class="language-tasks" to the code tag
-    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>\n?<pre(?:[^>]*)><code(?:\s+class="language-tasks"[^>]*)?>([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
+    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|info|todo|abstract|summary|tldr|success|check|done|tip|hint|important|question|help|faq|warning|caution|attention|failure|fail|missing|danger|error|bug|example|quote|cite)\]([-+]?)\s*(.*?)<\/p>\n?<pre(?:[^>]*)><code(?:\s+class="language-tasks"[^>]*)?>([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
 
     let result = htmlContent;
     const matches = [];
@@ -3515,7 +3555,7 @@ ${additionalContent.trim()}
   })();
 
   // Then handle regular Obsidian callouts without task queries
-  htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|tip|warning|danger|info|example|quote|todo)\]([-+]?)\s*(.*?)<\/p>([\s\S]*?)<\/blockquote>/gi,
+  htmlContent = htmlContent.replace(/<blockquote>\n?<p>\[!(note|info|todo|abstract|summary|tldr|success|check|done|tip|hint|important|question|help|faq|warning|caution|attention|failure|fail|missing|danger|error|bug|example|quote|cite)\]([-+]?)\s*(.*?)<\/p>([\s\S]*?)<\/blockquote>/gi,
     (match, type, modifier, title, content) => {
       const calloutType = type.toLowerCase();
       const isCollapsed = modifier === '-';
