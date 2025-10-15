@@ -969,6 +969,47 @@ function getBreadcrumb(filePath) {
   return links.join(' / ');
 }
 
+// Helper function to get current time tracking timer info
+async function getCurrentTimer() {
+  const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', '.current-timer');
+
+  try {
+    const content = await fs.readFile(timerFile, 'utf8');
+    const lines = content.trim().split('\n');
+
+    if (lines.length < 2) {
+      return null;
+    }
+
+    const description = lines[0];
+    const startTime = lines[1];
+
+    // Calculate duration
+    const start = new Date(startTime);
+    const now = new Date();
+    const durationMs = now - start;
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    // Format start time in Eastern timezone
+    const formattedStart = start.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/New_York'
+    });
+
+    return {
+      description,
+      startTime: formattedStart,
+      duration: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+    };
+  } catch (error) {
+    // No timer running or file doesn't exist
+    return null;
+  }
+}
+
 // Helper function to extract title from markdown file
 // Helper function to get ISO week number
 function getWeekNumber(date) {
@@ -1124,7 +1165,10 @@ async function getMarkdownTitle(filePath) {
 // Directory listing
 async function renderDirectory(dirPath, urlPath) {
   let items = await fs.readdir(dirPath, { withFileTypes: true });
-  
+
+  // Get current timer info
+  const currentTimer = await getCurrentTimer();
+
   // Filter out hidden files and directories (starting with ".")
   items = items.filter(item => !item.name.startsWith('.'));
   
@@ -1192,11 +1236,26 @@ async function renderDirectory(dirPath, urlPath) {
           </ol>
         </nav>
 
+        ${currentTimer ? `
+        <!-- Current Time Tracking Task -->
+        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+          <i class="fas fa-clock me-2"></i>
+          <div class="flex-grow-1">
+            <strong>${currentTimer.description}</strong>
+            <br>
+            <small>Started at ${currentTimer.startTime} • Duration: ${currentTimer.duration}</small>
+          </div>
+          <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="fas fa-stop"></i> Stop
+          </a>
+        </div>
+        ` : ''}
+
         <div class="row">
           <!-- Content column -->
           <div class="col-12 col-lg-7 mb-3">
   `;
-  
+
   // Special homepage content
   if (!urlPath) {
     // Use Eastern timezone for consistency with other scripts
@@ -5601,6 +5660,22 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error saving file:', error);
     res.status(500).json({ success: false, message: 'Failed to save file' });
+  }
+});
+
+// Stop time tracking timer
+app.post('/api/track/stop', authMiddleware, async (req, res) => {
+  try {
+    const { execSync } = await import('child_process');
+    execSync('bin/track stop', {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+    res.json({ success: true, message: 'Timer stopped' });
+  } catch (error) {
+    console.error('Error stopping timer:', error);
+    res.status(500).json({ success: false, message: 'Failed to stop timer' });
   }
 });
 
