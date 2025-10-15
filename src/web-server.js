@@ -969,9 +969,21 @@ function getBreadcrumb(filePath) {
   return links.join(' / ');
 }
 
+// Get configured timezone
+function getConfiguredTimezone() {
+  try {
+    const { execSync } = require('child_process');
+    const result = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
+    return result || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
+}
+
 // Helper function to get current time tracking timer info
 async function getCurrentTimer() {
   const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', '.current-timer');
+  const timezone = getConfiguredTimezone();
 
   try {
     const content = await fs.readFile(timerFile, 'utf8');
@@ -991,17 +1003,18 @@ async function getCurrentTimer() {
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-    // Format start time in Eastern timezone
+    // Format start time in configured timezone
     const formattedStart = start.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'America/New_York'
+      timeZone: timezone
     });
 
     return {
       description,
       startTime: formattedStart,
+      startTimeISO: startTime,
       duration: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
     };
   } catch (error) {
@@ -1236,20 +1249,53 @@ async function renderDirectory(dirPath, urlPath) {
           </ol>
         </nav>
 
+        <!-- Time Tracking -->
         ${currentTimer ? `
-        <!-- Current Time Tracking Task -->
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${currentTimer.startTimeISO}">
           <i class="fas fa-clock me-2"></i>
           <div class="flex-grow-1">
             <strong>${currentTimer.description}</strong>
             <br>
-            <small>Started at ${currentTimer.startTime} • Duration: ${currentTimer.duration}</small>
+            <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
           </div>
           <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
             <i class="fas fa-stop"></i> Stop
           </a>
         </div>
-        ` : ''}
+        <script>
+          // Update timer duration every second
+          function updateTimerDuration() {
+            const timerEl = document.querySelector('[data-timer-start]');
+            if (!timerEl) return;
+
+            const startTime = new Date(timerEl.dataset.timerStart);
+            const now = new Date();
+            const durationMs = now - startTime;
+            const hours = Math.floor(durationMs / (1000 * 60 * 60));
+            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
+            const durationSpan = timerEl.querySelector('.timer-duration');
+            if (durationSpan) {
+              durationSpan.textContent = durationText;
+            }
+          }
+
+          // Update immediately and then every second
+          updateTimerDuration();
+          setInterval(updateTimerDuration, 1000);
+        </script>
+        ` : `
+        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+          <i class="fas fa-clock me-2"></i>
+          <div class="input-group flex-grow-1">
+            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
+            <button class="btn btn-primary" onclick="fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: document.getElementById('timerDescription').value})}).then(() => location.reload())">
+              <i class="fas fa-play"></i> Start
+            </button>
+          </div>
+        </div>
+        `}
 
         <div class="row">
           <!-- Content column -->
@@ -3850,20 +3896,53 @@ ${cleanContent}
           </ol>
         </nav>
 
+        <!-- Time Tracking -->
         ${currentTimer ? `
-        <!-- Current Time Tracking Task -->
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${currentTimer.startTimeISO}">
           <i class="fas fa-clock me-2"></i>
           <div class="flex-grow-1">
             <strong>${currentTimer.description}</strong>
             <br>
-            <small>Started at ${currentTimer.startTime} • Duration: ${currentTimer.duration}</small>
+            <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
           </div>
           <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
             <i class="fas fa-stop"></i> Stop
           </a>
         </div>
-        ` : ''}
+        <script>
+          // Update timer duration every second
+          function updateTimerDuration() {
+            const timerEl = document.querySelector('[data-timer-start]');
+            if (!timerEl) return;
+
+            const startTime = new Date(timerEl.dataset.timerStart);
+            const now = new Date();
+            const durationMs = now - startTime;
+            const hours = Math.floor(durationMs / (1000 * 60 * 60));
+            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+            const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
+            const durationSpan = timerEl.querySelector('.timer-duration');
+            if (durationSpan) {
+              durationSpan.textContent = durationText;
+            }
+          }
+
+          // Update immediately and then every second
+          updateTimerDuration();
+          setInterval(updateTimerDuration, 1000);
+        </script>
+        ` : `
+        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+          <i class="fas fa-clock me-2"></i>
+          <div class="input-group flex-grow-1">
+            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
+            <button class="btn btn-primary" onclick="fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: document.getElementById('timerDescription').value})}).then(() => location.reload())">
+              <i class="fas fa-play"></i> Start
+            </button>
+          </div>
+        </div>
+        `}
 
         <div class="row">
           <!-- Content column -->
@@ -5678,6 +5757,27 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error saving file:', error);
     res.status(500).json({ success: false, message: 'Failed to save file' });
+  }
+});
+
+// Start time tracking timer
+app.post('/api/track/start', authMiddleware, express.json(), async (req, res) => {
+  try {
+    const { description } = req.body;
+    if (!description || description.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Description required' });
+    }
+
+    const { execSync } = await import('child_process');
+    execSync(`bin/track start "${description.replace(/"/g, '\\"')}"`, {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+    res.json({ success: true, message: 'Timer started' });
+  } catch (error) {
+    console.error('Error starting timer:', error);
+    res.status(500).json({ success: false, message: 'Failed to start timer' });
   }
 });
 
