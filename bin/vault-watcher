@@ -99,6 +99,11 @@ const filesBeingEnriched = new Set();
 let enrichmentQueue = [];
 let isEnriching = false;
 
+// Track time tracking enrichment
+const timeTrackingFilesBeingEnriched = new Set();
+let timeTrackingEnrichmentQueue = [];
+let isEnrichingTimeTracking = false;
+
 // Process task enrichment queue (runs separately from main processing)
 async function processEnrichmentQueue() {
   if (isEnriching || enrichmentQueue.length === 0) {
@@ -156,6 +161,56 @@ async function processEnrichmentQueue() {
     // Process more if queue has items
     if (enrichmentQueue.length > 0) {
       setTimeout(processEnrichmentQueue, 2000); // Process more after 2 seconds
+    }
+  }
+}
+
+// Process time tracking enrichment queue
+async function processTimeTrackingEnrichmentQueue() {
+  if (isEnrichingTimeTracking || timeTrackingEnrichmentQueue.length === 0) {
+    return;
+  }
+
+  isEnrichingTimeTracking = true;
+  const filesToEnrich = timeTrackingEnrichmentQueue.splice(0, 3); // Process up to 3 files at a time
+
+  try {
+    for (const file of filesToEnrich) {
+      if (timeTrackingFilesBeingEnriched.has(file)) {
+        continue; // Skip if already being processed
+      }
+
+      timeTrackingFilesBeingEnriched.add(file);
+
+      try {
+        // Run add-topics for the time tracking file
+        execSync('bin/track add-topics', {
+          cwd: projectRoot,
+          encoding: 'utf8',
+          stdio: 'pipe' // Suppress output
+        });
+
+        log(`Added topics to time tracking entries in ${path.basename(file)}`, 'success');
+      } catch (error) {
+        // Command failure shouldn't stop other enrichments
+        if (!error.message.includes('No entries needing topic tags found')) {
+          log(`Time tracking enrichment failed for ${path.basename(file)}: ${error.message}`, 'warn');
+        }
+      } finally {
+        // Remove from tracking after a delay to prevent immediate re-processing
+        setTimeout(() => {
+          timeTrackingFilesBeingEnriched.delete(file);
+        }, 60000); // 60 second cooldown
+      }
+    }
+  } catch (error) {
+    log(`Time tracking enrichment error: ${error.message}`, 'error');
+  } finally {
+    isEnrichingTimeTracking = false;
+
+    // Process more if queue has items
+    if (timeTrackingEnrichmentQueue.length > 0) {
+      setTimeout(processTimeTrackingEnrichmentQueue, 5000); // Process more after 5 seconds
     }
   }
 }
@@ -318,6 +373,19 @@ async function processChanges() {
     if (enrichmentQueue.length > 0 && !isEnriching) {
       // Run enrichment after a delay so it doesn't interfere with main processing
       setTimeout(processEnrichmentQueue, 5000); // 5 second delay
+    }
+
+    // Queue time tracking files for topic enrichment
+    const timeTrackingFiles = markdownFiles.filter(f => f.includes('/vault/logs/time-tracking/') && f.match(/\d{4}-\d{2}\.md$/));
+    for (const file of timeTrackingFiles) {
+      if (!timeTrackingFilesBeingEnriched.has(file) && !timeTrackingEnrichmentQueue.includes(file)) {
+        timeTrackingEnrichmentQueue.push(file);
+      }
+    }
+
+    // Start time tracking enrichment if not already running
+    if (timeTrackingEnrichmentQueue.length > 0 && !isEnrichingTimeTracking) {
+      setTimeout(processTimeTrackingEnrichmentQueue, 10000); // 10 second delay (longer to let user finish typing)
     }
 
     lastSyncTime = Date.now();
@@ -567,6 +635,7 @@ ${chalk.gray('Description:')}
   - Processes inbox when new files arrive
   - Cleans markdown formatting
   - Updates the database in real-time
+  - Adds topic tags to time tracking entries
 
 ${chalk.gray('Configuration:')}
   Debounce delay: ${DEBOUNCE_DELAY}ms (waits for changes to settle)

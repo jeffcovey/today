@@ -110,8 +110,9 @@ async function cmdStart(description) {
 
   // Check for running timer
   if (fs.existsSync(STATE_FILE)) {
-    const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
-    const [oldStart, oldDescription] = line.split('|');
+    const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
+    const oldDescription = lines[0];
+    const oldStart = lines[1];
 
     const currentTime = getCurrentTime();
     const duration = calculateDuration(oldStart, currentTime);
@@ -123,7 +124,7 @@ async function cmdStart(description) {
 
   // Start new timer
   const startTime = getCurrentTime();
-  fs.writeFileSync(STATE_FILE, `${startTime}|${description}`);
+  fs.writeFileSync(STATE_FILE, `${description}\n${startTime}`);
 
   console.log(chalk.green('✓') + ` Started: ${description}`);
   console.log(chalk.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
@@ -158,8 +159,9 @@ async function cmdStop() {
     process.exit(1);
   }
 
-  const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
-  const [start, description] = line.split('|');
+  const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
+  const description = lines[0];
+  const start = lines[1];
 
   await stopTimer(start, description);
 }
@@ -390,8 +392,9 @@ async function cmdStatus() {
     return;
   }
 
-  const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
-  const [start, description] = line.split('|');
+  const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
+  const description = lines[0];
+  const start = lines[1];
 
   const currentTime = getCurrentTime();
   const duration = calculateDuration(start, currentTime);
@@ -620,7 +623,7 @@ async function cmdSyncDb() {
   let lastSync = 0;
   if (fs.existsSync(SYNC_STATE_FILE)) {
     lastSync = parseInt(fs.readFileSync(SYNC_STATE_FILE, 'utf8').trim());
-    const lastSyncDate = new Date(lastSync * 1000).toLocaleString();
+    const lastSyncDate = new Date(lastSync * 1000).toLocaleString('en-US', { timeZone: TIMEZONE });
     console.log(chalk.blue('ℹ') + ` Last sync: ${lastSyncDate}`);
   }
 
