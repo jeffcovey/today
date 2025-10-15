@@ -3373,9 +3373,27 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+
+          // Look up task ID from database to create clickable link
+          let taskLink = '';
+          try {
+            const db = getDatabase();
+            const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
+              .get(relativeFilePath, task.lineNumber);
+            if (dbTask) {
+              taskLink = `/task/${dbTask.id}`;
+            }
+          } catch (error) {
+            console.error('Error looking up task ID:', error);
+          }
+
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
-          replacement += `${priorityIcon}${displayText}`;
+          if (taskLink) {
+            replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
+          } else {
+            replacement += `${priorityIcon}${displayText}`;
+          }
           replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
@@ -3402,9 +3420,27 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           // Add data attributes with file path and line number for future actions
           // Store full path in data-file and line number in data-line
           const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
+
+          // Look up task ID from database to create clickable link
+          let taskLink = '';
+          try {
+            const db = getDatabase();
+            const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
+              .get(relativeFilePath, task.lineNumber);
+            if (dbTask) {
+              taskLink = `/task/${dbTask.id}`;
+            }
+          } catch (error) {
+            console.error('Error looking up task ID:', error);
+          }
+
           replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
           replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
-          replacement += `${priorityIcon}${displayText}`;
+          if (taskLink) {
+            replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
+          } else {
+            replacement += `${priorityIcon}${displayText}`;
+          }
           replacement += `</li>\n`;
         }
         replacement += '</ul>\n';
