@@ -3378,8 +3378,10 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           let taskLink = '';
           try {
             const db = getDatabase();
+            // Database stores paths with 'vault/' prefix
+            const dbFilePath = 'vault/' + relativeFilePath;
             const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-              .get(relativeFilePath, task.lineNumber);
+              .get(dbFilePath, task.lineNumber);
             if (dbTask) {
               taskLink = `/task/${dbTask.id}`;
             }
@@ -3425,8 +3427,10 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           let taskLink = '';
           try {
             const db = getDatabase();
+            // Database stores paths with 'vault/' prefix
+            const dbFilePath = 'vault/' + relativeFilePath;
             const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-              .get(relativeFilePath, task.lineNumber);
+              .get(dbFilePath, task.lineNumber);
             if (dbTask) {
               taskLink = `/task/${dbTask.id}`;
             }
