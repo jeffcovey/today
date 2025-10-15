@@ -1263,27 +1263,32 @@ async function renderDirectory(dirPath, urlPath) {
           </a>
         </div>
         <script>
-          // Update timer duration every second
-          function updateTimerDuration() {
-            const timerEl = document.querySelector('[data-timer-start]');
-            if (!timerEl) return;
+          (function() {
+            // Update timer duration every second
+            function updateTimerDuration() {
+              const timerEl = document.querySelector('[data-timer-start]');
+              if (!timerEl) return;
 
-            const startTime = new Date(timerEl.dataset.timerStart);
-            const now = new Date();
-            const durationMs = now - startTime;
-            const hours = Math.floor(durationMs / (1000 * 60 * 60));
-            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+              const startTime = new Date(timerEl.dataset.timerStart);
+              const now = new Date();
+              const durationMs = now - startTime;
+              const hours = Math.floor(durationMs / (1000 * 60 * 60));
+              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-            const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
-            const durationSpan = timerEl.querySelector('.timer-duration');
-            if (durationSpan) {
-              durationSpan.textContent = durationText;
+              const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
+              const durationSpan = timerEl.querySelector('.timer-duration');
+              if (durationSpan) {
+                durationSpan.textContent = durationText;
+              }
             }
-          }
 
-          // Update immediately and then every second
-          updateTimerDuration();
-          setInterval(updateTimerDuration, 1000);
+            // Only start interval if not already running
+            if (!window.timerIntervalStarted) {
+              window.timerIntervalStarted = true;
+              updateTimerDuration();
+              setInterval(updateTimerDuration, 1000);
+            }
+          })();
         </script>
         ` : `
         <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
@@ -3910,27 +3915,32 @@ ${cleanContent}
           </a>
         </div>
         <script>
-          // Update timer duration every second
-          function updateTimerDuration() {
-            const timerEl = document.querySelector('[data-timer-start]');
-            if (!timerEl) return;
+          (function() {
+            // Update timer duration every second
+            function updateTimerDuration() {
+              const timerEl = document.querySelector('[data-timer-start]');
+              if (!timerEl) return;
 
-            const startTime = new Date(timerEl.dataset.timerStart);
-            const now = new Date();
-            const durationMs = now - startTime;
-            const hours = Math.floor(durationMs / (1000 * 60 * 60));
-            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+              const startTime = new Date(timerEl.dataset.timerStart);
+              const now = new Date();
+              const durationMs = now - startTime;
+              const hours = Math.floor(durationMs / (1000 * 60 * 60));
+              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-            const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
-            const durationSpan = timerEl.querySelector('.timer-duration');
-            if (durationSpan) {
-              durationSpan.textContent = durationText;
+              const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
+              const durationSpan = timerEl.querySelector('.timer-duration');
+              if (durationSpan) {
+                durationSpan.textContent = durationText;
+              }
             }
-          }
 
-          // Update immediately and then every second
-          updateTimerDuration();
-          setInterval(updateTimerDuration, 1000);
+            // Only start interval if not already running
+            if (!window.timerIntervalStarted) {
+              window.timerIntervalStarted = true;
+              updateTimerDuration();
+              setInterval(updateTimerDuration, 1000);
+            }
+          })();
         </script>
         ` : `
         <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
