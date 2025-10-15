@@ -5908,6 +5908,21 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
     // Parse the task line to extract details
     const taskText = task.line_text.replace(/^(\s*>)*\s*- \[[x\s-]\]\s*/i, '').trim();
 
+    // Create clean version for timer (remove status tags and dates)
+    const cleanTaskText = taskText
+      .replace(/#stage\/[^\s]*/g, '')         // Remove #stage/... tags
+      .replace(/[⏫🔼🔽⏬]/g, '')              // Remove priority emojis
+      .replace(/➕\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ➕ created dates
+      .replace(/⏳\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ⏳ due dates
+      .replace(/📅\s*\d{4}-\d{2}-\d{2}/g, '') // Remove 📅 scheduled dates
+      .replace(/✅\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ✅ done dates
+      .replace(/🔁\s*[^\n]*/g, '')            // Remove 🔁 recurrence
+      .replace(/\s+/g, ' ')                   // Collapse multiple spaces
+      .trim();
+
+    // Strip vault/ prefix from file path for links
+    const displayPath = task.file_path.replace(/^vault\//, '');
+
     const html = `
       <!DOCTYPE html>
       <html lang="en">
@@ -5946,17 +5961,17 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
                     <h6 class="text-muted mb-2">Location</h6>
                     <div>
                       <i class="fas fa-file me-2"></i>
-                      <a href="/${task.file_path}">${task.file_path}</a>
+                      <a href="/${displayPath}">${task.file_path}</a>
                       <span class="text-muted ms-2">(line ${task.line_number})</span>
                     </div>
                   </div>
 
                   <!-- Actions -->
                   <div class="d-flex gap-2 flex-wrap">
-                    <a href="/${task.file_path}" class="btn btn-primary">
+                    <a href="/${displayPath}" class="btn btn-primary">
                       <i class="fas fa-file-alt me-2"></i>View File
                     </a>
-                    <a href="/edit/${task.file_path}" class="btn btn-secondary">
+                    <a href="/edit/${displayPath}" class="btn btn-secondary">
                       <i class="fas fa-edit me-2"></i>Edit File
                     </a>
                     <button class="btn btn-success" onclick="startTimer()">
@@ -5987,7 +6002,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
 
         <script>
           function startTimer() {
-            const taskText = ${JSON.stringify(taskText)};
+            const taskText = ${JSON.stringify(cleanTaskText)};
             fetch('/api/track/start', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
