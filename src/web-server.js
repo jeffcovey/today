@@ -3851,7 +3851,52 @@ ${cleanContent}
       }
     }
   );
-  
+
+  // Make markdown tasks clickable - wrap task text in link to task detail page
+  // Look up task IDs from database and create links
+  const taskLinkMatches = [];
+  const taskLinkRegex = /<li[^>]*data-file="([^"]+)"[^>]*data-line="(\d+)"[^>]*>(.*?)<\/li>/gi;
+  let taskMatch;
+
+  while ((taskMatch = taskLinkRegex.exec(htmlContent)) !== null) {
+    const [fullMatch, dataFile, dataLine, liContent] = taskMatch;
+
+    // Look up task ID from database
+    try {
+      const db = getDatabase();
+      const task = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
+        .get(dataFile, parseInt(dataLine));
+
+      if (task) {
+        taskLinkMatches.push({
+          fullMatch,
+          dataFile,
+          dataLine,
+          liContent,
+          taskId: task.id
+        });
+      }
+    } catch (error) {
+      // Database lookup failed, skip this task
+      console.error('Error looking up task:', error);
+    }
+  }
+
+  // Replace task list items with clickable versions
+  for (const match of taskLinkMatches) {
+    // Extract checkbox and task content
+    const checkboxMatch = match.liContent.match(/(<input[^>]*>)(.*)/i);
+    if (checkboxMatch) {
+      const checkbox = checkboxMatch[1];
+      let taskContent = checkboxMatch[2].trim();
+
+      // Wrap task text in link (but not the checkbox)
+      const clickableTask = `<li data-file="${match.dataFile}" data-line="${match.dataLine}">${checkbox} <a href="/task/${match.taskId}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${taskContent}</a></li>`;
+
+      htmlContent = htmlContent.replace(match.fullMatch, clickableTask);
+    }
+  }
+
   const fileName = pageTitle || path.basename(urlPath);
   
   // Build breadcrumb
