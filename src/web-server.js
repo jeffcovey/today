@@ -3376,6 +3376,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
   console.log('[DEBUG] renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
 
+  // Get current timer info
+  const currentTimer = await getCurrentTimer();
+
   // Parse YAML frontmatter
   const { properties, contentWithoutFrontmatter } = parseFrontmatter(content);
   content = contentWithoutFrontmatter;
@@ -3846,6 +3849,21 @@ ${cleanContent}
             ${breadcrumbHtml}
           </ol>
         </nav>
+
+        ${currentTimer ? `
+        <!-- Current Time Tracking Task -->
+        <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+          <i class="fas fa-clock me-2"></i>
+          <div class="flex-grow-1">
+            <strong>${currentTimer.description}</strong>
+            <br>
+            <small>Started at ${currentTimer.startTime} • Duration: ${currentTimer.duration}</small>
+          </div>
+          <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="fas fa-stop"></i> Stop
+          </a>
+        </div>
+        ` : ''}
 
         <div class="row">
           <!-- Content column -->
