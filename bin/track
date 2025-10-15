@@ -1,0 +1,642 @@
+#!/bin/bash
+# Time tracking CLI with auto-stop protection
+
+set -e
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Directories and files
+TIME_DIR="$PROJECT_ROOT/vault/logs/time-tracking"
+STATE_FILE="$TIME_DIR/.current-timer"
+mkdir -p "$TIME_DIR"
+
+# Get timezone from config
+TIMEZONE=$(bin/get-config timezone)
+if [[ -z "$TIMEZONE" ]]; then
+    TIMEZONE="America/New_York"
+fi
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+# Get current time in configured timezone
+get_current_time() {
+    TZ="$TIMEZONE" date '+%Y-%m-%dT%H:%M:%S%z' | sed 's/\(..\)$/:\1/'
+}
+
+# Get current month file
+get_month_file() {
+    local year_month=$(TZ="$TIMEZONE" date '+%Y-%m')
+    echo "$TIME_DIR/$year_month.md"
+}
+
+
+# Parse duration from seconds to human readable
+format_duration() {
+    local seconds=$1
+    local hours=$((seconds / 3600))
+    local minutes=$(((seconds % 3600) / 60))
+
+    if [[ $hours -gt 0 ]]; then
+        echo "${hours}h ${minutes}m"
+    else
+        echo "${minutes}m"
+    fi
+}
+
+# Calculate duration in minutes between two timestamps
+calculate_duration() {
+    local start=$1
+    local end=$2
+
+    # Try macOS date format first, then GNU date
+    local start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%s" 2>/dev/null || \
+                        date -d "$start" "+%s" 2>/dev/null || echo "0")
+    local end_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$end" "+%s" 2>/dev/null || \
+                      date -d "$end" "+%s" 2>/dev/null || echo "0")
+
+    if [[ "$start_epoch" == "0" ]] || [[ "$end_epoch" == "0" ]]; then
+        echo "0"
+        return
+    fi
+
+    local duration_seconds=$((end_epoch - start_epoch))
+    local duration_minutes=$((duration_seconds / 60))
+
+    echo "$duration_minutes"
+}
+
+# Check for running timer and handle auto-stop
+check_running_timer() {
+    if [[ ! -f "$STATE_FILE" ]]; then
+        return 0
+    fi
+
+    local current_time=$(get_current_time)
+    local line=$(cat "$STATE_FILE")
+
+    IFS='|' read -r start description <<< "$line"
+
+    # Calculate how long it's been running
+    local duration_minutes=$(calculate_duration "$start" "$current_time")
+    local duration_hours=$((duration_minutes / 60))
+
+    # Check for max duration (6 hours)
+    if [[ $duration_hours -ge 6 ]]; then
+        print_warning "Timer has been running for ${duration_hours}h - auto-stopping"
+        stop_timer "$start" "$description" "$current_time"
+        return 1
+    fi
+
+    return 0
+}
+
+# Stop timer and write to file
+stop_timer() {
+    local start=$1
+    local description=$2
+    local end=${3:-$(get_current_time)}
+
+    local duration=$(calculate_duration "$start" "$end")
+    local month_file=$(get_month_file)
+
+    # Write completed entry (3 fields: start, end, description with tags)
+    echo "$start|$end|$description" >> "$month_file"
+
+    # Remove state file
+    rm -f "$STATE_FILE"
+
+    local duration_formatted=$(format_duration $((duration * 60)))
+    print_status "Stopped: $description ($duration_formatted)"
+}
+
+# Start command
+cmd_start() {
+    local description="$*"
+
+    if [[ -z "$description" ]]; then
+        print_error "Usage: track start \"Description with #topic/tags\""
+        echo ""
+        echo "Examples:"
+        echo "  track start \"Fixing image distortion #topic/ogm\""
+        echo "  track start \"Duolingo practice #topic/languages\""
+        echo "  track start \"Hip mobility workout #topic/fitness\""
+        exit 1
+    fi
+
+    # Check for running timer
+    if [[ -f "$STATE_FILE" ]]; then
+        local line=$(cat "$STATE_FILE")
+        IFS='|' read -r old_start old_description <<< "$line"
+
+        local current_time=$(get_current_time)
+        local duration=$(calculate_duration "$old_start" "$current_time")
+        local duration_formatted=$(format_duration $((duration * 60)))
+
+        print_warning "Stopping previous timer: $old_description ($duration_formatted)"
+        stop_timer "$old_start" "$old_description" "$current_time"
+    fi
+
+    # Start new timer
+    local start_time=$(get_current_time)
+    echo "$start_time|$description" > "$STATE_FILE"
+
+    print_status "Started: $description"
+    print_info "Timezone: $TIMEZONE"
+}
+
+# Stop command
+cmd_stop() {
+    if [[ ! -f "$STATE_FILE" ]]; then
+        print_error "No timer running"
+        exit 1
+    fi
+
+    local line=$(cat "$STATE_FILE")
+    IFS='|' read -r start description <<< "$line"
+
+    stop_timer "$start" "$description"
+}
+
+# Status command
+cmd_status() {
+    # First check for auto-stop conditions
+    if ! check_running_timer; then
+        # Timer was auto-stopped
+        echo ""
+        print_info "No timer currently running"
+        return
+    fi
+
+    if [[ ! -f "$STATE_FILE" ]]; then
+        print_info "No timer running"
+        return
+    fi
+
+    local line=$(cat "$STATE_FILE")
+    IFS='|' read -r start description <<< "$line"
+
+    local current_time=$(get_current_time)
+    local duration=$(calculate_duration "$start" "$current_time")
+    local duration_formatted=$(format_duration $((duration * 60)))
+
+    echo -e "${CYAN}⏱${NC}  Currently tracking:"
+    echo ""
+    echo -e "  ${GREEN}$description${NC}"
+    echo -e "  Started: $(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || echo "$start")"
+    echo -e "  Duration: $duration_formatted"
+}
+
+# Today command
+cmd_today() {
+    local month_file=$(get_month_file)
+    local today=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
+
+    if [[ ! -f "$month_file" ]]; then
+        print_info "No time entries for today"
+        return
+    fi
+
+    echo -e "${CYAN}Today's Time Tracking${NC} ($today)"
+    echo ""
+
+    # Get entries for today
+    local entries=$(grep "^$today" "$month_file" 2>/dev/null || echo "")
+
+    if [[ -z "$entries" ]]; then
+        print_info "No time entries for today"
+        return
+    fi
+
+    # Parse and display entries
+    local total_minutes=0
+    declare -A topic_minutes
+
+    while IFS='|' read -r start end field3 field4 field5; do
+        # Handle multiple formats for backward compatibility:
+        # - Old 5-field: start|end|duration|project|description
+        # - Old 4-field: start|end|project|description
+        # - New 3-field: start|end|description (with #topic/tags)
+        if [[ -n "$field5" ]]; then
+            # Old 5-field format: start|end|duration|project|description
+            local duration=$field3
+            local project=$field4
+            local description=$field5
+            local topics="$project"  # Use project as fallback topic
+        elif [[ -n "$field4" ]]; then
+            # Old 4-field format: start|end|project|description
+            local project=$field3
+            local description=$field4
+            local duration=0
+            local topics="$project"  # Use project as fallback topic
+        else
+            # New 3-field format: start|end|description (with #topic/tags in description)
+            local description=$field3
+            local duration=0
+            # Extract topics from description
+            local topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
+            if [[ -z "$topics" ]]; then
+                topics="(untagged)"
+            fi
+        fi
+
+        if [[ "$end" == "RUNNING" ]]; then
+            local current_time=$(get_current_time)
+            duration=$(calculate_duration "$start" "$current_time")
+            # Try macOS format first, then GNU date
+            local start_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || \
+                              TZ="$TIMEZONE" date -d "$start" "+%I:%M %p" 2>/dev/null || echo "?")
+            echo -e "  ${YELLOW}●${NC} $start_time - now ($(format_duration $((duration * 60))))"
+        else
+            # Calculate duration from timestamps if not provided
+            if [[ $duration -eq 0 ]]; then
+                duration=$(calculate_duration "$start" "$end")
+            fi
+            # Try macOS format first, then GNU date
+            local start_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || \
+                              TZ="$TIMEZONE" date -d "$start" "+%I:%M %p" 2>/dev/null || echo "?")
+            local end_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$end" "+%I:%M %p" 2>/dev/null || \
+                            TZ="$TIMEZONE" date -d "$end" "+%I:%M %p" 2>/dev/null || echo "?")
+            echo -e "  ${GREEN}✓${NC} $start_time - $end_time ($(format_duration $((duration * 60))))"
+        fi
+        echo -e "    $description"
+
+        total_minutes=$((total_minutes + duration))
+        topic_minutes[$topics]=$((${topic_minutes[$topics]:-0} + duration))
+    done <<< "$entries"
+
+    # Summary by topic (sorted by time spent, descending)
+    if [[ ${#topic_minutes[@]} -gt 0 ]]; then
+        echo ""
+        echo -e "${CYAN}By Topic:${NC}"
+        # Sort topics by minutes (descending)
+        for topic in $(for t in "${!topic_minutes[@]}"; do echo "${topic_minutes[$t]} $t"; done | sort -rn | cut -d' ' -f2-); do
+            local mins=${topic_minutes[$topic]}
+            echo -e "  $topic: $(format_duration $((mins * 60)))"
+        done
+    fi
+
+    echo ""
+    echo -e "${CYAN}Total:${NC} $(format_duration $((total_minutes * 60)))"
+
+    # Warning for long entries
+    while IFS='|' read -r start end field3 field4 field5; do
+        # Handle multiple formats (same logic as above)
+        if [[ -n "$field5" ]]; then
+            local duration=$field3
+            local description=$field5
+        elif [[ -n "$field4" ]]; then
+            local description=$field4
+            local duration=0
+        else
+            local description=$field3
+            local duration=0
+        fi
+
+        if [[ "$end" == "RUNNING" ]]; then
+            local current_time=$(get_current_time)
+            duration=$(calculate_duration "$start" "$current_time")
+        elif [[ $duration -eq 0 ]]; then
+            duration=$(calculate_duration "$start" "$end")
+        fi
+
+        local hours=$((duration / 60))
+        if [[ $hours -ge 3 ]]; then
+            echo ""
+            print_warning "Long entry detected: $description ($(format_duration $((duration * 60))))"
+            echo "  Consider splitting into smaller entries or verify end time"
+        fi
+    done <<< "$entries"
+}
+
+# Week command
+cmd_week() {
+    # Try macOS format first, then GNU date
+    local week_start=$(TZ="$TIMEZONE" date -v-7d '+%Y-%m-%d' 2>/dev/null || \
+                      TZ="$TIMEZONE" date -d '7 days ago' '+%Y-%m-%d')
+    local today=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
+
+    echo -e "${CYAN}This Week's Time Tracking${NC} ($week_start to $today)"
+    echo ""
+
+    # Get all month files that might contain this week's data
+    local current_month=$(TZ="$TIMEZONE" date '+%Y-%m')
+    # Try macOS format first, then GNU date
+    local prev_month=$(TZ="$TIMEZONE" date -v-1m '+%Y-%m' 2>/dev/null || \
+                      TZ="$TIMEZONE" date -d '1 month ago' '+%Y-%m')
+
+    local total_minutes=0
+    declare -A topic_minutes
+    declare -A day_minutes
+
+    for month_file in "$TIME_DIR/$prev_month.md" "$TIME_DIR/$current_month.md"; do
+        if [[ ! -f "$month_file" ]]; then
+            continue
+        fi
+
+        while IFS='|' read -r start end field3 field4 field5; do
+            local entry_date=${start:0:10}
+
+            # Check if entry is within the week
+            if [[ "$entry_date" < "$week_start" ]] || [[ "$entry_date" > "$today" ]]; then
+                continue
+            fi
+
+            # Handle multiple formats (same as cmd_today)
+            if [[ -n "$field5" ]]; then
+                # Old 5-field format
+                local duration=$field3
+                local project=$field4
+                local description=$field5
+                local topics="$project"
+            elif [[ -n "$field4" ]]; then
+                # Old 4-field format
+                local project=$field3
+                local description=$field4
+                local duration=0
+                local topics="$project"
+            else
+                # New 3-field format
+                local description=$field3
+                local duration=0
+                local topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
+                if [[ -z "$topics" ]]; then
+                    topics="(untagged)"
+                fi
+            fi
+
+            if [[ "$end" == "RUNNING" ]]; then
+                local current_time=$(get_current_time)
+                duration=$(calculate_duration "$start" "$current_time")
+            elif [[ $duration -eq 0 ]]; then
+                duration=$(calculate_duration "$start" "$end")
+            fi
+
+            total_minutes=$((total_minutes + duration))
+            topic_minutes[$topics]=$((${topic_minutes[$topics]:-0} + duration))
+            day_minutes[$entry_date]=$((${day_minutes[$entry_date]:-0} + duration))
+        done < "$month_file"
+    done
+
+    if [[ $total_minutes -eq 0 ]]; then
+        print_info "No time entries this week"
+        return
+    fi
+
+    # Show by day
+    echo -e "${CYAN}By Day:${NC}"
+    for i in {7..0}; do
+        # Try macOS format first, then GNU date
+        day=$(TZ="$TIMEZONE" date -v-${i}d '+%Y-%m-%d' 2>/dev/null || \
+             TZ="$TIMEZONE" date -d "$i days ago" '+%Y-%m-%d')
+        day_name=$(TZ="$TIMEZONE" date -v-${i}d '+%A' 2>/dev/null || \
+                  TZ="$TIMEZONE" date -d "$i days ago" '+%A')
+        mins=${day_minutes[$day]:-0}
+
+        if [[ $mins -gt 0 ]]; then
+            echo -e "  $day ($day_name): $(format_duration $((mins * 60)))"
+        fi
+    done
+
+    echo ""
+    echo -e "${CYAN}By Topic:${NC}"
+    # Sort topics by minutes (descending)
+    for topic in $(for t in "${!topic_minutes[@]}"; do echo "${topic_minutes[$t]} $t"; done | sort -rn | cut -d' ' -f2-); do
+        local mins=${topic_minutes[$topic]}
+        echo -e "  $topic: $(format_duration $((mins * 60)))"
+    done
+
+    echo ""
+    echo -e "${CYAN}Total:${NC} $(format_duration $((total_minutes * 60)))"
+
+    # Calculate daily average
+    local days_with_entries=${#day_minutes[@]}
+    if [[ $days_with_entries -gt 0 ]]; then
+        local avg_minutes=$((total_minutes / days_with_entries))
+        echo -e "${CYAN}Average per working day:${NC} $(format_duration $((avg_minutes * 60)))"
+    fi
+}
+
+# Sync-db command - sync markdown files to database (last 365 days only)
+cmd_sync_db() {
+    local DB_PATH="$PROJECT_ROOT/.data/today.db"
+    local SYNC_STATE_FILE="$TIME_DIR/.last-sync"
+
+    print_info "Syncing time tracking files to database (last 365 days)..."
+
+    # Note: time_entries table is created by migration v30 in src/migrations.js
+
+    # Calculate date 365 days ago
+    local cutoff_date=$(TZ="$TIMEZONE" date -v-365d '+%Y-%m-%d' 2>/dev/null || \
+                       TZ="$TIMEZONE" date -d '365 days ago' '+%Y-%m-%d')
+    local cutoff_year_month="${cutoff_date:0:7}"  # YYYY-MM format
+
+    # Get last sync timestamp (epoch seconds)
+    local last_sync=0
+    if [[ -f "$SYNC_STATE_FILE" ]]; then
+        last_sync=$(cat "$SYNC_STATE_FILE")
+        local last_sync_date=$(date -r "$last_sync" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || \
+                              date -d "@$last_sync" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
+        print_info "Last sync: $last_sync_date"
+    fi
+
+    # Process all markdown files (only YYYY-MM.md format)
+    local entry_count=0
+    local files_processed=0
+    local files_skipped=0
+
+    for file in "$TIME_DIR"/[0-9][0-9][0-9][0-9]-[0-9][0-9].md; do
+        if [[ ! -f "$file" ]]; then
+            continue
+        fi
+
+        # Get year-month from filename (e.g., "2024-10" from "2024-10.md")
+        local file_year_month=$(basename "$file" .md)
+
+        # Skip files older than 365 days
+        if [[ "$file_year_month" < "$cutoff_year_month" ]]; then
+            continue
+        fi
+
+        # Check if file has been modified since last sync
+        # Try GNU stat first (Linux), then macOS stat
+        local file_mtime=$(stat -c %Y "$file" 2>/dev/null || \
+                          stat -f %m "$file" 2>/dev/null || echo "0")
+
+        if [[ $last_sync -gt 0 ]] && [[ $file_mtime -le $last_sync ]]; then
+            files_skipped=$((files_skipped + 1))
+            continue
+        fi
+
+        files_processed=$((files_processed + 1))
+
+        while IFS='|' read -r start end field3 field4 field5; do
+            # Skip header lines or empty lines
+            if [[ "$start" =~ ^# ]] || [[ -z "$start" ]]; then
+                continue
+            fi
+
+            # Handle multiple formats for backward compatibility
+            local topics=""
+            if [[ -n "$field5" ]]; then
+                # Old 5-field format: start|end|duration|project|description
+                local duration=$field3
+                local project=$field4
+                local description=$field5
+                topics="$project"  # Use project as fallback topic
+            elif [[ -n "$field4" ]]; then
+                # Old 4-field format: start|end|project|description
+                local project=$field3
+                local description=$field4
+                local duration=0
+                topics="$project"  # Use project as fallback topic
+            else
+                # New 3-field format: start|end|description (with #topic/tags)
+                local description=$field3
+                local duration=0
+                # Extract topics from description
+                topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
+                if [[ -z "$topics" ]]; then
+                    topics="(untagged)"
+                fi
+            fi
+
+            # Handle running timers
+            if [[ "$end" == "RUNNING" ]]; then
+                end=""
+                duration=0
+            fi
+
+            # Calculate duration from timestamps if not already set
+            if [[ $duration -eq 0 ]] && [[ -n "$end" ]] && [[ "$end" != "RUNNING" ]]; then
+                duration=$(calculate_duration "$start" "$end")
+            fi
+
+            # Escape single quotes for SQL
+            escaped_topics="${topics//\'/\'\'}"
+            escaped_description="${description//\'/\'\'}"
+
+            # Set end time value
+            if [[ -n "$end" ]] && [[ "$end" != "RUNNING" ]]; then
+                end_value="'$end'"
+            else
+                end_value="NULL"
+            fi
+
+            # Ensure duration is numeric
+            if [[ -z "$duration" ]] || ! [[ "$duration" =~ ^[0-9]+$ ]]; then
+                duration=0
+            fi
+
+            # Insert or update entry (populate both project and topics for backward compatibility)
+            # project column gets first topic or full topics string
+            escaped_project="$escaped_topics"
+            sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO time_entries (start_time, end_time, duration_minutes, project, topics, description, source) VALUES ('$start', $end_value, $duration, '$escaped_project', '$escaped_topics', '$escaped_description', 'markdown');"
+
+            entry_count=$((entry_count + 1))
+        done < "$file"
+    done
+
+    # Save current sync timestamp
+    date +%s > "$SYNC_STATE_FILE"
+
+    if [[ $files_skipped -gt 0 ]]; then
+        print_status "Synced $entry_count entries from $files_processed file(s) (skipped $files_skipped unchanged file(s))"
+    else
+        print_status "Synced $entry_count entries from $files_processed file(s)"
+    fi
+
+    # Show summary
+    print_info "Recent entries:"
+    sqlite3 -column -header "$DB_PATH" <<'EOF'
+SELECT
+    DATE(start_time) as Date,
+    topics as Topics,
+    printf('%.1f', SUM(duration_minutes) / 60.0) as Hours,
+    COUNT(*) as Entries
+FROM time_entries
+WHERE DATE(start_time) >= DATE('now', '-7 days', 'localtime')
+GROUP BY DATE(start_time), topics
+ORDER BY DATE(start_time) DESC, Hours DESC
+LIMIT 20;
+EOF
+}
+
+# Main command handling
+case "${1:-}" in
+    start)
+        shift  # Remove 'start' from arguments
+        cmd_start "$@"  # Pass all remaining arguments
+        ;;
+    stop)
+        cmd_stop
+        ;;
+    status)
+        cmd_status
+        ;;
+    today)
+        cmd_today
+        ;;
+    week)
+        cmd_week
+        ;;
+    sync-db)
+        cmd_sync_db
+        ;;
+    *)
+        echo "Time Tracking CLI"
+        echo ""
+        echo "Usage: track [command] [options]"
+        echo ""
+        echo "Commands:"
+        echo "  start DESCRIPTION           Start tracking time (include #topic/tags in description)"
+        echo "  stop                        Stop current timer"
+        echo "  status                      Show current timer status"
+        echo "  today                       Show today's entries"
+        echo "  week                        Show this week's entries"
+        echo "  sync-db                     Sync markdown files to database"
+        echo ""
+        echo "Examples:"
+        echo "  track start \"Fixing image distortion #topic/ogm\""
+        echo "  track start \"Duolingo practice #topic/languages\""
+        echo "  track start \"Hip mobility workout #topic/fitness\""
+        echo "  track status"
+        echo "  track stop"
+        echo "  track today"
+        echo "  track sync-db"
+        echo ""
+        echo "Common Topics:"
+        echo "  #topic/ogm #topic/ogm_sysadmin #topic/ogm_site_development"
+        echo "  #topic/fitness #topic/meditation_mindfulness #topic/languages"
+        echo "  #topic/home_household #topic/hosting #topic/personal_admin"
+        echo ""
+        ;;
+esac

@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+Import Toggl time entries into markdown format for time tracking system.
+Converts Toggl data to: START|END|DESCRIPTION #topic/tag
+"""
+
+import sqlite3
+import sys
+from datetime import datetime
+
+# Project to topic mapping
+PROJECT_TO_TOPIC = {
+    "F.Accounting 💵": "#topic/personal_finance",
+    "F.Home & Household 🏠": "#topic/home_household",
+    "F.Hosting 🏨": "#topic/hosting",
+    "F.Personal Admin 🏗": "#topic/personal_admin",
+    "H.Family 👨‍❤️‍👨": "#topic/family",
+    "H.Friends & Social Life 🙂": "#topic/friends_socializing",
+    "H.Health & Fitness 🏃‍♂️": "#topic/fitness",
+    "H.Learning 👨‍🎓": "#topic/languages",
+    "H.Mental Clarity 🧘‍♂️": "#topic/meditation_mindfulness",
+    "H.Travel & Exploration 🚢": "#topic/travel",
+    "O.Content 🖼": "#topic/ogm",
+    "O.Marketing/SEO 📈": "#topic/ogm_marketing",
+    "O.Members 👬": "#topic/ogm_members",
+    "O.Site Development 🚧": "#topic/ogm_site_development",
+    "O.Staff 👥": "#topic/ogm_staff",
+    "O.Sysadmin 👨‍💻": "#topic/ogm_sysadmin",
+    "Z.Games ♟️": "#topic/games",
+}
+
+# Project name to clean description mapping (for when no description exists)
+PROJECT_TO_DESCRIPTION = {
+    "F.Accounting 💵": "Accounting",
+    "F.Home & Household 🏠": "Home & household",
+    "F.Hosting 🏨": "Hosting",
+    "F.Personal Admin 🏗": "Personal admin",
+    "H.Family 👨‍❤️‍👨": "Family time",
+    "H.Friends & Social Life 🙂": "Socializing",
+    "H.Health & Fitness 🏃‍♂️": "Exercise",
+    "H.Learning 👨‍🎓": "Learning",
+    "H.Mental Clarity 🧘‍♂️": "Meditation",
+    "H.Travel & Exploration 🚢": "Travel planning",
+    "O.Content 🖼": "OlderGay.Men content",
+    "O.Marketing/SEO 📈": "OlderGay.Men marketing",
+    "O.Members 👬": "OlderGay.Men member support",
+    "O.Site Development 🚧": "OlderGay.Men site development",
+    "O.Staff 👥": "OlderGay.Men staff",
+    "O.Sysadmin 👨‍💻": "OlderGay.Men sysadmin",
+    "Z.Games ♟️": "Games",
+}
+
+def clean_description(description, project):
+    """Clean up description by removing project prefix and separators."""
+    if not description:
+        # Use clean project description when no description exists
+        return PROJECT_TO_DESCRIPTION.get(project, project)
+
+    # Remove project prefix if present (e.g., "H.Health & Fitness 🏃‍♂️ - Exercise" -> "Exercise")
+    if project and description.startswith(project):
+        description = description[len(project):].strip()
+
+    # Remove leading " - " separator
+    if description.startswith("- "):
+        description = description[2:].strip()
+
+    # If we ended up with empty string after cleaning, use project description
+    if not description:
+        return PROJECT_TO_DESCRIPTION.get(project, project)
+
+    return description
+
+def import_month(year_month, db_path='.data/today.db', output_dir='vault/logs/time-tracking'):
+    """Import Toggl entries for a specific month."""
+    # Connect to database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get entries for the specified month
+    cursor.execute("""
+        SELECT
+            te.start,
+            te.stop,
+            te.description,
+            p.name as project
+        FROM toggl_time_entries te
+        LEFT JOIN toggl_projects p ON te.pid = p.id
+        WHERE strftime('%Y-%m', te.start) = ?
+        AND te.stop IS NOT NULL
+        ORDER BY te.start
+    """, (year_month,))
+
+    entries = cursor.fetchall()
+    conn.close()
+
+    if not entries:
+        print(f"No entries found for {year_month}")
+        return 0
+
+    # Convert to new format
+    output_lines = [f"# Time Tracking - {datetime.strptime(year_month, '%Y-%m').strftime('%B %Y')}", ""]
+
+    for start_utc, stop_utc, description, project in entries:
+        # Parse UTC timestamps
+        start_dt = datetime.fromisoformat(start_utc.replace('Z', '+00:00'))
+        stop_dt = datetime.fromisoformat(stop_utc.replace('Z', '+00:00'))
+
+        # Convert to America/New_York (EDT is -04:00, EST is -05:00)
+        # Note: This is simplified - doesn't account for DST transitions
+        start_local = start_dt.strftime('%Y-%m-%dT%H:%M:%S-04:00')
+        stop_local = stop_dt.strftime('%Y-%m-%dT%H:%M:%S-04:00')
+
+        # Clean description and get topic tag
+        clean_desc = clean_description(description, project)
+        topic_tag = PROJECT_TO_TOPIC.get(project, "#topic/other")
+
+        # Create entry
+        entry = f"{start_local}|{stop_local}|{clean_desc} {topic_tag}"
+        output_lines.append(entry)
+
+    # Write file
+    output_file = f"{output_dir}/{year_month}.md"
+    with open(output_file, 'w') as f:
+        f.write('\n'.join(output_lines) + '\n')
+
+    print(f"✓ Created {output_file} with {len(entries)} entries")
+    return len(entries)
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Usage: bin/toggl-to-markdown YYYY-MM [YYYY-MM ...]")
+        print("")
+        print("Examples:")
+        print("  bin/toggl-to-markdown 2025-10")
+        print("  bin/toggl-to-markdown 2025-09 2025-10")
+        sys.exit(1)
+
+    total = 0
+    for year_month in sys.argv[1:]:
+        total += import_month(year_month)
+
+    print(f"\nTotal: {total} entries imported")

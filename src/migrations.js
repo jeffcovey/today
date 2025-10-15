@@ -2203,6 +2203,59 @@ export class MigrationManager {
           console.log(`    Dropped ${droppedCount} legacy task tables`);
           console.log('    ✓ Tasks are now tracked in markdown files via markdown_tasks table');
         }
+      },
+      {
+        version: 30,
+        description: 'Add time_entries table for markdown-based time tracking',
+        fn: (db) => {
+          console.log('    Creating time_entries table for time tracking...');
+
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS time_entries (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              start_time DATETIME NOT NULL,
+              end_time DATETIME,
+              duration_minutes INTEGER,  -- Calculated from start_time/end_time during sync, not stored in markdown
+              project TEXT NOT NULL,
+              description TEXT,
+              source TEXT DEFAULT 'markdown',
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(start_time, project, description)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_time_entries_start ON time_entries(start_time);
+            CREATE INDEX IF NOT EXISTS idx_time_entries_project ON time_entries(project);
+            CREATE INDEX IF NOT EXISTS idx_time_entries_date ON time_entries(DATE(start_time));
+          `);
+
+          console.log('    ✓ Created time_entries table for markdown-based time tracking');
+          console.log('    Note: Markdown format is START|END|PROJECT|DESCRIPTION (duration calculated on sync)');
+          console.log('    Note: Toggl tables (toggl_time_entries, toggl_projects) remain for historical reference');
+        }
+      },
+      {
+        version: 31,
+        description: 'Replace project column with topics column for tag-based tracking',
+        fn: (db) => {
+          console.log('    Migrating from project to topics column...');
+
+          // Add topics column
+          db.exec(`ALTER TABLE time_entries ADD COLUMN topics TEXT;`);
+
+          // Migrate existing data: copy project to topics
+          db.exec(`UPDATE time_entries SET topics = project WHERE topics IS NULL;`);
+
+          // Create index on topics
+          db.exec(`CREATE INDEX IF NOT EXISTS idx_time_entries_topics ON time_entries(topics);`);
+
+          // Drop old project index (keep column for backward compatibility during transition)
+          db.exec(`DROP INDEX IF EXISTS idx_time_entries_project;`);
+
+          console.log('    ✓ Added topics column and migrated data from project column');
+          console.log('    Note: New markdown format is START|END|DESCRIPTION (with #topic/tags in description)');
+          console.log('    Note: project column retained for backward compatibility, but topics is primary');
+        }
       }
     ];
 

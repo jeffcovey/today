@@ -45,7 +45,9 @@
       "Bash(curl:*)",
       "Bash(cat:*)",
       "Bash(jq:*)",
-      "Bash(bin/email download:*)"
+      "Bash(bin/email download:*)",
+      "WebFetch(domain:developers.track.toggl.com)",
+      "WebFetch(domain:engineering.toggl.com)"
     ],
     "deny": [],
     "ask": []

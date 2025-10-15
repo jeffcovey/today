@@ -177,15 +177,21 @@ const queries = {
     // Time tracking
     console.log('=== TIME TRACKED TODAY ===');
     const timeEntries = db.prepare(`
-      SELECT 
-        COALESCE(p.name, 'No Project') as project,
-        printf('%.2f', SUM(te.duration) / 3600.0) as hours
-      FROM toggl_time_entries te
-      LEFT JOIN toggl_projects p ON te.pid = p.id
-      WHERE DATE(te.start) = DATE('now', 'localtime')
-      GROUP BY p.name
+      SELECT
+        project,
+        printf('%.2f', SUM(duration_minutes) / 60.0) as hours
+      FROM time_entries
+      WHERE DATE(start_time) = DATE('now', 'localtime')
+        AND end_time IS NOT NULL
+      GROUP BY project
+      ORDER BY SUM(duration_minutes) DESC
     `).all();
-    timeEntries.forEach(e => console.log(`${e.project}|${e.hours}`));
+
+    if (timeEntries.length > 0) {
+      timeEntries.forEach(e => console.log(`${e.project}|${e.hours}`));
+    } else {
+      console.log('No time tracked yet today');
+    }
   },
   
   tasks: () => {

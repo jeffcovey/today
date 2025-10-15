@@ -167,6 +167,9 @@ main() {
     if grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null && ! grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
         run_sync_step "⏱️ Toggl Sync" sync_toggl "Toggl synced" "Toggl sync"
     fi
+
+    # Markdown-based time tracking sync
+    run_sync_step "⏱️ Time Tracking Sync" sync_time_tracking "Time tracking synced" "Time tracking"
     
     # OlderGay.Men monitoring sync (if configured)
     if grep -q "GITHUB_ACCESS_TOKEN=" .env 2>/dev/null || grep -q "SENTRY_AUTH_TOKEN=" .env 2>/dev/null || grep -q "SCOUT_API_KEY=" .env 2>/dev/null; then
@@ -944,22 +947,22 @@ sync_calendar() {
 sync_toggl() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # Check if toggl binary exists
     if [[ ! -f bin/toggl ]]; then
         print_error "Toggl CLI not available"
         return 1
     fi
-    
+
     # Check if Toggl API token is configured
     if ! grep -q "TOGGL_API_TOKEN=" .env 2>/dev/null || grep -q "TOGGL_API_TOKEN=$" .env 2>/dev/null; then
         print_info "Toggl not configured (need TOGGL_API_TOKEN)"
         return 1
     fi
-    
+
     # Run Toggl sync for last 7 days
     print_info "Syncing Toggl time entries..."
-    
+
     sync_output=$(bin/toggl sync 7 2>&1)
     if [[ $? -eq 0 ]]; then
         # Extract entry count from output
@@ -967,16 +970,45 @@ sync_toggl() {
             entry_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ time entries" | grep -oE "[0-9]+" | head -1)
             print_info "Synced $entry_count time entries"
         fi
-        
+
         # Show today's total if available
         today_total=$(sqlite3 .data/today.db "SELECT printf('%.2f', SUM(duration) / 3600.0) FROM toggl_time_entries WHERE DATE(start) = DATE('now', 'localtime') AND stop IS NOT NULL" 2>/dev/null || echo "0")
         if [[ "$today_total" != "0" ]] && [[ -n "$today_total" ]]; then
             print_info "Today's tracked time: ${today_total} hours"
         fi
-        
+
         return 0
     else
         print_error "Toggl sync failed"
+        return 1
+    fi
+}
+
+# Sync markdown-based time tracking
+sync_time_tracking() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Syncing markdown time tracking to database..."
+
+    # Run time tracking sync
+    sync_output=$(bin/track sync-db 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract entry count from output
+        if echo "$sync_output" | grep -q "Synced [0-9]* time entries"; then
+            entry_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ time entries" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $entry_count time entries"
+        fi
+
+        # Show today's total if available
+        today_total=$(sqlite3 .data/today.db "SELECT printf('%.1f', SUM(duration_minutes) / 60.0) FROM time_entries WHERE DATE(start_time) = DATE('now', 'localtime') AND end_time IS NOT NULL" 2>/dev/null || echo "0")
+        if [[ "$today_total" != "0" ]] && [[ -n "$today_total" ]]; then
+            print_info "Today's tracked time: ${today_total} hours"
+        fi
+
+        return 0
+    else
+        print_error "Time tracking sync failed"
         return 1
     fi
 }
