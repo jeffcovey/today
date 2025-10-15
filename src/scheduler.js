@@ -56,8 +56,8 @@ const jobs = [
     },
     {
         schedule: '30 * * * *', // Every hour at :30 (half past)
-        command: 'bin/sync ; bin/tasks classify-stages ; bin/tasks prioritize-status ; bin/tasks add-topics || true', // Full sync + task management
-        description: 'Full sync and task management',
+        command: 'bin/sync ; bin/tasks classify-stages ; bin/tasks prioritize-status ; bin/tasks add-topics ; bin/track add-topics || true', // Full sync + task management + time tracking
+        description: 'Full sync, task management, and time tracking auto-tagging',
         timezone: true
     },
     {

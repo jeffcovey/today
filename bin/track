@@ -1,642 +1,770 @@
-#!/bin/bash
-# Time tracking CLI with auto-stop protection
+#!/usr/bin/env node
 
-set -e
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import chalk from 'chalk';
 
-# Load common dotenvx handler
-source "$(dirname "$0")/lib/dotenvx-loader.sh"
-auto_dotenvx "$@"
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+const TIME_DIR = path.join(PROJECT_ROOT, 'vault/logs/time-tracking');
+const STATE_FILE = path.join(TIME_DIR, '.current-timer');
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-# Directories and files
-TIME_DIR="$PROJECT_ROOT/vault/logs/time-tracking"
-STATE_FILE="$TIME_DIR/.current-timer"
-mkdir -p "$TIME_DIR"
-
-# Get timezone from config
-TIMEZONE=$(bin/get-config timezone)
-if [[ -z "$TIMEZONE" ]]; then
-    TIMEZONE="America/New_York"
-fi
-
-# Color output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-# Function to print colored output
-print_status() {
-    echo -e "${GREEN}✓${NC} $1"
+// Ensure time tracking directory exists
+if (!fs.existsSync(TIME_DIR)) {
+  fs.mkdirSync(TIME_DIR, { recursive: true });
 }
 
-print_error() {
-    echo -e "${RED}✗${NC} $1"
+// Get timezone from config
+function getTimezone() {
+  try {
+    const result = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
+    return result || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
 }
 
-print_info() {
-    echo -e "${BLUE}ℹ${NC} $1"
+const TIMEZONE = getTimezone();
+
+// Get current time in configured timezone
+function getCurrentTime() {
+  const cmd = `TZ="${TIMEZONE}" date '+%Y-%m-%dT%H:%M:%S%z'`;
+  const timestamp = execSync(cmd, { encoding: 'utf8' }).trim();
+  // Add colon in timezone offset (e.g., -0400 -> -04:00)
+  return timestamp.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
 }
 
-print_warning() {
-    echo -e "${YELLOW}⚠${NC} $1"
+// Get current month file path
+function getMonthFile() {
+  const yearMonth = execSync(`TZ="${TIMEZONE}" date '+%Y-%m'`, { encoding: 'utf8' }).trim();
+  return path.join(TIME_DIR, `${yearMonth}.md`);
 }
 
-# Get current time in configured timezone
-get_current_time() {
-    TZ="$TIMEZONE" date '+%Y-%m-%dT%H:%M:%S%z' | sed 's/\(..\)$/:\1/'
+// Format duration in seconds to human readable
+function formatDuration(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }
 
-# Get current month file
-get_month_file() {
-    local year_month=$(TZ="$TIMEZONE" date '+%Y-%m')
-    echo "$TIME_DIR/$year_month.md"
+// Calculate duration in minutes between two timestamps
+function calculateDuration(start, end) {
+  try {
+    const startEpoch = new Date(start).getTime() / 1000;
+    const endEpoch = new Date(end).getTime() / 1000;
+    return Math.floor((endEpoch - startEpoch) / 60);
+  } catch {
+    return 0;
+  }
 }
 
+// Parse natural language duration to minutes
+function parseDuration(input) {
+  input = input.toLowerCase().replace(/\s+/g, '');
 
-# Parse duration from seconds to human readable
-format_duration() {
-    local seconds=$1
-    local hours=$((seconds / 3600))
-    local minutes=$(((seconds % 3600) / 60))
+  // Decimal hours (e.g., "1.5h", "0.5hours")
+  const decimalHours = input.match(/^(\d+\.?\d*)h(ours?)?$/);
+  if (decimalHours) {
+    return Math.floor(parseFloat(decimalHours[1]) * 60);
+  }
 
-    if [[ $hours -gt 0 ]]; then
-        echo "${hours}h ${minutes}m"
-    else
-        echo "${minutes}m"
-    fi
+  // Hours + minutes (e.g., "2h30m", "1h15m")
+  const hoursMinutes = input.match(/(\d+)h(ours?)?(\d+)m(inutes?|ins?)?/);
+  if (hoursMinutes) {
+    return parseInt(hoursMinutes[1]) * 60 + parseInt(hoursMinutes[3]);
+  }
+
+  // Just hours (e.g., "2h", "2hours")
+  const justHours = input.match(/^(\d+)h(ours?)?$/);
+  if (justHours) {
+    return parseInt(justHours[1]) * 60;
+  }
+
+  // Just minutes (e.g., "20m", "35minutes")
+  const justMinutes = input.match(/^(\d+)m(inutes?|ins?)?$/);
+  if (justMinutes) {
+    return parseInt(justMinutes[1]);
+  }
+
+  return 0;
 }
 
-# Calculate duration in minutes between two timestamps
-calculate_duration() {
-    local start=$1
-    local end=$2
+// Start tracking
+async function cmdStart(description) {
+  if (!description) {
+    console.error(chalk.red('✗') + ' Usage: track start "Description with #topic/tags"');
+    console.log('');
+    console.log('Examples:');
+    console.log('  track start "Fixing image distortion #topic/ogm"');
+    console.log('  track start "Duolingo practice #topic/languages"');
+    console.log('  track start "Hip mobility workout #topic/fitness"');
+    process.exit(1);
+  }
 
-    # Try macOS date format first, then GNU date
-    local start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%s" 2>/dev/null || \
-                        date -d "$start" "+%s" 2>/dev/null || echo "0")
-    local end_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$end" "+%s" 2>/dev/null || \
-                      date -d "$end" "+%s" 2>/dev/null || echo "0")
+  // Check for running timer
+  if (fs.existsSync(STATE_FILE)) {
+    const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
+    const [oldStart, oldDescription] = line.split('|');
 
-    if [[ "$start_epoch" == "0" ]] || [[ "$end_epoch" == "0" ]]; then
-        echo "0"
-        return
-    fi
+    const currentTime = getCurrentTime();
+    const duration = calculateDuration(oldStart, currentTime);
+    const durationFormatted = formatDuration(duration * 60);
 
-    local duration_seconds=$((end_epoch - start_epoch))
-    local duration_minutes=$((duration_seconds / 60))
+    console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${oldDescription} (${durationFormatted})`);
+    await stopTimer(oldStart, oldDescription, currentTime);
+  }
 
-    echo "$duration_minutes"
+  // Start new timer
+  const startTime = getCurrentTime();
+  fs.writeFileSync(STATE_FILE, `${startTime}|${description}`);
+
+  console.log(chalk.green('✓') + ` Started: ${description}`);
+  console.log(chalk.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
 }
 
-# Check for running timer and handle auto-stop
-check_running_timer() {
-    if [[ ! -f "$STATE_FILE" ]]; then
-        return 0
-    fi
+// Stop timer and write to file
+async function stopTimer(start, description, end = null) {
+  if (!end) {
+    end = getCurrentTime();
+  }
 
-    local current_time=$(get_current_time)
-    local line=$(cat "$STATE_FILE")
+  const duration = calculateDuration(start, end);
+  const monthFile = getMonthFile();
 
-    IFS='|' read -r start description <<< "$line"
+  // Write completed entry
+  const entry = `${start}|${end}|${description}\n`;
+  fs.appendFileSync(monthFile, entry);
 
-    # Calculate how long it's been running
-    local duration_minutes=$(calculate_duration "$start" "$current_time")
-    local duration_hours=$((duration_minutes / 60))
+  // Remove state file
+  if (fs.existsSync(STATE_FILE)) {
+    fs.unlinkSync(STATE_FILE);
+  }
 
-    # Check for max duration (6 hours)
-    if [[ $duration_hours -ge 6 ]]; then
-        print_warning "Timer has been running for ${duration_hours}h - auto-stopping"
-        stop_timer "$start" "$description" "$current_time"
-        return 1
-    fi
-
-    return 0
+  const durationFormatted = formatDuration(duration * 60);
+  console.log(chalk.green('✓') + ` Stopped: ${description} (${durationFormatted})`);
 }
 
-# Stop timer and write to file
-stop_timer() {
-    local start=$1
-    local description=$2
-    local end=${3:-$(get_current_time)}
+// Stop command
+async function cmdStop() {
+  if (!fs.existsSync(STATE_FILE)) {
+    console.error(chalk.red('✗') + ' No timer running');
+    process.exit(1);
+  }
 
-    local duration=$(calculate_duration "$start" "$end")
-    local month_file=$(get_month_file)
+  const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
+  const [start, description] = line.split('|');
 
-    # Write completed entry (3 fields: start, end, description with tags)
-    echo "$start|$end|$description" >> "$month_file"
-
-    # Remove state file
-    rm -f "$STATE_FILE"
-
-    local duration_formatted=$(format_duration $((duration * 60)))
-    print_status "Stopped: $description ($duration_formatted)"
+  await stopTimer(start, description);
 }
 
-# Start command
-cmd_start() {
-    local description="$*"
+// Add command - add a completed entry
+async function cmdAdd(durationStr, ...descriptionParts) {
+  const description = descriptionParts.join(' ');
 
-    if [[ -z "$description" ]]; then
-        print_error "Usage: track start \"Description with #topic/tags\""
-        echo ""
-        echo "Examples:"
-        echo "  track start \"Fixing image distortion #topic/ogm\""
-        echo "  track start \"Duolingo practice #topic/languages\""
-        echo "  track start \"Hip mobility workout #topic/fitness\""
-        exit 1
-    fi
+  if (!durationStr || !description) {
+    console.error(chalk.red('✗') + ' Usage: track add DURATION "Description with #topic/tags"');
+    console.log('');
+    console.log('Examples:');
+    console.log('  track add 20m "Reviewing pull requests #topic/ogm_site_development"');
+    console.log('  track add 2h "Deep work session #topic/programming"');
+    console.log('  track add 1.5h "Language practice #topic/languages"');
+    console.log('  track add 2h30m "Project planning #topic/personal_admin"');
+    console.log('');
+    console.log('Supported duration formats:');
+    console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    process.exit(1);
+  }
 
-    # Check for running timer
-    if [[ -f "$STATE_FILE" ]]; then
-        local line=$(cat "$STATE_FILE")
-        IFS='|' read -r old_start old_description <<< "$line"
+  const durationMinutes = parseDuration(durationStr);
 
-        local current_time=$(get_current_time)
-        local duration=$(calculate_duration "$old_start" "$current_time")
-        local duration_formatted=$(format_duration $((duration * 60)))
+  if (durationMinutes === 0) {
+    console.error(chalk.red('✗') + ` Could not parse duration: ${durationStr}`);
+    console.log('');
+    console.log('Supported formats: 20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    process.exit(1);
+  }
 
-        print_warning "Stopping previous timer: $old_description ($duration_formatted)"
-        stop_timer "$old_start" "$old_description" "$current_time"
-    fi
+  const endTime = getCurrentTime();
+  const durationSeconds = durationMinutes * 60;
 
-    # Start new timer
-    local start_time=$(get_current_time)
-    echo "$start_time|$description" > "$STATE_FILE"
+  // Calculate start time
+  let startTime;
+  try {
+    startTime = execSync(`TZ="${TIMEZONE}" date -d "${durationSeconds} seconds ago" '+%Y-%m-%dT%H:%M:%S%z'`,
+      { encoding: 'utf8' }).trim();
+    startTime = startTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  } catch {
+    // Try macOS format
+    try {
+      startTime = execSync(`TZ="${TIMEZONE}" date -v-${durationSeconds}S '+%Y-%m-%dT%H:%M:%S%z'`,
+        { encoding: 'utf8' }).trim();
+      startTime = startTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+    } catch {
+      console.error(chalk.red('✗') + ' Could not calculate start time');
+      process.exit(1);
+    }
+  }
 
-    print_status "Started: $description"
-    print_info "Timezone: $TIMEZONE"
+  const monthFile = getMonthFile();
+  const entry = `${startTime}|${endTime}|${description}\n`;
+  fs.appendFileSync(monthFile, entry);
+
+  const durationFormatted = formatDuration(durationMinutes * 60);
+  console.log(chalk.green('✓') + ` Added: ${description} (${durationFormatted})`);
+
+  try {
+    const startDisplay = new Date(startTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: TIMEZONE
+    });
+    const endDisplay = new Date(endTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: TIMEZONE
+    });
+    console.log(chalk.blue('ℹ') + ` Time range: ${startDisplay} - ${endDisplay}`);
+  } catch {
+    // Ignore time display errors
+  }
 }
 
-# Stop command
-cmd_stop() {
-    if [[ ! -f "$STATE_FILE" ]]; then
-        print_error "No timer running"
-        exit 1
-    fi
+// Add topics command
+async function cmdAddTopics() {
+  console.log(chalk.blue('🏷️  Adding topic tags to time tracking entries...'));
 
-    local line=$(cat "$STATE_FILE")
-    IFS='|' read -r start description <<< "$line"
+  // Check if AI is available
+  const useAI = (() => {
+    try {
+      execSync('which claude', { encoding: 'utf8' });
+      return true;
+    } catch {
+      console.log(chalk.yellow('⚠️  Claude CLI not available - skipping auto-tagging'));
+      return false;
+    }
+  })();
 
-    stop_timer "$start" "$description"
+  if (!useAI) {
+    process.exit(0);
+  }
+
+  // Extract available topics from existing time tracking entries
+  console.log(chalk.gray('  Extracting available topics from time tracking files...'));
+  const topicSet = new Set();
+
+  const files = fs.readdirSync(TIME_DIR)
+    .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
+    .map(f => path.join(TIME_DIR, f));
+
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+      const topicMatches = line.match(/#topic\/[a-z_]+/g);
+      if (topicMatches) {
+        for (const match of topicMatches) {
+          topicSet.add(match.replace('#topic/', ''));
+        }
+      }
+    }
+  }
+
+  const availableTopics = Array.from(topicSet).sort();
+  console.log(chalk.gray(`  Found ${availableTopics.length} unique topics`));
+
+  // Find entries without topics
+  const entriesToTag = [];
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line && !line.startsWith('#') && line.includes('|')) {
+        const [start, end, description] = line.split('|');
+        if (start && description && !description.match(/#topic\//)) {
+          entriesToTag.push({
+            file,
+            lineIndex: i,
+            line,
+            description: description.trim()
+          });
+        }
+      }
+    }
+  }
+
+  if (entriesToTag.length === 0) {
+    console.log(chalk.gray('No entries needing topic tags found'));
+    process.exit(0);
+  }
+
+  console.log(chalk.gray(`  Found ${entriesToTag.length} entries needing topics`));
+
+  // Process in batches
+  const BATCH_SIZE = 30;
+  let totalTagged = 0;
+
+  for (let i = 0; i < entriesToTag.length; i += BATCH_SIZE) {
+    const batch = entriesToTag.slice(i, Math.min(i + BATCH_SIZE, entriesToTag.length));
+
+    const prompt = `Analyze these time tracking entries and suggest 1 relevant topic for each from the available list.
+
+Available topics: ${availableTopics.join(', ')}
+
+For each entry, choose the most relevant topic based on the activity description.
+
+Respond with a JSON array where each has:
+{"index": entry_index, "topic": "topic_name"}
+
+If no topics clearly apply, use an empty string for topic.
+Only use topics from the available list.
+
+Entries:
+${JSON.stringify(batch.map((e, idx) => ({index: idx + i, description: e.description})), null, 2)}`;
+
+    try {
+      const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10,
+        timeout: 60000
+      });
+
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const classifications = JSON.parse(jsonMatch[0]);
+
+        // Group updates by file
+        const fileUpdates = new Map();
+
+        for (const cls of classifications) {
+          const entry = batch[cls.index - i];
+          if (cls.topic && availableTopics.includes(cls.topic)) {
+            const [start, end, description] = entry.line.split('|');
+            const newLine = `${start}|${end}|${description.trim()} #topic/${cls.topic}`;
+
+            if (!fileUpdates.has(entry.file)) {
+              const content = fs.readFileSync(entry.file, 'utf8');
+              fileUpdates.set(entry.file, {
+                lines: content.split('\n'),
+                modified: false
+              });
+            }
+
+            const fileData = fileUpdates.get(entry.file);
+            fileData.lines[entry.lineIndex] = newLine;
+            fileData.modified = true;
+            totalTagged++;
+          }
+        }
+
+        // Write updated files
+        for (const [file, data] of fileUpdates) {
+          if (data.modified) {
+            fs.writeFileSync(file, data.lines.join('\n'));
+          }
+        }
+      }
+    } catch (error) {
+      console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
+    }
+  }
+
+  console.log(chalk.green(`✓ Added topic tags to ${totalTagged} entry(ies)`));
 }
 
-# Status command
-cmd_status() {
-    # First check for auto-stop conditions
-    if ! check_running_timer; then
-        # Timer was auto-stopped
-        echo ""
-        print_info "No timer currently running"
-        return
-    fi
+// Status command
+async function cmdStatus() {
+  if (!fs.existsSync(STATE_FILE)) {
+    console.log(chalk.blue('ℹ') + ' No timer running');
+    return;
+  }
 
-    if [[ ! -f "$STATE_FILE" ]]; then
-        print_info "No timer running"
-        return
-    fi
+  const line = fs.readFileSync(STATE_FILE, 'utf8').trim();
+  const [start, description] = line.split('|');
 
-    local line=$(cat "$STATE_FILE")
-    IFS='|' read -r start description <<< "$line"
+  const currentTime = getCurrentTime();
+  const duration = calculateDuration(start, currentTime);
+  const durationFormatted = formatDuration(duration * 60);
 
-    local current_time=$(get_current_time)
-    local duration=$(calculate_duration "$start" "$current_time")
-    local duration_formatted=$(format_duration $((duration * 60)))
+  console.log(chalk.cyan('⏱') + '  Currently tracking:');
+  console.log('');
+  console.log('  ' + chalk.green(description));
 
-    echo -e "${CYAN}⏱${NC}  Currently tracking:"
-    echo ""
-    echo -e "  ${GREEN}$description${NC}"
-    echo -e "  Started: $(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || echo "$start")"
-    echo -e "  Duration: $duration_formatted"
+  try {
+    const startDisplay = new Date(start).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: TIMEZONE
+    });
+    console.log(`  Started: ${startDisplay}`);
+  } catch {
+    console.log(`  Started: ${start}`);
+  }
+
+  console.log(`  Duration: ${durationFormatted}`);
 }
 
-# Today command
-cmd_today() {
-    local month_file=$(get_month_file)
-    local today=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
+// Today command
+async function cmdToday() {
+  const monthFile = getMonthFile();
+  const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
 
-    if [[ ! -f "$month_file" ]]; then
-        print_info "No time entries for today"
-        return
-    fi
+  if (!fs.existsSync(monthFile)) {
+    console.log(chalk.blue('ℹ') + ' No time entries for today');
+    return;
+  }
 
-    echo -e "${CYAN}Today's Time Tracking${NC} ($today)"
-    echo ""
+  console.log(chalk.cyan("Today's Time Tracking") + ` (${today})`);
+  console.log('');
 
-    # Get entries for today
-    local entries=$(grep "^$today" "$month_file" 2>/dev/null || echo "")
+  const content = fs.readFileSync(monthFile, 'utf8');
+  const lines = content.split('\n').filter(line => line.startsWith(today));
 
-    if [[ -z "$entries" ]]; then
-        print_info "No time entries for today"
-        return
-    fi
+  if (lines.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No time entries for today');
+    return;
+  }
 
-    # Parse and display entries
-    local total_minutes=0
-    declare -A topic_minutes
+  let totalMinutes = 0;
+  const topicMinutes = {};
 
-    while IFS='|' read -r start end field3 field4 field5; do
-        # Handle multiple formats for backward compatibility:
-        # - Old 5-field: start|end|duration|project|description
-        # - Old 4-field: start|end|project|description
-        # - New 3-field: start|end|description (with #topic/tags)
-        if [[ -n "$field5" ]]; then
-            # Old 5-field format: start|end|duration|project|description
-            local duration=$field3
-            local project=$field4
-            local description=$field5
-            local topics="$project"  # Use project as fallback topic
-        elif [[ -n "$field4" ]]; then
-            # Old 4-field format: start|end|project|description
-            local project=$field3
-            local description=$field4
-            local duration=0
-            local topics="$project"  # Use project as fallback topic
-        else
-            # New 3-field format: start|end|description (with #topic/tags in description)
-            local description=$field3
-            local duration=0
-            # Extract topics from description
-            local topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
-            if [[ -z "$topics" ]]; then
-                topics="(untagged)"
-            fi
-        fi
+  for (const line of lines) {
+    const [start, end, description] = line.split('|');
+    if (!description) continue;
 
-        if [[ "$end" == "RUNNING" ]]; then
-            local current_time=$(get_current_time)
-            duration=$(calculate_duration "$start" "$current_time")
-            # Try macOS format first, then GNU date
-            local start_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || \
-                              TZ="$TIMEZONE" date -d "$start" "+%I:%M %p" 2>/dev/null || echo "?")
-            echo -e "  ${YELLOW}●${NC} $start_time - now ($(format_duration $((duration * 60))))"
-        else
-            # Calculate duration from timestamps if not provided
-            if [[ $duration -eq 0 ]]; then
-                duration=$(calculate_duration "$start" "$end")
-            fi
-            # Try macOS format first, then GNU date
-            local start_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$start" "+%I:%M %p" 2>/dev/null || \
-                              TZ="$TIMEZONE" date -d "$start" "+%I:%M %p" 2>/dev/null || echo "?")
-            local end_time=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%dT%H:%M:%S%z" "$end" "+%I:%M %p" 2>/dev/null || \
-                            TZ="$TIMEZONE" date -d "$end" "+%I:%M %p" 2>/dev/null || echo "?")
-            echo -e "  ${GREEN}✓${NC} $start_time - $end_time ($(format_duration $((duration * 60))))"
-        fi
-        echo -e "    $description"
+    const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-        total_minutes=$((total_minutes + duration))
-        topic_minutes[$topics]=$((${topic_minutes[$topics]:-0} + duration))
-    done <<< "$entries"
+    let duration;
+    if (end === 'RUNNING') {
+      const currentTime = getCurrentTime();
+      duration = calculateDuration(start, currentTime);
+    } else {
+      duration = calculateDuration(start, end);
+    }
 
-    # Summary by topic (sorted by time spent, descending)
-    if [[ ${#topic_minutes[@]} -gt 0 ]]; then
-        echo ""
-        echo -e "${CYAN}By Topic:${NC}"
-        # Sort topics by minutes (descending)
-        for topic in $(for t in "${!topic_minutes[@]}"; do echo "${topic_minutes[$t]} $t"; done | sort -rn | cut -d' ' -f2-); do
-            local mins=${topic_minutes[$topic]}
-            echo -e "  $topic: $(format_duration $((mins * 60)))"
-        done
-    fi
+    totalMinutes += duration;
+    topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
 
-    echo ""
-    echo -e "${CYAN}Total:${NC} $(format_duration $((total_minutes * 60)))"
+    // Display entry
+    try {
+      const startTime = new Date(start).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: TIMEZONE
+      });
+      const endTime = end === 'RUNNING' ? 'now' : new Date(end).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: TIMEZONE
+      });
 
-    # Warning for long entries
-    while IFS='|' read -r start end field3 field4 field5; do
-        # Handle multiple formats (same logic as above)
-        if [[ -n "$field5" ]]; then
-            local duration=$field3
-            local description=$field5
-        elif [[ -n "$field4" ]]; then
-            local description=$field4
-            local duration=0
-        else
-            local description=$field3
-            local duration=0
-        fi
+      const symbol = end === 'RUNNING' ? chalk.yellow('●') : chalk.green('✓');
+      console.log(`  ${symbol} ${startTime} - ${endTime} (${formatDuration(duration * 60)})`);
+      console.log(`    ${description}`);
+    } catch {
+      console.log(`  ${start} - ${end} (${formatDuration(duration * 60)})`);
+      console.log(`    ${description}`);
+    }
+  }
 
-        if [[ "$end" == "RUNNING" ]]; then
-            local current_time=$(get_current_time)
-            duration=$(calculate_duration "$start" "$current_time")
-        elif [[ $duration -eq 0 ]]; then
-            duration=$(calculate_duration "$start" "$end")
-        fi
+  // Summary by topic
+  if (Object.keys(topicMinutes).length > 0) {
+    console.log('');
+    console.log(chalk.cyan('By Topic:'));
+    const sorted = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
+    for (const [topic, mins] of sorted) {
+      console.log(`  ${topic}: ${formatDuration(mins * 60)}`);
+    }
+  }
 
-        local hours=$((duration / 60))
-        if [[ $hours -ge 3 ]]; then
-            echo ""
-            print_warning "Long entry detected: $description ($(format_duration $((duration * 60))))"
-            echo "  Consider splitting into smaller entries or verify end time"
-        fi
-    done <<< "$entries"
+  console.log('');
+  console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
-# Week command
-cmd_week() {
-    # Try macOS format first, then GNU date
-    local week_start=$(TZ="$TIMEZONE" date -v-7d '+%Y-%m-%d' 2>/dev/null || \
-                      TZ="$TIMEZONE" date -d '7 days ago' '+%Y-%m-%d')
-    local today=$(TZ="$TIMEZONE" date '+%Y-%m-%d')
+// Week command
+async function cmdWeek() {
+  // Calculate week start (7 days ago)
+  let weekStart;
+  try {
+    weekStart = execSync(`TZ="${TIMEZONE}" date -d '7 days ago' '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+  } catch {
+    try {
+      weekStart = execSync(`TZ="${TIMEZONE}" date -v-7d '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+    } catch {
+      console.error(chalk.red('✗') + ' Could not calculate week start');
+      process.exit(1);
+    }
+  }
 
-    echo -e "${CYAN}This Week's Time Tracking${NC} ($week_start to $today)"
-    echo ""
+  const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
 
-    # Get all month files that might contain this week's data
-    local current_month=$(TZ="$TIMEZONE" date '+%Y-%m')
-    # Try macOS format first, then GNU date
-    local prev_month=$(TZ="$TIMEZONE" date -v-1m '+%Y-%m' 2>/dev/null || \
-                      TZ="$TIMEZONE" date -d '1 month ago' '+%Y-%m')
+  console.log(chalk.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
+  console.log('');
 
-    local total_minutes=0
-    declare -A topic_minutes
-    declare -A day_minutes
+  // Get current and previous month files
+  const currentMonth = execSync(`TZ="${TIMEZONE}" date '+%Y-%m'`, { encoding: 'utf8' }).trim();
+  let prevMonth;
+  try {
+    prevMonth = execSync(`TZ="${TIMEZONE}" date -d '1 month ago' '+%Y-%m'`, { encoding: 'utf8' }).trim();
+  } catch {
+    try {
+      prevMonth = execSync(`TZ="${TIMEZONE}" date -v-1m '+%Y-%m'`, { encoding: 'utf8' }).trim();
+    } catch {
+      prevMonth = currentMonth;
+    }
+  }
 
-    for month_file in "$TIME_DIR/$prev_month.md" "$TIME_DIR/$current_month.md"; do
-        if [[ ! -f "$month_file" ]]; then
-            continue
-        fi
+  const monthFiles = [
+    path.join(TIME_DIR, `${prevMonth}.md`),
+    path.join(TIME_DIR, `${currentMonth}.md`)
+  ];
 
-        while IFS='|' read -r start end field3 field4 field5; do
-            local entry_date=${start:0:10}
+  let totalMinutes = 0;
+  const topicMinutes = {};
+  const dayMinutes = {};
 
-            # Check if entry is within the week
-            if [[ "$entry_date" < "$week_start" ]] || [[ "$entry_date" > "$today" ]]; then
-                continue
-            fi
+  for (const monthFile of monthFiles) {
+    if (!fs.existsSync(monthFile)) continue;
 
-            # Handle multiple formats (same as cmd_today)
-            if [[ -n "$field5" ]]; then
-                # Old 5-field format
-                local duration=$field3
-                local project=$field4
-                local description=$field5
-                local topics="$project"
-            elif [[ -n "$field4" ]]; then
-                # Old 4-field format
-                local project=$field3
-                local description=$field4
-                local duration=0
-                local topics="$project"
-            else
-                # New 3-field format
-                local description=$field3
-                local duration=0
-                local topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
-                if [[ -z "$topics" ]]; then
-                    topics="(untagged)"
-                fi
-            fi
+    const content = fs.readFileSync(monthFile, 'utf8');
+    const lines = content.split('\n');
 
-            if [[ "$end" == "RUNNING" ]]; then
-                local current_time=$(get_current_time)
-                duration=$(calculate_duration "$start" "$current_time")
-            elif [[ $duration -eq 0 ]]; then
-                duration=$(calculate_duration "$start" "$end")
-            fi
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) continue;
 
-            total_minutes=$((total_minutes + duration))
-            topic_minutes[$topics]=$((${topic_minutes[$topics]:-0} + duration))
-            day_minutes[$entry_date]=$((${day_minutes[$entry_date]:-0} + duration))
-        done < "$month_file"
-    done
+      const [start, end, description] = line.split('|');
+      if (!start || !description) continue;
 
-    if [[ $total_minutes -eq 0 ]]; then
-        print_info "No time entries this week"
-        return
-    fi
+      const entryDate = start.substring(0, 10);
 
-    # Show by day
-    echo -e "${CYAN}By Day:${NC}"
-    for i in {7..0}; do
-        # Try macOS format first, then GNU date
-        day=$(TZ="$TIMEZONE" date -v-${i}d '+%Y-%m-%d' 2>/dev/null || \
-             TZ="$TIMEZONE" date -d "$i days ago" '+%Y-%m-%d')
-        day_name=$(TZ="$TIMEZONE" date -v-${i}d '+%A' 2>/dev/null || \
-                  TZ="$TIMEZONE" date -d "$i days ago" '+%A')
-        mins=${day_minutes[$day]:-0}
+      // Check if entry is within the week
+      if (entryDate < weekStart || entryDate > today) continue;
 
-        if [[ $mins -gt 0 ]]; then
-            echo -e "  $day ($day_name): $(format_duration $((mins * 60)))"
-        fi
-    done
+      const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-    echo ""
-    echo -e "${CYAN}By Topic:${NC}"
-    # Sort topics by minutes (descending)
-    for topic in $(for t in "${!topic_minutes[@]}"; do echo "${topic_minutes[$t]} $t"; done | sort -rn | cut -d' ' -f2-); do
-        local mins=${topic_minutes[$topic]}
-        echo -e "  $topic: $(format_duration $((mins * 60)))"
-    done
+      let duration;
+      if (end === 'RUNNING') {
+        const currentTime = getCurrentTime();
+        duration = calculateDuration(start, currentTime);
+      } else {
+        duration = calculateDuration(start, end);
+      }
 
-    echo ""
-    echo -e "${CYAN}Total:${NC} $(format_duration $((total_minutes * 60)))"
+      totalMinutes += duration;
+      topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
+      dayMinutes[entryDate] = (dayMinutes[entryDate] || 0) + duration;
+    }
+  }
 
-    # Calculate daily average
-    local days_with_entries=${#day_minutes[@]}
-    if [[ $days_with_entries -gt 0 ]]; then
-        local avg_minutes=$((total_minutes / days_with_entries))
-        echo -e "${CYAN}Average per working day:${NC} $(format_duration $((avg_minutes * 60)))"
-    fi
+  if (totalMinutes === 0) {
+    console.log(chalk.blue('ℹ') + ' No time entries for this week');
+    return;
+  }
+
+  // Summary by day
+  console.log(chalk.cyan('By Day:'));
+  const sortedDays = Object.entries(dayMinutes).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [day, mins] of sortedDays) {
+    console.log(`  ${day}: ${formatDuration(mins * 60)}`);
+  }
+
+  // Summary by topic
+  console.log('');
+  console.log(chalk.cyan('By Topic:'));
+  const sortedTopics = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
+  for (const [topic, mins] of sortedTopics) {
+    console.log(`  ${topic}: ${formatDuration(mins * 60)}`);
+  }
+
+  console.log('');
+  console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
-# Sync-db command - sync markdown files to database (last 365 days only)
-cmd_sync_db() {
-    local DB_PATH="$PROJECT_ROOT/.data/today.db"
-    local SYNC_STATE_FILE="$TIME_DIR/.last-sync"
+// Sync-db command
+async function cmdSyncDb() {
+  const DB_PATH = path.join(PROJECT_ROOT, '.data/today.db');
+  const SYNC_STATE_FILE = path.join(TIME_DIR, '.last-sync');
 
-    print_info "Syncing time tracking files to database (last 365 days)..."
+  console.log(chalk.blue('ℹ') + ' Syncing time tracking files to database (last 365 days)...');
 
-    # Note: time_entries table is created by migration v30 in src/migrations.js
+  // Calculate date 365 days ago
+  let cutoffDate;
+  try {
+    cutoffDate = execSync(`TZ="${TIMEZONE}" date -d '365 days ago' '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+  } catch {
+    try {
+      cutoffDate = execSync(`TZ="${TIMEZONE}" date -v-365d '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+    } catch {
+      console.error(chalk.red('✗') + ' Could not calculate cutoff date');
+      process.exit(1);
+    }
+  }
 
-    # Calculate date 365 days ago
-    local cutoff_date=$(TZ="$TIMEZONE" date -v-365d '+%Y-%m-%d' 2>/dev/null || \
-                       TZ="$TIMEZONE" date -d '365 days ago' '+%Y-%m-%d')
-    local cutoff_year_month="${cutoff_date:0:7}"  # YYYY-MM format
+  const cutoffYearMonth = cutoffDate.substring(0, 7); // YYYY-MM format
 
-    # Get last sync timestamp (epoch seconds)
-    local last_sync=0
-    if [[ -f "$SYNC_STATE_FILE" ]]; then
-        last_sync=$(cat "$SYNC_STATE_FILE")
-        local last_sync_date=$(date -r "$last_sync" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || \
-                              date -d "@$last_sync" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
-        print_info "Last sync: $last_sync_date"
-    fi
+  // Get last sync timestamp
+  let lastSync = 0;
+  if (fs.existsSync(SYNC_STATE_FILE)) {
+    lastSync = parseInt(fs.readFileSync(SYNC_STATE_FILE, 'utf8').trim());
+    const lastSyncDate = new Date(lastSync * 1000).toLocaleString();
+    console.log(chalk.blue('ℹ') + ` Last sync: ${lastSyncDate}`);
+  }
 
-    # Process all markdown files (only YYYY-MM.md format)
-    local entry_count=0
-    local files_processed=0
-    local files_skipped=0
+  // Process all markdown files
+  let entryCount = 0;
+  let filesProcessed = 0;
+  let filesSkipped = 0;
 
-    for file in "$TIME_DIR"/[0-9][0-9][0-9][0-9]-[0-9][0-9].md; do
-        if [[ ! -f "$file" ]]; then
-            continue
-        fi
+  const files = fs.readdirSync(TIME_DIR)
+    .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
+    .map(f => path.join(TIME_DIR, f));
 
-        # Get year-month from filename (e.g., "2024-10" from "2024-10.md")
-        local file_year_month=$(basename "$file" .md)
+  for (const file of files) {
+    const fileYearMonth = path.basename(file, '.md');
 
-        # Skip files older than 365 days
-        if [[ "$file_year_month" < "$cutoff_year_month" ]]; then
-            continue
-        fi
+    // Skip files older than 365 days
+    if (fileYearMonth < cutoffYearMonth) continue;
 
-        # Check if file has been modified since last sync
-        # Try GNU stat first (Linux), then macOS stat
-        local file_mtime=$(stat -c %Y "$file" 2>/dev/null || \
-                          stat -f %m "$file" 2>/dev/null || echo "0")
+    // Check if file modified since last sync
+    const stats = fs.statSync(file);
+    const fileMtime = Math.floor(stats.mtimeMs / 1000);
 
-        if [[ $last_sync -gt 0 ]] && [[ $file_mtime -le $last_sync ]]; then
-            files_skipped=$((files_skipped + 1))
-            continue
-        fi
+    if (lastSync > 0 && fileMtime <= lastSync) {
+      filesSkipped++;
+      continue;
+    }
 
-        files_processed=$((files_processed + 1))
+    filesProcessed++;
 
-        while IFS='|' read -r start end field3 field4 field5; do
-            # Skip header lines or empty lines
-            if [[ "$start" =~ ^# ]] || [[ -z "$start" ]]; then
-                continue
-            fi
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.split('\n');
 
-            # Handle multiple formats for backward compatibility
-            local topics=""
-            if [[ -n "$field5" ]]; then
-                # Old 5-field format: start|end|duration|project|description
-                local duration=$field3
-                local project=$field4
-                local description=$field5
-                topics="$project"  # Use project as fallback topic
-            elif [[ -n "$field4" ]]; then
-                # Old 4-field format: start|end|project|description
-                local project=$field3
-                local description=$field4
-                local duration=0
-                topics="$project"  # Use project as fallback topic
-            else
-                # New 3-field format: start|end|description (with #topic/tags)
-                local description=$field3
-                local duration=0
-                # Extract topics from description
-                topics=$(echo "$description" | grep -o '#topic/[a-z_]*' | paste -sd ' ' -)
-                if [[ -z "$topics" ]]; then
-                    topics="(untagged)"
-                fi
-            fi
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) continue;
 
-            # Handle running timers
-            if [[ "$end" == "RUNNING" ]]; then
-                end=""
-                duration=0
-            fi
+      const [start, end, description] = line.split('|');
+      if (!start || !description) continue;
 
-            # Calculate duration from timestamps if not already set
-            if [[ $duration -eq 0 ]] && [[ -n "$end" ]] && [[ "$end" != "RUNNING" ]]; then
-                duration=$(calculate_duration "$start" "$end")
-            fi
+      const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-            # Escape single quotes for SQL
-            escaped_topics="${topics//\'/\'\'}"
-            escaped_description="${description//\'/\'\'}"
+      let duration = 0;
+      let endValue = 'NULL';
 
-            # Set end time value
-            if [[ -n "$end" ]] && [[ "$end" != "RUNNING" ]]; then
-                end_value="'$end'"
-            else
-                end_value="NULL"
-            fi
+      if (end && end !== 'RUNNING') {
+        duration = calculateDuration(start, end);
+        endValue = `'${end}'`;
+      }
 
-            # Ensure duration is numeric
-            if [[ -z "$duration" ]] || ! [[ "$duration" =~ ^[0-9]+$ ]]; then
-                duration=0
-            fi
+      // Escape single quotes for SQL
+      const escapedTopics = topics.replace(/'/g, "''");
+      const escapedDescription = description.replace(/'/g, "''");
+      const escapedProject = escapedTopics;
 
-            # Insert or update entry (populate both project and topics for backward compatibility)
-            # project column gets first topic or full topics string
-            escaped_project="$escaped_topics"
-            sqlite3 "$DB_PATH" "INSERT OR REPLACE INTO time_entries (start_time, end_time, duration_minutes, project, topics, description, source) VALUES ('$start', $end_value, $duration, '$escaped_project', '$escaped_topics', '$escaped_description', 'markdown');"
+      // Insert or replace entry
+      const sql = `INSERT OR REPLACE INTO time_entries (start_time, end_time, duration_minutes, project, topics, description, source) VALUES ('${start}', ${endValue}, ${duration}, '${escapedProject}', '${escapedTopics}', '${escapedDescription}', 'markdown');`;
 
-            entry_count=$((entry_count + 1))
-        done < "$file"
-    done
+      try {
+        execSync(`sqlite3 "${DB_PATH}" "${sql}"`, { encoding: 'utf8' });
+        entryCount++;
+      } catch (error) {
+        console.error(chalk.red('✗') + ` Error syncing entry: ${error.message}`);
+      }
+    }
+  }
 
-    # Save current sync timestamp
-    date +%s > "$SYNC_STATE_FILE"
+  // Save current sync timestamp
+  fs.writeFileSync(SYNC_STATE_FILE, Math.floor(Date.now() / 1000).toString());
 
-    if [[ $files_skipped -gt 0 ]]; then
-        print_status "Synced $entry_count entries from $files_processed file(s) (skipped $files_skipped unchanged file(s))"
-    else
-        print_status "Synced $entry_count entries from $files_processed file(s)"
-    fi
+  if (filesSkipped > 0) {
+    console.log(chalk.green('✓') + ` Synced ${entryCount} entries from ${filesProcessed} file(s) (skipped ${filesSkipped} unchanged file(s))`);
+  } else {
+    console.log(chalk.green('✓') + ` Synced ${entryCount} entries from ${filesProcessed} file(s)`);
+  }
 
-    # Show summary
-    print_info "Recent entries:"
-    sqlite3 -column -header "$DB_PATH" <<'EOF'
-SELECT
-    DATE(start_time) as Date,
-    topics as Topics,
-    printf('%.1f', SUM(duration_minutes) / 60.0) as Hours,
-    COUNT(*) as Entries
-FROM time_entries
-WHERE DATE(start_time) >= DATE('now', '-7 days', 'localtime')
-GROUP BY DATE(start_time), topics
-ORDER BY DATE(start_time) DESC, Hours DESC
-LIMIT 20;
-EOF
+  // Show summary
+  console.log(chalk.blue('ℹ') + ' Recent entries:');
+  const summaryQuery = `SELECT DATE(start_time) as Date, topics as Topics, printf('%.1f', SUM(duration_minutes) / 60.0) as Hours, COUNT(*) as Entries FROM time_entries WHERE DATE(start_time) >= DATE('now', '-7 days', 'localtime') GROUP BY DATE(start_time), topics ORDER BY DATE(start_time) DESC, Hours DESC LIMIT 20;`;
+
+  try {
+    const output = execSync(`sqlite3 -column -header "${DB_PATH}" "${summaryQuery}"`, { encoding: 'utf8' });
+    console.log(output);
+  } catch (error) {
+    console.error(chalk.yellow('⚠') + ' Could not display summary');
+  }
 }
 
-# Main command handling
-case "${1:-}" in
-    start)
-        shift  # Remove 'start' from arguments
-        cmd_start "$@"  # Pass all remaining arguments
-        ;;
-    stop)
-        cmd_stop
-        ;;
-    status)
-        cmd_status
-        ;;
-    today)
-        cmd_today
-        ;;
-    week)
-        cmd_week
-        ;;
-    sync-db)
-        cmd_sync_db
-        ;;
-    *)
-        echo "Time Tracking CLI"
-        echo ""
-        echo "Usage: track [command] [options]"
-        echo ""
-        echo "Commands:"
-        echo "  start DESCRIPTION           Start tracking time (include #topic/tags in description)"
-        echo "  stop                        Stop current timer"
-        echo "  status                      Show current timer status"
-        echo "  today                       Show today's entries"
-        echo "  week                        Show this week's entries"
-        echo "  sync-db                     Sync markdown files to database"
-        echo ""
-        echo "Examples:"
-        echo "  track start \"Fixing image distortion #topic/ogm\""
-        echo "  track start \"Duolingo practice #topic/languages\""
-        echo "  track start \"Hip mobility workout #topic/fitness\""
-        echo "  track status"
-        echo "  track stop"
-        echo "  track today"
-        echo "  track sync-db"
-        echo ""
-        echo "Common Topics:"
-        echo "  #topic/ogm #topic/ogm_sysadmin #topic/ogm_site_development"
-        echo "  #topic/fitness #topic/meditation_mindfulness #topic/languages"
-        echo "  #topic/home_household #topic/hosting #topic/personal_admin"
-        echo ""
-        ;;
-esac
+// Main command handler
+const command = process.argv[2];
+const args = process.argv.slice(3);
+
+switch (command) {
+  case 'start':
+    await cmdStart(args.join(' '));
+    break;
+  case 'stop':
+    await cmdStop();
+    break;
+  case 'add':
+    await cmdAdd(args[0], ...args.slice(1));
+    break;
+  case 'add-topics':
+    await cmdAddTopics();
+    break;
+  case 'status':
+    await cmdStatus();
+    break;
+  case 'today':
+    await cmdToday();
+    break;
+  case 'week':
+    await cmdWeek();
+    break;
+  case 'sync-db':
+    await cmdSyncDb();
+    break;
+  default:
+    console.log('Time Tracking CLI');
+    console.log('');
+    console.log('Usage: track [command] [options]');
+    console.log('');
+    console.log('Commands:');
+    console.log('  start DESCRIPTION           Start tracking time (include #topic/tags in description)');
+    console.log('  stop                        Stop current timer');
+    console.log('  add DURATION DESCRIPTION    Add entry for work you forgot to track');
+    console.log('  add-topics                  Auto-add topic tags to entries using AI');
+    console.log('  status                      Show current timer status');
+    console.log('  today                       Show today\'s entries');
+    console.log('  week                        Show this week\'s entries');
+    console.log('  sync-db                     Sync markdown files to database');
+    console.log('');
+    console.log('Examples:');
+    console.log('  track start "Fixing image distortion #topic/ogm"');
+    console.log('  track stop');
+    console.log('  track add 20m "Code review #topic/ogm_site_development"');
+    console.log('  track add 1.5h "Language practice #topic/languages"');
+    console.log('  track status');
+    console.log('  track today');
+    console.log('');
+    console.log('Duration formats for \'add\' command:');
+    console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    console.log('');
+    console.log('Common Topics:');
+    console.log('  #topic/ogm #topic/ogm_sysadmin #topic/ogm_site_development');
+    console.log('  #topic/fitness #topic/meditation_mindfulness #topic/languages');
+    console.log('  #topic/home_household #topic/hosting #topic/personal_admin');
+    console.log('');
+}
