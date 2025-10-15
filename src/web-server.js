@@ -3892,6 +3892,30 @@ ${cleanContent}
     }
   );
 
+  // Make regular markdown tasks with task-id comments clickable
+  // This handles tasks from generated files like tasks-today.md that have task-id comments
+  // but don't have data-task-id or data-file attributes
+  htmlContent = htmlContent.replace(
+    /<li>(<input[^>]*type="checkbox"[^>]*>)\s*(.*?)<!--\s*task-id:\s*([a-f0-9]{32})\s*--><\/li>/gi,
+    (match, checkbox, taskContent, taskId) => {
+      // Look up the task in the markdown_tasks cache to create a link
+      try {
+        const db = getDatabase();
+        const task = db.prepare('SELECT id FROM markdown_tasks WHERE id = ?').get(taskId);
+
+        if (task) {
+          // Wrap task text in link
+          return `<li>${checkbox} <a href="/task/${taskId}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${taskContent.trim()}</a><!-- task-id: ${taskId} --></li>`;
+        }
+      } catch (error) {
+        console.error('Error looking up task by ID:', error);
+      }
+
+      // If lookup fails, return original
+      return match;
+    }
+  );
+
   // Make markdown tasks clickable - wrap task text in link to task detail page
   // Look up task IDs from database and create links
   const taskLinkMatches = [];
