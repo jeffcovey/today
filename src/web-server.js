@@ -5807,7 +5807,135 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
   }
 });
 
-// Task detail/edit page route - DISABLED (database removed, using Obsidian Tasks in markdown)
+// Task detail page for markdown tasks
+app.get('/task/:taskId', authMiddleware, async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.taskId);
+    const db = getDatabase();
+
+    // Get task from markdown_tasks cache
+    const task = db.prepare('SELECT * FROM markdown_tasks WHERE id = ?').get(taskId);
+
+    if (!task) {
+      return res.status(404).send('Task not found');
+    }
+
+    // Parse the task line to extract details
+    const taskText = task.line_text.replace(/^(\s*>)*\s*- \[[x\s-]\]\s*/i, '').trim();
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <title>Task: ${taskText.substring(0, 50)}...</title>
+        ${pageStyle}
+      </head>
+      <body>
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+              <i class="fas fa-tasks me-2"></i>Task Details
+            </a>
+          </div>
+        </nav>
+
+        <div class="container mt-4">
+          <div class="row justify-content-center">
+            <div class="col-md-10 col-lg-8">
+              <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                  <h4 class="mb-0">
+                    <i class="fas fa-check-circle me-2"></i>Task Details
+                  </h4>
+                </div>
+                <div class="card-body">
+                  <!-- Task Text -->
+                  <div class="mb-4">
+                    <h5 class="text-muted mb-2">Task</h5>
+                    <p class="fs-5">${taskText}</p>
+                  </div>
+
+                  <!-- File Location -->
+                  <div class="mb-4">
+                    <h6 class="text-muted mb-2">Location</h6>
+                    <div>
+                      <i class="fas fa-file me-2"></i>
+                      <a href="/${task.file_path}">${task.file_path}</a>
+                      <span class="text-muted ms-2">(line ${task.line_number})</span>
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="d-flex gap-2 flex-wrap">
+                    <a href="/${task.file_path}" class="btn btn-primary">
+                      <i class="fas fa-file-alt me-2"></i>View File
+                    </a>
+                    <a href="/edit/${task.file_path}" class="btn btn-secondary">
+                      <i class="fas fa-edit me-2"></i>Edit File
+                    </a>
+                    <button class="btn btn-success" onclick="startTimer()">
+                      <i class="fas fa-play me-2"></i>Start Timer
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="window.history.back()">
+                      <i class="fas fa-arrow-left me-2"></i>Back
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Raw Task Line -->
+              <div class="card mt-3 shadow-sm">
+                <div class="card-body">
+                  <small class="text-muted">
+                    <div class="mb-2"><strong>Task ID:</strong> ${task.id}</div>
+                    <div class="mb-2"><strong>Created:</strong> ${new Date(task.created_at).toLocaleString()}</div>
+                    <div class="mb-2"><strong>Updated:</strong> ${new Date(task.updated_at).toLocaleString()}</div>
+                    <div class="mb-2"><strong>Raw Line:</strong></div>
+                    <code class="d-block p-2 bg-light">${task.line_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          function startTimer() {
+            const taskText = ${JSON.stringify(taskText)};
+            fetch('/api/track/start', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({description: taskText})
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                alert('Timer started: ' + taskText);
+                window.location.href = '/';
+              } else {
+                alert('Failed to start timer: ' + data.message);
+              }
+            })
+            .catch(error => {
+              alert('Error starting timer: ' + error.message);
+            });
+          }
+        </script>
+
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      </body>
+      </html>
+    `;
+
+    res.send(html);
+  } catch (error) {
+    console.error('Error loading task:', error);
+    res.status(500).send('Error loading task');
+  }
+});
+
+// OLD Task detail/edit page route - DISABLED (database removed, using Obsidian Tasks in markdown)
 /*
 app.get('/task/:taskId', authMiddleware, async (req, res) => {
   try {
