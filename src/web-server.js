@@ -982,7 +982,7 @@ function getConfiguredTimezone() {
 
 // Helper function to get current time tracking timer info
 async function getCurrentTimer() {
-  const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', '.current-timer');
+  const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', 'current-timer');
   const timezone = getConfiguredTimezone();
 
   try {
