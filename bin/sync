@@ -1260,30 +1260,58 @@ process_inbox() {
             # Format expected:
             # # Time Tracking
             # <description with #topic/tags>
-            # <duration> (e.g., "2h30m", "1.5h", "45m")
+            # <start timestamp ISO 8601>
+            # <end timestamp ISO 8601>
 
-            # Extract description (line after title, skip empty lines)
+            # Extract description (line 2, skip empty lines)
             DESCRIPTION=$(echo "$CONTENT" | awk 'NR>1 && NF {print; exit}')
 
-            # Extract duration (last non-empty line)
-            DURATION=$(echo "$CONTENT" | awk 'NF {line=$0} END {print line}')
+            # Extract start timestamp (line 3)
+            START_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==2) {print; exit}}')
 
-            if [[ -n "$DESCRIPTION" ]] && [[ -n "$DURATION" ]] && [[ "$DESCRIPTION" != "$DURATION" ]]; then
-                # Use bin/track add to record the entry
-                if bin/track add "$DURATION" "$DESCRIPTION" >/dev/null 2>&1; then
-                    print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
-                    # Delete the processed file
-                    rm "$file"
-                    continue
+            # Extract end timestamp (line 4)
+            END_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==3) {print; exit}}')
+
+            if [[ -n "$DESCRIPTION" ]] && [[ -n "$START_TIME" ]] && [[ -n "$END_TIME" ]]; then
+                # Calculate duration using node
+                DURATION=$(node -e "
+                    const start = new Date('$START_TIME');
+                    const end = new Date('$END_TIME');
+                    const minutes = Math.round((end - start) / 1000 / 60);
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    if (hours > 0 && mins > 0) {
+                        console.log(hours + 'h' + mins + 'm');
+                    } else if (hours > 0) {
+                        console.log(hours + 'h');
+                    } else {
+                        console.log(mins + 'm');
+                    }
+                " 2>/dev/null)
+
+                if [[ -n "$DURATION" ]]; then
+                    # Use bin/track add to record the entry with start time
+                    if bin/track add "$DURATION" "$DESCRIPTION" --start "$START_TIME" >/dev/null 2>&1; then
+                        print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
+                        print_info "    Start: $START_TIME, End: $END_TIME"
+                        # Delete the processed file
+                        rm "$file"
+                        continue
+                    else
+                        print_error "  • Time tracking note failed to process"
+                        print_info "    Duration: $DURATION, Description: $DESCRIPTION"
+                        # Keep the file for manual review
+                        continue
+                    fi
                 else
-                    print_error "  • Time tracking note failed to process"
-                    print_info "    Duration: $DURATION, Description: $DESCRIPTION"
+                    print_error "  • Failed to calculate duration from timestamps"
+                    print_info "    Start: $START_TIME, End: $END_TIME"
                     # Keep the file for manual review
                     continue
                 fi
             else
-                print_error "  • Time tracking note missing description or duration"
-                print_info "    Expected format: Title, Description, Duration on separate lines"
+                print_error "  • Time tracking note missing description or timestamps"
+                print_info "    Expected format: Title, Description, Start Time, End Time on separate lines"
                 # Keep the file for manual review
                 continue
             fi
