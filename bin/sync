@@ -1255,7 +1255,7 @@ process_inbox() {
                 continue  # Skip the normal file move logic but keep the file
             fi
 
-        # Special case: Time Tracking note - process with bin/track add
+        # Special case: Time Tracking note - write directly to time tracking file
         elif [[ "$TITLE" == "Time Tracking" ]] || [[ "$BASENAME" == *"time-tracking"* ]]; then
             # Format expected:
             # # Time Tracking
@@ -1273,7 +1273,7 @@ process_inbox() {
             END_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==3) {print; exit}}')
 
             if [[ -n "$DESCRIPTION" ]] && [[ -n "$START_TIME" ]] && [[ -n "$END_TIME" ]]; then
-                # Calculate duration using node
+                # Calculate duration for display
                 DURATION=$(node -e "
                     const start = new Date('$START_TIME');
                     const end = new Date('$END_TIME');
@@ -1290,19 +1290,22 @@ process_inbox() {
                 " 2>/dev/null)
 
                 if [[ -n "$DURATION" ]]; then
-                    # Use bin/track add to record the entry with start time
-                    if bin/track add "$DURATION" "$DESCRIPTION" --start "$START_TIME" >/dev/null 2>&1; then
-                        print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
-                        print_info "    Start: $START_TIME, End: $END_TIME"
-                        # Delete the processed file
-                        rm "$file"
-                        continue
-                    else
-                        print_error "  • Time tracking note failed to process"
-                        print_info "    Duration: $DURATION, Description: $DESCRIPTION"
-                        # Keep the file for manual review
-                        continue
-                    fi
+                    # Get the year-month for the file (based on start time)
+                    YEAR_MONTH=$(echo "$START_TIME" | cut -d'T' -f1 | cut -d'-' -f1,2)
+                    TIME_FILE="vault/logs/time-tracking/${YEAR_MONTH}.md"
+
+                    # Ensure directory exists
+                    mkdir -p vault/logs/time-tracking 2>/dev/null
+
+                    # Write entry directly to time tracking file
+                    echo "${START_TIME}|${END_TIME}|${DESCRIPTION}" >> "$TIME_FILE"
+
+                    print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
+                    print_info "    Start: $START_TIME, End: $END_TIME"
+
+                    # Delete the processed file
+                    rm "$file"
+                    continue
                 else
                     print_error "  • Failed to calculate duration from timestamps"
                     print_info "    Start: $START_TIME, End: $END_TIME"
