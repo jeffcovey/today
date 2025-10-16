@@ -1264,13 +1264,13 @@ process_inbox() {
             # <end timestamp ISO 8601>
 
             # Extract description (line 2, skip empty lines)
-            DESCRIPTION=$(echo "$CONTENT" | awk 'NR>1 && NF {print; exit}')
+            DESCRIPTION=$(echo "$CONTENT" | awk 'NR>1 && NF {print; exit}' | xargs)
 
             # Extract start timestamp (line 3)
-            START_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==2) {print; exit}}')
+            START_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==2) {print; exit}}' | xargs)
 
             # Extract end timestamp (line 4)
-            END_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==3) {print; exit}}')
+            END_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==3) {print; exit}}' | xargs)
 
             if [[ -n "$DESCRIPTION" ]] && [[ -n "$START_TIME" ]] && [[ -n "$END_TIME" ]]; then
                 # Calculate duration for display
