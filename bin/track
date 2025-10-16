@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 const TIME_DIR = path.join(PROJECT_ROOT, 'vault/logs/time-tracking');
-const STATE_FILE = path.join(TIME_DIR, 'current-timer');
+const STATE_FILE = path.join(TIME_DIR, 'current-timer.md');
 
 // Ensure time tracking directory exists
 if (!fs.existsSync(TIME_DIR)) {

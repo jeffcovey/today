@@ -1254,7 +1254,40 @@ process_inbox() {
                 # Don't delete the file - user can fix the format
                 continue  # Skip the normal file move logic but keep the file
             fi
-        
+
+        # Special case: Time Tracking note - process with bin/track add
+        elif [[ "$TITLE" == "Time Tracking" ]] || [[ "$BASENAME" == *"time-tracking"* ]]; then
+            # Format expected:
+            # # Time Tracking
+            # <description with #topic/tags>
+            # <duration> (e.g., "2h30m", "1.5h", "45m")
+
+            # Extract description (line after title, skip empty lines)
+            DESCRIPTION=$(echo "$CONTENT" | awk 'NR>1 && NF {print; exit}')
+
+            # Extract duration (last non-empty line)
+            DURATION=$(echo "$CONTENT" | awk 'NF {line=$0} END {print line}')
+
+            if [[ -n "$DESCRIPTION" ]] && [[ -n "$DURATION" ]] && [[ "$DESCRIPTION" != "$DURATION" ]]; then
+                # Use bin/track add to record the entry
+                if bin/track add "$DURATION" "$DESCRIPTION" >/dev/null 2>&1; then
+                    print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
+                    # Delete the processed file
+                    rm "$file"
+                    continue
+                else
+                    print_error "  • Time tracking note failed to process"
+                    print_info "    Duration: $DURATION, Description: $DESCRIPTION"
+                    # Keep the file for manual review
+                    continue
+                fi
+            else
+                print_error "  • Time tracking note missing description or duration"
+                print_info "    Expected format: Title, Description, Duration on separate lines"
+                # Keep the file for manual review
+                continue
+            fi
+
         # Special case: Progress note - save to progress/ and append to today's review
         elif [[ "$TITLE" == "Progress" ]]; then
             # Parse the date from file content (format: "October 02, 2025 10:06 -0400")
