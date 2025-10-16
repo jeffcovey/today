@@ -110,16 +110,19 @@ async function cmdStart(description) {
 
   // Check for running timer
   if (fs.existsSync(STATE_FILE)) {
-    const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
-    const oldDescription = lines[0];
-    const oldStart = lines[1];
+    const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
+    if (content) {
+      const lines = content.split('\n');
+      const oldDescription = lines[0];
+      const oldStart = lines[1];
 
-    const currentTime = getCurrentTime();
-    const duration = calculateDuration(oldStart, currentTime);
-    const durationFormatted = formatDuration(duration * 60);
+      const currentTime = getCurrentTime();
+      const duration = calculateDuration(oldStart, currentTime);
+      const durationFormatted = formatDuration(duration * 60);
 
-    console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${oldDescription} (${durationFormatted})`);
-    await stopTimer(oldStart, oldDescription, currentTime);
+      console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${oldDescription} (${durationFormatted})`);
+      await stopTimer(oldStart, oldDescription, currentTime);
+    }
   }
 
   // Start new timer
@@ -143,10 +146,8 @@ async function stopTimer(start, description, end = null) {
   const entry = `${start}|${end}|${description}\n`;
   fs.appendFileSync(monthFile, entry);
 
-  // Remove state file
-  if (fs.existsSync(STATE_FILE)) {
-    fs.unlinkSync(STATE_FILE);
-  }
+  // Clear state file (keep it empty so Apple Shortcuts doesn't complain)
+  fs.writeFileSync(STATE_FILE, '');
 
   const durationFormatted = formatDuration(duration * 60);
   console.log(chalk.green('✓') + ` Stopped: ${description} (${durationFormatted})`);
@@ -159,7 +160,13 @@ async function cmdStop() {
     process.exit(1);
   }
 
-  const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
+  const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
+  if (!content) {
+    console.error(chalk.red('✗') + ' No timer running');
+    process.exit(1);
+  }
+
+  const lines = content.split('\n');
   const description = lines[0];
   const start = lines[1];
 
@@ -392,7 +399,13 @@ async function cmdStatus() {
     return;
   }
 
-  const lines = fs.readFileSync(STATE_FILE, 'utf8').trim().split('\n');
+  const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
+  if (!content) {
+    console.log(chalk.blue('ℹ') + ' No timer running');
+    return;
+  }
+
+  const lines = content.split('\n');
   const description = lines[0];
   const start = lines[1];
 

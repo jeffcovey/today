@@ -987,7 +987,14 @@ async function getCurrentTimer() {
 
   try {
     const content = await fs.readFile(timerFile, 'utf8');
-    const lines = content.trim().split('\n');
+    const trimmed = content.trim();
+
+    // If file is empty, no timer running
+    if (!trimmed) {
+      return null;
+    }
+
+    const lines = trimmed.split('\n');
 
     if (lines.length < 2) {
       return null;
