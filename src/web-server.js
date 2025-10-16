@@ -1265,8 +1265,22 @@ async function renderDirectory(dirPath, urlPath) {
             <br>
             <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
           </div>
-          <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
-            <i class="fas fa-stop"></i> Stop
+          <a href="#" id="stopTimerBtn" onclick="
+            const btn = this;
+            const icon = btn.querySelector('i');
+            const text = btn.querySelector('.btn-text');
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+            icon.className = 'fas fa-spinner fa-spin';
+            text.textContent = ' Stopping...';
+            fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()).catch(() => {
+              btn.disabled = false;
+              btn.style.pointerEvents = 'auto';
+              icon.className = 'fas fa-stop';
+              text.textContent = ' Stop';
+            });
+            return false;" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
           </a>
         </div>
         <script>
@@ -1302,8 +1316,21 @@ async function renderDirectory(dirPath, urlPath) {
           <i class="fas fa-clock me-2"></i>
           <div class="input-group flex-grow-1">
             <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
-            <button class="btn btn-primary" onclick="fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: document.getElementById('timerDescription').value})}).then(() => location.reload())">
-              <i class="fas fa-play"></i> Start
+            <button class="btn btn-primary" id="startTimerBtn" onclick="
+              const btn = this;
+              const icon = btn.querySelector('i');
+              const text = btn.querySelector('.btn-text');
+              const desc = document.getElementById('timerDescription').value;
+              if (!desc.trim()) return;
+              btn.disabled = true;
+              icon.className = 'fas fa-spinner fa-spin';
+              text.textContent = ' Starting...';
+              fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
+                btn.disabled = false;
+                icon.className = 'fas fa-play';
+                text.textContent = ' Start';
+              })">
+              <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
           </div>
         </div>
@@ -4028,8 +4055,22 @@ ${cleanContent}
             <br>
             <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
           </div>
-          <a href="#" onclick="fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()); return false;" class="btn btn-sm btn-outline-dark ms-2">
-            <i class="fas fa-stop"></i> Stop
+          <a href="#" id="stopTimerBtn" onclick="
+            const btn = this;
+            const icon = btn.querySelector('i');
+            const text = btn.querySelector('.btn-text');
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+            icon.className = 'fas fa-spinner fa-spin';
+            text.textContent = ' Stopping...';
+            fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()).catch(() => {
+              btn.disabled = false;
+              btn.style.pointerEvents = 'auto';
+              icon.className = 'fas fa-stop';
+              text.textContent = ' Stop';
+            });
+            return false;" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
           </a>
         </div>
         <script>
@@ -4065,8 +4106,21 @@ ${cleanContent}
           <i class="fas fa-clock me-2"></i>
           <div class="input-group flex-grow-1">
             <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
-            <button class="btn btn-primary" onclick="fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: document.getElementById('timerDescription').value})}).then(() => location.reload())">
-              <i class="fas fa-play"></i> Start
+            <button class="btn btn-primary" id="startTimerBtn" onclick="
+              const btn = this;
+              const icon = btn.querySelector('i');
+              const text = btn.querySelector('.btn-text');
+              const desc = document.getElementById('timerDescription').value;
+              if (!desc.trim()) return;
+              btn.disabled = true;
+              icon.className = 'fas fa-spinner fa-spin';
+              text.textContent = ' Starting...';
+              fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
+                btn.disabled = false;
+                icon.className = 'fas fa-play';
+                text.textContent = ' Start';
+              })">
+              <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
           </div>
         </div>
