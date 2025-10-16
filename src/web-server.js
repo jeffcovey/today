@@ -3928,8 +3928,10 @@ ${cleanContent}
     // Look up task ID from database
     try {
       const db = getDatabase();
+      // Database stores paths with 'vault/' prefix
+      const dbFilePath = 'vault/' + dataFile;
       const task = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-        .get(dataFile, parseInt(dataLine));
+        .get(dbFilePath, parseInt(dataLine));
 
       if (task) {
         taskLinkMatches.push({
