@@ -911,7 +911,7 @@ Examples:
       
     case 'delete':
       const deleteEventId = process.argv[3];
-      
+
       if (!deleteEventId || deleteEventId === '--help') {
         console.log(`
 Usage: calendar delete <event-id>
@@ -923,9 +923,21 @@ Example:
         `);
         break;
       }
-      
+
       console.log(`🗑️  Deleting event ${deleteEventId}...`);
-      await calSync.deleteGoogleEvent(deleteEventId);
+
+      // Look up the event in the database to find which calendar it belongs to
+      const eventToDelete = calSync.db.prepare(`
+        SELECT calendar_name FROM calendar_events WHERE id = ?
+      `).get(deleteEventId);
+
+      let calendarId = null;
+      if (eventToDelete && eventToDelete.calendar_name) {
+        calendarId = eventToDelete.calendar_name;
+        console.log(`   Found event in calendar: ${calendarId}`);
+      }
+
+      await calSync.deleteGoogleEvent(deleteEventId, calendarId);
       break;
       
     case 'update':
