@@ -1315,7 +1315,7 @@ async function renderDirectory(dirPath, urlPath) {
         <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
           <i class="fas fa-clock me-2"></i>
           <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
+            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
             <button class="btn btn-primary" id="startTimerBtn" onclick="
               const btn = this;
               const icon = btn.querySelector('i');
@@ -4105,7 +4105,7 @@ ${cleanContent}
         <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
           <i class="fas fa-clock me-2"></i>
           <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)">
+            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
             <button class="btn btn-primary" id="startTimerBtn" onclick="
               const btn = this;
               const icon = btn.querySelector('i');
