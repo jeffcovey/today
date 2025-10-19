@@ -506,6 +506,7 @@ IMPORTANT:
             model="claude-3-5-sonnet-20241022",
             max_tokens=2000,
             temperature=0,
+            timeout=60.0,  # 60 second timeout
             messages=[{"role": "user", "content": prompt}]
         )
 
