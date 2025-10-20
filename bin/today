@@ -403,6 +403,10 @@ def update_review_file(dry_run=False):
     import json
     from datetime import datetime
     import difflib
+    import warnings
+
+    # Suppress model deprecation warnings - we'll update when newer version is available
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
 
     # Get API key
     api_key = os.environ.get('TODAY_ANTHROPIC_KEY')
@@ -459,49 +463,58 @@ def update_review_file(dry_run=False):
                           shell=True, capture_output=True, text=True)
     current_time = result.stdout.strip()
 
+    # Get current date for task completion timestamps
+    result = subprocess.run([f'TZ={timezone} date "+%Y-%m-%d"'],
+                          shell=True, capture_output=True, text=True)
+    current_date = result.stdout.strip()
+
+    # Get timezone offset for timestamp
+    result = subprocess.run([f'TZ={timezone} date "+%z"'],
+                          shell=True, capture_output=True, text=True)
+    tz_offset = result.stdout.strip()
+
     # Create prompt for Claude to return specific edits
-    prompt = f"""You are updating a daily plan markdown file based on current database data.
-
-CURRENT FILE HAS THESE KEY SECTIONS:
-- Morning routine with tasks (some marked [x] with ✅ 2025-09-22)
-- Hip Mobility Workout with exercises
-- Time blocks for the day
-- An "Update" section showing status
-- Reflection and Completed sections
-
-CURRENT DATABASE DATA SUMMARY:
-{daily_data[:1000]}... (truncated for analysis)
+    prompt = f"""You are updating a daily plan markdown file with a progress update.
 
 CURRENT TIME: {current_time} ET
+CURRENT DATE: {current_date}
 
-RETURN A JSON OBJECT with these specific edits to make:
+CURRENT FILE CONTENT:
+{original_content}
+
+CURRENT DATABASE DATA (tasks, events, emails, etc.):
+{daily_data[:5000]}
+
+YOUR TASK:
+Create a new Progress Update section to append to the end of the file.
+Compare the current file with the database to see what's changed or been accomplished.
+
+This should summarize:
+1. What's been accomplished since the last update (tasks checked off, workouts done, meetings attended)
+2. Current status of high-priority items
+3. Any new events, emails, or tasks that need attention
+4. Overall progress and any blockers
+
+RETURN A JSON OBJECT:
 {{
-  "update_section": "New content for the ### Update section (include the heading)",
-  "tasks_to_check": ["exact text of tasks to mark as completed"],
-  "numbers_to_update": [{{
-    "find": "14 emails pending",
-    "replace": "22 emails pending"
-  }}]
+  "progress_update": "### Progress Update ({current_time})\\n\\n{current_date} HH:MM {tz_offset}\\n\\n- Brief summary of what's been done\\n- Current status\\n- What's next or any blockers",
+  "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
 }}
 
-For the update_section, include:
-### Update ({current_time})
-
-- First bullet point about current status
-- Second bullet about progress
-- Third bullet about what's pending
-- Optional fourth bullet
-
 IMPORTANT:
-- Only include tasks that should be newly checked off
-- Don't include tasks already marked with [x]
-- Be conservative - only update what you're certain about
-- Keep the update section to 5-7 lines max"""
+- Create a MEANINGFUL progress update - there's always something to report
+- Look at completed tasks in the file (marked [x]) since the last Progress Update
+- The update should be 2-4 bullet points, concise but informative
+- Only mark tasks as done if you see clear evidence (like workout exercises checked off)
+- Use the exact timezone offset in the timestamp: {tz_offset}"""
 
     # Call Claude API
     client = anthropic.Anthropic(api_key=api_key)
 
     try:
+        # NOTE: This model is deprecated as of Oct 22, 2025
+        # TODO: Update to newer model when available (check https://docs.anthropic.com/en/docs/about-claude/models)
+        # Try: claude-sonnet-4-YYYYMMDD or claude-3-5-sonnet-YYYYMMDD
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=2000,
@@ -546,34 +559,20 @@ IMPORTANT:
         # Apply edits to the content
         updated_content = original_content
 
-        # 1. Update the Update section
-        if 'update_section' in edits and edits['update_section']:
-            update_pattern = r'### Update \([^)]+\)\n.*?(?=\n##|\n---|\Z)'
-            if re.search(update_pattern, updated_content, re.DOTALL):
-                updated_content = re.sub(update_pattern, edits['update_section'].rstrip(),
-                                        updated_content, flags=re.DOTALL)
-            else:
-                # Add new update section after Reflection
-                reflection_pattern = r'(## 💭 Reflection\n\n\*[^*]+\*\n)'
-                updated_content = re.sub(reflection_pattern,
-                                        r'\1\n' + edits['update_section'] + '\n',
-                                        updated_content)
+        # 1. Append progress update at the end
+        if 'progress_update' in edits and edits['progress_update']:
+            # Append the progress update at the end of the file
+            updated_content = updated_content.rstrip() + '\n\n' + edits['progress_update'] + '\n'
 
         # 2. Check off completed tasks
-        if 'tasks_to_check' in edits:
+        if 'tasks_to_check' in edits and edits['tasks_to_check']:
             for task in edits['tasks_to_check']:
                 # Only check off if it's currently unchecked
                 unchecked_pattern = f"- \\[ \\] {re.escape(task)}"
                 if re.search(unchecked_pattern, updated_content):
                     updated_content = re.sub(unchecked_pattern,
-                                            f"- [x] {task} ✅ 2025-09-22",
-                                            updated_content)
-
-        # 3. Update numbers/counts
-        if 'numbers_to_update' in edits:
-            for update in edits['numbers_to_update']:
-                if 'find' in update and 'replace' in update:
-                    updated_content = updated_content.replace(update['find'], update['replace'])
+                                            f"- [x] {task} ✅ {current_date}",
+                                            updated_content, count=1)
 
         # SAFETY CHECKS
         updated_lines = updated_content.count('\n')
@@ -590,15 +589,20 @@ IMPORTANT:
         # Show what would be changed
         if dry_run:
             print("\n📝 Proposed changes:")
-            print(f"Update section: {edits.get('update_section', 'No changes')[:200]}")
-            print(f"Tasks to check: {edits.get('tasks_to_check', [])}")
-            print(f"Numbers to update: {edits.get('numbers_to_update', [])}")
+            print(f"Progress update to append:\n{edits.get('progress_update', 'None')}")
+            print(f"\nTasks to check: {edits.get('tasks_to_check', [])}")
             print("\n✅ Dry run complete - no changes made")
         else:
             # Write updated content back to file
             with open(review_file, 'w') as f:
                 f.write(updated_content)
-            print(f"✅ Updated {review_file}")
+
+            # Check if content actually changed
+            if updated_content != original_content:
+                print(f"✅ Updated {review_file}")
+            else:
+                print(f"⚠️  API returned no changes - {review_file} unchanged")
+                print("This might indicate the AI couldn't determine what to update.")
 
     except Exception as e:
         print(f"❌ Error: {e}")
