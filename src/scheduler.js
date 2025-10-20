@@ -111,6 +111,12 @@ const jobs = [
         command: 'bin/droplet-monitor || true',
         description: 'Monitor droplet health',
         timezone: false
+    },
+    {
+        schedule: '0 1 * * *', // Daily at 1 AM
+        command: 'bin/tasks archive-completed || true',
+        description: 'Archive completed tasks',
+        timezone: true
     }
 ];
 

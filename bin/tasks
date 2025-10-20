@@ -2119,4 +2119,153 @@ program
     }
   });
 
+// Archive completed tasks command
+program
+  .command('archive-completed')
+  .description('Move completed tasks from tasks-*.md files to tasks-archive.md and rebalance tasks.md')
+  .option('-v, --verbose', 'Show detailed output')
+  .action(async (options) => {
+    console.log(chalk.blue('📦 Archiving completed tasks and rebalancing...'));
+
+    try {
+      const tasksDir = path.join(__dirname, '..', 'vault', 'tasks');
+      const archiveFile = path.join(tasksDir, 'tasks-archive.md');
+      const tasksFile = path.join(tasksDir, 'tasks.md');
+
+      // Read current archive file
+      let archiveContent = '';
+      try {
+        archiveContent = await fs.readFile(archiveFile, 'utf8');
+      } catch (err) {
+        // Archive file doesn't exist yet
+        console.log(chalk.gray('Creating new tasks-archive.md file'));
+      }
+
+      let archiveTasks = archiveContent.split('\n').filter(line => line.trim());
+      let totalArchived = 0;
+
+      // Find all task files including tasks.md
+      const allFiles = await fs.readdir(tasksDir);
+      const taskFiles = allFiles
+        .filter(f => f === 'tasks.md' || f.match(/^tasks-\d+\.md$/))
+        .map(f => path.join(tasksDir, f))
+        .sort(); // Sort to process tasks.md first
+
+      if (taskFiles.length === 0) {
+        console.log(chalk.gray('No task files found to archive'));
+        return;
+      }
+
+      console.log(chalk.gray(`Checking ${taskFiles.length} task files...`));
+
+      // Process each task file - archive completed tasks
+      for (const filePath of taskFiles) {
+        const content = await fs.readFile(filePath, 'utf8');
+        const lines = content.split('\n');
+
+        // Separate completed from incomplete tasks
+        const completedTasks = [];
+        const remainingLines = [];
+
+        for (const line of lines) {
+          if (line.match(/^- \[x\]/i)) {
+            completedTasks.push(line);
+            totalArchived++;
+          } else if (line.trim()) {
+            remainingLines.push(line);
+          }
+        }
+
+        // Add completed tasks to archive
+        if (completedTasks.length > 0) {
+          archiveTasks = archiveTasks.concat(completedTasks);
+
+          // Write back remaining tasks
+          await fs.writeFile(filePath, remainingLines.join('\n') + '\n');
+
+          if (options.verbose) {
+            console.log(chalk.gray(`  ${path.basename(filePath)}: archived ${completedTasks.length} tasks`));
+          }
+        }
+      }
+
+      if (totalArchived > 0) {
+        // Write updated archive file
+        await fs.writeFile(archiveFile, archiveTasks.join('\n') + '\n');
+        console.log(chalk.green(`✓ Archived ${totalArchived} completed task(s) to tasks-archive.md`));
+      } else {
+        console.log(chalk.gray('No completed tasks to archive'));
+      }
+
+      // Now rebalance tasks.md if it exceeds 50 tasks
+      try {
+        const tasksContent = await fs.readFile(tasksFile, 'utf8');
+        const tasksLines = tasksContent.split('\n').filter(line => line.trim());
+
+        if (tasksLines.length > 50) {
+          console.log(chalk.blue(`\n📊 Rebalancing tasks.md (${tasksLines.length} tasks > 50 limit)...`));
+
+          // Keep first 50, move the rest
+          const toKeep = tasksLines.slice(0, 50);
+          const toMove = tasksLines.slice(50);
+
+          // Find existing numbered files and their task counts
+          const numberedFiles = allFiles
+            .filter(f => f.match(/^tasks-(\d+)\.md$/))
+            .map(f => {
+              const num = parseInt(f.match(/^tasks-(\d+)\.md$/)[1]);
+              return { num, file: f };
+            })
+            .sort((a, b) => a.num - b.num);
+
+          // Find a file with room (< 50 tasks) or create a new one
+          let targetFile = null;
+          let targetNum = null;
+
+          for (const { num, file } of numberedFiles) {
+            const filePath = path.join(tasksDir, file);
+            const content = await fs.readFile(filePath, 'utf8');
+            const lines = content.split('\n').filter(line => line.trim());
+
+            if (lines.length < 50) {
+              targetFile = filePath;
+              targetNum = num;
+              break;
+            }
+          }
+
+          // If no file has room, create a new one
+          if (!targetFile) {
+            targetNum = numberedFiles.length > 0 ? numberedFiles[numberedFiles.length - 1].num + 1 : 1;
+            targetFile = path.join(tasksDir, `tasks-${targetNum}.md`);
+            await fs.writeFile(targetFile, '');
+            console.log(chalk.gray(`  Created new file: tasks-${targetNum}.md`));
+          }
+
+          // Read target file and append tasks
+          const targetContent = await fs.readFile(targetFile, 'utf8');
+          const targetLines = targetContent.split('\n').filter(line => line.trim());
+          const combinedLines = targetLines.concat(toMove);
+
+          // Write files
+          await fs.writeFile(tasksFile, toKeep.join('\n') + '\n');
+          await fs.writeFile(targetFile, combinedLines.join('\n') + '\n');
+
+          console.log(chalk.green(`✓ Moved ${toMove.length} tasks from tasks.md to tasks-${targetNum}.md`));
+          console.log(chalk.gray(`  tasks.md now has ${toKeep.length} tasks`));
+          console.log(chalk.gray(`  tasks-${targetNum}.md now has ${combinedLines.length} tasks`));
+        }
+      } catch (err) {
+        // tasks.md might not exist yet
+        if (options.verbose) {
+          console.log(chalk.gray('  tasks.md not found or empty, skipping rebalance'));
+        }
+      }
+
+    } catch (error) {
+      console.error(chalk.red('Error archiving tasks:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
