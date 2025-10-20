@@ -2266,6 +2266,9 @@ program
       console.error(chalk.red('Error archiving tasks:'), error.message);
       process.exit(1);
     }
+
+    // Exit cleanly
+    process.exit(0);
   });
 
 program.parse();
