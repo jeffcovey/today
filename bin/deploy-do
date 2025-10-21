@@ -148,11 +148,29 @@ EOF
             ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo systemctl start resilio-sync 2>/dev/null || true"
         fi
         
-        # Install logrotate config if it exists
-        if [ -f "config/logrotate-today" ]; then
-            print_info "Installing logrotate configuration..."
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ -f ${DEPLOY_PATH}/config/logrotate-today ] && sudo cp ${DEPLOY_PATH}/config/logrotate-today /etc/logrotate.d/today && sudo chmod 644 /etc/logrotate.d/today && echo '✓ Logrotate configured' || true"
-        fi
+        # Install logrotate config
+        print_info "Installing logrotate configuration..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "sudo cp ${DEPLOY_PATH}/config/logrotate-today /etc/logrotate.d/today && sudo chmod 644 /etc/logrotate.d/today && echo '✓ Logrotate configured'"
+
+        # Setup WAL checkpoint cron job
+        print_info "Setting up SQLite WAL checkpoint cron job..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} << 'EOF'
+            # Create checkpoint script
+            cat > /opt/today/bin/checkpoint-wal.sh << 'SCRIPT'
+#!/bin/bash
+cd /opt/today
+npx dotenvx run -- sqlite3 .data/today.db "PRAGMA wal_checkpoint(PASSIVE);" >/dev/null 2>&1
+SCRIPT
+            chmod +x /opt/today/bin/checkpoint-wal.sh
+
+            # Add to crontab if not already present
+            if ! crontab -l 2>/dev/null | grep -q checkpoint-wal; then
+                (crontab -l 2>/dev/null; echo "*/30 * * * * /opt/today/bin/checkpoint-wal.sh") | crontab -
+                echo '✓ WAL checkpoint cron job added (runs every 30 minutes)'
+            else
+                echo '✓ WAL checkpoint cron job already configured'
+            fi
+EOF
 
         print_info "Restarting services..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "systemctl restart today-scheduler || true"
