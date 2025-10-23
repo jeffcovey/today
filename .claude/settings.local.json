@@ -47,7 +47,8 @@
       "Bash(jq:*)",
       "Bash(bin/email download:*)",
       "WebFetch(domain:developers.track.toggl.com)",
-      "WebFetch(domain:engineering.toggl.com)"
+      "WebFetch(domain:engineering.toggl.com)",
+      "WebFetch(domain:unsplash.com)"
     ],
     "deny": [],
     "ask": []
