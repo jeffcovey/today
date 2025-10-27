@@ -63,7 +63,7 @@ const jobs = [
     {
         schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EDT
         command: 'bin/today update || true',
-        description: 'Update daily review with Claude API',
+        description: 'Update today and tomorrow daily plans with Claude API',
         timezone: true
     },
     {

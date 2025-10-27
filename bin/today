@@ -40,8 +40,12 @@ def load_dotenv():
     except Exception:
         pass  # Continue without the key
 
-def get_review_file_path():
-    """Calculate the current review file path using configured timezone"""
+def get_review_file_path(target_date=None):
+    """Calculate the review file path for a given date using configured timezone
+
+    Args:
+        target_date: datetime object for the target date, or None for today
+    """
     # Get timezone from config
     timezone = 'America/New_York'  # default
     try:
@@ -52,22 +56,29 @@ def get_review_file_path():
     except:
         pass
 
-    # Get date in configured timezone
-    result = subprocess.run([f'TZ={timezone} date "+%Y %m %d %V"'],
-                          shell=True, capture_output=True, text=True)
-    if result.returncode == 0:
-        year_str, month_str, day_str, week_str = result.stdout.strip().split()
-        year = int(year_str)
-        month = int(month_str)
-        day = int(day_str)
-        week = int(week_str)
+    if target_date:
+        # Use the provided date
+        year = target_date.year
+        month = target_date.month
+        day = target_date.day
+        week = target_date.isocalendar()[1]
     else:
-        # Fallback to UTC if timezone command fails
-        now = datetime.now()
-        year = now.year
-        month = now.month
-        day = now.day
-        week = now.isocalendar()[1]
+        # Get date in configured timezone
+        result = subprocess.run([f'TZ={timezone} date "+%Y %m %d %V"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            year_str, month_str, day_str, week_str = result.stdout.strip().split()
+            year = int(year_str)
+            month = int(month_str)
+            day = int(day_str)
+            week = int(week_str)
+        else:
+            # Fallback to UTC if timezone command fails
+            now = datetime.now()
+            year = now.year
+            month = now.month
+            day = now.day
+            week = now.isocalendar()[1]
 
     # Determine quarter
     quarter = f"Q{(month - 1) // 3 + 1}"
@@ -397,7 +408,7 @@ def check_claude_auth():
     print("✅ Claude is authenticated\n")
 
 def update_review_file(dry_run=False):
-    """Update the review file using Claude API to intelligently update the plan"""
+    """Update both today's and tomorrow's review files using Claude API"""
     import anthropic
     import re
     import json
@@ -415,17 +426,40 @@ def update_review_file(dry_run=False):
         print("Please ensure it's set in .env and encrypted with dotenvx")
         sys.exit(1)
 
-    review_file = get_review_file_path()
+    # Update today's file
+    today_file = get_review_file_path()
+    if not Path(today_file).exists():
+        print(f"⚠️  Today's file not found: {today_file}")
+        print("Skipping today's update")
+    else:
+        print(f"📊 Updating today's plan: {today_file}...")
+        if dry_run:
+            print("🔍 DRY RUN MODE - No changes will be made")
+        _update_single_file(today_file, is_tomorrow=False, dry_run=dry_run, api_key=api_key)
 
-    # Check if review file exists
-    if not Path(review_file).exists():
-        print(f"❌ Review file not found: {review_file}")
-        print("Run 'bin/today' first to create today's review file")
-        sys.exit(1)
+    # Update tomorrow's file
+    tomorrow = datetime.now() + timedelta(days=1)
+    tomorrow_file = get_review_file_path(tomorrow)
+    if not Path(tomorrow_file).exists():
+        print(f"⚠️  Tomorrow's file not found: {tomorrow_file}")
+        print("Skipping tomorrow's update")
+    else:
+        print(f"📊 Updating tomorrow's plan: {tomorrow_file}...")
+        _update_single_file(tomorrow_file, is_tomorrow=True, dry_run=dry_run, api_key=api_key)
 
-    print(f"📊 Updating {review_file}...")
-    if dry_run:
-        print("🔍 DRY RUN MODE - No changes will be made")
+def _update_single_file(review_file, is_tomorrow, dry_run, api_key):
+    """Update a single review file using Claude API
+
+    Args:
+        review_file: Path to the file to update
+        is_tomorrow: Whether this is tomorrow's file (affects update strategy)
+        dry_run: Whether to actually write changes
+        api_key: Anthropic API key
+    """
+    import anthropic
+    import re
+    import json
+    from datetime import datetime
 
     # Get current database data
     try:
@@ -473,8 +507,42 @@ def update_review_file(dry_run=False):
                           shell=True, capture_output=True, text=True)
     tz_offset = result.stdout.strip()
 
-    # Create prompt for Claude to return specific edits
-    prompt = f"""You are updating a daily plan markdown file with a progress update.
+    # Create prompt for Claude based on whether this is tomorrow's file
+    if is_tomorrow:
+        prompt = f"""You are updating TOMORROW's daily plan with fresh priorities from the database.
+
+CURRENT TIME: {current_time} ET
+CURRENT DATE: {current_date}
+
+CURRENT FILE CONTENT (Tomorrow's Plan):
+{original_content}
+
+CURRENT DATABASE DATA (tasks, events, emails, etc.):
+{daily_data[:5000]}
+
+YOUR TASK:
+Refresh the "Top Priorities" section with current database data.
+This is a DRAFT plan for tomorrow that gets refined throughout today.
+
+Focus on:
+1. Overdue tasks that will carry into tomorrow
+2. Tasks scheduled for tomorrow
+3. Calendar events scheduled for tomorrow
+4. High-priority items that need attention
+
+RETURN A JSON OBJECT with updated priorities section:
+{{
+  "priorities_update": "### 🚨 Critical (Do First)\\n\\n- [ ] Task 1\\n- [ ] Task 2\\n\\n### ⚡ Quick Wins...\\n",
+  "notes": "Brief note about what changed"
+}}
+
+IMPORTANT:
+- Keep it lightweight - this is a draft
+- Focus on actionable items
+- Use proper Obsidian Tasks syntax with emojis and tags
+"""
+    else:
+        prompt = f"""You are updating TODAY's daily plan with a progress update.
 
 CURRENT TIME: {current_time} ET
 CURRENT DATE: {current_date}
@@ -559,20 +627,29 @@ IMPORTANT:
         # Apply edits to the content
         updated_content = original_content
 
-        # 1. Append progress update at the end
-        if 'progress_update' in edits and edits['progress_update']:
-            # Append the progress update at the end of the file
-            updated_content = updated_content.rstrip() + '\n\n' + edits['progress_update'] + '\n'
+        if is_tomorrow:
+            # For tomorrow's file, update the priorities section
+            if 'priorities_update' in edits and edits['priorities_update']:
+                # Find and replace the priorities section
+                priorities_pattern = r'## 📋 Top Priorities\n\n.*?(?=\n## |$)'
+                replacement = f"## 📋 Top Priorities\n\n{edits['priorities_update']}\n"
+                updated_content = re.sub(priorities_pattern, replacement, updated_content, flags=re.DOTALL)
+        else:
+            # For today's file, append progress update
+            # 1. Append progress update at the end
+            if 'progress_update' in edits and edits['progress_update']:
+                # Append the progress update at the end of the file
+                updated_content = updated_content.rstrip() + '\n\n' + edits['progress_update'] + '\n'
 
-        # 2. Check off completed tasks
-        if 'tasks_to_check' in edits and edits['tasks_to_check']:
-            for task in edits['tasks_to_check']:
-                # Only check off if it's currently unchecked
-                unchecked_pattern = f"- \\[ \\] {re.escape(task)}"
-                if re.search(unchecked_pattern, updated_content):
-                    updated_content = re.sub(unchecked_pattern,
-                                            f"- [x] {task} ✅ {current_date}",
-                                            updated_content, count=1)
+            # 2. Check off completed tasks
+            if 'tasks_to_check' in edits and edits['tasks_to_check']:
+                for task in edits['tasks_to_check']:
+                    # Only check off if it's currently unchecked
+                    unchecked_pattern = f"- \\[ \\] {re.escape(task)}"
+                    if re.search(unchecked_pattern, updated_content):
+                        updated_content = re.sub(unchecked_pattern,
+                                                f"- [x] {task} ✅ {current_date}",
+                                                updated_content, count=1)
 
         # SAFETY CHECKS
         updated_lines = updated_content.count('\n')
@@ -589,8 +666,12 @@ IMPORTANT:
         # Show what would be changed
         if dry_run:
             print("\n📝 Proposed changes:")
-            print(f"Progress update to append:\n{edits.get('progress_update', 'None')}")
-            print(f"\nTasks to check: {edits.get('tasks_to_check', [])}")
+            if is_tomorrow:
+                print(f"Priorities update:\n{edits.get('priorities_update', 'None')[:200]}...")
+                print(f"\nNotes: {edits.get('notes', 'None')}")
+            else:
+                print(f"Progress update to append:\n{edits.get('progress_update', 'None')}")
+                print(f"\nTasks to check: {edits.get('tasks_to_check', [])}")
             print("\n✅ Dry run complete - no changes made")
         else:
             # Write updated content back to file
@@ -599,7 +680,8 @@ IMPORTANT:
 
             # Check if content actually changed
             if updated_content != original_content:
-                print(f"✅ Updated {review_file}")
+                file_type = "tomorrow's plan" if is_tomorrow else "today's plan"
+                print(f"✅ Updated {file_type}: {review_file}")
             else:
                 print(f"⚠️  API returned no changes - {review_file} unchanged")
                 print("This might indicate the AI couldn't determine what to update.")
@@ -612,36 +694,45 @@ IMPORTANT:
                 f.write(backup_content)
         sys.exit(1)
 
-def create_review_from_template():
-    """Create daily review file from template if it doesn't exist"""
-    review_file = get_review_file_path()
+def _create_file_from_template(file_path, target_date, is_tomorrow=False):
+    """Helper function to create a plan file from template
 
-    if Path(review_file).exists():
-        return review_file
-
+    Args:
+        file_path: Path where the file should be created
+        target_date: datetime object for the target date
+        is_tomorrow: Whether this is tomorrow's plan (adds draft note)
+    """
     template_file = "vault/templates/daily-plan.md"
     if not Path(template_file).exists():
-        return review_file
-
-    print(f"📝 Creating daily plan from template...")
+        return
 
     # Ensure directory exists
-    Path(review_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     # Read template
     with open(template_file, 'r') as f:
         content = f.read()
 
-    # Replace template variables
-    now = datetime.now()
-    stage_theme, stage_focus = get_stage_info()
+    # Get stage info for the target date
+    day_of_week = target_date.strftime('%A')
+    stages = {
+        'Monday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Wednesday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Saturday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Thursday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Sunday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Tuesday': ('Off Stage', 'Personal time, nature, friends, reading'),
+        'Friday': ('Off Stage', 'Personal time, nature, friends, reading'),
+    }
+    stage_theme, stage_focus = stages.get(day_of_week, ('Unknown', 'Unknown'))
 
+    # Replace template variables
     replacements = {
-        '{{DAY_OF_WEEK}}': now.strftime('%A'),
-        '{{MONTH_NAME}}': now.strftime('%B'),
-        '{{DAY}}': str(now.day),
-        '{{YEAR}}': str(now.year),
-        '{{FULL_DATE}}': now.strftime('%B %d, %Y'),
+        '{{DAY_OF_WEEK}}': target_date.strftime('%A'),
+        '{{MONTH_NAME}}': target_date.strftime('%B'),
+        '{{DAY}}': str(target_date.day),
+        '{{YEAR}}': str(target_date.year),
+        '{{FULL_DATE}}': target_date.strftime('%B %d, %Y'),
         '{{STAGE_THEME}}': stage_theme,
         '{{STAGE_FOCUS}}': stage_focus,
         '{{PRIORITIES_FROM_DATABASE}}': '',
@@ -653,16 +744,48 @@ def create_review_from_template():
     for key, value in replacements.items():
         content = content.replace(key, value)
 
+    # Add draft note for tomorrow's plan
+    if is_tomorrow:
+        draft_note = "\n> [!info] Draft Plan\n> This is a preliminary plan for tomorrow. It will be refined throughout today.\n\n"
+        # Insert after the stage focus line
+        content = content.replace('**Theme:** ' + stage_focus,
+                                 '**Theme:** ' + stage_focus + draft_note)
+
     # Write the new review file
-    with open(review_file, 'w') as f:
+    with open(file_path, 'w') as f:
         f.write(content)
 
-    print(f"✅ Created daily plan: {review_file}\n")
-    return review_file
+def create_review_from_template():
+    """Create daily review files for today AND tomorrow from template"""
+    files_created = []
+
+    # Create for today
+    today_file = get_review_file_path()
+    if not Path(today_file).exists():
+        print(f"📝 Creating today's plan from template...")
+        _create_file_from_template(today_file, datetime.now(), is_tomorrow=False)
+        files_created.append(('today', today_file))
+
+    # Create for tomorrow
+    tomorrow = datetime.now() + timedelta(days=1)
+    tomorrow_file = get_review_file_path(tomorrow)
+    if not Path(tomorrow_file).exists():
+        print(f"📝 Creating tomorrow's plan from template...")
+        _create_file_from_template(tomorrow_file, tomorrow, is_tomorrow=True)
+        files_created.append(('tomorrow', tomorrow_file))
+
+    if files_created:
+        print(f"✅ Created daily plans:")
+        for label, path in files_created:
+            print(f"   {label.capitalize()}: {path}")
+        print()
+
+    return today_file
 
 def run_interactive_session(direct_request=None, non_interactive=False):
     """Run the interactive Claude session"""
-    review_file = get_review_file_path()
+    today_file = get_review_file_path()
+    tomorrow_file = get_review_file_path(datetime.now() + timedelta(days=1))
     stage_theme, stage_focus = get_stage_info()
 
     # Get timezone from config
@@ -718,7 +841,8 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 - **Current Time**: {current_time}
 - **Date**: {current_date} ({day_of_week})
 - **Stage**: {stage_theme} - {stage_focus}
-- **Review File**: {review_file}
+- **Today's Review File**: {today_file}
+- **Tomorrow's Review File**: {tomorrow_file}
 - **Active Tasks**: {task_count} (Overdue: {overdue_count}, High Priority: {high_priority_count})
 - **Time Blocking Calendar**: e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com
 {health_metrics}
@@ -795,10 +919,13 @@ Please help me with my daily review."""
     # Session end summary
     print("\n" + "━" * 50)
     print("✅ Claude session ended\n")
-    print(f"📝 Your review should be in: {review_file}\n")
+    print(f"📝 Your plans are in:")
+    print(f"   Today: {today_file}")
+    print(f"   Tomorrow: {tomorrow_file}\n")
     print("💡 Continue tracking progress with:")
     print("   bin/mark-done 'task description'")
     print("   bin/progress 'note'")
+    print("   bin/today update  # Update both files with progress")
     print("━" * 50 + "\n")
 
 def main():

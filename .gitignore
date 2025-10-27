@@ -9,6 +9,11 @@ dist/
 .data/
 .vscode-cli/
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Google Calendar Service Account Key
 google-calendar-key.json
 .last-dep-check

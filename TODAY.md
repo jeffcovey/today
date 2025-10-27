@@ -6,13 +6,17 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 1. Checks Claude authentication
 2. Syncs all data sources
 3. Updates the SQLite database with comprehensive content
-4. Starts this interactive session where Claude will **IMMEDIATELY**:
+4. Creates both today's and tomorrow's plan files (if they don't exist)
+5. Starts this interactive session where Claude will **IMMEDIATELY**:
    - Query the database for comprehensive daily data
    - Populate today's plan file at `vault/plans/YYYY_QQ_MM_W##_DD.md` with:
      - Categorized priorities from database
      - Time blocks scheduled around calendar events
      - Status summary with urgent items
-   - Create calendar time blocking events for top 5-6 priorities
+   - Populate tomorrow's plan file at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md` with:
+     - Preliminary priorities and upcoming events
+     - Draft time blocks based on stage theme
+   - Create calendar time blocking events for TODAY's top 5-6 priorities
    - Then remain available for follow-up questions and tasks
 
 **NO WAITING FOR APPROVAL** - Claude should complete all these steps automatically in the first response.
@@ -353,7 +357,7 @@ Based on database queries AND hierarchical plan alignment:
 
 1. **Query database** - Use `bin/db-query daily` (pre-approved, no permission needed)
 2. **Calculate current time/day** - Already provided in pre-computed context
-3. **Populate the daily plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
+3. **Populate TODAY's plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
    - Fill in "Top Priorities" section with categorized tasks from database:
      - 🚨 Critical (Do First) - High priority urgent items
      - ⚡ Quick Wins (<15 min)
@@ -368,12 +372,17 @@ Based on database queries AND hierarchical plan alignment:
      - Urgent items needing attention
      - System health issues
      - Wins/achievements
-4. **Create calendar time blocks** - Immediately run `bin/calendar add` for top 5-6 priorities:
+4. **Populate TOMORROW's plan file** at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md`:
+   - Add preliminary priorities based on overdue tasks and upcoming deadlines
+   - Note calendar events scheduled for tomorrow
+   - Suggest time blocks based on tomorrow's stage theme
+   - Keep it lightweight - this is a draft to refine throughout today
+5. **Create calendar time blocks for TODAY** - Immediately run `bin/calendar add` for top 5-6 priorities:
    - Schedule around existing calendar events
    - Include evening routine block
    - Use pre-approved calendar: `e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com`
-5. **Confirm completion** - Brief summary of what was done
-6. **Stay engaged** - Then remain available for follow-up questions
+6. **Confirm completion** - Brief summary of what was done
+7. **Stay engaged** - Then remain available for follow-up questions
 
 **DO NOT:**
 - Present analysis and wait for permission
