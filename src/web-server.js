@@ -3113,6 +3113,10 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
   return content;
 }
 
+// Simple cache for task query results (expires after 30 seconds)
+const taskQueryCache = new Map();
+const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
+
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
   const db = getDatabase();
@@ -3142,18 +3146,55 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Get all tasks from database cache
+  // Check cache first
+  const cacheKey = JSON.stringify({ filters, sortBy, sortReverse, groupBy });
+  const cached = taskQueryCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < TASK_QUERY_CACHE_TTL)) {
+    console.log(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
+    return cached.result;
+  }
+
+  // Build optimized SQL query with WHERE clauses
+  let sqlWhere = [`file_path NOT LIKE '%/.%'`,
+                  `file_path NOT LIKE '%/@inbox/%'`,
+                  `file_path NOT LIKE '%/node_modules/%'`];
+  let needsJsFiltering = false;
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const todayStr = todayDate.toISOString().split('T')[0];
+
+  // Analyze filters to build SQL WHERE clauses
+  for (const filter of filters) {
+    if (filter === 'done') {
+      sqlWhere.push(`line_text LIKE '- [x]%' OR line_text LIKE '- [X]%'`);
+    } else if (filter === 'not done') {
+      sqlWhere.push(`line_text LIKE '- [ ]%'`);
+    } else if (filter === 'done today') {
+      // Optimize for "done today" - the most common query
+      sqlWhere.push(`(line_text LIKE '- [x]%' OR line_text LIKE '- [X]%')`);
+      sqlWhere.push(`line_text LIKE '%✅ ${todayStr}%'`);
+    } else if (filter.startsWith('path includes ')) {
+      const pathPattern = filter.replace('path includes ', '').trim();
+      sqlWhere.push(`file_path LIKE '%${pathPattern}%'`);
+    } else if (filter.startsWith('path does not include ')) {
+      const pathPattern = filter.replace('path does not include ', '').trim();
+      sqlWhere.push(`file_path NOT LIKE '%${pathPattern}%'`);
+    } else {
+      // Complex filters need JavaScript processing
+      needsJsFiltering = true;
+    }
+  }
+
+  // Get filtered tasks from database
   let taskRows;
   try {
-    // Exclude hidden directories and @inbox from results
-    taskRows = db.prepare(`
+    const sql = `
       SELECT file_path, line_number, line_text
       FROM markdown_tasks
-      WHERE file_path NOT LIKE '%/.%'
-        AND file_path NOT LIKE '%/@inbox/%'
-        AND file_path NOT LIKE '%/node_modules/%'
-    `).all();
-    console.log(`[DEBUG] Found ${taskRows.length} total task lines from database`);
+      WHERE ${sqlWhere.join(' AND ')}
+    `;
+    taskRows = db.prepare(sql).all();
+    console.log(`[DEBUG] SQL filtered: ${taskRows.length} tasks (from ~6600 total)`);
   } catch (error) {
     console.error('[DEBUG] Error querying database:', error.message);
     taskRows = [];
@@ -3298,7 +3339,9 @@ async function executeTasksQuery(query) {
       return a[0].localeCompare(b[0]);
     });
 
-    return { grouped: sortedGroups };
+    const result = { grouped: sortedGroups };
+    taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
+    return result;
   } else if (groupBy && groupBy.includes('function')) {
     // Simple implementation for grouping by file path
     // This handles "group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')"
@@ -3319,10 +3362,14 @@ async function executeTasksQuery(query) {
       return a[0].localeCompare(b[0]);
     });
 
-    return { grouped: sortedGroups, groupType: 'custom' };
+    const result = { grouped: sortedGroups, groupType: 'custom' };
+    taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
+    return result;
   }
 
-  return { tasks: filtered };
+  const result = { tasks: filtered };
+  taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
+  return result;
 }
 
 // Process tasks code blocks in markdown content
