@@ -2144,10 +2144,10 @@ program
       let archiveTasks = archiveContent.split('\n').filter(line => line.trim());
       let totalArchived = 0;
 
-      // Find all task files including tasks.md
+      // Find all task files including tasks.md and repeating.md
       const allFiles = await fs.readdir(tasksDir);
       const taskFiles = allFiles
-        .filter(f => f === 'tasks.md' || f.match(/^tasks-\d+\.md$/))
+        .filter(f => f === 'tasks.md' || f === 'repeating.md' || f.match(/^tasks-\d+\.md$/))
         .map(f => path.join(tasksDir, f))
         .sort(); // Sort to process tasks.md first
 
@@ -2156,7 +2156,7 @@ program
         return;
       }
 
-      console.log(chalk.gray(`Checking ${taskFiles.length} task files...`));
+      console.log(chalk.gray(`Checking ${taskFiles.length} task files (including repeating.md)...`));
 
       // Process each task file - archive completed tasks
       for (const filePath of taskFiles) {
