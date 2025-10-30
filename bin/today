@@ -474,6 +474,21 @@ def _update_single_file(review_file, is_tomorrow, dry_run, api_key):
         print(f"❌ Failed to query database: {e}")
         sys.exit(1)
 
+    # Get detailed time tracking data
+    try:
+        result = subprocess.run(
+            ['bin/track', 'today'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        time_tracking_data = result.stdout
+        # Add time tracking to daily data
+        daily_data += "\n\n=== DETAILED TIME TRACKING ===\n" + time_tracking_data
+    except subprocess.CalledProcessError:
+        # If bin/track fails, continue without time tracking details
+        pass
+
     # Read current review file and create backup
     with open(review_file, 'r') as f:
         original_content = f.read()
@@ -558,10 +573,12 @@ Create a new Progress Update section to append to the end of the file.
 Compare the current file with the database to see what's changed or been accomplished.
 
 This should summarize:
-1. What's been accomplished since the last update (tasks checked off, workouts done, meetings attended)
+1. What's been accomplished since the last update (tasks checked off, workouts done, meetings attended, time tracked)
 2. Current status of high-priority items
 3. Any new events, emails, or tasks that need attention
 4. Overall progress and any blockers
+
+NOTE: The database includes detailed time tracking data showing what you've worked on today and for how long. Use this to provide context about your day.
 
 RETURN A JSON OBJECT:
 {{
@@ -580,11 +597,12 @@ IMPORTANT:
     client = anthropic.Anthropic(api_key=api_key)
 
     try:
-        # NOTE: This model is deprecated as of Oct 22, 2025
-        # TODO: Update to newer model when available (check https://docs.anthropic.com/en/docs/about-claude/models)
-        # Try: claude-sonnet-4-YYYYMMDD or claude-3-5-sonnet-YYYYMMDD
+        # Use model from environment variable or default to latest Sonnet
+        # Set CLAUDE_MODEL in .env to override (e.g., claude-haiku-4-5-20251001 for speed)
+        import os
+        model = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-5-20250929')
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model=model,
             max_tokens=2000,
             temperature=0,
             timeout=60.0,  # 60 second timeout
