@@ -462,13 +462,7 @@ async function cmdToday() {
 
     const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-    let duration;
-    if (end === 'RUNNING') {
-      const currentTime = getCurrentTime();
-      duration = calculateDuration(start, currentTime);
-    } else {
-      duration = calculateDuration(start, end);
-    }
+    const duration = calculateDuration(start, end);
 
     totalMinutes += duration;
     topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
@@ -481,14 +475,14 @@ async function cmdToday() {
         hour12: true,
         timeZone: TIMEZONE
       });
-      const endTime = end === 'RUNNING' ? 'now' : new Date(end).toLocaleTimeString('en-US', {
+      const endTime = new Date(end).toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
         timeZone: TIMEZONE
       });
 
-      const symbol = end === 'RUNNING' ? chalk.yellow('●') : chalk.green('✓');
+      const symbol = chalk.green('✓');
       console.log(`  ${symbol} ${startTime} - ${endTime} (${formatDuration(duration * 60)})`);
       console.log(`    ${description}`);
     } catch {
@@ -572,13 +566,7 @@ async function cmdWeek() {
 
       const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-      let duration;
-      if (end === 'RUNNING') {
-        const currentTime = getCurrentTime();
-        duration = calculateDuration(start, currentTime);
-      } else {
-        duration = calculateDuration(start, end);
-      }
+      const duration = calculateDuration(start, end);
 
       totalMinutes += duration;
       topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
@@ -680,7 +668,7 @@ async function cmdSyncDb() {
       let duration = 0;
       let endValue = 'NULL';
 
-      if (end && end !== 'RUNNING') {
+      if (end) {
         duration = calculateDuration(start, end);
         endValue = `'${end}'`;
       }
