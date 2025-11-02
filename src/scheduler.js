@@ -55,28 +55,24 @@ const jobs = [
         description: 'Quick sync'
     },
     {
-        schedule: '30 * * * *', // Every hour at :30 (half past)
+        schedule: '30 * * * *', // Every hour at :30 (half past) EST
         command: 'bin/sync ; bin/tasks classify-stages ; bin/tasks prioritize-status ; bin/tasks add-topics ; bin/track add-topics || true', // Full sync + task management + time tracking
-        description: 'Full sync, task management, and time tracking auto-tagging',
-        timezone: true
+        description: 'Full sync, task management, and time tracking auto-tagging'
     },
     {
-        schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EDT
+        schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EST
         command: 'bin/today update || true',
-        description: 'Update today and tomorrow daily plans with Claude API',
-        timezone: true
+        description: 'Update today and tomorrow daily plans with Claude API'
     },
     {
-        schedule: '0 3 * * *', // Daily at 3 AM
+        schedule: '0 3 * * *', // Daily at 3 AM EST
         command: 'bin/notion daily --all || true', // Run all Notion daily automation tasks
-        description: 'Notion daily automation (temporary until migration)',
-        timezone: true
+        description: 'Notion daily automation (temporary until migration)'
     },
     {
-        schedule: '0 2 * * *', // Daily at 2 AM
+        schedule: '0 2 * * *', // Daily at 2 AM EST
         command: 'bin/vault-snapshot || true', // Backup vault daily
-        description: 'Daily vault snapshot backup',
-        timezone: true
+        description: 'Daily vault snapshot backup'
     },
     // {
     //     schedule: '*/5 * * * *', // Every 5 minutes
@@ -89,34 +85,29 @@ const jobs = [
         description: 'Clean up old systemd logs'
     },
     {
-        schedule: '0 4 * * *', // Daily at 4 AM
+        schedule: '0 4 * * *', // Daily at 4 AM EST
         command: 'systemctl restart vault-watcher || true',
-        description: 'Restart vault-watcher to ensure latest code',
-        timezone: true
+        description: 'Restart vault-watcher to ensure latest code'
     },
     {
-        schedule: '15 * * * *', // Every hour at :15 (quarter past)
+        schedule: '15 * * * *', // Every hour at :15 (quarter past) EST
         command: 'bin/tasks update-cache || true',
-        description: 'Refresh markdown tasks cache',
-        timezone: false
+        description: 'Refresh markdown tasks cache'
     },
     {
-        schedule: '0 */6 * * *', // Every 6 hours
+        schedule: '0 */6 * * *', // Every 6 hours EST
         command: 'bin/droplet-maintenance || true',
-        description: 'Droplet maintenance (cleanup logs, check processes)',
-        timezone: false
+        description: 'Droplet maintenance (cleanup logs, check processes)'
     },
     {
         schedule: '*/15 * * * *', // Every 15 minutes
         command: 'bin/droplet-monitor || true',
-        description: 'Monitor droplet health',
-        timezone: false
+        description: 'Monitor droplet health'
     },
     {
-        schedule: '0 1 * * *', // Daily at 1 AM
+        schedule: '0 1 * * *', // Daily at 1 AM EST
         command: 'bin/tasks archive-completed || true',
-        description: 'Archive completed tasks',
-        timezone: true
+        description: 'Archive completed tasks'
     }
 ];
 
