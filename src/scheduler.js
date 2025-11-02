@@ -120,16 +120,16 @@ const jobs = [
     }
 ];
 
-import { getTimezone } from './config.js';
+// Note: node-cron has known bugs with the timezone option (memory leaks, doesn't work properly)
+// Instead, we rely on the TZ environment variable set in the systemd service
+// This makes cron expressions run in America/New_York timezone automatically
 
 jobs.forEach(job => {
-    const options = job.timezone ? { timezone: process.env.TZ || getTimezone() } : {};
-
     console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
 
     cron.schedule(job.schedule, () => {
         runCommand(job.command, job.description);
-    }, options);
+    });
 });
 
 console.log(`\n✨ Scheduler running with ${jobs.length} jobs`);
