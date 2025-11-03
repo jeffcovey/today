@@ -69,23 +69,28 @@ setup_ssh() {
         chown -R node:node /home/node/.ssh
     fi
     
+    # Set password for node user for iPad/mobile SSH access
+    # Default password is 'ipad2025' - change via SSH_PASSWORD env var
+    SSH_PASSWORD="${SSH_PASSWORD:-ipad2025}"
+    echo "node:$SSH_PASSWORD" | sudo chpasswd
+    echo "Set SSH password for user 'node'"
+
     # Configure SSH daemon
     sudo tee /etc/ssh/sshd_config.d/devcontainer.conf > /dev/null << 'EOF'
 # Dev container SSH configuration
 Port 2222
 PermitRootLogin no
-PasswordAuthentication no
+PasswordAuthentication yes
 PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 X11Forwarding yes
 PrintMotd no
 AcceptEnv LANG LC_*
-Subsystem sftp /usr/lib/openssh/sftp-server
 EOF
-    
+
     # Start SSH service
     echo "Starting SSH daemon..."
-    sudo service ssh start
+    sudo service ssh restart
     
     print_status "✅ SSH server setup complete!"
     echo ""

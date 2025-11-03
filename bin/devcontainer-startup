@@ -35,11 +35,8 @@ fi
 # Skip Resilio Sync in container since we're using mounted vault
 echo "ℹ️  Skipping Resilio Sync in container - using mounted iCloud vault"
 
-# Start code-server
-if [ -f "bin/start-code-server" ]; then
-    echo "Starting code-server..."
-    bash bin/start-code-server || echo "code-server startup failed"
-fi
+# Note: code-server is not started automatically
+# Run 'bin/start-code-server' manually when needed for remote access
 
 # Create a summary file for easy access
 mkdir -p ~/.config/devcontainer

@@ -69,6 +69,27 @@ Docker Container (Tailscale + SSH/VS Code)
 - **Access Control**: Can set ACLs in Tailscale admin console
 - **No exposed ports**: No public internet exposure
 
+### Default Passwords
+
+The container is configured with default passwords for convenience:
+- **SSH Password**: `ipad2025`
+- **VS Code Server Password**: `ipad2025`
+
+⚠️ **Security Note**: These passwords are only accessible over the Tailscale network (encrypted WireGuard tunnel), not the public internet. However, you should change them if:
+- You share your Tailscale network with others
+- You want additional security
+
+To change passwords:
+```bash
+# Change SSH password
+export SSH_PASSWORD="your-secure-password"
+bin/setup --ssh
+
+# Change code-server password
+export CODE_SERVER_PASSWORD="your-secure-password"
+bin/start-code-server
+```
+
 ## Benefits
 
 - ✅ **Zero configuration networking** - Works through NAT/firewalls
@@ -101,10 +122,27 @@ tailscale ip -4
 
 ### 3. Connect from iPad
 
-1. Install Tailscale app
-2. Sign in with same account
-3. Use SSH client with: `node@[tailscale-ip]:2222`
-4. Or use VS Code for Web at vscode.dev
+#### SSH Access (Terminal)
+
+1. Install Tailscale app on iPad
+2. Sign in with same Tailscale account
+3. Install an SSH client (Blink, Termius, etc.)
+4. Connect using:
+   ```
+   ssh node@[tailscale-ip] -p 2222
+   ```
+5. **Password**: `ipad2025` (default, can be changed via `SSH_PASSWORD` env var)
+
+#### VS Code Server Access (Browser-based IDE)
+
+1. Start code-server in the container:
+   ```bash
+   bin/start-code-server
+   ```
+2. Open in iPad browser: `http://[tailscale-ip]:8081`
+3. **Password**: `ipad2025` (default, can be changed via `CODE_SERVER_PASSWORD` env var)
+
+Note: code-server is not started automatically on container startup - run it manually when needed.
 
 ## Troubleshooting
 
@@ -119,6 +157,16 @@ tailscale ip -4
 - Verify SSH is running: `service ssh status`
 - Check Tailscale IP: `tailscale ip -4`
 - Ensure both devices are on same Tailnet
+- Default password is `ipad2025`
+- If using Blink on iPad, use `-p 2222` flag (not colon syntax)
+
+### Can't connect to VS Code Server
+
+- Ensure code-server is running: `ps aux | grep code-server`
+- Start it manually: `bin/start-code-server`
+- Check logs: `cat ~/.config/code-server/code-server.log`
+- Default password is `ipad2025`
+- Access at: `http://[tailscale-ip]:8081`
 
 ### Auth key setup
 
