@@ -16,10 +16,14 @@ fi
 # Create config directory
 mkdir -p ~/.config/code-server
 
-# Generate config with no auth
+# Get password from environment or use default
+CODE_SERVER_PASSWORD="${CODE_SERVER_PASSWORD:-ipad2025}"
+
+# Generate config with password auth
 cat > ~/.config/code-server/config.yaml <<EOF
 bind-addr: 0.0.0.0:8081
-auth: none
+auth: password
+password: $CODE_SERVER_PASSWORD
 cert: false
 EOF
 
@@ -44,7 +48,7 @@ fi
 
 # Run code-server in background with verbose logging
 # Temporarily unset VS Code IPC hook for code-server only
-(unset VSCODE_IPC_HOOK_CLI && nohup code-server --bind-addr 0.0.0.0:8081 --auth none --disable-telemetry --log debug /workspaces/$PROJECT_NAME > ~/.config/code-server/code-server.log 2>&1) &
+(unset VSCODE_IPC_HOOK_CLI && nohup code-server --bind-addr 0.0.0.0:8081 --auth password --disable-telemetry --log debug /workspaces/$PROJECT_NAME > ~/.config/code-server/code-server.log 2>&1) &
 
 # Save PID for later management
 echo $! > ~/.config/code-server/code-server.pid
@@ -68,7 +72,7 @@ else
         cat ~/.config/code-server/code-server.log
     else
         echo "Log file is empty or doesn't exist. Trying to run code-server directly:"
-        code-server --bind-addr 0.0.0.0:8081 --auth none --disable-telemetry /workspaces/$PROJECT_NAME &
+        code-server --bind-addr 0.0.0.0:8081 --auth password --disable-telemetry /workspaces/$PROJECT_NAME &
         sleep 2
         jobs
         kill %1 2>/dev/null || true
