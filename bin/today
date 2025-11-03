@@ -40,11 +40,14 @@ def load_dotenv():
     except Exception:
         pass  # Continue without the key
 
-def get_review_file_path(target_date=None):
-    """Calculate the review file path for a given date using configured timezone
+def get_date_components(target_date=None):
+    """Get year, month, day, week, quarter for a given date
 
     Args:
         target_date: datetime object for the target date, or None for today
+
+    Returns:
+        tuple: (year, month, day, week, quarter, timezone)
     """
     # Get timezone from config
     timezone = 'America/New_York'  # default
@@ -83,6 +86,15 @@ def get_review_file_path(target_date=None):
     # Determine quarter
     quarter = f"Q{(month - 1) // 3 + 1}"
 
+    return (year, month, day, week, quarter, timezone)
+
+def get_review_file_path(target_date=None):
+    """Calculate the review file path for a given date using configured timezone
+
+    Args:
+        target_date: datetime object for the target date, or None for today
+    """
+    year, month, day, week, quarter, _ = get_date_components(target_date)
     return f"vault/plans/{year}_{quarter}_{month:02d}_W{week:02d}_{day:02d}.md"
 
 def get_stage_info():
@@ -407,6 +419,96 @@ def check_claude_auth():
 
     print("✅ Claude is authenticated\n")
 
+def ensure_time_tracking_widgets(dry_run=False):
+    """Ensure all active plan files have time tracking widgets"""
+    from datetime import datetime
+    import re
+
+    print("⏱️  Checking time tracking widgets...")
+
+    # Get current date components
+    year, month, day, week, quarter, timezone = get_date_components()
+
+    # Define plan files with their date ranges
+    # Quarter end days: Q1=March 31, Q2=June 30, Q3=Sept 30, Q4=Dec 31
+    quarter_end_days = [31, 30, 30, 31]
+    plan_files = [
+        (f"vault/plans/{year}_00.md", f"{year}-01-01", f"{year}-12-31", "Year"),
+        (f"vault/plans/{year}_{quarter}_00.md",
+         f"{year}-{((int(quarter[1]) - 1) * 3) + 1:02d}-01",
+         f"{year}-{int(quarter[1]) * 3:02d}-{quarter_end_days[int(quarter[1])-1]:02d}",
+         f"{quarter}"),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_00.md",
+         f"{year}-{month:02d}-01",
+         f"{year}-{month:02d}-{[31,28,31,30,31,30,31,31,30,31,30,31][month-1]:02d}",
+         datetime(year, month, 1).strftime('%B')),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_W{week:02d}_00.md",
+         None,  # Week calculation is complex, we'll handle specially
+         None,
+         f"Week {week}")
+    ]
+
+    # Calculate week start/end for the week file
+    result = subprocess.run([f'TZ={timezone} date -d "$(date +%Y-W{week:02d}-1)" "+%Y-%m-%d"'],
+                          shell=True, capture_output=True, text=True)
+    if result.returncode == 0:
+        week_start = result.stdout.strip()
+        result = subprocess.run([f'TZ={timezone} date -d "{week_start} +6 days" "+%Y-%m-%d"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            week_end = result.stdout.strip()
+            # Update the week file entry with actual dates
+            plan_files[3] = (plan_files[3][0], week_start, week_end, plan_files[3][3])
+
+    files_updated = []
+
+    for file_path, start_date, end_date, period_name in plan_files:
+        if not Path(file_path).exists():
+            continue
+
+        if start_date is None or end_date is None:
+            continue
+
+        # Read file content
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        # Check if time tracking widget already exists
+        if 'scripts/time-tracking-widget' in content:
+            continue
+
+        # Check if there's already a time tracking section (old style)
+        if re.search(r'## ⏱️ Time Tracking', content):
+            continue
+
+        # Add time tracking widget at the end
+        widget_section = f"""
+## ⏱️ Time Tracking - {period_name}
+
+```dataviewjs
+await dv.view("scripts/time-tracking-widget", {{ startDate: '{start_date}', endDate: '{end_date}' }});
+```
+"""
+
+        updated_content = content.rstrip() + '\n' + widget_section + '\n'
+
+        if dry_run:
+            print(f"   Would add time tracking to: {file_path}")
+        else:
+            with open(file_path, 'w') as f:
+                f.write(updated_content)
+            files_updated.append((period_name, file_path))
+
+    if files_updated:
+        if not dry_run:
+            print(f"✅ Added time tracking widgets to {len(files_updated)} file(s):")
+            for period_name, file_path in files_updated:
+                print(f"   {period_name}: {file_path}")
+    else:
+        print("✅ All plan files have time tracking widgets")
+
+    print()
+
 def update_review_file(dry_run=False):
     """Update both today's and tomorrow's review files using Claude API"""
     import anthropic
@@ -425,6 +527,9 @@ def update_review_file(dry_run=False):
         print("❌ TODAY_ANTHROPIC_KEY not found in environment")
         print("Please ensure it's set in .env and encrypted with dotenvx")
         sys.exit(1)
+
+    # Ensure all plan files have time tracking widgets
+    ensure_time_tracking_widgets(dry_run=dry_run)
 
     # Update today's file
     today_file = get_review_file_path()
