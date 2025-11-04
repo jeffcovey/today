@@ -1028,8 +1028,8 @@ cleanup_time_blocking() {
         return 0
     fi
 
-    print_info "Cleaning up past Time Blocking events..."
-    cleanup_output=$(bin/calendar cleanup "$TIME_BLOCKING_CAL" 2>&1)
+    print_info "Cleaning up past Time Blocking events (keeping last 2 days)..."
+    cleanup_output=$(bin/calendar cleanup "$TIME_BLOCKING_CAL" 2 2>&1)
 
     if echo "$cleanup_output" | grep -q "✅"; then
         # Extract deleted count if shown

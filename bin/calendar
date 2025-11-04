@@ -948,7 +948,7 @@ class CalendarSync {
   }
 
   // Clean up past events from a specific calendar
-  async cleanupPastEvents(calendarId, beforeDate = null) {
+  async cleanupPastEvents(calendarId, beforeDate = null, daysToKeep = 0) {
     try {
       if (!calendarId) {
         throw new Error('Calendar ID is required for cleanup');
@@ -979,8 +979,14 @@ class CalendarSync {
 
       const calendar = google.calendar({ version: 'v3', auth });
 
-      // Set default cutoff to start of today
-      const cutoffDate = beforeDate || new Date();
+      // Set cutoff date: if beforeDate is provided, use it; otherwise use today minus daysToKeep
+      let cutoffDate;
+      if (beforeDate) {
+        cutoffDate = new Date(beforeDate);
+      } else {
+        cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+      }
       cutoffDate.setHours(0, 0, 0, 0);
 
       // Go back 2 years to catch all historical events
@@ -1230,22 +1236,32 @@ Example:
     case 'cleanup':
       // Clean up past events from a calendar
       const cleanupCalendarId = process.argv[3];
+      const daysToKeepCleanup = parseInt(process.argv[4]) || 0;
 
       if (!cleanupCalendarId || cleanupCalendarId === '--help') {
         console.log(`
-Usage: calendar cleanup <calendar-id>
+Usage: calendar cleanup <calendar-id> [days-to-keep]
 
-Delete all past events (before today) from the specified calendar.
+Delete past events from the specified calendar, optionally keeping recent days.
 Useful for time blocking calendars where old events are no longer needed.
 
-Example:
+Arguments:
+  calendar-id   - The calendar ID to clean up
+  days-to-keep  - Number of recent days to keep (default: 0, deletes all past events)
+
+Examples:
   calendar cleanup "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+  calendar cleanup "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" 2
         `);
         break;
       }
 
-      console.log(`🗑️  Cleaning up past events from calendar...`);
-      const cleanupResult = await calSync.cleanupPastEvents(cleanupCalendarId);
+      if (daysToKeepCleanup > 0) {
+        console.log(`🗑️  Cleaning up past events (keeping last ${daysToKeepCleanup} days)...`);
+      } else {
+        console.log(`🗑️  Cleaning up all past events from calendar...`);
+      }
+      const cleanupResult = await calSync.cleanupPastEvents(cleanupCalendarId, null, daysToKeepCleanup);
 
       if (cleanupResult.deleted > 0) {
         console.log(`✅ Deleted ${cleanupResult.deleted} past event(s)`);
