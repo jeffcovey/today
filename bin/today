@@ -659,7 +659,10 @@ RETURN A JSON OBJECT with updated priorities section:
 IMPORTANT:
 - Keep it lightweight - this is a draft
 - Focus on actionable items
-- Use proper Obsidian Tasks syntax with emojis and tags
+- Use simple checkboxes: "- [ ] Task description"
+- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+- Created date (➕) is fine - scripts add this automatically
+- Plan files use simple tasks - scheduling belongs in project/topic files only
 """
     else:
         prompt = f"""You are updating TODAY's daily plan with a progress update.
@@ -696,7 +699,10 @@ IMPORTANT:
 - Look at completed tasks in the file (marked [x]) since the last Progress Update
 - The update should be 2-4 bullet points, concise but informative
 - Only mark tasks as done if you see clear evidence (like workout exercises checked off)
-- Use the exact timezone offset in the timestamp: {tz_offset}"""
+- Use the exact timezone offset in the timestamp: {tz_offset}
+- Use simple checkboxes: "- [ ] Task description"
+- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+- Created date (➕) is fine - scripts add this automatically"""
 
     # Call Claude API
     client = anthropic.Anthropic(api_key=api_key)

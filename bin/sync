@@ -81,7 +81,8 @@ main() {
     run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
-    
+    run_sync_step "📋 Clean Plan Tasks" clean_plan_file_tasks "Plan tasks cleaned" "Plan task cleanup"
+
     # DISABLED: Task sync now handled by Obsidian Tasks plugin
     # SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
     run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
@@ -480,10 +481,79 @@ clean_markdown_files() {
 clean_database_task_titles() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # DISABLED: task-id cleanup no longer needed with Obsidian Tasks
     # Titles no longer contain task-id comments
-    
+
+    return 0
+}
+
+# Clean plan file tasks - remove date/recurrence properties
+clean_plan_file_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Cleaning tasks in plan files (removing date/recurrence properties)..."
+
+    # Find all markdown files in vault/plans/
+    PLAN_FILES=$(find vault/plans -type f -name "*.md" 2>/dev/null)
+
+    if [[ -z "$PLAN_FILES" ]]; then
+        print_info "No plan files found"
+        return 0
+    fi
+
+    CLEANED_COUNT=0
+    TASK_COUNT=0
+
+    # Process each plan file
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        # Check if file has tasks with date/recurrence properties (but NOT created date ➕)
+        if grep -qE '^\s*-\s*\[[x ]\].*[📅⏳🔁]' "$file" 2>/dev/null; then
+            # Create temp file
+            TEMP_FILE=$(mktemp)
+
+            # Process each line
+            FILE_MODIFIED=false
+            while IFS= read -r line; do
+                # Check if line is a task with date/recurrence properties
+                if echo "$line" | grep -qE '^\s*-\s*\[[x ]\].*[📅⏳🔁]'; then
+                    # Remove date and recurrence properties (but keep ➕ created date)
+                    # Remove 📅 YYYY-MM-DD (due date)
+                    cleaned_line=$(echo "$line" | sed -E 's/📅\s*[0-9]{4}-[0-9]{2}-[0-9]{2}//g')
+                    # Remove ⏳ YYYY-MM-DD (scheduled date)
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/⏳\s*[0-9]{4}-[0-9]{2}-[0-9]{2}//g')
+                    # Remove 🔁 recurrence patterns
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/🔁\s*every\s+[a-zA-Z0-9 ,]+//g')
+                    # Remove extra spaces (but preserve created date ➕ if present)
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/\s+/ /g' | sed -E 's/\s+$//')
+
+                    echo "$cleaned_line" >> "$TEMP_FILE"
+                    FILE_MODIFIED=true
+                    TASK_COUNT=$((TASK_COUNT + 1))
+                else
+                    echo "$line" >> "$TEMP_FILE"
+                fi
+            done < "$file"
+
+            # Replace file if modified
+            if [[ "$FILE_MODIFIED" == true ]]; then
+                mv "$TEMP_FILE" "$file"
+                CLEANED_COUNT=$((CLEANED_COUNT + 1))
+            else
+                rm -f "$TEMP_FILE"
+            fi
+        fi
+    done <<< "$PLAN_FILES"
+
+    if [[ $CLEANED_COUNT -gt 0 ]]; then
+        print_info "Cleaned $TASK_COUNT task(s) in $CLEANED_COUNT plan file(s)"
+    else
+        print_info "No tasks with date/recurrence properties found in plan files"
+    fi
+
     return 0
 }
 
@@ -1855,6 +1925,7 @@ case "${1:-}" in
         cleanup_sync_conflicts
         clean_markdown_files
         clean_database_task_titles
+        clean_plan_file_tasks
         process_inbox
         # DISABLED: Tasks now managed by Obsidian
         # SKIP_CLASSIFICATION=1 sync_tasks

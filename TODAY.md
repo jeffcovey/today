@@ -102,6 +102,12 @@ The `_00` suffix for aggregates ensures they sort before child items.
 - Time blocks left empty for manual/AI filling:
   - Morning, afternoon, evening sections ready for planning
   - Top priorities section has empty checkboxes to fill
+- **TASK FORMATTING IN PLAN FILES**:
+  - Use simple checkboxes ONLY: `- [ ] Task description`
+  - DO NOT add due dates (📅) or scheduled dates (⏳)
+  - DO NOT add recurrence (🔁 every week, etc.)
+  - Created date (➕) is fine - scripts add this automatically as metadata
+  - Plan files are for daily coordination - scheduling belongs in project/topic files
 - For incremental updates: Use `<details><summary>` tags to collapse old content
 
 ### Daily Plan Updates
