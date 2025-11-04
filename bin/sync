@@ -157,7 +157,10 @@ main() {
 
     # Clean up Time Blocking calendar past events
     run_sync_step "🗑️ Cleanup Time Blocking" cleanup_time_blocking "Time blocking cleaned" "Time blocking cleanup"
-    
+
+    # Sync time tracking entries to calendar
+    run_sync_step "⏱️ Sync Time Tracking to Calendar" sync_time_tracking_calendar "Time tracking synced to calendar" "Time tracking calendar sync"
+
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
     
@@ -1044,6 +1047,47 @@ cleanup_time_blocking() {
     else
         # Don't fail sync if cleanup fails - it's not critical
         print_info "Time blocking cleanup skipped (calendar may not exist)"
+        return 0
+    fi
+}
+
+# Sync time tracking entries to calendar
+sync_time_tracking_calendar() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Time Blocking calendar ID
+    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+
+    # Check if Google Calendar is configured
+    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
+        print_info "Google Calendar not configured, skipping time tracking sync"
+        return 0
+    fi
+
+    print_info "Syncing time tracking entries to calendar..."
+    sync_output=$(bin/calendar sync-time-tracking "$TIME_BLOCKING_CAL" 2>&1)
+
+    if echo "$sync_output" | grep -q "✅"; then
+        # Extract counts if shown
+        if echo "$sync_output" | grep -q "Already in sync"; then
+            total_count=$(echo "$sync_output" | grep -oE "Already in sync \([0-9]+ entries\)" | grep -oE "[0-9]+" || echo 0)
+            print_info "Time tracking already in sync ($total_count entries)"
+        elif echo "$sync_output" | grep -q "Added:"; then
+            added_count=$(echo "$sync_output" | grep -oE "Added: [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            removed_count=$(echo "$sync_output" | grep -oE "Removed: [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            if [[ "$added_count" -gt 0 ]] || [[ "$removed_count" -gt 0 ]]; then
+                print_info "Synced time tracking: +$added_count / -$removed_count entries"
+            else
+                print_info "Time tracking calendar synced"
+            fi
+        else
+            print_info "Time tracking calendar synced"
+        fi
+        return 0
+    else
+        # Don't fail sync if this fails - it's not critical
+        print_info "Time tracking calendar sync skipped"
         return 0
     fi
 }

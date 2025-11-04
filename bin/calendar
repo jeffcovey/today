@@ -779,6 +779,174 @@ class CalendarSync {
     }
   }
 
+  // Sync time tracking entries with calendar
+  async syncTimeTracking(calendarId, daysBack = 2) {
+    try {
+      if (!calendarId) {
+        throw new Error('Calendar ID is required for time tracking sync');
+      }
+
+      const TIME_TRACKING_EMOJI = '⏱️';
+
+      // Get service account credentials
+      let auth;
+
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+
+        auth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
+      } else {
+        throw new Error('No Google service account credentials found');
+      }
+
+      const calendar = google.calendar({ version: 'v3', auth });
+
+      // Calculate date range (today and previous N days)
+      const endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setHours(0, 0, 0, 0);
+
+      console.log(`🔄 Syncing time tracking entries from ${startDate.toDateString()} to ${endDate.toDateString()}...`);
+
+      // 1. Get time entries from database
+      const timeEntries = this.db.prepare(`
+        SELECT
+          id,
+          start_time,
+          end_time,
+          description,
+          topics
+        FROM time_entries
+        WHERE datetime(start_time) >= datetime('now', '-' || ? || ' days')
+          AND datetime(start_time) <= datetime('now')
+        ORDER BY start_time
+      `).all(daysBack);
+
+      console.log(`   Found ${timeEntries.length} time tracking entries in database`);
+
+      // Create a map of unique time entries (to handle duplicates)
+      const uniqueEntries = new Map();
+      for (const entry of timeEntries) {
+        const key = `${entry.start_time}|${entry.end_time}|${entry.description}`;
+        if (!uniqueEntries.has(key)) {
+          uniqueEntries.set(key, entry);
+        }
+      }
+
+      console.log(`   ${uniqueEntries.size} unique time entries after deduplication`);
+
+      // 2. Get existing calendar events with time tracking emoji
+      const response = await calendar.events.list({
+        calendarId: calendarId,
+        timeMin: startDate.toISOString(),
+        timeMax: endDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+      const calendarEvents = response.data.items || [];
+      const timeTrackingEvents = calendarEvents.filter(event =>
+        event.summary && event.summary.startsWith(TIME_TRACKING_EMOJI)
+      );
+
+      console.log(`   Found ${timeTrackingEvents.length} existing time tracking events in calendar`);
+
+      // 3. Create a map of existing events for comparison
+      const existingEventsMap = new Map();
+      for (const event of timeTrackingEvents) {
+        // Remove emoji prefix for comparison
+        const title = event.summary.replace(TIME_TRACKING_EMOJI + ' ', '');
+        const key = `${event.start.dateTime}|${event.end.dateTime}|${title}`;
+        existingEventsMap.set(key, event);
+      }
+
+      // 4. Find entries to add (in database but not in calendar)
+      const entriesToAdd = [];
+      for (const [key, entry] of uniqueEntries) {
+        const calendarKey = `${entry.start_time}|${entry.end_time}|${entry.description}`;
+        if (!existingEventsMap.has(calendarKey)) {
+          entriesToAdd.push(entry);
+        }
+      }
+
+      // 5. Find events to remove (in calendar but not in database)
+      const eventsToRemove = [];
+      for (const [key, event] of existingEventsMap) {
+        const title = event.summary.replace(TIME_TRACKING_EMOJI + ' ', '');
+        const dbKey = `${event.start.dateTime}|${event.end.dateTime}|${title}`;
+        if (!uniqueEntries.has(dbKey)) {
+          eventsToRemove.push(event);
+        }
+      }
+
+      console.log(`   ${entriesToAdd.length} entries to add, ${eventsToRemove.length} events to remove`);
+
+      // 6. Add missing entries to calendar
+      let addedCount = 0;
+      for (const entry of entriesToAdd) {
+        try {
+          const event = {
+            summary: `${TIME_TRACKING_EMOJI} ${entry.description}`,
+            start: {
+              dateTime: entry.start_time,
+              timeZone: this.defaultTimezone,
+            },
+            end: {
+              dateTime: entry.end_time,
+              timeZone: this.defaultTimezone,
+            },
+            reminders: {
+              useDefault: false,
+              overrides: []  // No reminders for time tracking entries
+            }
+          };
+
+          await calendar.events.insert({
+            calendarId: calendarId,
+            resource: event,
+          });
+
+          addedCount++;
+        } catch (error) {
+          console.error(`   ⚠️  Failed to add entry "${entry.description}": ${error.message}`);
+        }
+      }
+
+      // 7. Remove obsolete events from calendar
+      let removedCount = 0;
+      for (const event of eventsToRemove) {
+        try {
+          await calendar.events.delete({
+            calendarId: calendarId,
+            eventId: event.id,
+          });
+          removedCount++;
+        } catch (error) {
+          console.error(`   ⚠️  Failed to remove event "${event.summary}": ${error.message}`);
+        }
+      }
+
+      return { added: addedCount, removed: removedCount, total: uniqueEntries.size };
+    } catch (error) {
+      console.error('❌ Error syncing time tracking:', error.message);
+      throw error;
+    }
+  }
+
   // Clean up past events from a specific calendar
   async cleanupPastEvents(calendarId, beforeDate = null) {
     try {
@@ -1086,6 +1254,46 @@ Example:
       }
       break;
 
+    case 'sync-time-tracking':
+    case 'sync-tracking':
+      // Sync time tracking entries with calendar
+      const syncCalendarId = process.argv[3];
+      const daysBack = parseInt(process.argv[4]) || 2;
+
+      if (!syncCalendarId || syncCalendarId === '--help') {
+        console.log(`
+Usage: calendar sync-time-tracking <calendar-id> [days-back]
+
+Synchronize time tracking entries from the database with the Time Blocking calendar.
+Uses ⏱️ emoji prefix to identify time tracking entries.
+
+Arguments:
+  calendar-id  - The calendar ID to sync with (usually Time Blocking calendar)
+  days-back    - Number of days to look back (default: 2, checks today and previous 2 days)
+
+This command will:
+- Add time tracking entries from database that aren't in calendar
+- Remove calendar events with ⏱️ prefix that no longer exist in database
+
+Example:
+  calendar sync-time-tracking "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+  calendar sync-time-tracking "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" 3
+        `);
+        break;
+      }
+
+      const syncResult = await calSync.syncTimeTracking(syncCalendarId, daysBack);
+
+      if (syncResult.added > 0 || syncResult.removed > 0) {
+        console.log(`✅ Sync complete:`);
+        console.log(`   Added: ${syncResult.added} entries`);
+        console.log(`   Removed: ${syncResult.removed} entries`);
+        console.log(`   Total in database: ${syncResult.total} entries`);
+      } else {
+        console.log(`✅ Already in sync (${syncResult.total} entries)`);
+      }
+      break;
+
     case 'show':
     case 'get':
       // Show event details
@@ -1249,6 +1457,7 @@ Commands:
   update            - Update an existing Google Calendar event
   delete            - Delete a Google Calendar event
   cleanup           - Delete past events from a calendar (useful for time blocking)
+  sync-time-tracking - Sync time tracking entries with Time Blocking calendar
   show              - Show detailed event information
   list-calendars    - List available calendar IDs
   setup             - Show setup instructions
