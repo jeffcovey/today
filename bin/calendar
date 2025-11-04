@@ -639,12 +639,9 @@ class CalendarSync {
           dateTime: eventDetails.endDateTime,
           timeZone: eventDetails.timeZone || this.defaultTimezone,
         },
-        // Add 10-minute reminder by default
+        // Use calendar's default notifications (service accounts can't set working reminders)
         reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'popup', minutes: 10 }
-          ]
+          useDefault: true
         }
       };
 
@@ -768,11 +765,6 @@ class CalendarSync {
         };
       }
 
-      // Add reminders if specified
-      if (eventDetails.reminders !== undefined) {
-        event.reminders = eventDetails.reminders;
-      }
-
       const response = await calendar.events.patch({
         calendarId: calendarId,
         eventId: eventId,
@@ -862,98 +854,6 @@ class CalendarSync {
       return { deleted: deletedCount, calendarId };
     } catch (error) {
       console.error('❌ Error cleaning up past events:', error.message);
-      throw error;
-    }
-  }
-
-  // Add 10-minute reminders to events in a specific calendar
-  async addRemindersToCalendar(calendarId, minutesBefore = 10, startDate = null, endDate = null) {
-    try {
-      if (!calendarId) {
-        throw new Error('Calendar ID is required');
-      }
-
-      // Get service account credentials
-      let auth;
-
-      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
-        const credentials = JSON.parse(keyJson);
-
-        auth = new google.auth.GoogleAuth({
-          credentials,
-          scopes: ['https://www.googleapis.com/auth/calendar'],
-        });
-      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
-        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
-        const keyFilePath = path.resolve(keyPath);
-
-        auth = new google.auth.GoogleAuth({
-          keyFile: keyFilePath,
-          scopes: ['https://www.googleapis.com/auth/calendar'],
-        });
-      } else {
-        throw new Error('No Google service account credentials found');
-      }
-
-      const calendar = google.calendar({ version: 'v3', auth });
-
-      // Default to today and next 7 days
-      const now = startDate || new Date();
-      const weekFromNow = endDate || new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-      // Fetch events from the calendar
-      const response = await calendar.events.list({
-        calendarId: calendarId,
-        timeMin: now.toISOString(),
-        timeMax: weekFromNow.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      const events = response.data.items || [];
-
-      if (events.length === 0) {
-        return { updated: 0, calendarId };
-      }
-
-      // Update each event to add reminders
-      let updatedCount = 0;
-      for (const event of events) {
-        try {
-          // Check if event already has the desired reminder
-          const existingReminders = event.reminders?.overrides || [];
-          const hasDesiredReminder = existingReminders.some(
-            r => r.method === 'popup' && r.minutes === minutesBefore
-          );
-
-          if (!hasDesiredReminder) {
-            // Add the reminder (keeping any existing ones)
-            const newReminders = {
-              useDefault: false,
-              overrides: [
-                ...existingReminders,
-                { method: 'popup', minutes: minutesBefore }
-              ]
-            };
-
-            await calendar.events.patch({
-              calendarId: calendarId,
-              eventId: event.id,
-              resource: {
-                reminders: newReminders
-              }
-            });
-            updatedCount++;
-          }
-        } catch (error) {
-          console.error(`   ⚠️  Failed to add reminder to "${event.summary}": ${error.message}`);
-        }
-      }
-
-      return { updated: updatedCount, calendarId };
-    } catch (error) {
-      console.error('❌ Error adding reminders:', error.message);
       throw error;
     }
   }
@@ -1186,32 +1086,89 @@ Example:
       }
       break;
 
-    case 'add-reminders':
-      // Add reminders to events in a calendar
-      const remindersCalendarId = process.argv[3];
-      const minutesBefore = parseInt(process.argv[4]) || 10;
+    case 'show':
+    case 'get':
+      // Show event details
+      const showCalendarId = process.argv[3];
+      const showDate = process.argv[4] || new Date().toISOString().split('T')[0];
 
-      if (!remindersCalendarId || remindersCalendarId === '--help') {
+      if (!showCalendarId || showCalendarId === '--help') {
         console.log(`
-Usage: calendar add-reminders <calendar-id> [minutes-before]
+Usage: calendar show <calendar-id> [date]
 
-Add popup reminders to all future events in the specified calendar.
-Default is 10 minutes before each event.
+Show detailed event information including reminders for a specific calendar.
+Date format: YYYY-MM-DD (default: today)
 
-Examples:
-  calendar add-reminders "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
-  calendar add-reminders "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" 15
+Example:
+  calendar show "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+  calendar show "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" 2025-11-04
         `);
         break;
       }
 
-      console.log(`🔔 Adding ${minutesBefore}-minute reminders to calendar events...`);
-      const remindersResult = await calSync.addRemindersToCalendar(remindersCalendarId, minutesBefore);
+      console.log(`📅 Fetching events for ${showDate}...`);
 
-      if (remindersResult.updated > 0) {
-        console.log(`✅ Added reminders to ${remindersResult.updated} event(s)`);
+      // Get service account credentials
+      let showAuth;
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        const keyJson = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8');
+        const credentials = JSON.parse(keyJson);
+        showAuth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
+      } else if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH) {
+        const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH;
+        const keyFilePath = path.resolve(keyPath);
+        showAuth = new google.auth.GoogleAuth({
+          keyFile: keyFilePath,
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
+      }
+
+      const showCalendar = google.calendar({ version: 'v3', auth: showAuth });
+
+      const startOfDay = new Date(showDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(showDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const showResponse = await showCalendar.events.list({
+        calendarId: showCalendarId,
+        timeMin: startOfDay.toISOString(),
+        timeMax: endOfDay.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+      const showEvents = showResponse.data.items || [];
+
+      if (showEvents.length === 0) {
+        console.log('No events found for this date');
       } else {
-        console.log(`✅ All events already have reminders`);
+        console.log(`\nFound ${showEvents.length} event(s):\n`);
+        for (const event of showEvents) {
+          console.log(`📌 ${event.summary}`);
+          console.log(`   ID: ${event.id}`);
+          console.log(`   Start: ${event.start.dateTime || event.start.date}`);
+          console.log(`   End: ${event.end.dateTime || event.end.date}`);
+
+          if (event.reminders) {
+            if (event.reminders.useDefault) {
+              console.log(`   Reminders: Using default calendar reminders`);
+            } else if (event.reminders.overrides && event.reminders.overrides.length > 0) {
+              console.log(`   Reminders:`);
+              for (const reminder of event.reminders.overrides) {
+                console.log(`     - ${reminder.method}: ${reminder.minutes} minutes before`);
+              }
+            } else {
+              console.log(`   Reminders: None`);
+            }
+          } else {
+            console.log(`   Reminders: None`);
+          }
+          console.log('');
+        }
       }
       break;
 
@@ -1288,15 +1245,18 @@ Commands:
   sync              - Sync all configured calendars
   today             - Show today's events
   week              - Show this week's events
-  add               - Add a new event to Google Calendar (with 10-min reminder)
+  add               - Add a new event to Google Calendar
   update            - Update an existing Google Calendar event
   delete            - Delete a Google Calendar event
   cleanup           - Delete past events from a calendar (useful for time blocking)
-  add-reminders     - Add 10-minute reminders to calendar events
+  show              - Show detailed event information
   list-calendars    - List available calendar IDs
   setup             - Show setup instructions
 
 Calendar data is stored in SQLite database (.data/today.db)
+
+Note: Service accounts cannot set working notifications. To get notifications for
+events, set default notifications at the calendar level in Google Calendar settings.
 
 For detailed help on any command:
   calendar <command> --help

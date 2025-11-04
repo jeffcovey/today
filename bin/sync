@@ -157,9 +157,6 @@ main() {
 
     # Clean up Time Blocking calendar past events
     run_sync_step "🗑️ Cleanup Time Blocking" cleanup_time_blocking "Time blocking cleaned" "Time blocking cleanup"
-
-    # Add reminders to Time Blocking calendar events
-    run_sync_step "🔔 Add Time Block Reminders" add_time_blocking_reminders "Reminders added" "Time blocking reminders"
     
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
@@ -1047,43 +1044,6 @@ cleanup_time_blocking() {
     else
         # Don't fail sync if cleanup fails - it's not critical
         print_info "Time blocking cleanup skipped (calendar may not exist)"
-        return 0
-    fi
-}
-
-# Add 10-minute reminders to Time Blocking calendar events
-add_time_blocking_reminders() {
-    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/.." || return 1
-
-    # Time Blocking calendar ID
-    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
-
-    # Check if Google Calendar is configured
-    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
-        print_info "Google Calendar not configured, skipping reminders"
-        return 0
-    fi
-
-    print_info "Adding 10-minute reminders to Time Blocking events..."
-    reminders_output=$(bin/calendar add-reminders "$TIME_BLOCKING_CAL" 10 2>&1)
-
-    if echo "$reminders_output" | grep -q "✅"; then
-        # Extract updated count if shown
-        if echo "$reminders_output" | grep -q "Added reminders to [0-9]"; then
-            updated_count=$(echo "$reminders_output" | grep -oE "Added reminders to [0-9]+" | grep -oE "[0-9]+" || echo 0)
-            if [[ "$updated_count" -gt 0 ]]; then
-                print_info "Added reminders to $updated_count event(s)"
-            else
-                print_info "All events already have reminders"
-            fi
-        else
-            print_info "Time blocking reminders configured"
-        fi
-        return 0
-    else
-        # Don't fail sync if adding reminders fails - it's not critical
-        print_info "Time blocking reminders skipped (calendar may not exist)"
         return 0
     fi
 }
