@@ -154,6 +154,12 @@ main() {
     
     # Calendar sync
     run_sync_step "📅 Calendar Sync" sync_calendar "Calendar synced" "Calendar sync"
+
+    # Clean up Time Blocking calendar past events
+    run_sync_step "🗑️ Cleanup Time Blocking" cleanup_time_blocking "Time blocking cleaned" "Time blocking cleanup"
+
+    # Add reminders to Time Blocking calendar events
+    run_sync_step "🔔 Add Time Block Reminders" add_time_blocking_reminders "Reminders added" "Time blocking reminders"
     
     # Contacts sync
     run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
@@ -981,11 +987,11 @@ sync_pobox() {
 sync_calendar() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # Run calendar sync
     print_info "Syncing calendar events..."
     SYNC_OUTPUT=$(bin/calendar sync 2>&1)
-    
+
     # Check if sync was successful
     if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [0-9]"; then
         # Extract event count
@@ -1005,6 +1011,80 @@ sync_calendar() {
     else
         print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
         return 1
+    fi
+}
+
+# Clean up past events from Time Blocking calendar
+cleanup_time_blocking() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Time Blocking calendar ID
+    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+
+    # Check if Google Calendar is configured
+    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
+        print_info "Google Calendar not configured, skipping cleanup"
+        return 0
+    fi
+
+    print_info "Cleaning up past Time Blocking events..."
+    cleanup_output=$(bin/calendar cleanup "$TIME_BLOCKING_CAL" 2>&1)
+
+    if echo "$cleanup_output" | grep -q "✅"; then
+        # Extract deleted count if shown
+        if echo "$cleanup_output" | grep -q "Deleted [0-9]"; then
+            deleted_count=$(echo "$cleanup_output" | grep -oE "Deleted [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            if [[ "$deleted_count" -gt 0 ]]; then
+                print_info "Deleted $deleted_count old time block(s)"
+            else
+                print_info "No old events to clean up"
+            fi
+        else
+            print_info "Time blocking calendar cleaned"
+        fi
+        return 0
+    else
+        # Don't fail sync if cleanup fails - it's not critical
+        print_info "Time blocking cleanup skipped (calendar may not exist)"
+        return 0
+    fi
+}
+
+# Add 10-minute reminders to Time Blocking calendar events
+add_time_blocking_reminders() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Time Blocking calendar ID
+    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+
+    # Check if Google Calendar is configured
+    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
+        print_info "Google Calendar not configured, skipping reminders"
+        return 0
+    fi
+
+    print_info "Adding 10-minute reminders to Time Blocking events..."
+    reminders_output=$(bin/calendar add-reminders "$TIME_BLOCKING_CAL" 10 2>&1)
+
+    if echo "$reminders_output" | grep -q "✅"; then
+        # Extract updated count if shown
+        if echo "$reminders_output" | grep -q "Added reminders to [0-9]"; then
+            updated_count=$(echo "$reminders_output" | grep -oE "Added reminders to [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            if [[ "$updated_count" -gt 0 ]]; then
+                print_info "Added reminders to $updated_count event(s)"
+            else
+                print_info "All events already have reminders"
+            fi
+        else
+            print_info "Time blocking reminders configured"
+        fi
+        return 0
+    else
+        # Don't fail sync if adding reminders fails - it's not critical
+        print_info "Time blocking reminders skipped (calendar may not exist)"
+        return 0
     fi
 }
 
