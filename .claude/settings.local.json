@@ -48,7 +48,9 @@
       "Bash(bin/email download:*)",
       "WebFetch(domain:developers.track.toggl.com)",
       "WebFetch(domain:engineering.toggl.com)",
-      "WebFetch(domain:unsplash.com)"
+      "WebFetch(domain:unsplash.com)",
+      "WebFetch(domain:investor.vanguard.com)",
+      "WebFetch(domain:help.obsidian.md)"
     ],
     "deny": [],
     "ask": []

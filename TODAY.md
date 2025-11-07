@@ -255,7 +255,6 @@ SQLite database at `.data/today.db` contains:
 - **contacts**: Contact info with normalized data
 - **diary**: Day One journal entries from `vault/logs/Journal.json`
 - **file_tracking**: Recently modified files
-- **toggl_time_entries**: Time tracking data
 
 ### OGM Monitoring
 
@@ -300,14 +299,6 @@ SELECT title, count, last_seen
 FROM ogm_sentry_issues
 WHERE status = 'unresolved' AND count > 100
 ORDER BY count DESC;
-
--- Today's time tracking
-SELECT COALESCE(p.name, 'No Project') as project,
-       printf('%.2f', SUM(te.duration) / 3600.0) as hours
-FROM toggl_time_entries te
-LEFT JOIN toggl_projects p ON te.pid = p.id
-WHERE DATE(te.start) = DATE('now', 'localtime')
-GROUP BY p.name;
 
 -- Recent journal entries
 SELECT DATE(creation_date) as date,
