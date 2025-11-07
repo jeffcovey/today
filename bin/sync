@@ -1274,10 +1274,34 @@ sync_ogm_monitoring() {
 }
 
 # Process inbox notes (from Drafts uploads)
+# Move file to trash instead of deleting
+move_to_trash() {
+    local file="$1"
+    local reason="${2:-processed}"
+
+    # Create trash directory with dated subdirectories
+    local TRASH_DIR="vault/notes/.trash/$(date +%Y-%m)"
+    mkdir -p "$TRASH_DIR" 2>/dev/null
+
+    # Move file to trash with timestamp
+    local basename=$(basename "$file")
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local trash_file="$TRASH_DIR/${timestamp}-${basename}"
+
+    if mv "$file" "$trash_file" 2>/dev/null; then
+        print_info "    → Moved to trash: $trash_file ($reason)"
+        return 0
+    else
+        print_error "    Failed to move to trash, removing: $file"
+        rm -f "$file"  # Fallback to deletion if move fails
+        return 1
+    fi
+}
+
 process_inbox() {
     local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cd "$SCRIPT_DIR/.." || return 1
-    
+
     # Create inbox directory if it doesn't exist
     mkdir -p vault/notes/inbox 2>/dev/null
     
@@ -1352,9 +1376,9 @@ process_inbox() {
                 
                 print_info "  • Gratitude note → Added to logs/gratitude.md"
                 print_info "    $TODAY_DATE: $GRATITUDE_LINE"
-                
-                # Delete the gratitude note from inbox only after successful processing
-                rm "$file"
+
+                # Move processed gratitude note to trash for safety
+                move_to_trash "$file" "gratitude-processed"
                 continue  # Skip the normal file move logic
             else
                 print_error "  • Gratitude note has no content after 'I'm grateful for...'"
@@ -1411,8 +1435,8 @@ process_inbox() {
                     print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
                     print_info "    Start: $START_TIME, End: $END_TIME"
 
-                    # Delete the processed file
-                    rm "$file"
+                    # Move processed time tracking note to trash for safety
+                    move_to_trash "$file" "time-tracking-processed"
                     continue
                 else
                     print_error "  • Failed to calculate duration from timestamps"
@@ -1615,9 +1639,9 @@ process_inbox() {
                 
                 print_info "  • Task-only file → Added to tasks.md"
                 print_info "    Added $(echo "$CONTENT" | grep -c "^-\s*\[[ x]\]") task(s)"
-                
-                # Delete the original file from inbox
-                rm "$file"
+
+                # Move processed task file to trash for safety
+                move_to_trash "$file" "tasks-processed"
                 continue  # Skip the normal file move logic
             else
                 # Mixed content - move to vault root for visibility
@@ -1641,7 +1665,7 @@ process_inbox() {
         if [[ -f "$DEST_PATH" ]]; then
             # File exists, skip it
             print_info "    File exists, skipping: $DEST_FILE"
-            rm "$file"  # Remove from inbox since it's a duplicate
+            move_to_trash "$file" "duplicate"  # Move duplicate to trash instead of deleting
         else
             mv "$file" "$DEST_PATH" 2>/dev/null && {
                 print_info "    ✓ Filed to $DEST_PATH"
