@@ -108,6 +108,11 @@ const jobs = [
         schedule: '0 1 * * *', // Daily at 1 AM EST
         command: 'bin/tasks archive-completed || true',
         description: 'Archive completed tasks'
+    },
+    {
+        schedule: '0 12 * * *', // Daily at 12 PM (noon) EST
+        command: 'bin/email organize || true',
+        description: 'Organize inbox emails by stage'
     }
 ];
 

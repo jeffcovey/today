@@ -41,8 +41,9 @@ loadTodayApiKey();
 // Import commands
 Promise.all([
   import('../src/email-downloader.js'),
-  import('../src/email-manager.js')
-]).then(([{ EmailDownloader }, { EmailManager }]) => {
+  import('../src/email-manager.js'),
+  import('../src/email-organizer.js')
+]).then(([{ EmailDownloader }, { EmailManager }, { EmailOrganizer }]) => {
   program
     .name('email')
     .description('Email management CLI for downloading and managing emails')
@@ -157,13 +158,33 @@ Promise.all([
         console.log(chalk.gray('  • "How many emails from last week?"'));
         console.log(chalk.gray('  • "Move Heroku emails to a folder"'));
         console.log(chalk.gray('  • "Summarize my recent emails"\n'));
-        
+
         const manager = new EmailManager();
         await manager.conversationMode();
       } catch (error) {
         console.error(chalk.red('Error in conversation mode:'), error.message);
         console.error(chalk.gray('Stack trace:'), error.stack);
         // Don't exit on error, just return
+      }
+    });
+
+  program
+    .command('organize')
+    .description('Organize inbox emails into stage-based folders')
+    .action(async () => {
+      try {
+        console.log(chalk.blue('📁 Organizing emails by stage...'));
+        console.log(chalk.gray('This will categorize emails into:'));
+        console.log(chalk.gray('  • _Front Stage: Meetings, calls, support, communications'));
+        console.log(chalk.gray('  • _Back Stage: Maintenance, bills, bug fixes, organizing'));
+        console.log(chalk.gray('  • _Off Stage: Personal time, nature, friends, reading\n'));
+
+        const organizer = new EmailOrganizer();
+        await organizer.run();
+        process.exit(0); // Explicitly exit after successful completion
+      } catch (error) {
+        console.error(chalk.red('Error organizing emails:'), error.message);
+        process.exit(1);
       }
     });
 
