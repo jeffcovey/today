@@ -255,6 +255,7 @@ SQLite database at `.data/today.db` contains:
 - **contacts**: Contact info with normalized data
 - **diary**: Day One journal entries from `vault/logs/Journal.json`
 - **file_tracking**: Recently modified files
+- **vault/ changes**: Files modified today (based on filesystem mtime, automatically included in review context)
 
 ### OGM Monitoring
 
@@ -342,11 +343,12 @@ Based on database queries AND hierarchical plan alignment:
 3. **Quick Wins** - Under 15 minutes
 4. **Deep Work** - 1-2 hour focused block
 5. **Communications** - Check both received AND sent emails
-6. **Evening Planning** - Review and prepare
-7. **Self-Care** - Check journal entries for wellbeing patterns
-8. **Time Tracking** - Analyze tracked vs planned, alignment with priorities
-9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
-10. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
+6. **Changed Files** - Review vault/ files modified today for context on recent work
+7. **Evening Planning** - Review and prepare
+8. **Self-Care** - Check journal entries for wellbeing patterns
+9. **Time Tracking** - Analyze tracked vs planned, alignment with priorities
+10. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
+11. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
 
 ## Your First Steps - DO ALL IN FIRST RESPONSE
 

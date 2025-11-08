@@ -244,6 +244,76 @@ def get_existing_plans():
 
     return '\n'.join(plans) if plans else "No planning files found"
 
+def get_changed_vault_files():
+    """Get vault files that have been changed or added today based on filesystem modification time"""
+    try:
+        # Get timezone from config
+        timezone = 'America/New_York'  # default
+        try:
+            result = subprocess.run(['bin/get-config', 'timezone'],
+                                  capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                timezone = result.stdout.strip()
+        except:
+            pass
+
+        # Get today's date at midnight as a timestamp
+        result = subprocess.run([f'TZ={timezone} date -d "today 00:00:00" "+%s"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            return ""
+
+        today_midnight_ts = int(result.stdout.strip())
+
+        # Find all markdown files in vault/ modified today
+        vault_path = Path('vault')
+        if not vault_path.exists():
+            return ""
+
+        files = []
+        exclude_dirs = {'.sync', 'templates', '.git', '.git.nosync', '.obsidian', '.trash'}
+
+        for md_file in vault_path.rglob('*.md'):
+            # Skip excluded directories
+            if any(excl in md_file.parts for excl in exclude_dirs):
+                continue
+
+            # Check if file was modified today
+            mtime = md_file.stat().st_mtime
+            if mtime >= today_midnight_ts:
+                files.append(str(md_file))
+
+        if not files:
+            return ""
+
+        # Sort files by modification time (most recent first)
+        files.sort(key=lambda f: Path(f).stat().st_mtime, reverse=True)
+
+        # Format the output
+        lines = ["\n## 📝 Files Changed/Added Today in Vault"]
+        lines.append(f"\n{len(files)} file(s) modified or added today:\n")
+
+        for filepath in files:
+            # Try to get a brief description from the file
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read(500)  # Read first 500 chars
+                    # Try to extract a title or first heading
+                    title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+                    if title_match:
+                        title = title_match.group(1).strip()
+                        lines.append(f"- **{filepath}**: {title}")
+                    else:
+                        lines.append(f"- **{filepath}**")
+            except:
+                lines.append(f"- **{filepath}**")
+
+        return '\n'.join(lines)
+
+    except Exception as e:
+        # Silently fail if something goes wrong
+        return ""
+
 def check_dependencies():
     """Check dependencies once per day"""
     last_check_file = '.last-dep-check'
@@ -593,6 +663,11 @@ def _update_single_file(review_file, is_tomorrow, dry_run, api_key):
     except subprocess.CalledProcessError:
         # If bin/track fails, continue without time tracking details
         pass
+
+    # Get changed vault files
+    changed_files = get_changed_vault_files()
+    if changed_files:
+        daily_data += "\n\n" + changed_files
 
     # Read current review file and create backup
     with open(review_file, 'r') as f:
@@ -952,6 +1027,9 @@ def run_interactive_session(direct_request=None, non_interactive=False):
     # Get existing plans
     existing_plans = get_existing_plans()
 
+    # Get changed vault files
+    changed_files = get_changed_vault_files()
+
     # Read TODAY.md for context - always include this, even for direct requests
     today_context = ""
     if Path('TODAY.md').exists():
@@ -978,6 +1056,7 @@ def run_interactive_session(direct_request=None, non_interactive=False):
 
 ## Existing Plans
 {existing_plans}
+{changed_files}
 
 ## Database Tables Available:
 - markdown_tasks: Current tasks stored directly from markdown files
