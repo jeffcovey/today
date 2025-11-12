@@ -755,13 +755,17 @@ YOUR TASK:
 Create a new Progress Update section to append to the end of the file.
 Compare the current file with the database to see what's changed or been accomplished.
 
+🚨 CRITICAL: The database includes DETAILED TIME TRACKING DATA showing what work has been done today.
+   - Time tracking is THE GROUND TRUTH of productivity
+   - Physical work, meetings, coordination, deep work sessions are all tracked there
+   - NEVER assume "zero progress" without checking the time tracking data first
+   - Checkbox completions are NOT the primary measure of productivity
+
 This should summarize:
-1. What's been accomplished since the last update (tasks checked off, workouts done, meetings attended, time tracked)
+1. What's been accomplished since the last update - CHECK TIME TRACKING DATA FIRST (tasks checked off, workouts done, meetings attended, time tracked)
 2. Current status of high-priority items
 3. Any new events, emails, or tasks that need attention
 4. Overall progress and any blockers
-
-NOTE: The database includes detailed time tracking data showing what you've worked on today and for how long. Use this to provide context about your day.
 
 RETURN A JSON OBJECT:
 {{
