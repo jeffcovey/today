@@ -38,7 +38,7 @@
     "googleapis": "^159.0.0",
     "imapflow": "^1.0.195",
     "inquirer": "^12.9.4",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "mailparser": "^3.7.4",
     "marked": "^16.2.1",
     "node-cron": "^4.2.1",
