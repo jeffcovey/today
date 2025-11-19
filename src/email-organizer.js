@@ -13,9 +13,6 @@ const CATEGORIZATION_RULES = {
   [FOLDERS.FRONT_STAGE]: {
     // Front Stage: Meetings, calls, support, emails, communications
     patterns: [
-      '@github.com', // GitHub notifications
-      'notifications@github.com',
-      'dependabot',
       'help@oldergay.men', // Customer support
       'no-reply@supportmessaging.airbnb.com', // Airbnb communications
       'express@airbnb.com',
@@ -37,6 +34,9 @@ const CATEGORIZATION_RULES = {
       'noreply@notify.cloudflare.com', // Infrastructure alerts
       'alerts@mail.zapier.com', // Automation alerts
       '@sentry.io', // Error monitoring
+      '@github.com', // GitHub notifications
+      'notifications@github.com',
+      'dependabot',
       'github-actions',
       '@noreply.fpl.com', // FPL electric bill
       '@memberdoc.com', // Florida Blue insurance
