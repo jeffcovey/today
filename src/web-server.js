@@ -11,7 +11,6 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
-import { getMarkdownFileCache } from './markdown-file-cache.js';
 import yaml from 'js-yaml';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1031,15 +1030,7 @@ async function getCurrentTimer() {
   }
 }
 
-// Initialize markdown file cache
-const markdownCache = getMarkdownFileCache();
-
-// Helper function to extract title from markdown file (now using cache)
-async function getMarkdownTitle(filePath) {
-  const metadata = await markdownCache.getFileMetadata(filePath);
-  return metadata.title;
-}
-
+// Helper function to extract title from markdown file
 // Helper function to get ISO week number
 function getWeekNumber(date) {
   // ISO week date standard: weeks start on Monday, first week contains January 4th
@@ -1175,6 +1166,20 @@ function getPlanHierarchyLevel(filename) {
     case 'day': return 4;
     default: return 0;
   }
+}
+
+async function getMarkdownTitle(filePath) {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    // Look for the first H1 heading
+    const titleMatch = content.match(/^# (.+)$/m);
+    if (titleMatch) {
+      return titleMatch[1].trim();
+    }
+  } catch (error) {
+    console.error(`Error reading file ${filePath}:`, error);
+  }
+  return null;
 }
 
 // Directory listing
@@ -1511,25 +1516,19 @@ async function renderDirectory(dirPath, urlPath) {
     }
   }
   
-  // Batch fetch metadata for all markdown files (PERFORMANCE OPTIMIZATION)
-  const mdFiles = items.filter(item => !item.isDirectory() && item.name.endsWith('.md'));
-  const mdFilePaths = mdFiles.map(item => path.join(dirPath, item.name));
-  const mdMetadata = await markdownCache.getBatchMetadata(mdFilePaths);
-  const mdTitleMap = new Map(mdMetadata.map(md => [md.path, md.title]));
-
   // Then add files
   for (const item of items) {
     if (!item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
       const fullFilePath = path.join(dirPath, item.name);
       let icon = item.name.endsWith('.md') ? 'fa-file-alt text-info' : 'fa-file text-secondary';
-
+      
       // Calculate indentation and special icons for plans directory
       let indentStyle = '';
       if (urlPath === 'plans') {
         const level = getPlanHierarchyLevel(item.name);
         indentStyle = `padding-left: ${1.5 + level * 1.5}rem !important;`;
-
+        
         // Use specific icons for each plan level
         const planData = parsePlanFile(item.name);
         if (planData) {
@@ -1552,11 +1551,11 @@ async function renderDirectory(dirPath, urlPath) {
           }
         }
       }
-
-      // For markdown files, get title from batch-fetched metadata
+      
+      // For markdown files, try to get the title from the first H1
       let displayContent;
       if (item.name.endsWith('.md')) {
-        const title = mdTitleMap.get(fullFilePath);
+        const title = await getMarkdownTitle(fullFilePath);
         if (title) {
           // Show title with filename as subtitle, icon inline
           displayContent = `
@@ -1584,7 +1583,7 @@ async function renderDirectory(dirPath, urlPath) {
             <span>${item.name}</span>
           </div>`;
       }
-
+      
       html += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
