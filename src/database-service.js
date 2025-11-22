@@ -605,6 +605,3 @@ export class DatabaseService {
 export function getDatabase(dbPath = '.data/today.db', options = {}) {
   return DatabaseService.getInstance(dbPath, options);
 }
-
-// Export default singleton instance
-export default DatabaseService.getInstance();

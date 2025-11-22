@@ -1,35 +1,36 @@
 import { jest } from '@jest/globals';
 import Database from 'better-sqlite3';
 
-// Mock the database-sync module BEFORE importing SQLiteCache
-jest.unstable_mockModule('../src/database-sync.js', () => {
-  class MockDatabaseSync {
+// Mock the database-service module BEFORE importing SQLiteCache
+jest.unstable_mockModule('../src/database-service.js', () => {
+  class MockDatabaseService {
     constructor(dbPath) {
       this.localDb = new Database(':memory:');
     }
-    
+
     exec(sql) {
       return this.localDb.exec(sql);
     }
-    
+
     prepare(sql) {
       return this.localDb.prepare(sql);
     }
-    
+
     transaction(fn) {
       return this.localDb.transaction(fn);
     }
-    
+
     close() {
       if (this.localDb) {
         this.localDb.close();
       }
     }
   }
-  
+
   return {
-    getDatabaseSync: jest.fn((dbPath) => {
-      return new MockDatabaseSync(dbPath);
+    getDatabase: jest.fn((dbPath) => {
+      // Create a new instance for each call (not singleton in tests)
+      return new MockDatabaseService(dbPath);
     })
   };
 });
