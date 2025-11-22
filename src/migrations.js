@@ -646,7 +646,8 @@ export class MigrationManager {
               'summary_metrics', 'summary_recommendations', 'people_to_contact', 'sync_log',
               'sync_metadata', 'temporal_sync', 'time_entries_sync', 'todoist_sync_mapping',
               'streaks_data', 'project_pillar_mapping', 'diary', 'ogm_correlations',
-              'ogm_github_issues', 'ogm_sentry_issues', 'ogm_scout_metrics', 'ogm_summary_stats'
+              'ogm_github_issues', 'ogm_sentry_issues', 'ogm_scout_metrics', 'ogm_summary_stats',
+              'markdown_files'
             ];
             
             // Check which tables are missing
@@ -2146,6 +2147,31 @@ export class MigrationManager {
           console.log('    ✓ Added topics column and migrated data from project column');
           console.log('    Note: New markdown format is START|END|DESCRIPTION (with #topic/tags in description)');
           console.log('    Note: project column retained for backward compatibility, but topics is primary');
+        }
+      },
+      {
+        version: 32,
+        description: 'Add markdown_files table for file metadata caching',
+        fn: (db) => {
+          console.log('    Creating markdown_files table for performance optimization...');
+
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS markdown_files (
+              path TEXT PRIMARY KEY,
+              title TEXT,
+              mtime_ms INTEGER NOT NULL,
+              size_bytes INTEGER,
+              first_heading TEXT,
+              cached_at INTEGER NOT NULL,
+              UNIQUE(path)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_markdown_files_mtime ON markdown_files(mtime_ms);
+            CREATE INDEX IF NOT EXISTS idx_markdown_files_cached ON markdown_files(cached_at);
+          `);
+
+          console.log('    ✓ Created markdown_files table with indexes');
+          console.log('    This will dramatically improve directory listing performance');
         }
       }
     ];

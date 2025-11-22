@@ -24,6 +24,7 @@ let lastSyncTime = Date.now();
 // Import fs at the top level
 import fs from 'fs';
 import { getDatabase } from '../src/database-service.js';
+import { getMarkdownFileCache } from '../src/markdown-file-cache.js';
 
 // Logging
 function log(message, type = 'info') {
@@ -91,6 +92,16 @@ async function updateMarkdownTasksCache(filePath) {
     }
   } catch (error) {
     log(`Failed to update cache for ${filePath}: ${error.message}`, 'error');
+  }
+}
+
+// Invalidate markdown file metadata cache for a file
+async function invalidateMarkdownFileCache(filePath) {
+  try {
+    const mdCache = getMarkdownFileCache();
+    mdCache.invalidate(filePath);
+  } catch (error) {
+    // Ignore cache errors - not critical
   }
 }
 
@@ -332,11 +343,12 @@ async function processChanges() {
       }
     }
 
-    // Update markdown tasks cache
+    // Update markdown tasks cache and invalidate file metadata cache
     if (markdownFiles.length > 0) {
       log('Updating markdown tasks cache...', 'info');
       for (const file of markdownFiles) {
         await updateMarkdownTasksCache(file);
+        await invalidateMarkdownFileCache(file); // Also invalidate title cache
       }
       log('Markdown tasks cache updated', 'success');
     }
