@@ -57,9 +57,11 @@ export class DatabaseService {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    
-    // Open local database
-    this.localDb = new Database(this.dbPath);
+
+    // Open local database with timeout option (prevents blocking on open)
+    this.localDb = new Database(this.dbPath, {
+      timeout: 30000  // 30 seconds - wait for locks before failing
+    });
     this.localDb.pragma('journal_mode = WAL');
     this.localDb.pragma('busy_timeout = 30000');
     this.localDb.pragma('foreign_keys = OFF'); // Avoid issues during sync
