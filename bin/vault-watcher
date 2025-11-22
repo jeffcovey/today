@@ -24,6 +24,7 @@ let lastSyncTime = Date.now();
 // Import fs at the top level
 import fs from 'fs';
 import { getDatabase } from '../src/database-service.js';
+import { getMarkdownFileCache } from '../src/markdown-file-cache.js';
 
 // Logging
 function log(message, type = 'info') {
@@ -332,11 +333,13 @@ async function processChanges() {
       }
     }
 
-    // Update markdown tasks cache
+    // Update markdown tasks cache and invalidate file metadata cache
     if (markdownFiles.length > 0) {
       log('Updating markdown tasks cache...', 'info');
+      const mdCache = getMarkdownFileCache();
       for (const file of markdownFiles) {
         await updateMarkdownTasksCache(file);
+        mdCache.invalidate(file); // Invalidate title cache for changed files
       }
       log('Markdown tasks cache updated', 'success');
     }
