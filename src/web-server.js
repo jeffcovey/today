@@ -17,6 +17,9 @@ import yaml from 'js-yaml';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Web server only needs read-only access, disable Turso sync for faster startup
+const getReadOnlyDatabase = () => getDatabase('.data/today.db', { autoSync: false });
+
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
@@ -1369,7 +1372,7 @@ async function renderDirectory(dirPath, urlPath) {
     // Get task count for today from database cache
     let taskCount = 0;
     try {
-      const db = getDatabase();
+      const db = getReadOnlyDatabase();
       const todayISO = today.toISOString().split('T')[0];
 
       // Query database for tasks with scheduled or due dates for today
@@ -3134,7 +3137,7 @@ const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
 
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query) {
-  const db = getDatabase();
+  const db = getReadOnlyDatabase();
 
   // Remove blockquote markers (>) from query lines
   const lines = query.trim().split('\n')
@@ -3473,7 +3476,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           // Look up task ID from database to create clickable link
           let taskLink = '';
           try {
-            const db = getDatabase();
+            const db = getReadOnlyDatabase();
             // Database stores paths with 'vault/' prefix
             const dbFilePath = 'vault/' + relativeFilePath;
             const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
@@ -3522,7 +3525,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           // Look up task ID from database to create clickable link
           let taskLink = '';
           try {
-            const db = getDatabase();
+            const db = getReadOnlyDatabase();
             // Database stores paths with 'vault/' prefix
             const dbFilePath = 'vault/' + relativeFilePath;
             const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
@@ -3996,7 +3999,7 @@ ${cleanContent}
     (match, checkbox, taskContent, taskId) => {
       // Look up the task in the markdown_tasks cache to create a link
       try {
-        const db = getDatabase();
+        const db = getReadOnlyDatabase();
         const task = db.prepare('SELECT id FROM markdown_tasks WHERE id = ?').get(taskId);
 
         if (task) {
@@ -4023,7 +4026,7 @@ ${cleanContent}
 
     // Look up task ID from database
     try {
-      const db = getDatabase();
+      const db = getReadOnlyDatabase();
       // Database stores paths with 'vault/' prefix
       const dbFilePath = 'vault/' + dataFile;
       const task = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
@@ -5827,7 +5830,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     }
 
     // Check database cache but don't fail if not found
-    const db = getDatabase();
+    const db = getReadOnlyDatabase();
     const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
       .get(dbFilePath, line);
 
@@ -6045,7 +6048,7 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
 app.get('/task/:taskId', authMiddleware, async (req, res) => {
   try {
     const taskId = parseInt(req.params.taskId);
-    const db = getDatabase();
+    const db = getReadOnlyDatabase();
 
     // Get task from markdown_tasks cache
     const task = db.prepare('SELECT * FROM markdown_tasks WHERE id = ?').get(taskId);
