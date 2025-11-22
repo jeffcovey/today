@@ -1180,20 +1180,6 @@ function getPlanHierarchyLevel(filename) {
   }
 }
 
-async function getMarkdownTitle(filePath) {
-  try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    // Look for the first H1 heading
-    const titleMatch = content.match(/^# (.+)$/m);
-    if (titleMatch) {
-      return titleMatch[1].trim();
-    }
-  } catch (error) {
-    console.error(`Error reading file ${filePath}:`, error);
-  }
-  return null;
-}
-
 // Directory listing
 async function renderDirectory(dirPath, urlPath) {
   let items = await fs.readdir(dirPath, { withFileTypes: true });
