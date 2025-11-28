@@ -82,6 +82,7 @@ main() {
     run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
     run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
     run_sync_step "📋 Clean Plan Tasks" clean_plan_file_tasks "Plan tasks cleaned" "Plan task cleanup"
+    run_sync_step "🗓️ Cancel Old Plan Tasks" cancel_old_plan_tasks "Old plan tasks canceled" "Old plan task cleanup"
 
     # DISABLED: Task sync now handled by Obsidian Tasks plugin
     # SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
@@ -553,6 +554,97 @@ clean_plan_file_tasks() {
         print_info "Cleaned $TASK_COUNT task(s) in $CLEANED_COUNT plan file(s)"
     else
         print_info "No tasks with date/recurrence properties found in plan files"
+    fi
+
+    return 0
+}
+
+# Cancel undone tasks in old daily plan files
+# Only cancels tasks in Morning Routine, Evening Review, and Hip Mobility callouts
+cancel_old_plan_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Checking for old plan files with undone routine tasks..."
+
+    # Get today's day number from filename
+    TODAY_DAY=$(date +%d | sed 's/^0//')
+
+    # Find all daily plan files
+    ALL_PLAN_FILES=$(find vault/plans -type f -name "2*_Q*_*_W*_*.md" 2>/dev/null | sort)
+
+    if [[ -z "$ALL_PLAN_FILES" ]]; then
+        print_info "No plan files found"
+        return 0
+    fi
+
+    MODIFIED_FILES=0
+    TOTAL_TASKS_CANCELED=0
+
+    # Process each plan file
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        # Extract day from filename (last component before .md)
+        BASENAME=$(basename "$file" .md)
+        FILE_DAY=$(echo "$BASENAME" | rev | cut -d'_' -f1 | rev | sed 's/^0//')
+
+        # Skip if this is today's file or future
+        if [[ "$FILE_DAY" -ge "$TODAY_DAY" ]]; then
+            continue
+        fi
+
+        # Check if file has undone tasks in callouts
+        if ! grep -qE '^>\s*-\s*\[\s*\]' "$file" 2>/dev/null; then
+            continue
+        fi
+
+        # Create temp file
+        TEMP_FILE=$(mktemp)
+        FILE_MODIFIED=false
+        TASKS_CANCELED=0
+        IN_TARGET_CALLOUT=false
+
+        # Process each line
+        while IFS= read -r line; do
+            # Check if we're in one of the target callouts (Morning Routine, Evening Review, Hip Mobility)
+            if echo "$line" | grep -qE '^>\s*\[!.*\].*(Morning Routine|Evening Routine|Evening Review|Hip Mobility)'; then
+                IN_TARGET_CALLOUT=true
+            elif echo "$line" | grep -qE '^>\s*\[!'; then
+                # Different callout - not a target
+                IN_TARGET_CALLOUT=false
+            elif ! echo "$line" | grep -qE '^>'; then
+                # Exited callout
+                IN_TARGET_CALLOUT=false
+            fi
+
+            # If in target callout and line is an undone task, cancel it
+            if [ "$IN_TARGET_CALLOUT" = true ] && echo "$line" | grep -qE '^>\s*-\s*\[\s*\]'; then
+                # Change [ ] to [-]
+                canceled_line=$(echo "$line" | sed 's/\[\s*\]/[-]/')
+                echo "$canceled_line" >> "$TEMP_FILE"
+                FILE_MODIFIED=true
+                TASKS_CANCELED=$((TASKS_CANCELED + 1))
+            else
+                echo "$line" >> "$TEMP_FILE"
+            fi
+        done < "$file"
+
+        # Replace file if modified
+        if [ "$FILE_MODIFIED" = true ]; then
+            mv "$TEMP_FILE" "$file"
+            MODIFIED_FILES=$((MODIFIED_FILES + 1))
+            TOTAL_TASKS_CANCELED=$((TOTAL_TASKS_CANCELED + TASKS_CANCELED))
+        else
+            rm -f "$TEMP_FILE"
+        fi
+
+    done <<< "$ALL_PLAN_FILES"
+
+    if [ $MODIFIED_FILES -gt 0 ]; then
+        print_info "Canceled $TOTAL_TASKS_CANCELED routine task(s) in $MODIFIED_FILES old plan file(s)"
+    else
+        print_info "No routine tasks to cancel in old plan files"
     fi
 
     return 0
@@ -1933,6 +2025,16 @@ EOF
 
 # Parse command line arguments
 case "${1:-}" in
+    --cancel-old-plan-tasks)
+        # Only cancel old plan tasks
+        print_header "🗓️ Cancel Old Plan Tasks"
+        if cancel_old_plan_tasks; then
+            print_status "Old plan tasks processed successfully!"
+        else
+            print_error "Old plan task cancellation failed"
+        fi
+        exit 0
+        ;;
     --cleanup-conflicts)
         # Only cleanup sync-conflict files
         print_header "🗑️ Cleanup Sync Conflicts"
