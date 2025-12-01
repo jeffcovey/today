@@ -158,6 +158,13 @@ async function processRoutineSections(filePath, fileDate) {
     modified = true;
   }
 
+  // Remove "Due or Scheduled Today" section (no longer needed in old plan files)
+  const dueScheduledRegex = /> \[!note\]-?\s*📅 Due or Scheduled Today\n>\n> ```tasks\n> not done\n> \(scheduled before tomorrow\) OR \(due before tomorrow\)\n> sort by priority\n> group by happens\n> ```\n*/;
+  if (content.match(dueScheduledRegex)) {
+    content = content.replace(dueScheduledRegex, '');
+    modified = true;
+  }
+
   if (modified) {
     fs.writeFileSync(filePath, content, 'utf-8');
     return true;
