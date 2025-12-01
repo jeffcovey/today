@@ -165,6 +165,13 @@ async function processRoutineSections(filePath, fileDate) {
     modified = true;
   }
 
+  // Remove "Draft Plan" section (no longer needed in old plan files)
+  const draftPlanRegex = /> \[!info\] Draft Plan\n> This is a preliminary plan.*\n\n/;
+  if (content.match(draftPlanRegex)) {
+    content = content.replace(draftPlanRegex, '');
+    modified = true;
+  }
+
   if (modified) {
     fs.writeFileSync(filePath, content, 'utf-8');
     return true;
