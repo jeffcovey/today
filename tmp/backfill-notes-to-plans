@@ -1,0 +1,165 @@
+#!/bin/bash
+
+# Script to retroactively add progress and concern notes to their matching daily plan files
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}Backfilling progress and concern notes to daily plan files...${NC}"
+
+# Track statistics
+PROGRESS_ADDED=0
+PROGRESS_SKIPPED=0
+CONCERNS_ADDED=0
+CONCERNS_SKIPPED=0
+PLAN_FILES_UPDATED=0
+
+# Function to add note to plan file
+add_note_to_plan() {
+    local NOTE_FILE="$1"
+    local NOTE_TYPE="$2"  # "Progress" or "Concerns"
+
+    # Skip binary files
+    if ! file "$NOTE_FILE" | grep -q "text"; then
+        return 1
+    fi
+
+    # Read the note content
+    CONTENT=$(cat "$NOTE_FILE")
+
+    # Parse the date from file content (format: "November 30, 2025 22:32 -0500")
+    CONTENT_DATE=$(echo "$CONTENT" | head -10 | grep -E "^[A-Za-z]+ [0-9]+, [0-9]+ [0-9]+:[0-9]+" | head -1)
+
+    if [[ -n "$CONTENT_DATE" ]]; then
+        # Parse from content date
+        PARSED_DATE=$(echo "$CONTENT_DATE" | awk '{print $2 " " $1 " " $3}' | tr ',' ' ')
+        TARGET_DATE=$(date -d "$PARSED_DATE" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+        YEAR=$(date -d "$TARGET_DATE" +%Y)
+        MONTH=$(date -d "$TARGET_DATE" +%m)
+        DAY=$(date -d "$TARGET_DATE" +%d)
+        WEEK=$(date -d "$TARGET_DATE" +%V)
+        # Parse time for timestamp
+        TIME_PART=$(echo "$CONTENT_DATE" | grep -oE "[0-9]+:[0-9]+" | head -1)
+        TIMESTAMP=${TIME_PART:-"Unknown"}
+    else
+        # Extract date from filename (format: 2025-11-30-223200-UTC-progress.md)
+        BASENAME=$(basename "$NOTE_FILE")
+        if [[ "$BASENAME" =~ ^([0-9]{4})-([0-9]{2})-([0-9]{2}) ]]; then
+            YEAR="${BASH_REMATCH[1]}"
+            MONTH="${BASH_REMATCH[2]}"
+            DAY="${BASH_REMATCH[3]}"
+            TARGET_DATE="$YEAR-$MONTH-$DAY"
+            WEEK=$(date -d "$TARGET_DATE" +%V)
+            # Try to extract time from filename
+            if [[ "$BASENAME" =~ -([0-9]{2})([0-9]{2})([0-9]{2})- ]]; then
+                TIMESTAMP="${BASH_REMATCH[1]}:${BASH_REMATCH[2]}"
+            else
+                TIMESTAMP="Unknown"
+            fi
+        else
+            echo -e "${YELLOW}  ⚠ No date found in content or filename: $(basename "$NOTE_FILE")${NC}"
+            return 1
+        fi
+    fi
+
+    # Determine quarter from month
+    if [ $MONTH -le 3 ]; then Q="Q1"
+    elif [ $MONTH -le 6 ]; then Q="Q2"
+    elif [ $MONTH -le 9 ]; then Q="Q3"
+    else Q="Q4"
+    fi
+
+    PLAN_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+    # Check if plan file exists
+    if [[ ! -f "$PLAN_FILE" ]]; then
+        echo -e "${YELLOW}  ⚠ No plan file for $(basename "$NOTE_FILE") (would be $PLAN_FILE)${NC}"
+        return 1
+    fi
+
+    # Remove date line from content for insertion (only if content has date header)
+    if [[ -n "$CONTENT_DATE" ]]; then
+        CLEANED_CONTENT=$(echo "$CONTENT" | tail -n +2 | awk '
+            /^$/ && !started {next}  # Skip leading blank lines
+            {started=1; print}       # Print everything else
+        ')
+    else
+        # No date header, use content as-is
+        CLEANED_CONTENT="$CONTENT"
+    fi
+
+    # Check if this note is already in the plan file
+    # We'll check if the first line of cleaned content exists in the plan file
+    FIRST_LINE=$(echo "$CLEANED_CONTENT" | head -1)
+    if grep -qF "$FIRST_LINE" "$PLAN_FILE" 2>/dev/null; then
+        echo -e "  ✓ Already in plan: $(basename "$NOTE_FILE")"
+        return 2  # Return 2 for "already exists"
+    fi
+
+    # Find the insertion point - add before the ## Reflection section or at the end
+    if grep -q "^## .*Reflection" "$PLAN_FILE"; then
+        # Insert before Reflection section
+        TEMP_FILE=$(mktemp)
+        awk -v section="$NOTE_TYPE" -v timestamp="$TIMESTAMP" -v content="$CLEANED_CONTENT" '
+            /^## .*Reflection/ && !inserted {
+                print ""
+                print "### " section " Update (" timestamp ")"
+                print content
+                print ""
+                inserted=1
+            }
+            {print}
+        ' "$PLAN_FILE" > "$TEMP_FILE"
+        mv "$TEMP_FILE" "$PLAN_FILE"
+    else
+        # Append to end of file
+        echo "" >> "$PLAN_FILE"
+        echo "### $NOTE_TYPE Update ($TIMESTAMP)" >> "$PLAN_FILE"
+        echo "$CLEANED_CONTENT" >> "$PLAN_FILE"
+    fi
+
+    echo -e "${GREEN}  ✅ Added to plan: $(basename "$NOTE_FILE") → $(basename "$PLAN_FILE")${NC}"
+    return 0
+}
+
+# Process progress notes
+echo -e "\n${BLUE}Processing progress notes...${NC}"
+if [ -d "vault/notes/progress" ]; then
+    for NOTE_FILE in vault/notes/progress/*.md; do
+        if [ -f "$NOTE_FILE" ]; then
+            if add_note_to_plan "$NOTE_FILE" "Progress"; then
+                ((PROGRESS_ADDED++))
+                # Track unique plan files
+                PLAN_FILE=$(echo "$NOTE_FILE" | sed 's/notes\/progress/plans/')
+            elif [ $? -eq 2 ]; then
+                ((PROGRESS_SKIPPED++))
+            fi
+        fi
+    done
+fi
+
+# Process concern notes
+echo -e "\n${BLUE}Processing concern notes...${NC}"
+if [ -d "vault/notes/concerns" ]; then
+    for NOTE_FILE in vault/notes/concerns/*.md; do
+        if [ -f "$NOTE_FILE" ]; then
+            if add_note_to_plan "$NOTE_FILE" "Concerns"; then
+                ((CONCERNS_ADDED++))
+            elif [ $? -eq 2 ]; then
+                ((CONCERNS_SKIPPED++))
+            fi
+        fi
+    done
+fi
+
+# Report statistics
+echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}Summary:${NC}"
+echo -e "  Progress notes added: ${GREEN}$PROGRESS_ADDED${NC}"
+echo -e "  Progress notes skipped (already in plans): $PROGRESS_SKIPPED"
+echo -e "  Concern notes added: ${GREEN}$CONCERNS_ADDED${NC}"
+echo -e "  Concern notes skipped (already in plans): $CONCERNS_SKIPPED"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
