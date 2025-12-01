@@ -176,6 +176,12 @@ function processSection(content, sectionRegex, sectionName, calloutType) {
   }
 
   const sectionContent = match[1];
+
+  // Skip if this section has already been processed (has "Undone:" marker)
+  if (sectionContent.includes('**Undone:**')) {
+    return { content, modified: false };
+  }
+
   const lines = sectionContent.split('\n');
 
   // Count tasks
