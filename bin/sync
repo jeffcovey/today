@@ -1605,7 +1605,9 @@ process_inbox() {
                 echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
                 print_info "    Also added to today's review at $TIMESTAMP"
             else
-                print_info "    No review file for today - will be added when 'bin/today' is run"
+                print_warning "    No review file for today ($REVIEW_FILE)"
+                print_warning "    Leaving in inbox - will be filed when plan file is created"
+                continue  # Skip the file move logic - leave it in inbox
             fi
 
         # Special case: Concerns file - save to concerns/ and append to today's review
@@ -1670,7 +1672,9 @@ process_inbox() {
                 echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
                 print_info "    Also added to today's review at $TIMESTAMP"
             else
-                print_info "    No review file for today - will be added when 'bin/today' is run"
+                print_warning "    No review file for today ($REVIEW_FILE)"
+                print_warning "    Leaving in inbox - will be filed when plan file is created"
+                continue  # Skip the file move logic - leave it in inbox
             fi
         
         # Task files (contains checkboxes)
