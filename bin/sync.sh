@@ -1,0 +1,2227 @@
+#!/bin/bash
+# Unified sync script - Pull all external data sources
+# This script synchronizes all data sources to prepare for AI review
+#
+# NOTE: This is the legacy bash version. The Node.js version (bin/sync.js)
+# is now the preferred implementation and should be used for new development.
+# This bash version is kept for compatibility during the transition period.
+
+set -e
+
+# Load common dotenvx handler
+source "$(dirname "$0")/lib/dotenvx-loader.sh"
+auto_dotenvx "$@"
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+print_header() {
+    echo ""
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+    echo -e "${YELLOW}$1${NC}"
+    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+}
+
+# Track what was synced
+SYNC_SUMMARY=""
+
+# Helper function to run a sync step with timing
+run_sync_step() {
+    local header="$1"
+    local func="$2"
+    local success_msg="$3"
+    local summary_name="$4"
+    
+    print_header "$header"
+    START_TIME=$(date +%s)
+    if $func; then
+        print_status "$success_msg"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✓ $summary_name\n"
+    else
+        print_error "$summary_name sync failed"
+        SYNC_SUMMARY="${SYNC_SUMMARY}✗ $summary_name\n"
+    fi
+    END_TIME=$(date +%s)
+    print_info "⏱️  Took $((END_TIME - START_TIME)) seconds"
+    # Always return 0 to prevent script exit with set -e
+    return 0
+}
+
+# Main sync function
+main() {
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║       TODAY - Full Data Sync          ║${NC}"
+    echo -e "${BLUE}╚═══════════════════════════════════════╝${NC}"
+    echo ""
+    echo "Synchronizing all data sources..."
+    echo "Started at: $(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # Run all operations synchronously for reliability
+    print_info "Running all sync operations synchronously..."
+    
+    # Critical path operations (fast, important)
+    # Single bidirectional Turso sync (replaces separate pull and push)
+    run_sync_step "☁️ Turso Sync" sync_turso_bidirectional "Turso synced" "Turso sync"
+    # Vault sync handled by Resilio Sync - just verify directory exists
+    run_sync_step "📝 Vault Check" check_vault_exists "Vault directory verified" "Vault check"
+    run_sync_step "🗑️ Cleanup Conflicts" cleanup_sync_conflicts "Sync conflicts cleaned" "Conflict cleanup"
+    run_sync_step "🧹 Clean Markdown" clean_markdown_files "Markdown cleaned" "Markdown cleanup"
+    run_sync_step "🗄️ Clean Database" clean_database_task_titles "Database cleaned" "Database cleanup"
+    run_sync_step "📋 Clean Plan Tasks" clean_plan_file_tasks "Plan tasks cleaned" "Plan task cleanup"
+    run_sync_step "🗓️ Cancel Old Plan Tasks" cancel_old_plan_tasks "Old plan tasks canceled" "Old plan task cleanup"
+
+    # DISABLED: Task sync now handled by Obsidian Tasks plugin
+    # SKIP_CLASSIFICATION=1 run_sync_step "✅ Task Manager" sync_tasks "Tasks synced" "Task manager"
+    run_sync_step "📥 Process Inbox" process_inbox "Inbox processed" "Inbox processed"
+    # DISABLED: Project tasks now in markdown files only
+    # run_sync_step "📁 Sync Project Tasks" sync_project_tasks "Project tasks synced" "Project tasks"
+    
+    # Run additional operations synchronously (no background jobs)
+    print_header "⚡ Additional Sync Operations"
+
+    # Update markdown tasks cache and regenerate topic files
+    run_sync_step "🗄️ Update Task Cache" update_markdown_cache "Task cache updated" "Task cache update"
+    run_sync_step "📂 Generate Topics" generate_topic_files "Topic files generated" "Topic files"
+    
+    # Task classification for markdown files (works with Obsidian Tasks plugin)
+    print_info "🔍 Starting task classification for markdown files..."
+    {
+        # Run date added marker assignment
+        echo "Starting date added marker assignment..." > /tmp/classify-$$.log
+        bin/tasks add-date-added >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Date added markers completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Date added markers failed" >> /tmp/classify-$$.log
+        fi
+
+        # Run stage classification
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting stage classification..." >> /tmp/classify-$$.log
+        bin/tasks classify-stages >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Stage classification completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Stage classification failed" >> /tmp/classify-$$.log
+        fi
+
+        # Run topic assignment
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting topic assignment..." >> /tmp/classify-$$.log
+        bin/tasks add-topics >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Topic assignment completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Topic assignment failed" >> /tmp/classify-$$.log
+        fi
+
+        # Run priority assignment
+        echo "" >> /tmp/classify-$$.log
+        echo "Starting priority assignment..." >> /tmp/classify-$$.log
+        bin/tasks prioritize-status >> /tmp/classify-$$.log 2>&1
+        if [ $? -eq 0 ]; then
+            echo "✅ Priority assignment completed successfully" >> /tmp/classify-$$.log
+        else
+            echo "❌ Priority assignment failed" >> /tmp/classify-$$.log
+        fi
+    } &
+    CLASSIFY_PID=$!
+    print_info "   Classification running in background (PID: $CLASSIFY_PID)"
+    print_info "   Check progress: tail -f /tmp/classify-$$.log"
+    
+    # Email sync (if configured)
+    if grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null && grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
+        run_sync_step "📧 Email Sync" sync_email "Email synced" "Email sync"
+    fi
+    
+    # Pobox sent email sync (if configured)
+    if grep -q "POBOX_ACCOUNT=" .env 2>/dev/null && grep -q "POBOX_PASSWORD=" .env 2>/dev/null; then
+        run_sync_step "📤 Pobox Sent Mail" sync_pobox "Sent emails synced" "Pobox sync"
+    fi
+    
+    # Calendar sync
+    run_sync_step "📅 Calendar Sync" sync_calendar "Calendar synced" "Calendar sync"
+
+    # Clean up Time Blocking calendar past events
+    run_sync_step "🗑️ Cleanup Time Blocking" cleanup_time_blocking "Time blocking cleaned" "Time blocking cleanup"
+
+    # Sync time tracking entries to calendar
+    run_sync_step "⏱️ Sync Time Tracking to Calendar" sync_time_tracking_calendar "Time tracking synced to calendar" "Time tracking calendar sync"
+
+    # Contacts sync
+    run_sync_step "👥 Contacts Sync" sync_contacts "Contacts synced" "Contacts sync"
+    
+    
+    # Day One diary sync (if Journal.json exists)
+    if [[ -f vault/logs/Journal.json ]]; then
+        run_sync_step "📔 Day One Diary" sync_diary "Diary synced" "Day One diary"
+    fi
+    
+    # Markdown-based time tracking sync
+    run_sync_step "⏱️ Time Tracking Sync" sync_time_tracking "Time tracking synced" "Time tracking"
+    
+    # OlderGay.Men monitoring sync (if configured)
+    if grep -q "GITHUB_ACCESS_TOKEN=" .env 2>/dev/null || grep -q "SENTRY_AUTH_TOKEN=" .env 2>/dev/null || grep -q "SCOUT_API_KEY=" .env 2>/dev/null; then
+        run_sync_step "🌐 OGM Monitoring" sync_ogm_monitoring "OGM data synced" "OGM monitoring"
+    fi
+    
+    # NOTE: Vault sync handled automatically by Resilio Sync
+    # No final push needed
+    
+    print_status "All sync operations completed (classification running in background)."
+    
+    # Print summary
+    print_header "📋 Sync Summary"
+    echo -e "$SYNC_SUMMARY"
+    echo "Completed at: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+    
+    # Check if any sync failed
+    if echo -e "$SYNC_SUMMARY" | grep -q "✗"; then
+        print_error "Some data sources failed to sync"
+        echo "Please configure missing services in .env file"
+        exit 1
+    else
+        print_status "All data sources synchronized!"
+    fi
+    
+    echo ""
+    if [ ! -z "$CLASSIFY_PID" ]; then
+        echo "Note: Task stage & topic classification is still running in background (PID: $CLASSIFY_PID)"
+        echo "      Check progress: tail -f /tmp/classify-$$.log"
+    fi
+    echo ""
+    echo "Next step: Run 'bin/today' to get AI suggestions on what to do today"
+}
+
+# Check vault directory exists (Resilio Sync handles the actual sync)
+check_vault_exists() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Check if vault directory exists
+    if [[ ! -d vault ]]; then
+        print_error "Vault directory not found"
+        return 1
+    fi
+
+    print_info "Vault directory exists - Resilio Sync handles synchronization"
+
+    # Show content counts
+    note_count=$(find vault/notes -type f -name "*.md" 2>/dev/null | wc -l)
+    plan_count=$(find vault/plans -type f -name "*.md" 2>/dev/null | wc -l)
+    project_count=$(find vault/projects -type f -name "*.md" 2>/dev/null | wc -l)
+    topic_count=$(find vault/topics -type f -name "*.md" 2>/dev/null | wc -l)
+    print_info "Total notes: $note_count, plans: $plan_count, projects: $project_count, topics: $topic_count"
+
+    # Count OGM work files
+    ogm_count=$(find vault/logs/ogm-work -type f -name "*.md" 2>/dev/null | wc -l || echo 0)
+    if [[ $ogm_count -gt 0 ]]; then
+        print_info "OlderGay.Men work summaries: $ogm_count"
+    fi
+
+    # Show recent content (last 7 days) across all directories
+    recent_notes=$(find vault/notes -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_plans=$(find vault/plans -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_projects=$(find vault/projects -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_topics=$(find vault/topics -type f -name "*.md" -mtime -7 2>/dev/null | wc -l)
+    recent_count=$((recent_notes + recent_plans + recent_projects + recent_topics))
+
+    if [[ $recent_count -gt 0 ]]; then
+        print_info "Content from last 7 days: $recent_count files (notes: $recent_notes, plans: $recent_plans, projects: $recent_projects, topics: $recent_topics)"
+        # Show up to 5 most recent files across all directories
+        print_info "Most recent content:"
+        find vault/ -type f -name "*.md" ! -path "*/.*" -mtime -7 2>/dev/null | \
+            xargs ls -t 2>/dev/null | head -5 | while read -r file; do
+            echo "  • $(basename "$file") ($(dirname "$file"))"
+        done
+    fi
+
+    return 0
+}
+
+# Update markdown tasks cache
+update_markdown_cache() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Updating markdown tasks cache from .md files..."
+
+    # Run the cache update command
+    if node bin/tasks update-cache 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"📊"* ]] || [[ "$line" == *"🏷️"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"Error"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        print_error "Cache update failed"
+        return 1
+    fi
+}
+
+# Generate topic files from cache
+generate_topic_files() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Generating topic files from cache..."
+
+    # Run the topic generation command
+    if node bin/tasks generate-topics 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"🗑️"* ]] || [[ "$line" == *"Generated"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"Error"* ]]; then
+            print_error "$line"
+        fi
+    done; then
+        return 0
+    else
+        print_error "Topic generation failed"
+        return 1
+    fi
+}
+
+# Legacy function names kept for compatibility
+sync_github_vault() {
+    # Now just checks vault exists (Resilio handles sync)
+    check_vault_exists
+    return $?
+}
+
+sync_vault_git() {
+    # Alias for backward compatibility
+    check_vault_exists
+    return $?
+}
+
+# Clean up sync-conflict files
+cleanup_sync_conflicts() {
+    # Get the actual project root directory
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    print_info "Checking for sync-conflict files..."
+    
+    # Find all sync-conflict files
+    CONFLICT_FILES=$(find vault -name "*sync-conflict-*" -type f 2>/dev/null)
+    
+    if [[ -z "$CONFLICT_FILES" ]]; then
+        print_info "No sync-conflict files found"
+        return 0
+    fi
+    
+    TOTAL_CONFLICTS=$(echo "$CONFLICT_FILES" | wc -l)
+    print_info "Found $TOTAL_CONFLICTS sync-conflict file(s)"
+    
+    REMOVED_COUNT=0
+    KEPT_COUNT=0
+    
+    # Process each conflict file
+    while IFS= read -r conflict_file; do
+        if [[ -z "$conflict_file" ]]; then
+            continue
+        fi
+        
+        # Extract the original filename by removing the sync-conflict suffix
+        # Pattern: filename.sync-conflict-YYYYMMDD-HHMMSS-XXXXX.extension
+        original_file=$(echo "$conflict_file" | sed 's/\.sync-conflict-[0-9]\{8\}-[0-9]\{6\}-[A-Z0-9]\{7\}//')
+        
+        if [[ -f "$original_file" ]]; then
+            # Both files exist, compare them
+            if diff -q "$original_file" "$conflict_file" > /dev/null 2>&1; then
+                # Files are identical, safe to remove conflict
+                rm "$conflict_file"
+                REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                print_info "  ✓ Removed duplicate: $(basename "$conflict_file")"
+            else
+                # Files differ, check which is newer
+                # Use stat -c for Linux (GitHub Codespaces uses Linux)
+                original_mtime=$(stat -c %Y "$original_file" 2>/dev/null)
+                conflict_mtime=$(stat -c %Y "$conflict_file" 2>/dev/null)
+                
+                if [[ "$conflict_mtime" -lt "$original_mtime" ]]; then
+                    # Conflict file is older than original, safe to remove
+                    rm "$conflict_file"
+                    REMOVED_COUNT=$((REMOVED_COUNT + 1))
+                    print_info "  ✓ Removed older conflict: $(basename "$conflict_file")"
+                else
+                    # Conflict file is newer or same age, keep it for manual review
+                    KEPT_COUNT=$((KEPT_COUNT + 1))
+                    # print_info "  ⚠ Keeping for review: $(basename "$conflict_file")"
+                fi
+            fi
+        else
+            # Original file doesn't exist, rename conflict to original
+            mv "$conflict_file" "$original_file"
+            REMOVED_COUNT=$((REMOVED_COUNT + 1))
+            print_info "  ✓ Restored missing file: $(basename "$original_file")"
+        fi
+    done <<< "$CONFLICT_FILES"
+    
+    if [[ $REMOVED_COUNT -gt 0 ]]; then
+        print_info "Cleaned up $REMOVED_COUNT sync-conflict file(s)"
+    fi
+    
+    if [[ $KEPT_COUNT -gt 0 ]]; then
+        print_info "Kept $KEPT_COUNT conflict file(s) for manual review (newer than original)"
+    fi
+    
+    return 0
+}
+
+# Clean markdown files with markdownlint
+clean_markdown_files() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    print_info "Cleaning markdown files with markdownlint..."
+    
+    # Track last lint run using a marker file
+    LINT_MARKER=".data/.last-markdown-lint"
+    mkdir -p .data 2>/dev/null
+    
+    # Save current timestamp BEFORE we start any processing
+    # We'll use this to mark when we started, so files we modify don't get reprocessed
+    TEMP_MARKER=$(mktemp)
+    touch "$TEMP_MARKER"
+    
+    # Find files changed since last lint run
+    if [[ -f "$LINT_MARKER" ]]; then
+        # Files modified after the last lint run
+        ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -newer "$LINT_MARKER" -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
+    else
+        # First run or marker missing - process files from last 5 minutes
+        ALL_CHANGED_FILES=$(find vault -type f -name "*.md" -mmin -5 -not -path "*/.*" -not -name "*sync-conflict*" 2>/dev/null || true)
+    fi
+    
+    # Count changed files
+    if [[ -z "$ALL_CHANGED_FILES" ]]; then
+        print_info "No markdown files changed since last lint"
+        # Update marker with the time we checked
+        mv "$TEMP_MARKER" "$LINT_MARKER"
+        return 0
+    fi
+    
+    MD_COUNT=$(echo "$ALL_CHANGED_FILES" | wc -l | tr -d ' ')
+    print_info "Processing $MD_COUNT markdown file(s) changed since last lint..."
+    
+    # First, fix corrupted HTML comments (smart dash replacements from Drafts, etc.)
+    # This fixes: <!— becomes <!-- and —> becomes -->
+    COMMENT_FIXED_COUNT=0
+    while IFS= read -r file; do
+        # Skip empty lines
+        [[ -z "$file" ]] && continue
+        # Check if file has corrupted comments
+        if grep -qE '<!—|—>' "$file" 2>/dev/null; then
+            # Fix the corrupted comments
+            # Using sed with in-place editing
+            if [[ "$(uname)" == "Darwin" ]]; then
+                # macOS version
+                sed -i '' -e 's/<!—/<!--/g' -e 's/—>/-->/g' "$file"
+            else
+                # Linux version
+                sed -i -e 's/<!—/<!--/g' -e 's/—>/-->/g' "$file"
+            fi
+            COMMENT_FIXED_COUNT=$((COMMENT_FIXED_COUNT + 1))
+        fi
+    done <<< "$ALL_CHANGED_FILES"
+    
+    if [[ $COMMENT_FIXED_COUNT -gt 0 ]]; then
+        print_info "Fixed corrupted HTML comments in $COMMENT_FIXED_COUNT file(s)"
+    fi
+    
+    # DISABLED: task-id cleanup no longer needed with Obsidian Tasks
+    # We're transitioning away from task-id HTML comments to Obsidian Tasks syntax
+    # Tasks are now managed purely through markdown checkboxes
+    
+    # Run markdownlint-cli2 with fix option on changed files only
+    # Convert the list of files to arguments for markdownlint
+    if [[ -n "$ALL_CHANGED_FILES" ]]; then
+        # Convert newline-separated list to space-separated arguments
+        FILES_TO_LINT=$(echo "$ALL_CHANGED_FILES" | tr '\n' ' ')
+        output=$(npx markdownlint-cli2 --fix $FILES_TO_LINT 2>&1) || true
+    else
+        output=""
+    fi
+    
+    # Check if any files were fixed
+    if echo "$output" | grep -q "Fixing:"; then
+        fixed_count=$(echo "$output" | grep -c "Fixing:" || echo 0)
+        print_info "Fixed formatting in $fixed_count file(s)"
+    else
+        print_info "All markdown files are already clean"
+    fi
+    
+    # Update the marker file with the timestamp from BEFORE we started processing
+    # This ensures files we just modified won't be re-processed next time
+    mv "$TEMP_MARKER" "$LINT_MARKER"
+    
+    # NOTE: Vault changes handled by Resilio Sync
+    # Files are cleaned in-place and will sync automatically
+    
+    return 0
+}
+
+# Clean malformed task titles in database
+clean_database_task_titles() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # DISABLED: task-id cleanup no longer needed with Obsidian Tasks
+    # Titles no longer contain task-id comments
+
+    return 0
+}
+
+# Clean plan file tasks - remove date/recurrence properties
+clean_plan_file_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Cleaning tasks in plan files (removing date/recurrence properties)..."
+
+    # Find all markdown files in vault/plans/
+    PLAN_FILES=$(find vault/plans -type f -name "*.md" 2>/dev/null)
+
+    if [[ -z "$PLAN_FILES" ]]; then
+        print_info "No plan files found"
+        return 0
+    fi
+
+    CLEANED_COUNT=0
+    TASK_COUNT=0
+
+    # Process each plan file
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        # Check if file has tasks with date/recurrence properties (but NOT created date ➕)
+        if grep -qE '^\s*-\s*\[[x ]\].*[📅⏳🔁]' "$file" 2>/dev/null; then
+            # Create temp file
+            TEMP_FILE=$(mktemp)
+
+            # Process each line
+            FILE_MODIFIED=false
+            while IFS= read -r line; do
+                # Check if line is a task with date/recurrence properties
+                if echo "$line" | grep -qE '^\s*-\s*\[[x ]\].*[📅⏳🔁]'; then
+                    # Remove date and recurrence properties (but keep ➕ created date)
+                    # Remove 📅 YYYY-MM-DD (due date)
+                    cleaned_line=$(echo "$line" | sed -E 's/📅\s*[0-9]{4}-[0-9]{2}-[0-9]{2}//g')
+                    # Remove ⏳ YYYY-MM-DD (scheduled date)
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/⏳\s*[0-9]{4}-[0-9]{2}-[0-9]{2}//g')
+                    # Remove 🔁 recurrence patterns
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/🔁\s*every\s+[a-zA-Z0-9 ,]+//g')
+                    # Remove extra spaces (but preserve created date ➕ if present)
+                    cleaned_line=$(echo "$cleaned_line" | sed -E 's/\s+/ /g' | sed -E 's/\s+$//')
+
+                    echo "$cleaned_line" >> "$TEMP_FILE"
+                    FILE_MODIFIED=true
+                    TASK_COUNT=$((TASK_COUNT + 1))
+                else
+                    echo "$line" >> "$TEMP_FILE"
+                fi
+            done < "$file"
+
+            # Replace file if modified
+            if [[ "$FILE_MODIFIED" == true ]]; then
+                mv "$TEMP_FILE" "$file"
+                CLEANED_COUNT=$((CLEANED_COUNT + 1))
+            else
+                rm -f "$TEMP_FILE"
+            fi
+        fi
+    done <<< "$PLAN_FILES"
+
+    if [[ $CLEANED_COUNT -gt 0 ]]; then
+        print_info "Cleaned $TASK_COUNT task(s) in $CLEANED_COUNT plan file(s)"
+    else
+        print_info "No tasks with date/recurrence properties found in plan files"
+    fi
+
+    return 0
+}
+
+# Cancel undone tasks in old daily plan files
+# Cleans up Morning Routine, Evening Routine, and Hip Mobility callouts:
+# 1. Makes callouts open instead of collapsed
+# 2. Adds completion percentage to headers
+# 3. Replaces content with "Undone:" list of incomplete tasks
+# 4. Fixes "Completed Today" section to use specific date
+# Usage: cancel_old_plan_tasks [file_path]
+#   If file_path is provided, only process that file (ignoring date checks)
+#   If no file_path, process all old plan files
+cancel_old_plan_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    local SPECIFIC_FILE="$1"
+
+    if [[ -n "$SPECIFIC_FILE" ]]; then
+        # Process specific file only
+        print_info "Processing specific file: $SPECIFIC_FILE"
+        ALL_PLAN_FILES="$SPECIFIC_FILE"
+        TODAY="9999-12-31"  # Set far future date so we process the file regardless
+    else
+        print_info "Checking for old plan files to clean up..."
+        # Get today's date in YYYY-MM-DD format
+        TODAY=$(date +%Y-%m-%d)
+        # Find all daily plan files
+        ALL_PLAN_FILES=$(find vault/plans -type f -name "2*_Q*_*_W*_*.md" 2>/dev/null | sort)
+    fi
+
+    if [[ -z "$ALL_PLAN_FILES" ]]; then
+        print_info "No plan files found"
+        return 0
+    fi
+
+    MODIFIED_FILES=0
+
+    # Process each plan file
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        # Extract date from filename (format: YYYY_Q#_MM_W##_DD.md)
+        BASENAME=$(basename "$file" .md")
+        if [[ $BASENAME =~ ^([0-9]{4})_Q[0-9]_([0-9]{2})_W[0-9]+_([0-9]{2})$ ]]; then
+            YEAR="${BASH_REMATCH[1]}"
+            MONTH="${BASH_REMATCH[2]}"
+            DAY="${BASH_REMATCH[3]}"
+            FILE_DATE="${YEAR}-${MONTH}-${DAY}"
+        else
+            continue
+        fi
+
+        # Skip if this is today's file or in the future
+        if [[ "$FILE_DATE" >= "$TODAY" ]]; then
+            continue
+        fi
+
+        # Process the file with a node script
+        TEMP_SCRIPT=$(mktemp)
+        cat > "$TEMP_SCRIPT" << 'NODESCRIPT'
+const fs = require('fs');
+const filePath = process.argv[2];
+const fileDate = process.argv[3];
+
+let content = fs.readFileSync(filePath, 'utf-8');
+let modified = false;
+
+// Function to process a routine section
+function processSection(sectionRegex, sectionName, calloutType) {
+    const match = content.match(sectionRegex);
+    if (!match) return;
+
+    const sectionContent = match[1];
+    const lines = sectionContent.split('\n');
+
+    // Count tasks
+    let totalTasks = 0;
+    let completedTasks = 0;
+    const undoneTasks = [];
+
+    for (const line of lines) {
+        if (line.match(/^>\s*-\s*\[./)) {
+            totalTasks++;
+            if (line.match(/^>\s*-\s*\[x\]/i)) {
+                completedTasks++;
+            } else {
+                // Extract task text (remove checkbox and > prefix)
+                const taskText = line.replace(/^>\s*-\s*\[.\]\s*/, '').trim();
+                if (taskText) {
+                    undoneTasks.push(taskText);
+                }
+            }
+        }
+    }
+
+    if (totalTasks === 0) return;
+
+    const percentage = Math.round((completedTasks / totalTasks) * 100);
+
+    // Build new section
+    let newSection = `> [!${calloutType}] ${sectionName} (${percentage}% done)\n`;
+
+    if (undoneTasks.length > 0) {
+        newSection += `> \n> **Undone:**\n`;
+        for (const task of undoneTasks) {
+            newSection += `> - ${task}\n`;
+        }
+    } else {
+        newSection += `> \n> All tasks completed! ✅\n`;
+    }
+
+    content = content.replace(sectionRegex, newSection);
+    modified = true;
+}
+
+// Process the three routine sections
+processSection(/> \[!info\]-?\s*🌅 Morning Routine([\s\S]*?)(?=\n(?:>\s*\[!|###|##)|$)/i, '🌅 Morning Routine', 'info');
+processSection(/> \[!tip\]-?\s*🏃 Hip Mobility Workout \(45 minutes\)([\s\S]*?)(?=\n(?:>\s*\[!|###|##)|$)/i, '🏃 Hip Mobility Workout (45 minutes)', 'tip');
+processSection(/> \[!warning\]-?\s*🌄 Evening Routine([\s\S]*?)(?=\n(?:>\s*\[!|###|##)|$)/i, '🌄 Evening Routine', 'warning');
+
+// Fix the 'Completed Today' section to use specific date
+const dateRegex = /## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n\s*```tasks\n\s*done today\n/;
+const replacement = `## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n  \`\`\`tasks\n  done on ${fileDate}\n`;
+if (content.match(dateRegex)) {
+    content = content.replace(dateRegex, replacement);
+    modified = true;
+}
+
+if (modified) {
+    fs.writeFileSync(filePath, content, 'utf-8');
+    process.exit(0); // Success
+} else {
+    process.exit(1); // No changes
+}
+NODESCRIPT
+
+        node "$TEMP_SCRIPT" "$file" "$FILE_DATE"
+        NODE_RESULT=$?
+        rm -f "$TEMP_SCRIPT"
+
+        if [ $? -eq 0 ]; then
+            MODIFIED_FILES=$((MODIFIED_FILES + 1))
+        fi
+
+    done <<< "$ALL_PLAN_FILES"
+
+    if [ $MODIFIED_FILES -gt 0 ]; then
+        print_info "Cleaned up $MODIFIED_FILES old plan file(s)"
+    else
+        print_info "No plan files needed cleanup"
+    fi
+
+    return 0
+}
+
+# Check task consistency across all markdown files
+check_task_consistency() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    print_info "Checking task consistency across markdown files..."
+    
+    # Run consistency check with auto-fix enabled
+    # This now works correctly because:
+    # 1. We include vault/tasks/ files to respect manual changes there
+    # 2. We use file modification time to determine the correct state
+    # 3. The latest change wins, whether it's in source or generated files
+    output=$(bin/tasks check-consistency --fix 2>&1)
+    
+    if echo "$output" | grep -q "All tasks are consistent"; then
+        print_info "All tasks are consistent"
+        return 0
+    elif echo "$output" | grep -q "Fixed.*inconsistent task"; then
+        # Extract the number of fixed tasks
+        fixed_count=$(echo "$output" | grep -oE "Fixed [0-9]+ inconsistent" | grep -oE "[0-9]+")
+        print_info "Fixed $fixed_count inconsistent task(s)"
+        return 0
+    else
+        print_error "Task consistency check failed"
+        return 1
+    fi
+}
+
+# Sync task manager (includes stage classification)
+sync_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    print_info "Syncing task database with markdown files..."
+    
+    # Run the task sync command (now includes stage classification)
+    output=$(timeout 30 bin/tasks sync 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        # Show the sync output but filter for key info
+        echo "$output" | while IFS= read -r line; do
+            # Highlight stage classification results
+            if echo "$line" | grep -qE "Classified|Stage|Front|Back|Off"; then
+                print_info "$line"
+            elif echo "$line" | grep -q "✓"; then
+                print_info "$line"
+            elif echo "$line" | grep -q "Generated today.md"; then
+                print_info "$line"
+            fi
+        done
+        return 0
+    else
+        print_error "Task sync failed"
+        echo "$output" | while IFS= read -r line; do
+            print_info "$line"
+        done
+        return 1
+    fi
+}
+
+# Bidirectional sync with Turso cloud database
+sync_turso_bidirectional() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Check if Turso is configured
+    if [[ -z "$TURSO_DATABASE_URL" ]] || [[ -z "$TURSO_AUTH_TOKEN" ]]; then
+        print_info "Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)"
+        return 1
+    fi
+
+    # Check if database exists and has required tables
+    DB_PATH=".data/today.db"
+    DB_MISSING=false
+    TABLES_MISSING=false
+
+    if [[ ! -f "$DB_PATH" ]]; then
+        print_info "Database not found at $DB_PATH"
+        DB_MISSING=true
+    else
+        # Check if critical tables exist
+        REQUIRED_TABLES="tasks projects"
+        for table in $REQUIRED_TABLES; do
+            if ! sqlite3 "$DB_PATH" "SELECT name FROM sqlite_master WHERE type='table' AND name='$table'" 2>/dev/null | grep -q "$table"; then
+                print_info "Required table '$table' not found in database"
+                TABLES_MISSING=true
+                break
+            fi
+        done
+    fi
+
+    # If database is missing or corrupted, create it and pull from Turso
+    if [[ "$DB_MISSING" == "true" ]] || [[ "$TABLES_MISSING" == "true" ]]; then
+        print_info "Database missing or incomplete - creating fresh database..."
+
+        # Create .data directory if it doesn't exist
+        mkdir -p .data
+
+        # Create a new database and run migrations first
+        print_info "Creating database and running migrations..."
+        if node -e "
+            import('./src/migrations.js').then(async ({MigrationManager}) => {
+                const Database = (await import('better-sqlite3')).default;
+                const db = new Database('.data/today.db');
+                const manager = new MigrationManager(db);
+                await manager.runMigrations();
+                db.close();
+                console.log('✅ Database created and migrations applied');
+            }).catch(err => {
+                console.error('Failed to create database:', err.message);
+                process.exit(1);
+            });
+        " 2>&1 | while IFS= read -r line; do
+            print_info "    $line"
+        done; then
+            print_status "Database created with schema"
+        else
+            print_error "Failed to create database"
+            return 1
+        fi
+
+        # Now pull data from Turso
+        print_info "Pulling data from Turso..."
+        if timeout 60 bin/turso-sync pull 2>&1 | while IFS= read -r line; do
+            if [[ "$line" == *"✅"* ]] || [[ "$line" == *"✓"* ]] || [[ "$line" == *"successfully"* ]]; then
+                print_info "$line"
+            elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
+                print_error "$line"
+            else
+                print_info "$line"
+            fi
+        done; then
+            print_status "Successfully pulled data from Turso"
+            return 0
+        else
+            print_error "Failed to pull data from Turso"
+            return 1
+        fi
+    fi
+
+    # Normal bidirectional sync if database exists and is healthy
+    print_info "Performing bidirectional sync with Turso..."
+
+    # Run the turso-sync script with sync action (newest data wins)
+    if timeout 45 bin/turso-sync sync 2>&1 | while IFS= read -r line; do
+        if [[ "$line" == *"✅"* ]] || [[ "$line" == *"✓"* ]] || [[ "$line" == *"Bidirectional sync complete"* ]]; then
+            print_info "$line"
+        elif [[ "$line" == *"✗"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Failed"* ]]; then
+            print_error "$line"
+        elif [[ "$line" == *"Comparing timestamps"* ]] || [[ "$line" == *"Step"* ]]; then
+            print_info "$line"
+        fi
+    done; then
+        return 0
+    else
+        local exit_code=$?
+        if [[ $exit_code -eq 124 ]]; then
+            print_info "Turso sync timed out after 45s - continuing with local data"
+            return 0  # Don't fail the sync, just continue
+        else
+            print_error "Turso sync failed"
+            return 1
+        fi
+    fi
+}
+
+# Sync Notion database
+sync_notion() {
+    # Use the notion CLI to refresh cache
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if NOTION_TOKEN is configured
+    if ! grep -q "NOTION_TOKEN=" .env 2>/dev/null || grep -q "NOTION_TOKEN=your_notion" .env 2>/dev/null; then
+        print_error "Notion not configured"
+        print_info "Add NOTION_TOKEN to .env file"
+        return 1
+    fi
+    
+    # Set up cache database
+    CACHE_DB=".data/today.db"
+    
+    # Ensure sync_metadata table exists
+    if [[ -f "$CACHE_DB" ]]; then
+        sqlite3 "$CACHE_DB" "CREATE TABLE IF NOT EXISTS sync_metadata (key TEXT PRIMARY KEY, value TEXT)" 2>/dev/null
+        LAST_SYNC=$(sqlite3 "$CACHE_DB" "SELECT value FROM sync_metadata WHERE key='last_full_sync'" 2>/dev/null || echo "")
+    else
+        print_info "No cache found, initial sync needed..."
+        LAST_SYNC=""
+    fi
+    
+    # For now, use the regular fetch-tasks which is fast when cached
+    print_info "Syncing Notion tasks..."
+    
+    # Fetch tasks (will use cache intelligently)
+    task_output=$(bin/notion fetch-tasks 2>&1 | tail -5)
+    if [[ $? -eq 0 ]]; then
+        echo "$task_output" | while IFS= read -r line; do
+            print_info "$line"
+        done
+        
+        # Update sync timestamp
+        sqlite3 "$CACHE_DB" "INSERT OR REPLACE INTO sync_metadata (key, value) VALUES ('last_full_sync', datetime('now'))" 2>/dev/null
+        
+        return 0
+    else
+        print_error "Notion connection failed"
+        if echo "$output" | grep -q "NOTION_TOKEN"; then
+            print_info "Please configure NOTION_TOKEN in .env file"
+        else
+            print_info "Error: $output"
+        fi
+        return 1
+    fi
+}
+
+# Sync email
+sync_email() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if email-cli/email binary exists
+    EMAIL_BIN=""
+    if [[ -f bin/email ]]; then
+        EMAIL_BIN="bin/email"
+    elif [[ -f bin/email-cli ]]; then
+        EMAIL_BIN="bin/email-cli"
+    else
+        print_error "Email CLI not available"
+        return 1
+    fi
+    
+    # Check if email credentials are configured
+    if ! grep -q "EMAIL_ACCOUNT=" .env 2>/dev/null || ! grep -q "EMAIL_PASSWORD=" .env 2>/dev/null; then
+        print_error "Email not configured"
+        print_info "Run 'email setup' for configuration instructions"
+        return 1
+    fi
+    
+    # Incremental email sync - fetch emails newer than what we have
+    if [[ -f .data/today.db ]]; then
+        # Get the timestamp of the most recent email
+        EMAIL_INFO=$(sqlite3 .data/today.db "SELECT MAX(date), COUNT(*) FROM emails" 2>/dev/null || echo "||0")
+        LAST_EMAIL_DATE=$(echo "$EMAIL_INFO" | cut -d'|' -f1)
+        EMAIL_COUNT=$(echo "$EMAIL_INFO" | cut -d'|' -f2)
+        
+        if [[ -n "$LAST_EMAIL_DATE" ]] && [[ "$EMAIL_COUNT" -gt 0 ]]; then
+            # Calculate days since last email to determine sync range
+            DAYS_OLD=$(node -e "
+                const date = new Date('$LAST_EMAIL_DATE');
+                const now = new Date();
+                const daysSince = (now - date) / (1000 * 60 * 60 * 24);
+                console.log(Math.ceil(daysSince));
+            " 2>/dev/null || echo "7")
+            
+            # Sync enough days to catch all new emails since last sync
+            # Add 1 day buffer to ensure we don't miss anything
+            DAYS_TO_SYNC=$((DAYS_OLD + 1))
+            
+            # Cap at 7 days max for performance
+            if [[ $DAYS_TO_SYNC -gt 7 ]]; then
+                DAYS_TO_SYNC=7
+                print_info "Syncing emails from last 7 days (max range)..."
+            else
+                print_info "Syncing emails from last $DAYS_TO_SYNC days to catch all new mail..."
+            fi
+        else
+            print_info "No emails in database, initial sync of 7 days..."
+            DAYS_TO_SYNC=7
+        fi
+    else
+        print_info "No email database found, initial sync of 7 days..."
+        DAYS_TO_SYNC=7
+    fi
+    
+    # Use timeout based on days with 30 second base
+    TIMEOUT=$((30 + $DAYS_TO_SYNC * 5))  # 30s base + 5s per day
+    print_info "Fetching new emails (timeout: ${TIMEOUT}s)..."
+    
+    # Create a temp file for output
+    EMAIL_OUTPUT=$(mktemp)
+    
+    # Run email download in background with timeout, showing progress
+    timeout $TIMEOUT $EMAIL_BIN download --days $DAYS_TO_SYNC > "$EMAIL_OUTPUT" 2>&1 &
+    EMAIL_PID=$!
+    
+    # Monitor the output file for "already in progress" or transaction error messages
+    WAIT_COUNT=0
+    while kill -0 $EMAIL_PID 2>/dev/null; do
+        if grep -q "Another download is already in progress" "$EMAIL_OUTPUT" 2>/dev/null; then
+            print_info "Another email download is already in progress, skipping..."
+            kill $EMAIL_PID 2>/dev/null || true
+            wait $EMAIL_PID 2>/dev/null || true
+            rm -f "$EMAIL_OUTPUT"
+            return 0
+        fi
+        
+        # Check for database transaction errors
+        if grep -q "this.cache.db.transaction is not a function" "$EMAIL_OUTPUT" 2>/dev/null; then
+            print_error "Email database error detected"
+            print_info "Try running 'bin/email repair' to fix the database"
+            kill $EMAIL_PID 2>/dev/null || true
+            wait $EMAIL_PID 2>/dev/null || true
+            rm -f "$EMAIL_OUTPUT"
+            return 1
+        fi
+        
+        # Show any new output lines (for progress)
+        if [[ -f "$EMAIL_OUTPUT" ]] && [[ -s "$EMAIL_OUTPUT" ]]; then
+            tail -n +$((WAIT_COUNT + 1)) "$EMAIL_OUTPUT" 2>/dev/null | while IFS= read -r line; do
+                if [[ -n "$line" ]]; then
+                    echo "  $line"
+                fi
+            done
+            WAIT_COUNT=$(wc -l < "$EMAIL_OUTPUT" 2>/dev/null || echo 0)
+        fi
+        
+        sleep 0.5
+    done
+    
+    # Get exit code (don't wait forever if process was killed)
+    wait $EMAIL_PID 2>/dev/null || true
+    email_exit_code=$?
+    
+    # Read final output
+    output=$(cat "$EMAIL_OUTPUT" 2>/dev/null || echo "")
+    rm -f "$EMAIL_OUTPUT"
+    
+    # Check for timeout
+    if [[ $email_exit_code -eq 124 ]]; then
+        print_error "Email download timed out after $TIMEOUT seconds"
+        print_info "Try running 'email download --days 1' for a quicker sync"
+        return 1
+    elif [[ $email_exit_code -ne 0 ]]; then
+        print_error "Email download failed"
+        return 1
+    fi
+    
+    # Show download results
+    if echo "$output" | grep -q "Downloaded"; then
+        # Extract number of emails downloaded
+        email_count=$(echo "$output" | grep -oE "Downloaded [0-9]+ email" | grep -oE "[0-9]+") || true
+        if [[ -n "$email_count" ]]; then
+            print_info "Downloaded $email_count new emails"
+        fi
+    else
+        print_info "No new emails to download"
+    fi
+    
+    # Show email stats (with timeout to prevent hanging)
+    stats_output=$(timeout 2 $EMAIL_BIN stats 2>&1 | grep "Total emails:" | cut -d: -f2 | xargs) || true
+    if [[ -n "$stats_output" ]]; then
+        print_info "Total emails in database: $stats_output"
+    fi
+    
+    return 0
+}
+
+# Sync Pobox sent emails
+sync_pobox() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if Pobox credentials are configured
+    if ! grep -q "POBOX_ACCOUNT=" .env 2>/dev/null || ! grep -q "POBOX_PASSWORD=" .env 2>/dev/null; then
+        print_info "Pobox credentials not configured (skipping)"
+        return 0
+    fi
+    
+    print_info "Downloading sent emails from Pobox..."
+    
+    # Create temp file for output
+    POBOX_OUTPUT=$(mktemp /tmp/pobox-sync.XXXXXX)
+    
+    # Start the sync with timeout
+    TIMEOUT=60
+    timeout $TIMEOUT bin/pobox-sync > "$POBOX_OUTPUT" 2>&1 &
+    POBOX_PID=$!
+    
+    # Show progress dots while running
+    local dots=""
+    while kill -0 $POBOX_PID 2>/dev/null; do
+        dots="${dots}."
+        if [[ ${#dots} -gt 30 ]]; then
+            dots=""
+        fi
+        printf "\r   Syncing sent emails%-35s" "$dots"
+        sleep 0.5
+    done
+    
+    # Get exit code
+    wait $POBOX_PID 2>/dev/null || true
+    pobox_exit_code=$?
+    
+    # Clear the progress line
+    printf "\r%-70s\r" " "
+    
+    # Read output
+    output=$(cat "$POBOX_OUTPUT" 2>/dev/null || echo "")
+    rm -f "$POBOX_OUTPUT"
+    
+    # Check for timeout
+    if [[ $pobox_exit_code -eq 124 ]]; then
+        print_error "Pobox sync timed out after $TIMEOUT seconds"
+        return 1
+    elif [[ $pobox_exit_code -ne 0 ]]; then
+        print_error "Pobox sync failed"
+        echo "$output" | grep -v "^$" | head -5
+        return 1
+    fi
+    
+    # Show results
+    if echo "$output" | grep -q "Downloaded"; then
+        # Extract number of emails
+        email_count=$(echo "$output" | grep -oE "Downloaded [0-9]+ sent email" | grep -oE "[0-9]+") || true
+        if [[ -n "$email_count" ]]; then
+            print_info "Downloaded $email_count new sent emails"
+        fi
+    else
+        print_info "No new sent emails to download"
+    fi
+    
+    return 0
+}
+
+# Sync calendar events
+sync_calendar() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Run calendar sync
+    print_info "Syncing calendar events..."
+    SYNC_OUTPUT=$(bin/calendar sync 2>&1)
+
+    # Check if sync was successful
+    if echo "$SYNC_OUTPUT" | grep -q "✅ Synced [0-9]"; then
+        # Extract event count
+        EVENT_COUNT=$(echo "$SYNC_OUTPUT" | grep -oE "✅ Synced [0-9]+ calendar" | grep -oE "[0-9]+" || echo 0)
+        if [[ "$EVENT_COUNT" -gt 0 ]]; then
+            print_info "Synced $EVENT_COUNT calendar events"
+            # Show quick summary of today's events
+            TODAY_COUNT=$(bin/calendar today 2>/dev/null | jq '. | length' 2>/dev/null || echo 0)
+            if [[ "$TODAY_COUNT" -gt 0 ]]; then
+                print_info "$TODAY_COUNT events scheduled for today"
+            fi
+            return 0
+        else
+            print_info "No calendar events found"
+            return 0
+        fi
+    else
+        print_info "No calendars configured (run 'bin/setup --calendar' for instructions)"
+        return 1
+    fi
+}
+
+# Clean up past events from Time Blocking calendar
+cleanup_time_blocking() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Time Blocking calendar ID
+    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+
+    # Check if Google Calendar is configured
+    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
+        print_info "Google Calendar not configured, skipping cleanup"
+        return 0
+    fi
+
+    print_info "Cleaning up past Time Blocking events (keeping last 2 days)..."
+    cleanup_output=$(bin/calendar cleanup "$TIME_BLOCKING_CAL" 2 2>&1)
+
+    if echo "$cleanup_output" | grep -q "✅"; then
+        # Extract deleted count if shown
+        if echo "$cleanup_output" | grep -q "Deleted [0-9]"; then
+            deleted_count=$(echo "$cleanup_output" | grep -oE "Deleted [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            if [[ "$deleted_count" -gt 0 ]]; then
+                print_info "Deleted $deleted_count old time block(s)"
+            else
+                print_info "No old events to clean up"
+            fi
+        else
+            print_info "Time blocking calendar cleaned"
+        fi
+        return 0
+    else
+        # Don't fail sync if cleanup fails - it's not critical
+        print_info "Time blocking cleanup skipped (calendar may not exist)"
+        return 0
+    fi
+}
+
+# Sync time tracking entries to calendar
+sync_time_tracking_calendar() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Time Blocking calendar ID
+    local TIME_BLOCKING_CAL="e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+
+    # Check if Google Calendar is configured
+    if [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]] && [[ -z "$GOOGLE_SERVICE_ACCOUNT_KEY_PATH" ]]; then
+        print_info "Google Calendar not configured, skipping time tracking sync"
+        return 0
+    fi
+
+    print_info "Syncing time tracking entries to calendar..."
+    sync_output=$(bin/calendar sync-time-tracking "$TIME_BLOCKING_CAL" 2>&1)
+
+    if echo "$sync_output" | grep -q "✅"; then
+        # Extract counts if shown
+        if echo "$sync_output" | grep -q "Already in sync"; then
+            total_count=$(echo "$sync_output" | grep -oE "Already in sync \([0-9]+ entries\)" | grep -oE "[0-9]+" || echo 0)
+            print_info "Time tracking already in sync ($total_count entries)"
+        elif echo "$sync_output" | grep -q "Added:"; then
+            added_count=$(echo "$sync_output" | grep -oE "Added: [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            removed_count=$(echo "$sync_output" | grep -oE "Removed: [0-9]+" | grep -oE "[0-9]+" || echo 0)
+            if [[ "$added_count" -gt 0 ]] || [[ "$removed_count" -gt 0 ]]; then
+                print_info "Synced time tracking: +$added_count / -$removed_count entries"
+            else
+                print_info "Time tracking calendar synced"
+            fi
+        else
+            print_info "Time tracking calendar synced"
+        fi
+        return 0
+    else
+        # Don't fail sync if this fails - it's not critical
+        print_info "Time tracking calendar sync skipped"
+        return 0
+    fi
+}
+
+# Sync markdown-based time tracking
+sync_time_tracking() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    print_info "Syncing markdown time tracking to database..."
+
+    # Run time tracking sync
+    sync_output=$(bin/track sync-db 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract entry count from output
+        if echo "$sync_output" | grep -q "Synced [0-9]* time entries"; then
+            entry_count=$(echo "$sync_output" | grep -oE "Synced [0-9]+ time entries" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $entry_count time entries"
+        fi
+
+        # Show today's total if available
+        today_total=$(sqlite3 .data/today.db "SELECT printf('%.1f', SUM(duration_minutes) / 60.0) FROM time_entries WHERE DATE(start_time) = DATE('now', 'localtime') AND end_time IS NOT NULL" 2>/dev/null || echo "0")
+        if [[ "$today_total" != "0" ]] && [[ -n "$today_total" ]]; then
+            print_info "Today's tracked time: ${today_total} hours"
+        fi
+
+        return 0
+    else
+        print_error "Time tracking sync failed"
+        return 1
+    fi
+}
+
+# Sync contacts
+sync_contacts() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if contacts binary exists
+    if [[ ! -f bin/contacts ]]; then
+        print_error "Contacts CLI not available"
+        return 1
+    fi
+    
+    # Check if iCloud credentials are configured
+    if ! grep -q "ICLOUD_USERNAME=" .env 2>/dev/null || ! grep -q "ICLOUD_APP_PASSWORD=" .env 2>/dev/null; then
+        print_info "iCloud contacts not configured (need ICLOUD_USERNAME and ICLOUD_APP_PASSWORD)"
+        return 1
+    fi
+    
+    # Run contacts sync
+    print_info "Syncing iCloud contacts..."
+    
+    sync_output=$(bin/contacts sync 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract contact count from output
+        # Check for synced to database message
+        if echo "$sync_output" | grep -q "✅ Synced [0-9]* contacts to database"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts to database" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $contact_count contacts to database"
+        # Check for database cache message (new SQLite version)
+        elif echo "$sync_output" | grep -q "Loaded [0-9]* contacts from database cache"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from database cache" | grep -oE "[0-9]+" | head -1)
+            print_info "Loaded $contact_count contacts from cache"
+        # Fallback for old cache message
+        elif echo "$sync_output" | grep -q "Loaded [0-9]* contacts from cache"; then
+            contact_count=$(echo "$sync_output" | grep -oE "[0-9]+ contacts from cache" | grep -oE "[0-9]+" | head -1)
+            print_info "Loaded $contact_count contacts from cache"
+        else
+            print_info "No contacts found"
+        fi
+        
+        # Show stats (with timeout to prevent hanging)
+        stats_output=$(timeout 2 bin/contacts stats 2>&1 | grep -E "Total|With email" | head -2) || true
+        if [[ -n "$stats_output" ]]; then
+            echo "$stats_output" | while IFS= read -r line; do
+                print_info "  $line"
+            done
+        fi
+        
+        return 0
+    else
+        print_error "Contacts sync failed"
+        if echo "$sync_output" | grep -q "Authentication failed"; then
+            print_info "Check your iCloud app-specific password"
+        else
+            print_info "Error: $sync_output"
+        fi
+        return 1
+    fi
+}
+
+
+# Sync Day One diary entries to database
+sync_diary() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if diary-sync script exists
+    if [[ ! -f bin/diary-sync.cjs ]]; then
+        print_error "Diary sync script not available"
+        return 1
+    fi
+    
+    # Check if Journal.json exists
+    if [[ ! -f vault/logs/Journal.json ]]; then
+        print_info "No Day One journal export found"
+        return 1
+    fi
+    
+    # Run diary sync
+    print_info "Syncing Day One diary entries..."
+    
+    sync_output=$(node bin/diary-sync.cjs 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract stats from output
+        if echo "$sync_output" | grep -q "Successfully synced"; then
+            entry_count=$(echo "$sync_output" | grep -oE "synced [0-9]+ diary" | grep -oE "[0-9]+" | head -1)
+            print_info "Synced $entry_count diary entries"
+        elif echo "$sync_output" | grep -q "already up to date"; then
+            print_info "Diary already up to date"
+        fi
+        
+        # Show stats
+        if echo "$sync_output" | grep -q "Total entries:"; then
+            total=$(echo "$sync_output" | grep "Total entries:" | grep -oE "[0-9]+" | head -1)
+            recent=$(echo "$sync_output" | grep "Recent entries:" | grep -oE "[0-9]+ \(week\)" | grep -oE "[0-9]+" | head -1)
+            if [[ -n "$total" ]]; then
+                print_info "Total diary entries: $total (recent: $recent this week)"
+            fi
+        fi
+        
+        return 0
+    else
+        print_error "Diary sync failed"
+        if echo "$sync_output" | grep -q "not found"; then
+            print_info "Export your Day One journal to vault/logs/Journal.json"
+        fi
+        return 1
+    fi
+}
+
+# Sync OlderGay.Men monitoring data
+sync_ogm_monitoring() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if ogm-sync script exists
+    if [[ ! -f bin/ogm-sync ]]; then
+        print_error "OGM sync script not available"
+        return 1
+    fi
+    
+    # Run OGM sync
+    print_info "Syncing OlderGay.Men monitoring data..."
+    
+    sync_output=$(env bin/ogm-sync 2>&1)
+    if [[ $? -eq 0 ]]; then
+        # Extract stats from output
+        if echo "$sync_output" | grep -q "Open Issues"; then
+            # Parse the summary table
+            open_issues=$(echo "$sync_output" | grep -A1 "Open Issues" | tail -1 | awk '{print $1}')
+            active_errors=$(echo "$sync_output" | grep -A1 "Open Issues" | tail -1 | awk '{print $2}')
+            
+            if [[ -n "$open_issues" ]]; then
+                print_info "GitHub open issues: $open_issues"
+            fi
+            if [[ -n "$active_errors" ]]; then
+                print_info "Sentry active errors: $active_errors"
+            fi
+        fi
+        
+        # Check if performance metrics were synced
+        if echo "$sync_output" | grep -q "Scout performance metrics"; then
+            print_info "Performance metrics updated"
+        fi
+        
+        return 0
+    else
+        print_error "OGM monitoring sync failed"
+        print_info "Check API tokens in .env file"
+        return 1
+    fi
+}
+
+# Process inbox notes (from Drafts uploads)
+# Move file to trash instead of deleting
+move_to_trash() {
+    local file="$1"
+    local reason="${2:-processed}"
+
+    # Create trash directory with dated subdirectories
+    local TRASH_DIR="vault/notes/.trash/$(date +%Y-%m)"
+    mkdir -p "$TRASH_DIR" 2>/dev/null
+
+    # Move file to trash with timestamp
+    local basename=$(basename "$file")
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local trash_file="$TRASH_DIR/${timestamp}-${basename}"
+
+    if mv "$file" "$trash_file" 2>/dev/null; then
+        print_info "    → Moved to trash: $trash_file ($reason)"
+        return 0
+    else
+        print_error "    Failed to move to trash, removing: $file"
+        rm -f "$file"  # Fallback to deletion if move fails
+        return 1
+    fi
+}
+
+process_inbox() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+
+    # Create inbox directory if it doesn't exist
+    mkdir -p vault/notes/inbox 2>/dev/null
+    
+    # Check if there are any files in the inbox
+    INBOX_FILES=$(find vault/notes/inbox -type f -name "*.md" 2>/dev/null)
+    if [[ -z "$INBOX_FILES" ]]; then
+        print_info "No files in inbox to process"
+        return 0
+    fi
+    
+    # Count files to process
+    FILE_COUNT=$(echo "$INBOX_FILES" | wc -l)
+    print_info "Processing $FILE_COUNT file(s) from inbox..."
+    
+    # Process each file
+    while IFS= read -r file; do
+        if [[ -z "$file" ]]; then
+            continue
+        fi
+        
+        BASENAME=$(basename "$file")
+        CONTENT=$(cat "$file" 2>/dev/null || echo "")
+        FIRST_LINE=$(echo "$CONTENT" | head -1)
+        TITLE=$(echo "$FIRST_LINE" | sed 's/^#\s*//' | sed 's/^-\s*\[\s*\]\s*//')
+        
+        # Determine destination based on content
+        DEST_DIR=""
+        DEST_FILE=""
+        
+        # Special case: Gratitude note - append to gratitude log
+        if [[ "$TITLE" == "Gratitude" ]]; then
+            # Extract the gratitude line (everything after "I'm grateful for...")
+            # First find the line, then get everything after it that's not empty
+            GRATITUDE_LINE=$(echo "$CONTENT" | awk '/I.m grateful for/ {found=1; next} found && NF {print; exit}')
+            
+            if [[ -n "$GRATITUDE_LINE" ]]; then
+                # Get today's date in YYYY-MM-DD format
+                TODAY_DATE=$(date +%Y-%m-%d)
+                GRATITUDE_FILE="vault/logs/gratitude.md"
+                
+                # Create file if it doesn't exist
+                if [[ ! -f "$GRATITUDE_FILE" ]]; then
+                    echo "# Gratitude Log" > "$GRATITUDE_FILE"
+                    echo "" >> "$GRATITUDE_FILE"
+                    echo "<!-- Entries are automatically added from inbox notes -->" >> "$GRATITUDE_FILE"
+                    echo "<!-- Format: YYYY-MM-DD entry text -->" >> "$GRATITUDE_FILE"
+                    echo "" >> "$GRATITUDE_FILE"
+                fi
+                
+                # Create temp file for processing
+                TEMP_FILE=$(mktemp)
+                ENTRIES_FILE=$(mktemp)
+                
+                # Add new entry to a temp entries file
+                echo "$TODAY_DATE $GRATITUDE_LINE" > "$ENTRIES_FILE"
+                
+                # Get existing entries (skip header and blank lines)
+                tail -n +5 "$GRATITUDE_FILE" 2>/dev/null | grep -v "^$" >> "$ENTRIES_FILE" 2>/dev/null || true
+                
+                # Sort entries by date (reverse) and deduplicate
+                # The sort -r gives us newest first, and sort -u removes duplicates
+                SORTED_ENTRIES=$(sort -r -u "$ENTRIES_FILE")
+                
+                # Build the final file
+                head -4 "$GRATITUDE_FILE" > "$TEMP_FILE"  # Copy header
+                echo "" >> "$TEMP_FILE"  # Single blank line after header
+                echo "$SORTED_ENTRIES" >> "$TEMP_FILE"  # Add all entries without blank lines between them
+                
+                # Replace original file and clean up
+                mv "$TEMP_FILE" "$GRATITUDE_FILE"
+                rm -f "$ENTRIES_FILE"
+                
+                print_info "  • Gratitude note → Added to logs/gratitude.md"
+                print_info "    $TODAY_DATE: $GRATITUDE_LINE"
+
+                # Move processed gratitude note to trash for safety
+                move_to_trash "$file" "gratitude-processed"
+                continue  # Skip the normal file move logic
+            else
+                print_error "  • Gratitude note has no content after 'I'm grateful for...'"
+                print_info "    Note kept in inbox - please add content after 'I'm grateful for...'"
+                # Don't delete the file - user can fix the format
+                continue  # Skip the normal file move logic but keep the file
+            fi
+
+        # Special case: Time Tracking note - write directly to time tracking file
+        elif [[ "$TITLE" == "Time Tracking" ]] || [[ "$BASENAME" == *"time-tracking"* ]]; then
+            # Format expected:
+            # # Time Tracking
+            # <description with #topic/tags>
+            # <start timestamp ISO 8601>
+            # <end timestamp ISO 8601>
+
+            # Extract description (line 2, skip empty lines)
+            DESCRIPTION=$(echo "$CONTENT" | awk 'NR>1 && NF {print; exit}' | xargs)
+
+            # Extract start timestamp (line 3)
+            START_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==2) {print; exit}}' | xargs)
+
+            # Extract end timestamp (line 4)
+            END_TIME=$(echo "$CONTENT" | awk 'NR>1 && NF {count++; if(count==3) {print; exit}}' | xargs)
+
+            if [[ -n "$DESCRIPTION" ]] && [[ -n "$START_TIME" ]] && [[ -n "$END_TIME" ]]; then
+                # Calculate duration for display
+                DURATION=$(node -e "
+                    const start = new Date('$START_TIME');
+                    const end = new Date('$END_TIME');
+                    const minutes = Math.round((end - start) / 1000 / 60);
+                    const hours = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    if (hours > 0 && mins > 0) {
+                        console.log(hours + 'h' + mins + 'm');
+                    } else if (hours > 0) {
+                        console.log(hours + 'h');
+                    } else {
+                        console.log(mins + 'm');
+                    }
+                " 2>/dev/null)
+
+                if [[ -n "$DURATION" ]]; then
+                    # Get the year-month for the file (based on start time)
+                    YEAR_MONTH=$(echo "$START_TIME" | cut -d'T' -f1 | cut -d'-' -f1,2)
+                    TIME_FILE="vault/logs/time-tracking/${YEAR_MONTH}.md"
+
+                    # Ensure directory exists
+                    mkdir -p vault/logs/time-tracking 2>/dev/null
+
+                    # Write entry directly to time tracking file
+                    echo "${START_TIME}|${END_TIME}|${DESCRIPTION}" >> "$TIME_FILE"
+
+                    print_info "  • Time tracking note → Added $DURATION: $DESCRIPTION"
+                    print_info "    Start: $START_TIME, End: $END_TIME"
+
+                    # Move processed time tracking note to trash for safety
+                    move_to_trash "$file" "time-tracking-processed"
+                    continue
+                else
+                    print_error "  • Failed to calculate duration from timestamps"
+                    print_info "    Start: $START_TIME, End: $END_TIME"
+                    # Keep the file for manual review
+                    continue
+                fi
+            else
+                print_error "  • Time tracking note missing description or timestamps"
+                print_info "    Expected format: Title, Description, Start Time, End Time on separate lines"
+                # Keep the file for manual review
+                continue
+            fi
+
+        # Special case: Progress note - save to progress/ and append to today's review
+        elif [[ "$TITLE" == "Progress" ]]; then
+            # Parse the date from file content (format: "October 02, 2025 10:06 -0400")
+            CONTENT_DATE=$(echo "$CONTENT" | head -10 | grep -E "^[A-Za-z]+ [0-9]+, [0-9]+ [0-9]+:[0-9]+" | head -1)
+
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Parse the date components from content
+                PARSED_DATE=$(echo "$CONTENT_DATE" | awk '{print $2 " " $1 " " $3}' | tr ',' ' ')
+                TARGET_DATE=$(date -d "$PARSED_DATE" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+                YEAR=$(date -d "$TARGET_DATE" +%Y)
+                MONTH=$(date -d "$TARGET_DATE" +%m)
+                DAY=$(date -d "$TARGET_DATE" +%d)
+                WEEK=$(date -d "$TARGET_DATE" +%V)
+                # Parse time for timestamp
+                TIME_PART=$(echo "$CONTENT_DATE" | grep -oE "[0-9]+:[0-9]+" | head -1)
+                TIMESTAMP=${TIME_PART:-$(date +"%H:%M")}
+            else
+                # Fallback to current date if no date found in content
+                YEAR=$(date +%Y)
+                MONTH=$(date +%m)
+                DAY=$(date +%d)
+                WEEK=$(date +%V)
+                TIMESTAMP=$(date +"%H:%M")
+            fi
+
+            # Determine quarter from month
+            if [ $MONTH -le 3 ]; then Q="Q1"
+            elif [ $MONTH -le 6 ]; then Q="Q2"
+            elif [ $MONTH -le 9 ]; then Q="Q3"
+            else Q="Q4"
+            fi
+            REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+            # Remove title line and subsequent blank lines (like concerns)
+            CLEANED_CONTENT=$(echo "$CONTENT" | awk '
+                NR==1 && /^#.*[Pp]rogress/ {next}  # Skip title line if it contains "progress"
+                /^$/ && !started {next}            # Skip leading blank lines
+                {started=1; print}                 # Print everything else
+            ')
+
+            # Save to progress directory with date-based filename
+            echo "$CLEANED_CONTENT" > "$file"  # Update content for move
+            DEST_DIR="vault/notes/progress"
+
+            # Create filename based on the actual date from content
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Format: YYYY-MM-DD-HHMMSS-UTC-progress.md
+                TIME_FORMATTED=$(echo "$TIME_PART" | tr -d ':')
+                DEST_FILE="${YEAR}-${MONTH}-${DAY}-${TIME_FORMATTED}00-UTC-progress.md"
+                print_info "  • Progress file → progress/$DEST_FILE (using date from content)"
+            else
+                DEST_FILE="$BASENAME"
+                print_info "  • Progress file → progress/$BASENAME (no date found in content)"
+            fi
+
+            # Also append to review file if it exists
+            if [[ -f "$REVIEW_FILE" ]]; then
+                echo "" >> "$REVIEW_FILE"
+                echo "### Progress Update ($TIMESTAMP)" >> "$REVIEW_FILE"
+                echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
+                print_info "    Also added to today's review at $TIMESTAMP"
+            else
+                print_warning "    No review file for today ($REVIEW_FILE)"
+                print_warning "    Leaving in inbox - will be filed when plan file is created"
+                continue  # Skip the file move logic - leave it in inbox
+            fi
+
+        # Special case: Concerns file - save to concerns/ and append to today's review
+        elif [[ "$TITLE" == "Concerns" ]] || [[ "$BASENAME" == *"concerns"* ]]; then
+            # Parse the date from file content (format: "October 02, 2025 10:06 -0400")
+            CONTENT_DATE=$(echo "$CONTENT" | head -10 | grep -E "^[A-Za-z]+ [0-9]+, [0-9]+ [0-9]+:[0-9]+" | head -1)
+
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Parse the date components from content
+                PARSED_DATE=$(echo "$CONTENT_DATE" | awk '{print $2 " " $1 " " $3}' | tr ',' ' ')
+                TARGET_DATE=$(date -d "$PARSED_DATE" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)
+                YEAR=$(date -d "$TARGET_DATE" +%Y)
+                MONTH=$(date -d "$TARGET_DATE" +%m)
+                DAY=$(date -d "$TARGET_DATE" +%d)
+                WEEK=$(date -d "$TARGET_DATE" +%V)
+                # Parse time for timestamp
+                TIME_PART=$(echo "$CONTENT_DATE" | grep -oE "[0-9]+:[0-9]+" | head -1)
+                TIMESTAMP=${TIME_PART:-$(date +"%H:%M")}
+            else
+                # Fallback to current date if no date found in content
+                YEAR=$(date +%Y)
+                MONTH=$(date +%m)
+                DAY=$(date +%d)
+                WEEK=$(date +%V)
+                TIMESTAMP=$(date +"%H:%M")
+            fi
+
+            # Determine quarter from month
+            if [ $MONTH -le 3 ]; then Q="Q1"
+            elif [ $MONTH -le 6 ]; then Q="Q2"
+            elif [ $MONTH -le 9 ]; then Q="Q3"
+            else Q="Q4"
+            fi
+            REVIEW_FILE="vault/plans/${YEAR}_${Q}_${MONTH}_W${WEEK}_${DAY}.md"
+
+            # Remove title line and subsequent blank lines
+            CLEANED_CONTENT=$(echo "$CONTENT" | awk '
+                NR==1 && /^#.*[Cc]oncerns/ {next}  # Skip title line if it contains "concerns"
+                /^$/ && !started {next}            # Skip leading blank lines
+                {started=1; print}                 # Print everything else
+            ')
+
+            # Save to concerns directory with date-based filename
+            echo "$CLEANED_CONTENT" > "$file"  # Update content for move
+            DEST_DIR="vault/notes/concerns"
+
+            # Create filename based on the actual date from content
+            if [[ -n "$CONTENT_DATE" ]]; then
+                # Format: YYYY-MM-DD-HHMMSS-UTC-concerns.md
+                TIME_FORMATTED=$(echo "$TIME_PART" | tr -d ':')
+                DEST_FILE="${YEAR}-${MONTH}-${DAY}-${TIME_FORMATTED}00-UTC-concerns.md"
+                print_info "  • Concerns file → concerns/$DEST_FILE (using date from content)"
+            else
+                DEST_FILE="$BASENAME"
+                print_info "  • Concerns file → concerns/$BASENAME (no date found in content)"
+            fi
+
+            # Also append to review file if it exists
+            if [[ -f "$REVIEW_FILE" ]]; then
+                echo "" >> "$REVIEW_FILE"
+                echo "### Concerns ($TIMESTAMP)" >> "$REVIEW_FILE"
+                echo "$CLEANED_CONTENT" >> "$REVIEW_FILE"
+                print_info "    Also added to today's review at $TIMESTAMP"
+            else
+                print_warning "    No review file for today ($REVIEW_FILE)"
+                print_warning "    Leaving in inbox - will be filed when plan file is created"
+                continue  # Skip the file move logic - leave it in inbox
+            fi
+        
+        # Task files (contains checkboxes)
+        elif echo "$CONTENT" | grep -qE "^-\s*\[[ x]\]"; then
+            # Check if this file contains ONLY tasks (no other content)
+            TASK_ONLY=true
+            while IFS= read -r line; do
+                # Skip empty lines
+                if [[ -z "$line" ]] || [[ "$line" =~ ^[[:space:]]*$ ]]; then
+                    continue
+                fi
+                # Check if line is a task
+                if ! echo "$line" | grep -qE "^-\s*\[[ x]\]"; then
+                    TASK_ONLY=false
+                    break
+                fi
+            done <<< "$CONTENT"
+            
+            if [[ "$TASK_ONLY" == "true" ]]; then
+                # Append to consolidated tasks.md file
+                TASKS_FILE="vault/tasks/tasks.md"
+                mkdir -p vault 2>/dev/null
+                
+                # Insert tasks before Archive section (or at end if no Archive)
+                if [[ -f "$TASKS_FILE" ]]; then
+                    if grep -q "^# Archive" "$TASKS_FILE"; then
+                        # File has Archive section - insert before it
+                        TEMP_FILE=$(mktemp)
+                        
+                        # Get everything before Archive
+                        awk '/^# Archive/ {exit} {print}' "$TASKS_FILE" > "$TEMP_FILE"
+                        
+                        # Remove trailing blank lines from active section
+                        sed -i '' -e :a -e '/^\s*$/d;N;ba' "$TEMP_FILE" 2>/dev/null || \
+                        sed -i -e :a -e '/^\s*$/d;N;ba' "$TEMP_FILE" 2>/dev/null || true
+                        
+                        # Add the new tasks
+                        echo "" >> "$TEMP_FILE"
+                        echo "$CONTENT" >> "$TEMP_FILE"
+                        
+                        # Add Archive section back
+                        echo "" >> "$TEMP_FILE"
+                        awk '/^# Archive/,EOF {print}' "$TASKS_FILE" >> "$TEMP_FILE"
+                        
+                        # Replace original file
+                        mv "$TEMP_FILE" "$TASKS_FILE"
+                    else
+                        # No Archive section - just append at end
+                        if [[ -n "$(tail -c 1 "$TASKS_FILE")" ]]; then
+                            echo "" >> "$TASKS_FILE"
+                        fi
+                        echo "$CONTENT" >> "$TASKS_FILE"
+                    fi
+                else
+                    # File doesn't exist - create it
+                    echo "$CONTENT" > "$TASKS_FILE"
+                fi
+                
+                print_info "  • Task-only file → Added to tasks.md"
+                print_info "    Added $(echo "$CONTENT" | grep -c "^-\s*\[[ x]\]") task(s)"
+
+                # Move processed task file to trash for safety
+                move_to_trash "$file" "tasks-processed"
+                continue  # Skip the normal file move logic
+            else
+                # Mixed content - move to vault root for visibility
+                DEST_DIR="vault"
+                DEST_FILE="$BASENAME"
+                print_info "  • Mixed content with tasks → vault/$BASENAME"
+            fi
+
+        # Default - move to general notes directory
+        else
+            DEST_DIR="vault/notes/general"
+            DEST_FILE="$BASENAME"
+            print_info "  • Note → notes/general/$BASENAME"
+        fi
+        
+        # Create destination directory if needed
+        mkdir -p "$DEST_DIR" 2>/dev/null
+        
+        # Move the file
+        DEST_PATH="$DEST_DIR/$DEST_FILE"
+        if [[ -f "$DEST_PATH" ]]; then
+            # File exists, skip it
+            print_info "    File exists, skipping: $DEST_FILE"
+            move_to_trash "$file" "duplicate"  # Move duplicate to trash instead of deleting
+        else
+            mv "$file" "$DEST_PATH" 2>/dev/null && {
+                print_info "    ✓ Filed to $DEST_PATH"
+            } || {
+                print_error "    Failed to move $BASENAME"
+            }
+        fi
+    done <<< "$INBOX_FILES"
+    
+    # Files are automatically synced by Resilio Sync
+    # No need to commit or push
+    
+    return 0
+}
+
+# Sync tasks to their project markdown files
+sync_project_tasks() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    print_info "Syncing tasks to project markdown files..."
+    
+    # Get all active tasks with projects
+    TASKS_WITH_PROJECTS=$(sqlite3 .data/today.db "
+        SELECT 
+            t.id,
+            t.title,
+            t.status,
+            t.description,
+            p.name as project_name,
+            p.file_path
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        WHERE t.status <> 'done'
+        ORDER BY p.file_path, t.title;
+    " 2>/dev/null || echo "")
+    
+    if [[ -z "$TASKS_WITH_PROJECTS" ]]; then
+        print_info "No tasks with projects to sync"
+        return 0
+    fi
+    
+    # Count unique projects
+    PROJECT_COUNT=$(echo "$TASKS_WITH_PROJECTS" | cut -d'|' -f6 | sort -u | wc -l | tr -d ' ')
+    TASK_COUNT=$(echo "$TASKS_WITH_PROJECTS" | wc -l | tr -d ' ')
+    print_info "Found $TASK_COUNT task(s) across $PROJECT_COUNT project(s)"
+    
+    # Process each project's tasks
+    CURRENT_PROJECT=""
+    PROJECT_TASKS=""
+    SYNCED_COUNT=0
+    
+    while IFS='|' read -r task_id title status description project_name file_path; do
+        # Skip if no file path
+        if [[ -z "$file_path" ]]; then
+            continue
+        fi
+        
+        # Ensure file path starts with vault/ if it doesn't already
+        if [[ ! "$file_path" =~ ^vault/ ]] && [[ ! "$file_path" =~ ^/ ]]; then
+            file_path="vault/$file_path"
+        fi
+        
+        # When we hit a new project, process the previous one
+        if [[ "$file_path" != "$CURRENT_PROJECT" ]] && [[ -n "$CURRENT_PROJECT" ]]; then
+            # Process the accumulated tasks for the previous project
+            _sync_tasks_to_project_file "$CURRENT_PROJECT" "$PROJECT_TASKS"
+            PROJECT_TASKS=""
+        fi
+        
+        CURRENT_PROJECT="$file_path"
+        
+        # Format task with Obsidian Tasks checkbox
+        # Note: We're keeping task_id variable for database reference but not adding to markdown
+        TASK_LINE="- [ ] $title"
+        if [[ -n "$PROJECT_TASKS" ]]; then
+            PROJECT_TASKS="$PROJECT_TASKS"$'\n'"$TASK_LINE"
+        else
+            PROJECT_TASKS="$TASK_LINE"
+        fi
+    done <<< "$TASKS_WITH_PROJECTS"
+    
+    # Process the last project
+    if [[ -n "$CURRENT_PROJECT" ]] && [[ -n "$PROJECT_TASKS" ]]; then
+        _sync_tasks_to_project_file "$CURRENT_PROJECT" "$PROJECT_TASKS"
+    fi
+    
+    print_info "Synced tasks to $PROJECT_COUNT project file(s)"
+    return 0
+}
+
+# Helper function to sync tasks to a single project file
+_sync_tasks_to_project_file() {
+    local project_file="$1"
+    local tasks_to_add="$2"
+    
+    # Check if project file exists
+    if [[ ! -f "$project_file" ]]; then
+        print_info "  Creating project file: $project_file"
+        mkdir -p "$(dirname "$project_file")" 2>/dev/null
+        
+        # Extract project name from file path
+        local project_name=$(basename "$project_file" .md | tr '-' ' ' | sed 's/\b\(.\)/\u\1/g')
+        
+        # Create file with title and tasks
+        {
+            echo "# $project_name"
+            echo ""
+            echo "## Tasks"
+            echo ""
+            echo "$tasks_to_add"
+        } > "$project_file"
+        
+        SYNCED_COUNT=$((SYNCED_COUNT + 1))
+        return 0
+    fi
+    
+    # File exists - check which tasks are already present
+    local tasks_added=0
+    local temp_file=$(mktemp)
+    
+    # Read the file and find where to insert tasks
+    local in_header=true
+    local found_tasks_section=false
+    local tasks_to_insert=""
+    
+    # Check each task to see if it's already in the file
+    while IFS= read -r task_line; do
+        # DISABLED: duplicate check no longer needed with Obsidian Tasks
+        # Just add all tasks for now
+        if true; then
+            if true; then
+                if [[ -n "$tasks_to_insert" ]]; then
+                    tasks_to_insert="$tasks_to_insert"$'\n'"$task_line"
+                else
+                    tasks_to_insert="$task_line"
+                fi
+                tasks_added=$((tasks_added + 1))
+            fi
+        fi
+    done <<< "$tasks_to_add"
+    
+    # If no new tasks to add, skip
+    if [[ $tasks_added -eq 0 ]]; then
+        return 0
+    fi
+    
+    print_info "  Adding $tasks_added task(s) to $(basename "$project_file")"
+    
+    # Add new tasks at the top of the file, right after the title
+    # This ensures they're visible for processing
+    
+    local title_found=false
+    local tasks_inserted=false
+    
+    while IFS= read -r line; do
+        echo "$line" >> "$temp_file"
+        
+        # After we've found and written the title (# heading), insert tasks
+        if [[ "$line" =~ ^#\  ]] && [[ "$title_found" == false ]]; then
+            title_found=true
+            # Add a blank line after title, then the new tasks
+            echo "" >> "$temp_file"
+            echo "$tasks_to_insert" >> "$temp_file"
+            echo "" >> "$temp_file"
+            tasks_inserted=true
+        fi
+    done < "$project_file"
+    
+    # If no title was found, just prepend the tasks at the very beginning
+    if [[ "$tasks_inserted" == false ]]; then
+        {
+            echo "$tasks_to_insert"
+            echo ""
+            cat "$project_file"
+        } > "$temp_file.new"
+        mv "$temp_file.new" "$temp_file"
+    fi
+    
+    # Replace the original file
+    mv "$temp_file" "$project_file"
+    SYNCED_COUNT=$((SYNCED_COUNT + 1))
+}
+
+
+
+# Update cache statistics
+update_cache_stats() {
+    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cd "$SCRIPT_DIR/.." || return 1
+    
+    # Check if cache database exists
+    CACHE_DB=".data/today.db"
+    if [[ ! -f "$CACHE_DB" ]]; then
+        print_info "Cache database not found, initializing..."
+        mkdir -p .data
+        # Create an empty database with the required tables
+        sqlite3 "$CACHE_DB" <<EOF
+CREATE TABLE IF NOT EXISTS emails (
+    id TEXT PRIMARY KEY,
+    subject TEXT,
+    from_address TEXT,
+    date TEXT,
+    has_been_replied_to INTEGER DEFAULT 0,
+    text_content TEXT
+);
+CREATE TABLE IF NOT EXISTS task_cache (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    due_date TEXT,
+    stage TEXT,
+    tags TEXT,
+    description TEXT,
+    last_edited_time TEXT
+);
+CREATE TABLE IF NOT EXISTS database_cache (
+    id TEXT PRIMARY KEY,
+    data TEXT
+);
+CREATE TABLE IF NOT EXISTS cache_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+CREATE TABLE IF NOT EXISTS project_pillar_mapping (
+    project_id TEXT,
+    pillar_id TEXT
+);
+EOF
+        print_info "Cache database initialized"
+    fi
+    
+    # Get cache statistics
+    cache_output=$(node -e "
+        // Use environment variables already loaded by parent script
+        import('./src/sqlite-cache.js').then(({default: DatabaseCache}) => {
+            const cache = new DatabaseCache();
+            const stats = cache.getStatistics();
+            if (stats && stats.totalItems !== undefined) {
+                console.log('Items: ' + stats.totalItems);
+                console.log('Databases: ' + stats.totalDatabases);
+                const sizeInMB = stats.cacheSize ? (stats.cacheSize / 1024 / 1024).toFixed(2) : '0.00';
+                console.log('Size: ' + sizeInMB + ' MB');
+            } else {
+                console.log('Cache initialized');
+            }
+            cache.close();
+        }).catch((err) => {
+            console.error('Cache error: ' + err.message);
+            process.exit(1);
+        });
+    " 2>&1)
+    
+    if [[ $? -eq 0 ]]; then
+        if [[ -n "$cache_output" ]]; then
+            while IFS= read -r line; do
+                print_info "$line"
+            done <<< "$cache_output"
+        fi
+        return 0
+    else
+        # Silently succeed - cache errors aren't critical
+        return 0
+    fi
+}
+
+# Parse command line arguments
+case "${1:-}" in
+    --cancel-old-plan-tasks)
+        # Only cancel old plan tasks
+        # Optional: pass a specific file path as second argument
+        print_header "🗓️ Cancel Old Plan Tasks"
+        if cancel_old_plan_tasks "$2"; then
+            print_status "Old plan tasks processed successfully!"
+        else
+            print_error "Old plan task cancellation failed"
+        fi
+        exit 0
+        ;;
+    --cleanup-conflicts)
+        # Only cleanup sync-conflict files
+        print_header "🗑️ Cleanup Sync Conflicts"
+        if cleanup_sync_conflicts; then
+            print_status "Sync conflicts cleaned successfully!"
+        else
+            print_error "Sync conflict cleanup failed"
+        fi
+        exit 0
+        ;;
+    --process-inbox-only)
+        # Only process inbox files, no other sync operations
+        print_header "📥 Process Inbox Only"
+        if process_inbox; then
+            print_status "Inbox processed successfully!"
+        else
+            print_error "Inbox processing failed"
+        fi
+        exit 0
+        ;;
+    --vault)
+        # Check vault directory and process inbox
+        print_header "📝 Vault Check"
+        if check_vault_exists; then
+            print_status "Vault directory verified!"
+        else
+            print_error "Vault check failed"
+        fi
+        
+        # Clean markdown files after syncing (unless SKIP_MARKDOWN_CLEAN is set)
+        if [[ -z "$SKIP_MARKDOWN_CLEAN" ]]; then
+            print_header "🧹 Clean Markdown"
+            if clean_markdown_files; then
+                print_status "Markdown cleaned successfully!"
+            else
+                print_error "Markdown cleaning failed"
+            fi
+        fi
+        
+        # Also process inbox
+        print_header "📥 Process Inbox"
+        if process_inbox; then
+            print_status "Inbox processed successfully!"
+        else
+            print_error "Inbox processing failed"
+        fi
+        ;;
+    --quick)
+        # Quick sync - only critical sources
+        print_info "Quick sync mode - vault, inbox, and Turso"
+        check_vault_exists
+        cleanup_sync_conflicts
+        clean_markdown_files
+        clean_database_task_titles
+        clean_plan_file_tasks
+        process_inbox
+        # DISABLED: Tasks now managed by Obsidian
+        # SKIP_CLASSIFICATION=1 sync_tasks
+        # sync_project_tasks
+        # check_task_consistency
+        sync_turso_bidirectional  # Sync with Turso
+        # Resilio Sync handles vault synchronization automatically
+        ;;
+    --force)
+        # Force full sync - bypasses smart caching
+        print_info "Force sync mode - refreshing all data"
+        FORCE_SYNC=true
+        main
+        ;;
+    --quick-email)
+        # Just sync last day of email quickly
+        print_header "📧 Quick Email Sync"
+        EMAIL_BIN=""
+        if [[ -f bin/email ]]; then
+            EMAIL_BIN="bin/email"
+        elif [[ -f bin/email-cli ]]; then
+            EMAIL_BIN="bin/email-cli"
+        fi
+        if [[ -n "$EMAIL_BIN" ]]; then
+            print_info "Downloading emails from last 24 hours..."
+            timeout 30 $EMAIL_BIN download --days 1 | grep -E "Downloaded|Total|✅" || true
+            print_status "Quick email sync complete"
+        else
+            print_error "Email CLI not found"
+        fi
+        ;;
+    --help|-h)
+        echo "Usage: sync [OPTIONS]"
+        echo ""
+        echo "Intelligently synchronize all data sources"
+        echo ""
+        echo "Runs all operations synchronously for reliability:"
+        echo "  • Turso bidirectional sync (newest data wins)"
+        echo "  • GitHub vault, task sync, markdown cleanup"
+        echo "  • Task classification, email, calendar, contacts"
+        echo "  • Uses efficient timeouts and smart caching"
+        echo ""
+        echo "Options:"
+        echo "  --cleanup-conflicts  Remove duplicate sync-conflict files"
+        echo "  --vault             Check vault directory (Resilio handles sync)"
+        echo "  --quick             Quick sync (tasks and inbox only)"
+        echo "  --force             Force full refresh (bypass cache)"
+        echo "  --quick-email       Download last 24 hours of email"
+        echo "  --help              Show this help message"
+        echo ""
+        echo "Data sources synced:"
+        echo "  • Vault files (via Resilio Sync)"
+        echo "  • Markdown formatting cleanup (via markdownlint)"
+        echo "  • Local task manager"
+        echo "  • Email inbox (cached for 4 hours)"
+        echo "  • Calendar events"
+        echo "  • iCloud contacts (cached for 4 hours)"
+        echo "  • Inbox processing (files from Drafts)"
+        echo "  • Local cache"
+        ;;
+    *)
+        main
+        ;;
+esac
