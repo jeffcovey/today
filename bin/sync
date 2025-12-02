@@ -446,9 +446,16 @@ function processProgressNote(filePath, content, basename) {
   });
   const cleanedContent = cleanedLines.join('\n');
 
-  // Add to plan file
+  // Add to plan file with callout format
   const timestamp = dateStr.match(/\d+:\d+/)?.[0] || 'Unknown';
-  fs.appendFileSync(planFile, `\n### Progress Update (${timestamp})\n${cleanedContent}\n`);
+
+  // Format content with > prefix for callout
+  const calloutContent = cleanedContent
+    .split('\n')
+    .map(line => line ? '> ' + line : '>')
+    .join('\n');
+
+  fs.appendFileSync(planFile, `\n> [!success] 📊 Progress Update (${timestamp})\n>\n${calloutContent}\n`);
 
   printInfo(`  • Progress note → Added to ${path.basename(planFile)}`);
 
@@ -496,8 +503,16 @@ function processConcernNote(filePath, content, basename) {
   });
   const cleanedContent = cleanedLines.join('\n');
 
+  // Add to plan file with callout format
   const timestamp = dateStr.match(/\d+:\d+/)?.[0] || 'Unknown';
-  fs.appendFileSync(planFile, `\n### Concerns (${timestamp})\n${cleanedContent}\n`);
+
+  // Format content with > prefix for callout
+  const calloutContent = cleanedContent
+    .split('\n')
+    .map(line => line ? '> ' + line : '>')
+    .join('\n');
+
+  fs.appendFileSync(planFile, `\n> [!warning] ⚠️ Concerns (${timestamp})\n>\n${calloutContent}\n`);
 
   printInfo(`  • Concern note → Added to ${path.basename(planFile)}`);
 
