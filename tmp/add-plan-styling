@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+
+// Add Bootstrap-inspired CSS class to all existing plan files
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PLANS_DIR = path.join(__dirname, '..', 'vault', 'plans');
+const CSS_CLASS = 'plan';
+
+async function addCssClassToFile(filePath) {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+
+    // Check if file already has frontmatter with cssclasses: plan
+    if (content.match(/^---\s*\n[\s\S]*?cssclasses:\s*plan/m)) {
+      return { skipped: true, reason: 'already has cssclasses' };
+    }
+
+    // Check if it's a plan file (contains "Plan" or "plan" in first line)
+    if (!content.match(/^#.*Plan/m)) {
+      return { skipped: true, reason: 'not a plan file' };
+    }
+
+    let newContent;
+
+    // If file has existing frontmatter, add cssclasses to it
+    if (content.startsWith('---\n')) {
+      const frontmatterEnd = content.indexOf('---\n', 4);
+      if (frontmatterEnd > 0) {
+        const frontmatter = content.substring(0, frontmatterEnd + 4);
+        const body = content.substring(frontmatterEnd + 4);
+
+        // Add cssclasses before the closing ---
+        const newFrontmatter = frontmatter.replace(/---\n$/, `cssclasses: ${CSS_CLASS}\n---\n`);
+        newContent = newFrontmatter + body;
+      } else {
+        // Malformed frontmatter, add new one
+        newContent = `---\ncssclasses: ${CSS_CLASS}\n---\n\n${content}`;
+      }
+    } else {
+      // No frontmatter, add it
+      newContent = `---\ncssclasses: ${CSS_CLASS}\n---\n\n${content}`;
+    }
+
+    await fs.writeFile(filePath, newContent, 'utf-8');
+    return { updated: true };
+
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+async function processAllPlans() {
+  console.log('🎨 Adding Bootstrap styling to plan files...\n');
+
+  try {
+    const files = await fs.readdir(PLANS_DIR);
+
+    // Filter for plan files (various patterns: daily, weekly, monthly, quarterly, yearly)
+    const planFiles = files.filter(f => f.endsWith('.md'));
+
+    console.log(`Found ${planFiles.length} plan files\n`);
+
+    let updated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const file of planFiles) {
+      const filePath = path.join(PLANS_DIR, file);
+      const result = await addCssClassToFile(filePath);
+
+      if (result.updated) {
+        console.log(`✅ ${file}`);
+        updated++;
+      } else if (result.skipped) {
+        // Don't print skipped files to keep output clean
+        skipped++;
+      } else if (result.error) {
+        console.log(`❌ ${file}: ${result.error}`);
+        errors++;
+      }
+    }
+
+    console.log(`\n📊 Summary:`);
+    console.log(`   Updated: ${updated} files`);
+    console.log(`   Skipped: ${skipped} files (already styled or not plan files)`);
+    if (errors > 0) {
+      console.log(`   Errors:  ${errors} files`);
+    }
+    console.log(`\n✨ Done! All plan files now have Bootstrap styling.`);
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+}
+
+// Run if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  processAllPlans();
+}
+
+export { addCssClassToFile, processAllPlans };

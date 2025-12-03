@@ -72,6 +72,11 @@ async function cancelOldPlanTasks(specificFile = null) {
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
+  // Calculate one week ago (we only clean files from the last week)
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const weekAgoDate = oneWeekAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+
   // Find all plan files or use specific file
   let planFiles = [];
   if (specificFile) {
@@ -108,6 +113,11 @@ async function cancelOldPlanTasks(specificFile = null) {
 
     // Skip if this is today's file or in the future (unless processing specific file)
     if (!specificFile && fileDate >= today) {
+      continue;
+    }
+
+    // Skip if file is older than one week (unless processing specific file)
+    if (!specificFile && fileDate < weekAgoDate) {
       continue;
     }
 
@@ -148,28 +158,91 @@ async function processRoutineSections(filePath, fileDate) {
     }
   }
 
-  // Fix the "Completed Today" section
-  const dateRegex = /## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n\s*```tasks\n\s*done today\n/;
-  if (content.match(dateRegex)) {
+  // Fix the "Completed Today" section - use HTML markers if available, fallback to regex
+  const completedTodayMarker = /<!-- COMPLETED_TODAY:.*?-->\n## ✅ Completed Today[\s\S]*?```tasks\n\s*done today\n/;
+  if (content.match(completedTodayMarker)) {
     content = content.replace(
-      dateRegex,
-      `## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n  \`\`\`tasks\n  done on ${fileDate}\n`
+      completedTodayMarker,
+      `<!-- COMPLETED_TODAY: Auto-updated with specific date after day completes -->\n## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n  \`\`\`tasks\n  done on ${fileDate}\n`
     );
     modified = true;
+  } else {
+    // Fallback for old files without markers
+    const dateRegex = /## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n\s*```tasks\n\s*done today\n/;
+    if (content.match(dateRegex)) {
+      content = content.replace(
+        dateRegex,
+        `## ✅ Completed Today\n\n- ✅ Completed Tasks\n\n  \`\`\`tasks\n  done on ${fileDate}\n`
+      );
+      modified = true;
+    }
   }
 
-  // Remove "Due or Scheduled Today" section (no longer needed in old plan files)
-  const dueScheduledRegex = /> \[!note\]-?\s*📅 Due or Scheduled Today\n>\n> ```tasks\n> not done\n> \(scheduled before tomorrow\) OR \(due before tomorrow\)\n> sort by priority\n> group by happens\n> ```\n*/;
-  if (content.match(dueScheduledRegex)) {
-    content = content.replace(dueScheduledRegex, '');
+  // Remove "Due or Scheduled Today" section using HTML markers (cleaner)
+  const dueScheduledMarker = /<!-- DUE_TODAY:.*?-->[\s\S]*?<!-- \/DUE_TODAY -->\n*/g;
+  if (content.match(dueScheduledMarker)) {
+    content = content.replace(dueScheduledMarker, '');
     modified = true;
+  } else {
+    // Fallback for old files without markers
+    const dueScheduledRegex = /> \[!note\]-?\s*📅 Due or Scheduled Today\n>\n> ```tasks\n> not done\n> \(scheduled before tomorrow\) OR \(due before tomorrow\)\n> sort by priority\n> group by happens\n> ```\n*/;
+    if (content.match(dueScheduledRegex)) {
+      content = content.replace(dueScheduledRegex, '');
+      modified = true;
+    }
   }
 
-  // Remove "Draft Plan" section (no longer needed in old plan files)
+  // Remove "Draft Plan" section (legacy - for very old files)
   const draftPlanRegex = /> \[!info\] Draft Plan\n> This is a preliminary plan.*\n\n/;
   if (content.match(draftPlanRegex)) {
     content = content.replace(draftPlanRegex, '');
     modified = true;
+  }
+
+  // Remove day-specific time block sections (Morning, Afternoon, Evening)
+  // These are planning details that aren't needed once the day is complete
+
+  // First, try to remove using HTML comment markers (new template format)
+  const dailyScheduleMarker = /<!-- DAILY_SCHEDULE:.*?-->[\s\S]*?<!-- \/DAILY_SCHEDULE -->\n*/g;
+  if (content.match(dailyScheduleMarker)) {
+    content = content.replace(dailyScheduleMarker, '');
+    modified = true;
+  }
+
+  // Also remove individual time block sections (for older files without markers)
+  // This provides backward compatibility with files created before the template update
+  const lines = content.split('\n');
+  const filteredLines = [];
+  let inTimeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check if we're starting a time block section
+    if (line.match(/^### (?:Morning|Afternoon|Evening)(?:\s|$)/)) {
+      inTimeBlock = true;
+      modified = true;
+      continue; // Skip this line
+    }
+
+    // Check if we're ending the time block (new heading or callout)
+    if (inTimeBlock && (line.match(/^##[^#]/) || line.match(/^> \[!/))) {
+      inTimeBlock = false;
+      filteredLines.push(line);
+      continue;
+    }
+
+    // Skip lines while in time block
+    if (inTimeBlock) {
+      continue;
+    }
+
+    // Keep all other lines
+    filteredLines.push(line);
+  }
+
+  if (modified) {
+    content = filteredLines.join('\n');
   }
 
   if (modified) {
@@ -455,7 +528,7 @@ function processProgressNote(filePath, content, basename) {
     .map(line => line ? '> ' + line : '>')
     .join('\n');
 
-  fs.appendFileSync(planFile, `\n> [!success] 📊 Progress Update (${timestamp})\n>\n${calloutContent}\n`);
+  fs.appendFileSync(planFile, `\n<!-- PROGRESS_UPDATE -->\n> [!success] 📊 Progress Update (${timestamp})\n>\n${calloutContent}\n<!-- /PROGRESS_UPDATE -->\n`);
 
   printInfo(`  • Progress note → Added to ${path.basename(planFile)}`);
 
@@ -512,7 +585,7 @@ function processConcernNote(filePath, content, basename) {
     .map(line => line ? '> ' + line : '>')
     .join('\n');
 
-  fs.appendFileSync(planFile, `\n> [!warning] ⚠️ Concerns (${timestamp})\n>\n${calloutContent}\n`);
+  fs.appendFileSync(planFile, `\n<!-- CONCERN -->\n> [!warning] ⚠️ Concerns (${timestamp})\n>\n${calloutContent}\n<!-- /CONCERN -->\n`);
 
   printInfo(`  • Concern note → Added to ${path.basename(planFile)}`);
 
@@ -774,8 +847,12 @@ function syncCalendar() {
 function cleanupTimeBlocking() {
   printInfo('Cleaning up Time Blocking calendar...');
 
+  // Get Time Blocking calendar ID from environment
+  const timeBlockingCalendar = process.env.TIME_BLOCKING_CALENDAR_ID || 'e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com';
+
   try {
-    execSync('bin/calendar cleanup-time-blocking', { stdio: 'pipe' });
+    // Keep yesterday (1 day) so we can review planned vs. actual
+    execSync(`bin/calendar cleanup "${timeBlockingCalendar}" 1`, { stdio: 'pipe' });
     printInfo('Time blocking cleaned');
     return true;
   } catch (error) {

@@ -769,14 +769,16 @@ This should summarize:
 
 RETURN A JSON OBJECT:
 {{
-  "progress_update": "> [!success] 📊 Progress Update ({current_time})\\n>\\n> *{current_date} HH:MM {tz_offset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers",
+  "progress_update": "<!-- PROGRESS_UPDATE -->\\n> [!success] 📊 Progress Update ({current_time})\\n>\\n> *{current_date} HH:MM {tz_offset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers\\n<!-- /PROGRESS_UPDATE -->",
   "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
 }}
 
 NOTE: The progress_update should use the callout format with:
+- "<!-- PROGRESS_UPDATE -->" as the opening marker
 - "> [!success] 📊 Progress Update (TIME)" as the header
 - "> " prefix for all lines in the callout
 - "*italicized timestamp*" on the second line
+- "<!-- /PROGRESS_UPDATE -->" as the closing marker
 
 IMPORTANT:
 - Create a MEANINGFUL progress update - there's always something to report
