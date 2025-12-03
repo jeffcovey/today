@@ -753,6 +753,15 @@ function syncCalendar() {
     const output = execSync('bin/calendar sync', { encoding: 'utf8' });
     if (output.includes('✅')) {
       printInfo('Calendar synced');
+
+      // Export calendar events to JSON for Obsidian dashboard
+      try {
+        execSync('mkdir -p vault/logs/sync && sqlite3 .data/today.db "SELECT json_object(\'title\', title, \'start\', start_date, \'end\', end_date, \'location\', location) FROM calendar_events WHERE date(start_date) >= date(\'now\') AND date(start_date) <= date(\'now\', \'+2 days\') ORDER BY start_date ASC LIMIT 10" | jq -s \'.\' > vault/logs/sync/calendar-events.json', { encoding: 'utf8' });
+        printInfo('Calendar events exported to vault');
+      } catch (exportError) {
+        printWarning('Calendar export to vault failed (this is non-critical)');
+      }
+
       return true;
     }
     return false;
