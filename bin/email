@@ -59,6 +59,7 @@ Promise.all([
         console.log(chalk.blue(`📧 Downloading emails from the last ${options.days} days...`));
         const downloader = new EmailDownloader();
         await downloader.downloadEmails(options.account, parseInt(options.days));
+        process.exit(0); // Explicitly exit after successful download
       } catch (error) {
         console.error(chalk.red('Error downloading emails:'), error.message);
         process.exit(1);
