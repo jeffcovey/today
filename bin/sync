@@ -796,11 +796,38 @@ function syncEmail() {
     return false;
   }
 
+  // Try 7 days first
   try {
     execSync(`${emailBin} download --days 7`, { stdio: 'pipe', timeout: 60000 });
-    printInfo('Email synced');
+    printInfo('Email synced (7 days)');
     return true;
   } catch (error) {
+    if (error.signal === 'SIGTERM' || error.message.includes('ETIMEDOUT')) {
+      printWarning('7-day email sync timed out, trying 3 days...');
+
+      // Fall back to 3 days
+      try {
+        execSync(`${emailBin} download --days 3`, { stdio: 'pipe', timeout: 45000 });
+        printInfo('Email synced (3 days)');
+        return true;
+      } catch (fallbackError) {
+        if (fallbackError.signal === 'SIGTERM' || fallbackError.message.includes('ETIMEDOUT')) {
+          printWarning('3-day email sync timed out, trying 1 day...');
+
+          // Final fallback to 1 day with kill after timeout
+          try {
+            execSync(`timeout 30 ${emailBin} download --days 1`, { stdio: 'pipe', timeout: 35000, shell: true });
+            printInfo('Email synced (1 day)');
+            return true;
+          } catch (finalError) {
+            printError(`Email sync failed even with 1 day: ${finalError.message}`);
+            return false;
+          }
+        }
+        printError(`Email sync failed with 3 days: ${fallbackError.message}`);
+        return false;
+      }
+    }
     printError(`Email sync failed: ${error.message}`);
     return false;
   }
@@ -895,7 +922,7 @@ function syncDiary() {
   printInfo('Syncing Day One diary...');
 
   try {
-    execSync('bin/diary sync', { stdio: 'pipe' });
+    execSync('bin/diary-sync.cjs', { stdio: 'pipe' });
     printInfo('Diary synced');
     return true;
   } catch (error) {
@@ -908,7 +935,7 @@ function syncTimeTracking() {
   printInfo('Syncing time tracking...');
 
   try {
-    execSync('bin/time-tracking sync', { stdio: 'pipe' });
+    execSync('bin/track sync-db', { stdio: 'pipe' });
     printInfo('Time tracking synced');
     return true;
   } catch (error) {

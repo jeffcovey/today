@@ -2147,6 +2147,55 @@ export class MigrationManager {
           console.log('    Note: New markdown format is START|END|DESCRIPTION (with #topic/tags in description)');
           console.log('    Note: project column retained for backward compatibility, but topics is primary');
         }
+      },
+      {
+        version: 32,
+        description: 'Clean duplicate OGM GitHub issues and add unique constraint',
+        fn: (db) => {
+          console.log('    Cleaning duplicate OGM GitHub issues...');
+
+          // Check if table exists
+          const tableExists = db.prepare(`
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='ogm_github_issues'
+          `).get();
+
+          if (!tableExists) {
+            console.log('    ✓ ogm_github_issues table does not exist (skipped)');
+            return;
+          }
+
+          // Check for duplicates
+          const duplicates = db.prepare(`
+            SELECT number, COUNT(*) as cnt
+            FROM ogm_github_issues
+            GROUP BY number
+            HAVING cnt > 1
+          `).all();
+
+          if (duplicates.length > 0) {
+            console.log(`    Found ${duplicates.length} issue numbers with duplicates`);
+
+            // Delete duplicate records, keeping only the most recent one (highest id)
+            db.exec(`
+              DELETE FROM ogm_github_issues
+              WHERE id NOT IN (
+                SELECT MAX(id)
+                FROM ogm_github_issues
+                GROUP BY number
+              )
+            `);
+
+            console.log('    ✓ Removed duplicate issue records');
+          } else {
+            console.log('    No duplicates found');
+          }
+
+          // Add unique index on number column
+          db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_github_issue_number ON ogm_github_issues(number);`);
+
+          console.log('    ✓ Added unique constraint on issue number');
+        }
       }
     ];
 

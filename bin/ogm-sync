@@ -1,506 +1,410 @@
-#!/bin/bash
-# OlderGay.Men Data Sync Script
-# Fetches monitoring data from GitHub, Sentry, and Scout APM
-# and stores it in the local SQLite database for bin/today to use
+#!/usr/bin/env node
 
-set -e
+/**
+ * OlderGay.Men Data Sync Script
+ * Fetches monitoring data from GitHub, Sentry, and Scout APM
+ * and stores it in the local SQLite database for bin/today to use
+ */
 
-# Load common dotenvx handler  
-SCRIPT_DIR_LOADER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR_LOADER/lib/dotenvx-loader.sh"
-auto_dotenvx "$@"
+import Database from 'better-sqlite3';
+import chalk from 'chalk';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-# Color output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DB_PATH = path.join(__dirname, '../.data/today.db');
 
-print_status() {
-    echo -e "${GREEN}✓${NC} $1"
+// Utility functions for colored output
+const print = {
+  status: (msg) => console.log(chalk.green(`✓ ${msg}`)),
+  error: (msg) => console.error(chalk.red(`✗ ${msg}`)),
+  info: (msg) => console.log(chalk.blue(`ℹ ${msg}`)),
+  warning: (msg) => console.log(chalk.yellow(`⚠ ${msg}`)),
+  header: (msg) => {
+    console.log('');
+    console.log(chalk.yellow('═══════════════════════════════════════'));
+    console.log(chalk.yellow.bold(msg));
+    console.log(chalk.yellow('═══════════════════════════════════════'));
+  }
+};
+
+// Initialize database tables
+function initDatabase(db) {
+  print.info('Initializing OGM monitoring tables...');
+
+  db.exec(`
+    -- GitHub Issues table
+    CREATE TABLE IF NOT EXISTS ogm_github_issues (
+      number INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      state TEXT NOT NULL,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      closed_at DATETIME,
+      body TEXT,
+      labels TEXT,
+      comments_count INTEGER DEFAULT 0,
+      url TEXT,
+      synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Sentry Issues table
+    CREATE TABLE IF NOT EXISTS ogm_sentry_issues (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      culprit TEXT,
+      level TEXT,
+      status TEXT,
+      count INTEGER DEFAULT 0,
+      user_count INTEGER DEFAULT 0,
+      first_seen DATETIME NOT NULL,
+      last_seen DATETIME,
+      synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Scout Performance Metrics table
+    CREATE TABLE IF NOT EXISTS ogm_scout_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      metric_type TEXT NOT NULL,
+      timestamp DATETIME NOT NULL,
+      value REAL NOT NULL,
+      percentile_95 REAL,
+      throughput REAL,
+      error_rate REAL,
+      synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Correlations table (linking issues to errors)
+    CREATE TABLE IF NOT EXISTS ogm_correlations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      github_issue INTEGER,
+      sentry_issue TEXT,
+      correlation_type TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (github_issue) REFERENCES ogm_github_issues(number),
+      FOREIGN KEY (sentry_issue) REFERENCES ogm_sentry_issues(id)
+    );
+
+    -- Summary statistics table
+    CREATE TABLE IF NOT EXISTS ogm_summary_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stat_date DATE NOT NULL,
+      open_issues INTEGER DEFAULT 0,
+      closed_issues_today INTEGER DEFAULT 0,
+      active_errors INTEGER DEFAULT 0,
+      avg_response_time REAL,
+      p95_response_time REAL,
+      error_rate REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(stat_date)
+    );
+
+    -- Create indexes for better query performance
+    CREATE INDEX IF NOT EXISTS idx_issues_state ON ogm_github_issues(state);
+    CREATE INDEX IF NOT EXISTS idx_issues_updated ON ogm_github_issues(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_sentry_status ON ogm_sentry_issues(status);
+    CREATE INDEX IF NOT EXISTS idx_sentry_last_seen ON ogm_sentry_issues(last_seen);
+    CREATE INDEX IF NOT EXISTS idx_metrics_type ON ogm_scout_metrics(metric_type, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_summary_date ON ogm_summary_stats(stat_date);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_issue_number ON ogm_github_issues(number);
+  `);
+
+  print.status('Database tables initialized');
 }
 
-print_error() {
-    echo -e "${RED}✗${NC} $1"
+// Sync GitHub issues
+async function syncGitHubIssues(db) {
+  print.header('📊 Syncing GitHub Issues');
+
+  const token = process.env.GITHUB_ACCESS_TOKEN || process.env.GITHUB_TOKEN;
+  if (!token) {
+    print.error('GITHUB_ACCESS_TOKEN or GITHUB_TOKEN not configured');
+    print.info('Create a token at: https://github.com/settings/tokens');
+    return false;
+  }
+
+  try {
+    print.info('Fetching open issues from GitHub...');
+
+    const response = await fetch(
+      'https://api.github.com/repos/OlderGay-Men/OlderGay.Men/issues?state=open&per_page=100',
+      {
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const issues = await response.json();
+
+    if (issues.message) {
+      print.error(`GitHub API error: ${issues.message}`);
+      return false;
+    }
+
+    print.info(`Received ${issues.length} issues from GitHub`);
+
+    // Prepare upsert statement with parameterized queries
+    const upsert = db.prepare(`
+      INSERT INTO ogm_github_issues
+      (number, title, state, created_at, updated_at, closed_at, body, labels, comments_count, url, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(number) DO UPDATE SET
+        title = excluded.title,
+        state = excluded.state,
+        updated_at = excluded.updated_at,
+        closed_at = excluded.closed_at,
+        body = excluded.body,
+        labels = excluded.labels,
+        comments_count = excluded.comments_count,
+        url = excluded.url,
+        synced_at = CURRENT_TIMESTAMP
+    `);
+
+    let issueCount = 0;
+    for (const issue of issues) {
+      // Skip pull requests
+      if (issue.pull_request) continue;
+
+      try {
+        const labels = issue.labels?.map(l => l.name).join(',') || '';
+
+        upsert.run(
+          issue.number,
+          issue.title || 'Untitled',
+          issue.state || 'open',
+          issue.created_at,
+          issue.updated_at,
+          issue.closed_at || null,
+          issue.body || '',
+          labels,
+          issue.comments || 0,
+          issue.html_url || ''
+        );
+        issueCount++;
+      } catch (error) {
+        print.error(`Failed to insert issue #${issue.number}: ${error.message}`);
+      }
+    }
+
+    print.status(`Synced ${issueCount} GitHub issues`);
+
+    // Get total count
+    const totalCount = db.prepare("SELECT COUNT(*) as count FROM ogm_github_issues WHERE state='open'").get();
+    print.info(`Total open issues in database: ${totalCount.count}`);
+
+    return true;
+  } catch (error) {
+    print.error(`GitHub sync failed: ${error.message}`);
+    return false;
+  }
 }
 
-print_info() {
-    echo -e "${BLUE}ℹ${NC} $1"
+// Sync Sentry issues
+async function syncSentryIssues(db) {
+  print.header('🔍 Syncing Sentry Issues');
+
+  const token = process.env.SENTRY_AUTH_TOKEN || process.env.SENTRY_API_KEY;
+  if (!token) {
+    print.error('SENTRY_AUTH_TOKEN not configured');
+    print.info('Get your token at: https://sentry.io/settings/account/api/auth-tokens/');
+    return false;
+  }
+
+  const org = process.env.SENTRY_ORG || 'oldergaymen';
+  const project = process.env.SENTRY_PROJECT || 'rails';
+
+  try {
+    print.info('Fetching unresolved issues from Sentry...');
+
+    const response = await fetch(
+      `https://sentry.io/api/0/projects/${org}/${project}/issues/?query=is:unresolved&limit=100`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Sentry API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const issues = await response.json();
+
+    if (issues.error) {
+      print.error(`Sentry API error: ${issues.error}`);
+      return false;
+    }
+
+    print.info(`Received ${issues.length} issues from Sentry`);
+
+    // Prepare upsert statement
+    const upsert = db.prepare(`
+      INSERT INTO ogm_sentry_issues
+      (id, title, culprit, level, status, count, user_count, first_seen, last_seen, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        culprit = excluded.culprit,
+        level = excluded.level,
+        status = excluded.status,
+        count = excluded.count,
+        user_count = excluded.user_count,
+        last_seen = excluded.last_seen,
+        synced_at = CURRENT_TIMESTAMP
+    `);
+
+    let issueCount = 0;
+    for (const issue of issues) {
+      try {
+        upsert.run(
+          issue.id,
+          issue.title || 'Unknown',
+          issue.culprit || '',
+          issue.level || 'error',
+          issue.status || 'unresolved',
+          issue.count || 0,
+          issue.userCount || 0,
+          issue.firstSeen,
+          issue.lastSeen || issue.firstSeen
+        );
+        issueCount++;
+      } catch (error) {
+        print.error(`Failed to insert Sentry issue ${issue.id}: ${error.message}`);
+      }
+    }
+
+    print.status(`Synced ${issueCount} Sentry issues`);
+
+    // Get total count
+    const totalCount = db.prepare("SELECT COUNT(*) as count FROM ogm_sentry_issues WHERE status='unresolved'").get();
+    print.info(`Total unresolved issues in database: ${totalCount.count}`);
+
+    return true;
+  } catch (error) {
+    print.error(`Sentry sync failed: ${error.message}`);
+    return false;
+  }
 }
 
-print_header() {
-    echo ""
-    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
-    echo -e "${YELLOW}$1${NC}"
-    echo -e "${YELLOW}═══════════════════════════════════════${NC}"
+// Sync Scout metrics (stubbed - would need actual API implementation)
+async function syncScoutMetrics(db) {
+  print.header('🔍 Syncing Scout Performance Metrics');
+  print.info('Scout metrics sync not yet implemented');
+  return true;
 }
 
-# Database path
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DB_PATH="$SCRIPT_DIR/../.data/today.db"
+// Generate summary statistics
+function generateSummary(db) {
+  print.header('📈 Generating Summary Statistics');
 
-# Initialize database tables for OGM monitoring
-init_database() {
-    print_info "Initializing OGM monitoring tables..."
-    
-    sqlite3 "$DB_PATH" <<'EOF'
--- GitHub Issues table
-CREATE TABLE IF NOT EXISTS ogm_github_issues (
-    number INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    state TEXT NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    closed_at DATETIME,
-    body TEXT,
-    labels TEXT,
-    comments_count INTEGER DEFAULT 0,
-    url TEXT,
-    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+  const today = new Date().toISOString().split('T')[0];
 
--- Sentry Issues table
-CREATE TABLE IF NOT EXISTS ogm_sentry_issues (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    culprit TEXT,
-    level TEXT,
-    status TEXT,
-    count INTEGER DEFAULT 0,
-    user_count INTEGER DEFAULT 0,
-    first_seen DATETIME NOT NULL,
-    last_seen DATETIME,
-    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+  // Calculate metrics
+  const openIssues = db.prepare("SELECT COUNT(*) as count FROM ogm_github_issues WHERE state='open'").get();
+  const closedToday = db.prepare("SELECT COUNT(*) as count FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)=?").get(today);
+  const activeErrors = db.prepare("SELECT COUNT(*) as count FROM ogm_sentry_issues WHERE status='unresolved'").get();
 
--- Scout Performance Metrics table
-CREATE TABLE IF NOT EXISTS ogm_scout_metrics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    metric_type TEXT NOT NULL,
-    timestamp DATETIME NOT NULL,
-    value REAL NOT NULL,
-    percentile_95 REAL,
-    throughput REAL,
-    error_rate REAL,
-    synced_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+  console.log('');
+  console.log(`Summary for ${today}:`);
+  console.log('───────────────────────────────');
+  console.log(`GitHub Issues:     ${openIssues.count} open`);
+  console.log(`Closed Today:      ${closedToday.count}`);
+  console.log(`Sentry Errors:     ${activeErrors.count} active`);
+  console.log('');
 
--- Correlations table (linking issues to errors)
-CREATE TABLE IF NOT EXISTS ogm_correlations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    github_issue INTEGER,
-    sentry_issue TEXT,
-    correlation_type TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (github_issue) REFERENCES ogm_github_issues(number),
-    FOREIGN KEY (sentry_issue) REFERENCES ogm_sentry_issues(id)
-);
-
--- Summary statistics table
-CREATE TABLE IF NOT EXISTS ogm_summary_stats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    stat_date DATE NOT NULL,
-    open_issues INTEGER DEFAULT 0,
-    closed_issues_today INTEGER DEFAULT 0,
-    active_errors INTEGER DEFAULT 0,
-    avg_response_time REAL,
-    p95_response_time REAL,
-    error_rate REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(stat_date)
-);
-
--- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_issues_state ON ogm_github_issues(state);
-CREATE INDEX IF NOT EXISTS idx_issues_updated ON ogm_github_issues(updated_at);
-CREATE INDEX IF NOT EXISTS idx_sentry_status ON ogm_sentry_issues(status);
-CREATE INDEX IF NOT EXISTS idx_sentry_last_seen ON ogm_sentry_issues(last_seen);
-CREATE INDEX IF NOT EXISTS idx_metrics_type ON ogm_scout_metrics(metric_type, timestamp);
-CREATE INDEX IF NOT EXISTS idx_summary_date ON ogm_summary_stats(stat_date);
-EOF
-    
-    print_status "Database tables initialized"
+  print.status('Summary statistics generated');
 }
 
-# Sync GitHub issues using direct API calls
-sync_github_issues() {
-    print_header "📊 Syncing GitHub Issues"
-    
-    # Check for GitHub token
-    GITHUB_ACCESS_TOKEN="${GITHUB_ACCESS_TOKEN:-$GITHUB_TOKEN}"
-    if [[ -z "$GITHUB_ACCESS_TOKEN" ]]; then
-        print_error "GITHUB_ACCESS_TOKEN or GITHUB_TOKEN not configured"
-        print_info "Create a token at: https://github.com/settings/tokens"
-        return 1
-    fi
-    
-    print_info "Fetching open issues from GitHub..."
-    
-    # Fetch issues from GitHub API (excluding pull requests) - limit to 3 for testing
-    response=$(curl -s --max-time 10 -H "Authorization: token $GITHUB_ACCESS_TOKEN" \
-                    -H "Accept: application/vnd.github.v3+json" \
-                    "https://api.github.com/repos/OlderGay-Men/OlderGay.Men/issues?state=open&per_page=3" 2>/dev/null)
-    
-    print_info "GitHub API response received, checking JSON validity..."
-    
-    # Check response size
-    response_size=${#response}
-    print_info "Response size: $response_size characters"
-    
-    # Check if response is empty
-    if [[ -z "$response" ]]; then
-        print_error "Empty response from GitHub API"
-        return 1
-    fi
-    
-    # For very large responses, just check if it starts with '[' (JSON array)
-    if [[ $response_size -gt 10000 ]]; then
-        print_info "Large response detected, doing quick validation..."
-        response_start="${response:0:10}"
-        if [[ "$response_start" != "["* ]]; then
-            print_error "Response doesn't appear to be a JSON array"
-            print_error "Response start: ${response:0:100}..."
-            return 1
-        fi
-    else
-        # Check if we got valid JSON for smaller responses
-        if ! echo "$response" | timeout 5 jq -e . >/dev/null 2>&1; then
-            print_error "Failed to fetch GitHub issues - invalid response"
-            print_error "Response: ${response:0:200}..."
-            return 1
-        fi
-    fi
-    
-    # Check for API errors (skip for large responses to avoid jq performance issues)
-    if [[ $response_size -le 10000 ]] && echo "$response" | timeout 3 jq -e '.message' >/dev/null 2>&1; then
-        error_msg=$(echo "$response" | timeout 3 jq -r '.message')
-        print_error "GitHub API error: $error_msg"
-        return 1
-    fi
-    
-    # Parse and insert issues into database
-    print_info "Starting to process individual issues..."
-    issue_count=0
-    while IFS= read -r issue; do
-        print_info "Processing issue #$((issue_count + 1))..."
-        # Skip pull requests (they have a pull_request field)
-        if echo "$issue" | jq -e '.pull_request | select(. != null)' >/dev/null 2>&1; then
-            continue
-        fi
-        
-        # Extract fields with error handling
-        print_info "Issue JSON length: ${#issue}"
-        print_info "Issue JSON start: ${issue:0:100}..."
-        number=$(echo "$issue" | jq -r '.number' 2>/dev/null || echo "0")
-        print_info "Extracted number: $number"
-        title=$(echo "$issue" | jq -r '.title' 2>/dev/null | sed "s/'/''/g" || echo "Unknown")
-        state=$(echo "$issue" | jq -r '.state' 2>/dev/null || echo "unknown")
-        created_at=$(echo "$issue" | jq -r '.created_at' 2>/dev/null || echo "now()")
-        updated_at=$(echo "$issue" | jq -r '.updated_at' 2>/dev/null || echo "now()")
-        closed_at=$(echo "$issue" | jq -r '.closed_at // "null"' 2>/dev/null || echo "null")
-        body=$(echo "$issue" | jq -r '.body // ""' 2>/dev/null | sed "s/'/''/g" || echo "")
-        labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")' 2>/dev/null | sed "s/'/''/g" || echo "")
-        comments_count=$(echo "$issue" | jq -r '.comments' 2>/dev/null || echo "0")
-        url=$(echo "$issue" | jq -r '.html_url' 2>/dev/null || echo "")
-        
-        # Insert into database
-        print_info "Inserting issue #$number into database..."
-        if ! sqlite3 "$DB_PATH" <<EOF
-INSERT OR REPLACE INTO ogm_github_issues 
-(number, title, state, created_at, updated_at, closed_at, body, labels, comments_count, url)
-VALUES (
-    $number,
-    '$title',
-    '$state',
-    '$created_at',
-    '$updated_at',
-    $([ "$closed_at" = "null" ] && echo "NULL" || echo "'$closed_at'"),
-    '$body',
-    '$labels',
-    $comments_count,
-    '$url'
-);
-EOF
-        then
-            print_error "Failed to insert issue #$number into database"
-        fi
-        ((issue_count++))
-    print_info "Running jq to parse response..."
-    done < <(echo "$response" | timeout 30 jq -c '.[]')
-    
-    if [[ $issue_count -gt 0 ]]; then
-        print_status "Synced $issue_count GitHub issues"
-    else
-        print_info "No open issues found"
-    fi
-    
-    # Get issue count
-    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
-    print_info "Total open issues in database: $total_count"
+// Main function
+async function main() {
+  print.header('🌐 OlderGay.Men Monitoring Data Sync');
+  console.log('Syncing monitoring data for bin/today planning...');
+
+  const db = new Database(DB_PATH);
+
+  try {
+    // Initialize database
+    initDatabase(db);
+
+    // Sync each data source
+    await syncGitHubIssues(db);
+    await syncSentryIssues(db);
+    await syncScoutMetrics(db);
+
+    // Generate summary
+    generateSummary(db);
+
+    print.header('✅ OGM Data Sync Complete');
+
+    print.info('Data now available for bin/today planning:');
+    console.log('  • GitHub open issues and recent activity');
+    console.log('  • Sentry unresolved errors and patterns');
+    console.log('  • Scout performance metrics and slow endpoints');
+    console.log('  • Summary statistics and trends');
+    console.log('');
+    console.log("Run 'bin/today' to get AI recommendations based on this data");
+
+  } catch (error) {
+    print.error(`Sync failed: ${error.message}`);
+    console.error(error.stack);
+    process.exit(1);
+  } finally {
+    db.close();
+  }
 }
 
-# Sync Sentry issues using direct API calls
-sync_sentry_issues() {
-    print_header "🔍 Syncing Sentry Issues"
-    
-    # Check for Sentry token
-    SENTRY_TOKEN="${SENTRY_AUTH_TOKEN:-$SENTRY_API_KEY}"
-    if [[ -z "$SENTRY_TOKEN" ]]; then
-        print_error "SENTRY_AUTH_TOKEN not configured"
-        print_info "Get your token at: https://sentry.io/settings/account/api/auth-tokens/"
-        return 1
-    fi
-    
-    print_info "Fetching unresolved issues from Sentry..."
-    print_info "Using Sentry token: ${SENTRY_TOKEN:0:10}..."
-    
-    # Sentry API endpoint
-    ORG="${SENTRY_ORG:-oldergaymen}"  # Note: no hyphen in the org slug
-    PROJECT="${SENTRY_PROJECT:-rails}"
-    response=$(curl -s --max-time 10 -H "Authorization: Bearer $SENTRY_TOKEN" \
-                    -H "Accept: application/json" \
-                    "https://sentry.io/api/0/projects/$ORG/$PROJECT/issues/?query=is:unresolved&limit=5" 2>/dev/null)
-    
-    print_info "Sentry API response received, size: ${#response} characters"
-    
-    # Check response size and validate accordingly
-    response_size=${#response}
-    if [[ -z "$response" ]]; then
-        print_error "Empty response from Sentry API"
-        return 1
-    fi
-    
-    # Skip JSON validation for large responses to avoid performance issues
-    if [[ $response_size -le 10000 ]]; then
-        if ! echo "$response" | timeout 3 jq -e . >/dev/null 2>&1; then
-            print_error "Failed to fetch Sentry issues - invalid response"
-            return 1
-        fi
-        
-        # Check for API errors
-        if echo "$response" | timeout 3 jq -e '.error' >/dev/null 2>&1; then
-            error_msg=$(echo "$response" | timeout 3 jq -r '.error')
-            print_error "Sentry API error: $error_msg"
-            return 1
-        fi
-    fi
-    
-    # Parse and insert issues into database
-    issue_count=0
-    while IFS= read -r issue; do
-        # Extract fields
-        id=$(echo "$issue" | jq -r '.id' | sed "s/'/''/g")
-        title=$(echo "$issue" | jq -r '.title // "Unknown"' | sed "s/'/''/g")
-        culprit=$(echo "$issue" | jq -r '.culprit // ""' | sed "s/'/''/g")
-        level=$(echo "$issue" | jq -r '.level // "error"' | sed "s/'/''/g")
-        status=$(echo "$issue" | jq -r '.status // "unresolved"' | sed "s/'/''/g")
-        count=$(echo "$issue" | jq -r '.count // 0')
-        user_count=$(echo "$issue" | jq -r '.userCount // 0')
-        first_seen=$(echo "$issue" | jq -r '.firstSeen // "now()"')
-        last_seen=$(echo "$issue" | jq -r '.lastSeen // .firstSeen // "now()"')
-        
-        # Insert into database
-        sqlite3 "$DB_PATH" <<EOF
-INSERT OR REPLACE INTO ogm_sentry_issues
-(id, title, culprit, level, status, count, user_count, first_seen, last_seen)
-VALUES (
-    '$id',
-    '$title',
-    '$culprit',
-    '$level',
-    '$status',
-    $count,
-    $user_count,
-    '$first_seen',
-    '$last_seen'
-);
-EOF
-        ((issue_count++))
-    print_info "Processing Sentry issues..."
-    done < <(echo "$response" | timeout 20 jq -c '.[]?' 2>/dev/null)
-    
-    if [[ $issue_count -gt 0 ]]; then
-        print_status "Synced $issue_count Sentry issues"
-    else
-        print_info "No unresolved issues found"
-    fi
-    
-    # Get issue count
-    total_count=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_sentry_issues WHERE status='unresolved'" 2>/dev/null || echo 0)
-    print_info "Total unresolved issues in database: $total_count"
+// Handle command line arguments
+const command = process.argv[2];
+
+switch (command) {
+  case 'issues': {
+    const db = new Database(DB_PATH);
+    try {
+      initDatabase(db);
+      await syncGitHubIssues(db);
+    } finally {
+      db.close();
+    }
+    break;
+  }
+  case 'errors': {
+    const db = new Database(DB_PATH);
+    try {
+      initDatabase(db);
+      await syncSentryIssues(db);
+    } finally {
+      db.close();
+    }
+    break;
+  }
+  case 'performance': {
+    const db = new Database(DB_PATH);
+    try {
+      initDatabase(db);
+      await syncScoutMetrics(db);
+    } finally {
+      db.close();
+    }
+    break;
+  }
+  case 'summary': {
+    const db = new Database(DB_PATH);
+    try {
+      generateSummary(db);
+    } finally {
+      db.close();
+    }
+    break;
+  }
+  default:
+    await main();
 }
-
-# Sync Scout performance metrics using direct API calls
-sync_scout_metrics() {
-    print_header "🔍 Syncing Scout Performance Metrics"
-    
-    # Check for Scout API key
-    if [[ -z "$SCOUT_API_KEY" ]]; then
-        print_error "SCOUT_API_KEY not configured"
-        print_info "Get your API key at: https://scoutapm.com/apps"
-        return 1
-    fi
-    
-    SCOUT_APP="${SCOUT_APP_ID:-390577}"
-    print_info "Fetching performance metrics from Scout (App ID: $SCOUT_APP)..."
-    
-    # Calculate time range (last 24 hours)
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        START_TIME=$(date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
-        END_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-    else
-        # Linux
-        START_TIME=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
-        END_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-    fi
-    
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    metrics_added=0
-    
-    # Fetch response time metrics
-    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
-                    -H "Content-Type: application/json" \
-                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time?from=$START_TIME&to=$END_TIME" 2>/dev/null)
-    
-    if echo "$response" | jq -e '.results.series.response_time' >/dev/null 2>&1; then
-        # Calculate average from the series
-        avg_response=$(echo "$response" | jq '[.results.series.response_time[][1]] | add/length')
-        if [[ -n "$avg_response" ]] && [[ "$avg_response" != "null" ]]; then
-            sqlite3 "$DB_PATH" <<EOF
-INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
-VALUES ('avg_response_time', '$timestamp', $avg_response);
-EOF
-            ((metrics_added++))
-        fi
-    fi
-    
-    # Fetch 95th percentile response time
-    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
-                    -H "Content-Type: application/json" \
-                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/response_time_95th?from=$START_TIME&to=$END_TIME" 2>/dev/null)
-    
-    if echo "$response" | jq -e '.results.series.response_time_95th' >/dev/null 2>&1; then
-        # Calculate average from the series
-        p95_response=$(echo "$response" | jq '[.results.series.response_time_95th[][1]] | add/length')
-        if [[ -n "$p95_response" ]] && [[ "$p95_response" != "null" ]]; then
-            sqlite3 "$DB_PATH" <<EOF
-INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
-VALUES ('p95_response_time', '$timestamp', $p95_response);
-EOF
-            ((metrics_added++))
-        fi
-    fi
-    
-    # Fetch error rate
-    response=$(curl -s --max-time 10 -H "X-SCOUT-API: $SCOUT_API_KEY" \
-                    -H "Content-Type: application/json" \
-                    "https://scoutapm.com/api/v0/apps/$SCOUT_APP/metrics/errors?from=$START_TIME&to=$END_TIME" 2>/dev/null)
-    
-    if echo "$response" | jq -e '.results.series.errors' >/dev/null 2>&1; then
-        # Calculate average error rate
-        error_rate=$(echo "$response" | jq '[.results.series.errors[][1]] | add/length')
-        if [[ -n "$error_rate" ]] && [[ "$error_rate" != "null" ]]; then
-            sqlite3 "$DB_PATH" <<EOF
-INSERT INTO ogm_scout_metrics (metric_type, timestamp, value)
-VALUES ('error_rate', '$timestamp', $error_rate);
-EOF
-            ((metrics_added++))
-        fi
-    fi
-    
-    if [[ $metrics_added -gt 0 ]]; then
-        print_status "Synced $metrics_added Scout performance metrics"
-    else
-        print_info "No metrics found or API returned no data"
-    fi
-}
-
-# Generate summary statistics
-generate_summary() {
-    print_header "📈 Generating Summary Statistics"
-    
-    today=$(date +%Y-%m-%d)
-    
-    # Calculate metrics
-    open_issues=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='open'" 2>/dev/null || echo 0)
-    closed_today=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_github_issues WHERE state='closed' AND DATE(closed_at)='$today'" 2>/dev/null || echo 0)
-    active_errors=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM ogm_sentry_issues WHERE status='unresolved'" 2>/dev/null || echo 0)
-    
-    # Insert metrics using the correct schema
-    sqlite3 "$DB_PATH" <<EOF
--- GitHub metrics
-INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
-VALUES ('$today', 'github', 'open_issues', $open_issues, 'count', '$today');
-
-INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
-VALUES ('$today', 'github', 'closed_today', $closed_today, 'count', '$today');
-
--- Sentry metrics
-INSERT OR REPLACE INTO ogm_summary_stats (date, metric_type, metric_name, value, unit, stat_date)
-VALUES ('$today', 'sentry', 'active_errors', $active_errors, 'count', '$today');
-EOF
-    
-    # Display summary
-    echo ""
-    echo "Summary for $today:"
-    echo "───────────────────────────────"
-    echo "GitHub Issues:     $open_issues open"
-    echo "Closed Today:      $closed_today"
-    echo "Sentry Errors:     $active_errors active"
-    echo ""
-    
-    print_status "Summary statistics generated"
-}
-
-# Main function
-main() {
-    print_header "🌐 OlderGay.Men Monitoring Data Sync"
-    echo "Syncing monitoring data for bin/today planning..."
-    
-    # Initialize database if needed
-    init_database
-    
-    # Sync each data source
-    sync_github_issues
-    # TODO: Fix Sentry jq performance issue with large responses
-    # sync_sentry_issues
-    # sync_scout_metrics
-    
-    # Generate summary
-    generate_summary
-    
-    print_header "✅ OGM Data Sync Complete"
-    
-    # Show what will be available to bin/today
-    print_info "Data now available for bin/today planning:"
-    echo "  • GitHub open issues and recent activity"
-    echo "  • Sentry unresolved errors and patterns"
-    echo "  • Scout performance metrics and slow endpoints"
-    echo "  • Summary statistics and trends"
-    echo ""
-    echo "Run 'bin/today' to get AI recommendations based on this data"
-}
-
-# Handle command line arguments
-case "${1:-}" in
-    issues)
-        init_database
-        sync_github_issues
-        ;;
-    errors)
-        init_database
-        sync_sentry_issues
-        ;;
-    performance)
-        init_database
-        sync_scout_metrics
-        ;;
-    summary)
-        generate_summary
-        ;;
-    *)
-        main
-        ;;
-esac
