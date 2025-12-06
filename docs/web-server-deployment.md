@@ -193,11 +193,11 @@ If you already own a domain, create a subdomain:
 # Option 1: Test from the deployed server itself (most reliable)
 bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admin:\$WEB_PASSWORD http://localhost:3001/daily'"
 
-# Option 2: Direct access with credentials (if you know them)
-curl -u 'admin:5RDx9/RcQD2K/iXbKhhFyvn97ZSHW5uKUAMbfZbzV9g=' http://today.oldergay.men/daily
+# Option 2: Direct access with credentials (replace with your own)
+curl -u 'admin:YOUR_PASSWORD' http://your-domain.example.com/daily
 
 # Option 3: Using environment variables locally
-npx dotenvx run -- bash -c 'curl -u "$WEB_USER:$WEB_PASSWORD" http://today.oldergay.men/daily'
+npx dotenvx run -- bash -c 'curl -u "$WEB_USER:$WEB_PASSWORD" http://your-domain.example.com/daily'
 
 # To check specific elements in the HTML:
 bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admin:\$WEB_PASSWORD http://localhost:3001/daily | grep chatMessages'"
@@ -207,7 +207,7 @@ bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admi
 
 - The web server runs on port 3001 on the server
 - It's proxied through nginx to the domain
-- Always use the domain name (today.oldergay.men) not the raw IP
+- Always use the domain name (your configured domain) not the raw IP
 - SSL issues may occur with Cloudflare (error 525) - use HTTP or test locally on server
 - The server requires Basic Auth with credentials from .env
 

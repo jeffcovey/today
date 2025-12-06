@@ -100,7 +100,7 @@ if [ -f config/calendars.json ]; then
     echo "✅ Calendar config found ($CAL_COUNT calendars)"
 else
     echo "⚠️  No calendar config (optional)"
-    echo "   Copy config/calendars.json from main machine if needed"
+    echo "   Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
 fi
 
 if [ -f .notion-cache/notion-cache.db ]; then
@@ -166,6 +166,6 @@ else
     echo "  2. Test with: npx dotenvx get --all"
     echo ""
     echo "Optional steps:"
-    echo "  - Copy config/calendars.json from main machine"
+    echo "  - Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
     echo "  - Authenticate Claude CLI"
 fi

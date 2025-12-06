@@ -180,7 +180,7 @@ if [ "$BETTER_SQLITE_FOUND" = false ]; then
 fi
 
 if [ ! -f config/calendars.json ]; then
-    echo "  - Calendar config: Copy config/calendars.json from main machine"
+    echo "  - Calendar config: Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
 fi
 
 if ! command -v claude &> /dev/null; then

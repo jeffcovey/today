@@ -22,7 +22,7 @@ The Today application uses encrypted credentials stored with dotenvx for secure 
 
 ### Method 1: Browser Access (Recommended)
 
-1. Navigate to https://today.jeffcovey.net
+1. Navigate to https://your-domain.example.com
 2. Enter credentials at login prompt
 3. Session persists for 7 days
 
@@ -47,10 +47,10 @@ PASSWORD=$(npx dotenvx get WEB_PASSWORD --format shell)
 curl -c cookies.txt -X POST \
   -d "username=admin" \
   --data-urlencode "password=$PASSWORD" \
-  https://today.jeffcovey.net/auth/login
+  https://your-domain.example.com/auth/login
 
 # Access protected resources
-curl -b cookies.txt https://today.jeffcovey.net/tasks-today.md
+curl -b cookies.txt https://your-domain.example.com/tasks-today.md
 ```
 
 ### Method 4: Using deploy-do fetch (Recommended for CLI)
@@ -76,12 +76,12 @@ PASSWORD=$(npx dotenvx get WEB_PASSWORD --format shell)
 
 bin/deploy-do exec "curl -X POST -d 'username=admin' \
   --data-urlencode 'password=$PASSWORD' \
-  https://today.jeffcovey.net/auth/login \
+  https://your-domain.example.com/auth/login \
   -c /tmp/auth-cookies.txt"
 
 # Then use the cookie for authenticated requests
 bin/deploy-do exec "curl -b /tmp/auth-cookies.txt \
-  https://today.jeffcovey.net/tasks-today.md"
+  https://your-domain.example.com/tasks-today.md"
 ```
 
 ## Security Best Practices
@@ -129,7 +129,7 @@ curl -u "$USER:$PASS" http://localhost:3000/
 
 ```bash
 # Check authentication is working
-bin/deploy-do exec "curl -I https://today.jeffcovey.net"
+bin/deploy-do exec "curl -I https://your-domain.example.com"
 # Should redirect to /auth/login
 
 # Test with credentials
@@ -137,7 +137,7 @@ PASSWORD=$(npx dotenvx get WEB_PASSWORD)
 bin/deploy-do exec "curl -X POST \
   -d 'username=admin' \
   --data-urlencode 'password=$PASSWORD' \
-  https://today.jeffcovey.net/auth/login \
+  https://your-domain.example.com/auth/login \
   -w '\n%{http_code}\n'"
 # Should return 302 (redirect on success)
 ```
