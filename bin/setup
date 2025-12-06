@@ -21,6 +21,35 @@ print_warning() {
     echo -e "${YELLOW}$1${NC}"
 }
 
+# Function to setup config.toml
+setup_config() {
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+    CONFIG_FILE="$PROJECT_DIR/config.toml"
+    EXAMPLE_FILE="$PROJECT_DIR/config.toml.example"
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_warning "config.toml not found!"
+        echo ""
+        if [ -f "$EXAMPLE_FILE" ]; then
+            echo "Creating config.toml from example..."
+            cp "$EXAMPLE_FILE" "$CONFIG_FILE"
+            print_status "Created config.toml"
+            echo ""
+            print_warning "Please edit config.toml with your personal settings:"
+            echo "  - Your name and vocation"
+            echo "  - Your timezone and home location"
+            echo "  - Your schedule preferences"
+            echo ""
+        else
+            print_error "config.toml.example not found!"
+            exit 1
+        fi
+    else
+        print_status "config.toml already exists"
+    fi
+}
+
 # Function to show usage
 show_help() {
     cat << EOF
@@ -28,7 +57,8 @@ Usage: setup [OPTION]
 Unified setup script for development environment configurations
 
 Options:
-    --ssh                Setup SSH server for remote access
+    --config            Setup config.toml from example template
+    --ssh               Setup SSH server for remote access
     --tailscale         Setup Tailscale VPN for secure connectivity
     --tailscale-hostname Configure Tailscale hostname
     --dotenvx           Setup dotenvx for encrypted environment sync
@@ -404,7 +434,7 @@ setup_calendar() {
         echo "ℹ️  No public calendars configured"
         echo ""
         echo "To add public calendar URLs:"
-        echo "1. Copy config/calendars.example.json to config/calendars.json"
+        echo "1. Copy config/calendars.json.example to config/calendars.json"
         echo "2. Add your calendar URLs (from Airbnb, TripIt, etc.)"
         echo "3. Set 'enabled': true/false for each calendar"
     fi
@@ -487,8 +517,13 @@ case "$1" in
     --calendar)
         setup_calendar
         ;;
+    --config)
+        setup_config
+        ;;
     --all)
         print_status "Running all setup tasks..."
+        echo ""
+        setup_config
         echo ""
         setup_ssh
         echo ""
@@ -499,7 +534,7 @@ case "$1" in
         setup_dotenvx
         echo ""
         setup_calendar
-        print_status "✅ All setup tasks completed!"
+        print_status "All setup tasks completed!"
         ;;
     --help|-h)
         show_help

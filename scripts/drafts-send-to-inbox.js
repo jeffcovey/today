@@ -8,7 +8,8 @@
 
 // ============ CONFIGURATION ============
 const config = {
-    dropletUrl: 'https://today.jeffcovey.net/api/inbox/upload'  // Your droplet URL
+    // UPDATE THIS TO YOUR DOMAIN
+    dropletUrl: 'https://your-domain.example.com/api/inbox/upload'  // Your droplet URL
 };
 
 // Use Drafts Credential for secure token storage
