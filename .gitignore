@@ -21,8 +21,11 @@ google-calendar-key.json
 # Runtime and sync files (instance-specific)
 .sync-config.json
 
-# Turso client cache
-.turso-cache/
+# Private keys and credentials
+*.pem
+*.key
+*credentials*.json
+*secrets*.json
 
 # Resilio Sync credentials
 .resilio-password
