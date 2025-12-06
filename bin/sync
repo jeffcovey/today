@@ -137,11 +137,251 @@ async function cancelOldPlanTasks(specificFile = null) {
 }
 
 /**
+ * Generate a daily summary using AI to synthesize all daily data
+ */
+async function generateDailySummary(fileDate, filePath) {
+  try {
+    // Check for API key using dotenvx
+    let apiKey = '';
+    try {
+      apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY', { encoding: 'utf8' }).trim();
+    } catch (e) {
+      printWarning('No API key found for AI summary generation - skipping');
+      return '';
+    }
+
+    if (!apiKey || apiKey.includes('not set')) {
+      printWarning('No API key found for AI summary generation - skipping');
+      return '';
+    }
+
+    // Gather all data about the day
+    const dataSources = [];
+
+    // 1. Read the daily plan file
+    if (fs.existsSync(filePath)) {
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      dataSources.push(`DAILY PLAN FILE:\n${fileContent}`);
+    }
+
+    // 2. Read time tracking
+    const yearMonth = fileDate.substring(0, 7);
+    const timeTrackingFile = `vault/logs/time-tracking/${yearMonth}.md`;
+    if (fs.existsSync(timeTrackingFile)) {
+      const timeContent = fs.readFileSync(timeTrackingFile, 'utf-8');
+      const dayEntries = timeContent.split('\n').filter(line => line.startsWith(fileDate));
+      if (dayEntries.length > 0) {
+        dataSources.push(`TIME TRACKING:\n${dayEntries.join('\n')}`);
+      }
+    }
+
+    // 3. Query calendar events
+    try {
+      const eventsQuery = execSync(`bin/db-query custom "
+        SELECT title, start_date, end_date, location FROM calendar_events
+        WHERE date(start_date) = '${fileDate}'
+        ORDER BY start_date
+      "`, { encoding: 'utf8' });
+      const eventsData = JSON.parse(eventsQuery);
+      if (eventsData && eventsData.length > 0) {
+        dataSources.push(`CALENDAR EVENTS:\n${JSON.stringify(eventsData, null, 2)}`);
+      }
+    } catch (e) {}
+
+    // 4. Query diary entries
+    try {
+      const diaryQuery = execSync(`bin/db-query custom "
+        SELECT text FROM diary
+        WHERE date(creation_date) = '${fileDate}'
+        ORDER BY creation_date DESC
+        LIMIT 1
+      "`, { encoding: 'utf8' });
+      const diaryData = JSON.parse(diaryQuery);
+      if (diaryData && diaryData.length > 0) {
+        dataSources.push(`DIARY ENTRY:\n${diaryData[0].text}`);
+      }
+    } catch (e) {}
+
+    if (dataSources.length === 0) {
+      return 'No activity recorded this day';
+    }
+
+    // Call Claude API to generate summary
+    const prompt = `You are summarizing a day (${fileDate}) for a daily planning system. Review all the data below and write a 2-3 sentence narrative summary that captures:
+- What was accomplished (major wins, completed tasks)
+- The overall theme or focus of the day
+- Any notable challenges or insights
+
+Be qualitative and narrative, not just a list. Make it meaningful and readable.
+
+${dataSources.join('\n\n---\n\n')}
+
+Write ONLY the 2-3 sentence summary, nothing else:`;
+
+    // Create a temp file with the prompt
+    const tempPromptFile = `/tmp/summary-prompt-${Date.now()}.txt`;
+    fs.writeFileSync(tempPromptFile, prompt);
+
+    // Use CLAUDE_MODEL env var, defaulting to Haiku for speed/cost
+    const response = execSync(
+      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001'; const response = await client.messages.create({ model: model, max_tokens: 300, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
+      { encoding: 'utf8', timeout: 30000 }
+    );
+
+    // Clean up temp file
+    fs.unlinkSync(tempPromptFile);
+
+    return response.trim();
+  } catch (error) {
+    printWarning(`Failed to generate AI summary for ${fileDate}: ${error.message}`);
+    return '';
+  }
+}
+
+/**
+ * Generate a weekly summary using AI to synthesize all daily summaries
+ */
+async function generateWeeklySummary(weekFilePath) {
+  try {
+    // Check for API key using dotenvx
+    let apiKey = '';
+    try {
+      apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY', { encoding: 'utf8' }).trim();
+    } catch (e) {
+      printWarning('No API key found for AI weekly summary generation - skipping');
+      return '';
+    }
+
+    if (!apiKey || apiKey.includes('not set')) {
+      printWarning('No API key found for AI weekly summary generation - skipping');
+      return '';
+    }
+
+    // Read the weekly review file to get daily file references
+    const weekContent = fs.readFileSync(weekFilePath, 'utf-8');
+    const frontmatterMatch = weekContent.match(/^---\n([\s\S]*?)\n---/);
+    if (!frontmatterMatch) {
+      printWarning('Could not find frontmatter in weekly file');
+      return '';
+    }
+
+    const frontmatter = frontmatterMatch[1];
+
+    // Extract all day file names from frontmatter
+    const dayFileNames = [];
+    const dayMatches = frontmatter.matchAll(/(?:mon|tue|wed|thu|fri|sat|sun)_file:\s*(.+)/g);
+    for (const match of dayMatches) {
+      if (match[1] && match[1].trim()) {
+        dayFileNames.push(match[1].trim());
+      }
+    }
+
+    if (dayFileNames.length === 0) {
+      printWarning('No daily files found in weekly review frontmatter');
+      return '';
+    }
+
+    // Read all daily summaries
+    const dailySummaries = [];
+    for (const dayFileName of dayFileNames) {
+      // Add .md extension if not present
+      const fileName = dayFileName.endsWith('.md') ? dayFileName : `${dayFileName}.md`;
+      const dayFilePath = `vault/plans/${fileName}`;
+      if (fs.existsSync(dayFilePath)) {
+        const dayContent = fs.readFileSync(dayFilePath, 'utf-8');
+        const dayFrontmatterMatch = dayContent.match(/^---\n([\s\S]*?)\n---/);
+        if (dayFrontmatterMatch) {
+          const dayFrontmatter = dayFrontmatterMatch[1];
+          // Match both quoted and unquoted values
+          const summaryMatch = dayFrontmatter.match(/daily_summary:\s*"?([^"\n]+)"?/);
+          if (summaryMatch && summaryMatch[1] && summaryMatch[1].trim()) {
+            // Extract the date from filename (e.g., 2025_Q4_11_W48_24.md -> Nov 24)
+            const dateMatch = fileName.match(/_(\d{2})\.md$/);
+            const day = dateMatch ? dateMatch[1] : '??';
+            dailySummaries.push(`**Day ${day}:** ${summaryMatch[1].trim()}`);
+          }
+        }
+      }
+    }
+
+    if (dailySummaries.length === 0) {
+      return 'No daily summaries available for this week';
+    }
+
+    // Extract week metadata for context
+    const weekNumMatch = frontmatter.match(/week_number:\s*(.+)/);
+    const weekThemeMatch = frontmatter.match(/weekly_theme:\s*(.+)/);
+    const startDateMatch = frontmatter.match(/start_date:\s*(.+)/);
+    const endDateMatch = frontmatter.match(/end_date:\s*(.+)/);
+
+    const weekNum = weekNumMatch ? weekNumMatch[1].trim() : '??';
+    const weekTheme = weekThemeMatch ? weekThemeMatch[1].trim() : '';
+    const startDate = startDateMatch ? startDateMatch[1].trim() : '';
+    const endDate = endDateMatch ? endDateMatch[1].trim() : '';
+
+    // Create AI prompt
+    const prompt = `You are summarizing Week ${weekNum} (${startDate} to ${endDate}) for a weekly planning review${weekTheme ? `, which had the theme: "${weekTheme}"` : ''}.
+
+Review all the daily summaries below and write a 3-4 sentence narrative summary that captures:
+- The overall arc and narrative of the week
+- Major themes, patterns, or shifts that emerged across the days
+- Key accomplishments and how they built on each other
+- Any important lessons or insights from how the week unfolded
+
+Write in a direct, straightforward style. Avoid flowery language, superlatives, or overly dramatic phrasing like "masterclass", "crescendo", or "epic". Be honest and factual about what happened, not fawning or grandiose.
+
+DAILY SUMMARIES:
+${dailySummaries.join('\n\n')}
+
+Write ONLY the 3-4 sentence weekly summary, nothing else:`;
+
+    // Create a temp file with the prompt
+    const tempPromptFile = `/tmp/weekly-summary-prompt-${Date.now()}.txt`;
+    fs.writeFileSync(tempPromptFile, prompt);
+
+    // Use CLAUDE_MODEL env var, defaulting to Haiku for speed/cost
+    const response = execSync(
+      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001'; const response = await client.messages.create({ model: model, max_tokens: 500, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
+      { encoding: 'utf8', timeout: 30000 }
+    );
+
+    // Clean up temp file
+    fs.unlinkSync(tempPromptFile);
+
+    return response.trim();
+  } catch (error) {
+    printWarning(`Failed to generate AI weekly summary: ${error.message}`);
+    return '';
+  }
+}
+
+/**
  * Process routine sections in a single plan file
  */
 async function processRoutineSections(filePath, fileDate) {
   let content = fs.readFileSync(filePath, 'utf-8');
   let modified = false;
+
+  // Generate and add daily summary if not already present
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (frontmatterMatch) {
+    const frontmatter = frontmatterMatch[1];
+    // Check if daily_summary is empty or missing
+    if (!frontmatter.match(/daily_summary:\s*.+/) || frontmatter.match(/daily_summary:\s*$/m)) {
+      const summary = await generateDailySummary(fileDate, filePath);
+      if (summary) {
+        // Escape quotes in summary and wrap in quotes for YAML
+        const escapedSummary = summary.replace(/"/g, '\\"');
+        // Replace empty daily_summary with generated one
+        content = content.replace(
+          /daily_summary:\s*$/m,
+          `daily_summary: "${escapedSummary}"`
+        );
+        modified = true;
+        printInfo(`  Added daily summary for ${fileDate}`);
+      }
+    }
+  }
 
   // Process each routine section
   const sections = [
@@ -1075,6 +1315,75 @@ switch (command) {
         printError(`Old plan task cancellation failed: ${error.message}`);
         process.exit(1);
       });
+    break;
+
+  case '--generate-weekly-summary':
+    // Generate AI summary for a weekly review file
+    printHeader('📊 Generate Weekly Summary');
+    if (!args[1]) {
+      printError('Please provide a weekly review file path');
+      console.log('Usage: bin/sync --generate-weekly-summary vault/plans/YYYY_Q#_MM_W##.md');
+      process.exit(1);
+    }
+    (async () => {
+      try {
+        // Check if file needs the weekly_summary field
+        const weekFile = args[1];
+        let content = fs.readFileSync(weekFile, 'utf-8');
+        const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+
+        if (!frontmatterMatch) {
+          printError('Could not find frontmatter in weekly file');
+          process.exit(1);
+        }
+
+        const frontmatter = frontmatterMatch[1];
+
+        // Add weekly_summary field if missing
+        if (!frontmatter.includes('weekly_summary:')) {
+          content = content.replace(
+            /cssclasses: plan\n---/,
+            'weekly_summary:\ncssclasses: plan\n---'
+          );
+          fs.writeFileSync(weekFile, content);
+          printInfo('  Added weekly_summary field to frontmatter');
+          // Re-read to get updated content
+          content = fs.readFileSync(weekFile, 'utf-8');
+        }
+
+        // Check if summary already exists (re-check frontmatter after potential modification)
+        const updatedFrontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+        if (updatedFrontmatterMatch && updatedFrontmatterMatch[1].match(/weekly_summary:[ \t]+[^\n]+/)) {
+          printInfo('Weekly summary already exists - skipping');
+          process.exit(0);
+        }
+
+        // Generate the summary
+        const summary = await generateWeeklySummary(weekFile);
+        if (summary) {
+          // Re-read file in case we modified it
+          content = fs.readFileSync(weekFile, 'utf-8');
+          // Escape quotes in summary and wrap in quotes for YAML
+          const escapedSummary = summary.replace(/"/g, '\\"');
+          content = content.replace(
+            /weekly_summary:\s*$/m,
+            `weekly_summary: "${escapedSummary}"`
+          );
+          fs.writeFileSync(weekFile, content);
+          printStatus('Weekly summary generated successfully!');
+          console.log('');
+          console.log(chalk.gray('Summary:'));
+          console.log(summary);
+          console.log('');
+        } else {
+          printWarning('No summary generated');
+        }
+        process.exit(0);
+      } catch (error) {
+        printError(`Weekly summary generation failed: ${error.message}`);
+        process.exit(1);
+      }
+    })();
     break;
 
   case '--vault':
