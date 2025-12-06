@@ -2688,9 +2688,6 @@ function renderProperties(properties) {
   const other = {};
 
   for (const [key, value] of Object.entries(properties)) {
-    // Skip notion_ prefixed properties (too many, not that useful)
-    if (key.startsWith('notion_')) continue;
-
     if (importantKeys.includes(key)) {
       important[key] = value;
     } else if (metricKeys.includes(key)) {

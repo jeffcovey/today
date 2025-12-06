@@ -970,9 +970,260 @@ def _create_file_from_template(file_path, target_date, is_tomorrow=False):
     with open(file_path, 'w') as f:
         f.write(content)
 
+def _get_week_number(date):
+    """Get ISO week number for a date"""
+    # Use Python's built-in ISO week calculation
+    _, week_number, _ = date.isocalendar()
+    return week_number
+
+def _create_hierarchy_file_from_template(file_path, template_name, target_date):
+    """Create a review file from a template with date placeholders replaced
+
+    Args:
+        file_path: Path where the file should be created
+        template_name: Name of template file (e.g., 'weekly-review', 'monthly-review')
+        target_date: datetime object for the target period
+    """
+    template_file = f"vault/templates/{template_name}.md"
+    if not Path(template_file).exists():
+        print(f"⚠️  Template not found: {template_file}")
+        return False
+
+    # Ensure directory exists
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Read template
+    with open(template_file, 'r') as f:
+        content = f.read()
+
+    # Calculate date components
+    year = target_date.year
+    quarter = (target_date.month - 1) // 3 + 1
+    month = target_date.month
+    week = _get_week_number(target_date)
+
+    # Basic replacements for all templates
+    replacements = {
+        '{{YEAR}}': str(year),
+        '{{QUARTER}}': str(quarter),
+        '{{MONTH}}': target_date.strftime('%B'),
+        '{{MONTH_NUM}}': f"{month:02d}",
+        '{{WEEK_NUMBER}}': f"{week:02d}",
+        '{{CREATION_DATE}}': datetime.now().strftime('%B %d, %Y'),
+        '{{REVIEW_DATE}}': '',
+        # Stats placeholders - left blank for user to fill
+        '{{DAYS_COUNT}}': '',
+        '{{COMPLETED_TASKS}}': '',
+        '{{FRONT_DAYS}}': '',
+        '{{BACK_DAYS}}': '',
+        '{{OFF_DAYS}}': '',
+        '{{FRONT_PCT}}': '',
+        '{{BACK_PCT}}': '',
+        '{{OFF_PCT}}': '',
+        '{{TOP_TOPIC_1}}': '',
+        '{{TOP_TOPIC_2}}': '',
+        '{{TOP_TOPIC_3}}': '',
+        '{{TOP_1}}': '',
+        '{{TOP_2}}': '',
+        '{{TOP_3}}': '',
+        '{{COUNT_1}}': '',
+        '{{COUNT_2}}': '',
+        '{{COUNT_3}}': '',
+        '{{WEEKS_REVIEWED}}': '',
+        '{{TARGET_FRONT}}': '',
+        '{{TARGET_BACK}}': '',
+        '{{TARGET_OFF}}': '',
+        '{{PLANNED_FRONT}}': '',
+        '{{PLANNED_BACK}}': '',
+        '{{PLANNED_OFF}}': '',
+    }
+
+    # Template-specific replacements
+    if 'weekly' in template_name:
+        # Calculate week start (Monday) and end (Sunday)
+        days_to_monday = (target_date.weekday()) % 7
+        week_start = target_date - timedelta(days=days_to_monday)
+        week_end = week_start + timedelta(days=6)
+
+        replacements.update({
+            '{{START_DATE}}': week_start.strftime('%Y-%m-%d'),
+            '{{END_DATE}}': week_end.strftime('%Y-%m-%d'),
+            '{{START_DAY}}': str(week_start.day),
+            '{{END_DAY}}': str(week_end.day),
+            '{{WEEKLY_THEME}}': '',
+        })
+
+        # Add daily file links
+        day_names = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+        for i, day_prefix in enumerate(day_names):
+            day = week_start + timedelta(days=i)
+            day_file = f"{day.year}_Q{quarter}_{day.month:02d}_W{week:02d}_{day.day:02d}"
+            replacements.update({
+                f'{{{{{day_prefix}_FILE}}}}': day_file,
+                f'{{{{{day_prefix}_DATE}}}}': day.strftime('%b %d'),
+                f'{{{{{day_prefix}_THEME}}}}': '',
+            })
+
+    elif 'monthly' in template_name:
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        replacements.update({
+            '{{MONTH_START}}': f"{year}-{month:02d}-01",
+            '{{MONTH_END}}': f"{year}-{month:02d}-{last_day:02d}",
+            '{{MONTH_NAME}}': target_date.strftime('%B'),
+            '{{MONTHLY_THEME}}': '',
+            '{{TOTAL_DAYS}}': str(last_day),
+            '{{NEXT_MONTH}}': (target_date.replace(day=1) + timedelta(days=32)).strftime('%B'),
+        })
+
+        # Calculate weeks in month
+        first_day = target_date.replace(day=1)
+        weeks_in_month = []
+        current = first_day
+        while current.month == month:
+            week_num = _get_week_number(current)
+            if week_num not in [w[0] for w in weeks_in_month]:
+                # Get Monday of this week
+                days_to_monday = (current.weekday()) % 7
+                week_monday = current - timedelta(days=days_to_monday)
+                week_sunday = week_monday + timedelta(days=6)
+                weeks_in_month.append((week_num, week_monday, week_sunday))
+            current += timedelta(days=7)
+
+        replacements['{{TOTAL_WEEKS}}'] = str(len(weeks_in_month))
+
+        # Add week file links
+        for i, (week_num, monday, sunday) in enumerate(weeks_in_month, 1):
+            week_file = f"{year}_Q{quarter}_{month:02d}_W{week_num:02d}_00"
+            week_dates = f"{monday.strftime('%b %d')} - {sunday.strftime('%b %d')}"
+            replacements.update({
+                f'{{{{W{i}_FILE}}}}': week_file,
+                f'{{{{W{i}_NUM}}}}': str(week_num),
+                f'{{{{W{i}_DATES}}}}': week_dates,
+                f'{{{{W{i}_THEME}}}}': '',
+            })
+
+        # Fill remaining weeks with empty strings (up to W5)
+        for i in range(len(weeks_in_month) + 1, 6):
+            replacements.update({
+                f'{{{{W{i}_FILE}}}}': '',
+                f'{{{{W{i}_NUM}}}}': '',
+                f'{{{{W{i}_DATES}}}}': '',
+                f'{{{{W{i}_THEME}}}}': '',
+            })
+
+    elif 'quarterly' in template_name:
+        quarter_months = {
+            1: ('January', 'February', 'March', 1, 3),
+            2: ('April', 'May', 'June', 4, 6),
+            3: ('July', 'August', 'September', 7, 9),
+            4: ('October', 'November', 'December', 10, 12),
+        }
+        month1, month2, month3, start_m, end_m = quarter_months[quarter]
+        import calendar
+        _, last_day = calendar.monthrange(year, end_m)
+
+        replacements.update({
+            '{{MONTH1}}': month1,
+            '{{MONTH2}}': month2,
+            '{{MONTH3}}': month3,
+            '{{QUARTER_START}}': f"{year}-{start_m:02d}-01",
+            '{{QUARTER_END}}': f"{year}-{end_m:02d}-{last_day:02d}",
+        })
+
+    elif 'annual' in template_name:
+        replacements.update({
+            '{{NEXT_YEAR}}': str(year + 1),
+        })
+
+    # Apply replacements - now handles YAML frontmatter
+    for key, value in replacements.items():
+        content = content.replace(key, str(value))
+
+    # Write the file
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    return True
+
 def create_review_from_template():
-    """Create daily review files for today AND tomorrow from template"""
+    """Create daily review files for today AND tomorrow, plus ensure hierarchy exists for all periods"""
     files_created = []
+    today = datetime.now()
+    plans_dir = Path("vault/plans")
+
+    # Find all daily plan files to determine which weeks/months/quarters/years need reviews
+    daily_files = list(plans_dir.glob("*_*_*_W*_[0-9][0-9].md"))
+
+    # Extract unique periods from daily files
+    periods = {
+        'years': set(),
+        'quarters': set(),
+        'months': set(),
+        'weeks': set()
+    }
+
+    for daily_file in daily_files:
+        basename = daily_file.stem
+        match = re.match(r'(\d{4})_Q(\d)_(\d{2})_W(\d{2})_(\d{2})', basename)
+        if match:
+            year, quarter, month, week, day = match.groups()
+            periods['years'].add(year)
+            periods['quarters'].add(f"{year}_Q{quarter}")
+            periods['months'].add(f"{year}_Q{quarter}_{month}")
+            periods['weeks'].add(f"{year}_Q{quarter}_{month}_W{week}")
+
+    # Create annual reviews for all years
+    for year in sorted(periods['years']):
+        annual_file = plans_dir / f"{year}_00.md"
+        if not annual_file.exists():
+            print(f"📅 Creating annual review for {year}...")
+            target_date = datetime(int(year), 1, 1)
+            if _create_hierarchy_file_from_template(str(annual_file), 'annual-review', target_date):
+                files_created.append(('annual', str(annual_file)))
+
+    # Create quarterly reviews
+    for quarter_id in sorted(periods['quarters']):
+        quarterly_file = plans_dir / f"{quarter_id}_00.md"
+        if not quarterly_file.exists():
+            year, q = quarter_id.split('_Q')
+            quarter_num = int(q)
+            print(f"📅 Creating quarterly review for Q{quarter_num} {year}...")
+            # Use first month of quarter as target date
+            month = (quarter_num - 1) * 3 + 1
+            target_date = datetime(int(year), month, 1)
+            if _create_hierarchy_file_from_template(str(quarterly_file), 'quarterly-review', target_date):
+                files_created.append(('quarterly', str(quarterly_file)))
+
+    # Create monthly reviews
+    for month_id in sorted(periods['months']):
+        monthly_file = plans_dir / f"{month_id}_00.md"
+        if not monthly_file.exists():
+            match = re.match(r'(\d{4})_Q\d_(\d{2})', month_id)
+            if match:
+                year, month = match.groups()
+                target_date = datetime(int(year), int(month), 1)
+                print(f"📅 Creating monthly review for {target_date.strftime('%B %Y')}...")
+                if _create_hierarchy_file_from_template(str(monthly_file), 'monthly-review', target_date):
+                    files_created.append(('monthly', str(monthly_file)))
+
+    # Create weekly reviews
+    for week_id in sorted(periods['weeks']):
+        weekly_file = plans_dir / f"{week_id}_00.md"
+        if not weekly_file.exists():
+            match = re.match(r'(\d{4})_Q\d_(\d{2})_W(\d{2})', week_id)
+            if match:
+                year, month, week = match.groups()
+                # Find a daily file in this week to get the correct date
+                sample_daily = next(plans_dir.glob(f"{week_id}_*.md"), None)
+                if sample_daily:
+                    day_match = re.match(r'.*_(\d{2})\.md', sample_daily.name)
+                    if day_match:
+                        day = day_match.group(1)
+                        target_date = datetime(int(year), int(month), int(day))
+                        print(f"📅 Creating weekly review for Week {week}...")
+                        if _create_hierarchy_file_from_template(str(weekly_file), 'weekly-review', target_date):
+                            files_created.append(('weekly', str(weekly_file)))
 
     # Create for today
     today_file = get_review_file_path()
@@ -990,7 +1241,7 @@ def create_review_from_template():
         files_created.append(('tomorrow', tomorrow_file))
 
     if files_created:
-        print(f"✅ Created daily plans:")
+        print(f"✅ Created review files:")
         for label, path in files_created:
             print(f"   {label.capitalize()}: {path}")
         print()
@@ -1164,6 +1415,13 @@ def main():
     if not args.non_interactive:
         check_dependencies()
 
+    # Handle init command - create hierarchy files only
+    if args.command == 'init':
+        print("📅 Initializing review file hierarchy...")
+        create_review_from_template()
+        print("✅ Review hierarchy is ready!")
+        return
+
     # Handle update command
     if args.command == 'update':
         print("📊 Running automated review update...")
@@ -1182,7 +1440,8 @@ def main():
 
     # Join any remaining arguments as the direct request
     direct_request = None
-    if args.command and args.command != 'update':
+    known_commands = ['init', 'update', 'dry-run']
+    if args.command and args.command not in known_commands:
         # The first positional arg is actually a request, not a command
         parts = [args.command] + args.request
         direct_request = ' '.join(parts)

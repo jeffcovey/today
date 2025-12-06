@@ -45,7 +45,6 @@ const CATEGORIZATION_RULES = {
       '@conduent.com', // FundVantage Trust (financial)
       'no-reply@asana.com', // Asana project management
       'google-maps-platform-noreply@google.com', // Google Maps API
-      'notify@mail.notion.so', // Notion notifications
       '@md.getsentry.com', // Sentry error monitoring
       '@rxorder.walgreens.com', // Walgreens pharmacy
       'noreply@email.apple.com', // Apple security notifications
