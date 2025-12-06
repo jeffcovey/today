@@ -51,7 +51,8 @@
       "WebFetch(domain:unsplash.com)",
       "WebFetch(domain:investor.vanguard.com)",
       "WebFetch(domain:help.obsidian.md)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh issue comment:*)"
     ],
     "deny": [],
     "ask": []
