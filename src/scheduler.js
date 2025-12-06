@@ -65,11 +65,6 @@ const jobs = [
         description: 'Update today and tomorrow daily plans with Claude API'
     },
     {
-        schedule: '0 3 * * *', // Daily at 3 AM EST
-        command: 'bin/notion daily --all || true', // Run all Notion daily automation tasks
-        description: 'Notion daily automation (temporary until migration)'
-    },
-    {
         schedule: '0 2 * * *', // Daily at 2 AM EST
         command: 'bin/vault-snapshot || true', // Backup vault daily
         description: 'Daily vault snapshot backup'

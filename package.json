@@ -2,14 +2,10 @@
   "name": "today",
   "version": "1.0.0",
   "description": "A personal command center for reviewing inputs, managing plans and dreams, and deciding what to do each day",
-  "main": "src/index.js",
   "bin": {
-    "notion": "./bin/notion",
     "email": "./bin/email"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' npx jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
@@ -23,7 +19,6 @@
     "@anthropic-ai/sdk": "^0.60.0",
     "@dotenvx/dotenvx": "^1.49.0",
     "@libsql/client": "^0.15.15",
-    "@notionhq/client": "^4.0.2",
     "better-sqlite3": "^12.2.0",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
