@@ -554,34 +554,9 @@ function processSection(content, sectionRegex, sectionName, calloutType) {
 }
 
 // ============================================================================
-// Database Sync
+// Database - Local Only
 // ============================================================================
-
-async function syncTursoBidirectional() {
-  printInfo('Performing bidirectional sync with Turso...');
-
-  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
-    printInfo('Turso not configured (need TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)');
-    return false;
-  }
-
-  try {
-    execSync('bin/turso-sync sync', {
-      stdio: 'pipe',
-      timeout: 45000,
-      encoding: 'utf8'
-    });
-    printInfo('Turso synced successfully');
-    return true;
-  } catch (error) {
-    if (error.signal === 'SIGTERM') {
-      printInfo('Turso sync timed out - continuing with local data');
-      return true; // Don't fail
-    }
-    printError(`Turso sync failed: ${error.message}`);
-    return false;
-  }
-}
+// Database is now local-only SQLite with no cloud sync
 
 async function cleanDatabaseTaskTitles() {
   printInfo('Database cleanup skipped (using Obsidian Tasks)');
@@ -1233,7 +1208,6 @@ async function main() {
   printInfo('Running all sync operations synchronously...');
 
   // Critical path operations
-  await runSyncStep('☁️  Turso Sync', syncTursoBidirectional, 'Turso synced');
   await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
   await runSyncStep('🗑️  Cleanup Conflicts', cleanupSyncConflicts, 'Sync conflicts cleaned');
   await runSyncStep('🧹 Clean Markdown', cleanMarkdownFiles, 'Markdown cleaned');
@@ -1402,7 +1376,7 @@ switch (command) {
 
   case '--quick':
     // Quick sync - only critical sources
-    printInfo('Quick sync mode - vault, inbox, and Turso');
+    printInfo('Quick sync mode - vault and inbox');
     (async () => {
       checkVaultExists();
       await cleanupSyncConflicts();
@@ -1410,7 +1384,6 @@ switch (command) {
       await cleanDatabaseTaskTitles();
       await cleanPlanFileTasks();
       await processInbox();
-      await syncTursoBidirectional();
       printStatus('Quick sync completed!');
       process.exit(0);
     })();
