@@ -1,0 +1,51 @@
+# Configuration for Today system
+# Edit this file when your situation changes (e.g., when traveling)
+# This file contains non-secret user preferences (safe to commit)
+
+# ============================================================
+# User Information
+# ============================================================
+
+# Your name - used for filtering tasks assigned to you in Notion
+# This should match how your name appears in Notion's "Assigned To" field
+user_name = "Your Name"
+
+# Your email address - for git commits and notifications
+user_email = "your.email@example.com"
+
+# ============================================================
+# Git Configuration
+# ============================================================
+
+# Git author name for vault commits
+# Leave empty to use user_name above
+git_name = ""
+
+# Git author email for vault commits
+# Leave empty to use user_email above
+git_email = ""
+
+# ============================================================
+# Timezone Settings
+# ============================================================
+
+# Your current timezone
+# You can use:
+#   - City names: "Madrid", "London", "Tokyo", "New York"
+#   - Country names: "Spain", "Germany", "Japan"
+#   - Full timezone IDs: "America/New_York", "Europe/Madrid"
+#   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
+#
+# The system will automatically resolve these to proper timezone IDs.
+timezone = "America/New_York"
+
+# ============================================================
+# Preferences
+# ============================================================
+
+# Number of days to show in weekly review
+review_days = 7
+
+# Default AI model for summaries
+# Options: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229", etc.
+ai_model = "claude-3-5-sonnet-20241022"
