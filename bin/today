@@ -389,33 +389,8 @@ def check_and_recover_database():
             if result.returncode != 0:
                 print(f"❌ Failed to create database: {result.stderr}")
                 sys.exit(1)
-            print("✅ Database created with schema\n")
-
-        # Pull data from Turso
-        print("📥 Pulling data from Turso...")
-        result = subprocess.run(['bin/turso-sync', 'pull'],
-                              capture_output=True, text=True)
-        if result.returncode == 0:
-            print("✅ Database recovered successfully\n")
-
-            # Verify recovery
-            if Path(db_path).exists():
-                try:
-                    conn = sqlite3.connect(db_path)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')")
-                    tables_exist = cursor.fetchone()[0]
-                    conn.close()
-                    if tables_exist != 2:
-                        print("❌ Database recovery incomplete - tables still missing")
-                        sys.exit(1)
-                except Exception as e:
-                    print(f"❌ Database verification failed: {e}")
-                    sys.exit(1)
-        else:
-            print("❌ Failed to sync data from Turso")
-            print("Please ensure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are set in .env")
-            sys.exit(1)
+            print("✅ Database created with schema")
+            print("ℹ️  Database is a local cache - data will be populated from external sources\n")
 
     # Quick check that database has data
     try:
@@ -440,7 +415,7 @@ def check_and_recover_database():
                 print("📝 Initializing sync log...")
                 cursor.execute("""INSERT INTO sync_log
                     (timestamp, sync_type, success, source_system, target_system, created_at)
-                    VALUES (datetime('now'), 'initial', 1, 'local', 'turso', datetime('now'))""")
+                    VALUES (datetime('now'), 'initial', 1, 'local', 'local', datetime('now'))""")
                 conn.commit()
                 print("✅ Database ready (initialized)\n")
 

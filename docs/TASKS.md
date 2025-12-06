@@ -94,9 +94,3 @@ The task sync is automatically run when you execute `bin/sync`. It will:
 - `vault/logs/Streaks.md` - Uncompleted tasks from Streaks app
 - `vault/projects/*.md` - Project-specific tasks
 
-## Notion Integration
-
-While the task system is separate from Notion, you can still:
-- Import tasks from Notion's Action Items database
-- Export tasks to Notion if needed
-- Keep both systems in parallel during migration
