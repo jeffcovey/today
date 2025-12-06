@@ -28,7 +28,7 @@ cat ~/.config/devcontainer/access-info.txt
 
 ### 3. Access from iPad
 
-Open Safari and navigate to the URL shown (e.g., `http://100.65.74.31:8081`)
+Open Safari and navigate to the URL shown (e.g., `http://100.x.x.x:8081`)
 
 ## Configuration Details
 

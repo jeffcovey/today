@@ -92,7 +92,7 @@ cat ~/.config/code-server/config.yaml
 ps aux | grep code-server
 
 # Access from iPad Safari at:
-# http://100.65.74.31:8081 (your Tailscale IP)
+# http://100.x.x.x:8081 (your Tailscale IP)
 # Enter the password when prompted
 ```
 

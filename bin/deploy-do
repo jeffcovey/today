@@ -298,10 +298,10 @@ SCRIPT
         self.check_config()
 
         print_info("Copying nginx config to droplet...")
-        self.scp_to_remote('config/nginx-vault-web-fixed.conf', '/tmp/')
+        self.scp_to_remote('config/nginx-vault-web.conf', '/tmp/')
 
         print_info("Installing nginx config...")
-        self.ssh_cmd(f'sudo cp /tmp/nginx-vault-web-fixed.conf /etc/nginx/sites-available/{self.deploy_domain}')
+        self.ssh_cmd(f'sudo cp /tmp/nginx-vault-web.conf /etc/nginx/sites-available/{self.deploy_domain}')
 
         print_info("Testing nginx configuration...")
         self.ssh_cmd('sudo nginx -t')
