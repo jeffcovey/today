@@ -113,17 +113,9 @@ case "$ACTION" in
         print_info "Installing dependencies..."
         ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && npm install --production"
         
-        # Only initialize database if it doesn't exist
-        if ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "[ ! -f ${DEPLOY_PATH}/.data/today.db ]"; then
-            print_info "First deployment - initializing database..."
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js"
-            
-            print_info "Pulling all data from Turso (this may take a while)..."
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && rm -f .data/turso-sync.json && npx dotenvx run -- bin/turso-sync pull --full" || print_warning "Full pull may have been interrupted"
-        else
-            print_info "Database exists, running migrations..."
-            ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
-        fi
+        # Initialize/migrate database
+        print_info "Running database migrations..."
+        ssh -i "$SSH_KEY" ${DROPLET_USER}@${DROPLET_IP} "cd ${DEPLOY_PATH} && timeout 30 npx dotenvx run -- node src/migrations.js" || print_warning "Migrations may have already run"
         
         
         # Ensure Resilio Sync is installed and running

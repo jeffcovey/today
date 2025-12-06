@@ -17,6 +17,10 @@ import yaml from 'js-yaml';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Debug logging - set DEBUG=true in environment to enable verbose logging
+const DEBUG = process.env.DEBUG === 'true';
+const debug = (...args) => DEBUG && console.log('[DEBUG]', ...args);
+
 // Web server only needs read-only access, disable Turso sync for faster startup
 const getReadOnlyDatabase = () => getDatabase('.data/today.db', { autoSync: false });
 
@@ -32,7 +36,7 @@ const MARKDOWN_UPDATE_DELAY = 3000; // 3 seconds
 // Function to regenerate markdown file sections
 async function regenerateMarkdownSections(filePath) {
   try {
-    console.log(`Regenerating markdown sections for: ${filePath}`);
+    debug(`Regenerating markdown sections for: ${filePath}`);
     const { execSync } = await import('child_process');
     
     // Run the tasks sync command to regenerate the markdown
@@ -42,9 +46,9 @@ async function regenerateMarkdownSections(filePath) {
       stdio: 'pipe'
     });
     
-    console.log(`Markdown sections regenerated for: ${filePath}`);
+    debug(`Markdown sections regenerated for: ${filePath}`);
   } catch (error) {
-    console.error(`Failed to regenerate markdown for ${filePath}:`, error.message);
+    debug(`Failed to regenerate markdown for ${filePath}:`, error.message);
   }
 }
 
@@ -62,7 +66,7 @@ function scheduleMarkdownUpdate(filePath) {
   }, MARKDOWN_UPDATE_DELAY);
   
   pendingMarkdownUpdates.set(filePath, timeoutId);
-  console.log(`Scheduled markdown update for ${filePath} in ${MARKDOWN_UPDATE_DELAY}ms`);
+  debug(`Scheduled markdown update for ${filePath} in ${MARKDOWN_UPDATE_DELAY}ms`);
 }
 
 // Cache for rendered Markdown
@@ -2484,12 +2488,12 @@ async function getCachedRender(filePath, urlPath) {
         cachedStats.mtime === mtime && 
         cachedStats.size === size) {
       cached.hits = (cached.hits || 0) + 1;
-      console.log(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
+      debug(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
       return cached.html;
     }
-    
+
     // Render and cache the result
-    console.log(`[CACHE MISS] ${urlPath} - rendering...`);
+    debug(`[CACHE MISS] ${urlPath} - rendering...`);
     const rendered = await renderMarkdownUncached(filePath, urlPath);
     
     // Store in cache
@@ -2983,8 +2987,8 @@ async function executeDataviewJS(code, vaultPath, currentFilePath) {
     const context = {
       dv,
       console: {
-        log: (...args) => console.log('[DataviewJS]', ...args),
-        error: (...args) => console.error('[DataviewJS]', ...args)
+        log: (...args) => debug('[DataviewJS]', ...args),
+        error: (...args) => debug('[DataviewJS Error]', ...args)
       }
     };
 
@@ -3015,7 +3019,7 @@ async function executeDataviewJS(code, vaultPath, currentFilePath) {
 
     return output;
   } catch (error) {
-    console.error('DataviewJS execution error:', error);
+    debug('DataviewJS execution error:', error);
     return `<div class="alert alert-danger"><strong>DataviewJS Error:</strong> ${error.message}</div>`;
   }
 }
@@ -3046,13 +3050,13 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
       .join('\n');
 
     try {
-      console.log(`[DEBUG] Executing dataviewjs block`);
+      debug(`Executing dataviewjs block`);
       const html = await executeDataviewJS(code, vaultPath, currentFilePath);
 
       // Replace the code block with the rendered HTML
       processedContent = processedContent.replace(fullMatch, html);
     } catch (error) {
-      console.error('[DEBUG] Error executing dataviewjs block:', error);
+      debug('Error executing dataviewjs block:', error);
       const errorHtml = `<div class="alert alert-danger" role="alert">
         <strong>Dataview Error:</strong> ${error.message}
       </div>`;
@@ -3106,7 +3110,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
                   content.substring(matches[i].index + fullMatch.length);
       }
     } catch (error) {
-      console.error('[DEBUG] Error processing inline dataview:', error);
+      debug('Error processing inline dataview:', error);
       // Keep the original expression on error
     }
   }
@@ -3151,7 +3155,7 @@ async function executeTasksQuery(query) {
   const cacheKey = JSON.stringify({ filters, sortBy, sortReverse, groupBy });
   const cached = taskQueryCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < TASK_QUERY_CACHE_TTL)) {
-    console.log(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
+    debug(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
     return cached.result;
   }
 
@@ -3195,9 +3199,9 @@ async function executeTasksQuery(query) {
       WHERE ${sqlWhere.join(' AND ')}
     `;
     taskRows = db.prepare(sql).all();
-    console.log(`[DEBUG] SQL filtered: ${taskRows.length} tasks (from ~6600 total)`);
+    debug(`SQL filtered: ${taskRows.length} tasks (from ~6600 total)`);
   } catch (error) {
-    console.error('[DEBUG] Error querying database:', error.message);
+    debug('Error querying database:', error.message);
     taskRows = [];
   }
 
@@ -3281,7 +3285,7 @@ async function executeTasksQuery(query) {
         const matches = taskDateStr === todayStr;
         return t.isDone && matches;
       });
-      console.log(`[DEBUG] "done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${todayStr})`);
+      debug(`"done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${todayStr})`);
     } else if (filter.startsWith('path includes ')) {
       const pathPattern = filter.replace('path includes ', '').trim();
       filtered = filtered.filter(t => t.filePath.includes(pathPattern));
@@ -3391,7 +3395,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 
     // Skip blockquote tasks if requested
     if (skipBlockquotes && isInBlockquote) {
-      console.log(`[DEBUG] Skipping tasks block in blockquote`);
+      debug(`Skipping tasks block in blockquote`);
       continue;
     }
 
@@ -3401,11 +3405,11 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
     });
   }
 
-  console.log(`[DEBUG] Found ${matches.length} tasks code blocks to process`);
+  debug(`Found ${matches.length} tasks code blocks to process`);
 
   // Process each match
   for (const { fullMatch, query } of matches) {
-    console.log(`[DEBUG] Processing query:`, query);
+    debug(`Processing query:`, query);
     const result = await executeTasksQuery(query);
 
     let replacement = '<div class="tasks-query-result">\n';
@@ -3546,7 +3550,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 
 // Uncached Markdown rendering (original implementation)
 async function renderMarkdownUncached(filePath, urlPath) {
-  console.log('[DEBUG] renderMarkdown called for:', urlPath);
+  debug('renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
 
   // Get current timer info
@@ -3688,7 +3692,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
     // Process each match
     for (const { fullMatch, type, modifier, title, query, additionalContent } of matches) {
-      console.log(`[DEBUG] Processing Obsidian callout with tasks query`);
+      debug(`Processing Obsidian callout with tasks query`);
 
       // Execute the tasks query
       const queryResult = await executeTasksQuery(query);
@@ -4921,8 +4925,8 @@ ${cleanContent}
     </body>
     </html>
   `;
-  
-  console.log('[DEBUG] HTML includes chatMessages:', html.includes('chatMessages'));
+
+  debug('HTML includes chatMessages:', html.includes('chatMessages'));
   return html;
 }
 
@@ -5039,11 +5043,11 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
     
     try {
       // Debug logging
-      console.log('[AI Chat] Starting Claude execution...');
-      console.log('[AI Chat] Working directory:', process.cwd());
-      console.log('[AI Chat] Conversation length:', conversation.length);
-      console.log('[AI Chat] First 200 chars of conversation:', conversation.substring(0, 200));
-      
+      debug('[AI Chat] Starting Claude execution...');
+      debug('[AI Chat] Working directory:', process.cwd());
+      debug('[AI Chat] Conversation length:', conversation.length);
+      debug('[AI Chat] First 200 chars of conversation:', conversation.substring(0, 200));
+
       // Use spawn to properly pipe input to claude --print
       const claude = spawn('claude', ['--print'], {
         cwd: process.cwd(),
@@ -5068,13 +5072,13 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
       // Wait for the process to complete
       await new Promise((resolve, reject) => {
         claude.on('close', (code) => {
-          console.log('[AI Chat] Claude process exited with code:', code);
-          console.log('[AI Chat] stdout length:', stdout.length);
-          console.log('[AI Chat] stderr:', stderr || '(none)');
-          
+          debug('[AI Chat] Claude process exited with code:', code);
+          debug('[AI Chat] stdout length:', stdout.length);
+          debug('[AI Chat] stderr:', stderr || '(none)');
+
           if (code !== 0) {
-            console.error('[AI Chat] Claude failed with code:', code);
-            console.error('[AI Chat] stderr:', stderr);
+            debug('[AI Chat] Claude failed with code:', code);
+            debug('[AI Chat] stderr:', stderr);
             // Don't reject for timeout (code null) or non-zero codes, handle gracefully
             if (code === null) {
               reject(new Error('Request timed out after 5 minutes'));
@@ -5087,7 +5091,7 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
         });
         
         claude.on('error', (err) => {
-          console.error('[AI Chat] Failed to start Claude:', err);
+          debug('[AI Chat] Failed to start Claude:', err);
           reject(err);
         });
       });
@@ -5108,7 +5112,7 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
         fileModified: fileModified
       });
     } catch (error) {
-      console.error('[AI Chat] Error calling Claude:', error);
+      debug('[AI Chat] Error calling Claude:', error);
       
       let errorResponse = "I'm having trouble processing your request.";
       if (error.message && error.message.includes('timed out')) {
@@ -5193,8 +5197,8 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
     // Call Claude using the claude CLI with streaming
     const { spawn } = await import('child_process');
     
-    console.log('[AI Stream] Starting Claude with streaming...');
-    
+    debug('[AI Stream] Starting Claude with streaming...');
+
     // Use spawn with --print for regular output (stream-json might not be supported)
     const claude = spawn('claude', ['--print'], {
       cwd: process.cwd(),
@@ -5219,7 +5223,7 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
     });
     
     claude.stderr.on('data', (data) => {
-      console.error('[AI Stream] stderr:', data.toString());
+      debug('[AI Stream] stderr:', data.toString());
     });
     
     // Write the conversation to stdin
@@ -5227,7 +5231,7 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
     claude.stdin.end();
     
     claude.on('close', async (code) => {
-      console.log('[AI Stream] Claude process exited with code:', code);
+      debug('[AI Stream] Claude process exited with code:', code);
       
       if (code === 0) {
         // Check if file was modified
@@ -5317,9 +5321,9 @@ app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
     
     try {
       // Debug logging
-      console.log('[AI Directory Chat] Starting Claude execution...');
-      console.log('[AI Directory Chat] Directory path:', urlPath || '/');
-      
+      debug('[AI Directory Chat] Starting Claude execution...');
+      debug('[AI Directory Chat] Directory path:', urlPath || '/');
+
       // Use spawn to properly pipe input to claude --print
       const claude = spawn('claude', ['--print'], {
         cwd: process.cwd(),
@@ -5344,11 +5348,11 @@ app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
       // Wait for the process to complete
       await new Promise((resolve, reject) => {
         claude.on('close', (code) => {
-          console.log('[AI Directory Chat] Claude process exited with code:', code);
-          
+          debug('[AI Directory Chat] Claude process exited with code:', code);
+
           if (code !== 0) {
-            console.error('[AI Directory Chat] Claude failed with code:', code);
-            console.error('[AI Directory Chat] stderr:', stderr);
+            debug('[AI Directory Chat] Claude failed with code:', code);
+            debug('[AI Directory Chat] stderr:', stderr);
             if (code === null) {
               reject(new Error('Request timed out after 5 minutes'));
             } else {
@@ -5360,7 +5364,7 @@ app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
         });
         
         claude.on('error', (err) => {
-          console.error('[AI Directory Chat] Failed to start Claude:', err);
+          debug('[AI Directory Chat] Failed to start Claude:', err);
           reject(err);
         });
       });
@@ -5780,11 +5784,11 @@ function calculateNextRecurrence(pattern, fromDate) {
 app.post('/task/toggle', authMiddleware, async (req, res) => {
   try {
     const { filePath: file, lineNumber: line, completed } = req.body;
-    console.log(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
+    debug(`[TASK] Toggling task - file: ${file}, line: ${line}, completed: ${completed}`);
 
     // Validate required fields
     if (!file || !line) {
-      console.error('[TASK] Missing required fields:', { file, line });
+      debug('[TASK] Missing required fields:', { file, line });
       return res.status(400).json({ error: 'Missing file path or line number' });
     }
 
@@ -5801,14 +5805,14 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     const taskLine = lines[line - 1];
 
     if (!taskLine) {
-      console.error(`[TASK] Line ${line} not found in file with ${lines.length} lines`);
+      debug(`[TASK] Line ${line} not found in file with ${lines.length} lines`);
       return res.status(400).json({ error: 'Task line not found' });
     }
 
     // Validate that this is actually a task line
     // Updated regex to match tasks in blockquotes too
     if (!taskLine.match(/^(?:\s*>)*\s*- \[[ xX]\]/)) {
-      console.error(`[TASK] Line ${line} is not a task: "${taskLine}"`);
+      debug(`[TASK] Line ${line} is not a task: "${taskLine}"`);
       return res.status(400).json({ error: 'Not a task line' });
     }
 
@@ -5828,13 +5832,13 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       const normalizedFile = normalizeTask(taskLine);
 
       if (normalizedCache !== normalizedFile) {
-        console.log(`[TASK] Cache mismatch at line ${line}, using file version`);
-        console.log(`  Cache: "${cachedTask.line_text}"`);
-        console.log(`  File:  "${taskLine}"`);
+        debug(`[TASK] Cache mismatch at line ${line}, using file version`);
+        debug(`  Cache: "${cachedTask.line_text}"`);
+        debug(`  File:  "${taskLine}"`);
         // Don't fail - just proceed with the file version
       }
     } else {
-      console.log(`[TASK] Task not in cache, proceeding with file version: "${taskLine}"`);
+      debug(`[TASK] Task not in cache, proceeding with file version: "${taskLine}"`);
     }
 
     // Check if this is a recurring task (has 🔁 pattern)
@@ -5855,7 +5859,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       // If this is a recurring task, create the new occurrence
       if (isRecurring) {
         const recurrencePattern = recurringMatch[1].trim();
-        console.log(`[TASK] Processing recurring task with pattern: ${recurrencePattern}`);
+        debug(`[TASK] Processing recurring task with pattern: ${recurrencePattern}`);
 
         // Parse the recurrence pattern and calculate next date
         const nextDate = calculateNextRecurrence(recurrencePattern, today);
@@ -5889,7 +5893,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
             newTaskLine = newTaskLine + ` ➕ ${today}`;
           }
 
-          console.log(`[TASK] Created new recurring task: ${newTaskLine}`);
+          debug(`[TASK] Created new recurring task: ${newTaskLine}`);
         }
       }
     } else {
@@ -5919,7 +5923,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
           WHERE file_path = ? AND line_number = ?
         `);
         updateStmt.run(updatedLine, dbFilePath, line);
-        console.log(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
+        debug(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
       } else {
         // Insert new cache entry if task wasn't cached
         const insertStmt = db.prepare(`
@@ -5927,7 +5931,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
           VALUES (?, ?, ?)
         `);
         insertStmt.run(dbFilePath, line, updatedLine);
-        console.log(`[TASK] Added to database cache: ${dbFilePath}:${line}`);
+        debug(`[TASK] Added to database cache: ${dbFilePath}:${line}`);
       }
 
       // If we added a new recurring task, also add it to the cache
@@ -5937,7 +5941,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
           VALUES (?, ?, ?)
         `);
         insertStmt.run(dbFilePath, line + 1, newTaskLine);
-        console.log(`[TASK] Added new recurring task to cache: ${dbFilePath}:${line + 1}`);
+        debug(`[TASK] Added new recurring task to cache: ${dbFilePath}:${line + 1}`);
 
         // We should also update line numbers for all tasks after this insertion
         const updateStmt = db.prepare(`
@@ -5946,14 +5950,14 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
           WHERE file_path = ? AND line_number > ?
         `);
         updateStmt.run(dbFilePath, line);
-        console.log(`[TASK] Updated line numbers for subsequent tasks in cache`);
+        debug(`[TASK] Updated line numbers for subsequent tasks in cache`);
       }
     } catch (dbError) {
-      console.error('[TASK] Failed to update database cache:', dbError);
+      debug('[TASK] Failed to update database cache:', dbError);
       // Don't fail the request since the file was updated successfully
     }
 
-    console.log(`[TASK] Successfully updated task at line ${line}`);
+    debug(`[TASK] Successfully updated task at line ${line}`);
     res.json({ success: true, updatedLine });
   } catch (error) {
     console.error('Error updating task:', error);
