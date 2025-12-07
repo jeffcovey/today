@@ -1,6 +1,12 @@
 import { ImapFlow } from 'imapflow';
 import chalk from 'chalk';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { SQLiteCache } from './sqlite-cache.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const FOLDERS = {
   FRONT_STAGE: '_Front Stage',
@@ -8,80 +14,59 @@ const FOLDERS = {
   OFF_STAGE: '_Off Stage'
 };
 
-// Categorization rules
-const CATEGORIZATION_RULES = {
-  [FOLDERS.FRONT_STAGE]: {
-    // Front Stage: Meetings, calls, support, emails, communications
-    patterns: [
-      'help@oldergay.men', // Customer support
-      'no-reply@supportmessaging.airbnb.com', // Airbnb communications
-      'express@airbnb.com',
-      '@mail.beehiiv.com', // Newsletters
-      '@patreon.com', // Patreon communications
-      'bingo@patreon.com',
-      '@email.patreon.com', // Patreon notifications
-      '@oldergay.discoursemail.com', // OGM discussion notifications
-      '@facebookmail.com', // Facebook group notifications
-      'automated@airbnb.com' // Airbnb messages
-    ],
-    keywords: ['meeting', 'call', 'support', 'reply', 'message from', 'new reply']
-  },
-  [FOLDERS.BACK_STAGE]: {
-    // Back Stage: Maintenance, bills, bug fixes, organizing
-    patterns: [
-      'no.reply.alerts@chase.com', // Bank alerts
-      '@healthchecks.io', // System health monitoring
-      'noreply@notify.cloudflare.com', // Infrastructure alerts
-      'alerts@mail.zapier.com', // Automation alerts
-      '@sentry.io', // Error monitoring
-      '@github.com', // GitHub notifications
-      'notifications@github.com',
-      'dependabot',
-      'github-actions',
-      '@noreply.fpl.com', // FPL electric bill
-      '@memberdoc.com', // Florida Blue insurance
-      '@mbr.floridablue.com', // Florida Blue
-      '@servicetitan.com', // Service providers (plumber, etc)
-      '@conduent.com', // FundVantage Trust (financial)
-      'no-reply@asana.com', // Asana project management
-      'google-maps-platform-noreply@google.com', // Google Maps API
-      '@md.getsentry.com', // Sentry error monitoring
-      '@rxorder.walgreens.com', // Walgreens pharmacy
-      'noreply@email.apple.com', // Apple security notifications
-      'no-reply@zoom.us', // Zoom security notifications
-      '@sedo.com', // Domain registrar
-      '@heroku.com', // Heroku bills and notifications
-      'noreply@heroku.com'
-    ],
-    keywords: ['payment', 'bill', 'invoice', 'alert', 'error', 'failed', 'down', 'maintenance', 'statement', 'account']
-  },
-  [FOLDERS.OFF_STAGE]: {
-    // Off Stage: Personal time, nature, friends, reading, entertainment
-    patterns: [
-      '@amazon.com', // Amazon/shopping
-      '@email.apple.com', // Apple receipts
-      '@e.dsw.com', // Shopping
-      '@jacquielawson.com', // Personal ecards
-      '@scandigital.com', // Personal projects
-      'store-news@amazon.com',
-      'store_news@amazon.com',
-      '@email.meetup.com', // Meetup social events
-      '@wildapricot.org', // Social organizations
-      '@wordpress.com', // Blog subscriptions
-      '@gmail.com', // Personal emails (most common)
-      '@hotmail.co.uk', // Personal emails
-      'noreply_at_email_browardcenter_org', // Entertainment venues
-      '@email.trustedhousesitters.com', // Travel/housesitting
-      'ptww.convention.committee@gmail.com' // Prime Timers events
-    ],
-    keywords: ['book', 'deal', 'sale', 'ecard', 'recipe', 'travel', 'meetup', 'event']
+// Load email patterns from config.toml
+function loadEmailPatterns() {
+  const getConfigPath = join(__dirname, '..', 'bin', 'get-config');
+
+  const patterns = {
+    front_stage: [],
+    back_stage: [],
+    off_stage: []
+  };
+
+  for (const stage of ['front_stage', 'back_stage', 'off_stage']) {
+    try {
+      const result = execSync(`"${getConfigPath}" email.${stage}.patterns`, {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      const parsed = JSON.parse(result.trim());
+      if (Array.isArray(parsed)) {
+        patterns[stage] = parsed;
+      }
+    } catch {
+      // No patterns configured for this stage
+    }
   }
-};
+
+  return patterns;
+}
+
+// Build categorization rules from config
+function buildCategorizationRules() {
+  const patterns = loadEmailPatterns();
+
+  return {
+    [FOLDERS.FRONT_STAGE]: {
+      patterns: patterns.front_stage,
+      keywords: ['meeting', 'call', 'support', 'reply', 'message from', 'new reply']
+    },
+    [FOLDERS.BACK_STAGE]: {
+      patterns: patterns.back_stage,
+      keywords: ['payment', 'bill', 'invoice', 'alert', 'error', 'failed', 'down', 'maintenance', 'statement', 'account']
+    },
+    [FOLDERS.OFF_STAGE]: {
+      patterns: patterns.off_stage,
+      keywords: ['book', 'deal', 'sale', 'ecard', 'recipe', 'travel', 'meetup', 'event']
+    }
+  };
+}
 
 export class EmailOrganizer {
   constructor() {
     this.cache = new SQLiteCache();
     this.client = null;
+    this.categorizationRules = buildCategorizationRules();
   }
 
   async connect() {
@@ -141,7 +126,7 @@ export class EmailOrganizer {
     const subject = email.subject?.toLowerCase() || '';
 
     // First check Front Stage (highest priority - work/support)
-    const frontRules = CATEGORIZATION_RULES[FOLDERS.FRONT_STAGE];
+    const frontRules = this.categorizationRules[FOLDERS.FRONT_STAGE];
     if (frontRules.patterns) {
       for (const pattern of frontRules.patterns) {
         if (from.includes(pattern.toLowerCase())) {
@@ -158,7 +143,7 @@ export class EmailOrganizer {
     }
 
     // Then check Back Stage (system/financial)
-    const backRules = CATEGORIZATION_RULES[FOLDERS.BACK_STAGE];
+    const backRules = this.categorizationRules[FOLDERS.BACK_STAGE];
     if (backRules.patterns) {
       for (const pattern of backRules.patterns) {
         if (from.includes(pattern.toLowerCase())) {
@@ -175,7 +160,7 @@ export class EmailOrganizer {
     }
 
     // Then check Off Stage patterns explicitly (before automated/marketing check)
-    const offRules = CATEGORIZATION_RULES[FOLDERS.OFF_STAGE];
+    const offRules = this.categorizationRules[FOLDERS.OFF_STAGE];
     if (offRules.patterns) {
       for (const pattern of offRules.patterns) {
         if (from.includes(pattern.toLowerCase())) {
