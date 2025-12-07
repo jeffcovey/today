@@ -222,9 +222,16 @@ Write ONLY the 2-3 sentence summary, nothing else:`;
     const tempPromptFile = `/tmp/summary-prompt-${Date.now()}.txt`;
     fs.writeFileSync(tempPromptFile, prompt);
 
-    // Use CLAUDE_MODEL env var, defaulting to Haiku for speed/cost
+    // Get model from config.toml, fall back to env var, then default to Haiku for speed/cost
+    let model = 'claude-haiku-4-5-20251001';
+    try {
+      const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
+      if (configModel) model = configModel;
+    } catch { /* use default */ }
+    if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
+
     const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001'; const response = await client.messages.create({ model: model, max_tokens: 300, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
+      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 300, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
       { encoding: 'utf8', timeout: 30000 }
     );
 
@@ -339,9 +346,16 @@ Write ONLY the 3-4 sentence weekly summary, nothing else:`;
     const tempPromptFile = `/tmp/weekly-summary-prompt-${Date.now()}.txt`;
     fs.writeFileSync(tempPromptFile, prompt);
 
-    // Use CLAUDE_MODEL env var, defaulting to Haiku for speed/cost
+    // Get model from config.toml, fall back to env var, then default to Haiku for speed/cost
+    let model = 'claude-haiku-4-5-20251001';
+    try {
+      const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
+      if (configModel) model = configModel;
+    } catch { /* use default */ }
+    if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
+
     const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001'; const response = await client.messages.create({ model: model, max_tokens: 500, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
+      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 500, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
       { encoding: 'utf8', timeout: 30000 }
     );
 
