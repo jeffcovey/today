@@ -76,6 +76,19 @@ This file starts an interactive Claude session for your daily review. The `bin/t
    - If exists: Query only recent changes, update incrementally
    - If new: Create comprehensive analysis from full database
 
+7. **Check Projects Due for Review** (morning activity)
+   - Scan `vault/projects/*.md` for active projects with `review_frequency` and `last_reviewed` in frontmatter
+   - A project is overdue if: `today - last_reviewed > review_frequency`
+   - Filter by today's Stage theme:
+     - **Front Stage**: Projects with category `work`, `marketing`, `team`, `communication`
+     - **Back Stage**: Projects with category `health`, `finance`, `home`, `admin`, `maintenance`
+     - **Off Stage**: Projects with category `personal`, `relationships`, `hobbies`, `creative`
+   - Suggest 1-2 overdue projects for morning review, prioritizing:
+     1. Most overdue (longest since last review)
+     2. Highest priority (`priority: urgent` or `priority: high`)
+     3. Best stage alignment
+   - Morning is ideal for project reviews - before diving into tasks
+
 ### Plan Files Structure
 
 Hierarchical naming ensures proper sorting:
@@ -363,21 +376,27 @@ Based on database queries AND hierarchical plan alignment:
 1. **Query database** - Use `bin/db-query daily` (pre-approved, no permission needed)
 2. **Check user profile** - Use `bin/get-config profile` for personalization
 3. **Calculate current time/day** - Use timezone from config.toml
-4. **Populate TODAY's plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
+4. **Check projects due for review** - Scan `vault/projects/*.md` frontmatter:
+   - Look for `status: active`, `review_frequency`, and `last_reviewed` fields
+   - Calculate which are overdue based on review_frequency (daily/weekly/monthly)
+   - Filter to projects matching today's Stage theme category
+   - Include 1-2 overdue projects in morning time blocks
+5. **Populate TODAY's plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
    - Fill in "Top Priorities" section with categorized tasks from database
    - Fill in time blocks (Morning/Afternoon/Evening) with calendar events
    - Add status summary in Reflection section
-5. **Populate TOMORROW's plan file** at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md`:
+6. **Populate TOMORROW's plan file** at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md`:
    - Add preliminary priorities based on overdue tasks and upcoming deadlines
    - Note calendar events scheduled for tomorrow
    - Suggest time blocks based on tomorrow's stage theme
    - Keep it lightweight - this is a draft to refine throughout today
-6. **Create calendar time blocks for TODAY** - Immediately run `bin/calendar add` for top 5-6 priorities:
+7. **Create calendar time blocks for TODAY** - Immediately run `bin/calendar add` for top 5-6 priorities:
    - Schedule around existing calendar events
+   - Include morning project review block for overdue projects
    - Include evening routine block
    - Use pre-approved calendar from TIME_BLOCKING_CALENDAR_ID
-7. **Confirm completion** - Brief summary of what was done
-8. **Stay engaged** - Then remain available for follow-up questions
+8. **Confirm completion** - Brief summary of what was done
+9. **Stay engaged** - Then remain available for follow-up questions
 
 **DO NOT:**
 - Present analysis and wait for permission
