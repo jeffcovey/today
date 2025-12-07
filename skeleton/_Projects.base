@@ -1,0 +1,41 @@
+filters:
+  and:
+    - file.path.contains("projects")
+views:
+  - type: cards
+    name: Cards
+    filters:
+      and:
+        - status == "active"
+        - or:
+            - ""
+            - ""
+            - review_frequency == "never"
+            - review_frequency == "daily"
+            - (review_frequency == "weekly" && date(last_reviewed) < today() - "7 days")
+            - (review_frequency == "monthly" && date(last_reviewed) < today() - "30 days")
+    order:
+      - title
+      - priority
+    sort:
+      - property: last_reviewed
+        direction: ASC
+    image: note.cover_image
+    cardSize: 230
+  - type: table
+    name: Table
+    filters:
+      and:
+        - status != "completed"
+    order:
+      - title
+      - status
+      - last_reviewed
+      - related_projects
+    sort:
+      - property: status
+        direction: ASC
+    image: note.cover_image
+    cardSize: 230
+    columnSize:
+      note.title: 277

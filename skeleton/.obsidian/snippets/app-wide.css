@@ -1,0 +1,369 @@
+/*
+App-Wide CSS Styling
+Last updated 2025-12-04
+Consolidated styling for all page types: dashboard, plans, projects, packing lists
+*/
+
+/* ============================================
+   SHARED BASE STYLING - ALL PAGES
+   ============================================ */
+
+.dashboard,
+.plan,
+.project-template,
+.packing-list {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 20px;
+  margin: 0 auto;
+}
+
+.dashboard {
+  max-width: 1400px;
+}
+
+.plan,
+.project-template {
+  max-width: 1200px;
+}
+
+.packing-list {
+  max-width: 900px;
+}
+
+/* ============================================
+   SECTION HEADERS (H2) - SHARED STYLE
+   ============================================ */
+
+.dashboard h2,
+.plan h2 {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px 8px 0 0;
+  margin: 24px 0 0 0;
+  font-weight: 600;
+  font-size: 1.3em;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Card body - content after headers */
+.dashboard h2 + *,
+.plan h2 + *,
+.plan h2 + * + * {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-top: none;
+  padding: 20px;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-bottom: 24px;
+}
+
+/* ============================================
+   SUBSECTION HEADERS (H3)
+   ============================================ */
+
+.plan h3 {
+  background: var(--background-secondary);
+  padding: 10px 16px;
+  border-radius: 6px;
+  border-left: 4px solid #4A90E2;
+  margin: 16px 0 12px 0;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+/* ============================================
+   CALLOUTS - SHARED STYLING
+   ============================================ */
+
+.dashboard .callout,
+.plan .callout {
+  border-radius: 8px;
+  margin: 16px 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  border-width: 2px;
+}
+
+.dashboard .callout[data-callout="note"],
+.plan .callout[data-callout="note"] {
+  border-color: #4A90E2;
+  background: linear-gradient(to right, rgba(74, 144, 226, 0.05), transparent);
+}
+
+.dashboard .callout[data-callout="info"],
+.plan .callout[data-callout="info"] {
+  border-color: #51CF66;
+  background: linear-gradient(to right, rgba(81, 207, 102, 0.05), transparent);
+}
+
+.dashboard .callout[data-callout="warning"],
+.plan .callout[data-callout="warning"] {
+  border-color: #FF8C42;
+  background: linear-gradient(to right, rgba(255, 140, 66, 0.05), transparent);
+}
+
+.dashboard .callout[data-callout="tip"],
+.plan .callout[data-callout="tip"] {
+  border-color: #7950F2;
+  background: linear-gradient(to right, rgba(121, 80, 242, 0.05), transparent);
+}
+
+.dashboard .callout[data-callout="success"] {
+  border-color: #51CF66;
+  background: linear-gradient(to right, rgba(81, 207, 102, 0.05), transparent);
+}
+
+/* ============================================
+   TABLES - SHARED STYLING
+   ============================================ */
+
+.dashboard table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.dashboard table thead {
+  background: var(--background-secondary);
+  border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.dashboard table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.dashboard table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dashboard table tr:last-child td {
+  border-bottom: none;
+}
+
+.dashboard table tr:hover {
+  background: var(--background-secondary);
+}
+
+/* ============================================
+   STAT CARDS - DASHBOARD ONLY
+   ============================================ */
+
+.dashboard .stat-card {
+  background: var(--background-secondary);
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid var(--interactive-accent);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.dashboard .stat-card .stat-value {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--interactive-accent);
+}
+
+.dashboard .stat-card .stat-label {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================
+   DAILY PLAN - H1 HEADER
+   ============================================ */
+
+.plan h1 {
+  background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  font-size: 1.8em;
+  text-align: center;
+}
+
+/* ============================================
+   PROJECT TEMPLATE STYLING
+   ============================================ */
+
+.project-template h1 {
+  background: linear-gradient(135deg, #F093FB 0%, #F5576C 100%);
+  color: white;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
+  font-size: 2em;
+  text-align: center;
+}
+
+.project-template h2 {
+  background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 24px 0 16px 0;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.2);
+}
+
+.project-template strong {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  margin: 4px 4px 4px 0;
+  font-size: 0.9em;
+}
+
+.project-template h1 + p {
+  text-align: center;
+  font-size: 1.2em;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #F5576C;
+}
+
+/* ============================================
+   PACKING LIST STYLING
+   ============================================ */
+
+.packing-list h1 {
+  background: linear-gradient(135deg, #FA709A 0%, #FEE140 100%);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(250, 112, 154, 0.3);
+  font-size: 2em;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+.packing-list h1:not(:first-of-type) {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  font-size: 1.5em;
+  margin-top: 32px;
+}
+
+.packing-list h2 {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: white;
+  padding: 10px 18px;
+  border-radius: 8px;
+  margin: 20px 0 12px 0;
+  font-weight: 600;
+  font-size: 1.2em;
+  box-shadow: 0 2px 6px rgba(67, 233, 123, 0.3);
+}
+
+.packing-list .task-list-item {
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.packing-list .task-list-item:hover {
+  background: var(--background-secondary);
+}
+
+.packing-list .task-list-item.is-checked {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* ============================================
+   SHARED STYLING - TASKS, LINKS, QUOTES
+   ============================================ */
+
+.plan .task-list-item,
+.project-template .task-list-item,
+.packing-list .task-list-item {
+  padding: 6px 0;
+  margin: 2px 0;
+}
+
+.plan a,
+.project-template a,
+.packing-list a {
+  color: var(--link-color);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--link-color);
+  transition: all 0.2s;
+}
+
+.plan a:hover,
+.project-template a:hover,
+.packing-list a:hover {
+  border-bottom-style: solid;
+  opacity: 0.8;
+}
+
+.plan blockquote,
+.project-template blockquote,
+.packing-list blockquote {
+  border-left: 4px solid var(--interactive-accent);
+  padding-left: 16px;
+  margin: 16px 0;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.plan code,
+.project-template code,
+.packing-list code {
+  background: var(--background-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.plan hr,
+.project-template hr,
+.packing-list hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--background-modifier-border), transparent);
+  margin: 32px 0;
+}
+
+/* ============================================
+   DASHBOARD-SPECIFIC FEATURES
+   ============================================ */
+
+.dashboard .markdown-preview-section {
+  max-width: 100%;
+}
+
+.dashboard ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.dashboard li {
+  padding: 4px 0;
+}
+
+.dashboard ul.dataview {
+  row-gap: 0px !important;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}

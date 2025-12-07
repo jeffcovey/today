@@ -314,6 +314,158 @@ def get_changed_vault_files():
         # Silently fail if something goes wrong
         return ""
 
+def check_vault_exists():
+    """Check if vault directory exists and offer to initialize it from skeleton"""
+    import shutil
+
+    vault_path = Path('vault')
+    skeleton_path = Path('skeleton')
+
+    if vault_path.exists():
+        return True
+
+    if not skeleton_path.exists():
+        print("❌ Neither vault/ nor skeleton/ directory found.")
+        print("   Please ensure you have the complete Today repository.")
+        return False
+
+    print("━" * 60)
+    print("📁 Vault directory not found")
+    print("━" * 60)
+    print()
+    print("The vault/ directory contains your personal notes, tasks, and plans.")
+    print("It is excluded from this repository because it's meant to be private.")
+    print()
+    print("Would you like to initialize a new vault from the skeleton template?")
+    print()
+
+    try:
+        response = input("Initialize vault? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\n")
+        return False
+
+    if response != 'y':
+        print()
+        print("Vault not initialized. You can manually copy the skeleton:")
+        print("  cp -r skeleton vault")
+        print()
+        return False
+
+    print()
+    print("📦 Initializing vault from skeleton...")
+
+    try:
+        # Copy skeleton to vault
+        shutil.copytree(skeleton_path, vault_path)
+
+        # Remove .gitkeep files (they were just placeholders)
+        for gitkeep in vault_path.rglob('.gitkeep'):
+            gitkeep.unlink()
+
+        print("✅ Vault initialized successfully!")
+        print()
+        print("━" * 60)
+        print("📝 Next steps:")
+        print("━" * 60)
+        print()
+        print("1. Initialize a git repository for version control:")
+        print("   cd vault && git init && git add . && git commit -m 'Initial vault'")
+        print()
+        print("2. Set up sync (optional but recommended):")
+        print("   - Resilio Sync, Syncthing, or a private git remote")
+        print()
+        print("3. If using Obsidian, install recommended plugins:")
+        print("   - Dataview, Tasks, Templater, Calendar, Periodic Notes")
+        print()
+        print("See vault/README.md for detailed documentation.")
+        print("━" * 60)
+        print()
+        return True
+
+    except Exception as e:
+        print(f"❌ Failed to initialize vault: {e}")
+        return False
+
+def check_skeleton_updates():
+    """Check if skeleton has updates that should be merged into vault"""
+    import filecmp
+    import hashlib
+
+    vault_path = Path('vault')
+    skeleton_path = Path('skeleton')
+    tracking_file = Path('.skeleton-hashes')
+
+    if not vault_path.exists() or not skeleton_path.exists():
+        return
+
+    # Files that might be updated in skeleton and should be offered to merge
+    tracked_files = [
+        'scripts/time-tracking-widget.js',
+        'scripts/upcoming-events-widget.js',
+        'templates/daily-plan.md',
+        'templates/project.md',
+        '.obsidian/snippets/app-wide.css',
+    ]
+
+    # Load previous hashes
+    previous_hashes = {}
+    if tracking_file.exists():
+        try:
+            with open(tracking_file, 'r') as f:
+                for line in f:
+                    parts = line.strip().split(':', 1)
+                    if len(parts) == 2:
+                        previous_hashes[parts[0]] = parts[1]
+        except:
+            pass
+
+    updates_available = []
+
+    for rel_path in tracked_files:
+        skeleton_file = skeleton_path / rel_path
+        vault_file = vault_path / rel_path
+
+        if not skeleton_file.exists():
+            continue
+
+        # Calculate current skeleton hash
+        with open(skeleton_file, 'rb') as f:
+            current_hash = hashlib.md5(f.read()).hexdigest()
+
+        # Check if skeleton has changed since last check
+        if rel_path in previous_hashes and previous_hashes[rel_path] == current_hash:
+            continue  # No change in skeleton
+
+        # Check if vault file exists and differs from skeleton
+        if vault_file.exists():
+            if not filecmp.cmp(skeleton_file, vault_file, shallow=False):
+                updates_available.append(rel_path)
+
+        # Update tracking
+        previous_hashes[rel_path] = current_hash
+
+    # Save updated hashes
+    with open(tracking_file, 'w') as f:
+        for path, hash_val in previous_hashes.items():
+            f.write(f"{path}:{hash_val}\n")
+
+    if updates_available:
+        print("━" * 60)
+        print("📦 Skeleton updates available")
+        print("━" * 60)
+        print()
+        print("The following skeleton files have been updated:")
+        for path in updates_available:
+            print(f"  - {path}")
+        print()
+        print("To review and merge updates:")
+        print("  diff vault/<file> skeleton/<file>")
+        print("  cp skeleton/<file> vault/<file>")
+        print()
+        print("━" * 60)
+        print()
+
 def check_dependencies():
     """Check dependencies once per day"""
     last_check_file = '.last-dep-check'
@@ -1394,9 +1546,16 @@ def main():
     # Load environment variables
     load_dotenv()
 
+    # Check if vault exists (unless in non-interactive mode)
+    if not args.non_interactive:
+        if not check_vault_exists():
+            print("Cannot continue without vault directory.")
+            sys.exit(1)
+
     # Check dependencies once per day (unless in non-interactive mode)
     if not args.non_interactive:
         check_dependencies()
+        check_skeleton_updates()
 
     # Handle init command - create hierarchy files only
     if args.command == 'init':
