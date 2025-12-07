@@ -296,6 +296,62 @@ Focus different days on different types of work:
 - `#stage/back-stage` - Maintenance, bills, bug fixes, organizing
 - `#stage/off-stage` - Personal time, nature, friends, reading
 
+## Automation
+
+The scheduler (`src/scheduler.js`) automates daily operations:
+
+- **Every 10 minutes**: Quick sync (vault and tasks)
+- **Every hour**: Full sync + task classification + auto-tagging
+- **Every 2 hours**: Update daily plans with Claude API
+- **Daily at 1 AM**: Archive completed tasks
+- **Daily at 2 AM**: Vault snapshot backup
+
+### Running the Scheduler
+
+**Option 1: DigitalOcean Droplet** (recommended for always-on)
+
+See [DigitalOcean Deployment](docs/DIGITALOCEAN.md) for full instructions.
+
+**Option 2: Run Locally**
+
+```bash
+# Run scheduler in foreground
+node src/scheduler.js
+
+# Or run in background with pm2
+npm install -g pm2
+pm2 start src/scheduler.js --name today-scheduler
+pm2 save
+```
+
+**Option 3: System cron** (manual setup)
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add entries like:
+*/10 * * * * cd /path/to/today && bin/sync --quick
+0 */2 * * * cd /path/to/today && bin/today update
+```
+
+### Important: Version Control Your Vault
+
+**The scheduler modifies files automatically without asking.** It will update daily plans, archive tasks, and sync data. To track these changes and recover if needed:
+
+```bash
+cd vault
+git init
+git add .
+git commit -m "Initial vault"
+
+# After running the scheduler, review changes:
+git status
+git diff
+```
+
+This lets you see exactly what the scheduler changed and revert if needed.
+
 ## Development
 
 ### Using the Devcontainer
@@ -325,6 +381,7 @@ npm run lint:md:fix            # Auto-fix markdown issues
 ## Documentation
 
 - [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
+- [DigitalOcean Deployment](docs/DIGITALOCEAN.md) - Deploy to a DigitalOcean droplet
 - [Vault README](skeleton/README.md) - Detailed vault documentation
 
 ## License
