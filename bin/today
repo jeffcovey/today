@@ -1282,83 +1282,31 @@ def _create_hierarchy_file_from_template(file_path, template_name, target_date):
     return True
 
 def create_review_from_template():
-    """Create daily review files for today AND tomorrow, plus ensure hierarchy exists for all periods"""
+    """Create daily review files for today AND tomorrow
+
+    Note: Non-daily plan file creation (weekly/monthly/quarterly/annual) is disabled
+    while templates are being finalized. Re-enable when templates are ready.
+    """
     files_created = []
-    today = datetime.now()
-    plans_dir = Path("vault/plans")
 
-    # Find all daily plan files to determine which weeks/months/quarters/years need reviews
-    daily_files = list(plans_dir.glob("*_*_*_W*_[0-9][0-9].md"))
-
-    # Extract unique periods from daily files
-    periods = {
-        'years': set(),
-        'quarters': set(),
-        'months': set(),
-        'weeks': set()
-    }
-
-    for daily_file in daily_files:
-        basename = daily_file.stem
-        match = re.match(r'(\d{4})_Q(\d)_(\d{2})_W(\d{2})_(\d{2})', basename)
-        if match:
-            year, quarter, month, week, day = match.groups()
-            periods['years'].add(year)
-            periods['quarters'].add(f"{year}_Q{quarter}")
-            periods['months'].add(f"{year}_Q{quarter}_{month}")
-            periods['weeks'].add(f"{year}_Q{quarter}_{month}_W{week}")
-
-    # Create annual reviews for all years
-    for year in sorted(periods['years']):
-        annual_file = plans_dir / f"{year}_00.md"
-        if not annual_file.exists():
-            print(f"📅 Creating annual review for {year}...")
-            target_date = datetime(int(year), 1, 1)
-            if _create_hierarchy_file_from_template(str(annual_file), 'annual-review', target_date):
-                files_created.append(('annual', str(annual_file)))
-
-    # Create quarterly reviews
-    for quarter_id in sorted(periods['quarters']):
-        quarterly_file = plans_dir / f"{quarter_id}_00.md"
-        if not quarterly_file.exists():
-            year, q = quarter_id.split('_Q')
-            quarter_num = int(q)
-            print(f"📅 Creating quarterly review for Q{quarter_num} {year}...")
-            # Use first month of quarter as target date
-            month = (quarter_num - 1) * 3 + 1
-            target_date = datetime(int(year), month, 1)
-            if _create_hierarchy_file_from_template(str(quarterly_file), 'quarterly-review', target_date):
-                files_created.append(('quarterly', str(quarterly_file)))
-
-    # Create monthly reviews
-    for month_id in sorted(periods['months']):
-        monthly_file = plans_dir / f"{month_id}_00.md"
-        if not monthly_file.exists():
-            match = re.match(r'(\d{4})_Q\d_(\d{2})', month_id)
-            if match:
-                year, month = match.groups()
-                target_date = datetime(int(year), int(month), 1)
-                print(f"📅 Creating monthly review for {target_date.strftime('%B %Y')}...")
-                if _create_hierarchy_file_from_template(str(monthly_file), 'monthly-review', target_date):
-                    files_created.append(('monthly', str(monthly_file)))
-
-    # Create weekly reviews
-    for week_id in sorted(periods['weeks']):
-        weekly_file = plans_dir / f"{week_id}_00.md"
-        if not weekly_file.exists():
-            match = re.match(r'(\d{4})_Q\d_(\d{2})_W(\d{2})', week_id)
-            if match:
-                year, month, week = match.groups()
-                # Find a daily file in this week to get the correct date
-                sample_daily = next(plans_dir.glob(f"{week_id}_*.md"), None)
-                if sample_daily:
-                    day_match = re.match(r'.*_(\d{2})\.md', sample_daily.name)
-                    if day_match:
-                        day = day_match.group(1)
-                        target_date = datetime(int(year), int(month), int(day))
-                        print(f"📅 Creating weekly review for Week {week}...")
-                        if _create_hierarchy_file_from_template(str(weekly_file), 'weekly-review', target_date):
-                            files_created.append(('weekly', str(weekly_file)))
+    # TODO: Re-enable hierarchy file creation once templates are finalized
+    # This code creates annual, quarterly, monthly, and weekly review files
+    # based on which daily files exist. Disabled to prevent creating files
+    # from incomplete templates.
+    #
+    # plans_dir = Path("vault/plans")
+    # daily_files = list(plans_dir.glob("*_*_*_W*_[0-9][0-9].md"))
+    # periods = {'years': set(), 'quarters': set(), 'months': set(), 'weeks': set()}
+    # for daily_file in daily_files:
+    #     basename = daily_file.stem
+    #     match = re.match(r'(\d{4})_Q(\d)_(\d{2})_W(\d{2})_(\d{2})', basename)
+    #     if match:
+    #         year, quarter, month, week, day = match.groups()
+    #         periods['years'].add(year)
+    #         periods['quarters'].add(f"{year}_Q{quarter}")
+    #         periods['months'].add(f"{year}_Q{quarter}_{month}")
+    #         periods['weeks'].add(f"{year}_Q{quarter}_{month}_W{week}")
+    # ... hierarchy file creation loops ...
 
     # Create for today
     today_file = get_review_file_path()
