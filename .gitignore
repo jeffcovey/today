@@ -1,46 +1,69 @@
-node_modules/
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
 # .env is encrypted inline with dotenvx, safe to commit
 # .env
 .env.keys
 .env.local
-*.log
-.DS_Store
-dist/
-.data/
-.vscode-cli/
 
-# Python bytecode cache
-__pycache__/
-*.pyc
-*.pyo
+# =============================================================================
+# User Configuration (copy from *.example files)
+# =============================================================================
+config.toml
+config/calendars.json
 
-# Google Calendar Service Account Key
-google-calendar-key.json
-.last-dep-check
-
-# Runtime and sync files (instance-specific)
-.sync-config.json
-
-# Private keys and credentials
+# =============================================================================
+# Credentials & Keys
+# =============================================================================
 *.pem
 *.key
 *credentials*.json
 *secrets*.json
-
-# Resilio Sync credentials
+google-calendar-key.json
+.inbox-api-key
 .resilio-password
 Resilio Sync.btskey
 
-# Claude Code user settings and history
-.claude/
-.claude.json
-.claude.json.backup
+# =============================================================================
+# Data & Cache
+# =============================================================================
+.data/
+.calendar-cache/
+.notion-cache/
+.sync-config.json
+.last-dep-check
 
-# Vault files
-vault
+# =============================================================================
+# Vault (synced separately via Resilio/iCloud)
+# =============================================================================
 vault/
+vault
+
+# =============================================================================
+# Build & Dependencies
+# =============================================================================
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# =============================================================================
+# Editor & IDE
+# =============================================================================
+.vscode-cli/
+.claude/
+
+# =============================================================================
+# OS Files
+# =============================================================================
+.DS_Store
+*.log
+
+# =============================================================================
+# Runtime (container/server specific)
+# =============================================================================
 .config/
-.inbox-api-key
 .local/
 .npm/
 backups/
