@@ -223,20 +223,13 @@ class DigitalOceanDeploy:
 
         # Setup WAL checkpoint cron
         print_info("Setting up SQLite WAL checkpoint cron job...")
-        self.ssh_script('''
-            cat > /opt/today/bin/checkpoint-wal.sh << 'SCRIPT'
-#!/bin/bash
-cd /opt/today
-npx dotenvx run -- sqlite3 .data/today.db "PRAGMA wal_checkpoint(PASSIVE);" >/dev/null 2>&1
-SCRIPT
-            chmod +x /opt/today/bin/checkpoint-wal.sh
-            if ! crontab -l 2>/dev/null | grep -q checkpoint-wal; then
-                (crontab -l 2>/dev/null; echo "*/30 * * * * /opt/today/bin/checkpoint-wal.sh") | crontab -
-                echo "✓ WAL checkpoint cron job added (runs every 30 minutes)"
-            else
-                echo "✓ WAL checkpoint cron job already configured"
-            fi
-        ''')
+        # Write the checkpoint script
+        checkpoint_script = '#!/bin/bash\\ncd /opt/today\\nnpx dotenvx run -- sqlite3 .data/today.db "PRAGMA wal_checkpoint(PASSIVE);" >/dev/null 2>&1'
+        self.ssh_cmd(f'echo -e {repr(checkpoint_script)} > /opt/today/bin/checkpoint-wal.sh && chmod +x /opt/today/bin/checkpoint-wal.sh')
+        # Add cron job if not already present
+        self.ssh_cmd('crontab -l 2>/dev/null | grep -q checkpoint-wal || '
+                     '{ crontab -l 2>/dev/null; echo "*/30 * * * * /opt/today/bin/checkpoint-wal.sh"; } | crontab - && '
+                     'echo "✓ WAL checkpoint cron job configured"')
 
         # Restart services
         print_info("Restarting services...")
