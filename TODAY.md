@@ -26,35 +26,29 @@ This file starts an interactive Claude session for your daily review. The `bin/t
 ## Session Instructions for Claude
 </summary>
 
-### 🔴 CRITICAL FIRST STEPS 🔴
+### CRITICAL FIRST STEPS
 
 1. **Calculate Day of Week** (NEVER infer from activities)
-   - January 1, 2025 was Wednesday
-   - Calculate days from Jan 1 (not counting Jan 1 itself)
-   - Divide by 7: remainder determines day
-   - Verify calculation before proceeding
-
-2. **Get Current Time** (timezone from config.toml)
 
    ```bash
    TZ=$(bin/get-config timezone) date '+%A, %B %d, %Y at %I:%M %p %Z'
    ```
 
-   - NEVER guess time - always use this command
+   - NEVER guess time or day - always use this command
+   - NEVER infer the day from calendar activities or task patterns
    - Database uses UTC - convert to local time based on config.toml setting
 
-3. **Query Database Using Pre-Approved Script**
+2. **Query Database Using Pre-Approved Script**
 
    ```bash
    # Get comprehensive daily review data (pre-approved command)
    bin/db-query daily
-   
+
    # Or query specific data types:
    bin/db-query tasks      # Priority tasks
    bin/db-query events     # Calendar events
    bin/db-query emails     # Recent emails
    bin/db-query contacts   # Contact follow-ups
-   bin/db-query ogm        # OGM monitoring
    bin/db-query journal    # Journal entries
    ```
 
@@ -62,10 +56,14 @@ This file starts an interactive Claude session for your daily review. The `bin/t
    - This avoids approval prompts for sqlite3 commands
    - For custom queries: `bin/db-query custom "SELECT ..."`
 
-4. **Check Guest Room Status**
-   - Use `bin/db-query daily` which includes guest room section
-   - Two rooms need tracking
-   - Checkout: 12 PM, Check-in: 3 PM (prep time needed)
+3. **Check User Profile** (from config.toml)
+   - Run `bin/get-config profile` to get user preferences
+   - If profile is not configured, remind user to set it up
+   - Use profile info to personalize the daily review
+
+4. **Check Hosting Status** (if configured)
+   - Run `bin/get-config hosting` to see if hosting is enabled
+   - If enabled, check for guest check-ins/check-outs in calendar
 
 5. **Review Hierarchical Plans** (BEFORE creating today's plan)
    - Year: `vault/plans/YYYY_00.md`
@@ -115,7 +113,7 @@ The `_00` suffix for aggregates ensures they sort before child items.
 For existing daily plans:
 - Tasks update automatically via Obsidian Tasks queries
 - Add progress notes with timestamps: `### Update (2:30 PM)`
-- **🚨 CRITICAL: ALWAYS check time tracking logs BEFORE writing progress updates**:
+- **CRITICAL: ALWAYS check time tracking logs BEFORE writing progress updates**:
   - Read `vault/logs/time-tracking/YYYY-MM.md` to see actual work done today
   - Physical work, meetings, coordination, and deep work sessions are ALL tracked there
   - Never claim "zero progress" without checking time tracking first
@@ -132,21 +130,20 @@ After creating or updating daily plans:
    - Urgent tasks: 15-30 minute blocks
    - Deep work: 1-2 hour focused blocks
    - Routine tasks: 30-45 minute blocks
-   - Evening routine: 3+ hour wind-down block
-4. **Use Time Blocking Calendar**: Always specify `--calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"`
+   - Evening routine: wind-down block based on config.toml settings
+4. **Use Time Blocking Calendar**: Check TIME_BLOCKING_CALENDAR_ID in .env
 
 ### Available Commands
 
 ```bash
 # Task management (Obsidian-based)
 bin/today                              # Create daily plan from template
-bin/tasks sync                         # NO LONGER syncs to database (disabled)
-# Tasks are now managed directly in markdown files with Obsidian Tasks plugin:
+# Tasks are managed directly in markdown files with Obsidian Tasks plugin
 # - [ ] Task title 🔺 ⏳ 2025-09-20    # Priority + scheduled date
 # - [ ] Task title 📅 2025-09-21 🔁 every week  # Due date + recurrence
 
-# Calendar time blocking
-bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com"
+# Calendar time blocking (use TIME_BLOCKING_CALENDAR_ID)
+bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "$TIME_BLOCKING_CALENDAR_ID"
 bin/calendar list-calendars            # Show available calendars
 
 # Review tracking
@@ -155,32 +152,41 @@ bin/progress "Additional note"         # Add a progress note
 
 # Data sync
 bin/sync                               # Sync all data sources
+
+# Configuration
+bin/get-config timezone                # Get current timezone
+bin/get-config profile                 # Get user profile settings
+bin/get-config stages                  # Get stage theme settings
 ```
 
 </details>
 
 ## Guidelines
 
-### About Me
+### User Profile
 
-Jeffrey Covey ("Jeff") - see contacts database for details.
+**Check `config.toml` for personalized settings.** If not configured, the system will use defaults.
+
+Run `bin/get-config profile` to see:
+- User name and vocation
+- Wake/bed times for schedule planning
+- Wind-down preferences for evening routine
+
+If profile is empty, remind the user:
+> "Consider configuring your profile in `config.toml` for personalized daily reviews."
 
 ### Schedule & Timezone
 
-**🚨 Check config.toml for current timezone setting!**
+**Check config.toml for current timezone setting!**
 - Current timezone configured in `config.toml`
 - Edit when traveling: `timezone = "America/Los_Angeles"` etc.
-- Home: Oakland Park, Florida
-- Wake: ~5:30-6:00 AM (1hr morning routine)
-- Bed: ~9:30 PM (offline last 2 hours)
+- Wake/bed times in `[profile]` section
 
-### Vocation
+### Daily Structure (Stage Themes)
 
-Retired, devoted to https://oldergay.men/ - a website for older gay men and their admirers. Check `ogm_*` tables for production issues (GitHub issues, HoneyBadger errors, Scout APM metrics).
+**Stage Themes** help focus different types of work on different days. Check `config.toml` for customization.
 
-### Daily Structure
-
-**Stage Themes** (calculate day, don't infer from activities):
+Default schedule:
 - **Front Stage** (Mon/Wed/Sat): Meetings, calls, support, emails
 - **Back Stage** (Thu/Sun): Maintenance, bills, bug fixes, organizing
 - **Off Stage** (Tue/Fri): Personal time, nature, friends, reading
@@ -191,9 +197,8 @@ Retired, devoted to https://oldergay.men/ - a website for older gay men and thei
 
 ### Apple Health Data
 
-Health metrics are automatically extracted from the most recent health export file in `vault/logs/`:
+Health metrics are automatically extracted from health export files in `vault/logs/`:
 - Formats supported: `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json` or `HealthAutoExport.zip`
-- The script finds the most recent file by modification time (looks for any file matching `HealthAutoExport*.json` or `HealthAutoExport*.zip`)
 - Extracted metrics include:
   - Daily step counts and weekly averages
   - Weight tracking trends
@@ -204,30 +209,30 @@ Health metrics are automatically extracted from the most recent health export fi
 
 The `bin/today` script automatically finds and extracts key health metrics from the most recent export file and includes them in the daily review context.
 
-### Hosting
+### Hosting (Optional)
 
-Two guest rooms via Airbnb/MisterB&B:
-- Check-out: 12 PM (clean after)
-- Check-in: 3 PM (prep before)
+If `[hosting]` is enabled in config.toml:
+- Check-out/check-in times are configured there
+- Guest room status shown in daily review
+- Platform integrations (Airbnb, etc.) via calendar sync
 
 ### Contact Tracking
 
-6-week follow-up system for close friends:
+Follow-up system for maintaining relationships:
+- Default: 6 weeks (configurable in `[contacts]` section)
 - Query: `SELECT * FROM contacts WHERE julianday('now') - julianday(last_contacted) > 42`
 - Update: `UPDATE contacts SET last_contacted = DATE('now') WHERE full_name = 'Name'`
-- Great "Off Stage" activity for Tue/Fri
+- Great "Off Stage" activity
 
 ### Calendar Time Blocking
-
-**Time Blocking Calendar ID**: `e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com`
 
 Create focused time blocks for daily priorities:
 - **Urgent tasks**: 15-30 minute blocks
 - **Deep work**: 1-2 hour focused blocks
 - **Routine tasks**: 30-45 minute blocks
-- **Evening routine**: 3+ hour wind-down block
+- **Evening routine**: wind-down block
 
-**Usage**: After creating or updating daily plans, proactively create calendar events to structure the day with focused time blocks.
+Check `TIME_BLOCKING_CALENDAR_ID` in `.env` for the calendar to use.
 
 ### Hierarchical Goal Alignment
 
@@ -255,19 +260,20 @@ SQLite database at `.data/today.db` contains:
 ### Core Tables
 
 - **markdown_tasks**: Tasks cached from markdown files in vault/
-- **emails**: Received (iCloud) and sent (Pobox via `bin/pobox-sync`)
+- **emails**: Received and sent emails
 - **calendar_events**: Events with timezone data
 - **contacts**: Contact info with normalized data
-- **diary**: Day One journal entries from `vault/logs/Journal.json`
+- **diary**: Journal entries from `vault/logs/Journal.json`
 - **file_tracking**: Recently modified files
 - **vault/ changes**: Files modified today (based on filesystem mtime, automatically included in review context)
 
-### OGM Monitoring
+### Project Monitoring (Optional)
 
-- **ogm_github_issues**: Bugs and features
-- **ogm_scout_metrics**: Performance data
-- **ogm_sentry_issues**: Error tracking
-- **ogm_summary_stats**: Daily aggregates
+If `[monitoring]` is configured in config.toml:
+- **github_issues**: Bugs and features
+- **scout_metrics**: Performance data
+- **sentry_issues**: Error tracking
+- **summary_stats**: Daily aggregates
 
 <details>
 <summary>
@@ -293,18 +299,12 @@ FROM calendar_events
 WHERE DATE(start_date) = DATE('now')
 ORDER BY start_date;
 
--- Overdue contacts (6+ weeks)
+-- Overdue contacts (configurable weeks)
 SELECT full_name, last_contacted,
        CAST((julianday('now') - julianday(last_contacted)) / 7 AS INTEGER) as weeks_ago
 FROM contacts
 WHERE julianday('now') - julianday(last_contacted) > 42
 ORDER BY last_contacted;
-
--- OGM errors (from Sentry)
-SELECT title, count, last_seen
-FROM ogm_sentry_issues
-WHERE status = 'unresolved' AND count > 100
-ORDER BY count DESC;
 
 -- Recent journal entries
 SELECT DATE(creation_date) as date,
@@ -328,13 +328,9 @@ Tasks are managed directly in markdown files using Obsidian Tasks syntax:
 - [ ] Task title 📅 YYYY-MM-DD 🔼
 ```
 
-## DEPRECATED: No longer using task-id with Obsidian Tasks
-
-Tasks are now managed with Obsidian Tasks syntax
-
 ### Project files in `vault/projects/`
 
-- Use kebab-case: `palm-springs-trip.md`
+- Use kebab-case: `project-name.md`
 - Start with `# Project Name`
 - Include metadata: Dates, Status, Budget, Location
 - Tasks auto-associate with project during sync
@@ -365,33 +361,23 @@ Based on database queries AND hierarchical plan alignment:
 **CRITICAL:** All of these steps must be completed automatically in your FIRST response. Do NOT present analysis and wait for approval.
 
 1. **Query database** - Use `bin/db-query daily` (pre-approved, no permission needed)
-2. **Calculate current time/day** - Already provided in pre-computed context
-3. **Populate TODAY's plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
-   - Fill in "Top Priorities" section with categorized tasks from database:
-     - 🚨 Critical (Do First) - High priority urgent items
-     - ⚡ Quick Wins (<15 min)
-     - 📞 Communications
-     - 🏠 Home & Hosting
-     - ⚠️ System Alerts
-   - Fill in time blocks (Morning/Afternoon/Evening) with:
-     - Calendar events from database
-     - Scheduled work blocks around those events
-   - Add status summary in Reflection section with:
-     - Stage theme focus
-     - Urgent items needing attention
-     - System health issues
-     - Wins/achievements
-4. **Populate TOMORROW's plan file** at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md`:
+2. **Check user profile** - Use `bin/get-config profile` for personalization
+3. **Calculate current time/day** - Use timezone from config.toml
+4. **Populate TODAY's plan file** at `vault/plans/YYYY_QQ_MM_W##_DD.md`:
+   - Fill in "Top Priorities" section with categorized tasks from database
+   - Fill in time blocks (Morning/Afternoon/Evening) with calendar events
+   - Add status summary in Reflection section
+5. **Populate TOMORROW's plan file** at `vault/plans/YYYY_QQ_MM_W##_{DD+1}.md`:
    - Add preliminary priorities based on overdue tasks and upcoming deadlines
    - Note calendar events scheduled for tomorrow
    - Suggest time blocks based on tomorrow's stage theme
    - Keep it lightweight - this is a draft to refine throughout today
-5. **Create calendar time blocks for TODAY** - Immediately run `bin/calendar add` for top 5-6 priorities:
+6. **Create calendar time blocks for TODAY** - Immediately run `bin/calendar add` for top 5-6 priorities:
    - Schedule around existing calendar events
    - Include evening routine block
-   - Use pre-approved calendar: `e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com`
-6. **Confirm completion** - Brief summary of what was done
-7. **Stay engaged** - Then remain available for follow-up questions
+   - Use pre-approved calendar from TIME_BLOCKING_CALENDAR_ID
+7. **Confirm completion** - Brief summary of what was done
+8. **Stay engaged** - Then remain available for follow-up questions
 
 **DO NOT:**
 - Present analysis and wait for permission

@@ -16,7 +16,7 @@ The email manager includes AI-powered natural language search that understands c
 2. Add to your `.env` file:
 
    ```
-   ANTHROPIC_API_KEY=sk-ant-api...your-key-here
+   TODAY_ANTHROPIC_KEY=sk-ant-api...your-key-here
    ```
 
 ## Query Examples
@@ -62,7 +62,7 @@ If no API key is set, uses keyword matching on email subjects and content.
 
 ### "API key not found"
 
-Ensure ANTHROPIC_API_KEY is in your `.env` file or environment.
+Ensure TODAY_ANTHROPIC_KEY is in your `.env` file or environment.
 
 ### Poor search results
 

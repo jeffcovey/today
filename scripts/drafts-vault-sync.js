@@ -9,8 +9,8 @@
 
 // ============ CONFIGURATION ============
 const CONFIG = {
-    // Droplet API settings
-    dropletUrl: 'https://today.jeffcovey.net/api',  // Your droplet URL
+    // Droplet API settings - UPDATE THIS TO YOUR DOMAIN
+    dropletUrl: 'https://your-domain.example.com/api',  // Your droplet URL
     vaultApiKey: null,   // Will be set from credentials
 
     lastSyncKey: 'today_vault_sync_last_timestamp' // Key for storing last sync time

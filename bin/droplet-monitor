@@ -45,7 +45,9 @@ Time: $(date '+%Y-%m-%d %H:%M:%S')
     # Try to send via inbox API if available
     if [ -f /opt/today/.inbox-api-key ]; then
         source /opt/today/.inbox-api-key
-        curl -s -X POST https://today.jeffcovey.net/api/inbox/upload \
+        # DO_DEPLOY_DOMAIN should be set in environment
+        DEPLOY_DOMAIN="${DO_DEPLOY_DOMAIN:-localhost}"
+        curl -s -X POST "https://${DEPLOY_DOMAIN}/api/inbox/upload" \
             -H "X-API-Key: $INBOX_API_KEY" \
             -H "Content-Type: application/json" \
             -d "{\"content\": \"$alert_content\"}" > /dev/null 2>&1 || true

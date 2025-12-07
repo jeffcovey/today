@@ -29,10 +29,26 @@ alias status='bin/status'
 alias mark='bin/mark-done'
 alias progress='bin/progress'
 
-# Configure git identity if not already set
+# Configure git identity from config.toml if available
 if ! git config user.email > /dev/null 2>&1; then
-    git config --global user.email "jeff.covey@pobox.com"
-    git config --global user.name "Jeff Covey"
+    if [ -f "bin/get-config" ] && [ -f "config.toml" ]; then
+        CONFIG_NAME=$(bin/get-config profile.name 2>/dev/null)
+        CONFIG_EMAIL=$(bin/get-config profile.email 2>/dev/null)
+        if [ -n "$CONFIG_NAME" ] && [ -n "$CONFIG_EMAIL" ]; then
+            git config --global user.email "$CONFIG_EMAIL"
+            git config --global user.name "$CONFIG_NAME"
+            echo "✓ Git identity set from config.toml: $CONFIG_NAME <$CONFIG_EMAIL>"
+        else
+            echo "⚠️  Git identity not configured. Run:"
+            echo "   git config --global user.email 'your@email.com'"
+            echo "   git config --global user.name 'Your Name'"
+            echo "   Or add 'email' to [profile] section in config.toml"
+        fi
+    else
+        echo "⚠️  Git identity not configured. Run:"
+        echo "   git config --global user.email 'your@email.com'"
+        echo "   git config --global user.name 'Your Name'"
+    fi
 fi
 
 # Welcome message

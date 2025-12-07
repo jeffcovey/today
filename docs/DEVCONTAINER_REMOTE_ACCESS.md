@@ -28,7 +28,7 @@ cat ~/.config/devcontainer/access-info.txt
 
 ### 3. Access from iPad
 
-Open Safari and navigate to the URL shown (e.g., `http://100.65.74.31:8081`)
+Open Safari and navigate to the URL shown (e.g., `http://100.x.x.x:8081`)
 
 ## Configuration Details
 
@@ -41,7 +41,7 @@ The devcontainer.json includes:
 
 ### Scripts
 
-Located in `/workspaces/notion-cli/bin/`:
+Located in `/workspaces/today/bin/`:
 
 - **devcontainer-startup**: Main orchestrator script
 - **start-code-server**: Manages code-server process
@@ -51,7 +51,7 @@ Located in `/workspaces/notion-cli/bin/`:
 ### Service Naming
 
 Containers are named using the pattern: `{project}-{host}`
-- Example: `notion-cli-macmini`
+- Example: `today-macmini`
 - Helps identify containers when running multiple projects
 
 ## Managing Multiple Projects

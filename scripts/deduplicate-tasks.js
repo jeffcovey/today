@@ -43,8 +43,6 @@ try {
         t.completed_at,
         t.project_id,
         t.content,
-        t.notion_id,
-        t.notion_url,
         t.repeat_interval,
         t.repeat_next_date,
         (SELECT COUNT(*) FROM task_topics WHERE task_id = t.id) as topic_count,
@@ -75,11 +73,7 @@ try {
       // Content fields
       if (task.description) score += 20;
       if (task.content) score += 15;
-      
-      // Notion integration
-      if (task.notion_id) score += 25;
-      if (task.notion_url) score += 20;
-      
+
       // Recurrence info
       if (task.repeat_interval) score += 35;
       if (task.repeat_next_date) score += 30;

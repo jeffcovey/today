@@ -24,17 +24,17 @@ This document describes the migration from git-based vault synchronization to Re
 - Added to `/opt/today/bin/setup-droplet.sh` for automatic installation
 - Added to deployment process in `bin/deploy-do` to ensure it's installed on every deployment
 - Service available at:
-  - **HTTPS**: https://sync.today.jeffcovey.net (requires DNS setup)
-  - **HTTP**: http://167.71.106.64:8889 (direct access)
+  - **HTTPS**: https://sync.your-domain.example.com (requires DNS setup)
+  - **HTTP**: http://YOUR_DROPLET_IP:8889 (direct access)
 
 #### DNS Setup Required
 
-1. Add an A record for `sync.today.jeffcovey.net` → `167.71.106.64`
+1. Add an A record for `sync.your-domain.example.com` → `YOUR_DROPLET_IP`
 2. Once DNS propagates, SSL certificate will be automatically configured
 3. If SSL setup fails initially, run:
 
    ```bash
-   bin/deploy-do exec "sudo certbot --nginx -d sync.today.jeffcovey.net --non-interactive --agree-tos --email admin@jeffcovey.net --redirect"
+   bin/deploy-do exec "sudo certbot --nginx -d sync.your-domain.example.com --non-interactive --agree-tos --email admin@example.com --redirect"
    ```
 
 ### 2. Local Setup (Completed)
@@ -70,7 +70,7 @@ Resilio Sync runs on the host macOS system, not in the container.
 - **Secure Access**: Use SSH tunnel for encrypted access:
 
   ```bash
-  ssh -L 8889:localhost:8889 root@167.71.106.64
+  ssh -L 8889:localhost:8889 root@YOUR_DROPLET_IP
   # Then open: http://localhost:8889
   ```
 
@@ -119,7 +119,7 @@ command -v rslsync
 ### Access Web UI
 
 - Local: Resilio Sync app on macOS
-- Droplet: http://167.71.106.64:8889
+- Droplet: http://YOUR_DROPLET_IP:8889
 
 ### Manual Installation (if needed)
 

@@ -342,7 +342,6 @@ program
   .option('--stage <stage>', 'Filter by stage (Front Stage, Back Stage, Off Stage)')
   .option('-l, --legend', 'Show legend for symbols')
   .option('-c, --compact', 'Ultra-compact display (no table borders)')
-  .option('--with-notion', 'Show only tasks imported from Notion')
   .action((options) => {
     if (options.legend) {
       console.log(chalk.bold('\nTask List Legend:'));
@@ -360,15 +359,7 @@ program
 
     try {
       let tasks;
-      if (options.withNotion) {
-        // Get tasks with Notion IDs
-        tasks = tm.db.prepare(`
-          SELECT * FROM tasks 
-          WHERE notion_id IS NOT NULL 
-            AND status != '✅ Done'
-          ORDER BY do_date, status
-        `).all();
-      } else if (options.today) {
+      if (options.today) {
         tasks = tm.getTodayTasks();
       } else if (options.project) {
         tasks = tm.getProjectTasks(options.project);
@@ -381,9 +372,6 @@ program
       }
       if (options.stage) {
         tasks = tasks.filter(t => t.stage === options.stage);
-      }
-      if (options.withNotion && !options.today && !options.project) {
-        // Already filtered by notion_id in the query above
       }
 
       if (tasks.length === 0) {
@@ -1539,14 +1527,6 @@ program
           }
         }
 
-        // Notion info
-        if (task.notion_id) {
-          console.log(`Notion ID:       ${task.notion_id}`);
-          if (task.notion_url) {
-            console.log(`Notion URL:      ${task.notion_url}`);
-          }
-        }
-
         // Topics
         try {
           const topics = tm.db.prepare(`
@@ -1666,54 +1646,6 @@ program
 
         console.log(table.toString());
       }
-    } finally {
-      tm.close();
-    }
-  });
-
-// Clear Notion IDs command
-program
-  .command('clear-notion-ids')
-  .description('Remove Notion IDs from tasks after successful migration')
-  .option('--force', 'Skip confirmation prompt')
-  .action(async (options) => {
-    const tm = new TaskManager();
-
-    try {
-      // Count tasks with Notion IDs
-      const tasksWithNotion = tm.db.prepare(`
-        SELECT COUNT(*) as count 
-        FROM tasks 
-        WHERE notion_id IS NOT NULL
-      `).get();
-
-      if (tasksWithNotion.count === 0) {
-        console.log(chalk.gray('No tasks with Notion IDs found'));
-        return;
-      }
-
-      console.log(chalk.yellow(`Found ${tasksWithNotion.count} tasks with Notion IDs`));
-
-      if (!options.force) {
-        console.log(chalk.bold('\n⚠️  This will remove all Notion IDs from the database'));
-        console.log(chalk.gray('This action cannot be undone'));
-        console.log(chalk.gray('Make sure you have marked these tasks as done in Notion first'));
-        console.log(chalk.gray('\nTo proceed, run with --force flag'));
-        process.exit(0);
-      }
-
-      // Clear Notion IDs
-      const result = tm.db.prepare(`
-        UPDATE tasks 
-        SET notion_id = NULL, notion_url = NULL 
-        WHERE notion_id IS NOT NULL
-      `).run();
-
-      console.log(chalk.green(`✓ Cleared Notion IDs from ${result.changes} tasks`));
-
-    } catch (error) {
-      console.error(chalk.red('Error clearing Notion IDs:'), error.message);
-      process.exit(1);
     } finally {
       tm.close();
     }

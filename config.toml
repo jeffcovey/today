@@ -1,12 +1,142 @@
 # Configuration for Today system
 # Edit this file when your situation changes (e.g., when traveling)
 
-# Your current timezone
-# You can use:
-#   - City names: "Madrid", "London", "Tokyo", "New York"
-#   - Country names: "Spain", "Germany", "Japan"  
-#   - Full timezone IDs: "America/New_York", "Europe/Madrid"
-#   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
-#
-# The system will automatically resolve these to proper timezone IDs.
+# =============================================================================
+# Location & Time
+# =============================================================================
+
 timezone = "America/New_York"
+home_location = "Oakland Park, Florida"
+
+# =============================================================================
+# User Profile
+# =============================================================================
+
+[profile]
+name = "Jeffrey Covey"
+email = "jeff.covey@pobox.com"
+vocation = "Retired, devoted to https://oldergay.men/ - a website for older gay men and their admirers"
+wake_time = "05:30"
+bed_time = "21:30"
+wind_down_hours = 2
+
+# =============================================================================
+# Stage Themes
+# =============================================================================
+
+[stages]
+monday = "front"
+tuesday = "off"
+wednesday = "front"
+thursday = "back"
+friday = "off"
+saturday = "front"
+sunday = "back"
+
+# =============================================================================
+# Hosting
+# =============================================================================
+
+[hosting]
+enabled = true
+checkout_time = "12:00"
+checkin_time = "15:00"
+platforms = ["Airbnb", "MisterB&B"]
+
+# =============================================================================
+# Contact Follow-up
+# =============================================================================
+
+[contacts]
+follow_up_weeks = 6
+
+# =============================================================================
+# Project Monitoring
+# =============================================================================
+
+[monitoring]
+project_name = "OlderGay.Men"
+project_url = "https://oldergay.men"
+
+# =============================================================================
+# AI Configuration
+# =============================================================================
+
+[ai]
+claude_model = "claude-sonnet-4-20250514"
+
+# =============================================================================
+# Deployment
+# =============================================================================
+
+[deployment]
+domain = "today.jeffcovey.net"
+
+# =============================================================================
+# Email Categorization Patterns
+# =============================================================================
+# These patterns are used by the email organizer to sort emails into
+# Front Stage (work/support), Back Stage (maintenance/bills), and Off Stage (personal)
+
+[email.front_stage]
+# Front Stage: Meetings, calls, support, emails, communications
+patterns = [
+  "help@oldergay.men",
+  "no-reply@supportmessaging.airbnb.com",
+  "express@airbnb.com",
+  "@mail.beehiiv.com",
+  "@patreon.com",
+  "bingo@patreon.com",
+  "@email.patreon.com",
+  "@oldergay.discoursemail.com",
+  "@facebookmail.com",
+  "automated@airbnb.com"
+]
+
+[email.back_stage]
+# Back Stage: Maintenance, bills, bug fixes, organizing
+patterns = [
+  "no.reply.alerts@chase.com",
+  "@healthchecks.io",
+  "noreply@notify.cloudflare.com",
+  "alerts@mail.zapier.com",
+  "@sentry.io",
+  "@github.com",
+  "notifications@github.com",
+  "dependabot",
+  "github-actions",
+  "@noreply.fpl.com",
+  "@memberdoc.com",
+  "@mbr.floridablue.com",
+  "@servicetitan.com",
+  "@conduent.com",
+  "no-reply@asana.com",
+  "google-maps-platform-noreply@google.com",
+  "@md.getsentry.com",
+  "@rxorder.walgreens.com",
+  "noreply@email.apple.com",
+  "no-reply@zoom.us",
+  "@sedo.com",
+  "@heroku.com",
+  "noreply@heroku.com"
+]
+
+[email.off_stage]
+# Off Stage: Personal time, nature, friends, reading, entertainment
+patterns = [
+  "@amazon.com",
+  "@email.apple.com",
+  "@e.dsw.com",
+  "@jacquielawson.com",
+  "@scandigital.com",
+  "store-news@amazon.com",
+  "store_news@amazon.com",
+  "@email.meetup.com",
+  "@wildapricot.org",
+  "@wordpress.com",
+  "@gmail.com",
+  "@hotmail.co.uk",
+  "noreply_at_email_browardcenter_org",
+  "@email.trustedhousesitters.com",
+  "ptww.convention.committee@gmail.com"
+]

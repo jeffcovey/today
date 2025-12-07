@@ -112,7 +112,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
     }
   }
 
-  // Search any Notion database items using available AI
+  // Search database items using available AI
   async searchItems(items, query, databaseType = 'tasks') {
     if (this.searchMethod === 'anthropic' && this.client) {
       return this.searchWithClaude(items, query, databaseType);
@@ -129,13 +129,13 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
 
   // Get a display title for any database item
   getItemTitle(item) {
-    // Try various common Notion title property names
+    // Try various common title property names
     const titleProps = ['Name', 'Title', 'Task', 'Project', 'Item', 'Subject', 'Topic'];
 
     for (const prop of titleProps) {
       if (item.properties?.[prop]) {
         const propData = item.properties[prop];
-        // Handle different Notion property types
+        // Handle different property types
         if (propData.title?.[0]?.text?.content) {
           return propData.title[0].text.content;
         }
@@ -218,7 +218,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
     }).join('\n');
 
     // Flexible prompt that adapts to database type
-    const prompt = `You are searching through a ${databaseType} database in Notion. The user's query might be:
+    const prompt = `You are searching through a ${databaseType} database. The user's query might be:
 - Looking for specific ${databaseType} (direct search)
 - Asking questions (e.g., "what should I focus on?", "what's most important?")
 - Making complex requests (e.g., "things I've been neglecting", "quick wins")
@@ -305,7 +305,7 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
         max_tokens: 500,
         messages: [{
           role: 'user',
-          content: `I have a ${databaseType} database in Notion and need help finding relevant items based on this query: "${query}"
+          content: `I have a ${databaseType} database and need help finding relevant items based on this query: "${query}"
 
 This could be:
 - A direct search

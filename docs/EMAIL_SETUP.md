@@ -8,26 +8,26 @@ The email tool allows you to download and manage emails from your iCloud account
 
 ### 1. Generate App-Specific Password for iCloud
 
-Since you're using jeff.covey@icloud.com, you'll need to create an app-specific password:
+You'll need to create an app-specific password:
 
 1. Go to https://appleid.apple.com
 2. Sign in with your Apple ID
 3. Navigate to "Sign-In and Security"
 4. Click on "App-Specific Passwords"
 5. Click the "+" button to generate a new password
-6. Name it something like "notion-cli-email"
+6. Name it something like "today-cli-email"
 7. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)
 
 ### 2. Configure Environment Variables
 
 Add the following to your `.env` file:
 
-```
-EMAIL_ACCOUNT=jeff.covey@icloud.com
+```bash
+EMAIL_ACCOUNT=your.email@icloud.com
 EMAIL_PASSWORD=xxxx-xxxx-xxxx-xxxx
 ```
 
-Replace `xxxx-xxxx-xxxx-xxxx` with your actual app-specific password.
+Replace with your actual email and app-specific password.
 
 ### 3. Install the CLI
 

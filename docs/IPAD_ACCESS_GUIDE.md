@@ -25,7 +25,7 @@ Using Tailscale, you can securely access your home development container from an
 
 ```bash
 # In your local VS Code terminal
-cd /path/to/notion-cli
+cd /path/to/today
 
 # Rebuild container with new Tailscale configuration
 # VS Code: Cmd+Shift+P → "Dev Containers: Rebuild Container"
@@ -83,7 +83,7 @@ If you prefer a full web-based IDE:
 # Code-server is already installed in the container
 
 # Run code-server (specifying the workspace directory)
-nohup code-server --bind-addr 0.0.0.0:8081 /workspaces/notion-cli > /tmp/code-server.log 2>&1 &
+nohup code-server --bind-addr 0.0.0.0:8081 /workspaces/today > /tmp/code-server.log 2>&1 &
 
 # Get the password from the config file
 cat ~/.config/code-server/config.yaml
@@ -92,7 +92,7 @@ cat ~/.config/code-server/config.yaml
 ps aux | grep code-server
 
 # Access from iPad Safari at:
-# http://100.65.74.31:8081 (your Tailscale IP)
+# http://100.x.x.x:8081 (your Tailscale IP)
 # Enter the password when prompted
 ```
 
@@ -115,7 +115,7 @@ tailscale ip -4
 ### Using MagicDNS
 
 - Enable MagicDNS in Tailscale admin
-- Access by hostname: `notion-cli-container.tail-scale.ts.net`
+- Access by hostname: `today-container.tail-scale.ts.net`
 
 ## Tips for iPad Development
 

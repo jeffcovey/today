@@ -62,24 +62,6 @@ else
 fi
 echo ""
 
-# Check Notion configuration
-echo "📊 Notion Configuration:"
-if [ ! -z "$NOTION_TOKEN" ]; then
-    echo "  ✅ NOTION_TOKEN is set"
-else
-    echo "  ❌ NOTION_TOKEN not available"
-fi
-echo ""
-
-# Check Todoist configuration
-echo "✅ Todoist Configuration:"
-if [ ! -z "$TODOIST_TOKEN" ]; then
-    echo "  ✅ TODOIST_TOKEN is set"
-else
-    echo "  ❌ TODOIST_TOKEN not available"
-fi
-echo ""
-
 # Check calendar configuration
 echo "📅 Calendar Configuration:"
 if [ -f config/calendars.json ]; then
@@ -97,12 +79,6 @@ echo ""
 
 # Check databases
 echo "💾 Databases:"
-if [ -f .notion-cache/notion-cache.db ]; then
-    SIZE=$(du -h .notion-cache/notion-cache.db | cut -f1)
-    echo "  ✅ Notion cache exists ($SIZE)"
-else
-    echo "  ⚠️  Notion cache not initialized"
-fi
 if [ -d .calendar-cache ]; then
     echo "  ✅ Calendar cache directory exists"
 else
@@ -180,7 +156,7 @@ if [ "$BETTER_SQLITE_FOUND" = false ]; then
 fi
 
 if [ ! -f config/calendars.json ]; then
-    echo "  - Calendar config: Copy config/calendars.json from main machine"
+    echo "  - Calendar config: Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
 fi
 
 if ! command -v claude &> /dev/null; then

@@ -19,7 +19,7 @@ The vault web server provides secure, authenticated web access to your vault fil
 - Restarts on failure
 - Runs with dotenvx for encrypted environment variables
 
-### 3. Nginx Configuration (`config/nginx-vault.conf`)
+### 3. Nginx Configuration (`config/nginx-vault-web.conf`)
 
 - Reverse proxy to Node.js server
 - SSL/HTTPS support via Let's Encrypt
@@ -35,13 +35,13 @@ The vault web server provides secure, authenticated web access to your vault fil
 ## Prerequisites
 
 1. **Domain Name Required**
-   - You need a domain or subdomain pointing to your droplet IP (45.55.122.152)
+   - You need a domain or subdomain pointing to your droplet IP
    - SSL certificates require a valid domain name
    - Cannot use raw IP addresses with Let's Encrypt
 
 2. **DNS Setup**
-   - Add an A record pointing your domain to 45.55.122.152
-   - Example: `vault.yourdomain.com` → `45.55.122.152`
+   - Add an A record pointing your domain to your droplet IP
+   - Example: `vault.yourdomain.com` → `YOUR_DROPLET_IP`
    - Wait for DNS propagation (5-30 minutes typically)
 
 ## Deployment Steps
@@ -52,7 +52,7 @@ The vault web server provides secure, authenticated web access to your vault fil
 # Add DNS A record at your domain registrar:
 Type: A
 Name: vault (or @ for root domain)
-Value: 45.55.122.152
+Value: YOUR_DROPLET_IP
 TTL: 3600 (or default)
 ```
 
@@ -60,7 +60,7 @@ TTL: 3600 (or default)
 
 ```bash
 # SSH into your droplet
-ssh root@45.55.122.152
+ssh root@YOUR_DROPLET_IP
 
 # Navigate to project
 cd /opt/today
@@ -143,7 +143,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable vault-web
 sudo systemctl start vault-web
 
-# Access at http://45.55.122.152:3001
+# Access at http://YOUR_DROPLET_IP:3001
 # (Note: passwords sent in clear text without HTTPS!)
 ```
 
@@ -193,11 +193,11 @@ If you already own a domain, create a subdomain:
 # Option 1: Test from the deployed server itself (most reliable)
 bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admin:\$WEB_PASSWORD http://localhost:3001/daily'"
 
-# Option 2: Direct access with credentials (if you know them)
-curl -u 'admin:5RDx9/RcQD2K/iXbKhhFyvn97ZSHW5uKUAMbfZbzV9g=' http://today.oldergay.men/daily
+# Option 2: Direct access with credentials (replace with your own)
+curl -u 'admin:YOUR_PASSWORD' http://your-domain.example.com/daily
 
 # Option 3: Using environment variables locally
-npx dotenvx run -- bash -c 'curl -u "$WEB_USER:$WEB_PASSWORD" http://today.oldergay.men/daily'
+npx dotenvx run -- bash -c 'curl -u "$WEB_USER:$WEB_PASSWORD" http://your-domain.example.com/daily'
 
 # To check specific elements in the HTML:
 bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admin:\$WEB_PASSWORD http://localhost:3001/daily | grep chatMessages'"
@@ -207,7 +207,7 @@ bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admi
 
 - The web server runs on port 3001 on the server
 - It's proxied through nginx to the domain
-- Always use the domain name (today.oldergay.men) not the raw IP
+- Always use the domain name (your configured domain) not the raw IP
 - SSL issues may occur with Cloudflare (error 525) - use HTTP or test locally on server
 - The server requires Basic Auth with credentials from .env
 
@@ -219,7 +219,7 @@ bin/deploy-do exec "cd /opt/today && npx dotenvx run -- bash -c 'curl -s -u admi
 │   └── web-server.js       # Express server
 ├── config/
 │   ├── vault-web.service   # Systemd service
-│   └── nginx-vault.conf    # Nginx template
+│   └── nginx-vault-web.conf # Nginx config
 ├── bin/
 │   └── setup-vault-web     # Setup script
 ├── vault/                  # Files served by web server

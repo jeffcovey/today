@@ -12,7 +12,6 @@ services:
       # Mount the entire project directory
       - .:/app
       # Use named volumes for caches to persist between container rebuilds
-      - notion-cache:/app/.notion-cache
       - calendar-cache:/app/.calendar-cache
       # Override node_modules to use container's version
       - /app/node_modules
@@ -38,8 +37,6 @@ services:
     # command: ["ollama serve & sleep 5 && ollama pull tinyllama && tail -f /dev/null"]
 
 volumes:
-  notion-cache:
-    driver: local
   calendar-cache:
     driver: local
   ollama-data:

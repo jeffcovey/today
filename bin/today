@@ -769,10 +769,18 @@ IMPORTANT:
     client = anthropic.Anthropic(api_key=api_key)
 
     try:
-        # Use model from environment variable or default to latest Sonnet
-        # Set CLAUDE_MODEL in .env to override (e.g., claude-haiku-4-5-20251001 for speed)
+        # Get model from config.toml, fall back to env var, then default to Sonnet
         import os
-        model = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-5-20250929')
+        import subprocess
+        model = 'claude-sonnet-4-20250514'
+        try:
+            result = subprocess.run(['bin/get-config', 'ai.claude_model'],
+                                    capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                model = result.stdout.strip()
+        except: pass
+        if os.environ.get('CLAUDE_MODEL'):
+            model = os.environ.get('CLAUDE_MODEL')
         response = client.messages.create(
             model=model,
             max_tokens=2000,
