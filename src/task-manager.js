@@ -171,8 +171,6 @@ export class TaskManager {
         project_id TEXT,
         repeat_interval INTEGER,
         repeat_next_date DATE,
-        notion_id TEXT UNIQUE,
-        notion_url TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
@@ -272,8 +270,8 @@ export class TaskManager {
   createTask(data) {
     const id = data.id || this.generateId();
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (id, title, description, content, do_date, status, stage, project_id, repeat_interval, notion_id, notion_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, title, description, content, do_date, status, stage, project_id, repeat_interval)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
@@ -285,9 +283,7 @@ export class TaskManager {
       data.status || '🗂️ To File',
       data.stage || null,
       data.project_id || null,
-      data.repeat_interval || null,
-      data.notion_id || null,
-      data.notion_url || null
+      data.repeat_interval || null
     );
 
     // Add topics if provided

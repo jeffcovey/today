@@ -81,7 +81,7 @@ bin/deploy-do restart
 The scheduler runs automatically via systemd with these tasks:
 - **Every 10 minutes**: `bin/sync --quick` - Quick sync of GitHub vault and tasks
 - **Every 2 hours (5AM-9PM)**: `bin/today "Update today's review file"` - Claude updates your daily review
-- **Daily at 3AM**: `bin/notion daily --all` (temporary until migration)
+- **Daily at 3AM**: Daily review generation
 
 Edit `src/scheduler.js` to customize the schedule.
 

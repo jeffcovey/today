@@ -15,7 +15,7 @@ Since you're using jeff.covey@icloud.com, you'll need to create an app-specific 
 3. Navigate to "Sign-In and Security"
 4. Click on "App-Specific Passwords"
 5. Click the "+" button to generate a new password
-6. Name it something like "notion-cli-email"
+6. Name it something like "today-cli-email"
 7. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)
 
 ### 2. Configure Environment Variables

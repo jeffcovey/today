@@ -86,7 +86,7 @@ Most issues have been resolved, with one known limitation:
 - Detects OS and architecture automatically
 - Downloads appropriate VS Code CLI variant to `.vscode-cli/` on first run
 - Supports Linux (Alpine builds) and macOS across x64 and ARM64 architectures
-- Executes tunnel command using `/workspaces/notion-cli/.vscode-cli/code tunnel`
+- Executes tunnel command using `/workspaces/today/.vscode-cli/code tunnel`
 - ⚠️ **Note**: Has ARM64 server limitation - consider using SSH instead
 
 **`bin/setup --ssh`**:

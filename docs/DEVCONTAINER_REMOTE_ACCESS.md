@@ -41,7 +41,7 @@ The devcontainer.json includes:
 
 ### Scripts
 
-Located in `/workspaces/notion-cli/bin/`:
+Located in `/workspaces/today/bin/`:
 
 - **devcontainer-startup**: Main orchestrator script
 - **start-code-server**: Manages code-server process
@@ -51,7 +51,7 @@ Located in `/workspaces/notion-cli/bin/`:
 ### Service Naming
 
 Containers are named using the pattern: `{project}-{host}`
-- Example: `notion-cli-macmini`
+- Example: `today-macmini`
 - Helps identify containers when running multiple projects
 
 ## Managing Multiple Projects

@@ -25,7 +25,7 @@ COPY TODAY.md ./
 RUN chmod +x ./bin/*
 
 # Create directories for cache and config
-RUN mkdir -p /app/.notion-cache /app/config /app/notes
+RUN mkdir -p /app/config /app/notes
 
 # Set up environment
 ENV NODE_ENV=production

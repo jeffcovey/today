@@ -85,19 +85,7 @@ export class SQLiteCache {
         streak_name TEXT,
         current_count INTEGER,
         last_updated TEXT,
-        data_hash TEXT,
-        notion_page_id TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS todoist_sync_mapping (
-        notion_id TEXT PRIMARY KEY,
-        todoist_id TEXT NOT NULL,
-        last_synced INTEGER NOT NULL,
-        sync_hash TEXT,
-        notion_last_edited TEXT,
-        todoist_last_edited TEXT,
-        notion_hash TEXT,
-        todoist_hash TEXT
+        data_hash TEXT
       );
 
       CREATE TABLE IF NOT EXISTS temporal_sync (
@@ -110,10 +98,10 @@ export class SQLiteCache {
         previous_day_id TEXT
       );
 
-      -- Toggl project to Notion pillar mappings
+      -- Toggl project to pillar mappings
       CREATE TABLE IF NOT EXISTS project_pillar_mapping (
         toggl_project_id TEXT PRIMARY KEY,
-        notion_pillar_id TEXT,
+        pillar_id TEXT,
         project_name TEXT,
         pillar_name TEXT,
         updated_at INTEGER
@@ -389,84 +377,6 @@ export class SQLiteCache {
     }
   }
 
-  // Status groups logic (keeping existing interface)
-  async getCompleteGroupStatuses(databaseId, notionAPI) {
-    try {
-      // First get the database to check last_edited_time
-      const database = await notionAPI.notion.databases.retrieve({
-        database_id: databaseId
-      });
-
-      const currentLastEditedTime = database.last_edited_time;
-
-      // Check if we have valid cached data
-      if (await this.isCacheValid(databaseId, currentLastEditedTime)) {
-        const cached = await this.getCachedStatusGroups(databaseId);
-        return cached.statusGroups.completeStatuses;
-      }
-
-      // Cache is invalid or doesn't exist, fetch fresh data
-      const statusProperty = this.findStatusProperty(database.properties);
-      if (!statusProperty) {
-        throw new Error('No status property found in database');
-      }
-
-      const statusGroups = this.extractStatusGroups(statusProperty);
-      
-      // Cache the results
-      await this.setCachedStatusGroups(databaseId, statusGroups, currentLastEditedTime);
-      
-      return statusGroups.completeStatuses;
-    } catch (error) {
-      throw new Error(`Failed to get Complete group statuses: ${error.message}`);
-    }
-  }
-
-  findStatusProperty(properties) {
-    for (const [name, property] of Object.entries(properties)) {
-      if (property.type === 'status') {
-        return property;
-      }
-    }
-    return null;
-  }
-
-  extractStatusGroups(statusProperty) {
-    const { options, groups } = statusProperty.status;
-    
-    // Create a map of option_id to option name
-    const optionMap = {};
-    options.forEach(option => {
-      optionMap[option.id] = option.name;
-    });
-
-    // Find the Complete group and get all its status names
-    const completeGroup = groups.find(group => 
-      group.name.toLowerCase() === 'complete' || 
-      group.name.toLowerCase() === 'completed'
-    );
-
-    let completeStatuses = [];
-    if (completeGroup) {
-      completeStatuses = completeGroup.option_ids.map(optionId => 
-        optionMap[optionId]
-      ).filter(Boolean);
-    }
-
-    // Also extract all groups for potential future use
-    const allGroups = groups.map(group => ({
-      name: group.name,
-      color: group.color,
-      statuses: group.option_ids.map(optionId => optionMap[optionId]).filter(Boolean)
-    }));
-
-    return {
-      completeStatuses,
-      allGroups,
-      options
-    };
-  }
-
   // Utility methods
   async clearCache() {
     this.db.exec(`
@@ -475,7 +385,6 @@ export class SQLiteCache {
       DELETE FROM tag_cache;
       DELETE FROM status_groups_cache;
       DELETE FROM cache_metadata;
-      DELETE FROM todoist_sync_mapping;
     `);
   }
 
@@ -555,62 +464,6 @@ export class SQLiteCache {
       transaction();
     } catch (error) {
       console.error('Error setting cached databases:', error);
-    }
-  }
-
-  async initSyncTables() {
-    // Tables are already created in initDatabase, this is for compatibility
-    return true;
-  }
-
-  async getSyncMappings() {
-    try {
-      const stmt = this.db.prepare('SELECT * FROM todoist_sync_mapping');
-      return stmt.all();
-    } catch (error) {
-      console.error('Error getting sync mappings:', error);
-      return [];
-    }
-  }
-
-  async saveSyncMapping(notionId, todoistId, syncHash = null, metadata = {}) {
-    try {
-      const stmt = this.db.prepare(`
-        INSERT OR REPLACE INTO todoist_sync_mapping 
-        (notion_id, todoist_id, last_synced, sync_hash, notion_last_edited, todoist_last_edited, notion_hash, todoist_hash) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      stmt.run(
-        notionId, 
-        todoistId, 
-        Date.now(), 
-        syncHash,
-        metadata.notionLastEdited || null,
-        metadata.todoistLastEdited || null,
-        metadata.notionHash || null,
-        metadata.todoistHash || null
-      );
-    } catch (error) {
-      console.error('Error saving sync mapping:', error);
-    }
-  }
-
-  async getSyncMapping(notionId) {
-    try {
-      const stmt = this.db.prepare('SELECT * FROM todoist_sync_mapping WHERE notion_id = ?');
-      return stmt.get(notionId);
-    } catch (error) {
-      console.error('Error getting sync mapping:', error);
-      return null;
-    }
-  }
-
-  async deleteSyncMapping(notionId) {
-    try {
-      const stmt = this.db.prepare('DELETE FROM todoist_sync_mapping WHERE notion_id = ?');
-      stmt.run(notionId);
-    } catch (error) {
-      console.error('Error deleting sync mapping:', error);
     }
   }
 

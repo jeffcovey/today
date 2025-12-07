@@ -75,9 +75,9 @@ Promise.all([
       console.log('1. Go to https://appleid.apple.com');
       console.log('2. Sign in and go to "Sign-In and Security"');
       console.log('3. Select "App-Specific Passwords"');
-      console.log('4. Generate a new password for "notion-cli email"');
+      console.log('4. Generate a new password for "today-cli email"');
       console.log('5. Add the following to your .env file:');
-      console.log(chalk.green('\nEMAIL_ACCOUNT=jeff.covey@icloud.com'));
+      console.log(chalk.green('\nEMAIL_ACCOUNT=your@icloud.com'));
       console.log(chalk.green('EMAIL_PASSWORD=xxxx-xxxx-xxxx-xxxx'));
       console.log(chalk.gray('\n(Replace xxxx-xxxx-xxxx-xxxx with your app-specific password)'));
     });
