@@ -31,6 +31,7 @@ Resilio Sync.btskey
 .calendar-cache/
 .sync-config.json
 .last-dep-check
+.skeleton-hashes
 
 # =============================================================================
 # Vault (synced separately via Resilio/iCloud)
