@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-import { TaskManager } from '../src/task-manager.js';
-import { TaskStageClassifier } from '../src/task-stage-classifier.js';
 import { getDatabase } from '../src/database-service.js';
 import { program } from 'commander';
 import chalk from 'chalk';
@@ -67,526 +65,236 @@ program
   .description('Task management for Today system')
   .version('1.0.0');
 
-// Sync command
+// Sync command - updates markdown_tasks cache and generates topic files
 program
-  .command('sync [file]')
-  .description('Sync tasks from markdown files')
-  .option('-f, --full', 'Force full scan of all files')
-  .action(async (file, options) => {
-    const tm = new TaskManager();
-
+  .command('sync')
+  .description('Update markdown tasks cache and generate topic files')
+  .action(async () => {
     try {
-      if (file) {
-        // Sync specific file
-        const updates = await tm.syncMarkdownFile(file);
-        console.log(chalk.green(`✓ Synced ${file} (${updates} updates)`));
-      } else {
-        // Sync all markdown files in the entire repository
-        const fs = await import('fs');
-        const { execSync } = await import('child_process');
+      console.log(chalk.blue('Syncing tasks...'));
 
-        // Load last sync state (unless --full flag is used)
-        const syncStateFile = '.data/task-sync-state.json';
-        let lastSyncTime = null;
+      // Step 1: Update the markdown_tasks cache
+      console.log(chalk.blue('1. Updating markdown tasks cache...'));
+      execSync('node bin/tasks update-cache', {
+        encoding: 'utf8',
+        stdio: 'inherit'
+      });
 
-        if (!options.full) {
-          try {
-            if (fsSync.existsSync(syncStateFile)) {
-              const state = JSON.parse(fsSync.readFileSync(syncStateFile, 'utf8'));
-              lastSyncTime = state.lastSyncTime;
-            }
-          } catch (e) {
-            // No previous state
-          }
-        } else {
-          console.log(chalk.yellow('Full scan requested (--full flag)'));
-        }
+      // Step 2: Generate topic files
+      console.log(chalk.blue('\n2. Generating topic files...'));
+      execSync('node bin/tasks generate-topics', {
+        encoding: 'utf8',
+        stdio: 'inherit'
+      });
 
-        // Find markdown files
-        let allMarkdownFiles;
-        let onlyChangedFiles = false;
-
-        if (lastSyncTime) {
-          // Try to get only changed files since last sync
-          const minutesAgo = Math.ceil((Date.now() - new Date(lastSyncTime).getTime()) / 60000);
-          console.log(chalk.blue(`Finding markdown files changed in last ${minutesAgo} minutes...`));
-
-          try {
-            // Use find command to get recently modified files
-            const changedFiles = execSync(
-              `find "vault/" -name "*.md" -type f ! -path "*/.*" -mmin -${minutesAgo + 1} -not -path "*/templates/*" 2>/dev/null`,
-              { encoding: 'utf8' }
-            ).split('\n')
-              .filter(f => f)
-              .map(f => f.replace(/^\.\//, ''));
-
-            if (changedFiles.length > 0) {
-              allMarkdownFiles = changedFiles;
-              onlyChangedFiles = true;
-              console.log(chalk.gray(`  Found ${changedFiles.length} recently modified files`));
-            } else {
-              console.log(chalk.gray(`  No files modified since last sync`));
-              // Still scan project files in case they need initial setup
-              allMarkdownFiles = execSync('find "vault/projects" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
-                .split('\n')
-                .filter(f => f)
-                .map(f => f.replace(/^\.\//, ''));
-            }
-          } catch (e) {
-            // Find command failed, fall back to full scan
-            onlyChangedFiles = false;
-          }
-        }
-
-        // If we don't have changed files or no last sync time, do full scan
-        if (!onlyChangedFiles && !lastSyncTime) {
-          console.log(chalk.blue('Finding all markdown files (first sync)...'));
-          allMarkdownFiles = execSync('find "vault/" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
-            .split('\n')
-            .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
-            .map(f => f.replace(/^\.\//, ''));
-          console.log(chalk.gray(`  Found ${allMarkdownFiles.length} markdown files`));
-        }
-
-        // Always include review files (even if not modified recently)
-        // This ensures tasks in review files get their do_date set properly
-        try {
-          const reviewFiles = execSync('find "vault/plans" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
-            .split('\n')
-            .filter(f => f)
-            .map(f => f.replace(/^\.\//, ''));
-
-          let addedReviewFiles = 0;
-          for (const reviewFile of reviewFiles) {
-            if (!allMarkdownFiles.includes(reviewFile)) {
-              allMarkdownFiles.push(reviewFile);
-              addedReviewFiles++;
-            }
-          }
-
-          if (addedReviewFiles > 0) {
-            console.log(chalk.gray(`  Added ${addedReviewFiles} review file(s) to ensure proper date assignment`));
-          }
-        } catch (e) {
-          // If finding review files fails, at least add today's
-          const today = new Date();
-          const year = today.getFullYear();
-          const month = String(today.getMonth() + 1).padStart(2, '0');
-          const day = String(today.getDate()).padStart(2, '0');
-          const quarter = Math.ceil((today.getMonth() + 1) / 3);
-          // Calculate ISO week number
-          const onejan = new Date(today.getFullYear(), 0, 1);
-          const week = Math.ceil((((today - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-          const todayReviewFile = `vault/plans/${year}_Q${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
-          if (fsSync.existsSync(todayReviewFile) && !allMarkdownFiles.includes(todayReviewFile)) {
-            allMarkdownFiles.push(todayReviewFile);
-            console.log(chalk.gray(`  Added today's review file: ${todayReviewFile}`));
-          }
-        }
-
-        // Always include topic files to sync new tasks and checkbox changes
-        try {
-          const topicFiles = execSync('find "vault/topics" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null || echo ""', { encoding: 'utf8' })
-            .split('\n')
-            .filter(f => f)
-            .map(f => f.replace(/^\.\//, ''));
-
-          let addedTopicFiles = 0;
-          for (const topicFile of topicFiles) {
-            if (!allMarkdownFiles.includes(topicFile)) {
-              allMarkdownFiles.push(topicFile);
-              addedTopicFiles++;
-            }
-          }
-
-          if (addedTopicFiles > 0) {
-            console.log(chalk.gray(`  Added ${addedTopicFiles} topic file(s) for task sync`));
-          }
-        } catch (e) {
-          // Topic files not found, continue without them
-        }
-
-        // DISABLED: No longer syncing to database - using Obsidian Tasks plugin
-        console.log(chalk.green('✓ Database sync disabled - using Obsidian Tasks plugin'));
-
-        // Save sync state (still needed for change tracking)
-        const newState = { lastSyncTime: new Date().toISOString() };
-        try {
-          const path = await import('path');
-          const dir = path.dirname(syncStateFile);
-          if (!fsSync.existsSync(dir)) {
-            fsSync.mkdirSync(dir, { recursive: true });
-          }
-          fsSync.writeFileSync(syncStateFile, JSON.stringify(newState, null, 2));
-        } catch (e) {
-          console.error('Failed to save sync state:', e.message);
-        }
-      }
-
-      // DISABLED: Repeating tasks now handled by Obsidian Tasks plugin recurrence syntax
-
-      // Disabled - now using static today.md with Obsidian Tasks plugin queries
-      // const todayCount = await tm.generateTodayFile();
-      // console.log(chalk.green(`✓ Generated today.md with ${todayCount} tasks`));
-
-
-      // Disabled - now using static tasks.md with Obsidian Tasks plugin queries
-      // const allCount = await tm.generateAllTasksFile();
-      // console.log(chalk.green(`✓ Generated tasks.md with ${allCount} active tasks`));
-
-      // Disabled - now using static stages.md with Obsidian Tasks plugin queries
-      // const stagesCount = await tm.generateStagesFile();
-      // console.log(chalk.green(`✓ Generated stages.md with ${stagesCount} staged tasks`));
-
-      // Disabled - replaced with static topic files using Obsidian Tasks queries
-      // console.log(chalk.blue('Generating topic files...'));
-      // const topicCount = await tm.generateTopicFiles();
-      // if (topicCount > 0) {
-      //   console.log(chalk.green(`✓ Generated ${topicCount} topic files`));
-      // } else {
-      //   console.log(chalk.gray('  • No topics with tasks to generate'));
-      // }
-
-      // Generate topic files (now handled by generate-topics command)
-      console.log(chalk.blue('Generating topic files...'));
-      try {
-        const { execSync } = await import('child_process');
-        const output = execSync('node bin/tasks generate-topics', {
-          encoding: 'utf8',
-          stdio: 'pipe'
-        });
-        // Show the output from the command
-        console.log(output.split('\n').filter(line => line.trim()).slice(-3).join('\n'));
-      } catch (error) {
-        console.error(chalk.red('Error generating topic files:'), error.message);
-      }
-
-      // Classify stages for tasks without them in background
-      // This prevents the sync from hanging while waiting for AI
-      if (process.env.SKIP_CLASSIFICATION) {
-        console.log(chalk.yellow('⚡ Classification skipped (SKIP_CLASSIFICATION set)'));
-      } else {
-        // Count tasks needing classification
-        const unclassifiedCount = tm.db.prepare(`
-          SELECT COUNT(*) as count FROM tasks 
-          WHERE stage IS NULL 
-          AND status != '✅ Done'
-        `).get().count;
-
-        if (unclassifiedCount > 0) {
-          console.log(chalk.blue(`⚡ Launching background classification for ${unclassifiedCount} tasks...`));
-
-          // Spawn classification in background
-          const { spawn } = await import('child_process');
-          const classifyProcess = spawn('node', [
-            '-e',
-            `
-            const { TaskStageClassifier } = require('./src/task-stage-classifier.js');
-            const classifier = new TaskStageClassifier();
-            classifier.classifyTasks(true).then(result => {
-              if (result.classified > 0) {
-                console.log('✓ Background: Classified', result.classified, 'tasks');
-              }
-              classifier.close();
-              process.exit(0);
-            }).catch(err => {
-              console.error('Background classification error:', err.message);
-              classifier.close();
-              process.exit(1);
-            });
-            `
-          ], {
-            detached: true,
-            stdio: 'ignore',
-            cwd: process.cwd()
-          });
-
-          // Detach the child process so it continues after parent exits
-          classifyProcess.unref();
-        } else {
-          console.log(chalk.gray('  • All tasks already have stages assigned'));
-        }
-      }
+      console.log(chalk.green('\n✓ Sync complete'));
     } catch (error) {
       console.error(chalk.red('Error syncing tasks:'), error.message);
       process.exit(1);
-    } finally {
-      // Close task manager first
-      tm.close();
-
-      // Push any pending changes to Turso before exiting
-      try {
-        const db = getDatabase();
-        await Promise.race([
-          db.forcePush(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('forcePush timeout')), 5000)
-          )
-        ]);
-      } catch (err) {
-        console.error(chalk.yellow('Warning: Could not push to Turso:', err.message));
-      }
-
-      // Exit cleanly
-      process.exit(0);
     }
   });
 
-// List command
+// List command - uses markdown_tasks cache
 program
   .command('list')
-  .description('List tasks')
-  .option('-t, --today', 'Show only today\'s tasks')
-  .option('-p, --project <id>', 'Show tasks for a specific project')
-  .option('-s, --status <status>', 'Filter by status')
-  .option('--stage <stage>', 'Filter by stage (Front Stage, Back Stage, Off Stage)')
+  .description('List tasks from markdown files')
+  .option('-t, --today', 'Show tasks due/scheduled today')
+  .option('--stage <stage>', 'Filter by stage (front-stage, back-stage, off-stage)')
+  .option('--topic <topic>', 'Filter by topic')
+  .option('-a, --all', 'Include completed tasks')
   .option('-l, --legend', 'Show legend for symbols')
-  .option('-c, --compact', 'Ultra-compact display (no table borders)')
-  .action((options) => {
+  .option('-n, --limit <number>', 'Limit number of tasks shown', parseInt)
+  .action(async (options) => {
     if (options.legend) {
       console.log(chalk.bold('\nTask List Legend:'));
       console.log(chalk.gray('─────────────────'));
-      console.log('Stage symbols:');
-      console.log('  📥 = inbox    ⏭️ = next     🔵 = active');
-      console.log('  ⏸️ = waiting  ✅ = done     📦 = archived');
-      console.log('\nPriority symbols:');
-      console.log('  🔴 = critical (5)  🟠 = high (4)     🟡 = medium (3)');
-      console.log('  🔵 = low (2)       ⚪ = very low (1)');
+      console.log('Priority symbols:');
+      console.log('  🔺 = highest    ⏫ = high      🔼 = medium');
+      console.log('  🔽 = low        ⏬ = lowest');
+      console.log('\nStage tags:');
+      console.log('  #stage/front-stage - Meetings, calls, support, emails');
+      console.log('  #stage/back-stage  - Maintenance, planning, organizing');
+      console.log('  #stage/off-stage   - Personal time, relaxation');
+      console.log('\nDate markers:');
+      console.log('  📅 = due date   ⏳ = scheduled   ➕ = created');
       console.log('');
       return;
     }
-    const tm = new TaskManager('.data/today.db', { readOnly: true });
+
+    const db = getDatabase();
 
     try {
-      let tasks;
-      if (options.today) {
-        tasks = tm.getTodayTasks();
-      } else if (options.project) {
-        tasks = tm.getProjectTasks(options.project);
+      // Build query based on options
+      let conditions = ["file_path NOT LIKE 'vault/.%'", "file_path NOT LIKE '%/templates/%'"];
+      const params = [];
+
+      if (!options.all) {
+        conditions.push("line_text LIKE '- [ ]%'");  // Only uncompleted tasks
       } else {
-        tasks = tm.getActiveTasks();
+        conditions.push("(line_text LIKE '- [ ]%' OR line_text LIKE '- [x]%')");
       }
 
-      if (options.status) {
-        tasks = tasks.filter(t => t.status === options.status);
-      }
       if (options.stage) {
-        tasks = tasks.filter(t => t.stage === options.stage);
+        conditions.push("line_text LIKE ?");
+        params.push(`%#stage/${options.stage}%`);
       }
+
+      if (options.topic) {
+        conditions.push("line_text LIKE ?");
+        params.push(`%#topic/${options.topic}%`);
+      }
+
+      if (options.today) {
+        const today = new Date().toISOString().split('T')[0];
+        conditions.push("(line_text LIKE ? OR line_text LIKE ?)");
+        params.push(`%📅 ${today}%`, `%⏳ ${today}%`);
+      }
+
+      let sql = `SELECT file_path, line_number, line_text FROM markdown_tasks WHERE ${conditions.join(' AND ')} ORDER BY file_path, line_number`;
+
+      if (options.limit) {
+        sql += ` LIMIT ${options.limit}`;
+      }
+
+      const tasks = db.all(sql, ...params);
 
       if (tasks.length === 0) {
         console.log(chalk.gray('No tasks found'));
+        console.log(chalk.gray('Run "bin/tasks update-cache" to refresh the cache'));
         return;
       }
 
-      if (options.compact) {
-        // Ultra-compact display without table
-        console.log(chalk.gray('ID       S P  Title'));
-        console.log(chalk.gray('─'.repeat(60)));
-
-        const prioritySymbols = {
-          5: '🔴', 4: '🟠', 3: '🟡', 2: '🔵', 1: '⚪'
-        };
-        const statusDisplay = {
-          '🗂️ To File': '🗂️',
-          '1️⃣  1st Priority': '1️⃣',
-          '2️⃣  2nd Priority': '2️⃣',
-          '3️⃣  3rd Priority': '3️⃣',
-          '🤔 Waiting': '🤔',
-          '⏸️  Paused': '⏸️',
-          '✅ Done': '✅'
-        };
-
-        for (const task of tasks) {
-          const id = task.id.substring(0, 8);
-          const status = statusDisplay[task.status] || task.status.substring(0, 3);
-          const priority = prioritySymbols[task.priority] || '🟡';
-          const title = task.title.length > 45 ? task.title.substring(0, 42) + '...' : task.title;
-          console.log(`${id} ${status} ${priority} ${title}`);
-        }
-        console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
-        tm.close();
-        return;
-      }
-
+      // Extract and display tasks
       const table = new Table({
-        head: ['ID', 'Title', 'St', 'P', 'Due', 'Project'],
-        colWidths: [9, 37, 5, 4, 12, 12],
+        head: ['Pri', 'Task', 'File'],
+        colWidths: [5, 55, 30],
         wordWrap: true
       });
 
-      const prioritySymbols = {
-        5: '🔴',
-        4: '🟠',
-        3: '🟡',
-        2: '🔵',
-        1: '⚪'
-      };
-
-      // Status abbreviations for compact display
-      const statusDisplay = {
-        '🗂️ To File': '🗂️',
-        '1️⃣  1st Priority': '1️⃣',
-        '2️⃣  2nd Priority': '2️⃣',
-        '3️⃣  3rd Priority': '3️⃣',
-        '🤔 Waiting': '🤔',
-        '⏸️  Paused': '⏸️',
-        '✅ Done': '✅'
-      };
-
       for (const task of tasks) {
-        // Get project name if task has project_id
-        let projectName = '-';
-        if (task.project_id) {
-          const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
-          projectName = project ? project.name : '-';
+        // Extract priority
+        let priority = '  ';
+        if (task.line_text.includes('🔺')) priority = '🔺';
+        else if (task.line_text.includes('⏫')) priority = '⏫';
+        else if (task.line_text.includes('🔼')) priority = '🔼';
+        else if (task.line_text.includes('🔽')) priority = '🔽';
+        else if (task.line_text.includes('⏬')) priority = '⏬';
+
+        // Extract task title (remove checkbox, dates, tags, priority)
+        let title = task.line_text
+          .replace(/^- \[[x ]\] /, '')
+          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+          .replace(/#\w+\/[\w-]+/g, '')
+          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
+          .replace(/🔁 .+$/g, '')
+          .trim();
+
+        // Truncate long titles
+        if (title.length > 52) {
+          title = title.substring(0, 49) + '...';
         }
 
-        table.push([
-          task.id.substring(0, 8),
-          task.title,
-          statusDisplay[task.status] || (task.status ? task.status.substring(0, 3) : '?'),
-          prioritySymbols[task.priority] || '🟡',
-          task.do_date || '-',
-          projectName
-        ]);
+        // Shorten file path for display
+        let filePath = task.file_path.replace('vault/', '');
+        if (filePath.length > 27) {
+          filePath = '...' + filePath.substring(filePath.length - 24);
+        }
+
+        table.push([priority, title, filePath]);
       }
 
       console.log(table.toString());
       console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
 
-      // Show stage distribution if stages are set
-      const stageCounts = {};
+      // Show stage distribution
+      const stageCounts = { 'front-stage': 0, 'back-stage': 0, 'off-stage': 0, 'untagged': 0 };
       for (const task of tasks) {
-        if (task.stage) {
-          stageCounts[task.stage] = (stageCounts[task.stage] || 0) + 1;
-        }
+        if (task.line_text.includes('#stage/front-stage')) stageCounts['front-stage']++;
+        else if (task.line_text.includes('#stage/back-stage')) stageCounts['back-stage']++;
+        else if (task.line_text.includes('#stage/off-stage')) stageCounts['off-stage']++;
+        else stageCounts['untagged']++;
       }
-      if (Object.keys(stageCounts).length > 0) {
-        console.log(chalk.gray('\nBy Stage:'));
-        for (const [stage, count] of Object.entries(stageCounts)) {
-          const emoji = stage === 'Front Stage' ? '👥' :
-            stage === 'Back Stage' ? '🔧' : '🌴';
-          console.log(chalk.gray(`  ${emoji} ${stage}: ${count}`));
-        }
+
+      console.log(chalk.gray('\nBy Stage:'));
+      console.log(chalk.gray(`  👥 front-stage: ${stageCounts['front-stage']}`));
+      console.log(chalk.gray(`  🔧 back-stage: ${stageCounts['back-stage']}`));
+      console.log(chalk.gray(`  🌴 off-stage: ${stageCounts['off-stage']}`));
+      if (stageCounts['untagged'] > 0) {
+        console.log(chalk.gray(`  ❓ untagged: ${stageCounts['untagged']}`));
       }
     } finally {
-      tm.close();
+      await db.close();
     }
   });
 
-// Add command
+// Add command - appends task to vault/tasks/tasks.md
 program
   .command('add <title>')
-  .description('Add a new task')
+  .description('Add a new task to vault/tasks/tasks.md')
   .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
-  .option('-p, --priority <1-5>', 'Set priority (1-5)', '3')
-  .option('-t, --topics <topics>', 'Add topics (comma-separated)')
-  .option('-s, --status <status>', 'Set status', '🗂️  To File')
-  .option('--stage <stage>', 'Set stage (Front Stage, Back Stage, Off Stage)')
-  .option('--project <name>', 'Assign to project')
-  .action((title, options) => {
-    const tm = new TaskManager();
-
+  .option('-p, --priority <priority>', 'Set priority (highest, high, medium, low, lowest)', 'medium')
+  .option('--stage <stage>', 'Set stage (front-stage, back-stage, off-stage)')
+  .option('-t, --topic <topic>', 'Add topic tag')
+  .action(async (title, options) => {
     try {
-      const data = {
-        title,
-        do_date: options.date,
-        priority: parseInt(options.priority),
-        status: options.status,
-        stage: options.stage,
-        topics: options.topics ? options.topics.split(',').map(t => t.trim()) : []
+      const tasksFile = path.join(__dirname, '..', 'vault', 'tasks', 'tasks.md');
+
+      // Build task line
+      let taskLine = `- [ ] ${title}`;
+
+      // Add date added marker
+      taskLine = ensureDateAdded(taskLine);
+
+      // Add priority emoji
+      const priorityMap = {
+        highest: '🔺',
+        high: '⏫',
+        medium: '🔼',
+        low: '🔽',
+        lowest: '⏬'
       };
+      const priorityEmoji = priorityMap[options.priority] || '🔼';
+      taskLine = taskLine.replace(/^(- \[ \] .+?)( ➕)/, `$1 ${priorityEmoji}$2`);
 
-      if (options.project) {
-        data.project_id = tm.getOrCreateProject(options.project);
+      // Add stage tag
+      if (options.stage) {
+        taskLine += ` #stage/${options.stage}`;
       }
 
-      const id = tm.createTask(data);
-      console.log(chalk.green(`✓ Created task: ${id.substring(0, 8)}`));
-      console.log(chalk.gray(`  "${title}"`));
+      // Add topic tag
+      if (options.topic) {
+        taskLine += ` #topic/${options.topic}`;
+      }
+
+      // Add due date
+      if (options.date) {
+        taskLine += ` 📅 ${options.date}`;
+      }
+
+      // Append to tasks.md
+      let content = '';
+      try {
+        content = await fs.readFile(tasksFile, 'utf8');
+      } catch (err) {
+        // File doesn't exist yet
+      }
+
+      const lines = content.split('\n').filter(l => l.trim());
+      lines.push(taskLine);
+
+      await fs.writeFile(tasksFile, lines.join('\n') + '\n');
+
+      console.log(chalk.green(`✓ Added task to vault/tasks/tasks.md`));
+      console.log(chalk.gray(`  ${taskLine}`));
+      console.log(chalk.gray('  Run "bin/tasks update-cache" to refresh the cache'));
     } catch (error) {
-      console.error(chalk.red('Error creating task:'), error.message);
+      console.error(chalk.red('Error adding task:'), error.message);
       process.exit(1);
-    } finally {
-      tm.close();
     }
   });
 
-// Update command
-program
-  .command('update <id>')
-  .description('Update a task')
-  .option('-t, --title <title>', 'Update title')
-  .option('-d, --date <date>', 'Update due date')
-  .option('-p, --priority <1-5>', 'Update priority')
-  .option('-s, --status <status>', 'Update status')
-  .option('--stage <stage>', 'Update stage (Front Stage, Back Stage, Off Stage)')
-  .option('--topics <topics>', 'Update topics (comma-separated)')
-  .action((id, options) => {
-    const tm = new TaskManager();
-
-    try {
-      // Find task by partial ID
-      const tasks = tm.getActiveTasks();
-      const task = tasks.find(t => t.id.startsWith(id));
-
-      if (!task) {
-        console.error(chalk.red(`Task not found: ${id}`));
-        process.exit(1);
-      }
-
-      const updates = {};
-      if (options.title) updates.title = options.title;
-      if (options.date) updates.do_date = options.date;
-      if (options.priority) updates.priority = parseInt(options.priority);
-      if (options.status) updates.status = options.status;
-      if (options.stage) updates.stage = options.stage;
-      if (options.topics) updates.topics = options.topics.split(',').map(t => t.trim());
-
-      tm.updateTask(task.id, updates);
-      console.log(chalk.green(`✓ Updated task: ${task.id.substring(0, 8)}`));
-    } catch (error) {
-      console.error(chalk.red('Error updating task:'), error.message);
-      process.exit(1);
-    } finally {
-      tm.close();
-    }
-  });
-
-// Done command
-program
-  .command('done <id>')
-  .description('Mark a task as done')
-  .action((id) => {
-    const tm = new TaskManager();
-
-    try {
-      const tasks = tm.getActiveTasks();
-      const task = tasks.find(t => t.id.startsWith(id));
-
-      if (!task) {
-        console.error(chalk.red(`Task not found: ${id}`));
-        process.exit(1);
-      }
-
-      tm.updateTask(task.id, { status: '✅ Done' });
-      console.log(chalk.green(`✓ Marked as done: ${task.title}`));
-
-      // Check for repeating task
-      if (task.repeat_frequency) {
-        const repeated = tm.processRepeatingTasks();
-        if (repeated > 0) {
-          console.log(chalk.blue(`✓ Created next recurrence`));
-        }
-      }
-    } catch (error) {
-      console.error(chalk.red('Error marking task as done:'), error.message);
-      process.exit(1);
-    } finally {
-      tm.close();
-    }
-  });
+// Note: update and done commands removed - tasks are now edited directly in markdown files
+// Use Obsidian or any text editor to modify tasks in vault/tasks/*.md files
 
 // Classify stages command - works with markdown files
 program
@@ -1471,23 +1179,36 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
     process.exit(0);
   });
 
-// Search command
+// Search command - searches markdown_tasks cache
 program
   .command('search <query>')
-  .description('Search for tasks and show detailed information')
-  .option('-a, --all', 'Include completed/archived tasks')
-  .option('-v, --verbose', 'Show all available fields')
-  .action((query, options) => {
-    const tm = new TaskManager('.data/today.db', { readOnly: true });
+  .description('Search for tasks in markdown files')
+  .option('-a, --all', 'Include completed tasks')
+  .option('-n, --limit <number>', 'Limit number of results', parseInt)
+  .action(async (query, options) => {
+    const db = getDatabase();
 
     try {
-      // Search in all tasks if --all, otherwise just active
-      let sql = options.all ?
-        'SELECT * FROM tasks WHERE title LIKE ? OR description LIKE ? OR content LIKE ?' :
-        "SELECT * FROM tasks WHERE (title LIKE ? OR description LIKE ? OR content LIKE ?) AND status != '✅ Done'";
+      let sql = `
+        SELECT file_path, line_number, line_text
+        FROM markdown_tasks
+        WHERE line_text LIKE ?
+          AND file_path NOT LIKE 'vault/.%'
+          AND file_path NOT LIKE '%/templates/%'
+      `;
+
+      if (!options.all) {
+        sql += " AND line_text LIKE '- [ ]%'";
+      }
+
+      sql += ' ORDER BY file_path, line_number';
+
+      if (options.limit) {
+        sql += ` LIMIT ${options.limit}`;
+      }
 
       const searchPattern = `%${query}%`;
-      const tasks = tm.db.prepare(sql).all(searchPattern, searchPattern, searchPattern);
+      const tasks = db.all(sql, searchPattern);
 
       if (tasks.length === 0) {
         console.log(chalk.yellow(`No tasks found matching "${query}"`));
@@ -1496,333 +1217,47 @@ program
 
       console.log(chalk.blue(`\nFound ${tasks.length} task(s) matching "${query}":\n`));
 
+      const table = new Table({
+        head: ['Task', 'File', 'Line'],
+        colWidths: [50, 30, 6],
+        wordWrap: true
+      });
+
       for (const task of tasks) {
-        console.log(chalk.bold('═'.repeat(60)));
-        console.log(chalk.bold.cyan(`📋 ${task.title}`));
-        console.log(chalk.gray('─'.repeat(60)));
+        // Extract task title
+        let title = task.line_text
+          .replace(/^- \[[x ]\] /, '')
+          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
+          .replace(/#\w+\/[\w-]+/g, '')
+          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
+          .replace(/🔁 .+$/g, '')
+          .trim();
 
-        // Basic info
-        console.log(`ID:              ${chalk.yellow(task.id)}`);
-        console.log(`Status:          ${task.status || chalk.gray('Not set')}`);
-        console.log(`Stage:           ${task.stage || chalk.gray('Not set')}`);
-        console.log(`Do Date:         ${task.do_date || chalk.gray('Not set')}`);
-        console.log(`Created:         ${new Date(task.created_at).toLocaleString()}`);
-        console.log(`Updated:         ${new Date(task.updated_at).toLocaleString()}`);
-
-        if (task.completed_at) {
-          console.log(`Completed:       ${new Date(task.completed_at).toLocaleString()}`);
+        if (title.length > 47) {
+          title = title.substring(0, 44) + '...';
         }
 
-        // Project info
-        if (task.project_id) {
-          const project = tm.db.prepare('SELECT name FROM projects WHERE id = ?').get(task.project_id);
-          console.log(`Project:         ${project ? project.name : task.project_id}`);
+        let filePath = task.file_path.replace('vault/', '');
+        if (filePath.length > 27) {
+          filePath = '...' + filePath.substring(filePath.length - 24);
         }
 
-        // Repeat info
-        if (task.repeat_interval) {
-          console.log(`Repeat:          Every ${task.repeat_interval} days`);
-          if (task.repeat_next_date) {
-            console.log(`Next Due:        ${task.repeat_next_date}`);
-          }
-        }
-
-        // Topics
-        try {
-          const topics = tm.db.prepare(`
-            SELECT t.name FROM topics t
-            JOIN task_topics tt ON t.id = tt.topic_id
-            WHERE tt.task_id = ?
-          `).all(task.id);
-
-          if (topics.length > 0) {
-            console.log(`Topics:          ${topics.map(t => t.name).join(', ')}`);
-          }
-        } catch (e) {
-          // Topics table might not exist in some databases
-        }
-
-        // Description - Always show if exists
-        if (task.description) {
-          console.log('');
-          console.log(chalk.bold('Description:'));
-          console.log(chalk.gray(task.description));
-        }
-
-        if (task.content) {
-          console.log(`\nContent:`);
-          console.log(chalk.gray(task.content));
-        }
-
-        // Verbose mode - show ALL fields
-        if (options.verbose) {
-          console.log(chalk.gray('\n' + '─'.repeat(60)));
-          console.log(chalk.gray('All fields:'));
-          for (const [key, value] of Object.entries(task)) {
-            if (value !== null && value !== undefined && value !== '') {
-              console.log(chalk.gray(`  ${key}: ${value}`));
-            }
-          }
-        }
-
-        console.log('');
+        table.push([title, filePath, task.line_number]);
       }
+
+      console.log(table.toString());
     } catch (error) {
       console.error(chalk.red('Error searching tasks:'), error.message);
       process.exit(1);
     } finally {
-      tm.close();
+      await db.close();
     }
   });
 
-// Projects command
-program
-  .command('projects')
-  .description('List all projects')
-  .option('-d, --detailed', 'Show detailed project information')
-  .action((options) => {
-    const tm = new TaskManager();
+// Note: projects command removed - project management now through vault/projects/*.md files
 
-    try {
-      const projects = tm.db.prepare('SELECT * FROM projects ORDER BY start_date DESC, name').all();
-
-      if (projects.length === 0) {
-        console.log(chalk.gray('No projects found'));
-        return;
-      }
-
-      if (options.detailed) {
-        for (const project of projects) {
-          const taskCount = tm.db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?')
-            .get(project.id).count;
-          const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
-            .get(project.id).count;
-
-          console.log(chalk.bold(`\n${project.name}`));
-          console.log(chalk.gray('─'.repeat(40)));
-          console.log(`ID:       ${project.id.substring(0, 8)}`);
-          console.log(`Status:   ${project.status}`);
-          if (project.start_date || project.end_date) {
-            console.log(`Dates:    ${project.start_date || '?'} to ${project.end_date || '?'}`);
-          }
-          if (project.budget) {
-            console.log(`Budget:   $${project.budget.toLocaleString()}`);
-          }
-          console.log(`Tasks:    ${doneCount}/${taskCount} completed`);
-          if (project.file_path) {
-            console.log(`File:     ${project.file_path}`);
-          }
-          if (project.description) {
-            console.log(`\n${project.description.substring(0, 200)}${project.description.length > 200 ? '...' : ''}`);
-          }
-        }
-      } else {
-        const table = new Table({
-          head: ['ID', 'Name', 'Status', 'Dates', 'Tasks'],
-          colWidths: [10, 25, 10, 20, 10]
-        });
-
-        for (const project of projects) {
-          const taskCount = tm.db.prepare('SELECT COUNT(*) as count FROM tasks WHERE project_id = ?')
-            .get(project.id).count;
-          const doneCount = tm.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = '✅ Done'")
-            .get(project.id).count;
-
-          let dates = '-';
-          if (project.start_date && project.end_date) {
-            const start = new Date(project.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            const end = new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            dates = `${start} - ${end}`;
-          }
-
-          table.push([
-            project.id.substring(0, 8),
-            project.name,
-            project.status,
-            dates,
-            `${doneCount}/${taskCount}`
-          ]);
-        }
-
-        console.log(table.toString());
-      }
-    } finally {
-      tm.close();
-    }
-  });
-
-// Check consistency command
-program
-  .command('check-consistency')
-  .description('Check and fix task completion consistency across all markdown files')
-  .option('--fix', 'Automatically fix inconsistencies')
-  .option('-v, --verbose', 'Show detailed output')
-  .action(async (options) => {
-    const { execSync } = await import('child_process');
-    const { promises: fs } = await import('fs');
-    const tm = new TaskManager();
-
-    try {
-      if (options.verbose) {
-        console.log(chalk.blue('Checking task consistency across all markdown files...'));
-        console.log(chalk.gray('Using latest modification time to determine correct state'));
-      }
-
-      // Find all markdown files (including vault/tasks/ for proper consistency)
-      const markdownFiles = execSync('find "vault/" -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -not -name "*sync-conflict*" 2>/dev/null', { encoding: 'utf8' })
-        .split('\n')
-        .filter(f => f && !f.includes('node_modules') && !f.includes('.git'))
-        .map(f => f.replace(/^\.\//, ''));
-
-      if (options.verbose) {
-        console.log(chalk.gray(`Scanning ${markdownFiles.length} markdown files...`));
-      }
-
-      // Collect all task statuses from all files with modification times
-      const taskStatuses = new Map(); // taskId -> { states: Map<filePath, {completed, mtime}> }
-      const taskTitles = new Map(); // taskId -> title
-
-      for (const filePath of markdownFiles) {
-        // Process ALL files including vault/tasks/ to check consistency
-        // The "latest modification wins" logic will determine the correct state
-
-        try {
-          const content = await fs.readFile(filePath, 'utf-8');
-          const lines = content.split('\n');
-          const stats = await fs.stat(filePath);
-          const mtime = stats.mtime;
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            // DISABLED: task-id based sync no longer used with Obsidian Tasks
-            // Tasks are now managed through markdown_tasks cache table
-            // Skip processing tasks with old task-id format
-            continue;
-          }
-        } catch (err) {
-          // File doesn't exist or can't be read
-        }
-      }
-
-      // Find inconsistent tasks and determine correct state based on latest change
-      const inconsistentTasks = [];
-      for (const [taskId, status] of taskStatuses) {
-        const states = Array.from(status.states.entries());
-        const completedStates = states.filter(([_, state]) => state.completed);
-        const notCompletedStates = states.filter(([_, state]) => !state.completed);
-
-        // Only inconsistent if we have both completed and not completed states
-        if (completedStates.length > 0 && notCompletedStates.length > 0) {
-          // Find the most recent modification
-          let latestFile = null;
-          let latestMtime = new Date(0);
-          let latestCompleted = false;
-
-          for (const [file, state] of status.states) {
-            if (state.mtime > latestMtime) {
-              latestMtime = state.mtime;
-              latestFile = file;
-              latestCompleted = state.completed;
-            }
-          }
-
-          inconsistentTasks.push({
-            id: taskId,
-            title: taskTitles.get(taskId),
-            completedIn: completedStates.map(([file]) => file),
-            notCompletedIn: notCompletedStates.map(([file]) => file),
-            shouldBeCompleted: latestCompleted,
-            latestFile,
-            latestMtime
-          });
-        }
-      }
-
-      if (inconsistentTasks.length === 0) {
-        console.log(chalk.green('✓ All tasks are consistent across files!'));
-        return;
-      }
-
-      console.log(chalk.yellow(`Found ${inconsistentTasks.length} inconsistent task(s):\n`));
-
-      // Display inconsistencies
-      const table = new Table({
-        head: ['Task', 'Status', 'Files'],
-        colWidths: [40, 15, 40],
-        wordWrap: true
-      });
-
-      for (const task of inconsistentTasks) {
-        const taskTitle = task.title.length > 37 ? task.title.substring(0, 34) + '...' : task.title;
-        const status = task.shouldBeCompleted ? '→ Done' : '→ Not Done';
-        const latestInfo = `Latest: ${path.basename(task.latestFile)}\n${task.latestMtime.toLocaleString()}`;
-        table.push([taskTitle, status, latestInfo]);
-      }
-
-      console.log(table.toString());
-
-      if (!options.fix) {
-        console.log(chalk.yellow('\nRun with --fix to automatically resolve inconsistencies'));
-        console.log(chalk.gray('(Latest change wins strategy)'));
-        return;
-      }
-
-      // Fix inconsistencies
-      console.log(chalk.blue('\nFixing inconsistencies...'));
-
-      // Update database
-      for (const task of inconsistentTasks) {
-        const newStatus = task.shouldBeCompleted ? '✅ Done' : '🗂️ To File';
-        tm.updateTask(task.id, { status: newStatus });
-        if (options.verbose) {
-          console.log(chalk.green(`  ✓ Updated ${task.title.substring(0, 50)}... to ${newStatus}`));
-        }
-      }
-
-      // Update markdown files
-      for (const task of inconsistentTasks) {
-        const filesToUpdate = task.shouldBeCompleted ? task.notCompletedIn : task.completedIn;
-
-        for (const filePath of filesToUpdate) {
-          // Update ALL files to maintain consistency
-          // Even auto-generated files should reflect the latest state
-          const content = await fs.readFile(filePath, 'utf-8');
-          const lines = content.split('\n');
-          let updated = false;
-
-          // DISABLED: task-id based updates no longer used
-          // Tasks are now managed through Obsidian Tasks plugin
-          for (let i = 0; i < lines.length; i++) {
-            if (false) {  // Never true - disabled task-id updates
-              // Update the checkbox
-              if (task.shouldBeCompleted) {
-                lines[i] = lines[i].replace(/^- \[ \]/, '- [x]');
-              } else {
-                lines[i] = lines[i].replace(/^- \[x\]/, '- [ ]');
-              }
-              updated = true;
-            }
-          }
-
-          if (updated) {
-            await fs.writeFile(filePath, lines.join('\n'));
-            if (options.verbose) {
-              console.log(chalk.green(`  ✓ Updated ${filePath}`));
-            }
-          }
-        }
-      }
-
-      console.log(chalk.green(`\n✓ Fixed ${inconsistentTasks.length} inconsistent task(s)`));
-      console.log(chalk.gray('Run "bin/sync" to regenerate task files with consistent data'));
-
-    } catch (error) {
-      console.error(chalk.red('Error checking consistency:'), error.message);
-      process.exit(1);
-    } finally {
-      tm.close();
-    }
-  });
+// Note: check-consistency command removed - task-id based consistency checking is deprecated
+// Tasks are now managed directly through markdown files with Obsidian Tasks plugin
 
 // Update markdown cache command
 program
@@ -2029,25 +1464,6 @@ group by path
     } finally {
       // Close database connection to allow process to exit
       await db.close();
-    }
-  });
-
-// Map database topics command
-program
-  .command('map-topics')
-  .description('Map topics from old database to current markdown tasks')
-  .action(async () => {
-    console.log(chalk.blue('Mapping database topics...'));
-    try {
-      const { execSync } = await import('child_process');
-      const output = execSync('node bin/map-database-topics-improved.js', {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
-      console.log(output);
-    } catch (error) {
-      console.error(chalk.red('Error mapping topics:'), error.message);
-      process.exit(1);
     }
   });
 

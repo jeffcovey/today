@@ -27,24 +27,43 @@ cp .env.example .env
 # Edit config.toml with your preferences (timezone, profile, etc.)
 # Edit .env with your API keys and credentials
 
-# Initialize your vault (first run only)
+# Run daily planning (syncs data, initializes vault on first run)
 bin/today
-
-# Run daily sync and review
-bin/sync && bin/today
 ```
 
 ## Prerequisites
 
-- **Node.js 20+** (or use the devcontainer)
-- **Python 3.10+** (for `bin/today`)
-- **Anthropic API key** (for AI features)
+**Required:**
 
-Optional:
+- **Node.js 20+** - JavaScript runtime
+- **Python 3.10+** - For `bin/today` and related scripts
+- **Claude Code CLI** - Anthropic's AI assistant for daily reviews
+- **sqlite3** - Database operations
+- **Anthropic API key** - For AI features (set in `.env`)
+
+**Optional integrations:**
+
 - Google Calendar service account
 - iCloud account for calendar sync
 - IMAP email account
 - Toggl account for time tracking
+
+### Installing Claude Code
+
+The easiest way to get all dependencies is to use the devcontainer (see [Development](#development)). For manual installation:
+
+```bash
+# Install Claude Code CLI globally
+npm install -g @anthropic-ai/claude-code
+
+# Install Python dependencies
+pip install anthropic
+
+# Authenticate Claude (required before using bin/today)
+claude
+```
+
+When you run `claude` for the first time, it will open a browser to authenticate. Complete the authentication before running `bin/today`.
 
 ## Configuration
 
@@ -132,6 +151,51 @@ vault/
 The vault is designed to work standalone or with [Obsidian](https://obsidian.md/).
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, etc.).
+
+### Inbox Processing
+
+The `vault/notes/inbox/` directory is a drop zone for quick capture. When you run `bin/sync`, files are automatically processed based on their content:
+
+| File Type | Detection | Action |
+|-----------|-----------|--------|
+| **Progress notes** | First line is `# Progress` | Appended to today's plan file as a callout, archived to `notes/progress/` |
+| **Concern notes** | First line is `# Concerns` or filename contains "concerns" | Appended to today's plan file as a warning callout, archived to `notes/concerns/` |
+| **Task files** | Contains only checkbox lines (`- [ ]` or `- [x]`) | Tasks appended to `tasks/tasks.md`, original file trashed |
+| **Other notes** | Default | Moved to `notes/general/` |
+
+#### Quick Capture with Mobile Apps
+
+The inbox works great with quick-capture apps that can save files to a synced folder:
+
+**[Drafts](https://getdrafts.com/)** (iOS/Mac) - Create actions that save notes to your inbox:
+
+```
+# Progress note action
+Title: Progress
+Body: {{date}} {{time}}
+{{draft}}
+Save to: vault/notes/inbox/progress-{{timestamp}}.md
+
+# Quick task action
+Body: - [ ] {{draft}}
+Save to: vault/notes/inbox/task-{{timestamp}}.md
+```
+
+**[TextExpander](https://textexpander.com/)** - Create snippets for note formats:
+
+```
+# Progress snippet (;prog)
+# Progress
+%B %e, %Y %H:%M
+<cursor>
+
+# Concerns snippet (;concern)
+# Concerns
+%B %e, %Y %H:%M
+<cursor>
+```
+
+The date format `December 7, 2025 14:30` is parsed to determine which plan file to append to.
 
 ## Main Commands
 

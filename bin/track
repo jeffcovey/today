@@ -102,7 +102,7 @@ async function cmdStart(description) {
     console.error(chalk.red('✗') + ' Usage: track start "Description with #topic/tags"');
     console.log('');
     console.log('Examples:');
-    console.log('  track start "Fixing image distortion #topic/ogm"');
+    console.log('  track start "Deep work session #topic/programming"');
     console.log('  track start "Duolingo practice #topic/languages"');
     console.log('  track start "Hip mobility workout #topic/fitness"');
     process.exit(1);
@@ -181,7 +181,7 @@ async function cmdAdd(durationStr, ...descriptionParts) {
     console.error(chalk.red('✗') + ' Usage: track add DURATION "Description with #topic/tags"');
     console.log('');
     console.log('Examples:');
-    console.log('  track add 20m "Reviewing pull requests #topic/ogm_site_development"');
+    console.log('  track add 20m "Reviewing pull requests #topic/programming"');
     console.log('  track add 2h "Deep work session #topic/programming"');
     console.log('  track add 1.5h "Language practice #topic/languages"');
     console.log('  track add 2h30m "Project planning #topic/personal_admin"');
@@ -756,19 +756,14 @@ switch (command) {
     console.log('  sync-db                     Sync markdown files to database');
     console.log('');
     console.log('Examples:');
-    console.log('  track start "Fixing image distortion #topic/ogm"');
+    console.log('  track start "Deep work session #topic/programming"');
     console.log('  track stop');
-    console.log('  track add 20m "Code review #topic/ogm_site_development"');
-    console.log('  track add 1.5h "Language practice #topic/languages"');
+    console.log('  track add 20m "Code review #topic/programming"');
+    console.log('  track add 1.5h "Reading #topic/learning"');
     console.log('  track status');
     console.log('  track today');
     console.log('');
     console.log('Duration formats for \'add\' command:');
     console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
-    console.log('');
-    console.log('Common Topics:');
-    console.log('  #topic/ogm #topic/ogm_sysadmin #topic/ogm_site_development');
-    console.log('  #topic/fitness #topic/meditation_mindfulness #topic/languages');
-    console.log('  #topic/home_household #topic/hosting #topic/personal_admin');
     console.log('');
 }

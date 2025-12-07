@@ -8,8 +8,8 @@
  *
  * Synchronizes all data sources for the Today system:
  * - Vault files (via Resilio Sync)
- * - Database (Turso)
- * - Task management
+ * - Local SQLite database
+ * - Task management (via markdown_tasks cache)
  * - Plan files cleanup
  * - Inbox processing (Progress notes, Concern notes, Tasks)
  * - Email, Calendar, Contacts, Time tracking
