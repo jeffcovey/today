@@ -1,346 +1,267 @@
 # Today
 
-A personal command center for reviewing everything coming in, managing plans and dreams, and deciding what to do each day to be happy and productive. Integrates multiple data sources including Notion, email, calendar, and local task management to create a unified daily workflow.
+A personal command center for daily planning and productivity. Uses AI-assisted daily reviews, markdown-based task management, and integrations with email, calendar, and time tracking to help you decide what to do each day.
 
 ## Features
 
-### 🎯 **Productivity Management**
+- **AI-Powered Daily Reviews** - Claude-assisted morning reviews that synthesize calendar events, tasks, emails, and time tracking into actionable daily plans
+- **Vault-Based Task Management** - Markdown files using [Obsidian Tasks](https://publish.obsidian.md/tasks/) syntax for portable, version-controlled tasks
+- **Stage Themes** - Focus different days on different types of work (front-stage, back-stage, off-stage)
+- **Multi-Source Sync** - Pull data from Google Calendar, iCloud, email (IMAP), Toggl time tracking, and more
+- **Local-First** - All data stored in local markdown files; sync to cloud services is optional
 
-- 🌅 **Morning Routine Management** - Track and complete daily morning tasks
-- 📋 **Today's Plan** - Manage daily planning items  
-- ⚡ **Quick Tasks** - Handle "Now & Then" items efficiently
-- 🌙 **Evening Tasks** - Complete evening routine items
-- 🏠 **Day-End Chores** - Track household and end-of-day tasks
-- 📥 **Inbox Processing** - Manage items that need processing
-
-### 🤖 **Daily Automation**
-
-- 📅 **Temporal Management** - Automatically create missing Day and Week entries with proper relationships
-- 🔄 **Routine Reset** - Reset routine checkboxes daily for recurring tasks
-- ♻️ **Repeating Tasks** - Automatically handle completed repeating tasks
-- 🗓️ **Relationship Mapping** - Link Days to Weeks and previous Days ("Yesterday" relationships)
-
-### ⚡ **Batch Editing**
-
-- 🗄️ Browse and select from your Notion databases
-- 📝 Select multiple database items for batch editing
-- 🏷️ Assign tags to multiple tasks at once
-- 📅 Edit Do Dates for multiple items
-- 🎭 Assign Stage properties to tasks
-- 🔄 Interactive CLI with confirmation steps
-
-### 🔍 **Natural Language Search**
-
-- 🤖 AI-powered search across any Notion database
-- 💬 Ask questions like "what should I work on?" or "I'm bored"
-- 🎯 Handles direct searches, complex queries, and mood-based requests
-- 🔄 Multiple AI backends: Claude API, local Ollama, or basic search
-- 🔐 Privacy-conscious with automatic fallback
-
-### 🏗️ **Technical Features**
-
-- 💾 **SQLite Caching** - High-performance local caching with incremental sync
-- 🐳 **Docker Support** - Easy deployment and automation
-- 🛡️ **Error Handling** - Comprehensive validation and error recovery
-- ⚡ **Optimized Performance** - Concurrent processing and smart caching
-
-## Prerequisites
-
-- Node.js 18+ or Docker
-- A Notion integration token
-
-## Setup
-
-### 1. Create a Notion Integration
-
-1. Go to [https://www.notion.so/my-integrations](https://www.notion.so/my-integrations)
-2. Click "New integration"
-3. Give it a name and select your workspace
-4. Copy the "Internal Integration Token"
-
-### 2. Share Databases with Integration
-
-For full functionality, share these databases with your integration:
-
-**Required for Basic Features:**
-- Action Items (main tasks database)
-- Morning Routine
-- Evening Tasks  
-- Day-End Chores
-
-**Required for Advanced Features:**
-- Days (daily tracking)
-- Weeks (weekly planning)
-- Today's Plan (daily planning items)
-- Now and Then (quick tasks)
-- Inboxes (items to process)
-- Pillars (time tracking areas)
-
-**How to Share:**
-1. Open each Notion database
-2. Click "Share" in the top right
-3. Click "Invite" and search for your integration name
-4. Grant "Edit" permissions
-
-### 3. Install and Configure
-
-#### Option A: Local Installation
+## Quick Start
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd notion-cli
+git clone https://github.com/jeffcovey/today.git
+cd today
 
 # Install dependencies
 npm install
 
-# Create environment file
+# Copy configuration templates
+cp config.toml.example config.toml
 cp .env.example .env
 
-# Edit .env and add your Notion token
-NOTION_TOKEN=your_notion_integration_token_here
+# Edit config.toml with your preferences (timezone, profile, etc.)
+# Edit .env with your API keys and credentials
+
+# Initialize your vault (first run only)
+bin/today
+
+# Run daily sync and review
+bin/sync && bin/today
 ```
 
-#### Option B: Docker
+## Prerequisites
+
+- **Node.js 20+** (or use the devcontainer)
+- **Python 3.10+** (for `bin/today`)
+- **Anthropic API key** (for AI features)
+
+Optional:
+- Google Calendar service account
+- iCloud account for calendar sync
+- IMAP email account
+- Toggl account for time tracking
+
+## Configuration
+
+### config.toml
+
+Non-secret configuration lives in `config.toml`. Copy from the example:
 
 ```bash
-# Create environment file
+cp config.toml.example config.toml
+```
+
+Key settings:
+
+```toml
+# Your timezone
+timezone = "America/New_York"
+
+[profile]
+name = "Your Name"
+email = "you@example.com"
+wake_time = "06:00"
+bed_time = "21:30"
+
+# Day-of-week themes
+[stages]
+monday = "front"     # Outward-facing: meetings, calls, emails
+tuesday = "back"     # Maintenance: bills, bug fixes, organizing
+wednesday = "front"
+thursday = "back"
+friday = "off"       # Personal: nature, friends, hobbies
+saturday = "off"
+sunday = "back"
+
+[ai]
+claude_model = "claude-sonnet-4-20250514"
+```
+
+### Environment Variables (.env)
+
+Secrets and credentials go in `.env`. The file is encrypted using [dotenvx](https://dotenvx.com/).
+
+```bash
 cp .env.example .env
-
-# Edit .env and add your Notion token
-NOTION_TOKEN=your_notion_integration_token_here
-
-# Build and run with Docker Compose
-docker-compose up --build
+# Edit .env with your credentials
+npx dotenvx encrypt  # Encrypt the file
 ```
 
-## Usage
+Key variables:
 
-### Interactive Mode
+| Variable | Description |
+|----------|-------------|
+| `TODAY_ANTHROPIC_KEY` | Anthropic API key for AI features |
+| `EMAIL_ACCOUNT` / `EMAIL_PASSWORD` | IMAP email credentials |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Base64-encoded Google service account JSON |
+| `GOOGLE_CALENDAR_IDS` | Comma-separated calendar IDs |
+| `ICLOUD_USERNAME` / `ICLOUD_APP_PASSWORD` | iCloud credentials |
+| `TOGGL_API_TOKEN` | Toggl time tracking API token |
 
-```bash
-# Run the interactive CLI (local)
-npm start
+See `.env.example` for the full list.
 
-# Using Docker Compose
-docker-compose run notion
+## Vault Structure
 
-# Direct edit command
-npm run start edit
+Your personal data lives in the `vault/` directory. On first run, `bin/today` will offer to initialize it from the `skeleton/` template.
+
+```
+vault/
+├── Dashboard.md              # Main dashboard with widgets
+├── plans/                    # Daily, weekly, monthly plans
+│   └── 2025_Q1_01_W01_15.md  # Daily plan for Jan 15, 2025
+├── tasks/                    # Task collections
+│   ├── tasks.md              # Main task inbox
+│   ├── repeating.md          # Recurring tasks
+│   └── every_six_weeks.md    # Contact reminders
+├── notes/                    # General notes
+│   ├── inbox/                # New notes landing zone
+│   ├── concerns/             # Issues to address
+│   └── progress/             # Progress updates
+├── projects/                 # Project files
+├── topics/                   # Topic-based notes
+├── templates/                # Note templates
+├── scripts/                  # DataviewJS widgets
+└── logs/                     # Sync status, time tracking
 ```
 
-### Command Line Operations
+The vault is designed to work standalone or with [Obsidian](https://obsidian.md/).
 
-#### Task Management
+**Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, etc.).
+
+## Main Commands
+
+### bin/today
+
+The main command for daily planning. Runs an AI-assisted review session.
 
 ```bash
-# Sync and manage tasks
-bin/tasks sync                         # Sync all tasks from markdown files
-bin/tasks list                         # List all active tasks
-bin/tasks list --today                 # Show today's tasks
-bin/tasks list --with-notion           # Show tasks imported from Notion
-bin/tasks add "New task" --date 2025-08-14
+bin/today                      # Interactive daily review
+bin/today update               # Update review file via API
+bin/today --no-sync            # Skip sync step
+bin/today "specific request"   # Focused session with a request
 ```
 
-#### Daily Automation (Perfect for Cron/Docker)
+### bin/sync
+
+Synchronizes all data sources.
 
 ```bash
-# Run all daily automation tasks
-notion daily --all
-
-# Individual operations
-notion daily --reset-routines          # Reset routine checkboxes
-notion daily --mark-repeating-tasks    # Handle completed repeating tasks  
-notion daily --create-temporal         # Create missing days/weeks
+bin/sync                       # Full sync
+bin/sync --calendar            # Sync calendars only
+bin/sync --email               # Sync email only
+bin/sync --toggl               # Sync time tracking only
 ```
 
-#### Temporal Management
+### bin/tasks
+
+Manage tasks from markdown files.
 
 ```bash
-# Create missing days and weeks with relationships
-notion temporal --create-missing-days
-
-# Specify date range
-notion temporal --create-missing-days --start-date 2024-01-01 --end-date 2024-01-31
+bin/tasks list                 # List all active tasks
+bin/tasks list --today         # Show today's tasks
+bin/tasks sync                 # Sync tasks from vault files
+bin/tasks add "Task" --date 2025-01-20
 ```
 
-#### Docker Automation Examples
+### bin/email
+
+Email management.
 
 ```bash
-# Daily automation via Docker (great for cron)
-docker run --env-file .env notion daily --all
-
-# Create missing temporal entries
-docker run --env-file .env notion temporal --create-missing-days
+bin/email list                 # List recent emails
+bin/email list --unread        # Show unread emails
+bin/email download             # Download emails to local cache
 ```
 
-## How It Works
+### bin/calendar
 
-### Interactive Productivity Management
-
-1. **Smart Menu**: Automatically shows available routines and tasks based on current status
-2. **Routine Management**: Check off morning routine, evening tasks, day-end chores
-3. **Quick Access**: Today's plan, quick tasks, and inbox processing readily available
-4. **Batch Operations**: Edit multiple database items with powerful selection tools
-5. **Real-time Updates**: Changes sync immediately with optimized caching
-
-### Automated Daily Operations
-
-1. **Temporal Structure**: Automatically creates missing Day and Week entries
-2. **Relationship Mapping**: Links Days to Weeks and previous Days for continuity
-3. **Routine Reset**: Automatically unchecks routine items for the next day
-4. **Repeating Tasks**: Converts completed repeating tasks back to repeating status
-5. **Cache Optimization**: Intelligent caching ensures fast performance
-
-### Batch Editing Workflow
-
-1. **Database Selection**: Choose from your accessible Notion databases
-2. **Item Selection**: Select which database items to edit (checkbox interface)
-3. **Property Selection**: Choose which properties to modify
-4. **Value Input**: Enter new values for selected properties
-5. **Confirmation**: Review changes before applying
-6. **Batch Update**: All selected items are updated with new values
-
-## Supported Property Types
-
-- ✅ Title
-- ✅ Rich Text
-- ✅ Number
-- ✅ Select
-- ✅ Multi-select
-- ✅ Date
-- ✅ Checkbox
-- ✅ URL
-- ✅ Email
-- ✅ Phone Number
-
-## Error Handling
-
-The CLI includes comprehensive error handling:
-- Invalid Notion tokens
-- Network connectivity issues
-- Permission errors
-- Invalid property values
-- Partial update failures
-
-## Examples
-
-### Daily Productivity Workflow
-
-**Morning:**
+Calendar operations.
 
 ```bash
-# Reset routines for the day and create any missing temporal entries
-notion daily --all
-
-# Or use interactive mode to check off morning routine items
-npm start
-# → Select "🌅 Complete morning routine"
+bin/calendar today             # Show today's events
+bin/calendar week              # Show this week's events
+bin/calendar sync              # Sync calendars to database
 ```
 
-**Throughout the Day:**
+### bin/track
+
+Time tracking integration.
 
 ```bash
-# Interactive management
-npm start
-# → "📋 Manage today's plan" - Handle daily planning items  
-# → "⚡ Quick tasks" - Process quick "now and then" items
-# → "📥 Process inboxes" - Clear inbox items
+bin/track                      # Show current timer status
+bin/track start "Task"         # Start a timer
+bin/track stop                 # Stop current timer
 ```
 
-**Evening:**
+## Task Syntax
 
-```bash
-# Complete evening routines
-npm start  
-# → "🌙 Complete evening tasks"
-# → "🏠 Complete day-end chores"
+Tasks use [Obsidian Tasks](https://publish.obsidian.md/tasks/) syntax:
+
+```markdown
+- [ ] Task description ⏫ 📅 2025-01-15 🔁 every week
 ```
 
-### Batch Editing Examples
+### Priority Markers
 
-**Update Task Status:**
-1. Select your "Tasks" database
-2. Choose multiple tasks  
-3. Select the "Status" property
-4. Set all selected tasks to "In Progress"
+| Marker | Priority |
+|--------|----------|
+| 🔺 | Urgent/highest |
+| ⏫ | High |
+| 🔼 | Medium |
+| 🔽 | Low |
 
-**Assign Tags to Multiple Tasks:**
-1. Choose "🏷️ Assign tags to tasks"
-2. Select tasks that need tagging
-3. Choose or create tags to assign
+### Date Markers
 
-**Set Due Dates:**
-1. Choose "📅 Edit Do Date for tasks"
-2. Select tasks needing deadlines
-3. Set new due dates for all selected items
+| Marker | Meaning |
+|--------|---------|
+| 📅 YYYY-MM-DD | Due date |
+| ⏳ YYYY-MM-DD | Scheduled date |
+| ➕ YYYY-MM-DD | Created date |
+| ✅ YYYY-MM-DD | Completion date |
 
-### Automation Examples
+### Stage Tags
 
-**Daily Cron Job:**
+Focus different days on different types of work:
+
+- `#stage/front-stage` - Meetings, calls, support, emails
+- `#stage/back-stage` - Maintenance, bills, bug fixes, organizing
+- `#stage/off-stage` - Personal time, nature, friends, reading
+
+## Development
+
+### Using the Devcontainer
+
+The easiest way to develop is using VS Code's devcontainer:
+
+1. Install [Docker](https://www.docker.com/) and [VS Code](https://code.visualstudio.com/)
+2. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
+3. Open this folder in VS Code
+4. Click "Reopen in Container" when prompted
+
+### Running Tests
 
 ```bash
-# Add to your cron (runs daily at 6 AM)
-0 6 * * * docker run --env-file /path/to/.env notion daily --all
+npm test                       # Run all tests
+npm run test:watch             # Watch mode
+npm run test:coverage          # Coverage report
 ```
 
-**Weekly Temporal Sync:**
+### Linting
 
 ```bash
-# Ensure Days and Weeks are created for the next week
-notion temporal --create-missing-days --start-date $(date +%Y-%m-%d) --end-date $(date -d '+7 days' +%Y-%m-%d)
-```
-
-## Remote Development with VS Code Tunnel
-
-The Docker container includes VS Code CLI with tunnel support, allowing you to access your development environment from anywhere.
-
-### Starting a VS Code Tunnel
-
-```bash
-# From within the container (or Docker Compose shell)
-code tunnel --accept-server-license-terms
-
-# The tunnel will start in /app directory by default
-# You can also specify a different directory:
-cd /workspaces/notion && code tunnel --accept-server-license-terms
-```
-
-### Authentication
-
-1. On first run, you'll receive a device code (e.g., `5AB0-0AF9`)
-2. Visit https://github.com/login/device
-3. Enter the provided code
-4. Once authenticated, you'll receive a tunnel URL (e.g., `https://vscode.dev/tunnel/<machine-name>`)
-
-### Using the Tunnel
-
-- Access your tunnel URL from any browser
-- VS Code will open with full access to your container environment
-- The tunnel persists as long as the container is running
-- To stop the tunnel, press `Ctrl+C` in the terminal
-
-### Alternative Authentication Providers
-
-```bash
-# Use Microsoft account instead of GitHub
-code tunnel user login --provider microsoft
+npm run lint                   # Lint markdown files
+npm run lint:md:fix            # Auto-fix markdown issues
 ```
 
 ## Documentation
 
-- [Notion Migration Guide](docs/notion-migration.md) - Complete guide for migrating tasks from Notion to Today
-- [Notes System](vault/notes/README.md) - Real-time notes synchronization
-
-## Development
-
-```bash
-# Run in development mode with auto-restart
-npm run dev
-
-# Build Docker image
-docker build -t notion-cli .
-```
+- [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
+- [Vault README](skeleton/README.md) - Detailed vault documentation
 
 ## License
 
