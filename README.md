@@ -2,6 +2,10 @@
 
 A personal command center for daily planning and productivity. Uses AI-assisted daily reviews, markdown-based task management, and integrations with email, calendar, and time tracking to help you decide what to do each day.
 
+<p align="center">
+  <img src="docs/images/daily-plan-example.png" alt="Daily Plan Example" width="500">
+</p>
+
 ## Features
 
 - **AI-Powered Daily Reviews** - Claude-assisted morning reviews that synthesize calendar events, tasks, emails, and time tracking into actionable daily plans
