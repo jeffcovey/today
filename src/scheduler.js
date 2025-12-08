@@ -95,6 +95,11 @@ const jobs = [
         description: 'Droplet maintenance (cleanup logs, check processes)'
     },
     {
+        schedule: '0 */2 * * *', // Every 2 hours EST
+        command: 'systemctl restart resilio-sync || true',
+        description: 'Restart Resilio Sync to prevent stale connections'
+    },
+    {
         schedule: '*/15 * * * *', // Every 15 minutes
         command: 'bin/droplet-monitor || true',
         description: 'Monitor droplet health'
