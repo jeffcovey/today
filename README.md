@@ -40,7 +40,6 @@ bin/today
 **Required:**
 
 - **Node.js 20+** - JavaScript runtime
-- **Python 3.10+** - For `bin/today` and related scripts
 - **Claude Code CLI** - Anthropic's AI assistant for daily reviews
 - **sqlite3** - Database operations
 - **Anthropic API key** - For AI features (set in `.env`)
@@ -59,9 +58,6 @@ The easiest way to get all dependencies is to use the devcontainer (see [Develop
 ```bash
 # Install Claude Code CLI globally
 npm install -g @anthropic-ai/claude-code
-
-# Install Python dependencies
-pip install anthropic
 
 # Authenticate Claude (required before using bin/today)
 claude
