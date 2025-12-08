@@ -225,6 +225,10 @@ class DigitalOceanDeploy {
     printInfo('Installing logrotate configuration...');
     this.sshCmd(`sudo cp ${this.deployPath}/config/logrotate-today /etc/logrotate.d/today && sudo chmod 644 /etc/logrotate.d/today && echo "✓ Logrotate configured"`);
 
+    // Update Resilio Sync service config
+    printInfo('Updating Resilio Sync service configuration...');
+    this.sshCmd(`sudo cp ${this.deployPath}/config/resilio-sync.service /etc/systemd/system/resilio-sync.service && sudo systemctl daemon-reload && echo "✓ Resilio Sync service updated"`);
+
     // Setup WAL checkpoint cron
     printInfo('Setting up SQLite WAL checkpoint cron job...');
     this.sshScript(`
