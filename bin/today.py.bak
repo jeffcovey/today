@@ -1,0 +1,1571 @@
+#!/usr/bin/env python3
+"""
+Today - Daily review and planning tool
+
+Usage:
+    bin/today [options] [command] [request]
+    bin/today update                  # Update review file via API
+    bin/today --no-sync               # Skip sync step
+    bin/today "specific request"      # Focused session with request
+"""
+
+import os
+import sys
+import subprocess
+import argparse
+from datetime import datetime, timedelta
+from pathlib import Path
+import json
+import re
+import sqlite3
+from collections import defaultdict
+import glob
+import zipfile
+
+# Add src directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+def load_dotenv():
+    """Load encrypted environment variables using dotenvx"""
+    try:
+        # Check if we have encrypted env
+        if Path('.env').exists():
+            result = subprocess.run(
+                ['npx', 'dotenvx', 'get', 'TODAY_ANTHROPIC_KEY'],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                os.environ['TODAY_ANTHROPIC_KEY'] = result.stdout.strip()
+    except Exception:
+        pass  # Continue without the key
+
+def get_date_components(target_date=None):
+    """Get year, month, day, week, quarter for a given date
+
+    Args:
+        target_date: datetime object for the target date, or None for today
+
+    Returns:
+        tuple: (year, month, day, week, quarter, timezone)
+    """
+    # Get timezone from config
+    timezone = 'America/New_York'  # default
+    try:
+        result = subprocess.run(['bin/get-config', 'timezone'],
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            timezone = result.stdout.strip()
+    except:
+        pass
+
+    if target_date:
+        # Use the provided date
+        year = target_date.year
+        month = target_date.month
+        day = target_date.day
+        week = target_date.isocalendar()[1]
+    else:
+        # Get date in configured timezone
+        result = subprocess.run([f'TZ={timezone} date "+%Y %m %d %V"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            year_str, month_str, day_str, week_str = result.stdout.strip().split()
+            year = int(year_str)
+            month = int(month_str)
+            day = int(day_str)
+            week = int(week_str)
+        else:
+            # Fallback to UTC if timezone command fails
+            now = datetime.now()
+            year = now.year
+            month = now.month
+            day = now.day
+            week = now.isocalendar()[1]
+
+    # Determine quarter
+    quarter = f"Q{(month - 1) // 3 + 1}"
+
+    return (year, month, day, week, quarter, timezone)
+
+def get_review_file_path(target_date=None):
+    """Calculate the review file path for a given date using configured timezone
+
+    Args:
+        target_date: datetime object for the target date, or None for today
+    """
+    year, month, day, week, quarter, _ = get_date_components(target_date)
+    return f"vault/plans/{year}_{quarter}_{month:02d}_W{week:02d}_{day:02d}.md"
+
+def get_stage_info():
+    """Get current stage theme and focus"""
+    day_of_week = datetime.now().strftime('%A')
+
+    stages = {
+        'Monday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Wednesday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Saturday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Thursday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Sunday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Tuesday': ('Off Stage', 'Personal time, nature, friends, reading'),
+        'Friday': ('Off Stage', 'Personal time, nature, friends, reading'),
+    }
+
+    return stages.get(day_of_week, ('Unknown', 'Unknown'))
+
+def get_task_statistics():
+    """Get task statistics from markdown files"""
+    stats = {'total': 0, 'overdue': 0, 'high_priority': 0}
+    today = datetime.now().date()
+
+    # Find all markdown files
+    md_files = []
+    for pattern in ['vault/**/*.md', 'vault/*.md']:
+        md_files.extend(glob.glob(pattern, recursive=True))
+
+    # Exclude templates
+    md_files = [f for f in md_files if '/templates/' not in f and '/.sync/' not in f]
+
+    for file_path in md_files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+                # Count unchecked tasks
+                tasks = re.findall(r'^- \[ \].*$', content, re.MULTILINE)
+                stats['total'] += len(tasks)
+
+                # Count overdue (with 📅 or ⏳ dates before today)
+                for task in tasks:
+                    # Check for high priority
+                    if '🔺' in task or '⏫' in task or '🔴' in task:
+                        stats['high_priority'] += 1
+
+                    # Check for dates
+                    date_match = re.search(r'[📅⏳]\s*(\d{4}-\d{2}-\d{2})', task)
+                    if date_match:
+                        task_date = datetime.strptime(date_match.group(1), '%Y-%m-%d').date()
+                        if task_date < today:
+                            stats['overdue'] += 1
+        except Exception:
+            continue
+
+    return stats
+
+def get_health_metrics():
+    """Extract health metrics from Apple Health export"""
+    # Look for the most recent health export file (either .zip or .json with date range)
+    health_files = glob.glob('vault/logs/HealthAutoExport*.json') + glob.glob('vault/logs/HealthAutoExport*.zip')
+
+    if not health_files:
+        return ""
+
+    # Sort by modification time to get the most recent
+    health_files.sort(key=lambda x: Path(x).stat().st_mtime, reverse=True)
+    health_export = health_files[0]
+
+    try:
+        # Check if it's a JSON file directly
+        if health_export.endswith('.json'):
+            with open(health_export, 'r') as f:
+                data = json.load(f)
+        else:
+            # It's a zip file, extract and analyze
+            with zipfile.ZipFile(health_export, 'r') as z:
+                # Find the JSON file
+                json_files = [f for f in z.namelist() if f.startswith('HealthAutoExport') and f.endswith('.json')]
+                if not json_files:
+                    return ""
+
+                with z.open(json_files[0]) as f:
+                    data = json.load(f)
+
+                # Process metrics
+                yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+                metrics = {}
+
+                for metric in data.get('data', {}).get('metrics', []):
+                    if metric.get('name') == 'step_count':
+                        daily_steps = defaultdict(float)
+                        for entry in metric.get('data', []):
+                            date_str = entry['date'].split()[0]
+                            steps = entry.get('qty', 0)
+                            daily_steps[date_str] += steps
+
+                        # Last 7 days average
+                        recent_dates = sorted(daily_steps.keys())[-7:]
+                        if recent_dates:
+                            avg_steps = sum(daily_steps[d] for d in recent_dates) / len(recent_dates)
+                            metrics['avg_steps'] = int(avg_steps)
+                            if yesterday in daily_steps:
+                                metrics['yesterday_steps'] = int(daily_steps[yesterday])
+
+                    elif metric.get('name') == 'weight_body_mass':
+                        weights = [(e['date'].split()[0], e.get('qty', 0))
+                                 for e in metric.get('data', [])]
+                        if weights:
+                            weights.sort()
+                            metrics['weight'] = f"{weights[-1][1]:.1f} lbs"
+
+                # Format as string
+                if metrics:
+                    lines = ["\n## Health Metrics (Last 7 days)"]
+                    if 'avg_steps' in metrics:
+                        lines.append(f"- **Average Steps**: {metrics['avg_steps']}/day")
+                    if 'yesterday_steps' in metrics:
+                        lines.append(f"- **Yesterday**: {metrics['yesterday_steps']} steps")
+                    if 'weight' in metrics:
+                        lines.append(f"- **Weight**: {metrics['weight']}")
+                    return '\n'.join(lines)
+    except Exception:
+        pass
+
+    return ""
+
+def get_existing_plans():
+    """Check which planning files exist"""
+    now = datetime.now()
+    year = now.year
+    month = now.month
+    week = now.isocalendar()[1]
+    quarter = f"Q{(month - 1) // 3 + 1}"
+
+    plans = []
+    plan_files = [
+        (f"vault/plans/{year}_00.md", "Year plan"),
+        (f"vault/plans/{year}_{quarter}_00.md", "Quarter plan"),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_00.md", "Month plan"),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_W{week:02d}_00.md", "Week plan")
+    ]
+
+    for file_path, desc in plan_files:
+        if Path(file_path).exists():
+            plans.append(f"- {desc}: {file_path}")
+
+    return '\n'.join(plans) if plans else "No planning files found"
+
+def get_changed_vault_files():
+    """Get vault files that have been changed or added today based on filesystem modification time"""
+    try:
+        # Get timezone from config
+        timezone = 'America/New_York'  # default
+        try:
+            result = subprocess.run(['bin/get-config', 'timezone'],
+                                  capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                timezone = result.stdout.strip()
+        except:
+            pass
+
+        # Get today's date at midnight as a timestamp
+        result = subprocess.run([f'TZ={timezone} date -d "today 00:00:00" "+%s"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            return ""
+
+        today_midnight_ts = int(result.stdout.strip())
+
+        # Find all markdown files in vault/ modified today
+        vault_path = Path('vault')
+        if not vault_path.exists():
+            return ""
+
+        files = []
+        exclude_dirs = {'.sync', 'templates', '.git', '.git.nosync', '.obsidian', '.trash'}
+
+        for md_file in vault_path.rglob('*.md'):
+            # Skip excluded directories
+            if any(excl in md_file.parts for excl in exclude_dirs):
+                continue
+
+            # Check if file was modified today
+            mtime = md_file.stat().st_mtime
+            if mtime >= today_midnight_ts:
+                files.append(str(md_file))
+
+        if not files:
+            return ""
+
+        # Sort files by modification time (most recent first)
+        files.sort(key=lambda f: Path(f).stat().st_mtime, reverse=True)
+
+        # Format the output
+        lines = ["\n## 📝 Files Changed/Added Today in Vault"]
+        lines.append(f"\n{len(files)} file(s) modified or added today:\n")
+
+        for filepath in files:
+            # Try to get a brief description from the file
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read(500)  # Read first 500 chars
+                    # Try to extract a title or first heading
+                    title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+                    if title_match:
+                        title = title_match.group(1).strip()
+                        lines.append(f"- **{filepath}**: {title}")
+                    else:
+                        lines.append(f"- **{filepath}**")
+            except:
+                lines.append(f"- **{filepath}**")
+
+        return '\n'.join(lines)
+
+    except Exception as e:
+        # Silently fail if something goes wrong
+        return ""
+
+def check_vault_exists():
+    """Check if vault directory exists and offer to initialize it from skeleton"""
+    import shutil
+
+    vault_path = Path('vault')
+    skeleton_path = Path('skeleton')
+
+    if vault_path.exists():
+        return True
+
+    if not skeleton_path.exists():
+        print("❌ Neither vault/ nor skeleton/ directory found.")
+        print("   Please ensure you have the complete Today repository.")
+        return False
+
+    print("━" * 60)
+    print("📁 Vault directory not found")
+    print("━" * 60)
+    print()
+    print("The vault/ directory contains your personal notes, tasks, and plans.")
+    print("It is excluded from this repository because it's meant to be private.")
+    print()
+    print("Would you like to initialize a new vault from the skeleton template?")
+    print()
+
+    try:
+        response = input("Initialize vault? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\n")
+        return False
+
+    if response != 'y':
+        print()
+        print("Vault not initialized. You can manually copy the skeleton:")
+        print("  cp -r skeleton vault")
+        print()
+        return False
+
+    print()
+    print("📦 Initializing vault from skeleton...")
+
+    try:
+        # Copy skeleton to vault
+        shutil.copytree(skeleton_path, vault_path)
+
+        # Remove .gitkeep files (they were just placeholders)
+        for gitkeep in vault_path.rglob('.gitkeep'):
+            gitkeep.unlink()
+
+        print("✅ Vault initialized successfully!")
+        print()
+        print("━" * 60)
+        print("📝 Next steps:")
+        print("━" * 60)
+        print()
+        print("1. Initialize a git repository for version control:")
+        print("   cd vault && git init && git add . && git commit -m 'Initial vault'")
+        print()
+        print("2. Set up sync (optional but recommended):")
+        print("   - Resilio Sync, Syncthing, or a private git remote")
+        print()
+        print("3. If using Obsidian, install recommended plugins:")
+        print("   - Dataview, Tasks, Templater, Calendar, Periodic Notes")
+        print()
+        print("See vault/README.md for detailed documentation.")
+        print("━" * 60)
+        print()
+        return True
+
+    except Exception as e:
+        print(f"❌ Failed to initialize vault: {e}")
+        return False
+
+def check_skeleton_updates():
+    """Check if skeleton has updates that should be merged into vault"""
+    import filecmp
+    import hashlib
+
+    vault_path = Path('vault')
+    skeleton_path = Path('skeleton')
+    tracking_file = Path('.skeleton-hashes')
+
+    if not vault_path.exists() or not skeleton_path.exists():
+        return
+
+    # Files that might be updated in skeleton and should be offered to merge
+    tracked_files = [
+        'scripts/time-tracking-widget.js',
+        'scripts/upcoming-events-widget.js',
+        'templates/daily-plan.md',
+        'templates/project.md',
+        '.obsidian/snippets/app-wide.css',
+    ]
+
+    # Load previous hashes
+    previous_hashes = {}
+    if tracking_file.exists():
+        try:
+            with open(tracking_file, 'r') as f:
+                for line in f:
+                    parts = line.strip().split(':', 1)
+                    if len(parts) == 2:
+                        previous_hashes[parts[0]] = parts[1]
+        except:
+            pass
+
+    updates_available = []
+
+    for rel_path in tracked_files:
+        skeleton_file = skeleton_path / rel_path
+        vault_file = vault_path / rel_path
+
+        if not skeleton_file.exists():
+            continue
+
+        # Calculate current skeleton hash
+        with open(skeleton_file, 'rb') as f:
+            current_hash = hashlib.md5(f.read()).hexdigest()
+
+        # Check if skeleton has changed since last check
+        if rel_path in previous_hashes and previous_hashes[rel_path] == current_hash:
+            continue  # No change in skeleton
+
+        # Check if vault file exists and differs from skeleton
+        if vault_file.exists():
+            if not filecmp.cmp(skeleton_file, vault_file, shallow=False):
+                updates_available.append(rel_path)
+
+        # Update tracking
+        previous_hashes[rel_path] = current_hash
+
+    # Save updated hashes
+    with open(tracking_file, 'w') as f:
+        for path, hash_val in previous_hashes.items():
+            f.write(f"{path}:{hash_val}\n")
+
+    if updates_available:
+        print("━" * 60)
+        print("📦 Skeleton updates available")
+        print("━" * 60)
+        print()
+        print("The following skeleton files have been updated:")
+        for path in updates_available:
+            print(f"  - {path}")
+        print()
+        print("To review and merge updates:")
+        print("  diff vault/<file> skeleton/<file>")
+        print("  cp skeleton/<file> vault/<file>")
+        print()
+        print("━" * 60)
+        print()
+
+def check_dependencies():
+    """Check dependencies once per day"""
+    last_check_file = '.last-dep-check'
+    today_date = datetime.now().strftime('%Y-%m-%d')
+
+    # Skip if already checked today or in CI environment
+    if os.environ.get('SKIP_DEP_CHECK') == 'true':
+        return
+
+    try:
+        if Path(last_check_file).exists():
+            with open(last_check_file, 'r') as f:
+                if f.read().strip() == today_date:
+                    return
+    except:
+        pass
+
+    print("🔍 Checking for dependency updates (timeout in 10s)...")
+    try:
+        subprocess.run(['timeout', '10', 'bin/update-deps', '--quiet'],
+                      check=False, capture_output=True)
+    except:
+        print("⚠️  Dependency check timed out, continuing...")
+
+    # Update check file
+    with open(last_check_file, 'w') as f:
+        f.write(today_date)
+    print()
+
+def run_sync(skip_sync=False):
+    """Run data sync unless skipped"""
+    if skip_sync:
+        print("⏭️  Skipping sync step")
+        return
+
+    print("🔄 Syncing data sources...")
+    subprocess.run(['bin/sync'], check=False)
+
+def check_and_recover_database():
+    """Check database and recover from Turso if needed"""
+    db_path = '.data/today.db'
+    db_missing = not Path(db_path).exists()
+    tables_missing = False
+
+    if not db_missing:
+        # Check if critical tables exist
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')")
+            tables_exist = cursor.fetchone()[0]
+            conn.close()
+            if tables_exist != 2:
+                tables_missing = True
+                print("⚠️  Database missing required tables")
+        except:
+            tables_missing = True
+    else:
+        print(f"⚠️  Database not found at {db_path}")
+
+    # Recover if needed
+    if db_missing or tables_missing:
+        print("🔄 Database missing or incomplete - recovering from Turso...\n")
+
+        # Create directory
+        Path('.data').mkdir(exist_ok=True)
+
+        # Create database with migrations if missing
+        if db_missing:
+            print("🔨 Creating database and running migrations...")
+            result = subprocess.run(['node', 'src/migrations.js'],
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"❌ Failed to create database: {result.stderr}")
+                sys.exit(1)
+            print("✅ Database created with schema")
+            print("ℹ️  Database is a local cache - data will be populated from external sources\n")
+
+    # Quick check that database has data
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Check sync log
+        cursor.execute("SELECT MAX(created_at) FROM sync_log")
+        last_sync = cursor.fetchone()[0]
+
+        if last_sync:
+            print(f"✅ Database ready (last sync: {last_sync})\n")
+        else:
+            # Check task count
+            cursor.execute("SELECT COUNT(*) FROM tasks")
+            task_count = cursor.fetchone()[0]
+
+            if task_count > 0:
+                print(f"✅ Database ready ({task_count} tasks found)\n")
+            else:
+                # Initialize sync log
+                print("📝 Initializing sync log...")
+                cursor.execute("""INSERT INTO sync_log
+                    (timestamp, sync_type, success, source_system, target_system, created_at)
+                    VALUES (datetime('now'), 'initial', 1, 'local', 'local', datetime('now'))""")
+                conn.commit()
+                print("✅ Database ready (initialized)\n")
+
+        conn.close()
+    except Exception as e:
+        print(f"❌ Database check failed: {e}")
+        sys.exit(1)
+
+def lint_markdown():
+    """Run markdown linting if available"""
+    if Path('.markdownlint.json').exists():
+        print("📝 Checking markdown formatting...")
+        try:
+            result = subprocess.run(
+                ['npx', 'markdownlint-cli2', 'vault/plans/*.md'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.stdout:
+                # Show first 10 lines of output
+                lines = result.stdout.strip().split('\n')[:10]
+                for line in lines:
+                    print(line)
+        except:
+            pass
+        print()
+
+def check_claude_auth():
+    """Check if Claude CLI is authenticated"""
+    print("🔐 Checking Claude authentication...")
+    result = subprocess.run(
+        ['claude', '-p', 'Say "ok"'],
+        capture_output=True,
+        text=True
+    )
+
+    if any(err in result.stdout + result.stderr for err in ['Invalid API key', 'Please run /login', 'not authenticated']):
+        print("\n⚠️  Claude CLI is not authenticated!")
+        print("━" * 50)
+        print("\nClaude is essential for daily reviews.")
+        print("Please authenticate now by running:\n")
+        print("  claude\n")
+        print("Then follow the browser prompt to login.")
+        print("After authentication, run 'bin/today' again.")
+        print("━" * 50)
+        sys.exit(1)
+
+    print("✅ Claude is authenticated\n")
+
+def ensure_time_tracking_widgets(dry_run=False):
+    """Ensure all active plan files have time tracking widgets"""
+    from datetime import datetime
+    import re
+
+    print("⏱️  Checking time tracking widgets...")
+
+    # Get current date components
+    year, month, day, week, quarter, timezone = get_date_components()
+
+    # Define plan files with their date ranges
+    # Quarter end days: Q1=March 31, Q2=June 30, Q3=Sept 30, Q4=Dec 31
+    quarter_end_days = [31, 30, 30, 31]
+    plan_files = [
+        (f"vault/plans/{year}_00.md", f"{year}-01-01", f"{year}-12-31", "Year"),
+        (f"vault/plans/{year}_{quarter}_00.md",
+         f"{year}-{((int(quarter[1]) - 1) * 3) + 1:02d}-01",
+         f"{year}-{int(quarter[1]) * 3:02d}-{quarter_end_days[int(quarter[1])-1]:02d}",
+         f"{quarter}"),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_00.md",
+         f"{year}-{month:02d}-01",
+         f"{year}-{month:02d}-{[31,28,31,30,31,30,31,31,30,31,30,31][month-1]:02d}",
+         datetime(year, month, 1).strftime('%B')),
+        (f"vault/plans/{year}_{quarter}_{month:02d}_W{week:02d}_00.md",
+         None,  # Week calculation is complex, we'll handle specially
+         None,
+         f"Week {week}")
+    ]
+
+    # Calculate week start/end for the week file
+    result = subprocess.run([f'TZ={timezone} date -d "$(date +%Y-W{week:02d}-1)" "+%Y-%m-%d"'],
+                          shell=True, capture_output=True, text=True)
+    if result.returncode == 0:
+        week_start = result.stdout.strip()
+        result = subprocess.run([f'TZ={timezone} date -d "{week_start} +6 days" "+%Y-%m-%d"'],
+                              shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            week_end = result.stdout.strip()
+            # Update the week file entry with actual dates
+            plan_files[3] = (plan_files[3][0], week_start, week_end, plan_files[3][3])
+
+    files_updated = []
+
+    for file_path, start_date, end_date, period_name in plan_files:
+        if not Path(file_path).exists():
+            continue
+
+        if start_date is None or end_date is None:
+            continue
+
+        # Read file content
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        # Check if time tracking widget already exists
+        if 'scripts/time-tracking-widget' in content:
+            continue
+
+        # Check if there's already a time tracking section (old style)
+        if re.search(r'## ⏱️ Time Tracking', content):
+            continue
+
+        # Add time tracking widget at the end
+        widget_section = f"""
+## ⏱️ Time Tracking - {period_name}
+
+```dataviewjs
+await dv.view("scripts/time-tracking-widget", {{ startDate: '{start_date}', endDate: '{end_date}' }});
+```
+"""
+
+        updated_content = content.rstrip() + '\n' + widget_section + '\n'
+
+        if dry_run:
+            print(f"   Would add time tracking to: {file_path}")
+        else:
+            with open(file_path, 'w') as f:
+                f.write(updated_content)
+            files_updated.append((period_name, file_path))
+
+    if files_updated:
+        if not dry_run:
+            print(f"✅ Added time tracking widgets to {len(files_updated)} file(s):")
+            for period_name, file_path in files_updated:
+                print(f"   {period_name}: {file_path}")
+    else:
+        print("✅ All plan files have time tracking widgets")
+
+    print()
+
+def update_review_file(dry_run=False):
+    """Update both today's and tomorrow's review files using Claude API"""
+    import anthropic
+    import re
+    import json
+    from datetime import datetime
+    import difflib
+    import warnings
+
+    # Suppress model deprecation warnings - we'll update when newer version is available
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+    # Get API key
+    api_key = os.environ.get('TODAY_ANTHROPIC_KEY')
+    if not api_key:
+        print("❌ TODAY_ANTHROPIC_KEY not found in environment")
+        print("Please ensure it's set in .env and encrypted with dotenvx")
+        sys.exit(1)
+
+    # Ensure all plan files have time tracking widgets
+    ensure_time_tracking_widgets(dry_run=dry_run)
+
+    # Update today's file
+    today_file = get_review_file_path()
+    if not Path(today_file).exists():
+        print(f"⚠️  Today's file not found: {today_file}")
+        print("Skipping today's update")
+    else:
+        print(f"📊 Updating today's plan: {today_file}...")
+        if dry_run:
+            print("🔍 DRY RUN MODE - No changes will be made")
+        _update_single_file(today_file, is_tomorrow=False, dry_run=dry_run, api_key=api_key)
+
+    # Update tomorrow's file
+    tomorrow = datetime.now() + timedelta(days=1)
+    tomorrow_file = get_review_file_path(tomorrow)
+    if not Path(tomorrow_file).exists():
+        print(f"⚠️  Tomorrow's file not found: {tomorrow_file}")
+        print("Skipping tomorrow's update")
+    else:
+        print(f"📊 Updating tomorrow's plan: {tomorrow_file}...")
+        _update_single_file(tomorrow_file, is_tomorrow=True, dry_run=dry_run, api_key=api_key)
+
+def _update_single_file(review_file, is_tomorrow, dry_run, api_key):
+    """Update a single review file using Claude API
+
+    Args:
+        review_file: Path to the file to update
+        is_tomorrow: Whether this is tomorrow's file (affects update strategy)
+        dry_run: Whether to actually write changes
+        api_key: Anthropic API key
+    """
+    import anthropic
+    import re
+    import json
+    from datetime import datetime
+
+    # Get current database data
+    try:
+        result = subprocess.run(
+            ['bin/db-query', 'daily'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        daily_data = result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to query database: {e}")
+        sys.exit(1)
+
+    # Get detailed time tracking data
+    try:
+        result = subprocess.run(
+            ['bin/track', 'today'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        time_tracking_data = result.stdout
+        # Add time tracking to daily data
+        daily_data += "\n\n=== DETAILED TIME TRACKING ===\n" + time_tracking_data
+    except subprocess.CalledProcessError:
+        # If bin/track fails, continue without time tracking details
+        pass
+
+    # Get changed vault files
+    changed_files = get_changed_vault_files()
+    if changed_files:
+        daily_data += "\n\n" + changed_files
+
+    # Read current review file and create backup
+    with open(review_file, 'r') as f:
+        original_content = f.read()
+
+    # Create a backup in memory
+    backup_content = original_content
+    original_lines = original_content.count('\n')
+
+    # Get timezone from config
+    timezone = 'America/New_York'  # default
+    try:
+        result = subprocess.run(['bin/get-config', 'timezone'],
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            timezone = result.stdout.strip()
+    except:
+        pass
+
+    # Get current time in configured timezone
+    result = subprocess.run([f'TZ={timezone} date "+%I:%M %p"'],
+                          shell=True, capture_output=True, text=True)
+    current_time = result.stdout.strip()
+
+    # Get current date for task completion timestamps
+    result = subprocess.run([f'TZ={timezone} date "+%Y-%m-%d"'],
+                          shell=True, capture_output=True, text=True)
+    current_date = result.stdout.strip()
+
+    # Get timezone offset for timestamp
+    result = subprocess.run([f'TZ={timezone} date "+%z"'],
+                          shell=True, capture_output=True, text=True)
+    tz_offset = result.stdout.strip()
+
+    # Create prompt for Claude based on whether this is tomorrow's file
+    if is_tomorrow:
+        prompt = f"""You are updating TOMORROW's daily plan with fresh priorities from the database.
+
+CURRENT TIME: {current_time} ET
+CURRENT DATE: {current_date}
+
+CURRENT FILE CONTENT (Tomorrow's Plan):
+{original_content}
+
+CURRENT DATABASE DATA (tasks, events, emails, etc.):
+{daily_data[:5000]}
+
+YOUR TASK:
+Refresh the "Top Priorities" section with current database data.
+This is a DRAFT plan for tomorrow that gets refined throughout today.
+
+Focus on:
+1. Overdue tasks that will carry into tomorrow
+2. Tasks scheduled for tomorrow
+3. Calendar events scheduled for tomorrow
+4. High-priority items that need attention
+
+RETURN A JSON OBJECT with updated priorities section:
+{{
+  "priorities_update": "### 🚨 Critical (Do First)\\n\\n- [ ] Task 1\\n- [ ] Task 2\\n\\n### ⚡ Quick Wins...\\n",
+  "notes": "Brief note about what changed"
+}}
+
+IMPORTANT:
+- Keep it lightweight - this is a draft
+- Focus on actionable items
+- Use simple checkboxes: "- [ ] Task description"
+- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+- Created date (➕) is fine - scripts add this automatically
+- Plan files use simple tasks - scheduling belongs in project/topic files only
+"""
+    else:
+        prompt = f"""You are updating TODAY's daily plan with a progress update.
+
+CURRENT TIME: {current_time} ET
+CURRENT DATE: {current_date}
+
+CURRENT FILE CONTENT:
+{original_content}
+
+CURRENT DATABASE DATA (tasks, events, emails, etc.):
+{daily_data[:5000]}
+
+YOUR TASK:
+Create a new Progress Update section to append to the end of the file.
+Compare the current file with the database to see what's changed or been accomplished.
+
+🚨 CRITICAL: The database includes DETAILED TIME TRACKING DATA showing what work has been done today.
+   - Time tracking is THE GROUND TRUTH of productivity
+   - Physical work, meetings, coordination, deep work sessions are all tracked there
+   - NEVER assume "zero progress" without checking the time tracking data first
+   - Checkbox completions are NOT the primary measure of productivity
+
+This should summarize:
+1. What's been accomplished since the last update - CHECK TIME TRACKING DATA FIRST (tasks checked off, workouts done, meetings attended, time tracked)
+2. Current status of high-priority items
+3. Any new events, emails, or tasks that need attention
+4. Overall progress and any blockers
+
+RETURN A JSON OBJECT:
+{{
+  "progress_update": "<!-- PROGRESS_UPDATE -->\\n> [!success] 📊 Progress Update ({current_time})\\n>\\n> *{current_date} HH:MM {tz_offset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers\\n<!-- /PROGRESS_UPDATE -->",
+  "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
+}}
+
+NOTE: The progress_update should use the callout format with:
+- "<!-- PROGRESS_UPDATE -->" as the opening marker
+- "> [!success] 📊 Progress Update (TIME)" as the header
+- "> " prefix for all lines in the callout
+- "*italicized timestamp*" on the second line
+- "<!-- /PROGRESS_UPDATE -->" as the closing marker
+
+IMPORTANT:
+- Create a MEANINGFUL progress update - there's always something to report
+- Look at completed tasks in the file (marked [x]) since the last Progress Update
+- The update should be 2-4 bullet points, concise but informative
+- Only mark tasks as done if you see clear evidence (like workout exercises checked off)
+- Use the exact timezone offset in the timestamp: {tz_offset}
+- Use simple checkboxes: "- [ ] Task description"
+- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+- Created date (➕) is fine - scripts add this automatically"""
+
+    # Call Claude API
+    client = anthropic.Anthropic(api_key=api_key)
+
+    try:
+        # Get model from config.toml, fall back to env var, then default to Sonnet
+        import os
+        import subprocess
+        model = 'claude-sonnet-4-20250514'
+        try:
+            result = subprocess.run(['bin/get-config', 'ai.claude_model'],
+                                    capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                model = result.stdout.strip()
+        except: pass
+        if os.environ.get('CLAUDE_MODEL'):
+            model = os.environ.get('CLAUDE_MODEL')
+        response = client.messages.create(
+            model=model,
+            max_tokens=2000,
+            temperature=0,
+            timeout=60.0,  # 60 second timeout
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        response_text = response.content[0].text
+
+        # Try to parse as JSON
+        try:
+            # Extract JSON if it's wrapped in markdown
+            if '```json' in response_text:
+                json_str = response_text.split('```json')[1].split('```')[0]
+            elif '```' in response_text:
+                json_str = response_text.split('```')[1].split('```')[0]
+            elif '{' in response_text:
+                # Find the JSON object in the response
+                start = response_text.index('{')
+                # Simple bracket counting to find the end
+                count = 0
+                end = start
+                for i, char in enumerate(response_text[start:], start):
+                    if char == '{':
+                        count += 1
+                    elif char == '}':
+                        count -= 1
+                        if count == 0:
+                            end = i + 1
+                            break
+                json_str = response_text[start:end]
+            else:
+                json_str = response_text
+
+            edits = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print(f"⚠️  Failed to parse Claude's response as JSON: {e}")
+            print(f"Response: {response_text[:200]}...")
+            sys.exit(1)
+
+        # Apply edits to the content
+        updated_content = original_content
+
+        if is_tomorrow:
+            # For tomorrow's file, update the priorities section
+            if 'priorities_update' in edits and edits['priorities_update']:
+                # Find and replace the priorities section
+                priorities_pattern = r'## 📋 Top Priorities\n\n.*?(?=\n## |$)'
+                replacement = f"## 📋 Top Priorities\n\n{edits['priorities_update']}\n"
+                updated_content = re.sub(priorities_pattern, replacement, updated_content, flags=re.DOTALL)
+        else:
+            # For today's file, append progress update
+            # 1. Append progress update at the end
+            if 'progress_update' in edits and edits['progress_update']:
+                # Append the progress update at the end of the file
+                updated_content = updated_content.rstrip() + '\n\n' + edits['progress_update'] + '\n'
+
+            # 2. Check off completed tasks
+            if 'tasks_to_check' in edits and edits['tasks_to_check']:
+                for task in edits['tasks_to_check']:
+                    # Only check off if it's currently unchecked
+                    unchecked_pattern = f"- \\[ \\] {re.escape(task)}"
+                    if re.search(unchecked_pattern, updated_content):
+                        updated_content = re.sub(unchecked_pattern,
+                                                f"- [x] {task} ✅ {current_date}",
+                                                updated_content, count=1)
+
+        # SAFETY CHECKS
+        updated_lines = updated_content.count('\n')
+        if updated_lines < original_lines * 0.9:
+            print(f"⚠️  Safety check failed: Updated file has {updated_lines} lines vs original {original_lines}")
+            print("Aborting update to prevent data loss")
+            sys.exit(1)
+
+        if len(updated_content) < len(original_content) * 0.9:
+            print(f"⚠️  Safety check failed: Updated content is too short")
+            print(f"Original: {len(original_content)} chars, Updated: {len(updated_content)} chars")
+            sys.exit(1)
+
+        # Show what would be changed
+        if dry_run:
+            print("\n📝 Proposed changes:")
+            if is_tomorrow:
+                print(f"Priorities update:\n{edits.get('priorities_update', 'None')[:200]}...")
+                print(f"\nNotes: {edits.get('notes', 'None')}")
+            else:
+                print(f"Progress update to append:\n{edits.get('progress_update', 'None')}")
+                print(f"\nTasks to check: {edits.get('tasks_to_check', [])}")
+            print("\n✅ Dry run complete - no changes made")
+        else:
+            # Write updated content back to file
+            with open(review_file, 'w') as f:
+                f.write(updated_content)
+
+            # Check if content actually changed
+            if updated_content != original_content:
+                file_type = "tomorrow's plan" if is_tomorrow else "today's plan"
+                print(f"✅ Updated {file_type}: {review_file}")
+            else:
+                print(f"⚠️  API returned no changes - {review_file} unchanged")
+                print("This might indicate the AI couldn't determine what to update.")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        if not dry_run:
+            print("Restoring original content...")
+            with open(review_file, 'w') as f:
+                f.write(backup_content)
+        sys.exit(1)
+
+def _create_file_from_template(file_path, target_date, is_tomorrow=False):
+    """Helper function to create a plan file from template
+
+    Args:
+        file_path: Path where the file should be created
+        target_date: datetime object for the target date
+        is_tomorrow: Whether this is tomorrow's plan (adds draft note)
+    """
+    template_file = "vault/templates/daily-plan.md"
+    if not Path(template_file).exists():
+        return
+
+    # Ensure directory exists
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Read template
+    with open(template_file, 'r') as f:
+        content = f.read()
+
+    # Get stage info for the target date
+    day_of_week = target_date.strftime('%A')
+    stages = {
+        'Monday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Wednesday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Saturday': ('Front Stage', 'Meetings, calls, support, emails'),
+        'Thursday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Sunday': ('Back Stage', 'Maintenance, bills, bug fixes, organizing'),
+        'Tuesday': ('Off Stage', 'Personal time, nature, friends, reading'),
+        'Friday': ('Off Stage', 'Personal time, nature, friends, reading'),
+    }
+    stage_theme, stage_focus = stages.get(day_of_week, ('Unknown', 'Unknown'))
+
+    # Replace template variables
+    replacements = {
+        '{{DAY_OF_WEEK}}': target_date.strftime('%A'),
+        '{{MONTH_NAME}}': target_date.strftime('%B'),
+        '{{DAY}}': str(target_date.day),
+        '{{YEAR}}': str(target_date.year),
+        '{{FULL_DATE}}': target_date.strftime('%B %d, %Y'),
+        '{{STAGE_THEME}}': stage_theme,
+        '{{STAGE_FOCUS}}': stage_focus,
+        '{{PRIORITIES_FROM_DATABASE}}': '',
+        '{{MORNING_TIME_BLOCKS}}': '',
+        '{{AFTERNOON_TIME_BLOCKS}}': '',
+        '{{EVENING_TIME_BLOCKS}}': '',
+    }
+
+    for key, value in replacements.items():
+        content = content.replace(key, value)
+
+    # Add draft note for tomorrow's plan
+    if is_tomorrow:
+        draft_note = "\n> [!info] Draft Plan\n> This is a preliminary plan for tomorrow. It will be refined throughout today.\n\n"
+        # Insert after the stage focus line
+        content = content.replace('**Theme:** ' + stage_focus,
+                                 '**Theme:** ' + stage_focus + draft_note)
+
+    # Write the new review file
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+def _get_week_number(date):
+    """Get ISO week number for a date"""
+    # Use Python's built-in ISO week calculation
+    _, week_number, _ = date.isocalendar()
+    return week_number
+
+def _create_hierarchy_file_from_template(file_path, template_name, target_date):
+    """Create a review file from a template with date placeholders replaced
+
+    Args:
+        file_path: Path where the file should be created
+        template_name: Name of template file (e.g., 'weekly-review', 'monthly-review')
+        target_date: datetime object for the target period
+    """
+    template_file = f"vault/templates/{template_name}.md"
+    if not Path(template_file).exists():
+        print(f"⚠️  Template not found: {template_file}")
+        return False
+
+    # Ensure directory exists
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
+    # Read template
+    with open(template_file, 'r') as f:
+        content = f.read()
+
+    # Calculate date components
+    year = target_date.year
+    quarter = (target_date.month - 1) // 3 + 1
+    month = target_date.month
+    week = _get_week_number(target_date)
+
+    # Basic replacements for all templates
+    replacements = {
+        '{{YEAR}}': str(year),
+        '{{QUARTER}}': str(quarter),
+        '{{MONTH}}': target_date.strftime('%B'),
+        '{{MONTH_NUM}}': f"{month:02d}",
+        '{{WEEK_NUMBER}}': f"{week:02d}",
+        '{{CREATION_DATE}}': datetime.now().strftime('%B %d, %Y'),
+        '{{REVIEW_DATE}}': '',
+        # Stats placeholders - left blank for user to fill
+        '{{DAYS_COUNT}}': '',
+        '{{COMPLETED_TASKS}}': '',
+        '{{FRONT_DAYS}}': '',
+        '{{BACK_DAYS}}': '',
+        '{{OFF_DAYS}}': '',
+        '{{FRONT_PCT}}': '',
+        '{{BACK_PCT}}': '',
+        '{{OFF_PCT}}': '',
+        '{{TOP_TOPIC_1}}': '',
+        '{{TOP_TOPIC_2}}': '',
+        '{{TOP_TOPIC_3}}': '',
+        '{{TOP_1}}': '',
+        '{{TOP_2}}': '',
+        '{{TOP_3}}': '',
+        '{{COUNT_1}}': '',
+        '{{COUNT_2}}': '',
+        '{{COUNT_3}}': '',
+        '{{WEEKS_REVIEWED}}': '',
+        '{{TARGET_FRONT}}': '',
+        '{{TARGET_BACK}}': '',
+        '{{TARGET_OFF}}': '',
+        '{{PLANNED_FRONT}}': '',
+        '{{PLANNED_BACK}}': '',
+        '{{PLANNED_OFF}}': '',
+    }
+
+    # Template-specific replacements
+    if 'weekly' in template_name:
+        # Calculate week start (Monday) and end (Sunday)
+        days_to_monday = (target_date.weekday()) % 7
+        week_start = target_date - timedelta(days=days_to_monday)
+        week_end = week_start + timedelta(days=6)
+
+        replacements.update({
+            '{{START_DATE}}': week_start.strftime('%Y-%m-%d'),
+            '{{END_DATE}}': week_end.strftime('%Y-%m-%d'),
+            '{{START_DAY}}': str(week_start.day),
+            '{{END_DAY}}': str(week_end.day),
+            '{{WEEKLY_THEME}}': '',
+        })
+
+        # Add daily file links
+        day_names = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+        for i, day_prefix in enumerate(day_names):
+            day = week_start + timedelta(days=i)
+            day_file = f"{day.year}_Q{quarter}_{day.month:02d}_W{week:02d}_{day.day:02d}"
+            replacements.update({
+                f'{{{{{day_prefix}_FILE}}}}': day_file,
+                f'{{{{{day_prefix}_DATE}}}}': day.strftime('%b %d'),
+                f'{{{{{day_prefix}_THEME}}}}': '',
+            })
+
+    elif 'monthly' in template_name:
+        import calendar
+        _, last_day = calendar.monthrange(year, month)
+        replacements.update({
+            '{{MONTH_START}}': f"{year}-{month:02d}-01",
+            '{{MONTH_END}}': f"{year}-{month:02d}-{last_day:02d}",
+            '{{MONTH_NAME}}': target_date.strftime('%B'),
+            '{{MONTHLY_THEME}}': '',
+            '{{TOTAL_DAYS}}': str(last_day),
+            '{{NEXT_MONTH}}': (target_date.replace(day=1) + timedelta(days=32)).strftime('%B'),
+        })
+
+        # Calculate weeks in month
+        first_day = target_date.replace(day=1)
+        weeks_in_month = []
+        current = first_day
+        while current.month == month:
+            week_num = _get_week_number(current)
+            if week_num not in [w[0] for w in weeks_in_month]:
+                # Get Monday of this week
+                days_to_monday = (current.weekday()) % 7
+                week_monday = current - timedelta(days=days_to_monday)
+                week_sunday = week_monday + timedelta(days=6)
+                weeks_in_month.append((week_num, week_monday, week_sunday))
+            current += timedelta(days=7)
+
+        replacements['{{TOTAL_WEEKS}}'] = str(len(weeks_in_month))
+
+        # Add week file links
+        for i, (week_num, monday, sunday) in enumerate(weeks_in_month, 1):
+            week_file = f"{year}_Q{quarter}_{month:02d}_W{week_num:02d}_00"
+            week_dates = f"{monday.strftime('%b %d')} - {sunday.strftime('%b %d')}"
+            replacements.update({
+                f'{{{{W{i}_FILE}}}}': week_file,
+                f'{{{{W{i}_NUM}}}}': str(week_num),
+                f'{{{{W{i}_DATES}}}}': week_dates,
+                f'{{{{W{i}_THEME}}}}': '',
+            })
+
+        # Fill remaining weeks with empty strings (up to W5)
+        for i in range(len(weeks_in_month) + 1, 6):
+            replacements.update({
+                f'{{{{W{i}_FILE}}}}': '',
+                f'{{{{W{i}_NUM}}}}': '',
+                f'{{{{W{i}_DATES}}}}': '',
+                f'{{{{W{i}_THEME}}}}': '',
+            })
+
+    elif 'quarterly' in template_name:
+        quarter_months = {
+            1: ('January', 'February', 'March', 1, 3),
+            2: ('April', 'May', 'June', 4, 6),
+            3: ('July', 'August', 'September', 7, 9),
+            4: ('October', 'November', 'December', 10, 12),
+        }
+        month1, month2, month3, start_m, end_m = quarter_months[quarter]
+        import calendar
+        _, last_day = calendar.monthrange(year, end_m)
+
+        replacements.update({
+            '{{MONTH1}}': month1,
+            '{{MONTH2}}': month2,
+            '{{MONTH3}}': month3,
+            '{{QUARTER_START}}': f"{year}-{start_m:02d}-01",
+            '{{QUARTER_END}}': f"{year}-{end_m:02d}-{last_day:02d}",
+        })
+
+    elif 'annual' in template_name:
+        replacements.update({
+            '{{NEXT_YEAR}}': str(year + 1),
+        })
+
+    # Apply replacements - now handles YAML frontmatter
+    for key, value in replacements.items():
+        content = content.replace(key, str(value))
+
+    # Write the file
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    return True
+
+def create_review_from_template():
+    """Create daily review files for today AND tomorrow
+
+    Note: Non-daily plan file creation (weekly/monthly/quarterly/annual) is disabled
+    while templates are being finalized. Re-enable when templates are ready.
+    """
+    files_created = []
+
+    # TODO: Re-enable hierarchy file creation once templates are finalized
+    # This code creates annual, quarterly, monthly, and weekly review files
+    # based on which daily files exist. Disabled to prevent creating files
+    # from incomplete templates.
+    #
+    # plans_dir = Path("vault/plans")
+    # daily_files = list(plans_dir.glob("*_*_*_W*_[0-9][0-9].md"))
+    # periods = {'years': set(), 'quarters': set(), 'months': set(), 'weeks': set()}
+    # for daily_file in daily_files:
+    #     basename = daily_file.stem
+    #     match = re.match(r'(\d{4})_Q(\d)_(\d{2})_W(\d{2})_(\d{2})', basename)
+    #     if match:
+    #         year, quarter, month, week, day = match.groups()
+    #         periods['years'].add(year)
+    #         periods['quarters'].add(f"{year}_Q{quarter}")
+    #         periods['months'].add(f"{year}_Q{quarter}_{month}")
+    #         periods['weeks'].add(f"{year}_Q{quarter}_{month}_W{week}")
+    # ... hierarchy file creation loops ...
+
+    # Create for today
+    today_file = get_review_file_path()
+    if not Path(today_file).exists():
+        print(f"📝 Creating today's plan from template...")
+        _create_file_from_template(today_file, datetime.now(), is_tomorrow=False)
+        files_created.append(('today', today_file))
+
+    # Create for tomorrow
+    tomorrow = datetime.now() + timedelta(days=1)
+    tomorrow_file = get_review_file_path(tomorrow)
+    if not Path(tomorrow_file).exists():
+        print(f"📝 Creating tomorrow's plan from template...")
+        _create_file_from_template(tomorrow_file, tomorrow, is_tomorrow=True)
+        files_created.append(('tomorrow', tomorrow_file))
+
+    if files_created:
+        print(f"✅ Created review files:")
+        for label, path in files_created:
+            print(f"   {label.capitalize()}: {path}")
+        print()
+
+    return today_file
+
+def run_interactive_session(direct_request=None, non_interactive=False):
+    """Run the interactive Claude session"""
+    today_file = get_review_file_path()
+    tomorrow_file = get_review_file_path(datetime.now() + timedelta(days=1))
+    stage_theme, stage_focus = get_stage_info()
+
+    # Get timezone from config
+    timezone = 'America/New_York'  # default
+    try:
+        result = subprocess.run(['bin/get-config', 'timezone'],
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            timezone = result.stdout.strip()
+    except:
+        pass
+
+    # Build the context with proper timezone
+    result = subprocess.run([f'TZ={timezone} date "+%A, %B %d, %Y at %I:%M %p %Z"'],
+                          shell=True, capture_output=True, text=True)
+    current_time = result.stdout.strip()
+
+    result = subprocess.run([f'TZ={timezone} date "+%Y-%m-%d"'],
+                          shell=True, capture_output=True, text=True)
+    current_date = result.stdout.strip()
+
+    result = subprocess.run([f'TZ={timezone} date "+%A"'],
+                          shell=True, capture_output=True, text=True)
+    day_of_week = result.stdout.strip()
+
+    # Get task counts from markdown
+    task_stats = get_task_statistics()
+    task_count = str(task_stats['total'])
+    overdue_count = str(task_stats['overdue'])
+    high_priority_count = str(task_stats['high_priority'])
+
+    # Get health metrics
+    health_metrics = get_health_metrics()
+
+    # Get existing plans
+    existing_plans = get_existing_plans()
+
+    # Get changed vault files
+    changed_files = get_changed_vault_files()
+
+    # Read TODAY.md for context - always include this, even for direct requests
+    today_context = ""
+    if Path('TODAY.md').exists():
+        with open('TODAY.md', 'r') as f:
+            today_content = f.read()
+            # Remove the critical first steps section
+            today_content = re.sub(r'### 🔴 CRITICAL FIRST STEPS 🔴.*?(?=##|$)', '',
+                                  today_content, flags=re.DOTALL)
+            # Get the session instructions part
+            match = re.search(r'## Session Instructions for Claude.*', today_content, re.DOTALL)
+            if match:
+                today_context = match.group(0)
+
+    # Build the common context that all sessions need
+    common_context = f"""## Pre-Computed Context
+- **Current Time**: {current_time}
+- **Date**: {current_date} ({day_of_week})
+- **Stage**: {stage_theme} - {stage_focus}
+- **Today's Review File**: {today_file}
+- **Tomorrow's Review File**: {tomorrow_file}
+- **Active Tasks**: {task_count} (Overdue: {overdue_count}, High Priority: {high_priority_count})
+- **Time Blocking Calendar**: e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com
+{health_metrics}
+
+## Existing Plans
+{existing_plans}
+{changed_files}
+
+## Database Tables Available:
+- markdown_tasks: Current tasks stored directly from markdown files
+- emails: Recent emails with subjects, senders, reply status
+- calendar_events: Upcoming events with times, locations
+- contacts: Contact information
+- file_tracking: Recently modified files
+- people_to_contact: People needing follow-up
+- diary: Day One journal entries with text, dates, locations
+
+## Available Commands
+- bin/db-query daily - Get comprehensive daily review data
+- bin/db-query tasks - Get priority tasks
+- bin/mark-done 'task' - Mark a task as complete
+- bin/progress 'note' - Add a progress note
+- bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" - Create time blocking events
+
+{today_context}"""
+
+    if direct_request:
+        if non_interactive:
+            print("🤖 Running Claude in non-interactive mode...")
+            prompt = f"""# Focused Work Session - NON-INTERACTIVE MODE
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- The user ran this command specifically requesting: "{direct_request}"
+- Complete the task WITHOUT asking for confirmation
+
+{common_context}
+
+## Direct Request from User
+"{direct_request}"
+
+Execute the request NOW without asking for permission!"""
+
+            try:
+                subprocess.run(['timeout', '600', 'claude', '--print', '--dangerously-skip-permissions', prompt],
+                             check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"ERROR: Command timed out or failed after 10 minutes: {e}")
+                sys.exit(1)
+        else:
+            print(f"📊 Starting focused session: {direct_request}\n")
+            print("🤖 Starting Claude focused session...")
+
+            prompt = f"""# Focused Work Session
+
+{common_context}
+
+## User Request
+"{direct_request}"
+
+Please help me with this specific request."""
+
+            subprocess.run(['claude', prompt])
+    else:
+        print("🤖 Starting Claude daily review session...")
+        prompt = f"""# Daily Review Session
+
+{common_context}
+
+Please help me with my daily review."""
+
+        subprocess.run(['claude', prompt])
+
+    # Session end summary
+    print("\n" + "━" * 50)
+    print("✅ Claude session ended\n")
+    print(f"📝 Your plans are in:")
+    print(f"   Today: {today_file}")
+    print(f"   Tomorrow: {tomorrow_file}\n")
+    print("💡 Continue tracking progress with:")
+    print("   bin/mark-done 'task description'")
+    print("   bin/progress 'note'")
+    print("   bin/today update  # Update both files with progress")
+    print("━" * 50 + "\n")
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description='Today - Daily review and planning tool')
+    parser.add_argument('command', nargs='?', help='Command to run (e.g., "update")')
+    parser.add_argument('request', nargs='*', help='Direct request for Claude')
+    parser.add_argument('--no-sync', action='store_true', help='Skip the sync step')
+    parser.add_argument('--non-interactive', action='store_true', help='Run in non-interactive mode')
+
+    args = parser.parse_args()
+
+    # Load environment variables
+    load_dotenv()
+
+    # Check if vault exists (unless in non-interactive mode)
+    if not args.non_interactive:
+        if not check_vault_exists():
+            print("Cannot continue without vault directory.")
+            sys.exit(1)
+
+    # Check dependencies once per day (unless in non-interactive mode)
+    if not args.non_interactive:
+        check_dependencies()
+        check_skeleton_updates()
+
+    # Handle init command - create hierarchy files only
+    if args.command == 'init':
+        print("📅 Initializing review file hierarchy...")
+        create_review_from_template()
+        print("✅ Review hierarchy is ready!")
+        return
+
+    # Handle update command
+    if args.command == 'update':
+        print("📊 Running automated review update...")
+        if not args.no_sync:
+            run_sync()
+        update_review_file(dry_run=False)
+        return
+
+    # Handle dry-run command
+    if args.command == 'dry-run':
+        print("📊 Running review update in dry-run mode...")
+        if not args.no_sync:
+            run_sync()
+        update_review_file(dry_run=True)
+        return
+
+    # Join any remaining arguments as the direct request
+    direct_request = None
+    known_commands = ['init', 'update', 'dry-run']
+    if args.command and args.command not in known_commands:
+        # The first positional arg is actually a request, not a command
+        parts = [args.command] + args.request
+        direct_request = ' '.join(parts)
+    elif args.request:
+        direct_request = ' '.join(args.request)
+
+    # Display appropriate message
+    if direct_request:
+        print(f"📊 Starting focused session: {direct_request}")
+    else:
+        print("📊 Starting daily review process...")
+
+    # Check Claude authentication (unless non-interactive)
+    if not args.non_interactive:
+        check_claude_auth()
+
+    # Run sync (unless skipped)
+    if not args.no_sync:
+        run_sync(skip_sync=False)
+    else:
+        print("⚠️  Skipping sync (--no-sync flag provided)")
+
+    # Check and recover database if needed
+    check_and_recover_database()
+
+    # Run markdown linting (non-blocking)
+    if not args.non_interactive:
+        lint_markdown()
+
+    # Create review file from template if needed
+    create_review_from_template()
+
+    # Run the appropriate session
+    run_interactive_session(direct_request, args.non_interactive)
+
+if __name__ == '__main__':
+    main()
