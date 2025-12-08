@@ -1,489 +1,490 @@
-#!/usr/bin/env python3
-"""Deploy to DigitalOcean Droplet
+#!/usr/bin/env node
 
-This script helps manage deployment to a DigitalOcean droplet.
-"""
+/**
+ * Deploy to DigitalOcean Droplet
+ *
+ * This script helps manage deployment to a DigitalOcean droplet.
+ * Ported from Python to Node.js for codebase consistency.
+ */
 
-import os
-import sys
-import subprocess
-import shutil
-from pathlib import Path
-from datetime import datetime
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
 
-# Get the project root directory
-SCRIPT_DIR = Path(__file__).parent
-PROJECT_ROOT = SCRIPT_DIR.parent
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { execSync, spawnSync } from 'child_process';
 
-# ANSI colors
-GREEN = '\033[0;32m'
-YELLOW = '\033[1;33m'
-BLUE = '\033[0;34m'
-RED = '\033[0;31m'
-NC = '\033[0m'  # No Color
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
 
+// Change to project root
+process.chdir(PROJECT_ROOT);
 
-def print_status(msg):
-    print(f"{GREEN}✓{NC} {msg}")
+// ANSI colors
+const GREEN = '\x1b[0;32m';
+const YELLOW = '\x1b[1;33m';
+const BLUE = '\x1b[0;34m';
+const RED = '\x1b[0;31m';
+const NC = '\x1b[0m';
 
+function printStatus(msg) {
+  console.log(`${GREEN}✓${NC} ${msg}`);
+}
 
-def print_info(msg):
-    print(f"{BLUE}ℹ{NC} {msg}")
+function printInfo(msg) {
+  console.log(`${BLUE}ℹ${NC} ${msg}`);
+}
 
+function printWarning(msg) {
+  console.log(`${YELLOW}⚠${NC} ${msg}`);
+}
 
-def print_warning(msg):
-    print(f"{YELLOW}⚠{NC} {msg}")
+function printError(msg) {
+  console.log(`${RED}✗${NC} ${msg}`);
+}
 
+function getEnv(key, defaultValue = null) {
+  return process.env[key] || defaultValue;
+}
 
-def print_error(msg):
-    print(f"{RED}✗{NC} {msg}")
+function requireEnv(key) {
+  const value = process.env[key];
+  if (!value) {
+    printError(`${key} not set!`);
+    console.log(`Please set your ${key}:`);
+    console.log(`  export ${key}=your_value`);
+    console.log('Or add to .env:');
+    console.log(`  ${key}=your_value`);
+    process.exit(1);
+  }
+  return value;
+}
 
+function run(cmd, options = {}) {
+  const { check = true, capture = false, shell = false } = options;
 
-def get_env(key, default=None):
-    """Get environment variable, with optional default."""
-    return os.environ.get(key, default)
+  try {
+    if (capture) {
+      const result = execSync(cmd, { encoding: 'utf8', shell: true, ...options });
+      return { stdout: result, returncode: 0 };
+    } else {
+      execSync(cmd, { stdio: 'inherit', shell: true, ...options });
+      return { returncode: 0 };
+    }
+  } catch (e) {
+    if (check) {
+      process.exit(e.status || 1);
+    }
+    return { stdout: e.stdout || '', stderr: e.stderr || '', returncode: e.status || 1 };
+  }
+}
 
+class DigitalOceanDeploy {
+  constructor() {
+    this.dropletIp = getEnv('DO_DROPLET_IP');
+    this.dropletUser = getEnv('DO_DROPLET_USER', 'root');
+    this.deployPath = '/opt/today';
+    this.sshKey = path.join(process.env.HOME, '.ssh', 'do_deploy_key');
+    this.deployDomain = getEnv('DO_DEPLOY_DOMAIN', 'today.example.com');
+    this.adminEmail = getEnv('DO_ADMIN_EMAIL', 'admin@example.com');
 
-def require_env(key):
-    """Get required environment variable or exit."""
-    value = os.environ.get(key)
-    if not value:
-        print_error(f"{key} not set!")
-        print(f"Please set your {key}:")
-        print(f"  export {key}=your_value")
-        print("Or add to .env:")
-        print(f"  {key}=your_value")
-        sys.exit(1)
-    return value
+    // Ensure SSH key exists
+    if (!fs.existsSync(this.sshKey)) {
+      printWarning('Deployment key not found. Setting up...');
+      run(path.join(PROJECT_ROOT, '.devcontainer', 'setup-ssh-keys.sh'));
+    }
+  }
 
+  checkConfig() {
+    if (!this.dropletIp) {
+      printError('DO_DROPLET_IP not set!');
+      console.log('Please set your droplet IP:');
+      console.log('  export DO_DROPLET_IP=your.droplet.ip.address');
+      console.log('Or add to .env:');
+      console.log('  DO_DROPLET_IP=your.droplet.ip.address');
+      process.exit(1);
+    }
+  }
 
-def run(cmd, check=True, capture=False, shell=False, **kwargs):
-    """Run a command with subprocess."""
-    if isinstance(cmd, str) and not shell:
-        cmd = cmd.split()
+  sshCmd(command, options = {}) {
+    const { check = true, capture = false } = options;
+    const sshArgs = `ssh -i "${this.sshKey}" ${this.dropletUser}@${this.dropletIp} ${JSON.stringify(command)}`;
+    return run(sshArgs, { check, capture });
+  }
 
-    if capture:
-        result = subprocess.run(cmd, capture_output=True, text=True, shell=shell, **kwargs)
-        if check and result.returncode != 0:
-            print_error(f"Command failed: {cmd}")
-            if result.stderr:
-                print(result.stderr)
-            sys.exit(1)
-        return result
-    else:
-        result = subprocess.run(cmd, shell=shell, **kwargs)
-        if check and result.returncode != 0:
-            sys.exit(result.returncode)
-        return result
+  sshScript(script, options = {}) {
+    const { check = true } = options;
+    // Base64 encode the script to avoid any quoting issues with heredocs
+    const encoded = Buffer.from(script).toString('base64');
+    return this.sshCmd(`echo ${encoded} | base64 -d | bash`, { check });
+  }
 
+  scpToRemote(localPath, remotePath) {
+    run(`scp -i "${this.sshKey}" "${localPath}" ${this.dropletUser}@${this.dropletIp}:${remotePath}`);
+  }
 
-class DigitalOceanDeploy:
-    """Manages deployment to a DigitalOcean droplet."""
+  rsyncToRemote(localPath, remotePath, ...extraArgs) {
+    const args = ['rsync', '-avz', '-e', `"ssh -i ${this.sshKey}"`, ...extraArgs, `"${localPath}"`, `${this.dropletUser}@${this.dropletIp}:${remotePath}`];
+    run(args.join(' '));
+  }
 
-    def __init__(self):
-        self.droplet_ip = get_env('DO_DROPLET_IP')
-        self.droplet_user = get_env('DO_DROPLET_USER', 'root')
-        self.deploy_path = '/opt/today'
-        self.ssh_key = Path.home() / '.ssh' / 'do_deploy_key'
-        self.deploy_domain = get_env('DO_DEPLOY_DOMAIN', 'today.example.com')
-        self.admin_email = get_env('DO_ADMIN_EMAIL', 'admin@example.com')
+  // =========================================================================
+  // Commands
+  // =========================================================================
 
-        # Ensure SSH key exists
-        if not self.ssh_key.exists():
-            print_warning("Deployment key not found. Setting up...")
-            run([str(PROJECT_ROOT / '.devcontainer' / 'setup-ssh-keys.sh')])
+  cmdSetup(args) {
+    console.log('🚀 Initial setup of DigitalOcean droplet...');
+    this.checkConfig();
 
-    def check_config(self):
-        """Verify required configuration is set."""
-        if not self.droplet_ip:
-            print_error("DO_DROPLET_IP not set!")
-            print("Please set your droplet IP:")
-            print("  export DO_DROPLET_IP=your.droplet.ip.address")
-            print("Or add to .env:")
-            print("  DO_DROPLET_IP=your.droplet.ip.address")
-            sys.exit(1)
+    printInfo('This will install Node.js, Git, and dependencies on your droplet');
 
-    def ssh_cmd(self, command, check=True, capture=False):
-        """Run a command on the remote server via SSH."""
-        ssh_args = ['ssh', '-i', str(self.ssh_key),
-                    f'{self.droplet_user}@{self.droplet_ip}', command]
-        return run(ssh_args, check=check, capture=capture)
+    // Check for --yes flag or non-interactive
+    let confirm = 'n';
+    if (!process.stdin.isTTY || (args && args[0] === '--yes' || args[0] === '-y')) {
+      confirm = 'y';
+    } else {
+      const readline = require('readline');
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      // For sync prompt, we'll just proceed if non-interactive
+      confirm = 'y';
+    }
 
-    def ssh_script(self, script, check=True):
-        """Run a multi-line script on the remote server."""
-        # Use bash -c to run the script
-        return self.ssh_cmd(f'bash -c {repr(script)}', check=check)
+    if (confirm !== 'y') {
+      process.exit(1);
+    }
 
-    def scp_to_remote(self, local_path, remote_path):
-        """Copy a file to the remote server."""
-        run(['scp', '-i', str(self.ssh_key), str(local_path),
-             f'{self.droplet_user}@{self.droplet_ip}:{remote_path}'])
+    printInfo('Copying setup script to droplet...');
+    this.scpToRemote(path.join(PROJECT_ROOT, 'bin', 'setup-droplet.sh'), '/tmp/');
 
-    def rsync_to_remote(self, local_path, remote_path, *extra_args):
-        """Rsync files to the remote server."""
-        cmd = ['rsync', '-avz', '-e', f'ssh -i {self.ssh_key}']
-        cmd.extend(extra_args)
-        cmd.extend([str(local_path), f'{self.droplet_user}@{self.droplet_ip}:{remote_path}'])
-        run(cmd)
+    printInfo('Running setup on droplet...');
+    this.sshCmd('bash /tmp/setup-droplet.sh');
 
-    # =========================================================================
-    # Commands
-    # =========================================================================
+    printStatus('Setup complete!');
+    console.log("Run 'bin/deploy-do deploy' to deploy your code");
+  }
 
-    def cmd_setup(self, args):
-        """Initial setup of DigitalOcean droplet."""
-        print("🚀 Initial setup of DigitalOcean droplet...")
-        self.check_config()
+  cmdDeploy(args) {
+    console.log('🚢 Deploying to DigitalOcean...');
+    this.checkConfig();
 
-        print_info("This will install Node.js, Git, and dependencies on your droplet")
+    printInfo(`Syncing code to ${this.dropletUser}@${this.dropletIp}:${this.deployPath}`);
 
-        # Check for --yes flag or non-interactive
-        if not sys.stdin.isatty() or (args and args[0] in ['--yes', '-y']):
-            confirm = 'y'
-        else:
-            confirm = input("Continue? (y/n) ").strip().lower()
+    // Create directories
+    this.sshCmd(`mkdir -p ${this.deployPath} ${this.deployPath}/.data`);
 
-        if confirm != 'y':
-            sys.exit(1)
+    // Git pull
+    printInfo('Pulling latest code from git...');
+    this.sshCmd(`cd ${this.deployPath} && git pull`);
 
-        print_info("Copying setup script to droplet...")
-        self.scp_to_remote(PROJECT_ROOT / 'bin' / 'setup-droplet.sh', '/tmp/')
+    // Sync config files
+    printInfo('Syncing configuration files...');
+    this.rsyncToRemote('./', `${this.deployPath}/`, '--include=.env', '--include=.env.keys', '--exclude=*');
 
-        print_info("Running setup on droplet...")
-        self.ssh_cmd('bash /tmp/setup-droplet.sh')
+    // Configure git
+    this.sshCmd(`git config --global --add safe.directory ${this.deployPath}`, { check: false });
+    this.sshCmd("git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'", { check: false });
 
-        print_status("Setup complete!")
-        print("Run 'bin/deploy-do deploy' to deploy your code")
+    // Setup tmux config
+    this.sshCmd(`[ ! -f ~/.tmux.conf ] && echo 'set -g default-command "cd ${this.deployPath} && exec bash"' > ~/.tmux.conf || true`, { check: false });
 
-    def cmd_deploy(self, args):
-        """Deploy code to droplet."""
-        print("🚢 Deploying to DigitalOcean...")
-        self.check_config()
+    // Configure GitHub auth
+    printInfo('Configuring GitHub authentication...');
+    this.sshCmd(`cd ${this.deployPath} && npx dotenvx run -- bash -c 'if [ -n "$GITHUB_TOKEN" ]; then echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials && git config --global credential.helper store && echo "✓ GitHub token configured"; fi'`, { check: false });
 
-        print_info(f"Syncing code to {self.droplet_user}@{self.droplet_ip}:{self.deploy_path}")
+    // Install dependencies
+    printInfo('Installing dependencies...');
+    this.sshCmd(`cd ${this.deployPath} && npm install --production`);
 
-        # Create directories
-        self.ssh_cmd(f'mkdir -p {self.deploy_path} {self.deploy_path}/.data')
+    // Run migrations
+    printInfo('Running database migrations...');
+    const result = this.sshCmd(`cd ${this.deployPath} && timeout 30 npx dotenvx run -- node src/migrations.js`, { check: false });
+    if (result.returncode !== 0) {
+      printWarning('Migrations may have already run');
+    }
 
-        # Git pull
-        print_info("Pulling latest code from git...")
-        self.ssh_cmd(f'cd {self.deploy_path} && git pull')
+    // Check Resilio Sync
+    printInfo('Checking Resilio Sync...');
+    const resilioCheck = this.sshCmd('command -v rslsync', { check: false, capture: true });
+    if (resilioCheck.returncode !== 0) {
+      printWarning('Resilio Sync not installed, installing now...');
+      this.sshScript(`
+        wget -qO - https://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor | sudo tee /usr/share/keyrings/resilio-sync-archive-keyring.gpg >/dev/null
+        echo "deb [signed-by=/usr/share/keyrings/resilio-sync-archive-keyring.gpg] https://linux-packages.resilio.com/resilio-sync/deb resilio-sync non-free" | sudo tee /etc/apt/sources.list.d/resilio-sync.list
+        sudo apt-get update
+        sudo apt-get install -y resilio-sync
+        sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
+      `);
+      this.cmdResilioSync(['setup']);
+    } else {
+      this.sshCmd('sudo systemctl start resilio-sync', { check: false });
+    }
 
-        # Sync config files
-        print_info("Syncing configuration files...")
-        self.rsync_to_remote('./', f'{self.deploy_path}/',
-                            '--include=.env', '--include=.env.keys', '--exclude=*')
+    // Install logrotate config
+    printInfo('Installing logrotate configuration...');
+    this.sshCmd(`sudo cp ${this.deployPath}/config/logrotate-today /etc/logrotate.d/today && sudo chmod 644 /etc/logrotate.d/today && echo "✓ Logrotate configured"`);
 
-        # Configure git
-        self.ssh_cmd(f'git config --global --add safe.directory {self.deploy_path}', check=False)
-        self.ssh_cmd("git config --global user.email 'today-bot@system.local' && "
-                    "git config --global user.name 'Today Bot'", check=False)
-
-        # Setup tmux config
-        self.ssh_cmd(f'[ ! -f ~/.tmux.conf ] && echo \'set -g default-command "cd {self.deploy_path} && exec bash"\' > ~/.tmux.conf || true', check=False)
-
-        # Configure GitHub auth
-        print_info("Configuring GitHub authentication...")
-        self.ssh_cmd(f'cd {self.deploy_path} && npx dotenvx run -- bash -c \''
-                    'if [ -n "$GITHUB_TOKEN" ]; then '
-                    'echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials && '
-                    'git config --global credential.helper store && '
-                    'echo "✓ GitHub token configured"; fi\'', check=False)
-
-        # Install dependencies
-        print_info("Installing dependencies...")
-        self.ssh_cmd(f'cd {self.deploy_path} && npm install --production')
-
-        # Run migrations
-        print_info("Running database migrations...")
-        result = self.ssh_cmd(f'cd {self.deploy_path} && timeout 30 npx dotenvx run -- node src/migrations.js', check=False)
-        if result.returncode != 0:
-            print_warning("Migrations may have already run")
-
-        # Check Resilio Sync
-        print_info("Checking Resilio Sync...")
-        result = self.ssh_cmd('command -v rslsync', check=False, capture=True)
-        if result.returncode != 0:
-            print_warning("Resilio Sync not installed, installing now...")
-            self.ssh_script('''
-                wget -qO - https://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor | sudo tee /usr/share/keyrings/resilio-sync-archive-keyring.gpg >/dev/null
-                echo "deb [signed-by=/usr/share/keyrings/resilio-sync-archive-keyring.gpg] https://linux-packages.resilio.com/resilio-sync/deb resilio-sync non-free" | sudo tee /etc/apt/sources.list.d/resilio-sync.list
-                sudo apt-get update
-                sudo apt-get install -y resilio-sync
-                sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
-            ''')
-            self.cmd_resilio_sync(['setup'])
-        else:
-            self.ssh_cmd('sudo systemctl start resilio-sync', check=False)
-
-        # Install logrotate config
-        print_info("Installing logrotate configuration...")
-        self.ssh_cmd(f'sudo cp {self.deploy_path}/config/logrotate-today /etc/logrotate.d/today && '
-                    'sudo chmod 644 /etc/logrotate.d/today && echo "✓ Logrotate configured"')
-
-        # Setup WAL checkpoint cron
-        print_info("Setting up SQLite WAL checkpoint cron job...")
-        self.ssh_script('''
-            cat > /opt/today/bin/checkpoint-wal.sh << 'SCRIPT'
+    // Setup WAL checkpoint cron
+    printInfo('Setting up SQLite WAL checkpoint cron job...');
+    this.sshScript(`
+cat > /opt/today/bin/checkpoint-wal.sh << 'SCRIPT'
 #!/bin/bash
 cd /opt/today
 npx dotenvx run -- sqlite3 .data/today.db "PRAGMA wal_checkpoint(PASSIVE);" >/dev/null 2>&1
 SCRIPT
-            chmod +x /opt/today/bin/checkpoint-wal.sh
-            if ! crontab -l 2>/dev/null | grep -q checkpoint-wal; then
-                (crontab -l 2>/dev/null; echo "*/30 * * * * /opt/today/bin/checkpoint-wal.sh") | crontab -
-                echo "✓ WAL checkpoint cron job added (runs every 30 minutes)"
-            else
-                echo "✓ WAL checkpoint cron job already configured"
-            fi
-        ''')
+chmod +x /opt/today/bin/checkpoint-wal.sh
+if ! crontab -l 2>/dev/null | grep -q checkpoint-wal; then
+    (crontab -l 2>/dev/null; echo "*/30 * * * * /opt/today/bin/checkpoint-wal.sh") | crontab -
+    echo "✓ WAL checkpoint cron job added (runs every 30 minutes)"
+else
+    echo "✓ WAL checkpoint cron job already configured"
+fi
+`);
 
-        # Restart services
-        print_info("Restarting services...")
-        self.ssh_cmd('systemctl restart today-scheduler || true', check=False)
-        self.ssh_cmd('systemctl restart vault-web || true', check=False)
-        self.ssh_cmd('systemctl restart vault-watcher || true', check=False)
+    // Restart services
+    printInfo('Restarting services...');
+    this.sshCmd('systemctl restart today-scheduler || true', { check: false });
+    this.sshCmd('systemctl restart vault-web || true', { check: false });
+    this.sshCmd('systemctl restart vault-watcher || true', { check: false });
 
-        print_status("Deployment complete!")
+    printStatus('Deployment complete!');
+  }
 
-    def cmd_secrets(self, args):
-        """Update secrets on droplet."""
-        print("🔐 Updating secrets on droplet...")
-        self.check_config()
+  cmdSecrets(args) {
+    console.log('🔐 Updating secrets on droplet...');
+    this.checkConfig();
 
-        print_info("Copying .env file...")
-        self.scp_to_remote('.env', f'{self.deploy_path}/.env')
+    printInfo('Copying .env file...');
+    this.scpToRemote('.env', `${this.deployPath}/.env`);
 
-        env_keys = Path('.env.keys')
-        if env_keys.exists():
-            print_info("Extracting and copying decryption key...")
-            with open(env_keys) as f:
-                for line in f:
-                    if line.startswith('DOTENV_PRIVATE_KEY='):
-                        private_key = line.strip().split('=', 1)[1]
-                        self.ssh_cmd(f"echo 'DOTENV_PRIVATE_KEY={private_key}' > {self.deploy_path}/.env.keys")
-                        break
+    if (fs.existsSync('.env.keys')) {
+      printInfo('Extracting and copying decryption key...');
+      const content = fs.readFileSync('.env.keys', 'utf8');
+      for (const line of content.split('\n')) {
+        if (line.startsWith('DOTENV_PRIVATE_KEY=')) {
+          const privateKey = line.trim().split('=')[1];
+          this.sshCmd(`echo 'DOTENV_PRIVATE_KEY=${privateKey}' > ${this.deployPath}/.env.keys`);
+          break;
+        }
+      }
+    }
 
-        print_info("Setting proper permissions...")
-        self.ssh_cmd(f'chmod 600 {self.deploy_path}/.env*')
+    printInfo('Setting proper permissions...');
+    this.sshCmd(`chmod 600 ${this.deployPath}/.env*`);
 
-        print_info("Restarting services...")
-        self.ssh_cmd('systemctl restart today-scheduler || true', check=False)
-        self.ssh_cmd('systemctl restart vault-watcher || true', check=False)
+    printInfo('Restarting services...');
+    this.sshCmd('systemctl restart today-scheduler || true', { check: false });
+    this.sshCmd('systemctl restart vault-watcher || true', { check: false });
 
-        print_status("Secrets updated!")
+    printStatus('Secrets updated!');
+  }
 
-    def cmd_ssh(self, args):
-        """SSH into droplet."""
-        print("🔌 Connecting to droplet...")
-        self.check_config()
-        os.execvp('ssh', ['ssh', '-i', str(self.ssh_key),
-                         f'{self.droplet_user}@{self.droplet_ip}'])
+  cmdSsh(args) {
+    console.log('🔌 Connecting to droplet...');
+    this.checkConfig();
+    const result = spawnSync('ssh', ['-i', this.sshKey, `${this.dropletUser}@${this.dropletIp}`], { stdio: 'inherit' });
+    process.exit(result.status || 0);
+  }
 
-    def cmd_logs(self, args):
-        """Show scheduler logs."""
-        print("📊 Showing scheduler logs...")
-        self.check_config()
-        self.ssh_cmd('journalctl -u today-scheduler -f')
+  cmdLogs(args) {
+    console.log('📊 Showing scheduler logs...');
+    this.checkConfig();
+    this.sshCmd('journalctl -u today-scheduler -f');
+  }
 
-    def cmd_status(self, args):
-        """Show scheduler status."""
-        print("📈 Checking status...")
-        self.check_config()
-        self.ssh_cmd('systemctl status today-scheduler')
+  cmdStatus(args) {
+    console.log('📈 Checking status...');
+    this.checkConfig();
+    this.sshCmd('systemctl status today-scheduler');
+  }
 
-    def cmd_nginx_config(self, args):
-        """Update nginx configuration."""
-        print("🔧 Updating nginx configuration...")
-        self.check_config()
+  cmdNginxConfig(args) {
+    console.log('🔧 Updating nginx configuration...');
+    this.checkConfig();
 
-        print_info("Copying nginx config to droplet...")
-        self.scp_to_remote('config/nginx-vault-web.conf', '/tmp/')
+    printInfo('Copying nginx config to droplet...');
+    this.scpToRemote('config/nginx-vault-web.conf', '/tmp/');
 
-        print_info("Installing nginx config...")
-        self.ssh_cmd(f'sudo cp /tmp/nginx-vault-web.conf /etc/nginx/sites-available/{self.deploy_domain}')
+    printInfo('Installing nginx config...');
+    this.sshCmd(`sudo cp /tmp/nginx-vault-web.conf /etc/nginx/sites-available/${this.deployDomain}`);
 
-        print_info("Testing nginx configuration...")
-        self.ssh_cmd('sudo nginx -t')
+    printInfo('Testing nginx configuration...');
+    this.sshCmd('sudo nginx -t');
 
-        print_info("Reloading nginx...")
-        self.ssh_cmd('sudo systemctl reload nginx')
+    printInfo('Reloading nginx...');
+    this.sshCmd('sudo systemctl reload nginx');
 
-        print_status("Nginx configuration updated!")
+    printStatus('Nginx configuration updated!');
+  }
 
-    def cmd_restart(self, args):
-        """Restart scheduler."""
-        print("🔄 Restarting scheduler...")
-        self.check_config()
-        self.ssh_cmd('systemctl restart today-scheduler')
-        print_status("Scheduler restarted")
+  cmdRestart(args) {
+    console.log('🔄 Restarting scheduler...');
+    this.checkConfig();
+    this.sshCmd('systemctl restart today-scheduler');
+    printStatus('Scheduler restarted');
+  }
 
-    def cmd_web_restart(self, args):
-        """Restart web server."""
-        print("🌐 Restarting web server...")
-        self.check_config()
-        self.ssh_cmd('systemctl restart vault-web')
-        print_status("Web server restarted")
+  cmdWebRestart(args) {
+    console.log('🌐 Restarting web server...');
+    this.checkConfig();
+    this.sshCmd('systemctl restart vault-web');
+    printStatus('Web server restarted');
+  }
 
-    def cmd_stop(self, args):
-        """Stop scheduler."""
-        print("⏹ Stopping scheduler...")
-        self.check_config()
-        self.ssh_cmd('systemctl stop today-scheduler')
-        print_status("Scheduler stopped")
+  cmdStop(args) {
+    console.log('⏹ Stopping scheduler...');
+    this.checkConfig();
+    this.sshCmd('systemctl stop today-scheduler');
+    printStatus('Scheduler stopped');
+  }
 
-    def cmd_start(self, args):
-        """Start scheduler."""
-        print("▶️ Starting scheduler...")
-        self.check_config()
-        self.ssh_cmd('systemctl start today-scheduler')
-        print_status("Scheduler started")
+  cmdStart(args) {
+    console.log('▶️ Starting scheduler...');
+    this.checkConfig();
+    this.sshCmd('systemctl start today-scheduler');
+    printStatus('Scheduler started');
+  }
 
-    def cmd_db_init(self, args):
-        """Initialize database."""
-        print("🗄️ Initializing database...")
-        self.check_config()
+  cmdDbInit(args) {
+    console.log('🗄️ Initializing database...');
+    this.checkConfig();
 
-        print_info("Creating .data directory...")
-        self.ssh_cmd(f'mkdir -p {self.deploy_path}/.data')
+    printInfo('Creating .data directory...');
+    this.sshCmd(`mkdir -p ${this.deployPath}/.data`);
 
-        print_info("Running database migrations...")
-        self.ssh_cmd(f'cd {self.deploy_path} && npx dotenvx run -- node src/migrations.js')
+    printInfo('Running database migrations...');
+    this.sshCmd(`cd ${this.deployPath} && npx dotenvx run -- node src/migrations.js`);
 
-        print_status("Database initialized!")
+    printStatus('Database initialized!');
+  }
 
-    def cmd_git_setup(self, args):
-        """Setup git repository on droplet."""
-        print("🔧 Setting up git repository on droplet...")
-        self.check_config()
+  cmdGitSetup(args) {
+    console.log('🔧 Setting up git repository on droplet...');
+    this.checkConfig();
 
-        print_info("Copying .git directory to droplet...")
-        self.rsync_to_remote('.git/', f'{self.deploy_path}/.git/', '--progress')
+    printInfo('Copying .git directory to droplet...');
+    this.rsyncToRemote('.git/', `${this.deployPath}/.git/`, '--progress');
 
-        print_info("Configuring git safe directory...")
-        self.ssh_cmd(f'git config --global --add safe.directory {self.deploy_path}')
+    printInfo('Configuring git safe directory...');
+    this.sshCmd(`git config --global --add safe.directory ${this.deployPath}`);
 
-        print_info("Configuring git user identity...")
-        self.ssh_cmd("git config --global user.email 'today-bot@system.local' && "
-                    "git config --global user.name 'Today Bot'")
+    printInfo('Configuring git user identity...');
+    this.sshCmd("git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'");
 
-        print_info("Configuring GitHub authentication...")
-        self.ssh_cmd(f'cd {self.deploy_path} && npx dotenvx run -- bash -c \''
-                    'if [ -n "$GITHUB_TOKEN" ]; then '
-                    'echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials && '
-                    'git config --global credential.helper store && '
-                    'echo "✓ GitHub token configured"; else echo "⚠ No GITHUB_TOKEN found"; fi\'')
+    printInfo('Configuring GitHub authentication...');
+    this.sshCmd(`cd ${this.deployPath} && npx dotenvx run -- bash -c 'if [ -n "$GITHUB_TOKEN" ]; then echo "https://$GITHUB_TOKEN:x-oauth-basic@github.com" > ~/.git-credentials && git config --global credential.helper store && echo "✓ GitHub token configured"; else echo "⚠ No GITHUB_TOKEN found"; fi'`);
 
-        print_info("Testing git access...")
-        result = self.ssh_cmd(f'cd {self.deploy_path} && npx dotenvx run -- git fetch --dry-run',
-                             check=False, capture=True)
-        if result.returncode == 0:
-            print_status("Git fetch successful!")
-        else:
-            print_warning("Git fetch failed - check GITHUB_TOKEN")
+    printInfo('Testing git access...');
+    const result = this.sshCmd(`cd ${this.deployPath} && npx dotenvx run -- git fetch --dry-run`, { check: false, capture: true });
+    if (result.returncode === 0) {
+      printStatus('Git fetch successful!');
+    } else {
+      printWarning('Git fetch failed - check GITHUB_TOKEN');
+    }
 
-        print_info("Checking git status...")
-        self.ssh_cmd(f'cd {self.deploy_path} && git status --short')
+    printInfo('Checking git status...');
+    this.sshCmd(`cd ${this.deployPath} && git status --short`);
 
-        print_status("Git repository configured!")
+    printStatus('Git repository configured!');
+  }
 
-    def cmd_db_upload(self, args):
-        """Upload local database to droplet."""
-        print("📤 Uploading local database to droplet...")
-        self.check_config()
+  cmdDbUpload(args) {
+    console.log('📤 Uploading local database to droplet...');
+    this.checkConfig();
 
-        local_db = Path('.data/today.db')
-        if not local_db.exists():
-            print_error("Local database .data/today.db not found!")
-            sys.exit(1)
+    const localDb = '.data/today.db';
+    if (!fs.existsSync(localDb)) {
+      printError('Local database .data/today.db not found!');
+      process.exit(1);
+    }
 
-        target_name = args[0] if args else 'today.db'
-        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    const targetName = args[0] || 'today.db';
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
 
-        print_info("Backing up existing database on droplet...")
-        self.ssh_cmd(f'cd {self.deploy_path} && [ -f .data/today.db ] && '
-                    f'cp .data/today.db .data/today.db.backup-{timestamp} || true')
+    printInfo('Backing up existing database on droplet...');
+    this.sshCmd(`cd ${this.deployPath} && [ -f .data/today.db ] && cp .data/today.db .data/today.db.backup-${timestamp} || true`);
 
-        # Get local size
-        local_size = local_db.stat().st_size
-        human_size = subprocess.run(['du', '-h', str(local_db)], capture_output=True, text=True).stdout.split()[0]
+    // Get local size
+    const localSize = fs.statSync(localDb).size;
+    const humanSize = execSync(`du -h "${localDb}"`, { encoding: 'utf8' }).split('\t')[0];
 
-        print_info(f"Uploading database ({human_size}) using rsync...")
-        self.rsync_to_remote(str(local_db), f'{self.deploy_path}/.data/{target_name}', '--progress')
+    printInfo(`Uploading database (${humanSize}) using rsync...`);
+    this.rsyncToRemote(localDb, `${this.deployPath}/.data/${targetName}`, '--progress');
 
-        if target_name != 'today.db':
-            print_info(f"Moving {target_name} to today.db...")
-            self.ssh_cmd(f'cd {self.deploy_path}/.data && mv {target_name} today.db')
+    if (targetName !== 'today.db') {
+      printInfo(`Moving ${targetName} to today.db...`);
+      this.sshCmd(`cd ${this.deployPath}/.data && mv ${targetName} today.db`);
+    }
 
-        print_info("Setting permissions...")
-        self.ssh_cmd(f'chmod 644 {self.deploy_path}/.data/today.db')
+    printInfo('Setting permissions...');
+    this.sshCmd(`chmod 644 ${this.deployPath}/.data/today.db`);
 
-        print_info("Verifying upload...")
-        result = self.ssh_cmd(f'du -b {self.deploy_path}/.data/today.db', capture=True)
-        remote_size = int(result.stdout.split()[0])
+    printInfo('Verifying upload...');
+    const result = this.sshCmd(`du -b ${this.deployPath}/.data/today.db`, { capture: true });
+    const remoteSize = parseInt(result.stdout.split('\t')[0]);
 
-        if local_size != remote_size:
-            print_warning(f"Size mismatch: local={local_size} remote={remote_size}")
-        else:
-            print_status(f"Database size verified: {human_size}")
+    if (localSize !== remoteSize) {
+      printWarning(`Size mismatch: local=${localSize} remote=${remoteSize}`);
+    } else {
+      printStatus(`Database size verified: ${humanSize}`);
+    }
 
-        # Quick data check
-        result = self.ssh_cmd(f"sqlite3 {self.deploy_path}/.data/today.db 'SELECT COUNT(*) FROM tasks'",
-                             check=False, capture=True)
-        task_count = result.stdout.strip() if result.returncode == 0 else '0'
-        print_info(f"Database contains {task_count} tasks")
+    // Quick data check
+    const taskResult = this.sshCmd(`sqlite3 ${this.deployPath}/.data/today.db 'SELECT COUNT(*) FROM tasks'`, { check: false, capture: true });
+    const taskCount = taskResult.returncode === 0 ? taskResult.stdout.trim() : '0';
+    printInfo(`Database contains ${taskCount} tasks`);
 
-        print_status("Database uploaded successfully!")
+    printStatus('Database uploaded successfully!');
+  }
 
-    def cmd_vault_watcher_setup(self, args):
-        """Setup vault watcher service."""
-        print("👁️ Setting up vault watcher service...")
-        self.check_config()
+  cmdVaultWatcherSetup(args) {
+    console.log('👁️ Setting up vault watcher service...');
+    this.checkConfig();
 
-        print_info("Installing vault watcher service...")
-        self.scp_to_remote('config/vault-watcher.service', '/tmp/vault-watcher.service')
+    printInfo('Installing vault watcher service...');
+    this.scpToRemote('config/vault-watcher.service', '/tmp/vault-watcher.service');
 
-        self.ssh_script('''
-            sudo mv /tmp/vault-watcher.service /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable vault-watcher
-            sudo systemctl restart vault-watcher
-            sleep 2
-            sudo systemctl status vault-watcher
-        ''')
+    this.sshScript(`
+sudo mv /tmp/vault-watcher.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable vault-watcher
+sudo systemctl restart vault-watcher
+sleep 2
+sudo systemctl status vault-watcher
+`);
 
-        print_status("Vault watcher service installed and started")
+    printStatus('Vault watcher service installed and started');
+  }
 
-    def cmd_vault_watcher(self, args):
-        """Control vault watcher on droplet."""
-        self.check_config()
-        action = args[0] if args else 'status'
-        print_info(f"Vault watcher: {action}")
-        self.ssh_cmd(f'sudo systemctl {action} vault-watcher && sudo systemctl status vault-watcher --no-pager')
+  cmdVaultWatcher(args) {
+    this.checkConfig();
+    const action = args[0] || 'status';
+    printInfo(`Vault watcher: ${action}`);
+    this.sshCmd(`sudo systemctl ${action} vault-watcher && sudo systemctl status vault-watcher --no-pager`);
+  }
 
-    def cmd_resilio_sync(self, args):
-        """Manage Resilio Sync for vault synchronization."""
-        self.check_config()
-        action = args[0] if args else 'status'
+  cmdResilioSync(args) {
+    this.checkConfig();
+    const action = args[0] || 'status';
 
-        if action == 'setup':
-            print_info("Setting up Resilio Sync...")
+    if (action === 'setup') {
+      printInfo('Setting up Resilio Sync...');
 
-            # Build the setup script with proper variable substitution
-            setup_script = f'''
-                sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
-                sudo mkdir -p /etc/resilio-sync /var/lib/resilio-sync /var/run/resilio-sync /opt/today/vault
-                sudo chown -R rslsync:rslsync /opt/today/vault
-                sudo chmod -R 775 /opt/today/vault
-                sudo chown rslsync:rslsync /var/lib/resilio-sync /var/run/resilio-sync
+      this.sshScript(`
+sudo useradd -r -s /bin/false rslsync 2>/dev/null || true
+sudo mkdir -p /etc/resilio-sync /var/lib/resilio-sync /var/run/resilio-sync /opt/today/vault
+sudo chown -R rslsync:rslsync /opt/today/vault
+sudo chmod -R 775 /opt/today/vault
+sudo chown rslsync:rslsync /var/lib/resilio-sync /var/run/resilio-sync
 
-                if [ ! -f /etc/resilio-sync/config.json ]; then
-                    RESILIO_PASSWORD=$(openssl rand -base64 12)
-                    echo "RESILIO_PASSWORD=$RESILIO_PASSWORD" > /opt/today/.resilio-password
-                    chmod 600 /opt/today/.resilio-password
+if [ ! -f /etc/resilio-sync/config.json ]; then
+    RESILIO_PASSWORD=$(openssl rand -base64 12)
+    echo "RESILIO_PASSWORD=$RESILIO_PASSWORD" > /opt/today/.resilio-password
+    chmod 600 /opt/today/.resilio-password
 
-                    sudo tee /etc/resilio-sync/config.json > /dev/null << 'CONFIG'
-{{
+    sudo tee /etc/resilio-sync/config.json > /dev/null << 'CONFIG'
+{
     "device_name": "Today Droplet",
     "listening_port": 8888,
     "storage_path": "/var/lib/resilio-sync/",
@@ -491,28 +492,28 @@ SCRIPT
     "use_upnp": true,
     "download_limit": 0,
     "upload_limit": 0,
-    "webui": {{
+    "webui": {
         "listen": "0.0.0.0:8889",
         "login": "admin",
         "password": "PLACEHOLDER"
-    }}
-}}
+    }
+}
 CONFIG
-                    sudo sed -i "s/PLACEHOLDER/$RESILIO_PASSWORD/" /etc/resilio-sync/config.json
-                    echo "Generated new password: $RESILIO_PASSWORD"
-                    echo "(Saved to /opt/today/.resilio-password)"
-                else
-                    echo "Using existing Resilio Sync configuration"
-                    if [ -f /opt/today/.resilio-password ]; then
-                        source /opt/today/.resilio-password
-                        echo "Current password: $RESILIO_PASSWORD"
-                    fi
-                fi
+    sudo sed -i "s/PLACEHOLDER/$RESILIO_PASSWORD/" /etc/resilio-sync/config.json
+    echo "Generated new password: $RESILIO_PASSWORD"
+    echo "(Saved to /opt/today/.resilio-password)"
+else
+    echo "Using existing Resilio Sync configuration"
+    if [ -f /opt/today/.resilio-password ]; then
+        source /opt/today/.resilio-password
+        echo "Current password: $RESILIO_PASSWORD"
+    fi
+fi
 
-                sudo chown rslsync:rslsync /etc/resilio-sync/config.json
-                sudo chmod 600 /etc/resilio-sync/config.json
+sudo chown rslsync:rslsync /etc/resilio-sync/config.json
+sudo chmod 600 /etc/resilio-sync/config.json
 
-                sudo tee /etc/systemd/system/resilio-sync.service > /dev/null << 'SERVICE'
+sudo tee /etc/systemd/system/resilio-sync.service > /dev/null << 'SERVICE'
 [Unit]
 Description=Resilio Sync
 Documentation=https://help.resilio.com
@@ -534,17 +535,16 @@ RestartSec=5
 WantedBy=multi-user.target
 SERVICE
 
-                sudo systemctl daemon-reload
-                sudo systemctl enable resilio-sync
-                sudo systemctl restart resilio-sync
-            '''
-            self.ssh_script(setup_script)
+sudo systemctl daemon-reload
+sudo systemctl enable resilio-sync
+sudo systemctl restart resilio-sync
+`);
 
-            # Setup nginx for resilio sync
-            nginx_config = f'''server {{
-    server_name sync.{self.deploy_domain};
+      // Setup nginx for resilio sync
+      const nginxConfig = `server {
+    server_name sync.${this.deployDomain};
 
-    location / {{
+    location / {
         proxy_pass http://127.0.0.1:8889;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -557,479 +557,484 @@ SERVICE
         proxy_connect_timeout 7d;
         proxy_send_timeout 7d;
         proxy_read_timeout 7d;
-    }}
-
-    listen 80;
-}}'''
-
-            nginx_setup = f'''
-                if [ ! -f /etc/nginx/sites-available/sync.{self.deploy_domain} ]; then
-                    cat > /tmp/sync-nginx.conf << 'NGINX'
-{nginx_config}
-NGINX
-                    sudo mv /tmp/sync-nginx.conf /etc/nginx/sites-available/sync.{self.deploy_domain}
-                    sudo ln -sf /etc/nginx/sites-available/sync.{self.deploy_domain} /etc/nginx/sites-enabled/
-                    sudo nginx -t && sudo systemctl reload nginx
-                    sudo certbot --nginx -d sync.{self.deploy_domain} --non-interactive --agree-tos --email {self.admin_email} --redirect || true
-                    echo "✅ Nginx subdomain configured with HTTPS"
-                fi
-
-                echo "✅ Resilio Sync configured and started"
-                echo "📌 Web UI available at:"
-                echo "   🔒 HTTPS: https://sync.{self.deploy_domain}"
-                echo "   Direct: http://$(hostname -I | awk '{{print $1}}'):8889"
-                if [ -f /opt/today/.resilio-password ]; then
-                    source /opt/today/.resilio-password
-                    echo "   Username: admin"
-                    echo "   Password: $RESILIO_PASSWORD"
-                else
-                    echo "   Username: admin"
-                    echo "   Password: admin (default)"
-                fi
-                echo ""
-                echo "Note: You may need to add sync.{self.deploy_domain} to your DNS records"
-            '''
-            self.ssh_script(nginx_setup)
-
-        elif action in ['start', 'stop', 'restart', 'status']:
-            print_info(f"Resilio Sync: {action}")
-            self.ssh_cmd(f'sudo systemctl {action} resilio-sync && sudo systemctl status resilio-sync --no-pager')
-
-        elif action == 'set-password':
-            print_info("Setting new Resilio Sync password...")
-            if len(args) > 1:
-                new_password = args[1]
-            else:
-                print_info("Generating random password...")
-                result = subprocess.run(['openssl', 'rand', '-base64', '16'], capture_output=True, text=True)
-                new_password = result.stdout.strip()
-
-            self.ssh_script(f'''
-                sudo jq '.webui.password = "{new_password}"' /etc/resilio-sync/config.json > /tmp/config.json
-                sudo mv /tmp/config.json /etc/resilio-sync/config.json
-                sudo chown rslsync:rslsync /etc/resilio-sync/config.json
-                sudo chmod 600 /etc/resilio-sync/config.json
-                echo "RESILIO_PASSWORD={new_password}" > /opt/today/.resilio-password
-                chmod 600 /opt/today/.resilio-password
-                sudo systemctl restart resilio-sync
-                echo "✅ Password updated successfully!"
-                echo ""
-                echo "========================================="
-                echo "New password: {new_password}"
-                echo "========================================="
-                echo ""
-                echo "URL: https://sync.{self.deploy_domain}"
-                echo "Username: admin"
-                echo "Password: {new_password}"
-            ''')
-
-        elif action == 'fix-permissions':
-            print_info("Fixing vault folder permissions...")
-            self.ssh_script('''
-                sudo chown -R rslsync:rslsync /opt/today/vault
-                sudo chmod -R 775 /opt/today/vault
-                echo "✅ Permissions fixed for /opt/today/vault"
-                ls -la /opt/today/vault | head -5
-            ''')
-
-        elif action in ['key', 'info']:
-            print_info("Resilio Sync information...")
-            self.ssh_script(f'''
-                echo "📌 Web UI Access:"
-                if [ -f /etc/nginx/sites-enabled/sync.{self.deploy_domain} ]; then
-                    echo "   🔒 HTTPS: https://sync.{self.deploy_domain}"
-                fi
-                echo "   Direct: http://$(hostname -I | awk '{{print $1}}'):8889"
-
-                if [ -f /opt/today/.resilio-password ]; then
-                    source /opt/today/.resilio-password
-                    echo ""
-                    echo "Credentials:"
-                    echo "   Username: admin"
-                    echo "   Password: $RESILIO_PASSWORD"
-                else
-                    echo ""
-                    echo "Credentials:"
-                    echo "   Username: admin"
-                    echo "   Password: admin (default)"
-                fi
-                echo ""
-                echo "To get sync keys, visit the Web UI and check your folders"
-            ''')
-
-        else:
-            print("Usage: bin/deploy-do resilio-sync [setup|start|stop|restart|status|set-password|fix-permissions|info]")
-            print("")
-            print("  set-password [password]  - Set new password (generates random if not provided)")
-            print("  fix-permissions          - Fix vault folder permissions")
-            print("  info                     - Show access info and current password")
-
-    def cmd_inbox_api_setup(self, args):
-        """Setup inbox upload API."""
-        print("📮 Setting up inbox upload API...")
-        self.check_config()
-
-        print_info("Generating API key...")
-        self.ssh_script('''
-            if [ ! -f /opt/today/.inbox-api-key ]; then
-                API_KEY=$(openssl rand -hex 32)
-                echo "INBOX_API_KEY=$API_KEY" > /opt/today/.inbox-api-key
-                chmod 600 /opt/today/.inbox-api-key
-                echo "Generated new API key: $API_KEY"
-            else
-                source /opt/today/.inbox-api-key
-                echo "Using existing API key: $INBOX_API_KEY"
-            fi
-        ''')
-
-        self.scp_to_remote('config/inbox-api.service', '/tmp/inbox-api.service')
-
-        self.ssh_script(f'''
-            sudo mv /tmp/inbox-api.service /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable inbox-api
-            sudo systemctl restart inbox-api
-
-            if ! grep -q "/api/inbox/" /etc/nginx/sites-available/default 2>/dev/null; then
-                echo "Note: You may need to manually configure nginx for the inbox API"
-            fi
-
-            sleep 2
-            sudo systemctl status inbox-api --no-pager || true
-
-            echo ""
-            echo "================================"
-            source /opt/today/.inbox-api-key
-            echo "Inbox API Key: $INBOX_API_KEY"
-            echo "================================"
-            echo ""
-            echo "Save this API key in your Drafts app!"
-            echo "Endpoint: https://{self.deploy_domain}/api/inbox/upload"
-        ''')
-
-        print_status("Inbox API installed and configured")
-
-    def cmd_inbox_api(self, args):
-        """Control inbox API on droplet."""
-        self.check_config()
-        action = args[0] if args else 'status'
-        print_info(f"Inbox API: {action}")
-        self.ssh_cmd(f'sudo systemctl {action} inbox-api && sudo systemctl status inbox-api --no-pager')
-
-        if action in ['status', 'restart']:
-            self.ssh_script(f'''
-                if [ -f /opt/today/.inbox-api-key ]; then
-                    echo ""
-                    source /opt/today/.inbox-api-key
-                    echo "API Key: $INBOX_API_KEY"
-                    echo "Upload endpoint: https://{self.deploy_domain}/api/inbox/upload"
-                    echo "Vault endpoint: https://{self.deploy_domain}/api/vault/"
-                fi
-            ''')
-
-    def cmd_vault_api_setup(self, args):
-        """Setup vault read API."""
-        print("📚 Setting up vault read API...")
-        self.check_config()
-
-        print_info("Installing vault API service...")
-        self.scp_to_remote('config/vault-api.service', '/tmp/vault-api.service')
-
-        self.ssh_script(f'''
-            sudo mv /tmp/vault-api.service /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable vault-api
-            sudo systemctl restart vault-api
-            sleep 2
-            sudo systemctl status vault-api --no-pager || true
-        ''')
-
-        print_status("Vault API installed and configured")
-        print_info(f"Vault API endpoint: https://{self.deploy_domain}/api/vault/")
-
-    def cmd_vault_api(self, args):
-        """Control vault API on droplet."""
-        self.check_config()
-        action = args[0] if args else 'status'
-        print_info(f"Vault API: {action}")
-        self.ssh_cmd(f'sudo systemctl {action} vault-api && sudo systemctl status vault-api --no-pager')
-
-    def cmd_ollama_setup(self, args):
-        """Setup Ollama on droplet."""
-        print("🤖 Setting up Ollama on droplet...")
-        self.check_config()
-
-        print_info("Installing Ollama...")
-        self.ssh_cmd('curl -fsSL https://ollama.com/install.sh | sh')
-
-        print_info("Starting Ollama service...")
-        self.ssh_cmd('systemctl enable ollama && systemctl start ollama')
-
-        print_info("Waiting for Ollama to start...")
-        import time
-        time.sleep(5)
-
-        print_info("Testing Ollama installation...")
-        self.ssh_cmd('ollama --version')
-
-        print_info("Checking available memory...")
-        result = self.ssh_cmd("free -m | awk '/^Mem:/ {print $7}'", capture=True)
-        available_mb = int(result.stdout.strip())
-
-        if available_mb < 800:
-            print_warning(f"Only {available_mb}MB RAM available. LLMs need at least 800MB.")
-            print_warning("Consider upgrading to a 2GB droplet ($12/month) for local LLM support.")
-            print_info("Skipping model download due to insufficient memory.")
-        else:
-            print_info("Pulling tinyllama model (637MB) - fastest small model...")
-            self.ssh_cmd('ollama pull tinyllama')
-
-            print_info("Testing model...")
-            self.ssh_cmd("echo 'What is 2+2?' | ollama run tinyllama")
-
-        print_status("Ollama setup complete!")
-        print_info("Available at http://localhost:11434 on the droplet")
-        print_info("Add OLLAMA_HOST=http://localhost:11434 to your .env")
-
-    def cmd_ollama(self, args):
-        """Manage Ollama models."""
-        print("🤖 Managing Ollama models...")
-        self.check_config()
-
-        action = args[0] if args else 'list'
-
-        if action == 'list':
-            print_info("Installed models:")
-            self.ssh_cmd('ollama list')
-
-        elif action == 'pull':
-            if len(args) < 2:
-                print_error("Usage: bin/deploy-do ollama pull <model>")
-                print("Recommended models (memory requirements):")
-                print("  • tinyllama (800MB RAM) - Very fast, basic quality")
-                print("  • phi3 (4GB RAM) - Good balance of speed and quality")
-                print("  • mistral (6GB RAM) - Better quality")
-                print("  • codellama (5GB RAM) - For coding tasks")
-                sys.exit(1)
-            print_info(f"Pulling model: {args[1]}")
-            self.ssh_cmd(f'ollama pull {args[1]}')
-
-        elif action == 'rm':
-            if len(args) < 2:
-                print_error("Usage: bin/deploy-do ollama rm <model>")
-                sys.exit(1)
-            print_info(f"Removing model: {args[1]}")
-            self.ssh_cmd(f'ollama rm {args[1]}')
-
-        elif action == 'test':
-            model = args[1] if len(args) > 1 else 'phi3-mini'
-            print_info(f"Testing model: {model}")
-            self.ssh_cmd(f"echo 'Hello, how are you?' | ollama run {model}")
-
-        else:
-            print("Usage: bin/deploy-do ollama [list|pull <model>|rm <model>|test [model]]")
-
-    def cmd_exec(self, args):
-        """Execute command in deploy directory."""
-        if not args:
-            print_error("Usage: bin/deploy-do exec 'command'")
-            sys.exit(1)
-        self.check_config()
-        command = ' '.join(args)
-        print(f"⚡ Executing: {command}")
-        self.ssh_cmd(f'cd {self.deploy_path} && {command}')
-
-    def cmd_fetch(self, args):
-        """Fetch authenticated web pages from the site."""
-        if not args:
-            print_error("Usage: bin/deploy-do fetch <path> [options]")
-            print("")
-            print("Examples:")
-            print("  bin/deploy-do fetch /                    # Fetch homepage")
-            print("  bin/deploy-do fetch /tasks-today.md      # Fetch today's tasks")
-            print("  bin/deploy-do fetch /plans/              # List plans directory")
-            print("  bin/deploy-do fetch /api/health          # Check API health")
-            print("")
-            print("Options:")
-            print("  --raw           Output raw HTML/content without processing")
-            print("  --headers       Include response headers")
-            print("  --no-auth       Skip authentication (for public endpoints)")
-            print("  --output FILE   Save response to file")
-            sys.exit(1)
-
-        self.check_config()
-
-        url_path = args[0]
-        raw_output = '--raw' in args
-        show_headers = '--headers' in args
-        skip_auth = '--no-auth' in args
-        output_file = None
-
-        if '--output' in args:
-            idx = args.index('--output')
-            if idx + 1 < len(args):
-                output_file = args[idx + 1]
-
-        curl_opts = '-i' if show_headers else ''
-
-        print_info(f"Fetching: {url_path}")
-        full_url = f"https://{self.deploy_domain}{url_path}"
-
-        if not skip_auth:
-            print_info("Authenticating...")
-
-            # Get password from dotenvx
-            result = subprocess.run(['npx', 'dotenvx', 'get', 'WEB_PASSWORD', '--format', 'shell'],
-                                   capture_output=True, text=True)
-            web_password = result.stdout.strip()
-            if not web_password:
-                print_error("Failed to decrypt WEB_PASSWORD. Ensure .env.keys exists.")
-                sys.exit(1)
-
-            # Create temp cookie file
-            import tempfile
-            cookie_file = f'/tmp/deploy-do-cookies-{os.getpid()}'
-
-            # Authenticate
-            auth_result = self.ssh_cmd(
-                f"curl -s -c {cookie_file} -X POST -d 'username=admin' "
-                f"--data-urlencode 'password={web_password}' "
-                f"https://{self.deploy_domain}/auth/login -o /dev/null -w '%{{http_code}}'",
-                capture=True
-            )
-            auth_status = auth_result.stdout.strip()
-
-            if auth_status not in ['200', '302']:
-                print_error(f"Authentication failed (HTTP {auth_status})")
-                self.ssh_cmd(f'rm -f {cookie_file}', check=False)
-                sys.exit(1)
-
-            print_status("Authenticated successfully")
-
-            # Fetch with auth
-            if output_file:
-                result = self.ssh_cmd(f"curl -s -b {cookie_file} {curl_opts} '{full_url}'", capture=True)
-                with open(output_file, 'w') as f:
-                    f.write(result.stdout)
-                print_status(f"Saved to: {output_file}")
-            elif raw_output:
-                self.ssh_cmd(f"curl -s -b {cookie_file} {curl_opts} '{full_url}'")
-            else:
-                self.ssh_cmd(f"curl -s -b {cookie_file} {curl_opts} '{full_url}' | "
-                           "sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g' | sed 's/&lt;/</g' | "
-                           "sed 's/&gt;/>/g' | sed 's/&amp;/\\&/g'")
-
-            # Cleanup
-            self.ssh_cmd(f'rm -f {cookie_file}', check=False)
-        else:
-            # No auth needed
-            if output_file:
-                result = self.ssh_cmd(f"curl -s {curl_opts} '{full_url}'", capture=True)
-                with open(output_file, 'w') as f:
-                    f.write(result.stdout)
-                print_status(f"Saved to: {output_file}")
-            elif raw_output:
-                self.ssh_cmd(f"curl -s {curl_opts} '{full_url}'")
-            else:
-                self.ssh_cmd(f"curl -s {curl_opts} '{full_url}' | "
-                           "sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g'")
-
-    def show_help(self):
-        """Show usage help."""
-        print("Usage: bin/deploy-do [command]")
-        print("")
-        print("Commands:")
-        print("  setup       - Initial droplet setup (run once)")
-        print("  deploy      - Deploy code to droplet (default, includes .git)")
-        print("  secrets     - Update .env files")
-        print("  db-init     - Initialize database")
-        print("  db-upload   - Upload local database to droplet")
-        print("  git-setup   - Manually setup git repository")
-        print("  vault-watcher-setup - Setup vault file watcher service")
-        print("  vault-watcher - Control vault watcher (start|stop|restart|status)")
-        print("  resilio-sync - Manage Resilio Sync (setup|start|stop|restart|status|key)")
-        print("  inbox-api-setup - Setup inbox upload API for Drafts")
-        print("  inbox-api   - Control inbox API (start|stop|restart|status)")
-        print("  vault-api-setup - Setup vault read API for Drafts sync")
-        print("  vault-api   - Control vault API (start|stop|restart|status)")
-        print("  ollama-setup - Install and setup Ollama with phi3-mini model")
-        print("  ollama      - Manage Ollama models (list|pull|rm|test)")
-        print("  nginx-config - Update nginx configuration")
-        print("  ssh         - SSH into droplet")
-        print("  logs        - Show scheduler logs")
-        print("  status      - Show scheduler status")
-        print("  restart     - Restart scheduler")
-        print("  web-restart - Restart web server")
-        print("  stop        - Stop scheduler")
-        print("  start       - Start scheduler")
-        print("  exec CMD    - Execute command in deploy directory")
-        print("  fetch PATH  - Fetch authenticated web pages from the site")
-        print("")
-        print("First time setup:")
-        print("  1. Create a DigitalOcean droplet (Ubuntu 24.04)")
-        print("  2. Add DO_DROPLET_IP to .env and encrypt with dotenvx")
-        print("  3. bin/deploy-do setup       # Install dependencies on droplet")
-        print("  4. bin/deploy-do secrets     # Copy encrypted secrets")
-        print("  5. bin/deploy-do deploy      # Deploy code (includes .git)")
-        print("  6. bin/deploy-do db-upload   # Upload your local database")
-        print("  7. bin/deploy-do ollama-setup # Install Ollama with phi3-mini model")
-        print("")
-        print("Note: deploy now includes .git for sync operations")
-
-
-def main():
-    # Load environment from dotenvx if not already loaded
-    if not os.environ.get('DOTENVX_INJECTED'):
-        os.environ['DOTENVX_INJECTED'] = '1'
-        os.chdir(PROJECT_ROOT)
-        os.execvp('npx', ['npx', 'dotenvx', 'run', '--', sys.executable] + sys.argv)
-
-    deployer = DigitalOceanDeploy()
-
-    # Parse command
-    args = sys.argv[1:]
-    command = args[0] if args else 'deploy'
-    command_args = args[1:] if len(args) > 1 else []
-
-    # Map commands to methods
-    commands = {
-        'setup': deployer.cmd_setup,
-        'deploy': deployer.cmd_deploy,
-        'secrets': deployer.cmd_secrets,
-        'ssh': deployer.cmd_ssh,
-        'logs': deployer.cmd_logs,
-        'status': deployer.cmd_status,
-        'nginx-config': deployer.cmd_nginx_config,
-        'restart': deployer.cmd_restart,
-        'web-restart': deployer.cmd_web_restart,
-        'stop': deployer.cmd_stop,
-        'start': deployer.cmd_start,
-        'db-init': deployer.cmd_db_init,
-        'git-setup': deployer.cmd_git_setup,
-        'db-upload': deployer.cmd_db_upload,
-        'vault-watcher-setup': deployer.cmd_vault_watcher_setup,
-        'vault-watcher': deployer.cmd_vault_watcher,
-        'resilio-sync': deployer.cmd_resilio_sync,
-        'inbox-api-setup': deployer.cmd_inbox_api_setup,
-        'inbox-api': deployer.cmd_inbox_api,
-        'vault-api-setup': deployer.cmd_vault_api_setup,
-        'vault-api': deployer.cmd_vault_api,
-        'ollama-setup': deployer.cmd_ollama_setup,
-        'ollama': deployer.cmd_ollama,
-        'exec': deployer.cmd_exec,
-        'fetch': deployer.cmd_fetch,
-        'help': lambda _: deployer.show_help(),
-        '--help': lambda _: deployer.show_help(),
-        '-h': lambda _: deployer.show_help(),
     }
 
-    if command in commands:
-        commands[command](command_args)
-    else:
-        print_error(f"Unknown command: {command}")
-        deployer.show_help()
-        sys.exit(1)
+    listen 80;
+}`;
 
+      const nginxSetupEncoded = Buffer.from(`
+if [ ! -f /etc/nginx/sites-available/sync.${this.deployDomain} ]; then
+    cat > /tmp/sync-nginx.conf << 'NGINX'
+${nginxConfig}
+NGINX
+    sudo mv /tmp/sync-nginx.conf /etc/nginx/sites-available/sync.${this.deployDomain}
+    sudo ln -sf /etc/nginx/sites-available/sync.${this.deployDomain} /etc/nginx/sites-enabled/
+    sudo nginx -t && sudo systemctl reload nginx
+    sudo certbot --nginx -d sync.${this.deployDomain} --non-interactive --agree-tos --email ${this.adminEmail} --redirect || true
+    echo "✅ Nginx subdomain configured with HTTPS"
+fi
 
-if __name__ == '__main__':
-    main()
+echo "✅ Resilio Sync configured and started"
+echo "📌 Web UI available at:"
+echo "   🔒 HTTPS: https://sync.${this.deployDomain}"
+echo "   Direct: http://$(hostname -I | awk '{print $1}'):8889"
+if [ -f /opt/today/.resilio-password ]; then
+    source /opt/today/.resilio-password
+    echo "   Username: admin"
+    echo "   Password: $RESILIO_PASSWORD"
+else
+    echo "   Username: admin"
+    echo "   Password: admin (default)"
+fi
+echo ""
+echo "Note: You may need to add sync.${this.deployDomain} to your DNS records"
+`).toString('base64');
+      this.sshCmd(`echo ${nginxSetupEncoded} | base64 -d | bash`);
+
+    } else if (['start', 'stop', 'restart', 'status'].includes(action)) {
+      printInfo(`Resilio Sync: ${action}`);
+      this.sshCmd(`sudo systemctl ${action} resilio-sync && sudo systemctl status resilio-sync --no-pager`);
+
+    } else if (action === 'set-password') {
+      printInfo('Setting new Resilio Sync password...');
+      let newPassword;
+      if (args[1]) {
+        newPassword = args[1];
+      } else {
+        printInfo('Generating random password...');
+        newPassword = execSync('openssl rand -base64 16', { encoding: 'utf8' }).trim();
+      }
+
+      this.sshScript(`
+sudo jq '.webui.password = "${newPassword}"' /etc/resilio-sync/config.json > /tmp/config.json
+sudo mv /tmp/config.json /etc/resilio-sync/config.json
+sudo chown rslsync:rslsync /etc/resilio-sync/config.json
+sudo chmod 600 /etc/resilio-sync/config.json
+echo "RESILIO_PASSWORD=${newPassword}" > /opt/today/.resilio-password
+chmod 600 /opt/today/.resilio-password
+sudo systemctl restart resilio-sync
+echo "✅ Password updated successfully!"
+echo ""
+echo "========================================="
+echo "New password: ${newPassword}"
+echo "========================================="
+echo ""
+echo "URL: https://sync.${this.deployDomain}"
+echo "Username: admin"
+echo "Password: ${newPassword}"
+`);
+
+    } else if (action === 'fix-permissions') {
+      printInfo('Fixing vault folder permissions...');
+      this.sshScript(`
+sudo chown -R rslsync:rslsync /opt/today/vault
+sudo chmod -R 775 /opt/today/vault
+echo "✅ Permissions fixed for /opt/today/vault"
+ls -la /opt/today/vault | head -5
+`);
+
+    } else if (action === 'key' || action === 'info') {
+      printInfo('Resilio Sync information...');
+      this.sshScript(`
+echo "📌 Web UI Access:"
+if [ -f /etc/nginx/sites-enabled/sync.${this.deployDomain} ]; then
+    echo "   🔒 HTTPS: https://sync.${this.deployDomain}"
+fi
+echo "   Direct: http://$(hostname -I | awk '{print $1}'):8889"
+
+if [ -f /opt/today/.resilio-password ]; then
+    source /opt/today/.resilio-password
+    echo ""
+    echo "Credentials:"
+    echo "   Username: admin"
+    echo "   Password: $RESILIO_PASSWORD"
+else
+    echo ""
+    echo "Credentials:"
+    echo "   Username: admin"
+    echo "   Password: admin (default)"
+fi
+echo ""
+echo "To get sync keys, visit the Web UI and check your folders"
+`);
+
+    } else {
+      console.log('Usage: bin/deploy-do resilio-sync [setup|start|stop|restart|status|set-password|fix-permissions|info]');
+      console.log('');
+      console.log('  set-password [password]  - Set new password (generates random if not provided)');
+      console.log('  fix-permissions          - Fix vault folder permissions');
+      console.log('  info                     - Show access info and current password');
+    }
+  }
+
+  cmdInboxApiSetup(args) {
+    console.log('📮 Setting up inbox upload API...');
+    this.checkConfig();
+
+    printInfo('Generating API key...');
+    this.sshScript(`
+if [ ! -f /opt/today/.inbox-api-key ]; then
+    API_KEY=$(openssl rand -hex 32)
+    echo "INBOX_API_KEY=$API_KEY" > /opt/today/.inbox-api-key
+    chmod 600 /opt/today/.inbox-api-key
+    echo "Generated new API key: $API_KEY"
+else
+    source /opt/today/.inbox-api-key
+    echo "Using existing API key: $INBOX_API_KEY"
+fi
+`);
+
+    this.scpToRemote('config/inbox-api.service', '/tmp/inbox-api.service');
+
+    this.sshScript(`
+sudo mv /tmp/inbox-api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable inbox-api
+sudo systemctl restart inbox-api
+
+if ! grep -q "/api/inbox/" /etc/nginx/sites-available/default 2>/dev/null; then
+    echo "Note: You may need to manually configure nginx for the inbox API"
+fi
+
+sleep 2
+sudo systemctl status inbox-api --no-pager || true
+
+echo ""
+echo "================================"
+source /opt/today/.inbox-api-key
+echo "Inbox API Key: $INBOX_API_KEY"
+echo "================================"
+echo ""
+echo "Save this API key in your Drafts app!"
+echo "Endpoint: https://${this.deployDomain}/api/inbox/upload"
+`);
+
+    printStatus('Inbox API installed and configured');
+  }
+
+  cmdInboxApi(args) {
+    this.checkConfig();
+    const action = args[0] || 'status';
+    printInfo(`Inbox API: ${action}`);
+    this.sshCmd(`sudo systemctl ${action} inbox-api && sudo systemctl status inbox-api --no-pager`);
+
+    if (action === 'status' || action === 'restart') {
+      this.sshScript(`
+if [ -f /opt/today/.inbox-api-key ]; then
+    echo ""
+    source /opt/today/.inbox-api-key
+    echo "API Key: $INBOX_API_KEY"
+    echo "Upload endpoint: https://${this.deployDomain}/api/inbox/upload"
+    echo "Vault endpoint: https://${this.deployDomain}/api/vault/"
+fi
+`);
+    }
+  }
+
+  cmdVaultApiSetup(args) {
+    console.log('📚 Setting up vault read API...');
+    this.checkConfig();
+
+    printInfo('Installing vault API service...');
+    this.scpToRemote('config/vault-api.service', '/tmp/vault-api.service');
+
+    this.sshScript(`
+sudo mv /tmp/vault-api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable vault-api
+sudo systemctl restart vault-api
+sleep 2
+sudo systemctl status vault-api --no-pager || true
+`);
+
+    printStatus('Vault API installed and configured');
+    printInfo(`Vault API endpoint: https://${this.deployDomain}/api/vault/`);
+  }
+
+  cmdVaultApi(args) {
+    this.checkConfig();
+    const action = args[0] || 'status';
+    printInfo(`Vault API: ${action}`);
+    this.sshCmd(`sudo systemctl ${action} vault-api && sudo systemctl status vault-api --no-pager`);
+  }
+
+  cmdOllamaSetup(args) {
+    console.log('🤖 Setting up Ollama on droplet...');
+    this.checkConfig();
+
+    printInfo('Installing Ollama...');
+    this.sshCmd('curl -fsSL https://ollama.com/install.sh | sh');
+
+    printInfo('Starting Ollama service...');
+    this.sshCmd('systemctl enable ollama && systemctl start ollama');
+
+    printInfo('Waiting for Ollama to start...');
+    execSync('sleep 5');
+
+    printInfo('Testing Ollama installation...');
+    this.sshCmd('ollama --version');
+
+    printInfo('Checking available memory...');
+    const result = this.sshCmd("free -m | awk '/^Mem:/ {print $7}'", { capture: true });
+    const availableMb = parseInt(result.stdout.trim());
+
+    if (availableMb < 800) {
+      printWarning(`Only ${availableMb}MB RAM available. LLMs need at least 800MB.`);
+      printWarning('Consider upgrading to a 2GB droplet ($12/month) for local LLM support.');
+      printInfo('Skipping model download due to insufficient memory.');
+    } else {
+      printInfo('Pulling tinyllama model (637MB) - fastest small model...');
+      this.sshCmd('ollama pull tinyllama');
+
+      printInfo('Testing model...');
+      this.sshCmd("echo 'What is 2+2?' | ollama run tinyllama");
+    }
+
+    printStatus('Ollama setup complete!');
+    printInfo('Available at http://localhost:11434 on the droplet');
+    printInfo('Add OLLAMA_HOST=http://localhost:11434 to your .env');
+  }
+
+  cmdOllama(args) {
+    console.log('🤖 Managing Ollama models...');
+    this.checkConfig();
+
+    const action = args[0] || 'list';
+
+    if (action === 'list') {
+      printInfo('Installed models:');
+      this.sshCmd('ollama list');
+
+    } else if (action === 'pull') {
+      if (args.length < 2) {
+        printError('Usage: bin/deploy-do ollama pull <model>');
+        console.log('Recommended models (memory requirements):');
+        console.log('  • tinyllama (800MB RAM) - Very fast, basic quality');
+        console.log('  • phi3 (4GB RAM) - Good balance of speed and quality');
+        console.log('  • mistral (6GB RAM) - Better quality');
+        console.log('  • codellama (5GB RAM) - For coding tasks');
+        process.exit(1);
+      }
+      printInfo(`Pulling model: ${args[1]}`);
+      this.sshCmd(`ollama pull ${args[1]}`);
+
+    } else if (action === 'rm') {
+      if (args.length < 2) {
+        printError('Usage: bin/deploy-do ollama rm <model>');
+        process.exit(1);
+      }
+      printInfo(`Removing model: ${args[1]}`);
+      this.sshCmd(`ollama rm ${args[1]}`);
+
+    } else if (action === 'test') {
+      const model = args[1] || 'phi3-mini';
+      printInfo(`Testing model: ${model}`);
+      this.sshCmd(`echo 'Hello, how are you?' | ollama run ${model}`);
+
+    } else {
+      console.log('Usage: bin/deploy-do ollama [list|pull <model>|rm <model>|test [model]]');
+    }
+  }
+
+  cmdExec(args) {
+    if (!args.length) {
+      printError("Usage: bin/deploy-do exec 'command'");
+      process.exit(1);
+    }
+    this.checkConfig();
+    const command = args.join(' ');
+    console.log(`⚡ Executing: ${command}`);
+    this.sshCmd(`cd ${this.deployPath} && ${command}`);
+  }
+
+  cmdFetch(args) {
+    if (!args.length) {
+      printError('Usage: bin/deploy-do fetch <path> [options]');
+      console.log('');
+      console.log('Examples:');
+      console.log('  bin/deploy-do fetch /                    # Fetch homepage');
+      console.log('  bin/deploy-do fetch /tasks-today.md      # Fetch today\'s tasks');
+      console.log('  bin/deploy-do fetch /plans/              # List plans directory');
+      console.log('  bin/deploy-do fetch /api/health          # Check API health');
+      console.log('');
+      console.log('Options:');
+      console.log('  --raw           Output raw HTML/content without processing');
+      console.log('  --headers       Include response headers');
+      console.log('  --no-auth       Skip authentication (for public endpoints)');
+      console.log('  --output FILE   Save response to file');
+      process.exit(1);
+    }
+
+    this.checkConfig();
+
+    const urlPath = args[0];
+    const rawOutput = args.includes('--raw');
+    const showHeaders = args.includes('--headers');
+    const skipAuth = args.includes('--no-auth');
+    let outputFile = null;
+
+    const outputIdx = args.indexOf('--output');
+    if (outputIdx !== -1 && outputIdx + 1 < args.length) {
+      outputFile = args[outputIdx + 1];
+    }
+
+    const curlOpts = showHeaders ? '-i' : '';
+
+    printInfo(`Fetching: ${urlPath}`);
+    const fullUrl = `https://${this.deployDomain}${urlPath}`;
+
+    if (!skipAuth) {
+      printInfo('Authenticating...');
+
+      // Get password from dotenvx
+      let webPassword;
+      try {
+        const result = execSync('npx dotenvx get WEB_PASSWORD --format shell', { encoding: 'utf8' });
+        webPassword = result.trim();
+      } catch {
+        printError('Failed to decrypt WEB_PASSWORD. Ensure .env.keys exists.');
+        process.exit(1);
+      }
+
+      // Create temp cookie file
+      const cookieFile = `/tmp/deploy-do-cookies-${process.pid}`;
+
+      // Authenticate
+      const authResult = this.sshCmd(
+        `curl -s -c ${cookieFile} -X POST -d 'username=admin' --data-urlencode 'password=${webPassword}' https://${this.deployDomain}/auth/login -o /dev/null -w '%{http_code}'`,
+        { capture: true }
+      );
+      const authStatus = authResult.stdout.trim();
+
+      if (!['200', '302'].includes(authStatus)) {
+        printError(`Authentication failed (HTTP ${authStatus})`);
+        this.sshCmd(`rm -f ${cookieFile}`, { check: false });
+        process.exit(1);
+      }
+
+      printStatus('Authenticated successfully');
+
+      // Fetch with auth
+      if (outputFile) {
+        const result = this.sshCmd(`curl -s -b ${cookieFile} ${curlOpts} '${fullUrl}'`, { capture: true });
+        fs.writeFileSync(outputFile, result.stdout);
+        printStatus(`Saved to: ${outputFile}`);
+      } else if (rawOutput) {
+        this.sshCmd(`curl -s -b ${cookieFile} ${curlOpts} '${fullUrl}'`);
+      } else {
+        this.sshCmd(`curl -s -b ${cookieFile} ${curlOpts} '${fullUrl}' | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g' | sed 's/&lt;/</g' | sed 's/&gt;/>/g' | sed 's/&amp;/\\&/g'`);
+      }
+
+      // Cleanup
+      this.sshCmd(`rm -f ${cookieFile}`, { check: false });
+    } else {
+      // No auth needed
+      if (outputFile) {
+        const result = this.sshCmd(`curl -s ${curlOpts} '${fullUrl}'`, { capture: true });
+        fs.writeFileSync(outputFile, result.stdout);
+        printStatus(`Saved to: ${outputFile}`);
+      } else if (rawOutput) {
+        this.sshCmd(`curl -s ${curlOpts} '${fullUrl}'`);
+      } else {
+        this.sshCmd(`curl -s ${curlOpts} '${fullUrl}' | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g'`);
+      }
+    }
+  }
+
+  showHelp() {
+    console.log('Usage: bin/deploy-do [command]');
+    console.log('');
+    console.log('Commands:');
+    console.log('  setup       - Initial droplet setup (run once)');
+    console.log('  deploy      - Deploy code to droplet (default, includes .git)');
+    console.log('  secrets     - Update .env files');
+    console.log('  db-init     - Initialize database');
+    console.log('  db-upload   - Upload local database to droplet');
+    console.log('  git-setup   - Manually setup git repository');
+    console.log('  vault-watcher-setup - Setup vault file watcher service');
+    console.log('  vault-watcher - Control vault watcher (start|stop|restart|status)');
+    console.log('  resilio-sync - Manage Resilio Sync (setup|start|stop|restart|status|key)');
+    console.log('  inbox-api-setup - Setup inbox upload API for Drafts');
+    console.log('  inbox-api   - Control inbox API (start|stop|restart|status)');
+    console.log('  vault-api-setup - Setup vault read API for Drafts sync');
+    console.log('  vault-api   - Control vault API (start|stop|restart|status)');
+    console.log('  ollama-setup - Install and setup Ollama with phi3-mini model');
+    console.log('  ollama      - Manage Ollama models (list|pull|rm|test)');
+    console.log('  nginx-config - Update nginx configuration');
+    console.log('  ssh         - SSH into droplet');
+    console.log('  logs        - Show scheduler logs');
+    console.log('  status      - Show scheduler status');
+    console.log('  restart     - Restart scheduler');
+    console.log('  web-restart - Restart web server');
+    console.log('  stop        - Stop scheduler');
+    console.log('  start       - Start scheduler');
+    console.log('  exec CMD    - Execute command in deploy directory');
+    console.log('  fetch PATH  - Fetch authenticated web pages from the site');
+    console.log('');
+    console.log('First time setup:');
+    console.log('  1. Create a DigitalOcean droplet (Ubuntu 24.04)');
+    console.log('  2. Add DO_DROPLET_IP to .env and encrypt with dotenvx');
+    console.log('  3. bin/deploy-do setup       # Install dependencies on droplet');
+    console.log('  4. bin/deploy-do secrets     # Copy encrypted secrets');
+    console.log('  5. bin/deploy-do deploy      # Deploy code (includes .git)');
+    console.log('  6. bin/deploy-do db-upload   # Upload your local database');
+    console.log('  7. bin/deploy-do ollama-setup # Install Ollama with phi3-mini model');
+    console.log('');
+    console.log('Note: deploy now includes .git for sync operations');
+  }
+}
+
+// ============================================================================
+// Main
+// ============================================================================
+
+function main() {
+  const deployer = new DigitalOceanDeploy();
+
+  // Parse command
+  const args = process.argv.slice(2);
+  const command = args[0] || 'deploy';
+  const commandArgs = args.slice(1);
+
+  // Map commands to methods
+  const commands = {
+    'setup': (a) => deployer.cmdSetup(a),
+    'deploy': (a) => deployer.cmdDeploy(a),
+    'secrets': (a) => deployer.cmdSecrets(a),
+    'ssh': (a) => deployer.cmdSsh(a),
+    'logs': (a) => deployer.cmdLogs(a),
+    'status': (a) => deployer.cmdStatus(a),
+    'nginx-config': (a) => deployer.cmdNginxConfig(a),
+    'restart': (a) => deployer.cmdRestart(a),
+    'web-restart': (a) => deployer.cmdWebRestart(a),
+    'stop': (a) => deployer.cmdStop(a),
+    'start': (a) => deployer.cmdStart(a),
+    'db-init': (a) => deployer.cmdDbInit(a),
+    'git-setup': (a) => deployer.cmdGitSetup(a),
+    'db-upload': (a) => deployer.cmdDbUpload(a),
+    'vault-watcher-setup': (a) => deployer.cmdVaultWatcherSetup(a),
+    'vault-watcher': (a) => deployer.cmdVaultWatcher(a),
+    'resilio-sync': (a) => deployer.cmdResilioSync(a),
+    'inbox-api-setup': (a) => deployer.cmdInboxApiSetup(a),
+    'inbox-api': (a) => deployer.cmdInboxApi(a),
+    'vault-api-setup': (a) => deployer.cmdVaultApiSetup(a),
+    'vault-api': (a) => deployer.cmdVaultApi(a),
+    'ollama-setup': (a) => deployer.cmdOllamaSetup(a),
+    'ollama': (a) => deployer.cmdOllama(a),
+    'exec': (a) => deployer.cmdExec(a),
+    'fetch': (a) => deployer.cmdFetch(a),
+    'help': () => deployer.showHelp(),
+    '--help': () => deployer.showHelp(),
+    '-h': () => deployer.showHelp(),
+  };
+
+  if (commands[command]) {
+    commands[command](commandArgs);
+  } else {
+    printError(`Unknown command: ${command}`);
+    deployer.showHelp();
+    process.exit(1);
+  }
+}
+
+main();
