@@ -89,6 +89,18 @@ function getReviewFilePath(targetDate = null) {
   return getDailyPlanPath(getDateComponents(targetDate));
 }
 
+/**
+ * Get tomorrow's date in the configured timezone.
+ * This prevents timezone issues when system runs in UTC but user is in EST/etc.
+ */
+function getTomorrowDate() {
+  const timezone = getTimezone();
+  const todayInTz = execSync(`TZ=${timezone} date "+%Y-%m-%d"`, { encoding: 'utf8' }).trim();
+  const tomorrow = new Date(todayInTz + 'T12:00:00'); // Use noon to avoid DST edge cases
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
+}
+
 function getCurrentStageInfo() {
   const timezone = getTimezone();
   let dayOfWeek;
@@ -689,8 +701,7 @@ function createReviewFromTemplate() {
   }
 
   // Create for tomorrow
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = getTomorrowDate();
   const tomorrowFile = getReviewFilePath(tomorrow);
   if (!fs.existsSync(tomorrowFile)) {
     console.log('📝 Creating tomorrow\'s plan from template...');
@@ -735,8 +746,7 @@ async function updateReviewFile(dryRun = false) {
   }
 
   // Update tomorrow's file
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = getTomorrowDate();
   const tomorrowFile = getReviewFilePath(tomorrow);
   if (!fs.existsSync(tomorrowFile)) {
     console.log(`⚠️  Tomorrow's file not found: ${tomorrowFile}`);
@@ -988,9 +998,7 @@ IMPORTANT:
 
 function runInteractiveSession(directRequest = null, nonInteractive = false) {
   const todayFile = getReviewFilePath();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowFile = getReviewFilePath(tomorrow);
+  const tomorrowFile = getReviewFilePath(getTomorrowDate());
   const [stageTheme, stageFocus] = getStageInfo();
   const timezone = getTimezone();
 
