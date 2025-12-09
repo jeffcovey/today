@@ -37,6 +37,10 @@ export function getTimezone() {
   return config.timezone || 'America/New_York';
 }
 
+export function getFullConfig() {
+  return readConfig();
+}
+
 export function getConfig(key) {
   const config = readConfig();
   // Support dot notation (e.g., 'ai.claude_model')

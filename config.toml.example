@@ -127,3 +127,14 @@
 #   "@amazon.com",
 #   "@gmail.com",
 # ]
+
+# =============================================================================
+# Plugins
+# =============================================================================
+# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
+# Uncomment and set enabled = true to activate a plugin
+
+# [plugins.time-tracking.default]
+# enabled = true
+# days_to_sync = 365
+# directory = "vault/logs/time-tracking"

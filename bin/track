@@ -598,116 +598,18 @@ async function cmdWeek() {
   console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
-// Sync-db command
+// Sync-db command - delegates to plugin system
 async function cmdSyncDb() {
-  const DB_PATH = path.join(PROJECT_ROOT, '.data/today.db');
-  const SYNC_STATE_FILE = path.join(TIME_DIR, '.last-sync');
-
-  console.log(chalk.blue('ℹ') + ' Syncing time tracking files to database (last 365 days)...');
-
-  // Calculate date 365 days ago
-  let cutoffDate;
-  try {
-    cutoffDate = execSync(`TZ="${TIMEZONE}" date -d '365 days ago' '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
-  } catch {
-    try {
-      cutoffDate = execSync(`TZ="${TIMEZONE}" date -v-365d '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
-    } catch {
-      console.error(chalk.red('✗') + ' Could not calculate cutoff date');
-      process.exit(1);
-    }
-  }
-
-  const cutoffYearMonth = cutoffDate.substring(0, 7); // YYYY-MM format
-
-  // Get last sync timestamp
-  let lastSync = 0;
-  if (fs.existsSync(SYNC_STATE_FILE)) {
-    lastSync = parseInt(fs.readFileSync(SYNC_STATE_FILE, 'utf8').trim());
-    const lastSyncDate = new Date(lastSync * 1000).toLocaleString('en-US', { timeZone: TIMEZONE });
-    console.log(chalk.blue('ℹ') + ` Last sync: ${lastSyncDate}`);
-  }
-
-  // Process all markdown files
-  let entryCount = 0;
-  let filesProcessed = 0;
-  let filesSkipped = 0;
-
-  const files = fs.readdirSync(TIME_DIR)
-    .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
-    .map(f => path.join(TIME_DIR, f));
-
-  for (const file of files) {
-    const fileYearMonth = path.basename(file, '.md');
-
-    // Skip files older than 365 days
-    if (fileYearMonth < cutoffYearMonth) continue;
-
-    // Check if file modified since last sync
-    const stats = fs.statSync(file);
-    const fileMtime = Math.floor(stats.mtimeMs / 1000);
-
-    if (lastSync > 0 && fileMtime <= lastSync) {
-      filesSkipped++;
-      continue;
-    }
-
-    filesProcessed++;
-
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      if (!line || line.startsWith('#')) continue;
-
-      const [start, end, description] = line.split('|');
-      if (!start || !description) continue;
-
-      const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
-
-      let duration = 0;
-      let endValue = 'NULL';
-
-      if (end) {
-        duration = calculateDuration(start, end);
-        endValue = `'${end}'`;
-      }
-
-      // Escape single quotes for SQL
-      const escapedTopics = topics.replace(/'/g, "''");
-      const escapedDescription = description.replace(/'/g, "''");
-      const escapedProject = escapedTopics;
-
-      // Insert or replace entry
-      const sql = `INSERT OR REPLACE INTO time_entries (start_time, end_time, duration_minutes, project, topics, description, source) VALUES ('${start}', ${endValue}, ${duration}, '${escapedProject}', '${escapedTopics}', '${escapedDescription}', 'markdown');`;
-
-      try {
-        execSync(`sqlite3 "${DB_PATH}" "${sql}"`, { encoding: 'utf8' });
-        entryCount++;
-      } catch (error) {
-        console.error(chalk.red('✗') + ` Error syncing entry: ${error.message}`);
-      }
-    }
-  }
-
-  // Save current sync timestamp
-  fs.writeFileSync(SYNC_STATE_FILE, Math.floor(Date.now() / 1000).toString());
-
-  if (filesSkipped > 0) {
-    console.log(chalk.green('✓') + ` Synced ${entryCount} entries from ${filesProcessed} file(s) (skipped ${filesSkipped} unchanged file(s))`);
-  } else {
-    console.log(chalk.green('✓') + ` Synced ${entryCount} entries from ${filesProcessed} file(s)`);
-  }
-
-  // Show summary
-  console.log(chalk.blue('ℹ') + ' Recent entries:');
-  const summaryQuery = `SELECT DATE(start_time) as Date, topics as Topics, printf('%.1f', SUM(duration_minutes) / 60.0) as Hours, COUNT(*) as Entries FROM time_entries WHERE DATE(start_time) >= DATE('now', '-7 days', 'localtime') GROUP BY DATE(start_time), topics ORDER BY DATE(start_time) DESC, Hours DESC LIMIT 20;`;
+  console.log(chalk.blue('ℹ') + ' Syncing time tracking via plugin system...');
 
   try {
-    const output = execSync(`sqlite3 -column -header "${DB_PATH}" "${summaryQuery}"`, { encoding: 'utf8' });
-    console.log(output);
+    const result = execSync('bin/plugins sync time-tracking', { encoding: 'utf8' });
+    // Strip dotenvx output and show result
+    const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+    console.log(lines.join('\n'));
   } catch (error) {
-    console.error(chalk.yellow('⚠') + ' Could not display summary');
+    console.error(chalk.red('✗') + ' Sync failed:', error.message);
+    process.exit(1);
   }
 }
 

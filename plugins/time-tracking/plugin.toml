@@ -1,0 +1,17 @@
+# Time Tracking Plugin
+# Syncs local markdown time tracking files to database
+
+name = "time-tracking"
+displayName = "Time Tracking"
+description = "Sync local markdown time tracking files to database"
+type = "time-entries"
+access = "read-write"
+
+requiredEnv = []
+
+[commands]
+sync = "./sync.js"
+
+[configSchema]
+days_to_sync = { type = "number", default = 365 }
+directory = { type = "string", default = "vault/logs/time-tracking" }
