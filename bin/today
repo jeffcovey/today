@@ -409,11 +409,12 @@ function checkAndRecoverDatabase() {
 
   if (!dbMissing) {
     try {
+      // Check for core tables used by the system (tasks table was replaced by markdown_tasks in migration 29)
       const result = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('tasks', 'projects')"`,
+        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('markdown_tasks', 'calendar_events', 'contacts')"`,
         { encoding: 'utf8' }
       );
-      if (parseInt(result.trim()) !== 2) {
+      if (parseInt(result.trim()) !== 3) {
         tablesMissing = true;
         console.log('⚠️  Database missing required tables');
       }
@@ -451,8 +452,9 @@ function checkAndRecoverDatabase() {
     if (lastSync) {
       console.log(`✅ Database ready (last sync: ${lastSync})\n`);
     } else {
+      // Check markdown_tasks instead of legacy tasks table
       const taskCount = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM tasks"`,
+        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM markdown_tasks"`,
         { encoding: 'utf8' }
       ).trim();
 

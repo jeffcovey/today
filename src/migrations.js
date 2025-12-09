@@ -2196,6 +2196,34 @@ export class MigrationManager {
 
           console.log('    ✓ Added unique constraint on issue number');
         }
+      },
+      {
+        version: 33,
+        description: 'Add last_contacted column to contacts table',
+        fn: (db) => {
+          console.log('    Adding last_contacted column to contacts table...');
+
+          // Check if contacts table exists
+          const tableExists = db.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'"
+          ).get();
+
+          if (!tableExists) {
+            console.log('    ✓ contacts table does not exist (skipped)');
+            return;
+          }
+
+          // Check if column already exists
+          const columns = db.prepare('PRAGMA table_info(contacts)').all();
+          const hasLastContacted = columns.some(c => c.name === 'last_contacted');
+
+          if (!hasLastContacted) {
+            db.exec('ALTER TABLE contacts ADD COLUMN last_contacted TEXT');
+            console.log('    ✓ Added last_contacted column to contacts table');
+          } else {
+            console.log('    last_contacted column already exists');
+          }
+        }
       }
     ];
 
