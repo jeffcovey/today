@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import { getPluginSources, discoverPlugins } from '../src/plugin-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -598,8 +599,43 @@ async function cmdWeek() {
   console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
+// Check if any time-tracking plugins are enabled
+async function checkTimeTrackingPlugins() {
+  // Check if any plugins with type 'time-entries' are enabled
+  const plugins = await discoverPlugins();
+
+  for (const [name, plugin] of plugins) {
+    if (plugin.type === 'time-entries') {
+      const sources = getPluginSources(name);
+      if (sources.length > 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // Sync-db command - delegates to plugin system
 async function cmdSyncDb() {
+  // Check if any time-tracking plugins are enabled
+  const hasPlugins = await checkTimeTrackingPlugins();
+
+  if (!hasPlugins) {
+    console.log(chalk.yellow('⚠') + ' No time-tracking plugins are enabled.');
+    console.log('');
+    console.log('To sync time tracking data to the database, configure a plugin:');
+    console.log('');
+    console.log('  ' + chalk.cyan('bin/plugins configure time-tracking'));
+    console.log('');
+    console.log('Or manually add to config.toml:');
+    console.log('');
+    console.log('  [plugins.time-tracking.local]');
+    console.log('  enabled = true');
+    console.log('  directory = "vault/logs/time-tracking"');
+    return;
+  }
+
   console.log(chalk.blue('ℹ') + ' Syncing time tracking via plugin system...');
 
   try {

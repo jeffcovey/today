@@ -6,12 +6,14 @@ autoDotenvx();
 
 import chalk from 'chalk';
 import fs from 'fs';
+import inquirer from 'inquirer';
 import {
   discoverPlugins,
   getPluginSources,
   getEnabledPlugins,
   syncPluginSource
 } from '../src/plugin-loader.js';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -269,6 +271,369 @@ async function cmdSync(pluginName, sourceName) {
   }
 }
 
+async function cmdConfigure(pluginNameArg) {
+  const plugins = await discoverPlugins();
+
+  if (plugins.size === 0) {
+    console.log(chalk.yellow('No plugins available.'));
+    return;
+  }
+
+  // Main loop - returns to plugin selection after configuring
+  while (true) {
+    let pluginName = pluginNameArg;
+
+    // If no plugin specified, let user choose
+    if (!pluginName) {
+      const pluginChoices = Array.from(plugins.values()).map((p, i) => ({
+        name: `${p.displayName || p.name} - ${p.description}`,
+        value: p.name
+      }));
+      pluginChoices.push({ name: 'Exit', value: '__exit__' });
+
+      const { selectedPlugin } = await inquirer.prompt([{
+        type: 'rawlist',
+        name: 'selectedPlugin',
+        message: 'Select a plugin to configure:',
+        choices: pluginChoices
+      }]);
+
+      if (!selectedPlugin || selectedPlugin === '__exit__') {
+        return;
+      }
+      pluginName = selectedPlugin;
+    }
+
+    const plugin = plugins.get(pluginName);
+    if (!plugin) {
+      console.error(chalk.red(`Plugin not found: ${pluginName}`));
+      process.exit(1);
+    }
+
+    // Configure the selected plugin
+    const shouldExit = await configurePlugin(plugin, pluginName);
+
+    // If a specific plugin was passed as argument, exit after configuring it
+    if (pluginNameArg || shouldExit) {
+      return;
+    }
+  }
+}
+
+async function configurePlugin(plugin, pluginName) {
+  // Inner configuration loop for a single plugin
+  while (true) {
+    console.log('');
+    console.log(chalk.cyan(`Configuring ${plugin.displayName || plugin.name}`));
+    console.log(chalk.gray(plugin.description));
+
+    // Refresh configured sources each iteration
+    let allConfiguredSources = [];
+    try {
+      const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+      const parsedConfig = parseToml(configContent);
+      if (parsedConfig.plugins?.[pluginName]) {
+        allConfiguredSources = Object.entries(parsedConfig.plugins[pluginName]).map(([name, cfg]) => ({
+          sourceName: name,
+          config: cfg
+        }));
+      }
+    } catch {
+      // No config yet
+    }
+
+    // Show current sources
+    if (allConfiguredSources.length > 0) {
+      console.log('');
+      console.log('Current sources:');
+      for (const s of allConfiguredSources) {
+        const status = s.config.enabled === true ? chalk.green('enabled') : chalk.gray('disabled');
+        console.log(`  ${s.sourceName} (${status})`);
+      }
+    }
+    console.log('');
+
+    // Ask what action to take
+    const actionChoices = [
+      { name: 'Add new source', value: 'add' }
+    ];
+
+    if (allConfiguredSources.length > 0) {
+      actionChoices.push(
+        { name: 'Enable/disable source', value: 'toggle' },
+        { name: 'Edit source settings', value: 'edit' },
+        { name: 'Remove source', value: 'remove' }
+      );
+    }
+
+    actionChoices.push({ name: 'Back', value: '__back__' });
+
+    const { action } = await inquirer.prompt([{
+      type: 'rawlist',
+      name: 'action',
+      message: 'What would you like to do?',
+      choices: actionChoices
+    }]);
+
+    if (!action || action === '__back__') {
+      return false; // Return to plugin selection
+    }
+
+    // Read current config
+    let config = {};
+    try {
+      const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+      config = parseToml(configContent);
+    } catch {
+      // Config doesn't exist yet, that's fine
+    }
+
+    // Initialize plugins section if needed
+    if (!config.plugins) {
+      config.plugins = {};
+    }
+    if (!config.plugins[pluginName]) {
+      config.plugins[pluginName] = {};
+    }
+
+    // Get existing source names for validation
+    const existingSourceNames = allConfiguredSources.map(s => s.sourceName);
+
+    if (action === 'add') {
+      // Get source name
+      const { sourceName } = await inquirer.prompt([{
+        type: 'input',
+        name: 'sourceName',
+        message: 'Source name (e.g., "local", "work", "personal"):',
+        default: 'default',
+        validate: (input) => {
+          if (!input.match(/^[a-z0-9_-]+$/)) {
+            return 'Source name must be lowercase alphanumeric with dashes or underscores';
+          }
+          if (existingSourceNames.includes(input)) {
+            return `Source "${input}" already exists. Choose a different name.`;
+          }
+          return true;
+        }
+      }]);
+
+      // Get configuration values from configSchema
+      const sourceConfig = { enabled: true };
+
+      if (plugin.configSchema) {
+        console.log('');
+        console.log(chalk.cyan('Configure plugin options:'));
+
+        for (const [key, schema] of Object.entries(plugin.configSchema)) {
+          const promptConfig = {
+            name: key,
+            message: `${key}:`,
+            default: schema.default
+          };
+
+          if (schema.type === 'number') {
+            promptConfig.type = 'number';
+          } else if (schema.type === 'boolean') {
+            promptConfig.type = 'confirm';
+          } else {
+            promptConfig.type = 'input';
+          }
+
+          const answer = await inquirer.prompt([promptConfig]);
+          sourceConfig[key] = answer[key];
+        }
+      }
+
+      // Save to config
+      config.plugins[pluginName][sourceName] = sourceConfig;
+      writeConfig(config);
+
+      console.log('');
+      console.log(chalk.green('✓') + ` Added source "${sourceName}"`);
+
+    } else if (action === 'toggle') {
+      // Choose source to toggle
+      const { sourceToToggle } = await inquirer.prompt([{
+        type: 'rawlist',
+        name: 'sourceToToggle',
+        message: 'Select source to enable/disable:',
+        choices: allConfiguredSources.map(s => ({
+          name: `${s.sourceName} ${s.config.enabled === true ? chalk.green('(enabled)') : chalk.gray('(disabled)')}`,
+          value: s.sourceName
+        }))
+      }]);
+
+      if (sourceToToggle) {
+        const currentConfig = config.plugins[pluginName][sourceToToggle];
+        const newEnabled = currentConfig.enabled !== true;
+
+        // Toggle enabled status, keep rest of config
+        config.plugins[pluginName][sourceToToggle] = {
+          ...currentConfig,
+          enabled: newEnabled
+        };
+        writeConfig(config);
+
+        console.log('');
+        if (newEnabled) {
+          console.log(chalk.green('✓') + ` Enabled source "${sourceToToggle}"`);
+        } else {
+          console.log(chalk.yellow('○') + ` Disabled source "${sourceToToggle}"`);
+        }
+      }
+
+    } else if (action === 'edit') {
+      // Choose source to edit
+      const { sourceToEdit } = await inquirer.prompt([{
+        type: 'rawlist',
+        name: 'sourceToEdit',
+        message: 'Select source to edit:',
+        choices: allConfiguredSources.map(s => ({
+          name: `${s.sourceName} ${s.config.enabled === true ? chalk.green('(enabled)') : chalk.gray('(disabled)')}`,
+          value: s.sourceName
+        }))
+      }]);
+
+      if (sourceToEdit) {
+        const currentConfig = config.plugins[pluginName][sourceToEdit] || {};
+
+        // Edit enabled status
+        const { enabled } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'enabled',
+          message: 'Enable this source?',
+          default: currentConfig.enabled === true
+        }]);
+
+        const sourceConfig = { enabled };
+
+        // Edit other config values
+        if (plugin.configSchema) {
+          console.log('');
+          console.log(chalk.cyan('Configure plugin options:'));
+
+          for (const [key, schema] of Object.entries(plugin.configSchema)) {
+            const currentValue = currentConfig[key] !== undefined ? currentConfig[key] : schema.default;
+
+            const promptConfig = {
+              name: key,
+              message: `${key}:`,
+              default: currentValue
+            };
+
+            if (schema.type === 'number') {
+              promptConfig.type = 'number';
+            } else if (schema.type === 'boolean') {
+              promptConfig.type = 'confirm';
+            } else {
+              promptConfig.type = 'input';
+            }
+
+            const answer = await inquirer.prompt([promptConfig]);
+            sourceConfig[key] = answer[key];
+          }
+        }
+
+        // Save to config
+        config.plugins[pluginName][sourceToEdit] = sourceConfig;
+        writeConfig(config);
+
+        console.log('');
+        console.log(chalk.green('✓') + ` Updated source "${sourceToEdit}"`);
+      }
+
+    } else if (action === 'remove') {
+      // Choose source to remove
+      const { sourceToRemove } = await inquirer.prompt([{
+        type: 'rawlist',
+        name: 'sourceToRemove',
+        message: 'Select source to remove:',
+        choices: allConfiguredSources.map(s => s.sourceName)
+      }]);
+
+      if (sourceToRemove) {
+        const { confirmRemove } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'confirmRemove',
+          message: chalk.red(`Are you sure you want to remove "${sourceToRemove}"?`),
+          default: false
+        }]);
+
+        if (confirmRemove) {
+          delete config.plugins[pluginName][sourceToRemove];
+
+          // Clean up empty plugin section
+          if (Object.keys(config.plugins[pluginName]).length === 0) {
+            delete config.plugins[pluginName];
+          }
+
+          writeConfig(config);
+
+          console.log('');
+          console.log(chalk.green('✓') + ` Removed source "${sourceToRemove}"`);
+        } else {
+          console.log(chalk.gray('Cancelled.'));
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Write config object to config.toml, preserving comments where possible
+ */
+function writeConfig(config) {
+  // Read existing file to preserve structure/comments
+  let existingContent = '';
+  try {
+    existingContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+  } catch {
+    // File doesn't exist
+  }
+
+  if (existingContent) {
+    // Try to update just the plugins section
+    const pluginsSection = stringifyToml({ plugins: config.plugins });
+
+    // Check if plugins section exists
+    const pluginsMatch = existingContent.match(/^# =+\n# Plugins\n# =+.*?(?=\n# =|\n*$)/ms);
+
+    if (pluginsMatch) {
+      // Replace plugins section
+      const before = existingContent.slice(0, pluginsMatch.index);
+      const newPluginsSection = `# =============================================================================
+# Plugins
+# =============================================================================
+# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
+# Uncomment and set enabled = true to activate a plugin
+
+${pluginsSection}`;
+
+      existingContent = before.trimEnd() + '\n\n' + newPluginsSection;
+      fs.writeFileSync(CONFIG_PATH, existingContent);
+    } else {
+      // No plugins section yet, append it
+      const newPluginsSection = `
+# =============================================================================
+# Plugins
+# =============================================================================
+# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
+# Uncomment and set enabled = true to activate a plugin
+
+${pluginsSection}`;
+
+      fs.writeFileSync(CONFIG_PATH, existingContent.trimEnd() + '\n' + newPluginsSection);
+    }
+  } else {
+    // Write new config file
+    const content = `# Configuration for Today system
+# See config.toml.example for all available options
+
+${stringifyToml(config)}`;
+    fs.writeFileSync(CONFIG_PATH, content);
+  }
+}
+
 function showHelp() {
   console.log(`
 ${chalk.bold('Plugin Management CLI')}
@@ -278,11 +643,14 @@ Usage: plugins <command> [options]
 Commands:
   list                      Show all available plugins
   status                    Show enabled plugins and their sources
+  configure [plugin]        Interactive plugin configuration
   sync [plugin] [source]    Sync plugin data (all if no plugin specified)
 
 Examples:
   plugins list
   plugins status
+  plugins configure
+  plugins configure time-tracking
   plugins sync
   plugins sync time-tracking
   plugins sync time-tracking local
@@ -311,6 +679,9 @@ try {
       break;
     case 'status':
       await cmdStatus();
+      break;
+    case 'configure':
+      await cmdConfigure(arg1);
       break;
     case 'sync':
       await cmdSync(arg1, arg2);
