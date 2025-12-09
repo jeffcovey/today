@@ -186,7 +186,7 @@ async function generateDailySummary(fileDate, filePath) {
       if (eventsData && eventsData.length > 0) {
         dataSources.push(`CALENDAR EVENTS:\n${JSON.stringify(eventsData, null, 2)}`);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // 4. Query diary entries
     try {
@@ -200,7 +200,7 @@ async function generateDailySummary(fileDate, filePath) {
       if (diaryData && diaryData.length > 0) {
         dataSources.push(`DIARY ENTRY:\n${diaryData[0].text}`);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (dataSources.length === 0) {
       return 'No activity recorded this day';
@@ -1160,15 +1160,32 @@ function syncDiary() {
   }
 }
 
-function syncTimeTracking() {
-  printInfo('Syncing time tracking...');
+async function syncPlugins() {
+  printInfo('Syncing enabled plugins...');
 
   try {
-    execSync('bin/track sync-db', { stdio: 'pipe' });
-    printInfo('Time tracking synced');
+    const output = execSync('bin/plugins sync', { encoding: 'utf8', stdio: 'pipe' });
+    // Filter out dotenvx messages and show results
+    const lines = output.split('\n').filter(l => !l.includes('[dotenvx'));
+    for (const line of lines) {
+      if (line.trim()) {
+        if (line.includes('✓')) {
+          printInfo(line.trim().replace(/^\s*/, '  '));
+        } else if (line.includes('✗')) {
+          printWarning(line.trim().replace(/^\s*/, '  '));
+        } else if (line.includes('Syncing') || line.includes('plugins')) {
+          printInfo(line.trim());
+        }
+      }
+    }
     return true;
   } catch (error) {
-    printError(`Time tracking sync failed: ${error.message}`);
+    // Check if it's just "no plugins enabled"
+    if (error.stdout && error.stdout.includes('No plugins to sync')) {
+      printInfo('No plugins enabled - skipping plugin sync');
+      return true;
+    }
+    printError(`Plugin sync failed: ${error.message}`);
     return false;
   }
 }
@@ -1268,8 +1285,8 @@ async function main() {
     await runSyncStep('📔 Day One Diary', syncDiary, 'Diary synced');
   }
 
-  // Time tracking sync
-  await runSyncStep('⏱️  Time Tracking Sync', syncTimeTracking, 'Time tracking synced');
+  // Plugin sync (time tracking, etc.)
+  await runSyncStep('🔌 Plugin Sync', syncPlugins, 'Plugins synced');
 
   // OGM monitoring (if configured)
   if (fs.existsSync('.env') && (fs.readFileSync('.env', 'utf8').includes('GITHUB_ACCESS_TOKEN=') || fs.readFileSync('.env', 'utf8').includes('SENTRY_AUTH_TOKEN='))) {
@@ -1437,8 +1454,8 @@ switch (command) {
     const emailBin = fs.existsSync('bin/email')
       ? 'bin/email'
       : fs.existsSync('bin/email-cli')
-      ? 'bin/email-cli'
-      : null;
+        ? 'bin/email-cli'
+        : null;
     if (emailBin) {
       printInfo('Downloading emails from last 24 hours...');
       try {
@@ -1458,6 +1475,49 @@ switch (command) {
     }
     break;
 
+  case '--plugins':
+    // Sync specific plugins or all enabled plugins
+    printHeader('🔌 Plugin Sync');
+    (async () => {
+      const pluginArg = args[1]; // Optional: comma-separated plugin names
+      try {
+        let cmd = 'bin/plugins sync';
+        if (pluginArg) {
+          // Sync each specified plugin
+          const pluginNames = pluginArg.split(',').map(p => p.trim());
+          for (const pluginName of pluginNames) {
+            printInfo(`Syncing plugin: ${pluginName}`);
+            try {
+              const output = execSync(`bin/plugins sync ${pluginName}`, { encoding: 'utf8' });
+              const lines = output.split('\n').filter(l => !l.includes('[dotenvx') && l.trim());
+              for (const line of lines) {
+                console.log(line);
+              }
+            } catch (pluginError) {
+              printError(`Failed to sync ${pluginName}: ${pluginError.message}`);
+            }
+          }
+        } else {
+          // Sync all enabled plugins
+          const output = execSync(cmd, { encoding: 'utf8' });
+          const lines = output.split('\n').filter(l => !l.includes('[dotenvx') && l.trim());
+          for (const line of lines) {
+            console.log(line);
+          }
+        }
+        printStatus('Plugin sync complete');
+        process.exit(0);
+      } catch (error) {
+        if (error.stdout && error.stdout.includes('No plugins to sync')) {
+          printInfo('No plugins enabled');
+          process.exit(0);
+        }
+        printError(`Plugin sync failed: ${error.message}`);
+        process.exit(1);
+      }
+    })();
+    break;
+
   case '--help':
   case '-h':
     console.log(`
@@ -1465,6 +1525,7 @@ ${chalk.bold('Today - Full Data Sync')}
 
 ${chalk.gray('Usage:')}
   bin/sync                              Run full sync
+  bin/sync --plugins [name,name,...]    Sync specific plugins (or all if no names)
   bin/sync --cancel-old-plan-tasks      Clean up old plan files
   bin/sync --cancel-old-plan-tasks FILE Clean up specific plan file
   bin/sync --cleanup-conflicts          Remove duplicate sync-conflict files
@@ -1486,6 +1547,7 @@ ${chalk.gray('Data sources synced:')}
   • Calendar events
   • Contacts
   • Inbox processing
+  • Enabled plugins
   • Local cache
     `);
     process.exit(0);
