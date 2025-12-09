@@ -199,10 +199,6 @@ Default schedule:
 - **Back Stage** (Thu/Sun): Maintenance, bills, bug fixes, organizing
 - **Off Stage** (Tue/Fri): Personal time, nature, friends, reading
 
-### Streaks & Habits
-
-`vault/logs/Streaks.md` - tracks uncompleted tasks from Streaks app for daily health and habit goals.
-
 ### Hosting (Optional)
 
 If `[hosting]` is enabled in config.toml:

@@ -155,3 +155,6 @@
 # - Current weight trend (last 3 readings)
 # - Sleep duration from last night
 # """
+
+# [plugins.streaks-habits.default]
+# enabled = true
