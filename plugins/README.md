@@ -20,6 +20,10 @@ Plugins are configured in `config.toml`:
 enabled = true
 days_to_sync = 365
 directory = "vault/logs/time-tracking"
+ai_instructions = """
+This tracks my personal time entries. Focus on productivity patterns
+and highlight any days with unusually low or high activity.
+"""
 ```
 
 Each section follows the pattern `[plugins.<plugin-name>.<source-name>]`:
@@ -27,6 +31,21 @@ Each section follows the pattern `[plugins.<plugin-name>.<source-name>]`:
 - `source-name`: Your label for this instance (e.g., `local`, `work`, `personal`)
 
 Multiple sources create separate database tables, avoiding conflicts.
+
+### AI Instructions
+
+The optional `ai_instructions` field lets you provide context to the AI about how to interpret and use this data source. This is included in the prompt when running `bin/today` sessions.
+
+Use TOML multi-line strings (triple quotes) for longer instructions:
+
+```toml
+ai_instructions = """
+This is my work time tracking. When reviewing:
+- Prioritize entries tagged with #topic/urgent
+- Highlight any meetings that ran over 1 hour
+- Note patterns in my most productive hours
+"""
+```
 
 ## plugin.toml Format
 
@@ -113,10 +132,30 @@ Duration-based activity records for time tracking.
 ```bash
 bin/plugins list              # Show available plugins
 bin/plugins status            # Show enabled plugins and their sources
+bin/plugins configure         # Interactive configuration
+bin/plugins configure <plugin>  # Configure specific plugin
 bin/plugins sync              # Sync all enabled plugins
 bin/plugins sync <plugin>     # Sync specific plugin
 bin/plugins sync <plugin> <source>  # Sync specific source
 ```
+
+### Interactive Configuration
+
+Run `bin/plugins configure` to interactively manage plugin sources:
+
+```
+? Select a plugin to configure: Time Tracking
+? What would you like to do?
+  1) Add new source
+  2) Edit source
+  3) Remove source
+  4) Back
+```
+
+When editing a source, you can:
+- Enable/disable the source
+- Edit plugin-specific settings (e.g., `days_to_sync`, `directory`)
+- Add or edit AI instructions (opens in `$EDITOR`)
 
 ## Creating a New Plugin
 

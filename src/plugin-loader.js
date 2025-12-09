@@ -297,3 +297,42 @@ export async function syncAllPlugins(context) {
 
   return results;
 }
+
+/**
+ * Get plugin data formatted for AI consumption
+ * Returns enabled plugins with their data and any user-provided AI instructions
+ * @returns {Promise<Array<{plugin: object, source: string, ai_instructions: string|null, dataQuery: string}>>}
+ */
+export async function getPluginDataForAI() {
+  const enabledPlugins = await getEnabledPlugins();
+  const result = [];
+
+  for (const { plugin, sources } of enabledPlugins) {
+    for (const { sourceName, config } of sources) {
+      const tableName = `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`;
+
+      result.push({
+        pluginName: plugin.name,
+        displayName: plugin.displayName || plugin.name,
+        description: plugin.description,
+        type: plugin.type,
+        source: sourceName,
+        tableName,
+        ai_instructions: config.ai_instructions || null,
+        config: {
+          // Include non-sensitive config fields for context
+          ...Object.fromEntries(
+            Object.entries(config).filter(([key]) =>
+              !['enabled', 'ai_instructions'].includes(key) &&
+              !key.toLowerCase().includes('token') &&
+              !key.toLowerCase().includes('secret') &&
+              !key.toLowerCase().includes('password')
+            )
+          )
+        }
+      });
+    }
+  }
+
+  return result;
+}

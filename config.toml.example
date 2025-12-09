@@ -134,7 +134,15 @@
 # Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
 # Uncomment and set enabled = true to activate a plugin
 
-# [plugins.time-tracking.default]
+# [plugins.time-tracking.local]
 # enabled = true
 # days_to_sync = 365
 # directory = "vault/logs/time-tracking"
+# ai_instructions = """
+# Time tracking is THE GROUND TRUTH of productivity.
+# ALWAYS check time tracking data BEFORE making progress assessments:
+# - Physical work, meetings, coordination, and deep work are all tracked here
+# - Never assume "zero progress" without checking time tracking first
+# - Checkbox completions are NOT the primary measure of productivity
+# - Check current-timer.md for what's being worked on now
+# """

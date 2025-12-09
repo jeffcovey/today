@@ -126,11 +126,6 @@ The `_00` suffix for aggregates ensures they sort before child items.
 For existing daily plans:
 - Tasks update automatically via Obsidian Tasks queries
 - Add progress notes with timestamps: `### Update (2:30 PM)`
-- **CRITICAL: ALWAYS check time tracking logs BEFORE writing progress updates**:
-  - Read `vault/logs/time-tracking/YYYY-MM.md` to see actual work done today
-  - Physical work, meetings, coordination, and deep work sessions are ALL tracked there
-  - Never claim "zero progress" without checking time tracking first
-  - Checkbox completions are only ONE indicator - time tracked is the ground truth
 - Check off completed tasks directly in Obsidian
 - Evening reflection section for end-of-day review
 
@@ -360,14 +355,8 @@ Based on database queries AND hierarchical plan alignment:
 6. **Changed Files** - Review vault/ files modified today for context on recent work
 7. **Evening Planning** - Review and prepare
 8. **Self-Care** - Check journal entries for wellbeing patterns
-9. **🚨 TIME TRACKING - THE GROUND TRUTH** - **ALWAYS check `vault/logs/time-tracking/` BEFORE making progress assessments**:
-   - Check `vault/logs/time-tracking/YYYY-MM.md` for today's actual work
-   - Check `vault/logs/time-tracking/current-timer.md` for what's being worked on now
-   - Time tracking shows REAL work (physical tasks, meetings, coordination) not just checkbox completions
-   - Never assume "zero progress" without checking time tracking first
-   - Checkbox completions are NOT the primary measure of productivity
-10. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
-11. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
+9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
+10. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
 
 ## Your First Steps - DO ALL IN FIRST RESPONSE
 

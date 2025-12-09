@@ -25,6 +25,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 // Import shared modules
 import { getTimezone, getConfig, getClaudeModel } from '../src/config.js';
+import { getPluginDataForAI } from '../src/plugin-loader.js';
 import {
   getQuarter,
   getISOWeek,
@@ -996,7 +997,42 @@ IMPORTANT:
 // Interactive Session
 // ============================================================================
 
-function runInteractiveSession(directRequest = null, nonInteractive = false) {
+/**
+ * Build plugin context for AI prompt
+ * Includes enabled plugins with their table names and any user instructions
+ */
+async function getPluginContext() {
+  try {
+    const pluginData = await getPluginDataForAI();
+    if (pluginData.length === 0) return '';
+
+    const lines = ['\n## Enabled Plugins\n'];
+    lines.push('The following data plugins are enabled and syncing data to the database:\n');
+
+    for (const plugin of pluginData) {
+      lines.push(`### ${plugin.displayName} (${plugin.source})`);
+      lines.push(`- **Type**: ${plugin.type}`);
+      lines.push(`- **Table**: ${plugin.tableName}`);
+      if (plugin.description) {
+        lines.push(`- **Description**: ${plugin.description}`);
+      }
+
+      // Include user-provided AI instructions if present
+      if (plugin.ai_instructions) {
+        lines.push(`\n**User Instructions for this data source:**`);
+        lines.push(`> ${plugin.ai_instructions.replace(/\n/g, '\n> ')}`);
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  } catch (error) {
+    // Silently fail if plugin system has issues
+    return '';
+  }
+}
+
+async function runInteractiveSession(directRequest = null, nonInteractive = false) {
   const todayFile = getReviewFilePath();
   const tomorrowFile = getReviewFilePath(getTomorrowDate());
   const [stageTheme, stageFocus] = getStageInfo();
@@ -1010,6 +1046,7 @@ function runInteractiveSession(directRequest = null, nonInteractive = false) {
   const healthMetrics = getHealthMetrics();
   const existingPlans = getExistingPlans();
   const changedFiles = getChangedVaultFiles();
+  const pluginContext = await getPluginContext();
 
   // Read TODAY.md for context
   let todayContext = '';
@@ -1051,7 +1088,7 @@ ${changedFiles}
 - bin/mark-done 'task' - Mark a task as complete
 - bin/progress 'note' - Add a progress note
 - bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" - Create time blocking events
-
+${pluginContext}
 ${todayContext}`;
 
   let prompt;
@@ -1245,7 +1282,7 @@ async function main() {
   createReviewFromTemplate();
 
   // Run the appropriate session
-  runInteractiveSession(directRequest, nonInteractive);
+  await runInteractiveSession(directRequest, nonInteractive);
 }
 
 main().catch((e) => {
