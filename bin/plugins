@@ -1,0 +1,331 @@
+#!/usr/bin/env node
+
+// Plugin management CLI
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import chalk from 'chalk';
+import fs from 'fs';
+import {
+  discoverPlugins,
+  getPluginSources,
+  getEnabledPlugins,
+  syncPluginSource
+} from '../src/plugin-loader.js';
+import { getDatabase } from '../src/database-service.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.toml');
+const CONFIG_EXAMPLE_PATH = path.join(PROJECT_ROOT, 'config.toml.example');
+
+/**
+ * Ensure config.toml has entries for all available plugins.
+ * Adds commented-out defaults for new plugins, removes entries for deleted plugins.
+ */
+async function ensurePluginConfig() {
+  const plugins = await discoverPlugins();
+
+  if (plugins.size === 0) return;
+
+  // Read current config
+  let configContent = '';
+  try {
+    configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+  } catch {
+    return; // No config file yet
+  }
+
+  // Build the plugin config section
+  const pluginConfigs = [];
+  for (const [name, plugin] of plugins) {
+    const sectionHeader = `[plugins.${name}.`;
+
+    // Check if this plugin already has any configuration
+    if (configContent.includes(sectionHeader) || configContent.includes(`# ${sectionHeader}`)) {
+      continue; // Already configured (enabled or commented)
+    }
+
+    // Generate commented-out default config
+    const lines = [];
+    lines.push(`# [plugins.${name}.default]`);
+    lines.push(`# enabled = true`);
+
+    if (plugin.configSchema) {
+      for (const [key, schema] of Object.entries(plugin.configSchema)) {
+        const defaultValue = schema.default;
+        if (defaultValue !== undefined) {
+          const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
+          lines.push(`# ${key} = ${valueStr}`);
+        }
+      }
+    }
+
+    pluginConfigs.push(lines.join('\n'));
+  }
+
+  // Update config.toml if there are new plugins
+  if (pluginConfigs.length > 0) {
+    // Find where to insert - after existing plugins section or at the end
+    const pluginsHeaderMatch = configContent.match(/^# =+\n# Plugins\n# =+/m);
+
+    if (pluginsHeaderMatch) {
+      // Find the end of the plugins section (next header or EOF)
+      const afterHeader = configContent.indexOf(pluginsHeaderMatch[0]) + pluginsHeaderMatch[0].length;
+      const nextHeaderMatch = configContent.slice(afterHeader).match(/\n# =+\n#[^=]/);
+      const insertPoint = nextHeaderMatch
+        ? afterHeader + nextHeaderMatch.index
+        : configContent.length;
+
+      // Insert new plugin configs before the next section
+      const before = configContent.slice(0, insertPoint).trimEnd();
+      const after = configContent.slice(insertPoint);
+
+      configContent = before + '\n\n' + pluginConfigs.join('\n\n') + after;
+    } else {
+      // No plugins section yet, append at the end
+      configContent = configContent.trimEnd() + '\n\n' +
+        '# =============================================================================\n' +
+        '# Plugins\n' +
+        '# =============================================================================\n' +
+        '# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]\n' +
+        '# Uncomment and set enabled = true to activate a plugin\n\n' +
+        pluginConfigs.join('\n\n') + '\n';
+    }
+
+    fs.writeFileSync(CONFIG_PATH, configContent);
+  }
+
+  // Also update config.toml.example if it exists
+  try {
+    let exampleContent = fs.readFileSync(CONFIG_EXAMPLE_PATH, 'utf8');
+    let exampleModified = false;
+
+    for (const [name, plugin] of plugins) {
+      const sectionHeader = `[plugins.${name}.`;
+      if (exampleContent.includes(sectionHeader) || exampleContent.includes(`# ${sectionHeader}`)) {
+        continue;
+      }
+
+      // Add plugins section header if needed
+      if (!exampleContent.includes('# Plugins')) {
+        exampleContent = exampleContent.trimEnd() + '\n\n' +
+          '# =============================================================================\n' +
+          '# Plugins\n' +
+          '# =============================================================================\n' +
+          '# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]\n' +
+          '# Uncomment and set enabled = true to activate a plugin\n';
+      }
+
+      const lines = [];
+      lines.push(`# [plugins.${name}.default]`);
+      lines.push(`# enabled = true`);
+
+      if (plugin.configSchema) {
+        for (const [key, schema] of Object.entries(plugin.configSchema)) {
+          const defaultValue = schema.default;
+          if (defaultValue !== undefined) {
+            const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
+            lines.push(`# ${key} = ${valueStr}`);
+          }
+        }
+      }
+
+      exampleContent = exampleContent.trimEnd() + '\n\n' + lines.join('\n') + '\n';
+      exampleModified = true;
+    }
+
+    if (exampleModified) {
+      fs.writeFileSync(CONFIG_EXAMPLE_PATH, exampleContent);
+    }
+  } catch {
+    // Example file doesn't exist, that's fine
+  }
+}
+
+async function cmdList() {
+  const plugins = await discoverPlugins();
+
+  console.log(chalk.cyan('Available Plugins:'));
+  console.log('');
+
+  for (const [name, plugin] of plugins) {
+    const sources = getPluginSources(name);
+    const status = sources.length > 0
+      ? chalk.green(`${sources.length} source(s) enabled`)
+      : chalk.gray('not configured');
+
+    console.log(`  ${chalk.bold(plugin.displayName || name)}`);
+    console.log(`    Type: ${plugin.type} | Access: ${plugin.access}`);
+    console.log(`    ${plugin.description}`);
+    console.log(`    Status: ${status}`);
+
+    if (sources.length > 0) {
+      for (const { sourceName } of sources) {
+        console.log(`      - ${sourceName}`);
+      }
+    }
+    console.log('');
+  }
+}
+
+async function cmdStatus() {
+  const enabledPlugins = await getEnabledPlugins();
+
+  if (enabledPlugins.length === 0) {
+    console.log(chalk.yellow('No plugins are currently enabled.'));
+    console.log('');
+    console.log('Configure plugins in config.toml:');
+    console.log('');
+    console.log('  [plugins.time-tracking.local]');
+    console.log('  enabled = true');
+    return;
+  }
+
+  console.log(chalk.cyan('Enabled Plugins:'));
+  console.log('');
+
+  for (const { plugin, sources } of enabledPlugins) {
+    console.log(`  ${chalk.bold(plugin.displayName || plugin.name)}`);
+
+    for (const { sourceName, config } of sources) {
+      const tableName = `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`;
+      console.log(`    ${chalk.green('●')} ${sourceName} → ${tableName}`);
+    }
+    console.log('');
+  }
+}
+
+async function cmdSync(pluginName, sourceName) {
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  const context = { db, vaultPath };
+
+  if (pluginName) {
+    // Sync specific plugin
+    const plugins = await discoverPlugins();
+    const plugin = plugins.get(pluginName);
+
+    if (!plugin) {
+      console.error(chalk.red(`Plugin not found: ${pluginName}`));
+      process.exit(1);
+    }
+
+    const sources = getPluginSources(pluginName);
+
+    if (sources.length === 0) {
+      console.error(chalk.red(`Plugin ${pluginName} has no enabled sources.`));
+      process.exit(1);
+    }
+
+    // Filter to specific source if provided
+    const toSync = sourceName
+      ? sources.filter(s => s.sourceName === sourceName)
+      : sources;
+
+    if (sourceName && toSync.length === 0) {
+      console.error(chalk.red(`Source not found: ${sourceName}`));
+      process.exit(1);
+    }
+
+    for (const { sourceName: src, config } of toSync) {
+      console.log(`Syncing ${pluginName}/${src}...`);
+      const result = await syncPluginSource(plugin, src, config, context);
+
+      if (result.success) {
+        console.log(chalk.green(`  ✓ ${result.message}`));
+      } else {
+        console.log(chalk.red(`  ✗ ${result.message}`));
+      }
+    }
+  } else {
+    // Sync all enabled plugins
+    const enabledPlugins = await getEnabledPlugins();
+
+    if (enabledPlugins.length === 0) {
+      console.log(chalk.yellow('No plugins to sync.'));
+      return;
+    }
+
+    console.log(chalk.cyan('Syncing all plugins...'));
+    console.log('');
+
+    for (const { plugin, sources } of enabledPlugins) {
+      for (const { sourceName: src, config } of sources) {
+        console.log(`  ${plugin.name}/${src}...`);
+        const result = await syncPluginSource(plugin, src, config, context);
+
+        if (result.success) {
+          console.log(chalk.green(`    ✓ ${result.message}`));
+        } else {
+          console.log(chalk.red(`    ✗ ${result.message}`));
+        }
+      }
+    }
+  }
+}
+
+function showHelp() {
+  console.log(`
+${chalk.bold('Plugin Management CLI')}
+
+Usage: plugins <command> [options]
+
+Commands:
+  list                      Show all available plugins
+  status                    Show enabled plugins and their sources
+  sync [plugin] [source]    Sync plugin data (all if no plugin specified)
+
+Examples:
+  plugins list
+  plugins status
+  plugins sync
+  plugins sync time-tracking
+  plugins sync time-tracking local
+
+Configuration:
+  Plugins are configured in config.toml:
+
+  [plugins.time-tracking.local]
+  enabled = true
+  days_to_sync = 365
+`);
+}
+
+// Main
+const command = process.argv[2];
+const arg1 = process.argv[3];
+const arg2 = process.argv[4];
+
+// Ensure config.toml has entries for all plugins
+await ensurePluginConfig();
+
+try {
+  switch (command) {
+    case 'list':
+      await cmdList();
+      break;
+    case 'status':
+      await cmdStatus();
+      break;
+    case 'sync':
+      await cmdSync(arg1, arg2);
+      break;
+    case '--help':
+    case '-h':
+    case undefined:
+      showHelp();
+      break;
+    default:
+      console.error(chalk.red(`Unknown command: ${command}`));
+      showHelp();
+      process.exit(1);
+  }
+} catch (error) {
+  console.error(chalk.red('Error:'), error.message);
+  process.exit(1);
+}
