@@ -1,14 +1,16 @@
 # Plugins
 
-Plugins integrate external data sources with the Today system. Each plugin syncs data to a local SQLite table where it can be queried and displayed.
+Plugins integrate external data sources with the Today system. Some plugins sync data to SQLite tables; others provide AI instructions for querying external files.
 
 ## Directory Structure
 
 ```
 plugins/
-  time-tracking/
+  markdown-time-tracking/
     plugin.toml      # Plugin metadata
     sync.js          # Sync command (can be any executable)
+  apple-health-auto-export/
+    plugin.toml      # Plugin metadata (no sync - read-only)
 ```
 
 ## Configuration
@@ -16,25 +18,35 @@ plugins/
 Plugins are configured in `config.toml`:
 
 ```toml
-[plugins.time-tracking.local]
+[plugins.markdown-time-tracking.local]
 enabled = true
 days_to_sync = 365
 directory = "vault/logs/time-tracking"
 ai_instructions = """
-This tracks my personal time entries. Focus on productivity patterns
-and highlight any days with unusually low or high activity.
+Time tracking is THE GROUND TRUTH of productivity.
+ALWAYS check time tracking data BEFORE making progress assessments.
+"""
+
+[plugins.apple-health-auto-export.default]
+enabled = true
+ai_instructions = """
+When I ask about health, always include yesterday's steps and current weight.
 """
 ```
 
 Each section follows the pattern `[plugins.<plugin-name>.<source-name>]`:
-- `plugin-name`: The plugin's `name` from plugin.toml (e.g., `time-tracking`)
-- `source-name`: Your label for this instance (e.g., `local`, `work`, `personal`)
+- `plugin-name`: The plugin's `name` from plugin.toml (e.g., `markdown-time-tracking`)
+- `source-name`: Your label for this instance (e.g., `local`, `work`, `default`)
 
-Multiple sources create separate database tables, avoiding conflicts.
+Multiple sources create separate database tables (for plugins with sync), avoiding conflicts.
 
 ### AI Instructions
 
-The optional `ai_instructions` field lets you provide context to the AI about how to interpret and use this data source. This is included in the prompt when running `bin/today` sessions.
+Plugins have two levels of AI instructions:
+
+1. **Plugin instructions** (`aiInstructions` in plugin.toml): Tell the AI how to query and use the data. These are defined by the plugin author.
+
+2. **User instructions** (`ai_instructions` in config.toml): Your personal preferences for how to interpret the data. These follow the plugin's built-in instructions.
 
 Use TOML multi-line strings (triple quotes) for longer instructions:
 
@@ -53,16 +65,31 @@ This is my work time tracking. When reviewing:
 # Plugin metadata
 name = "my-plugin"
 displayName = "My Plugin"
-description = "What this plugin does"
+description = "Short description (shown in plugin list)"
 type = "time-entries"        # Data type (see Plugin Types below)
 access = "read-write"        # read-only, write-only, or read-write
 
 # Environment variables required to run
 requiredEnv = ["API_TOKEN"]
 
+# Long description for users (shown by `bin/plugins info`)
+longDescription = """
+Detailed documentation about this plugin, including:
+- What data it provides
+- How to set it up
+- Configuration options explained
+"""
+
+# Instructions for the AI on how to query/use this data
+aiInstructions = """
+Data is available in the `my_plugin_{source}` table.
+Query with: SELECT * FROM my_plugin_default WHERE date > date('now', '-7 days')
+"""
+
 # Commands - paths relative to plugin directory
 [commands]
 sync = "./sync.js"           # Can be .js, .sh, .py, or any executable
+                             # Omit this section for read-only plugins
 
 # Configuration options with defaults
 [configSchema]
@@ -130,12 +157,13 @@ Duration-based activity records for time tracking.
 ## CLI Commands
 
 ```bash
-bin/plugins list              # Show available plugins
-bin/plugins status            # Show enabled plugins and their sources
-bin/plugins configure         # Interactive configuration
-bin/plugins configure <plugin>  # Configure specific plugin
-bin/plugins sync              # Sync all enabled plugins
-bin/plugins sync <plugin>     # Sync specific plugin
+bin/plugins list                    # Show available plugins
+bin/plugins info <plugin>           # Show detailed plugin documentation
+bin/plugins status                  # Show enabled plugins and their sources
+bin/plugins configure               # Interactive configuration
+bin/plugins configure <plugin>      # Configure specific plugin
+bin/plugins sync                    # Sync all enabled plugins
+bin/plugins sync <plugin>           # Sync specific plugin
 bin/plugins sync <plugin> <source>  # Sync specific source
 ```
 

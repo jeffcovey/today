@@ -24,19 +24,19 @@ describe('Plugin Loader', () => {
   });
 
   describe('discoverPlugins', () => {
-    test('should discover time-tracking plugin from plugins directory', async () => {
+    test('should discover markdown-time-tracking plugin from plugins directory', async () => {
       const plugins = await discoverPlugins();
 
       expect(plugins.size).toBeGreaterThan(0);
-      expect(plugins.has('time-tracking')).toBe(true);
+      expect(plugins.has('markdown-time-tracking')).toBe(true);
     });
 
     test('should return plugin metadata from plugin.toml', async () => {
       const plugins = await discoverPlugins();
-      const timeTracking = plugins.get('time-tracking');
+      const timeTracking = plugins.get('markdown-time-tracking');
 
-      expect(timeTracking).toHaveProperty('name', 'time-tracking');
-      expect(timeTracking).toHaveProperty('displayName', 'Time Tracking');
+      expect(timeTracking).toHaveProperty('name', 'markdown-time-tracking');
+      expect(timeTracking).toHaveProperty('displayName', 'Markdown Time Tracking');
       expect(timeTracking).toHaveProperty('type', 'time-entries');
       expect(timeTracking).toHaveProperty('access', 'read-write');
       expect(timeTracking).toHaveProperty('commands');
@@ -45,10 +45,10 @@ describe('Plugin Loader', () => {
 
     test('should include plugin path in metadata', async () => {
       const plugins = await discoverPlugins();
-      const timeTracking = plugins.get('time-tracking');
+      const timeTracking = plugins.get('markdown-time-tracking');
 
       expect(timeTracking).toHaveProperty('_path');
-      expect(timeTracking._path).toContain('plugins/time-tracking');
+      expect(timeTracking._path).toContain('markdown-time-tracking');
     });
   });
 
@@ -56,7 +56,7 @@ describe('Plugin Loader', () => {
     test('should return empty array when plugin not configured', () => {
       getFullConfig.mockReturnValue({});
 
-      const sources = getPluginSources('time-tracking');
+      const sources = getPluginSources('markdown-time-tracking');
 
       expect(sources).toEqual([]);
     });
@@ -64,7 +64,7 @@ describe('Plugin Loader', () => {
     test('should return empty array when no plugins section', () => {
       getFullConfig.mockReturnValue({ timezone: 'America/New_York' });
 
-      const sources = getPluginSources('time-tracking');
+      const sources = getPluginSources('markdown-time-tracking');
 
       expect(sources).toEqual([]);
     });
@@ -72,14 +72,14 @@ describe('Plugin Loader', () => {
     test('should return sources with enabled = true', () => {
       getFullConfig.mockReturnValue({
         plugins: {
-          'time-tracking': {
+          'markdown-time-tracking': {
             local: { enabled: true, days_to_sync: 365 },
             work: { enabled: true, directory: 'vault/logs/work' }
           }
         }
       });
 
-      const sources = getPluginSources('time-tracking');
+      const sources = getPluginSources('markdown-time-tracking');
 
       expect(sources).toHaveLength(2);
       expect(sources[0]).toEqual({
@@ -95,14 +95,14 @@ describe('Plugin Loader', () => {
     test('should exclude sources with enabled = false', () => {
       getFullConfig.mockReturnValue({
         plugins: {
-          'time-tracking': {
+          'markdown-time-tracking': {
             local: { enabled: true },
             disabled: { enabled: false }
           }
         }
       });
 
-      const sources = getPluginSources('time-tracking');
+      const sources = getPluginSources('markdown-time-tracking');
 
       expect(sources).toHaveLength(1);
       expect(sources[0].sourceName).toBe('local');
@@ -111,14 +111,14 @@ describe('Plugin Loader', () => {
     test('should exclude sources without enabled = true (opt-in)', () => {
       getFullConfig.mockReturnValue({
         plugins: {
-          'time-tracking': {
+          'markdown-time-tracking': {
             local: { enabled: true },
             implicit: { days_to_sync: 30 }  // no enabled field
           }
         }
       });
 
-      const sources = getPluginSources('time-tracking');
+      const sources = getPluginSources('markdown-time-tracking');
 
       expect(sources).toHaveLength(1);
       expect(sources[0].sourceName).toBe('local');
@@ -137,7 +137,7 @@ describe('Plugin Loader', () => {
     test('should return plugins with their sources', async () => {
       getFullConfig.mockReturnValue({
         plugins: {
-          'time-tracking': {
+          'markdown-time-tracking': {
             local: { enabled: true, days_to_sync: 365 }
           }
         }
@@ -146,7 +146,7 @@ describe('Plugin Loader', () => {
       const enabled = await getEnabledPlugins();
 
       expect(enabled).toHaveLength(1);
-      expect(enabled[0].plugin.name).toBe('time-tracking');
+      expect(enabled[0].plugin.name).toBe('markdown-time-tracking');
       expect(enabled[0].sources).toHaveLength(1);
       expect(enabled[0].sources[0].sourceName).toBe('local');
     });

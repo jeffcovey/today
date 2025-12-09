@@ -162,7 +162,7 @@ async function cmdList() {
       ? chalk.green(`${sources.length} source(s) enabled`)
       : chalk.gray('not configured');
 
-    console.log(`  ${chalk.bold(plugin.displayName || name)}`);
+    console.log(`  ${chalk.bold(plugin.displayName || name)} ${chalk.gray(`(${name})`)}`);
     console.log(`    Type: ${plugin.type} | Access: ${plugin.access}`);
     console.log(`    ${plugin.description}`);
     console.log(`    Status: ${status}`);
@@ -219,6 +219,13 @@ async function cmdSync(pluginName, sourceName) {
       process.exit(1);
     }
 
+    // Check if plugin has a sync command
+    if (!plugin.commands?.sync) {
+      console.log(chalk.yellow(`Plugin ${pluginName} does not have a sync command.`));
+      console.log(chalk.gray('This plugin provides read-only access to external data.'));
+      return;
+    }
+
     const sources = getPluginSources(pluginName);
 
     if (sources.length === 0) {
@@ -250,7 +257,10 @@ async function cmdSync(pluginName, sourceName) {
     // Sync all enabled plugins
     const enabledPlugins = await getEnabledPlugins();
 
-    if (enabledPlugins.length === 0) {
+    // Filter to plugins that have sync commands
+    const syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.sync);
+
+    if (syncablePlugins.length === 0) {
       console.log(chalk.yellow('No plugins to sync.'));
       return;
     }
@@ -258,7 +268,7 @@ async function cmdSync(pluginName, sourceName) {
     console.log(chalk.cyan('Syncing all plugins...'));
     console.log('');
 
-    for (const { plugin, sources } of enabledPlugins) {
+    for (const { plugin, sources } of syncablePlugins) {
       for (const { sourceName: src, config } of sources) {
         console.log(`  ${plugin.name}/${src}...`);
         const result = await syncPluginSource(plugin, src, config, context);
@@ -709,6 +719,67 @@ ${tomlOutput}`;
   }
 }
 
+async function cmdInfo(pluginName) {
+  const plugins = await discoverPlugins();
+
+  if (!pluginName) {
+    console.error(chalk.red('Usage: plugins info <plugin-name>'));
+    console.log('');
+    console.log('Available plugins:');
+    for (const [name] of plugins) {
+      console.log(`  ${name}`);
+    }
+    process.exit(1);
+  }
+
+  const plugin = plugins.get(pluginName);
+  if (!plugin) {
+    console.error(chalk.red(`Plugin not found: ${pluginName}`));
+    process.exit(1);
+  }
+
+  console.log('');
+  console.log(chalk.bold(plugin.displayName || plugin.name));
+  console.log(chalk.gray('─'.repeat(60)));
+  console.log('');
+  console.log(`Type: ${plugin.type}`);
+  console.log(`Access: ${plugin.access}`);
+
+  if (plugin.commands?.sync) {
+    console.log(`Sync: ${chalk.green('yes')}`);
+  } else {
+    console.log(`Sync: ${chalk.gray('no (read-only, external data)')}`);
+  }
+
+  console.log('');
+
+  if (plugin.longDescription) {
+    console.log(plugin.longDescription.trim());
+  } else {
+    console.log(plugin.description);
+  }
+
+  // Show configured sources
+  const sources = getPluginSources(pluginName);
+  if (sources.length > 0) {
+    console.log('');
+    console.log(chalk.cyan('Configured sources:'));
+    for (const { sourceName, config } of sources) {
+      const status = config.enabled === true ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log(`  ${sourceName} (${status})`);
+      if (config.ai_instructions) {
+        console.log(chalk.gray('    AI instructions from config.toml:'));
+        const lines = config.ai_instructions.trim().split('\n');
+        for (const line of lines) {
+          console.log(chalk.gray(`      ${line}`));
+        }
+      }
+    }
+  }
+
+  console.log('');
+}
+
 function showHelp() {
   console.log(`
 ${chalk.bold('Plugin Management CLI')}
@@ -717,23 +788,25 @@ Usage: plugins <command> [options]
 
 Commands:
   list                      Show all available plugins
+  info <plugin>             Show detailed plugin documentation
   status                    Show enabled plugins and their sources
   configure [plugin]        Interactive plugin configuration
   sync [plugin] [source]    Sync plugin data (all if no plugin specified)
 
 Examples:
   plugins list
+  plugins info markdown-time-tracking
   plugins status
   plugins configure
-  plugins configure time-tracking
+  plugins configure markdown-time-tracking
   plugins sync
-  plugins sync time-tracking
-  plugins sync time-tracking local
+  plugins sync markdown-time-tracking
+  plugins sync markdown-time-tracking local
 
 Configuration:
   Plugins are configured in config.toml:
 
-  [plugins.time-tracking.local]
+  [plugins.markdown-time-tracking.local]
   enabled = true
   days_to_sync = 365
 `);
@@ -751,6 +824,9 @@ try {
   switch (command) {
     case 'list':
       await cmdList();
+      break;
+    case 'info':
+      await cmdInfo(arg1);
       break;
     case 'status':
       await cmdStatus();

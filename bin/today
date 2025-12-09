@@ -116,90 +116,6 @@ function getCurrentStageInfo() {
 // Note: getTaskStatistics is now imported from src/plan-utils.js
 
 // ============================================================================
-// Health Metrics
-// ============================================================================
-
-function getHealthMetrics() {
-  const healthFiles = [];
-  try {
-    const files = fs.readdirSync('vault/logs');
-    for (const file of files) {
-      if (file.startsWith('HealthAutoExport') && (file.endsWith('.json') || file.endsWith('.zip'))) {
-        healthFiles.push(path.join('vault/logs', file));
-      }
-    }
-  } catch {
-    return '';
-  }
-
-  if (healthFiles.length === 0) return '';
-
-  // Sort by modification time
-  healthFiles.sort((a, b) => {
-    try {
-      return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
-    } catch {
-      return 0;
-    }
-  });
-
-  const healthExport = healthFiles[0];
-
-  try {
-    let data;
-    if (healthExport.endsWith('.json')) {
-      data = JSON.parse(fs.readFileSync(healthExport, 'utf8'));
-    } else {
-      // For zip files, we'd need a zip library - skip for now
-      return '';
-    }
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    const metrics = {};
-
-    for (const metric of data?.data?.metrics || []) {
-      if (metric.name === 'step_count') {
-        const dailySteps = {};
-        for (const entry of metric.data || []) {
-          const dateStr = entry.date.split(' ')[0];
-          dailySteps[dateStr] = (dailySteps[dateStr] || 0) + (entry.qty || 0);
-        }
-
-        const dates = Object.keys(dailySteps).sort().slice(-7);
-        if (dates.length > 0) {
-          const avgSteps = dates.reduce((sum, d) => sum + dailySteps[d], 0) / dates.length;
-          metrics.avgSteps = Math.round(avgSteps);
-          if (dailySteps[yesterdayStr]) {
-            metrics.yesterdaySteps = Math.round(dailySteps[yesterdayStr]);
-          }
-        }
-      } else if (metric.name === 'weight_body_mass') {
-        const weights = (metric.data || [])
-          .map(e => [e.date.split(' ')[0], e.qty || 0])
-          .sort((a, b) => a[0].localeCompare(b[0]));
-        if (weights.length > 0) {
-          metrics.weight = `${weights[weights.length - 1][1].toFixed(1)} lbs`;
-        }
-      }
-    }
-
-    if (Object.keys(metrics).length > 0) {
-      const lines = ['\n## Health Metrics (Last 7 days)'];
-      if (metrics.avgSteps) lines.push(`- **Average Steps**: ${metrics.avgSteps}/day`);
-      if (metrics.yesterdaySteps) lines.push(`- **Yesterday**: ${metrics.yesterdaySteps} steps`);
-      if (metrics.weight) lines.push(`- **Weight**: ${metrics.weight}`);
-      return lines.join('\n');
-    }
-  } catch {
-    // Silently fail
-  }
-
-  return '';
-}
-
-// ============================================================================
 // Plan File Helpers
 // ============================================================================
 
@@ -999,28 +915,32 @@ IMPORTANT:
 
 /**
  * Build plugin context for AI prompt
- * Includes enabled plugins with their table names and any user instructions
+ * Includes enabled plugins with their AI instructions
  */
 async function getPluginContext() {
   try {
     const pluginData = await getPluginDataForAI();
     if (pluginData.length === 0) return '';
 
-    const lines = ['\n## Enabled Plugins\n'];
-    lines.push('The following data plugins are enabled and syncing data to the database:\n');
+    const lines = ['\n## Enabled Data Sources\n'];
 
     for (const plugin of pluginData) {
       lines.push(`### ${plugin.displayName} (${plugin.source})`);
       lines.push(`- **Type**: ${plugin.type}`);
-      lines.push(`- **Table**: ${plugin.tableName}`);
-      if (plugin.description) {
-        lines.push(`- **Description**: ${plugin.description}`);
+      lines.push(`- **Access**: ${plugin.access}`);
+      if (plugin.tableName) {
+        lines.push(`- **Table**: ${plugin.tableName}`);
       }
 
-      // Include user-provided AI instructions if present
-      if (plugin.ai_instructions) {
-        lines.push(`\n**User Instructions for this data source:**`);
-        lines.push(`> ${plugin.ai_instructions.replace(/\n/g, '\n> ')}`);
+      // Include plugin's AI instructions (how to use this data)
+      if (plugin.pluginAiInstructions) {
+        lines.push(`\n${plugin.pluginAiInstructions.trim()}`);
+      }
+
+      // Include user's custom AI instructions
+      if (plugin.userAiInstructions) {
+        lines.push(`\n**User Instructions:**`);
+        lines.push(`> ${plugin.userAiInstructions.trim().replace(/\n/g, '\n> ')}`);
       }
       lines.push('');
     }
@@ -1043,7 +963,6 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   const dayOfWeek = execSync(`TZ=${timezone} date "+%A"`, { encoding: 'utf8' }).trim();
 
   const taskStats = getTaskStatistics();
-  const healthMetrics = getHealthMetrics();
   const existingPlans = getExistingPlans();
   const changedFiles = getChangedVaultFiles();
   const pluginContext = await getPluginContext();
@@ -1067,7 +986,6 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
 - **Tomorrow's Review File**: ${tomorrowFile}
 - **Active Tasks**: ${taskStats.total} (Overdue: ${taskStats.overdue}, High Priority: ${taskStats.highPriority})
 - **Time Blocking Calendar**: e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com
-${healthMetrics}
 
 ## Existing Plans
 ${existingPlans}

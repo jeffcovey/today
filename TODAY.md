@@ -203,20 +203,6 @@ Default schedule:
 
 `vault/logs/Streaks.md` - tracks uncompleted tasks from Streaks app for daily health and habit goals.
 
-### Apple Health Data
-
-Health metrics are automatically extracted from health export files in `vault/logs/`:
-- Formats supported: `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json` or `HealthAutoExport.zip`
-- Extracted metrics include:
-  - Daily step counts and weekly averages
-  - Weight tracking trends
-  - Workout history (type, duration, calories)
-  - Alcohol consumption patterns
-  - Sleep analysis and breathing disturbances
-  - Heart rate variability and resting heart rate
-
-The `bin/today` script automatically finds and extracts key health metrics from the most recent export file and includes them in the daily review context.
-
 ### Hosting (Optional)
 
 If `[hosting]` is enabled in config.toml:
@@ -355,8 +341,7 @@ Based on database queries AND hierarchical plan alignment:
 6. **Changed Files** - Review vault/ files modified today for context on recent work
 7. **Evening Planning** - Review and prepare
 8. **Self-Care** - Check journal entries for wellbeing patterns
-9. **Health Metrics** - Review step counts, weight trends, workout consistency, alcohol patterns
-10. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
+9. **Time Blocking** - Create focused calendar events for priorities using the "Time Blocking" calendar
 
 ## Your First Steps - DO ALL IN FIRST RESPONSE
 
