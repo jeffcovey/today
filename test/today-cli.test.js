@@ -17,6 +17,11 @@ function runToday(args = '', options = {}) {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 30000,
+      env: {
+        ...process.env,
+        // Skip dependency checks in tests for faster execution
+        SKIP_DEP_CHECK: 'true',
+      },
       ...options,
     });
     return { stdout: output, exitCode: 0 };
