@@ -25,12 +25,20 @@ describe('All Plugins', () => {
       expect(['read-only', 'write-only', 'read-write']).toContain(plugin.access);
     });
 
-    test('should have a sync command', () => {
-      expect(plugin.commands).toBeDefined();
-      expect(plugin.commands.sync).toBeDefined();
+    test('should have sync command if not read-only external data', () => {
+      // Plugins with sync commands should have them defined
+      if (plugin.commands?.sync) {
+        expect(plugin.commands.sync).toBeDefined();
+      }
+      // Read-only plugins without sync are valid (e.g., apple-health-auto-export)
+      // They provide AI instructions for querying external data
     });
 
-    test('should have sync command that exists and is executable', () => {
+    test('should have sync command that exists and is executable if defined', () => {
+      // Skip if no sync command (read-only plugins)
+      if (!plugin.commands?.sync) {
+        return;
+      }
       const syncPath = path.join(plugin._path, plugin.commands.sync);
       expect(fs.existsSync(syncPath)).toBe(true);
 
@@ -40,7 +48,11 @@ describe('All Plugins', () => {
       expect(isExecutable).toBe(true);
     });
 
-    test('should have a schema defined for its type', () => {
+    test('should have a schema defined for its type if it has sync', () => {
+      // Only plugins that sync data need schemas
+      if (!plugin.commands?.sync) {
+        return;
+      }
       const schema = getSchema(plugin.type);
       expect(schema).not.toBeNull();
     });

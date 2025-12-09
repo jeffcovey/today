@@ -1,0 +1,48 @@
+# Streaks Habits Plugin
+# Provides AI access to habit tracking data from the Streaks iOS app
+
+name = "streaks-habits"
+displayName = "Streaks Habits"
+description = "Daily habit tracking from the Streaks iOS app"
+type = "habits"
+access = "read-only"
+
+requiredEnv = []
+
+longDescription = """
+Provides access to daily habit data from the Streaks iOS app (https://streaksapp.com).
+
+Streaks is a habit tracking app that helps you build good habits by tracking daily tasks.
+It syncs uncompleted tasks to a markdown file in your vault.
+
+Setup:
+1. Install Streaks on your iOS device from the App Store
+2. Configure Streaks to export to your vault via Shortcuts or manual export
+3. The export file should be saved to `vault/logs/Streaks.md`
+
+The file contains one habit per line, with optional duration:
+- Simple habit: `Do Tai Chi Standing`
+- Habit with duration: `Read Offline, 2m 30s`
+- Apple Health linked (♥︎ prefix): `♥︎ Walk 6,500 Steps`
+
+Items in this file are uncompleted habits for the day.
+"""
+
+aiInstructions = """
+Daily habit data from Streaks is in `vault/logs/Streaks.md`.
+
+Format: One habit per line
+- Simple: `Habit name`
+- With duration: `Habit name, Xm Ys`
+- Apple Health linked: `♥︎ Habit name` (these sync with Apple Health)
+
+The file shows UNCOMPLETED habits for today. An empty file means all habits are done.
+
+When reviewing daily progress:
+1. Read `vault/logs/Streaks.md` to see remaining habits
+2. Habits with ♥︎ prefix are linked to Apple Health metrics
+3. Suggest scheduling time blocks for uncompleted habits
+"""
+
+# No sync command - data arrives via Streaks app export
+# No configSchema needed - file location is fixed

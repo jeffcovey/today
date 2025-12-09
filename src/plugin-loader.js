@@ -297,3 +297,71 @@ export async function syncAllPlugins(context) {
 
   return results;
 }
+
+/**
+ * Get plugin data formatted for AI consumption
+ * Returns enabled plugins with their AI instructions (both plugin-defined and user-defined)
+ * @returns {Promise<Array<{pluginName: string, displayName: string, description: string, type: string, access: string, source: string, tableName: string|null, pluginAiInstructions: string|null, userAiInstructions: string|null, config: object}>>}
+ */
+export async function getPluginDataForAI() {
+  const enabledPlugins = await getEnabledPlugins();
+  const result = [];
+
+  for (const { plugin, sources } of enabledPlugins) {
+    for (const { sourceName, config } of sources) {
+      const tableName = plugin.commands?.sync
+        ? `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`
+        : null;
+
+      result.push({
+        pluginName: plugin.name,
+        displayName: plugin.displayName || plugin.name,
+        description: plugin.description,
+        type: plugin.type,
+        access: plugin.access,
+        source: sourceName,
+        tableName,
+        // Plugin's instructions for AI (from plugin.toml)
+        pluginAiInstructions: plugin.aiInstructions || null,
+        // User's custom instructions (from config.toml)
+        userAiInstructions: config.ai_instructions || null,
+        config: {
+          // Include non-sensitive config fields for context
+          ...Object.fromEntries(
+            Object.entries(config).filter(([key]) =>
+              !['enabled', 'ai_instructions'].includes(key) &&
+              !key.toLowerCase().includes('token') &&
+              !key.toLowerCase().includes('secret') &&
+              !key.toLowerCase().includes('password')
+            )
+          )
+        }
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Get all available plugins' AI instructions (even if not configured)
+ * This tells the AI about all data sources it could potentially access
+ * @returns {Promise<Array<{pluginName: string, displayName: string, description: string, aiInstructions: string|null}>>}
+ */
+export async function getAllPluginAiInstructions() {
+  const plugins = await discoverPlugins();
+  const result = [];
+
+  for (const [name, plugin] of plugins) {
+    result.push({
+      pluginName: name,
+      displayName: plugin.displayName || name,
+      description: plugin.description,
+      type: plugin.type,
+      access: plugin.access,
+      aiInstructions: plugin.aiInstructions || null
+    });
+  }
+
+  return result;
+}

@@ -133,8 +133,28 @@
 # =============================================================================
 # Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
 # Uncomment and set enabled = true to activate a plugin
+#
+# Plugins have built-in AI instructions that tell the AI how to query data.
+# You can add your own ai_instructions to customize how the AI interprets
+# and prioritizes the data for your workflow.
 
-# [plugins.time-tracking.default]
+# [plugins.markdown-time-tracking.local]
 # enabled = true
 # days_to_sync = 365
 # directory = "vault/logs/time-tracking"
+# ai_instructions = """
+# Time tracking is THE GROUND TRUTH of productivity.
+# ALWAYS check time tracking data BEFORE making progress assessments.
+# """
+
+# [plugins.apple-health-auto-export.default]
+# enabled = true
+# ai_instructions = """
+# When making plans and reviews, always check:
+# - Yesterday's step count and 7-day average
+# - Current weight trend (last 3 readings)
+# - Sleep duration from last night
+# """
+
+# [plugins.streaks-habits.default]
+# enabled = true

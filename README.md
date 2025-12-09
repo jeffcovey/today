@@ -262,6 +262,19 @@ bin/track start "Task"         # Start a timer
 bin/track stop                 # Stop current timer
 ```
 
+### bin/plugins
+
+Manage data source plugins.
+
+```bash
+bin/plugins list               # Show available plugins
+bin/plugins status             # Show enabled plugins and sources
+bin/plugins configure          # Interactive plugin configuration
+bin/plugins sync               # Sync all enabled plugins
+```
+
+See [plugins/README.md](plugins/README.md) for details on creating and configuring plugins.
+
 ## Task Syntax
 
 Tasks use [Obsidian Tasks](https://publish.obsidian.md/tasks/) syntax:

@@ -6,6 +6,8 @@ autoDotenvx();
 
 import chalk from 'chalk';
 import fs from 'fs';
+import os from 'os';
+import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 import {
   discoverPlugins,
@@ -160,7 +162,7 @@ async function cmdList() {
       ? chalk.green(`${sources.length} source(s) enabled`)
       : chalk.gray('not configured');
 
-    console.log(`  ${chalk.bold(plugin.displayName || name)}`);
+    console.log(`  ${chalk.bold(plugin.displayName || name)} ${chalk.gray(`(${name})`)}`);
     console.log(`    Type: ${plugin.type} | Access: ${plugin.access}`);
     console.log(`    ${plugin.description}`);
     console.log(`    Status: ${status}`);
@@ -217,6 +219,13 @@ async function cmdSync(pluginName, sourceName) {
       process.exit(1);
     }
 
+    // Check if plugin has a sync command
+    if (!plugin.commands?.sync) {
+      console.log(chalk.yellow(`Plugin ${pluginName} does not have a sync command.`));
+      console.log(chalk.gray('This plugin provides read-only access to external data.'));
+      return;
+    }
+
     const sources = getPluginSources(pluginName);
 
     if (sources.length === 0) {
@@ -248,7 +257,10 @@ async function cmdSync(pluginName, sourceName) {
     // Sync all enabled plugins
     const enabledPlugins = await getEnabledPlugins();
 
-    if (enabledPlugins.length === 0) {
+    // Filter to plugins that have sync commands
+    const syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.sync);
+
+    if (syncablePlugins.length === 0) {
       console.log(chalk.yellow('No plugins to sync.'));
       return;
     }
@@ -256,7 +268,7 @@ async function cmdSync(pluginName, sourceName) {
     console.log(chalk.cyan('Syncing all plugins...'));
     console.log('');
 
-    for (const { plugin, sources } of enabledPlugins) {
+    for (const { plugin, sources } of syncablePlugins) {
       for (const { sourceName: src, config } of sources) {
         console.log(`  ${plugin.name}/${src}...`);
         const result = await syncPluginSource(plugin, src, config, context);
@@ -268,6 +280,47 @@ async function cmdSync(pluginName, sourceName) {
         }
       }
     }
+  }
+}
+
+/**
+ * Get the user's preferred editor
+ */
+function getEditor() {
+  return process.env.EDITOR || process.env.VISUAL || 'nano';
+}
+
+/**
+ * Edit text in an external editor
+ * @param {string} currentText - Current text content
+ * @param {string} filename - Suggested filename for the temp file
+ * @returns {string|null} - Edited text, or null if cancelled/unchanged
+ */
+function editInEditor(currentText, filename = 'edit.txt') {
+  const editor = getEditor();
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, `plugins-${Date.now()}-${filename}`);
+
+  try {
+    // Write current content to temp file
+    fs.writeFileSync(tmpFile, currentText || '');
+
+    // Open editor (blocking)
+    console.log(chalk.gray(`Opening ${editor}... (save and close to continue)`));
+    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
+
+    // Read back the result
+    const newText = fs.readFileSync(tmpFile, 'utf8');
+
+    // Clean up
+    fs.unlinkSync(tmpFile);
+
+    return newText;
+  } catch (error) {
+    // Clean up on error
+    try { fs.unlinkSync(tmpFile); } catch {}
+    console.error(chalk.red(`Editor failed: ${error.message}`));
+    return null;
   }
 }
 
@@ -360,8 +413,7 @@ async function configurePlugin(plugin, pluginName) {
 
     if (allConfiguredSources.length > 0) {
       actionChoices.push(
-        { name: 'Enable/disable source', value: 'toggle' },
-        { name: 'Edit source settings', value: 'edit' },
+        { name: 'Edit source', value: 'edit' },
         { name: 'Remove source', value: 'remove' }
       );
     }
@@ -451,48 +503,23 @@ async function configurePlugin(plugin, pluginName) {
       console.log('');
       console.log(chalk.green('✓') + ` Added source "${sourceName}"`);
 
-    } else if (action === 'toggle') {
-      // Choose source to toggle
-      const { sourceToToggle } = await inquirer.prompt([{
-        type: 'rawlist',
-        name: 'sourceToToggle',
-        message: 'Select source to enable/disable:',
-        choices: allConfiguredSources.map(s => ({
-          name: `${s.sourceName} ${s.config.enabled === true ? chalk.green('(enabled)') : chalk.gray('(disabled)')}`,
-          value: s.sourceName
-        }))
-      }]);
-
-      if (sourceToToggle) {
-        const currentConfig = config.plugins[pluginName][sourceToToggle];
-        const newEnabled = currentConfig.enabled !== true;
-
-        // Toggle enabled status, keep rest of config
-        config.plugins[pluginName][sourceToToggle] = {
-          ...currentConfig,
-          enabled: newEnabled
-        };
-        writeConfig(config);
-
-        console.log('');
-        if (newEnabled) {
-          console.log(chalk.green('✓') + ` Enabled source "${sourceToToggle}"`);
-        } else {
-          console.log(chalk.yellow('○') + ` Disabled source "${sourceToToggle}"`);
-        }
-      }
-
     } else if (action === 'edit') {
-      // Choose source to edit
-      const { sourceToEdit } = await inquirer.prompt([{
-        type: 'rawlist',
-        name: 'sourceToEdit',
-        message: 'Select source to edit:',
-        choices: allConfiguredSources.map(s => ({
-          name: `${s.sourceName} ${s.config.enabled === true ? chalk.green('(enabled)') : chalk.gray('(disabled)')}`,
-          value: s.sourceName
-        }))
-      }]);
+      // Choose source to edit (skip prompt if only one)
+      let sourceToEdit;
+      if (allConfiguredSources.length === 1) {
+        sourceToEdit = allConfiguredSources[0].sourceName;
+      } else {
+        const { selected } = await inquirer.prompt([{
+          type: 'rawlist',
+          name: 'selected',
+          message: 'Select source to edit:',
+          choices: allConfiguredSources.map(s => ({
+            name: `${s.sourceName} ${s.config.enabled === true ? chalk.green('(enabled)') : chalk.gray('(disabled)')}`,
+            value: s.sourceName
+          }))
+        }]);
+        sourceToEdit = selected;
+      }
 
       if (sourceToEdit) {
         const currentConfig = config.plugins[pluginName][sourceToEdit] || {};
@@ -534,6 +561,32 @@ async function configurePlugin(plugin, pluginName) {
           }
         }
 
+        // Ask about AI instructions
+        const currentInstructions = currentConfig.ai_instructions || '';
+        const hasInstructions = currentInstructions.length > 0;
+
+        console.log('');
+        const { editAiInstructions } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'editAiInstructions',
+          message: hasInstructions ? 'Edit AI instructions?' : 'Add AI instructions? (tells AI how to use this data)',
+          default: false
+        }]);
+
+        if (editAiInstructions) {
+          const newInstructions = editInEditor(currentInstructions, 'ai-instructions.txt');
+          if (newInstructions !== null) {
+            const trimmed = newInstructions.trim();
+            if (trimmed) {
+              sourceConfig.ai_instructions = trimmed;
+            }
+            // If empty, just don't add it (effectively removes)
+          }
+        } else if (hasInstructions) {
+          // Preserve existing instructions if not editing
+          sourceConfig.ai_instructions = currentInstructions;
+        }
+
         // Save to config
         config.plugins[pluginName][sourceToEdit] = sourceConfig;
         writeConfig(config);
@@ -543,13 +596,19 @@ async function configurePlugin(plugin, pluginName) {
       }
 
     } else if (action === 'remove') {
-      // Choose source to remove
-      const { sourceToRemove } = await inquirer.prompt([{
-        type: 'rawlist',
-        name: 'sourceToRemove',
-        message: 'Select source to remove:',
-        choices: allConfiguredSources.map(s => s.sourceName)
-      }]);
+      // Choose source to remove (skip prompt if only one)
+      let sourceToRemove;
+      if (allConfiguredSources.length === 1) {
+        sourceToRemove = allConfiguredSources[0].sourceName;
+      } else {
+        const { selected } = await inquirer.prompt([{
+          type: 'rawlist',
+          name: 'selected',
+          message: 'Select source to remove:',
+          choices: allConfiguredSources.map(s => s.sourceName)
+        }]);
+        sourceToRemove = selected;
+      }
 
       if (sourceToRemove) {
         const { confirmRemove } = await inquirer.prompt([{
@@ -580,6 +639,29 @@ async function configurePlugin(plugin, pluginName) {
 }
 
 /**
+ * Convert smol-toml output to use multi-line strings for ai_instructions
+ * smol-toml uses \n escapes, but triple-quoted strings are more readable
+ */
+function formatMultilineStrings(tomlStr) {
+  // Match ai_instructions = "..." and convert to triple-quoted if it contains \n
+  return tomlStr.replace(
+    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
+    (match, prefix, content) => {
+      // Check if it has escaped newlines
+      if (!content.includes('\\n')) {
+        return match; // Keep as-is if single line
+      }
+      // Unescape the content and use triple quotes
+      const unescaped = content
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+      return `${prefix}"""\n${unescaped}\n"""`;
+    }
+  );
+}
+
+/**
  * Write config object to config.toml, preserving comments where possible
  */
 function writeConfig(config) {
@@ -593,7 +675,8 @@ function writeConfig(config) {
 
   if (existingContent) {
     // Try to update just the plugins section
-    const pluginsSection = stringifyToml({ plugins: config.plugins });
+    let pluginsSection = stringifyToml({ plugins: config.plugins });
+    pluginsSection = formatMultilineStrings(pluginsSection);
 
     // Check if plugins section exists
     const pluginsMatch = existingContent.match(/^# =+\n# Plugins\n# =+.*?(?=\n# =|\n*$)/ms);
@@ -626,12 +709,75 @@ ${pluginsSection}`;
     }
   } else {
     // Write new config file
+    let tomlOutput = stringifyToml(config);
+    tomlOutput = formatMultilineStrings(tomlOutput);
     const content = `# Configuration for Today system
 # See config.toml.example for all available options
 
-${stringifyToml(config)}`;
+${tomlOutput}`;
     fs.writeFileSync(CONFIG_PATH, content);
   }
+}
+
+async function cmdInfo(pluginName) {
+  const plugins = await discoverPlugins();
+
+  if (!pluginName) {
+    console.error(chalk.red('Usage: plugins info <plugin-name>'));
+    console.log('');
+    console.log('Available plugins:');
+    for (const [name] of plugins) {
+      console.log(`  ${name}`);
+    }
+    process.exit(1);
+  }
+
+  const plugin = plugins.get(pluginName);
+  if (!plugin) {
+    console.error(chalk.red(`Plugin not found: ${pluginName}`));
+    process.exit(1);
+  }
+
+  console.log('');
+  console.log(chalk.bold(plugin.displayName || plugin.name));
+  console.log(chalk.gray('─'.repeat(60)));
+  console.log('');
+  console.log(`Type: ${plugin.type}`);
+  console.log(`Access: ${plugin.access}`);
+
+  if (plugin.commands?.sync) {
+    console.log(`Sync: ${chalk.green('yes')}`);
+  } else {
+    console.log(`Sync: ${chalk.gray('no (read-only, external data)')}`);
+  }
+
+  console.log('');
+
+  if (plugin.longDescription) {
+    console.log(plugin.longDescription.trim());
+  } else {
+    console.log(plugin.description);
+  }
+
+  // Show configured sources
+  const sources = getPluginSources(pluginName);
+  if (sources.length > 0) {
+    console.log('');
+    console.log(chalk.cyan('Configured sources:'));
+    for (const { sourceName, config } of sources) {
+      const status = config.enabled === true ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log(`  ${sourceName} (${status})`);
+      if (config.ai_instructions) {
+        console.log(chalk.gray('    AI instructions from config.toml:'));
+        const lines = config.ai_instructions.trim().split('\n');
+        for (const line of lines) {
+          console.log(chalk.gray(`      ${line}`));
+        }
+      }
+    }
+  }
+
+  console.log('');
 }
 
 function showHelp() {
@@ -642,23 +788,25 @@ Usage: plugins <command> [options]
 
 Commands:
   list                      Show all available plugins
+  info <plugin>             Show detailed plugin documentation
   status                    Show enabled plugins and their sources
   configure [plugin]        Interactive plugin configuration
   sync [plugin] [source]    Sync plugin data (all if no plugin specified)
 
 Examples:
   plugins list
+  plugins info markdown-time-tracking
   plugins status
   plugins configure
-  plugins configure time-tracking
+  plugins configure markdown-time-tracking
   plugins sync
-  plugins sync time-tracking
-  plugins sync time-tracking local
+  plugins sync markdown-time-tracking
+  plugins sync markdown-time-tracking local
 
 Configuration:
   Plugins are configured in config.toml:
 
-  [plugins.time-tracking.local]
+  [plugins.markdown-time-tracking.local]
   enabled = true
   days_to_sync = 365
 `);
@@ -676,6 +824,9 @@ try {
   switch (command) {
     case 'list':
       await cmdList();
+      break;
+    case 'info':
+      await cmdInfo(arg1);
       break;
     case 'status':
       await cmdStatus();

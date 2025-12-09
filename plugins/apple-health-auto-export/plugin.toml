@@ -1,0 +1,59 @@
+# Apple Health Auto Export Plugin
+# Provides AI access to health data exported from iOS Health app
+
+name = "apple-health-auto-export"
+displayName = "Apple Health Auto Export"
+description = "Health metrics from iOS Health app via Auto Export"
+type = "health-metrics"
+access = "read-only"
+
+requiredEnv = []
+
+longDescription = """
+Provides access to health data exported from the iOS Health app using the
+"Health Auto Export" app (https://www.healthyapps.dev/health-auto-export).
+
+Setup:
+1. Install "Health Auto Export" on your iOS device from the App Store
+2. Configure it to export to a synced folder (iCloud, Dropbox, etc.)
+3. Set the export destination to `vault/logs/` in your Today vault
+4. The app will create files like `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json`
+
+The export file contains metrics including:
+- Step counts and distance walked
+- Weight and body measurements
+- Heart rate and HRV
+- Sleep analysis
+- Workouts (type, duration, calories)
+- Nutrition (water, caffeine, alcohol)
+- And many more depending on your Health app data
+
+This plugin does not sync data - it tells the AI how to read the export files
+that are already synced to your vault via your preferred sync method.
+"""
+
+aiInstructions = """
+Health data from Apple Health is available in `vault/logs/HealthAutoExport*.json`.
+
+To query health metrics:
+1. Find the most recent file matching `HealthAutoExport*.json` in `vault/logs/`
+2. Parse the JSON - structure is `data.metrics[]` where each metric has:
+   - `name`: metric identifier (e.g., `step_count`, `weight_body_mass`, `heart_rate`)
+   - `units`: measurement units
+   - `data[]`: array of readings with `date` and `qty` fields
+
+Common metric names:
+- `step_count` - daily steps
+- `weight_body_mass` - weight in lbs
+- `heart_rate` - BPM readings
+- `heart_rate_variability_sdnn` - HRV in ms
+- `sleep_analysis` - sleep sessions
+- `dietary_water` - water intake
+- `dietary_caffeine` - caffeine in mg
+- `number_of_alcoholic_beverages` - alcohol consumption
+
+Only read and parse metrics relevant to the user's question.
+"""
+
+# No sync command - data arrives via external sync (iCloud, Dropbox, etc.)
+# No configSchema needed - the file location is fixed at vault/logs/
