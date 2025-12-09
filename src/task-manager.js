@@ -5,7 +5,6 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import { getDatabase } from './database-service.js';
-import { DateParser } from './date-parser.js';
 import { getTopicEmoji } from './tag-emoji-mappings.js';
 
 export class TaskManager {
@@ -13,7 +12,6 @@ export class TaskManager {
     // Use unified DatabaseService for all database access
     // Pass readOnly option to skip Turso sync for read-only operations
     this.db = getDatabase(dbPath, { readOnly: options.readOnly || false });
-    this.dateParser = new DateParser();
     // DO NOT recreate schema - database already exists with correct schema from Turso
     // Schema is managed by migrations and Turso sync, not by this module
     
@@ -923,18 +921,7 @@ export class TaskManager {
         }
 
         // Use scheduled date or due date as the do_date (prefer scheduled)
-        let extractedDate = scheduledDate || dueDate;
-
-        // Also support legacy date tags if no Obsidian Tasks dates found
-        if (!extractedDate) {
-          const dateTags = this.dateParser.extractDateTags(title);
-          if (dateTags.length > 0) {
-            // Use the first date tag found
-            extractedDate = dateTags[0].parsed;
-            // Remove all date topics from the title
-            title = this.dateParser.removeTagsFromText(title, dateTags);
-          }
-        }
+        const extractedDate = scheduledDate || dueDate;
 
         let taskId;
         if (existingId) {

@@ -17,6 +17,7 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 
 # Install required system packages
+# Note: python3 is required for node-gyp to compile native modules like better-sqlite3
 echo "📦 Installing system dependencies..."
 apt-get install -y \
     git \
