@@ -57,10 +57,10 @@ describe('All Plugins', () => {
       expect(schema).not.toBeNull();
     });
 
-    test('should have configSchema if it has config options', () => {
-      // configSchema is optional, but if present should be an object
-      if (plugin.configSchema) {
-        expect(typeof plugin.configSchema).toBe('object');
+    test('should have settings if it has config options', () => {
+      // settings is optional, but if present should be an object
+      if (plugin.settings) {
+        expect(typeof plugin.settings).toBe('object');
       }
     });
   });

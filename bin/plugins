@@ -17,6 +17,7 @@ import {
 } from '../src/plugin-loader.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
+import { ensureHealthyDatabase } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -58,8 +59,8 @@ async function ensurePluginConfig() {
     lines.push(`# [plugins.${name}.default]`);
     lines.push(`# enabled = true`);
 
-    if (plugin.configSchema) {
-      for (const [key, schema] of Object.entries(plugin.configSchema)) {
+    if (plugin.settings) {
+      for (const [key, schema] of Object.entries(plugin.settings)) {
         const defaultValue = schema.default;
         if (defaultValue !== undefined) {
           const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
@@ -128,8 +129,8 @@ async function ensurePluginConfig() {
       lines.push(`# [plugins.${name}.default]`);
       lines.push(`# enabled = true`);
 
-      if (plugin.configSchema) {
-        for (const [key, schema] of Object.entries(plugin.configSchema)) {
+      if (plugin.settings) {
+        for (const [key, schema] of Object.entries(plugin.settings)) {
           const defaultValue = schema.default;
           if (defaultValue !== undefined) {
             const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
@@ -204,6 +205,13 @@ async function cmdStatus() {
 }
 
 async function cmdSync(pluginName, sourceName) {
+  // Ensure database is healthy and migrations are run
+  const healthResult = await ensureHealthyDatabase({ verbose: false });
+  if (!healthResult.success) {
+    console.error(chalk.red('Database health check failed'));
+    process.exit(1);
+  }
+
   const db = getDatabase();
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
@@ -469,14 +477,14 @@ async function configurePlugin(plugin, pluginName) {
         }
       }]);
 
-      // Get configuration values from configSchema
+      // Get configuration values from settings
       const sourceConfig = { enabled: true };
 
-      if (plugin.configSchema) {
+      if (plugin.settings) {
         console.log('');
         console.log(chalk.cyan('Configure plugin options:'));
 
-        for (const [key, schema] of Object.entries(plugin.configSchema)) {
+        for (const [key, schema] of Object.entries(plugin.settings)) {
           const promptConfig = {
             name: key,
             message: `${key}:`,
@@ -535,11 +543,11 @@ async function configurePlugin(plugin, pluginName) {
         const sourceConfig = { enabled };
 
         // Edit other config values
-        if (plugin.configSchema) {
+        if (plugin.settings) {
           console.log('');
           console.log(chalk.cyan('Configure plugin options:'));
 
-          for (const [key, schema] of Object.entries(plugin.configSchema)) {
+          for (const [key, schema] of Object.entries(plugin.settings)) {
             const currentValue = currentConfig[key] !== undefined ? currentConfig[key] : schema.default;
 
             const promptConfig = {

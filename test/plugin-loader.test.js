@@ -37,7 +37,7 @@ describe('Plugin Loader', () => {
 
       expect(timeTracking).toHaveProperty('name', 'markdown-time-tracking');
       expect(timeTracking).toHaveProperty('displayName', 'Markdown Time Tracking');
-      expect(timeTracking).toHaveProperty('type', 'time-entries');
+      expect(timeTracking).toHaveProperty('type', 'time-logs');
       expect(timeTracking).toHaveProperty('access', 'read-write');
       expect(timeTracking).toHaveProperty('commands');
       expect(timeTracking.commands).toHaveProperty('sync');

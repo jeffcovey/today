@@ -45,4 +45,4 @@ When reviewing daily progress:
 """
 
 # No sync command - data arrives via Streaks app export
-# No configSchema needed - file location is fixed
+# No settings needed - file location is fixed

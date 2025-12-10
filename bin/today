@@ -403,9 +403,9 @@ function runSync(skipSync = false) {
 // Database Check
 // ============================================================================
 
-function checkAndRecoverDatabase() {
+async function checkAndRecoverDatabase() {
   console.log('🔍 Checking database health...');
-  const result = ensureHealthyDatabase({ verbose: true });
+  const result = await ensureHealthyDatabase({ verbose: true });
 
   if (!result.success) {
     console.error('❌ Database check failed');
@@ -1095,7 +1095,7 @@ async function main() {
   }
 
   // Always check database health first (except for help which returns early)
-  checkAndRecoverDatabase();
+  await checkAndRecoverDatabase();
 
   // Handle init command
   if (command === 'init') {

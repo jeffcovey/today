@@ -574,7 +574,7 @@ function processSection(content, sectionRegex, sectionName, calloutType) {
 // Database is now local-only SQLite with no cloud sync
 
 async function checkDatabaseHealth() {
-  const result = ensureHealthyDatabase({ verbose: false });
+  const result = await ensureHealthyDatabase({ verbose: false });
 
   if (!result.success) {
     printError('Database health check failed');

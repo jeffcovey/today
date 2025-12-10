@@ -4,7 +4,7 @@
 name = "markdown-time-tracking"
 displayName = "Markdown Time Tracking"
 description = "Sync local markdown time tracking files to database"
-type = "time-entries"
+type = "time-logs"
 access = "read-write"
 
 requiredEnv = []
@@ -25,10 +25,8 @@ This plugin reads the markdown files and syncs them to SQLite for querying.
 """
 
 aiInstructions = """
-Time tracking data is synced to the `markdown_time_tracking_{source}` table.
-
-To check current activity, read `vault/logs/time-tracking/current-timer.md`.
-To see today's entries, read `vault/logs/time-tracking/YYYY-MM.md` for the current month.
+To check current ongoing activity, read `{directory}/current-timer.md`.
+To see entries, read `{directory}/YYYY-MM.md` for the relevant month.
 
 Each line in the monthly file is: `START_ISO8601|END_ISO8601|Description #topic/tag`
 Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #topic/programming`
@@ -37,6 +35,6 @@ Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #t
 [commands]
 sync = "./sync.js"
 
-[configSchema]
+[settings]
 days_to_sync = { type = "number", default = 365 }
 directory = { type = "string", default = "vault/logs/time-tracking" }

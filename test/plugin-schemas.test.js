@@ -2,12 +2,12 @@ import { validateEntries, getSchema, getPluginTypes } from '../src/plugin-schema
 
 describe('Plugin Schemas', () => {
   describe('getSchema', () => {
-    test('should return schema for time-entries', () => {
-      const schema = getSchema('time-entries');
+    test('should return schema for time-logs', () => {
+      const schema = getSchema('time-logs');
 
       expect(schema).not.toBeNull();
       expect(schema.required).toContain('start_time');
-      expect(schema.required).toContain('description');
+      expect(schema.optional).toContain('description');
       expect(schema.optional).toContain('end_time');
     });
 
@@ -23,7 +23,7 @@ describe('Plugin Schemas', () => {
       const types = getPluginTypes();
 
       expect(Array.isArray(types)).toBe(true);
-      expect(types).toContain('time-entries');
+      expect(types).toContain('time-logs');
     });
   });
 
@@ -33,19 +33,18 @@ describe('Plugin Schemas', () => {
       warn: () => {}
     };
 
-    describe('time-entries', () => {
+    describe('time-logs', () => {
       test('should pass valid entries', () => {
         const entries = [
           {
             start_time: '2025-01-15T09:00:00-05:00',
             end_time: '2025-01-15T10:30:00-05:00',
             duration_minutes: 90,
-            description: 'Working on tests',
-            topics: '#topic/programming'
+            description: 'Working on tests'
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(true);
         expect(result.errors).toHaveLength(0);
@@ -54,12 +53,11 @@ describe('Plugin Schemas', () => {
       test('should pass entries with only required fields', () => {
         const entries = [
           {
-            start_time: '2025-01-15T09:00:00-05:00',
-            description: 'Working on tests'
+            start_time: '2025-01-15T09:00:00-05:00'
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(true);
         expect(result.errors).toHaveLength(0);
@@ -72,36 +70,21 @@ describe('Plugin Schemas', () => {
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(false);
         expect(result.errors.length).toBeGreaterThan(0);
         expect(result.errors[0]).toContain('start_time');
       });
 
-      test('should fail when missing required field description', () => {
-        const entries = [
-          {
-            start_time: '2025-01-15T09:00:00-05:00'
-          }
-        ];
-
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
-
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
-        expect(result.errors[0]).toContain('description');
-      });
-
       test('should fail when required field has wrong type', () => {
         const entries = [
           {
-            start_time: 12345,  // should be string
-            description: 'Test'
+            start_time: 12345  // should be string
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(false);
         expect(result.errors[0]).toContain('should be string');
@@ -111,12 +94,11 @@ describe('Plugin Schemas', () => {
         const entries = [
           {
             start_time: '2025-01-15T09:00:00-05:00',
-            description: 'Test',
             unknown_field: 'value'
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(true);  // warnings don't fail
         expect(result.warnings.length).toBeGreaterThan(0);
@@ -127,12 +109,11 @@ describe('Plugin Schemas', () => {
         const entries = [
           {
             start_time: '2025-01-15T09:00:00-05:00',
-            description: 'Test',
             duration_minutes: '90'  // should be number
           }
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(true);  // warnings don't fail
         expect(result.warnings.length).toBeGreaterThan(0);
@@ -155,12 +136,12 @@ describe('Plugin Schemas', () => {
     describe('multiple entries', () => {
       test('should validate all entries and collect errors', () => {
         const entries = [
-          { start_time: '2025-01-15T09:00:00-05:00', description: 'Valid' },
+          { start_time: '2025-01-15T09:00:00-05:00' },
           { description: 'Missing start_time' },
-          { start_time: '2025-01-15T10:00:00-05:00' }  // missing description
+          { end_time: '2025-01-15T10:00:00-05:00' }  // missing start_time
         ];
 
-        const result = validateEntries('time-entries', entries, { logger: mockLogger });
+        const result = validateEntries('time-logs', entries, { logger: mockLogger });
 
         expect(result.valid).toBe(false);
         expect(result.errors.length).toBe(2);

@@ -1,4 +1,32 @@
 // Database migration system for schema versioning
+// Schema definitions are in plugin-schemas.js (single source of truth)
+
+import { schemas, getSqlColumns, getTableName, getIndexes } from './plugin-schemas.js';
+
+/**
+ * Build migrations from plugin type schemas
+ * Each schema becomes a numbered migration in order of definition
+ */
+function buildMigrations() {
+  return Object.keys(schemas).map((type, index) => {
+    const table = getTableName(type);
+    const columns = getSqlColumns(type);
+    const indexes = getIndexes(type);
+
+    return {
+      version: index + 1,
+      description: `Create ${table} table for ${type} plugin type`,
+      fn: (db) => {
+        db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
+      ${columns}
+    )`);
+        for (const col of indexes) {
+          db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_${col} ON ${table}(${col})`);
+        }
+      }
+    };
+  });
+}
 
 export class MigrationManager {
   constructor(db) {
@@ -54,8 +82,8 @@ export class MigrationManager {
     console.log('Running database migrations...');
     const startVersion = this.getCurrentVersion();
 
-    // Plugin type tables will be added here as we build each one
-    const migrations = [];
+    // Build migrations from plugin type schemas
+    const migrations = buildMigrations();
 
     // Apply migrations
     for (const migration of migrations) {

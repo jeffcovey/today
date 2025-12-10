@@ -46,8 +46,8 @@ describe('Database Migrations', () => {
     await manager.runMigrations();
 
     const version = manager.getCurrentVersion();
-    // With empty migrations array, version starts at 0
-    expect(version).toBe(0);
+    // Version should be >= 1 after running migrations
+    expect(version).toBeGreaterThanOrEqual(1);
 
     db.close();
   });

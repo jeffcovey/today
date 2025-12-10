@@ -92,7 +92,9 @@ sync = "./sync.js"           # Can be .js, .sh, .py, or any executable
                              # Omit this section for read-only plugins
 
 # Configuration options with defaults
-[configSchema]
+# Format: name = { type = "string"|"number"|"boolean", default = value }
+# These can be referenced in aiInstructions as {name} placeholders
+[settings]
 days_to_sync = { type = "number", default = 365 }
 directory = { type = "string", default = "vault/logs/time-tracking" }
 ```

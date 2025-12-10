@@ -109,9 +109,9 @@ export function backupDatabase() {
 
 /**
  * Create a fresh database with the current schema
- * @returns {boolean} Success status
+ * @returns {Promise<boolean>} Success status
  */
-export function createFreshDatabase() {
+export async function createFreshDatabase() {
   // Ensure directory exists
   const dir = path.dirname(DB_PATH);
   if (!fs.existsSync(dir)) {
@@ -130,7 +130,7 @@ export function createFreshDatabase() {
 
     // Run migrations
     const migrationManager = new MigrationManager(db);
-    migrationManager.runMigrations();
+    await migrationManager.runMigrations();
 
     db.close();
     return true;
@@ -150,9 +150,9 @@ export function createFreshDatabase() {
  * @param {Object} options
  * @param {boolean} options.verbose - Print status messages
  * @param {boolean} options.forceRecreate - Force database recreation
- * @returns {Object} { success: boolean, recreated: boolean, message: string }
+ * @returns {Promise<Object>} { success: boolean, recreated: boolean, message: string }
  */
-export function ensureHealthyDatabase(options = {}) {
+export async function ensureHealthyDatabase(options = {}) {
   const { verbose = true, forceRecreate = false } = options;
 
   const log = (msg) => { if (verbose) console.log(msg); };
@@ -184,7 +184,7 @@ export function ensureHealthyDatabase(options = {}) {
 
   // Create fresh database
   log('🔨 Creating fresh database...');
-  if (createFreshDatabase()) {
+  if (await createFreshDatabase()) {
     success('Database created successfully');
     log('ℹ️  Database is a local cache - data will be populated from sync');
     return { success: true, recreated: true, message: 'Database recreated' };

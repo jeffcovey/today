@@ -174,7 +174,8 @@ function runPluginCommand(plugin, command, sourceConfig) {
  */
 export async function syncPluginSource(plugin, sourceName, sourceConfig, context) {
   const { db } = context;
-  const tableName = `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`;
+  // Source identifier for the `source` column (e.g., "markdown-time-tracking/default")
+  const sourceId = `${plugin.name}/${sourceName}`;
 
   // Run the sync command
   const result = runPluginCommand(plugin, 'sync', sourceConfig);
@@ -183,7 +184,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     return {
       success: false,
       count: 0,
-      message: `Error syncing ${plugin.name}/${sourceName}: ${result.error}`
+      message: `Error syncing ${sourceId}: ${result.error}`
     };
   }
 
@@ -198,7 +199,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 
   // Validate entries against schema
   const validation = validateEntries(plugin.type, entries, {
-    pluginName: `${plugin.name}/${sourceName}`,
+    pluginName: sourceId,
     logger: console
   });
 
@@ -206,64 +207,83 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     return {
       success: false,
       count: 0,
-      message: `Plugin ${plugin.name}/${sourceName} returned invalid data (${validation.errors.length} errors)`
+      message: `Plugin ${sourceId} returned invalid data (${validation.errors.length} errors)`
     };
   }
 
-  // Create table based on plugin type
-  ensureTable(db, tableName, plugin.type);
+  // Get the standardized table name for this plugin type
+  const tableName = getTableNameForType(plugin.type);
+  if (!tableName) {
+    return {
+      success: false,
+      count: 0,
+      message: `Unknown plugin type: ${plugin.type}`
+    };
+  }
 
-  // Insert entries
-  const count = insertEntries(db, tableName, plugin.type, entries);
+  // Insert entries with source identifier
+  const count = insertEntries(db, tableName, plugin.type, entries, sourceId);
 
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${plugin.name}/${sourceName}`
+    message: `Synced ${count} entries from ${sourceId}`
   };
 }
 
 /**
- * Ensure database table exists for plugin type
+ * Map plugin types to their standardized table names
+ * Tables are created by migrations, not by plugins
  */
-function ensureTable(db, tableName, pluginType) {
-  if (pluginType === 'time-entries') {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS ${tableName} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        start_time TEXT NOT NULL,
-        end_time TEXT,
-        duration_minutes INTEGER,
-        description TEXT,
-        topics TEXT,
-        source TEXT DEFAULT 'plugin',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(start_time, end_time, description)
-      )
-    `);
-  }
-  // Add other plugin types here as we implement them
+const TYPE_TO_TABLE = {
+  'time-logs': 'time_logs',
+  // Add other types as migrations are created:
+  // 'tasks': 'tasks',
+  // 'events': 'events',
+  // 'email': 'email',
+  // 'people': 'people',
+  // 'habits': 'habits',
+  // 'diary': 'diary',
+};
+
+/**
+ * Get the standardized table name for a plugin type
+ */
+function getTableNameForType(pluginType) {
+  return TYPE_TO_TABLE[pluginType] || null;
 }
 
 /**
- * Insert entries into database table
+ * Insert entries into the standardized type table
+ * @param {object} db - Database connection
+ * @param {string} tableName - Standardized table name
+ * @param {string} pluginType - Plugin type
+ * @param {Array} entries - Entries to insert
+ * @param {string} sourceId - Source identifier (e.g., "markdown-time-tracking/default")
+ * @returns {number} Number of entries inserted
  */
-function insertEntries(db, tableName, pluginType, entries) {
-  if (pluginType === 'time-entries') {
+function insertEntries(db, tableName, pluginType, entries, sourceId) {
+  if (pluginType === 'time-logs') {
+    // Clear existing entries for this source before inserting
+    db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+
     const insert = db.prepare(`
       INSERT OR REPLACE INTO ${tableName}
-      (start_time, end_time, duration_minutes, description, topics, source)
-      VALUES (?, ?, ?, ?, ?, 'plugin')
+      (id, source, start_time, end_time, duration_minutes, description)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const insertAll = db.transaction(() => {
       for (const entry of entries) {
+        // Generate ID from source + start_time for uniqueness
+        const id = entry.id || `${sourceId}:${entry.start_time}`;
         insert.run(
+          id,
+          sourceId,
           entry.start_time,
           entry.end_time || null,
           entry.duration_minutes || 0,
-          entry.description,
-          entry.topics || null
+          entry.description || null
         );
       }
     });
@@ -272,6 +292,7 @@ function insertEntries(db, tableName, pluginType, entries) {
     return entries.length;
   }
 
+  // Add other plugin types as migrations are created
   return 0;
 }
 
@@ -313,6 +334,25 @@ export async function getPluginDataForAI() {
         ? `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`
         : null;
 
+      // Build config values: plugin settings defaults, then user overrides
+      const settingsDefaults = {};
+      if (plugin.settings) {
+        for (const [key, def] of Object.entries(plugin.settings)) {
+          if (def.default !== undefined) {
+            settingsDefaults[key] = def.default;
+          }
+        }
+      }
+      const mergedConfig = { ...settingsDefaults, ...config };
+
+      // Interpolate {variable} placeholders in aiInstructions with config values
+      let aiInstructions = plugin.aiInstructions || null;
+      if (aiInstructions) {
+        aiInstructions = aiInstructions.replace(/\{(\w+)\}/g, (match, key) => {
+          return mergedConfig[key] !== undefined ? mergedConfig[key] : match;
+        });
+      }
+
       result.push({
         pluginName: plugin.name,
         displayName: plugin.displayName || plugin.name,
@@ -321,8 +361,8 @@ export async function getPluginDataForAI() {
         access: plugin.access,
         source: sourceName,
         tableName,
-        // Plugin's instructions for AI (from plugin.toml)
-        pluginAiInstructions: plugin.aiInstructions || null,
+        // Plugin's instructions for AI (from plugin.toml), with config values interpolated
+        pluginAiInstructions: aiInstructions,
         // User's custom instructions (from config.toml)
         userAiInstructions: config.ai_instructions || null,
         config: {
