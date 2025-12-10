@@ -24,93 +24,30 @@ describe('Database Migrations', () => {
     }
   });
 
-  test('should create database from scratch with all migrations', async () => {
-    const db = new Database(dbPath);
-    const manager = new MigrationManager(db);
-
-    const version = await manager.runMigrations();
-
-    // Should have applied all migrations
-    expect(version).toBeGreaterThanOrEqual(33);
-
-    db.close();
-  });
-
-  test('should create all required tables', async () => {
+  test('should create schema_version table', async () => {
     const db = new Database(dbPath);
     const manager = new MigrationManager(db);
     await manager.runMigrations();
 
-    // Get all tables
+    // schema_version table must exist
     const tables = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-    ).all().map(row => row.name);
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+    ).get();
 
-    // Core tables that must exist
-    const requiredTables = [
-      'markdown_tasks',
-      'time_entries',
-      'calendar_events',
-      'contacts',
-      'emails',
-      'diary',
-      'sync_log',
-      'schema_version'
-    ];
-
-    for (const table of requiredTables) {
-      expect(tables).toContain(table);
-    }
+    expect(tables).toBeDefined();
+    expect(tables.name).toBe('schema_version');
 
     db.close();
   });
 
-  test('markdown_tasks table should have correct schema', async () => {
+  test('should track schema version correctly', async () => {
     const db = new Database(dbPath);
     const manager = new MigrationManager(db);
     await manager.runMigrations();
 
-    const columns = db.prepare('PRAGMA table_info(markdown_tasks)').all();
-    const columnNames = columns.map(c => c.name);
-
-    expect(columnNames).toContain('id');
-    expect(columnNames).toContain('file_path');
-    expect(columnNames).toContain('line_number');
-    expect(columnNames).toContain('line_text');
-    expect(columnNames).toContain('created_at');
-    expect(columnNames).toContain('updated_at');
-
-    db.close();
-  });
-
-  test('time_entries table should have correct schema', async () => {
-    const db = new Database(dbPath);
-    const manager = new MigrationManager(db);
-    await manager.runMigrations();
-
-    const columns = db.prepare('PRAGMA table_info(time_entries)').all();
-    const columnNames = columns.map(c => c.name);
-
-    expect(columnNames).toContain('id');
-    expect(columnNames).toContain('start_time');
-    expect(columnNames).toContain('end_time');
-    expect(columnNames).toContain('description');
-    expect(columnNames).toContain('topics');
-    expect(columnNames).toContain('source');
-
-    db.close();
-  });
-
-  test('contacts table should have last_contacted column', async () => {
-    const db = new Database(dbPath);
-    const manager = new MigrationManager(db);
-    await manager.runMigrations();
-
-    const columns = db.prepare('PRAGMA table_info(contacts)').all();
-    const columnNames = columns.map(c => c.name);
-
-    expect(columnNames).toContain('last_contacted');
-    expect(columnNames).toContain('notes');
+    const version = manager.getCurrentVersion();
+    // With empty migrations array, version starts at 0
+    expect(version).toBe(0);
 
     db.close();
   });
@@ -119,25 +56,75 @@ describe('Database Migrations', () => {
     const db = new Database(dbPath);
     const manager = new MigrationManager(db);
 
-    const version1 = await manager.runMigrations();
-    const version2 = await manager.runMigrations();
+    await manager.runMigrations();
+    const version1 = manager.getCurrentVersion();
+
+    await manager.runMigrations();
+    const version2 = manager.getCurrentVersion();
 
     expect(version1).toBe(version2);
 
     db.close();
   });
 
-  test('legacy tasks table should not exist', async () => {
+  test('should apply migrations in order', async () => {
+    const db = new Database(dbPath);
+    const manager = new MigrationManager(db);
+
+    // Manually apply a test migration
+    await manager.applyMigration(1, 'Test migration', (db) => {
+      db.exec('CREATE TABLE test_table (id INTEGER PRIMARY KEY)');
+    });
+
+    const version = manager.getCurrentVersion();
+    expect(version).toBe(1);
+
+    // Verify the migration was recorded
+    const record = db.prepare('SELECT * FROM schema_version WHERE version = 1').get();
+    expect(record).toBeDefined();
+    expect(record.description).toBe('Test migration');
+
+    db.close();
+  });
+
+  test('should skip already-applied migrations', async () => {
+    const db = new Database(dbPath);
+    const manager = new MigrationManager(db);
+
+    // Apply migration 1
+    const applied1 = await manager.applyMigration(1, 'First migration', (db) => {
+      db.exec('CREATE TABLE first_table (id INTEGER PRIMARY KEY)');
+    });
+    expect(applied1).toBe(true);
+
+    // Try to apply migration 1 again - should be skipped
+    const applied2 = await manager.applyMigration(1, 'First migration', (db) => {
+      db.exec('CREATE TABLE first_table (id INTEGER PRIMARY KEY)');
+    });
+    expect(applied2).toBe(false);
+
+    db.close();
+  });
+
+  test('legacy tables should not exist in fresh database', async () => {
     const db = new Database(dbPath);
     const manager = new MigrationManager(db);
     await manager.runMigrations();
 
-    // The old 'tasks' table was dropped in migration 29
-    const tasksTable = db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'"
-    ).get();
+    // These legacy tables should NOT exist in a fresh database
+    const legacyTables = [
+      'todoist_sync_mapping',
+      'markdown_sync',
+      'ogm_github_issues',
+      'cache_metadata',
+    ];
 
-    expect(tasksTable).toBeUndefined();
+    for (const tableName of legacyTables) {
+      const table = db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+      ).get(tableName);
+      expect(table).toBeUndefined();
+    }
 
     db.close();
   });

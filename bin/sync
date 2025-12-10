@@ -21,6 +21,7 @@ import { execSync, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import { ensureHealthyDatabase } from '../src/db-health.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -571,6 +572,23 @@ function processSection(content, sectionRegex, sectionName, calloutType) {
 // Database - Local Only
 // ============================================================================
 // Database is now local-only SQLite with no cloud sync
+
+async function checkDatabaseHealth() {
+  const result = ensureHealthyDatabase({ verbose: false });
+
+  if (!result.success) {
+    printError('Database health check failed');
+    return false;
+  }
+
+  if (result.recreated) {
+    printInfo('Database was recreated - data will be populated from sync');
+  } else {
+    printInfo('Database is healthy');
+  }
+
+  return true;
+}
 
 async function cleanDatabaseTaskTitles() {
   printInfo('Database cleanup skipped (using Obsidian Tasks)');
@@ -1238,6 +1256,9 @@ async function main() {
 
   printInfo('Running all sync operations synchronously...');
 
+  // Database health check (must be first - other operations depend on it)
+  await runSyncStep('🔍 Database Health', checkDatabaseHealth, 'Database verified');
+
   // Critical path operations
   await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
   await runSyncStep('🗑️  Cleanup Conflicts', cleanupSyncConflicts, 'Sync conflicts cleaned');
@@ -1394,6 +1415,7 @@ switch (command) {
   case '--vault':
     // Check vault and process inbox
     (async () => {
+      await runSyncStep('🔍 Database Health', checkDatabaseHealth, 'Database verified');
       await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
 
       if (!process.env.SKIP_MARKDOWN_CLEAN) {
@@ -1409,6 +1431,7 @@ switch (command) {
     // Quick sync - only critical sources
     printInfo('Quick sync mode - vault and inbox');
     (async () => {
+      await checkDatabaseHealth();
       checkVaultExists();
       await cleanupSyncConflicts();
       await cleanMarkdownFiles();

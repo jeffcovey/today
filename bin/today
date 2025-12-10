@@ -26,6 +26,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // Import shared modules
 import { getTimezone, getConfig, getClaudeModel } from '../src/config.js';
 import { getPluginDataForAI } from '../src/plugin-loader.js';
+import { ensureHealthyDatabase } from '../src/db-health.js';
 import {
   getQuarter,
   getISOWeek,
@@ -403,75 +404,16 @@ function runSync(skipSync = false) {
 // ============================================================================
 
 function checkAndRecoverDatabase() {
-  const dbPath = '.data/today.db';
-  let dbMissing = !fs.existsSync(dbPath);
-  let tablesMissing = false;
+  console.log('🔍 Checking database health...');
+  const result = ensureHealthyDatabase({ verbose: true });
 
-  if (!dbMissing) {
-    try {
-      // Check for core tables used by the system (tasks table was replaced by markdown_tasks in migration 29)
-      const result = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('markdown_tasks', 'calendar_events', 'contacts')"`,
-        { encoding: 'utf8' }
-      );
-      if (parseInt(result.trim()) !== 3) {
-        tablesMissing = true;
-        console.log('⚠️  Database missing required tables');
-      }
-    } catch {
-      tablesMissing = true;
-    }
-  } else {
-    console.log(`⚠️  Database not found at ${dbPath}`);
-  }
-
-  if (dbMissing || tablesMissing) {
-    console.log('🔄 Database missing or incomplete - recovering...\n');
-    fs.mkdirSync('.data', { recursive: true });
-
-    if (dbMissing) {
-      console.log('🔨 Creating database and running migrations...');
-      try {
-        execSync('node src/migrations.js', { stdio: 'inherit' });
-        console.log('✅ Database created with schema');
-        console.log('ℹ️  Database is a local cache - data will be populated from external sources\n');
-      } catch (e) {
-        console.error(`❌ Failed to create database: ${e.message}`);
-        process.exit(1);
-      }
-    }
-  }
-
-  // Quick check that database has data
-  try {
-    const lastSync = execSync(
-      `sqlite3 "${dbPath}" "SELECT MAX(created_at) FROM sync_log"`,
-      { encoding: 'utf8' }
-    ).trim();
-
-    if (lastSync) {
-      console.log(`✅ Database ready (last sync: ${lastSync})\n`);
-    } else {
-      // Check markdown_tasks instead of legacy tasks table
-      const taskCount = execSync(
-        `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM markdown_tasks"`,
-        { encoding: 'utf8' }
-      ).trim();
-
-      if (parseInt(taskCount) > 0) {
-        console.log(`✅ Database ready (${taskCount} tasks found)\n`);
-      } else {
-        console.log('📝 Initializing sync log...');
-        execSync(
-          `sqlite3 "${dbPath}" "INSERT INTO sync_log (timestamp, sync_type, success, source_system, target_system, created_at) VALUES (datetime('now'), 'initial', 1, 'local', 'local', datetime('now'))"`,
-          { stdio: 'pipe' }
-        );
-        console.log('✅ Database ready (initialized)\n');
-      }
-    }
-  } catch (e) {
-    console.error(`❌ Database check failed: ${e.message}`);
+  if (!result.success) {
+    console.error('❌ Database check failed');
     process.exit(1);
+  }
+
+  if (result.recreated) {
+    console.log('ℹ️  Run bin/sync to populate data from external sources\n');
   }
 }
 
@@ -1152,6 +1094,9 @@ async function main() {
     checkSkeletonUpdates();
   }
 
+  // Always check database health first (except for help which returns early)
+  checkAndRecoverDatabase();
+
   // Handle init command
   if (command === 'init') {
     console.log('📅 Initializing review file hierarchy...');
@@ -1194,9 +1139,6 @@ async function main() {
   } else {
     console.log('⚠️  Skipping sync (--no-sync flag provided)');
   }
-
-  // Check and recover database if needed
-  checkAndRecoverDatabase();
 
   // Create review file from template if needed
   createReviewFromTemplate();
