@@ -103,10 +103,14 @@ for (const entry of rawEntries) {
     };
   }
 
+  // Day One escapes periods, brackets, etc. - unescape them
+  const cleanText = entry.text
+    .replace(/\\([.\[\](){}*+?^$|#!-])/g, '$1');
+
   entries.push({
     id: entry.uuid,
     date: entry.creationDate,
-    text: entry.text,
+    text: cleanText,
     metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
   });
 }
