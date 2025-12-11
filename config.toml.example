@@ -200,3 +200,10 @@
 # inbox_ids = ""  # Comma-separated inbox IDs, or empty for all
 # include_archived = false
 # limit = 100
+
+# [plugins.sentry-issues.default]
+# enabled = true
+# organization = "your-org-slug"
+# project = ""  # Optional: filter to specific project
+# query = "is:unresolved"
+# limit = 100

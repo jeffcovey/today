@@ -18,7 +18,7 @@ const PROJECT_ROOT = path.dirname(__dirname);
 // Open command - show open issues (default)
 async function cmdOpen(options = {}) {
   const db = getDatabase();
-  const limit = options.limit || 20;
+  const limitPerSource = options.limit || 10;
 
   // Validate source filter if provided
   if (options.source) {
@@ -27,47 +27,56 @@ async function cmdOpen(options = {}) {
       showSourceFilterError(options.source, 'issues', allSources);
       return;
     }
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
-    console.log('');
   }
 
-  // Build query with optional source filter
-  let query = `
-    SELECT id, title, state, opened_at, url, metadata, source
-    FROM issues
-    WHERE state = 'open'
-    ORDER BY opened_at DESC
-    LIMIT ?
-  `;
-  const params = [limit];
-
+  // Get all sources or filter to specified one
+  let sourceFilter = '';
   if (options.source) {
-    query = `
-      SELECT id, title, state, opened_at, url, metadata, source
-      FROM issues
-      WHERE state = 'open' AND source LIKE ?
-      ORDER BY opened_at DESC
-      LIMIT ?
-    `;
-    params.unshift(`%${options.source}%`);
+    sourceFilter = `AND source LIKE '%${options.source}%'`;
   }
 
-  const issues = db.prepare(query).all(...params);
+  // Get distinct sources
+  const sources = db.prepare(`
+    SELECT DISTINCT source FROM issues
+    WHERE state = 'open' ${sourceFilter}
+    ORDER BY source
+  `).all().map(r => r.source);
 
-  if (issues.length === 0) {
+  if (sources.length === 0) {
     console.log(chalk.blue('ℹ') + ' No open issues');
     return;
   }
 
-  console.log(chalk.cyan('Open Issues'));
-  console.log('');
+  let totalShown = 0;
 
-  for (const issue of issues) {
-    displayIssue(issue);
+  for (const source of sources) {
+    // Get issues for this source
+    const issues = db.prepare(`
+      SELECT id, title, state, opened_at, url, metadata, source
+      FROM issues
+      WHERE state = 'open' AND source = ?
+      ORDER BY opened_at DESC
+      LIMIT ?
+    `).all(source, limitPerSource);
+
+    // Get total count for this source
+    const totalCount = db.prepare(`
+      SELECT COUNT(*) as count FROM issues
+      WHERE state = 'open' AND source = ?
+    `).get(source).count;
+
+    // Display source header
+    console.log(chalk.cyan(`── ${source} `) + chalk.gray(`(${issues.length} of ${totalCount} open)`));
+    console.log('');
+
+    for (const issue of issues) {
+      displayIssue(issue);
+    }
+
+    totalShown += issues.length;
   }
 
-  console.log('');
-  console.log(chalk.cyan('Total:') + ` ${issues.length} open issues`);
+  console.log(chalk.cyan('Total:') + ` ${totalShown} issues shown`);
 }
 
 // Closed command - show recently closed issues
