@@ -262,17 +262,58 @@ const queries = {
   },
 
   journal: () => {
-    // Recent journal entries
+    // Recent journal entries (using new schema: date, text, metadata)
     const entries = db.prepare(`
       SELECT
-        DATE(creation_date) as date,
+        DATE(date) as entry_date,
         SUBSTR(text, 1, 200) as preview,
-        CASE WHEN starred = 1 THEN '⭐' ELSE '' END as starred
+        metadata
       FROM diary
-      WHERE datetime(creation_date) >= datetime('now', '-7 days')
-      ORDER BY creation_date DESC
+      WHERE datetime(date) >= datetime('now', '-7 days')
+      ORDER BY date DESC
     `).all();
-    entries.forEach(e => console.log(`${e.date}|${e.starred}${e.preview}`));
+    entries.forEach(e => {
+      let starred = '';
+      try {
+        const meta = e.metadata ? JSON.parse(e.metadata) : {};
+        if (meta.starred) starred = '⭐ ';
+      } catch {}
+      console.log(`${e.entry_date}|${starred}${e.preview}`);
+    });
+  },
+
+  'on-this-day': () => {
+    // Entries from this date in previous years
+    const now = new Date();
+    const monthDay = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const entries = db.prepare(`
+      SELECT
+        DATE(date) as entry_date,
+        SUBSTR(text, 1, 300) as preview,
+        metadata
+      FROM diary
+      WHERE substr(date, 6, 5) = ?
+      ORDER BY date DESC
+    `).all(monthDay);
+
+    if (entries.length === 0) {
+      console.log(`No entries found for this day (${monthDay}) in previous years`);
+      return;
+    }
+
+    console.log(`=== ON THIS DAY (${monthDay}) ===`);
+    entries.forEach(e => {
+      let location = '';
+      try {
+        const meta = e.metadata ? JSON.parse(e.metadata) : {};
+        if (meta.location?.localityName) location = ` [${meta.location.localityName}]`;
+      } catch {}
+      console.log(`${e.entry_date}${location}|${e.preview}`);
+    });
+    console.log('---');
+    const years = new Set(entries.map(e => e.entry_date.substring(0, 4)));
+    console.log(`${entries.length} entries across ${years.size} years`);
   },
 
   schema: () => {
@@ -307,7 +348,7 @@ if (handler) {
   handler();
 } else {
   console.error(`Unknown command: ${command}`);
-  console.error('Available commands: daily, tasks, events, emails, contacts, ogm, journal, schema, custom');
+  console.error('Available commands: daily, tasks, events, emails, contacts, ogm, journal, on-this-day, schema, custom');
   process.exit(1);
 }
 

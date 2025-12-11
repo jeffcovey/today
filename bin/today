@@ -589,8 +589,10 @@ async function updateReviewFile(dryRun = false) {
 }
 
 async function updateSingleFile(reviewFile, isTomorrow, dryRun, apiKey) {
-  // Get current database data
-  let dailyData;
+  // Gather data from specialized CLIs
+  let dailyData = '';
+
+  // Get tasks data (still uses db-query for comprehensive task view)
   try {
     dailyData = execSync('bin/db-query daily', { encoding: 'utf8' });
   } catch (e) {
@@ -598,12 +600,32 @@ async function updateSingleFile(reviewFile, isTomorrow, dryRun, apiKey) {
     process.exit(1);
   }
 
-  // Get detailed time tracking data
+  // Get time tracking data
   try {
     const timeTracking = execSync('bin/track today', { encoding: 'utf8' });
-    dailyData += '\n\n=== DETAILED TIME TRACKING ===\n' + timeTracking;
+    dailyData += '\n\n=== TIME TRACKING ===\n' + timeTracking;
   } catch {
-    // Continue without time tracking details
+    // Continue without time tracking
+  }
+
+  // Get today's diary entries
+  try {
+    const diaryToday = execSync('bin/diary today 2>/dev/null', { encoding: 'utf8' });
+    if (diaryToday && !diaryToday.includes('No diary entries')) {
+      dailyData += '\n\n=== TODAY\'S DIARY ===\n' + diaryToday;
+    }
+  } catch {
+    // Continue without diary
+  }
+
+  // Get on-this-day diary entries for historical context
+  try {
+    const onThisDay = execSync('bin/diary on-this-day 2>/dev/null', { encoding: 'utf8' });
+    if (onThisDay && !onThisDay.includes('No entries')) {
+      dailyData += '\n\n=== ON THIS DAY (Historical) ===\n' + onThisDay;
+    }
+  } catch {
+    // Continue without on-this-day entries
   }
 
   // Get changed vault files
@@ -881,6 +903,28 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   const changedFiles = getChangedVaultFiles();
   const pluginContext = await getPluginContext();
 
+  // Get diary entries from the last week
+  let diaryContext = '';
+  try {
+    const diaryWeek = execSync('bin/diary week 2>/dev/null', { encoding: 'utf8' });
+    if (diaryWeek && !diaryWeek.includes('No diary entries')) {
+      diaryContext = '\n## Recent Diary Entries (Last 7 Days)\n' + diaryWeek;
+    }
+  } catch {
+    // Continue without recent diary
+  }
+
+  // Get on-this-day diary entries for historical context
+  let onThisDayContext = '';
+  try {
+    const onThisDay = execSync('bin/diary on-this-day 2>/dev/null', { encoding: 'utf8' });
+    if (onThisDay && !onThisDay.includes('No entries')) {
+      onThisDayContext = '\n## Historical Context (On This Day)\n' + onThisDay;
+    }
+  } catch {
+    // Continue without on-this-day entries
+  }
+
   // Read TODAY.md for context
   let todayContext = '';
   if (fs.existsSync('TODAY.md')) {
@@ -905,22 +949,45 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
 ${existingPlans}
 ${changedFiles}
 
-## Database Tables Available:
-- markdown_tasks: Current tasks stored directly from markdown files
-- emails: Recent emails with subjects, senders, reply status
-- calendar_events: Upcoming events with times, locations
-- contacts: Contact information
-- file_tracking: Recently modified files
-- people_to_contact: People needing follow-up
-- diary: Day One journal entries with text, dates, locations
+## Data Access CLIs
+Use these specialized commands to query and manage data:
 
-## Available Commands
-- bin/db-query daily - Get comprehensive daily review data
-- bin/db-query tasks - Get priority tasks
+### Time Tracking (bin/track)
+- bin/track today - Show today's time entries
+- bin/track week - Show this week's entries
+- bin/track start "description #topic/tag" - Start a timer
+- bin/track stop - Stop current timer
+- bin/track status - Show running timer
+
+### Diary (bin/diary)
+- bin/diary today - Show today's journal entries
+- bin/diary week - Show this week's entries
+- bin/diary search "term" - Search diary content
+- bin/diary on-this-day - Entries from this date in previous years
+- bin/diary stats - Entry statistics
+
+### Calendar (bin/calendar)
+- bin/calendar today - Show today's events
+- bin/calendar week - Show this week's events
+- bin/calendar add --title "Event" --date "YYYY-MM-DD" "HH:MM" "HH:MM" - Add event
+- bin/calendar add --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" - Time blocking calendar
+
+### Email (bin/email)
+- bin/email list - Show recent emails
+- bin/email stats - Email statistics
+
+### Tasks
 - bin/mark-done 'task' - Mark a task as complete
 - bin/progress 'note' - Add a progress note
-- bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "e1jdfoki06hfrg8kh55mn9kvvs@group.calendar.google.com" - Create time blocking events
+
+### Advanced Database Queries
+For complex queries beyond what the CLIs provide, use bin/db-query custom "SQL":
+- Database: .data/today.db (SQLite)
+- Schema reference: src/plugin-schemas.js defines table structures for plugin data types
+- Tables: time_logs, diary, calendar_events, emails, contacts, markdown_tasks
 ${pluginContext}
+${diaryContext}
+${onThisDayContext}
 ${todayContext}`;
 
   let prompt;
