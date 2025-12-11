@@ -115,7 +115,6 @@ describe('Database Migrations', () => {
     const legacyTables = [
       'todoist_sync_mapping',
       'markdown_sync',
-      'ogm_github_issues',
       'cache_metadata',
     ];
 

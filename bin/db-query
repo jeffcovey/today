@@ -237,28 +237,28 @@ const queries = {
     contacts.forEach(c => console.log(`${c.full_name}|${c.organization || ''}|${c.notes || ''}`));
   },
 
-  ogm: () => {
-    // OGM monitoring data
-    console.log('=== OGM ERRORS ===');
-    const sentryIssues = db.prepare(`
-      SELECT title, count, last_seen
-      FROM ogm_sentry_issues
-      WHERE status = 'unresolved' AND count > 100
+  issues: () => {
+    // Issues from all sources (GitHub, Sentry, Front, etc.)
+    console.log('=== OPEN ISSUES BY SOURCE ===');
+    const sources = db.prepare(`
+      SELECT source, COUNT(*) as count
+      FROM issues
+      WHERE state = 'open'
+      GROUP BY source
       ORDER BY count DESC
-      LIMIT 10
     `).all();
-    sentryIssues.forEach(i => console.log(`${i.title}|${i.count}|${i.last_seen}`));
+    sources.forEach(s => console.log(`${s.source}: ${s.count} open`));
     console.log('---');
 
-    console.log('=== OGM GITHUB ISSUES ===');
-    const githubIssues = db.prepare(`
-      SELECT title, state, created_at
-      FROM ogm_github_issues
+    console.log('=== RECENT OPEN ISSUES ===');
+    const issues = db.prepare(`
+      SELECT title, state, opened_at, source
+      FROM issues
       WHERE state = 'open'
-      ORDER BY created_at DESC
+      ORDER BY opened_at DESC
       LIMIT 10
     `).all();
-    githubIssues.forEach(i => console.log(`${i.title}|${i.state}|${i.created_at}`));
+    issues.forEach(i => console.log(`${i.title}|${i.state}|${i.opened_at}|${i.source}`));
   },
 
   journal: () => {
@@ -348,7 +348,7 @@ if (handler) {
   handler();
 } else {
   console.error(`Unknown command: ${command}`);
-  console.error('Available commands: daily, tasks, events, emails, contacts, ogm, journal, on-this-day, schema, custom');
+  console.error('Available commands: daily, tasks, events, emails, contacts, issues, journal, on-this-day, schema, custom');
   process.exit(1);
 }
 

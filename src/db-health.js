@@ -22,8 +22,6 @@ const BACKUP_PATH = '.data/today.db.backup';
 const LEGACY_TABLES = [
   'todoist_sync_mapping',
   'markdown_sync',
-  'ogm_github_issues',
-  'ogm_sentry_issues',
   'cache_metadata',
   'database_cache',
 ];

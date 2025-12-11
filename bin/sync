@@ -1087,18 +1087,6 @@ async function syncPlugins() {
   }
 }
 
-function syncOgmMonitoring() {
-  printInfo('Syncing OGM monitoring...');
-
-  try {
-    execSync('bin/ogm-sync', { stdio: 'pipe', timeout: 60000 });
-    printInfo('OGM data synced');
-    return true;
-  } catch (error) {
-    printError(`OGM monitoring sync failed: ${error.message}`);
-    return false;
-  }
-}
 
 // ============================================================================
 // Main Sync Orchestration
@@ -1181,11 +1169,6 @@ async function main() {
   await runSyncStep('👥 Contacts Sync', syncContacts, 'Contacts synced');
 
   // Diary sync is now handled by the dayone-diary plugin (synced above with other plugins)
-
-  // OGM monitoring (if configured)
-  if (fs.existsSync('.env') && (fs.readFileSync('.env', 'utf8').includes('GITHUB_ACCESS_TOKEN=') || fs.readFileSync('.env', 'utf8').includes('SENTRY_AUTH_TOKEN='))) {
-    await runSyncStep('🌐 OGM Monitoring', syncOgmMonitoring, 'OGM data synced');
-  }
 
   printStatus('All sync operations completed!');
   console.log('');
