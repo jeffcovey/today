@@ -204,7 +204,7 @@ async function cmdStatus() {
   }
 }
 
-async function cmdSync(pluginName, sourceName) {
+async function cmdSync(pluginName, sourceName, options = {}) {
   // Ensure database is healthy and migrations are run
   const healthResult = await ensureHealthyDatabase({ verbose: false });
   if (!healthResult.success) {
@@ -216,6 +216,9 @@ async function cmdSync(pluginName, sourceName) {
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
   const context = { db, vaultPath };
+
+  // Get type filter from options
+  const typeFilter = options.type || options.t;
 
   if (pluginName) {
     // Sync specific plugin
@@ -262,18 +265,29 @@ async function cmdSync(pluginName, sourceName) {
       }
     }
   } else {
-    // Sync all enabled plugins
+    // Sync all enabled plugins (optionally filtered by type)
     const enabledPlugins = await getEnabledPlugins();
 
     // Filter to plugins that have sync commands
-    const syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.sync);
+    let syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.sync);
+
+    // Apply type filter if specified
+    if (typeFilter) {
+      syncablePlugins = syncablePlugins.filter(({ plugin }) => plugin.type === typeFilter);
+
+      if (syncablePlugins.length === 0) {
+        console.log(chalk.yellow(`No plugins of type '${typeFilter}' to sync.`));
+        return;
+      }
+    }
 
     if (syncablePlugins.length === 0) {
       console.log(chalk.yellow('No plugins to sync.'));
       return;
     }
 
-    console.log(chalk.cyan('Syncing all plugins...'));
+    const typeMsg = typeFilter ? ` (type: ${typeFilter})` : '';
+    console.log(chalk.cyan(`Syncing plugins${typeMsg}...`));
     console.log('');
 
     for (const { plugin, sources } of syncablePlugins) {
@@ -800,6 +814,7 @@ Commands:
   status                    Show enabled plugins and their sources
   configure [plugin]        Interactive plugin configuration
   sync [plugin] [source]    Sync plugin data (all if no plugin specified)
+    --type <type>           Only sync plugins of a specific type (e.g., time-logs)
 
 Examples:
   plugins list
@@ -808,6 +823,7 @@ Examples:
   plugins configure
   plugins configure markdown-time-tracking
   plugins sync
+  plugins sync --type time-logs
   plugins sync markdown-time-tracking
   plugins sync markdown-time-tracking local
 
@@ -820,10 +836,48 @@ Configuration:
 `);
 }
 
+// Parse arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const result = {
+    command: null,
+    positional: [],
+    options: {}
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      // Check if next arg is the value (not another flag)
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        result.options[key] = args[i + 1];
+        i++;
+      } else {
+        result.options[key] = true;
+      }
+    } else if (arg.startsWith('-') && arg.length === 2) {
+      const key = arg.slice(1);
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        result.options[key] = args[i + 1];
+        i++;
+      } else {
+        result.options[key] = true;
+      }
+    } else if (!result.command) {
+      result.command = arg;
+    } else {
+      result.positional.push(arg);
+    }
+  }
+
+  return result;
+}
+
 // Main
-const command = process.argv[2];
-const arg1 = process.argv[3];
-const arg2 = process.argv[4];
+const { command, positional, options } = parseArgs();
+const arg1 = positional[0];
+const arg2 = positional[1];
 
 // Ensure config.toml has entries for all plugins
 await ensurePluginConfig();
@@ -843,7 +897,7 @@ try {
       await cmdConfigure(arg1);
       break;
     case 'sync':
-      await cmdSync(arg1, arg2);
+      await cmdSync(arg1, arg2, options);
       break;
     case '--help':
     case '-h':

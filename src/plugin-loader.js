@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig } from './config.js';
 import { validateEntries } from './plugin-schemas.js';
+import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -131,9 +132,10 @@ export function isPluginConfigured(pluginName) {
  * @param {object} plugin - Plugin metadata from plugin.toml
  * @param {string} command - Command name (e.g., 'sync')
  * @param {object} sourceConfig - Source configuration from config.toml
+ * @param {object} extraEnv - Additional environment variables
  * @returns {{success: boolean, data?: any, error?: string}}
  */
-function runPluginCommand(plugin, command, sourceConfig) {
+function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
     return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
@@ -151,7 +153,8 @@ function runPluginCommand(plugin, command, sourceConfig) {
       env: {
         ...process.env,
         PROJECT_ROOT,
-        PLUGIN_CONFIG: JSON.stringify(sourceConfig)
+        PLUGIN_CONFIG: JSON.stringify(sourceConfig),
+        ...extraEnv
       },
       maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
     });
@@ -162,6 +165,28 @@ function runPluginCommand(plugin, command, sourceConfig) {
     const message = error.stderr || error.message;
     return { success: false, error: message };
   }
+}
+
+/**
+ * Get last sync metadata for a source
+ */
+function getSyncMetadata(db, sourceId) {
+  try {
+    return db.prepare('SELECT * FROM sync_metadata WHERE source = ?').get(sourceId);
+  } catch {
+    // Table might not exist yet
+    return null;
+  }
+}
+
+/**
+ * Update sync metadata after a successful sync
+ */
+function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount) {
+  db.prepare(`
+    INSERT OR REPLACE INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count)
+    VALUES (?, datetime('now'), ?, ?)
+  `).run(sourceId, JSON.stringify(filesProcessed), entriesCount);
 }
 
 /**
@@ -177,8 +202,15 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   // Source identifier for the `source` column (e.g., "markdown-time-tracking/default")
   const sourceId = `${plugin.name}/${sourceName}`;
 
-  // Run the sync command
-  const result = runPluginCommand(plugin, 'sync', sourceConfig);
+  // Get last sync time to enable incremental sync
+  const syncMeta = getSyncMetadata(db, sourceId);
+  const lastSyncTime = syncMeta?.last_synced_at || null;
+
+  // Run the sync command with last sync time and source ID
+  const result = runPluginCommand(plugin, 'sync', sourceConfig, {
+    LAST_SYNC_TIME: lastSyncTime || '',
+    SOURCE_ID: sourceId
+  });
 
   if (!result.success) {
     return {
@@ -188,12 +220,33 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     };
   }
 
-  const entries = result.data;
-  if (!Array.isArray(entries)) {
+  // Plugin can return either:
+  // - Array of entries (legacy full sync)
+  // - Object with { entries: [], files_processed: [], incremental: true }
+  let entries;
+  let filesProcessed = null;
+  let isIncremental = false;
+
+  if (Array.isArray(result.data)) {
+    entries = result.data;
+  } else if (result.data && Array.isArray(result.data.entries)) {
+    entries = result.data.entries;
+    filesProcessed = result.data.files_processed || null;
+    isIncremental = result.data.incremental === true;
+  } else {
     return {
       success: false,
       count: 0,
-      message: `Plugin ${plugin.name} sync did not return an array`
+      message: `Plugin ${plugin.name} sync did not return valid data`
+    };
+  }
+
+  // If no entries and incremental, nothing changed
+  if (entries.length === 0 && isIncremental) {
+    return {
+      success: true,
+      count: 0,
+      message: `No changes since last sync`
     };
   }
 
@@ -222,12 +275,56 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   }
 
   // Insert entries with source identifier
-  const count = insertEntries(db, tableName, plugin.type, entries, sourceId);
+  const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
 
+  // Update sync metadata
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count);
+
+  // Run auto-tagger if enabled (never fails the sync)
+  let taggingResult = null;
+  const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
+  if (sourceConfig.auto_add_topics && taggableField && plugin.access === 'read-write') {
+    try {
+      const updater = createFileBasedUpdater(PROJECT_ROOT);
+      taggingResult = await runAutoTagger({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName,
+        taggableField,
+        updateEntry: (id, newValue) => updater.update(id, newValue)
+      });
+
+      // Flush any file changes
+      updater.flush();
+
+      // If we tagged entries, sync again to update database
+      if (taggingResult.tagged > 0) {
+        const resyncResult = runPluginCommand(plugin, 'sync', sourceConfig, {
+          LAST_SYNC_TIME: '', // Force full re-read of modified files
+          SOURCE_ID: sourceId
+        });
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to tagging
+      console.warn(`Warning: Auto-tagging failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  const incrementalMsg = isIncremental ? ' (incremental)' : '';
+  const taggingMsg = taggingResult?.tagged ? `, tagged ${taggingResult.tagged}` : '';
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${taggingMsg}`
   };
 }
 
@@ -260,12 +357,24 @@ function getTableNameForType(pluginType) {
  * @param {string} pluginType - Plugin type
  * @param {Array} entries - Entries to insert
  * @param {string} sourceId - Source identifier (e.g., "markdown-time-tracking/default")
+ * @param {Array|null} filesProcessed - List of files that were processed (for incremental sync)
  * @returns {number} Number of entries inserted
  */
-function insertEntries(db, tableName, pluginType, entries, sourceId) {
+function insertEntries(db, tableName, pluginType, entries, sourceId, filesProcessed) {
   if (pluginType === 'time-logs') {
-    // Clear existing entries for this source before inserting
-    db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+    // For incremental sync, only delete entries from the specific files that were re-processed
+    // For full sync (filesProcessed is null), delete all entries for this source
+    if (filesProcessed && filesProcessed.length > 0) {
+      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
+      for (const file of filesProcessed) {
+        // IDs are in format: sourceId:filepath:start_time
+        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
+      }
+    } else if (!filesProcessed) {
+      // Full sync: delete all entries for this source
+      db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+    }
+    // If filesProcessed is empty array, nothing to delete (no files changed)
 
     const insert = db.prepare(`
       INSERT OR REPLACE INTO ${tableName}
@@ -275,8 +384,12 @@ function insertEntries(db, tableName, pluginType, entries, sourceId) {
 
     const insertAll = db.transaction(() => {
       for (const entry of entries) {
-        // Generate ID from source + start_time for uniqueness
-        const id = entry.id || `${sourceId}:${entry.start_time}`;
+        // Generate ID from source + entry.id (which may include filepath) + start_time
+        // This allows incremental deletes by file
+        // Format: sourceId:filepath:start_time or sourceId:start_time (legacy)
+        const id = entry.id
+          ? `${sourceId}:${entry.id}`
+          : `${sourceId}:${entry.start_time}`;
         insert.run(
           id,
           sourceId,
@@ -404,4 +517,158 @@ export async function getAllPluginAiInstructions() {
   }
 
   return result;
+}
+
+/**
+ * Get enabled sources for a plugin type, optionally filtered by a search pattern
+ * Returns sources matching the filter, or all sources if no filter provided
+ * @param {string} pluginType - Plugin type (e.g., 'time-logs')
+ * @param {string|null} sourceFilter - Optional filter pattern (matches against source IDs)
+ * @returns {Promise<{sources: Array<{sourceId: string, plugin: object, sourceName: string, config: object}>, allSources: Array<{sourceId: string, enabled: boolean}>}>}
+ */
+export async function getSourcesForType(pluginType, sourceFilter = null) {
+  const plugins = await discoverPlugins();
+  const allSources = [];
+  const matchingSources = [];
+
+  for (const [name, plugin] of plugins) {
+    if (plugin.type !== pluginType) continue;
+
+    const sources = getPluginSources(name);
+
+    // Track all sources for this type (enabled and disabled info)
+    if (sources.length > 0) {
+      for (const { sourceName, config } of sources) {
+        const sourceId = `${name}/${sourceName}`;
+        allSources.push({ sourceId, enabled: true, pluginName: name });
+
+        // Check if it matches the filter
+        if (!sourceFilter || sourceId.includes(sourceFilter)) {
+          matchingSources.push({ sourceId, plugin, sourceName, config });
+        }
+      }
+    } else {
+      // Plugin exists but has no enabled sources
+      allSources.push({ sourceId: name, enabled: false, pluginName: name });
+    }
+  }
+
+  return { sources: matchingSources, allSources };
+}
+
+/**
+ * Write an entry using a plugin's write command
+ * @param {string} pluginName - Plugin name (e.g., 'markdown-time-tracking')
+ * @param {string} sourceName - Source name (e.g., 'local')
+ * @param {object} entry - Entry data to write
+ * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+ */
+export async function writePluginEntry(pluginName, sourceName, entry) {
+  const plugin = await getPlugin(pluginName);
+  if (!plugin) {
+    return { success: false, error: `Plugin not found: ${pluginName}` };
+  }
+
+  if (!plugin.commands?.write) {
+    return { success: false, error: `Plugin ${pluginName} does not support writing` };
+  }
+
+  const sources = getPluginSources(pluginName);
+  const source = sources.find(s => s.sourceName === sourceName);
+  if (!source) {
+    return { success: false, error: `Source not found: ${pluginName}/${sourceName}` };
+  }
+
+  return runPluginCommand(plugin, 'write', source.config, {
+    ENTRY_JSON: JSON.stringify(entry)
+  });
+}
+
+/**
+ * Get writable sources for a plugin type, with validation
+ * Returns the target source to write to, handling single vs multiple source cases
+ * @param {string} pluginType - Plugin type (e.g., 'time-logs')
+ * @param {string|null} sourceFilter - Optional source filter from --source option
+ * @returns {Promise<{success: boolean, source?: object, error?: string, availableSources?: Array}>}
+ */
+export async function getWritableSource(pluginType, sourceFilter = null) {
+  const { sources, allSources } = await getSourcesForType(pluginType);
+
+  // Filter to sources that support writing
+  const writableSources = sources.filter(s => s.plugin.commands?.write);
+
+  if (writableSources.length === 0) {
+    return {
+      success: false,
+      error: `No ${pluginType} plugins with write support are enabled`,
+      availableSources: allSources
+    };
+  }
+
+  // If source filter provided, find matching source
+  if (sourceFilter) {
+    const matching = writableSources.filter(s => s.sourceId.includes(sourceFilter));
+    if (matching.length === 0) {
+      return {
+        success: false,
+        error: `No writable source matching "${sourceFilter}"`,
+        availableSources: writableSources.map(s => ({ sourceId: s.sourceId, enabled: true }))
+      };
+    }
+    if (matching.length > 1) {
+      return {
+        success: false,
+        error: `Multiple sources match "${sourceFilter}". Be more specific.`,
+        availableSources: matching.map(s => ({ sourceId: s.sourceId, enabled: true }))
+      };
+    }
+    return { success: true, source: matching[0] };
+  }
+
+  // No filter provided - require it if multiple writable sources
+  if (writableSources.length > 1) {
+    return {
+      success: false,
+      error: `Multiple ${pluginType} sources available. Use --source to specify which one.`,
+      availableSources: writableSources.map(s => ({ sourceId: s.sourceId, enabled: true }))
+    };
+  }
+
+  // Single writable source - use it
+  return { success: true, source: writableSources[0] };
+}
+
+/**
+ * Write an entry and sync the database
+ * Handles source selection, writing via plugin, and syncing
+ * @param {string} pluginType - Plugin type (e.g., 'time-logs')
+ * @param {object} entry - Entry data to write
+ * @param {object} options - { sourceFilter, db, vaultPath, onSync }
+ * @returns {Promise<{success: boolean, error?: string, availableSources?: Array}>}
+ */
+export async function writeEntryAndSync(pluginType, entry, options = {}) {
+  const { sourceFilter, db, vaultPath, onSync } = options;
+
+  // Get target source
+  const sourceResult = await getWritableSource(pluginType, sourceFilter);
+  if (!sourceResult.success) {
+    return sourceResult;
+  }
+
+  const { source } = sourceResult;
+
+  // Write via plugin
+  const writeResult = await writePluginEntry(source.plugin.name, source.sourceName, entry);
+  if (!writeResult.success) {
+    return { success: false, error: writeResult.error };
+  }
+
+  // Sync if db context provided
+  if (db) {
+    if (onSync) onSync();
+    const context = { db, vaultPath };
+    await syncPluginSource(source.plugin, source.sourceName, source.config, context);
+  }
+
+  return { success: true, source };
 }

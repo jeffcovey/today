@@ -164,7 +164,22 @@ export async function ensureHealthyDatabase(options = {}) {
   const health = checkDatabaseHealth();
 
   if (health.healthy && !forceRecreate) {
-    log(`✅ Database healthy (schema version ${health.version})`);
+    // Database is healthy, but check if there are new migrations to apply
+    try {
+      const db = new Database(DB_PATH);
+      const migrationManager = new MigrationManager(db, { verbose });
+      const startVersion = migrationManager.getCurrentVersion();
+      await migrationManager.runMigrations();
+      const endVersion = migrationManager.getCurrentVersion();
+      db.close();
+
+      if (endVersion > startVersion) {
+        log(`✅ Database migrated from version ${startVersion} to ${endVersion}`);
+      }
+    } catch (migrationError) {
+      error(`Migration failed: ${migrationError.message}`);
+      return { success: false, recreated: false, message: `Migration failed: ${migrationError.message}` };
+    }
     return { success: true, recreated: false, message: 'Database is healthy' };
   }
 

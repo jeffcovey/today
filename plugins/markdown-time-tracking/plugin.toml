@@ -34,7 +34,10 @@ Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #t
 
 [commands]
 sync = "./sync.js"
+write = "./write.js"
 
 [settings]
 days_to_sync = { type = "number", default = 365 }
 directory = { type = "string", default = "vault/logs/time-tracking" }
+auto_add_topics = { type = "boolean", default = false, description = "Automatically add topic tags using AI after syncing" }
+taggable_field = { type = "string", default = "description", description = "Database field to add topic tags to" }

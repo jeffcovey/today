@@ -4,11 +4,31 @@
 import { schemas, getSqlColumns, getTableName, getIndexes } from './plugin-schemas.js';
 
 /**
+ * System migrations (not tied to plugin types)
+ */
+const systemMigrations = [
+  {
+    version: 100,  // Use high numbers for system tables to avoid conflicts
+    description: 'Create sync_metadata table for tracking plugin sync state',
+    fn: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sync_metadata (
+          source TEXT PRIMARY KEY,
+          last_synced_at DATETIME,
+          last_sync_files TEXT,
+          entries_count INTEGER DEFAULT 0
+        )
+      `);
+    }
+  }
+];
+
+/**
  * Build migrations from plugin type schemas
  * Each schema becomes a numbered migration in order of definition
  */
 function buildMigrations() {
-  return Object.keys(schemas).map((type, index) => {
+  const pluginMigrations = Object.keys(schemas).map((type, index) => {
     const table = getTableName(type);
     const columns = getSqlColumns(type);
     const indexes = getIndexes(type);
@@ -26,11 +46,15 @@ function buildMigrations() {
       }
     };
   });
+
+  // Combine plugin and system migrations, sorted by version
+  return [...pluginMigrations, ...systemMigrations].sort((a, b) => a.version - b.version);
 }
 
 export class MigrationManager {
-  constructor(db) {
+  constructor(db, options = {}) {
     this.db = db;
+    this.verbose = options.verbose ?? true;
     this.initMigrationTable();
   }
 
@@ -54,11 +78,12 @@ export class MigrationManager {
     const currentVersion = this.getCurrentVersion();
 
     if (version <= currentVersion) {
-      console.log(`  Migration ${version} already applied: ${description}`);
       return false;
     }
 
-    console.log(`  Applying migration ${version}: ${description}`);
+    if (this.verbose) {
+      console.log(`  Applying migration ${version}: ${description}`);
+    }
 
     try {
       // Run migration in a transaction
@@ -70,7 +95,9 @@ export class MigrationManager {
           .run(version, description);
       })();
 
-      console.log(`  Migration ${version} applied successfully`);
+      if (this.verbose) {
+        console.log(`  Migration ${version} applied successfully`);
+      }
       return true;
     } catch (error) {
       console.error(`  Migration ${version} failed:`, error.message);
@@ -79,7 +106,6 @@ export class MigrationManager {
   }
 
   async runMigrations() {
-    console.log('Running database migrations...');
     const startVersion = this.getCurrentVersion();
 
     // Build migrations from plugin type schemas
@@ -91,10 +117,8 @@ export class MigrationManager {
     }
 
     const endVersion = this.getCurrentVersion();
-    if (endVersion > startVersion) {
+    if (endVersion > startVersion && this.verbose) {
       console.log(`Database migrated from version ${startVersion} to ${endVersion}`);
-    } else {
-      console.log(`Database at version ${endVersion} (no migrations needed)`);
     }
   }
 }

@@ -129,6 +129,24 @@
 # ]
 
 # =============================================================================
+# Tags / Topics (Optional)
+# =============================================================================
+# Define your preferred topic tags for categorizing entries.
+# These are used by plugins with auto_add_topics enabled.
+# Tags discovered in existing data are also used, so this list is additive.
+
+[tags]
+# topics = [
+#   "programming",
+#   "meetings",
+#   "email",
+#   "reading",
+#   "exercise",
+#   "personal_admin",
+#   "learning",
+# ]
+
+# =============================================================================
 # Plugins
 # =============================================================================
 # Each plugin source is configured under [plugins.<plugin-name>.<source-name>]

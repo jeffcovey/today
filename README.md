@@ -97,6 +97,10 @@ friday = "off"       # Personal: nature, friends, hobbies
 saturday = "off"
 sunday = "back"
 
+# Topic tags for auto-categorization (used by plugins with auto_add_topics)
+[tags]
+topics = ["programming", "meetings", "email", "reading", "exercise"]
+
 [ai]
 claude_model = "claude-sonnet-4-20250514"
 ```

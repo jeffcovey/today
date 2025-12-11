@@ -1,22 +1,15 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
-import { getPluginSources, discoverPlugins } from '../src/plugin-loader.js';
+import { getDatabase } from '../src/database-service.js';
+import { getSourcesForType, getWritableSource, writeEntryAndSync } from '../src/plugin-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
-const TIME_DIR = path.join(PROJECT_ROOT, 'vault/logs/time-tracking');
-const STATE_FILE = path.join(TIME_DIR, 'current-timer.md');
-
-// Ensure time tracking directory exists
-if (!fs.existsSync(TIME_DIR)) {
-  fs.mkdirSync(TIME_DIR, { recursive: true });
-}
 
 // Get timezone from config
 function getTimezone() {
@@ -36,12 +29,6 @@ function getCurrentTime() {
   const timestamp = execSync(cmd, { encoding: 'utf8' }).trim();
   // Add colon in timezone offset (e.g., -0400 -> -04:00)
   return timestamp.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-}
-
-// Get current month file path
-function getMonthFile() {
-  const yearMonth = execSync(`TZ="${TIMEZONE}" date '+%Y-%m'`, { encoding: 'utf8' }).trim();
-  return path.join(TIME_DIR, `${yearMonth}.md`);
 }
 
 // Format duration in seconds to human readable
@@ -98,9 +85,9 @@ function parseDuration(input) {
 }
 
 // Start tracking
-async function cmdStart(description) {
+async function cmdStart(description, options = {}) {
   if (!description) {
-    console.error(chalk.red('✗') + ' Usage: track start "Description with #topic/tags"');
+    console.error(chalk.red('✗') + ' Usage: track start "Description with #topic/tags" [--source SOURCE]');
     console.log('');
     console.log('Examples:');
     console.log('  track start "Deep work session #topic/programming"');
@@ -109,77 +96,171 @@ async function cmdStart(description) {
     process.exit(1);
   }
 
-  // Check for running timer
-  if (fs.existsSync(STATE_FILE)) {
-    const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
-    if (content) {
-      const lines = content.split('\n');
-      const oldDescription = lines[0];
-      const oldStart = lines[1];
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
-      const currentTime = getCurrentTime();
-      const duration = calculateDuration(oldStart, currentTime);
-      const durationFormatted = formatDuration(duration * 60);
+  // Get target source
+  const sourceResult = await getWritableSource('time-logs', options.source);
+  if (!sourceResult.success) {
+    showSourceError(sourceResult.error, sourceResult.availableSources);
+    process.exit(1);
+  }
+  const { source } = sourceResult;
 
-      console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${oldDescription} (${durationFormatted})`);
-      await stopTimer(oldStart, oldDescription, currentTime);
+  // Check for running timer on this source
+  const runningTimer = db.prepare(`
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL AND source = ?
+    ORDER BY start_time DESC
+    LIMIT 1
+  `).get(source.sourceId);
+
+  if (runningTimer) {
+    const currentTime = getCurrentTime();
+    const duration = calculateDuration(runningTimer.start_time, currentTime);
+    const durationFormatted = formatDuration(duration * 60);
+
+    console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${runningTimer.description} (${durationFormatted})`);
+
+    // Stop the previous timer
+    const stopEntry = {
+      start_time: runningTimer.start_time,
+      end_time: currentTime,
+      description: runningTimer.description
+    };
+
+    const stopResult = await writeEntryAndSync('time-logs', stopEntry, {
+      sourceFilter: options.source,
+      db,
+      vaultPath
+    });
+
+    if (!stopResult.success) {
+      console.error(chalk.red('✗') + ` Failed to stop previous timer: ${stopResult.error}`);
+      process.exit(1);
     }
   }
 
-  // Start new timer
+  // Start new timer (entry with NULL end_time)
   const startTime = getCurrentTime();
-  fs.writeFileSync(STATE_FILE, `${description}\n${startTime}`);
+  const entry = {
+    start_time: startTime,
+    end_time: null,
+    description: description
+  };
+
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: options.source,
+    db,
+    vaultPath
+  });
+
+  if (!result.success) {
+    console.error(chalk.red('✗') + ` Failed to start timer: ${result.error}`);
+    process.exit(1);
+  }
 
   console.log(chalk.green('✓') + ` Started: ${description}`);
   console.log(chalk.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
 }
 
-// Stop timer and write to file
-async function stopTimer(start, description, end = null) {
-  if (!end) {
-    end = getCurrentTime();
+// Stop command
+async function cmdStop(options = {}) {
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  // Find running timer(s)
+  let query = `
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `;
+
+  const runningTimers = db.prepare(query).all();
+
+  if (runningTimers.length === 0) {
+    console.error(chalk.red('✗') + ' No timer running');
+    process.exit(1);
   }
 
-  const duration = calculateDuration(start, end);
-  const monthFile = getMonthFile();
+  // If --source specified, filter to that source
+  let timerToStop = runningTimers[0];
+  if (options.source) {
+    const matching = runningTimers.filter(t => t.source.includes(options.source));
+    if (matching.length === 0) {
+      console.error(chalk.red('✗') + ` No running timer matching source "${options.source}"`);
+      console.log('');
+      console.log('Running timers:');
+      for (const t of runningTimers) {
+        console.log(`  ${t.source}: ${t.description}`);
+      }
+      process.exit(1);
+    }
+    timerToStop = matching[0];
+  } else if (runningTimers.length > 1) {
+    // Multiple timers, require --source
+    console.error(chalk.red('✗') + ' Multiple timers running. Use --source to specify which one to stop.');
+    console.log('');
+    console.log('Running timers:');
+    for (const t of runningTimers) {
+      console.log(`  ${t.source}: ${t.description}`);
+    }
+    process.exit(1);
+  }
 
-  // Write completed entry
-  const entry = `${start}|${end}|${description}\n`;
-  fs.appendFileSync(monthFile, entry);
-
-  // Clear state file (keep it empty so Apple Shortcuts doesn't complain)
-  fs.writeFileSync(STATE_FILE, '');
-
+  const endTime = getCurrentTime();
+  const duration = calculateDuration(timerToStop.start_time, endTime);
   const durationFormatted = formatDuration(duration * 60);
-  console.log(chalk.green('✓') + ` Stopped: ${description} (${durationFormatted})`);
+
+  // Complete the entry
+  const entry = {
+    start_time: timerToStop.start_time,
+    end_time: endTime,
+    description: timerToStop.description
+  };
+
+  // Extract plugin name from the source ID for filtering
+  const [pluginName] = timerToStop.source.split('/');
+
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: pluginName,
+    db,
+    vaultPath
+  });
+
+  if (!result.success) {
+    console.error(chalk.red('✗') + ` Failed to stop timer: ${result.error}`);
+    process.exit(1);
+  }
+
+  console.log(chalk.green('✓') + ` Stopped: ${timerToStop.description} (${durationFormatted})`);
 }
 
-// Stop command
-async function cmdStop() {
-  if (!fs.existsSync(STATE_FILE)) {
-    console.error(chalk.red('✗') + ' No timer running');
-    process.exit(1);
+// Helper to display source errors consistently
+function showSourceError(error, availableSources) {
+  console.error(chalk.red('✗') + ` ${error}`);
+  console.log('');
+  if (availableSources && availableSources.length > 0) {
+    console.log('Available sources:');
+    for (const { sourceId, enabled } of availableSources) {
+      const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log(`  ${sourceId} (${status})`);
+    }
   }
-
-  const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
-  if (!content) {
-    console.error(chalk.red('✗') + ' No timer running');
-    process.exit(1);
-  }
-
-  const lines = content.split('\n');
-  const description = lines[0];
-  const start = lines[1];
-
-  await stopTimer(start, description);
+  console.log('');
+  console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
 }
 
 // Add command - add a completed entry
-async function cmdAdd(durationStr, ...descriptionParts) {
+async function cmdAdd(durationStr, options = {}) {
+  // Handle case where description parts come after options parsing
+  const descriptionParts = options._positional || [];
   const description = descriptionParts.join(' ');
 
   if (!durationStr || !description) {
-    console.error(chalk.red('✗') + ' Usage: track add DURATION "Description with #topic/tags"');
+    console.error(chalk.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE]');
     console.log('');
     console.log('Examples:');
     console.log('  track add 20m "Reviewing pull requests #topic/programming"');
@@ -222,9 +303,27 @@ async function cmdAdd(durationStr, ...descriptionParts) {
     }
   }
 
-  const monthFile = getMonthFile();
-  const entry = `${startTime}|${endTime}|${description}\n`;
-  fs.appendFileSync(monthFile, entry);
+  // Write entry via plugin and sync
+  const entry = {
+    start_time: startTime,
+    end_time: endTime,
+    description: description
+  };
+
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: options.source,
+    db,
+    vaultPath,
+    onSync: () => console.log(chalk.gray('Syncing...'))
+  });
+
+  if (!result.success) {
+    showSourceError(result.error, result.availableSources);
+    process.exit(1);
+  }
 
   const durationFormatted = formatDuration(durationMinutes * 60);
   console.log(chalk.green('✓') + ` Added: ${description} (${durationFormatted})`);
@@ -248,197 +347,107 @@ async function cmdAdd(durationStr, ...descriptionParts) {
   }
 }
 
-// Add topics command
-async function cmdAddTopics() {
-  console.log(chalk.blue('🏷️  Adding topic tags to time tracking entries...'));
-
-  // Check if AI is available
-  const useAI = (() => {
-    try {
-      execSync('which claude', { encoding: 'utf8' });
-      return true;
-    } catch {
-      console.log(chalk.yellow('⚠️  Claude CLI not available - skipping auto-tagging'));
-      return false;
-    }
-  })();
-
-  if (!useAI) {
-    process.exit(0);
-  }
-
-  // Extract available topics from existing time tracking entries
-  console.log(chalk.gray('  Extracting available topics from time tracking files...'));
-  const topicSet = new Set();
-
-  const files = fs.readdirSync(TIME_DIR)
-    .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
-    .map(f => path.join(TIME_DIR, f));
-
-  for (const file of files) {
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      const topicMatches = line.match(/#topic\/[a-z_]+/g);
-      if (topicMatches) {
-        for (const match of topicMatches) {
-          topicSet.add(match.replace('#topic/', ''));
-        }
-      }
-    }
-  }
-
-  const availableTopics = Array.from(topicSet).sort();
-  console.log(chalk.gray(`  Found ${availableTopics.length} unique topics`));
-
-  // Find entries without topics
-  const entriesToTag = [];
-  for (const file of files) {
-    const content = fs.readFileSync(file, 'utf8');
-    const lines = content.split('\n');
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line && !line.startsWith('#') && line.includes('|')) {
-        const [start, end, description] = line.split('|');
-        if (start && description && !description.match(/#topic\//)) {
-          entriesToTag.push({
-            file,
-            lineIndex: i,
-            line,
-            description: description.trim()
-          });
-        }
-      }
-    }
-  }
-
-  if (entriesToTag.length === 0) {
-    console.log(chalk.gray('No entries needing topic tags found'));
-    process.exit(0);
-  }
-
-  console.log(chalk.gray(`  Found ${entriesToTag.length} entries needing topics`));
-
-  // Process in batches
-  const BATCH_SIZE = 30;
-  let totalTagged = 0;
-
-  for (let i = 0; i < entriesToTag.length; i += BATCH_SIZE) {
-    const batch = entriesToTag.slice(i, Math.min(i + BATCH_SIZE, entriesToTag.length));
-
-    const prompt = `Analyze these time tracking entries and suggest 1 relevant topic for each from the available list.
-
-Available topics: ${availableTopics.join(', ')}
-
-For each entry, choose the most relevant topic based on the activity description.
-
-Respond with a JSON array where each has:
-{"index": entry_index, "topic": "topic_name"}
-
-If no topics clearly apply, use an empty string for topic.
-Only use topics from the available list.
-
-Entries:
-${JSON.stringify(batch.map((e, idx) => ({index: idx + i, description: e.description})), null, 2)}`;
-
-    try {
-      const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-        encoding: 'utf8',
-        maxBuffer: 1024 * 1024 * 10,
-        timeout: 60000
-      });
-
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const classifications = JSON.parse(jsonMatch[0]);
-
-        // Group updates by file
-        const fileUpdates = new Map();
-
-        for (const cls of classifications) {
-          const entry = batch[cls.index - i];
-          if (cls.topic && availableTopics.includes(cls.topic)) {
-            const [start, end, description] = entry.line.split('|');
-            const newLine = `${start}|${end}|${description.trim()} #topic/${cls.topic}`;
-
-            if (!fileUpdates.has(entry.file)) {
-              const content = fs.readFileSync(entry.file, 'utf8');
-              fileUpdates.set(entry.file, {
-                lines: content.split('\n'),
-                modified: false
-              });
-            }
-
-            const fileData = fileUpdates.get(entry.file);
-            fileData.lines[entry.lineIndex] = newLine;
-            fileData.modified = true;
-            totalTagged++;
-          }
-        }
-
-        // Write updated files
-        for (const [file, data] of fileUpdates) {
-          if (data.modified) {
-            fs.writeFileSync(file, data.lines.join('\n'));
-          }
-        }
-      }
-    } catch (error) {
-      console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
-    }
-  }
-
-  console.log(chalk.green(`✓ Added topic tags to ${totalTagged} entry(ies)`));
-}
-
-// Status command
+// Status command - queries DB for running timers (end_time IS NULL)
 async function cmdStatus() {
-  if (!fs.existsSync(STATE_FILE)) {
+  const db = getDatabase();
+
+  // Query for all running timers across all sources
+  const runningTimers = db.prepare(`
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `).all();
+
+  if (runningTimers.length === 0) {
     console.log(chalk.blue('ℹ') + ' No timer running');
     return;
   }
-
-  const content = fs.readFileSync(STATE_FILE, 'utf8').trim();
-  if (!content) {
-    console.log(chalk.blue('ℹ') + ' No timer running');
-    return;
-  }
-
-  const lines = content.split('\n');
-  const description = lines[0];
-  const start = lines[1];
-
-  const currentTime = getCurrentTime();
-  const duration = calculateDuration(start, currentTime);
-  const durationFormatted = formatDuration(duration * 60);
 
   console.log(chalk.cyan('⏱') + '  Currently tracking:');
   console.log('');
-  console.log('  ' + chalk.green(description));
 
-  try {
-    const startDisplay = new Date(start).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: TIMEZONE
-    });
-    console.log(`  Started: ${startDisplay}`);
-  } catch {
-    console.log(`  Started: ${start}`);
+  const currentTime = getCurrentTime();
+
+  for (const timer of runningTimers) {
+    const { start_time, description, source } = timer;
+    const duration = calculateDuration(start_time, currentTime);
+    const durationFormatted = formatDuration(duration * 60);
+
+    console.log('  ' + chalk.green(description));
+
+    try {
+      const startDisplay = new Date(start_time).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: TIMEZONE
+      });
+      console.log(`  Started: ${startDisplay}`);
+    } catch {
+      console.log(`  Started: ${start_time}`);
+    }
+
+    console.log(`  Duration: ${durationFormatted}`);
+    console.log(`  Source: ${chalk.gray(source)}`);
+
+    if (runningTimers.length > 1) {
+      console.log('');
+    }
   }
-
-  console.log(`  Duration: ${durationFormatted}`);
 }
 
-// Today command
-async function cmdToday() {
-  const monthFile = getMonthFile();
+// Today command - queries time_logs table
+async function cmdToday(options = {}) {
+  const db = getDatabase();
   const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
 
-  if (!fs.existsSync(monthFile)) {
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      console.log(chalk.red('✗') + ` No sources matching "${options.source}"`);
+      console.log('');
+      if (allSources.length > 0) {
+        console.log('Available time-logs sources:');
+        for (const { sourceId, enabled } of allSources) {
+          const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
+          console.log(`  ${sourceId} (${status})`);
+        }
+      } else {
+        console.log('No time-logs plugins found.');
+      }
+      console.log('');
+      console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
+      return;
+    }
+    // Show which sources we're querying
+    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE date(start_time) = ?
+    ORDER BY start_time
+  `;
+  const params = [today];
+
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE date(start_time) = ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
     console.log(chalk.blue('ℹ') + ' No time entries for today');
     return;
   }
@@ -446,48 +455,42 @@ async function cmdToday() {
   console.log(chalk.cyan("Today's Time Tracking") + ` (${today})`);
   console.log('');
 
-  const content = fs.readFileSync(monthFile, 'utf8');
-  const lines = content.split('\n').filter(line => line.startsWith(today));
-
-  if (lines.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No time entries for today');
-    return;
-  }
-
   let totalMinutes = 0;
   const topicMinutes = {};
 
-  for (const line of lines) {
-    const [start, end, description] = line.split('|');
+  for (const entry of entries) {
+    const { start_time, end_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDuration(start_time, end_time);
+
     if (!description) continue;
 
     const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
-
-    const duration = calculateDuration(start, end);
 
     totalMinutes += duration;
     topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
 
     // Display entry
     try {
-      const startTime = new Date(start).toLocaleTimeString('en-US', {
+      const startTime = new Date(start_time).toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
         timeZone: TIMEZONE
       });
-      const endTime = new Date(end).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: TIMEZONE
-      });
+      const endDisplay = end_time
+        ? new Date(end_time).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: TIMEZONE
+          })
+        : 'now';
 
-      const symbol = chalk.green('✓');
-      console.log(`  ${symbol} ${startTime} - ${endTime} (${formatDuration(duration * 60)})`);
+      const symbol = end_time ? chalk.green('✓') : chalk.yellow('⏱');
+      console.log(`  ${symbol} ${startTime} - ${endDisplay} (${formatDuration(duration * 60)})`);
       console.log(`    ${description}`);
     } catch {
-      console.log(`  ${start} - ${end} (${formatDuration(duration * 60)})`);
+      console.log(`  ${start_time} - ${end_time || 'now'} (${formatDuration(duration * 60)})`);
       console.log(`    ${description}`);
     }
   }
@@ -506,8 +509,34 @@ async function cmdToday() {
   console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
-// Week command
-async function cmdWeek() {
+// Week command - queries time_logs table
+async function cmdWeek(options = {}) {
+  const db = getDatabase();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      console.log(chalk.red('✗') + ` No sources matching "${options.source}"`);
+      console.log('');
+      if (allSources.length > 0) {
+        console.log('Available time-logs sources:');
+        for (const { sourceId, enabled } of allSources) {
+          const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
+          console.log(`  ${sourceId} (${status})`);
+        }
+      } else {
+        console.log('No time-logs plugins found.');
+      }
+      console.log('');
+      console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
+      return;
+    }
+    // Show which sources we're querying
+    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
   // Calculate week start (7 days ago)
   let weekStart;
   try {
@@ -523,61 +552,51 @@ async function cmdWeek() {
 
   const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
 
-  console.log(chalk.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
-  console.log('');
+  // Build query with optional source filter
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE date(start_time) >= ? AND date(start_time) <= ?
+    ORDER BY start_time
+  `;
+  const params = [weekStart, today];
 
-  // Get current and previous month files
-  const currentMonth = execSync(`TZ="${TIMEZONE}" date '+%Y-%m'`, { encoding: 'utf8' }).trim();
-  let prevMonth;
-  try {
-    prevMonth = execSync(`TZ="${TIMEZONE}" date -d '1 month ago' '+%Y-%m'`, { encoding: 'utf8' }).trim();
-  } catch {
-    try {
-      prevMonth = execSync(`TZ="${TIMEZONE}" date -v-1m '+%Y-%m'`, { encoding: 'utf8' }).trim();
-    } catch {
-      prevMonth = currentMonth;
-    }
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE date(start_time) >= ? AND date(start_time) <= ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
   }
 
-  const monthFiles = [
-    path.join(TIME_DIR, `${prevMonth}.md`),
-    path.join(TIME_DIR, `${currentMonth}.md`)
-  ];
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No time entries for this week');
+    return;
+  }
+
+  console.log(chalk.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
+  console.log('');
 
   let totalMinutes = 0;
   const topicMinutes = {};
   const dayMinutes = {};
 
-  for (const monthFile of monthFiles) {
-    if (!fs.existsSync(monthFile)) continue;
+  for (const entry of entries) {
+    const { start_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDuration(start_time, entry.end_time);
 
-    const content = fs.readFileSync(monthFile, 'utf8');
-    const lines = content.split('\n');
+    if (!description) continue;
 
-    for (const line of lines) {
-      if (!line || line.startsWith('#')) continue;
+    const entryDate = start_time.substring(0, 10);
+    const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
 
-      const [start, end, description] = line.split('|');
-      if (!start || !description) continue;
-
-      const entryDate = start.substring(0, 10);
-
-      // Check if entry is within the week
-      if (entryDate < weekStart || entryDate > today) continue;
-
-      const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
-
-      const duration = calculateDuration(start, end);
-
-      totalMinutes += duration;
-      topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
-      dayMinutes[entryDate] = (dayMinutes[entryDate] || 0) + duration;
-    }
-  }
-
-  if (totalMinutes === 0) {
-    console.log(chalk.blue('ℹ') + ' No time entries for this week');
-    return;
+    totalMinutes += duration;
+    topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
+    dayMinutes[entryDate] = (dayMinutes[entryDate] || 0) + duration;
   }
 
   // Summary by day
@@ -599,84 +618,91 @@ async function cmdWeek() {
   console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
 }
 
-// Check if any time-tracking plugins are enabled
-async function checkTimeTrackingPlugins() {
-  // Check if any plugins with type 'time-entries' are enabled
-  const plugins = await discoverPlugins();
-
-  for (const [name, plugin] of plugins) {
-    if (plugin.type === 'time-entries') {
-      const sources = getPluginSources(name);
-      if (sources.length > 0) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-// Sync-db command - delegates to plugin system
-async function cmdSyncDb() {
-  // Check if any time-tracking plugins are enabled
-  const hasPlugins = await checkTimeTrackingPlugins();
-
-  if (!hasPlugins) {
-    console.log(chalk.yellow('⚠') + ' No time-tracking plugins are enabled.');
-    console.log('');
-    console.log('To sync time tracking data to the database, configure a plugin:');
-    console.log('');
-    console.log('  ' + chalk.cyan('bin/plugins configure time-tracking'));
-    console.log('');
-    console.log('Or manually add to config.toml:');
-    console.log('');
-    console.log('  [plugins.time-tracking.local]');
-    console.log('  enabled = true');
-    console.log('  directory = "vault/logs/time-tracking"');
-    return;
-  }
-
-  console.log(chalk.blue('ℹ') + ' Syncing time tracking via plugin system...');
+// Sync command - delegates to plugin system for all time-logs plugins
+async function cmdSync() {
+  console.log(chalk.blue('ℹ') + ' Syncing time-logs plugins to database...');
 
   try {
-    const result = execSync('bin/plugins sync time-tracking', { encoding: 'utf8' });
+    const result = execSync('bin/plugins sync --type time-logs', { encoding: 'utf8' });
     // Strip dotenvx output and show result
     const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
     console.log(lines.join('\n'));
   } catch (error) {
-    console.error(chalk.red('✗') + ' Sync failed:', error.message);
-    process.exit(1);
+    // Check if it's just "no plugins" vs actual error
+    if (error.stdout?.includes('No plugins of type')) {
+      console.log(chalk.yellow('⚠') + ' No time-logs plugins are enabled.');
+      console.log('');
+      console.log('To sync time tracking data, configure a plugin:');
+      console.log('');
+      console.log('  ' + chalk.cyan('bin/plugins configure'));
+    } else {
+      console.error(chalk.red('✗') + ' Sync failed:', error.message);
+      process.exit(1);
+    }
   }
 }
 
+// Parse arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const result = {
+    command: null,
+    positional: [],
+    options: {}
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        result.options[key] = args[i + 1];
+        i++;
+      } else {
+        result.options[key] = true;
+      }
+    } else if (arg.startsWith('-') && arg.length === 2) {
+      const key = arg.slice(1);
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        result.options[key] = args[i + 1];
+        i++;
+      } else {
+        result.options[key] = true;
+      }
+    } else if (!result.command) {
+      result.command = arg;
+    } else {
+      result.positional.push(arg);
+    }
+  }
+
+  return result;
+}
+
 // Main command handler
-const command = process.argv[2];
-const args = process.argv.slice(3);
+const { command, positional, options } = parseArgs();
 
 switch (command) {
   case 'start':
-    await cmdStart(args.join(' '));
+    await cmdStart(positional.join(' '), options);
     break;
   case 'stop':
-    await cmdStop();
+    await cmdStop(options);
     break;
   case 'add':
-    await cmdAdd(args[0], ...args.slice(1));
-    break;
-  case 'add-topics':
-    await cmdAddTopics();
+    await cmdAdd(positional[0], { ...options, _positional: positional.slice(1) });
     break;
   case 'status':
     await cmdStatus();
     break;
   case 'today':
-    await cmdToday();
+    await cmdToday(options);
     break;
   case 'week':
-    await cmdWeek();
+    await cmdWeek(options);
     break;
-  case 'sync-db':
-    await cmdSyncDb();
+  case 'sync':
+    await cmdSync();
     break;
   default:
     console.log('Time Tracking CLI');
@@ -684,14 +710,16 @@ switch (command) {
     console.log('Usage: track [command] [options]');
     console.log('');
     console.log('Commands:');
-    console.log('  start DESCRIPTION           Start tracking time (include #topic/tags in description)');
-    console.log('  stop                        Stop current timer');
-    console.log('  add DURATION DESCRIPTION    Add entry for work you forgot to track');
-    console.log('  add-topics                  Auto-add topic tags to entries using AI');
+    console.log('  start DESC [--source]       Start tracking time (include #topic/tags in description)');
+    console.log('  stop [--source]             Stop current timer');
+    console.log('  add DURATION DESC [--source] Add entry for work you forgot to track');
     console.log('  status                      Show current timer status');
-    console.log('  today                       Show today\'s entries');
-    console.log('  week                        Show this week\'s entries');
-    console.log('  sync-db                     Sync markdown files to database');
+    console.log('  today [--source NAME]       Show today\'s entries');
+    console.log('  week [--source NAME]        Show this week\'s entries');
+    console.log('  sync                        Sync all time-logs plugins to database');
+    console.log('');
+    console.log('Options:');
+    console.log('  --source NAME               Filter by plugin source (e.g., markdown-time-tracking)');
     console.log('');
     console.log('Examples:');
     console.log('  track start "Deep work session #topic/programming"');
@@ -700,6 +728,8 @@ switch (command) {
     console.log('  track add 1.5h "Reading #topic/learning"');
     console.log('  track status');
     console.log('  track today');
+    console.log('  track today --source toggl');
+    console.log('  track week --source markdown');
     console.log('');
     console.log('Duration formats for \'add\' command:');
     console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
