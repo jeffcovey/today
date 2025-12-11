@@ -180,3 +180,7 @@
 # [plugins.resilio-conflict-cleanup.default]
 # enabled = true
 # directory = "vault"
+
+# [plugins.markdownlint-cleanup.default]
+# enabled = true
+# directory = "vault/**/*.md"

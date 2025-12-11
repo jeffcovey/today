@@ -1,0 +1,31 @@
+# Markdownlint Cleanup Plugin
+# Auto-fixes markdown formatting issues using markdownlint-cli2
+
+name = "markdownlint-cleanup"
+displayName = "Markdownlint Cleanup"
+description = "Auto-fix markdown formatting issues using markdownlint-cli2"
+type = "utility"
+access = "read-write"
+
+requiredEnv = []
+
+longDescription = """
+Runs markdownlint-cli2 with --fix to automatically correct markdown formatting
+issues in your vault files.
+
+This plugin requires markdownlint-cli2 to be installed (included in devDependencies).
+
+Common fixes include:
+- Consistent heading styles
+- Proper list indentation
+- Blank lines around headings and code blocks
+- Trailing whitespace removal (configurable)
+
+Configure rules in .markdownlint.jsonc at the project root.
+"""
+
+[commands]
+sync = "./sync.js"
+
+[settings]
+directory = { type = "string", default = "vault/**/*.md", description = "Glob pattern for files to lint" }

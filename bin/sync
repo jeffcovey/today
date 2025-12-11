@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Today - Full Data Sync (Node.js version)
+ * Today - Full Data Sync
  *
- * This is the new Node.js implementation of the sync system, ported from the
- * original bash version (bin/sync). This version is preferred for new development.
+ * Orchestrates sync operations for the Today system:
+ * - Runs enabled plugins (primary sync mechanism)
+ * - Database health checks
+ * - Vault verification
+ * - Plan file cleanup and processing
+ * - Inbox processing
+ * - External service syncs (email, calendar, contacts, etc.)
  *
- * Synchronizes all data sources for the Today system:
- * - Vault files (via Resilio Sync)
- * - Local SQLite database
- * - Task management (via markdown_tasks cache)
- * - Plan files cleanup
- * - Inbox processing (Progress notes, Concern notes, Tasks)
- * - Email, Calendar, Contacts, Time tracking
- * - OGM monitoring
+ * Most sync logic is being migrated to plugins. This script orchestrates
+ * plugin execution and handles core operations that aren't yet pluginized.
  */
 
 import fs from 'fs';
@@ -29,6 +28,13 @@ import {
   getQuarterNumber,
   addDaysToDate,
 } from '../src/date-utils.js';
+import {
+  printStatus,
+  printError,
+  printInfo,
+  printWarning,
+  printHeader,
+} from '../src/cli-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,33 +42,6 @@ const projectRoot = path.dirname(__dirname);
 
 // Change to project root
 process.chdir(projectRoot);
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function printStatus(message) {
-  console.log(chalk.green(`✓ ${message}`));
-}
-
-function printError(message) {
-  console.error(chalk.red(`✗ ${message}`));
-}
-
-function printInfo(message) {
-  console.log(chalk.blue(`ℹ ${message}`));
-}
-
-function printWarning(message) {
-  console.log(chalk.yellow(`⚠ ${message}`));
-}
-
-function printHeader(message) {
-  console.log('');
-  console.log(chalk.blue('═══════════════════════════════════════'));
-  console.log(chalk.blue.bold(message));
-  console.log(chalk.blue('═══════════════════════════════════════'));
-}
 
 // ============================================================================
 // Plan File Cleanup Functions
@@ -599,11 +578,6 @@ async function checkDatabaseHealth() {
   return true;
 }
 
-async function cleanDatabaseTaskTitles() {
-  printInfo('Database cleanup skipped (using Obsidian Tasks)');
-  return true;
-}
-
 async function cleanPlanFileTasks() {
   printInfo('Cleaning tasks in plan files (removing date/recurrence properties)...');
 
@@ -770,7 +744,7 @@ function processProgressNote(filePath, content, basename) {
   }
 
   // Clean content (remove title and blank lines)
-  const cleanedLines = content.split('\n').slice(1).filter((line, i, arr) => {
+  const cleanedLines = content.split('\n').slice(1).filter((line, i) => {
     return i > 0 || line.trim(); // Skip leading blank lines
   });
   const cleanedContent = cleanedLines.join('\n');
@@ -952,24 +926,6 @@ function checkVaultExists() {
   printInfo(`Total notes: ${noteCount}, plans: ${planCount}, projects: ${projectCount}, topics: ${topicCount}`);
 
   return true;
-}
-
-function cleanMarkdownFiles() {
-  printInfo('Cleaning markdown files with markdownlint...');
-
-  try {
-    // Run markdownlint on all markdown files
-    // MD009 (no-trailing-spaces) is disabled to preserve double-space line breaks
-    execSync('npx markdownlint-cli2 --fix "vault/**/*.md"', {
-      stdio: 'pipe'
-    });
-    printInfo('All markdown files are clean');
-    return true;
-  } catch (error) {
-    // markdownlint returns non-zero if it fixed files
-    printInfo('Fixed formatting in markdown files');
-    return true;
-  }
 }
 
 function syncEmail() {
@@ -1204,8 +1160,6 @@ async function main() {
 
   // Critical path operations
   await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
-  await runSyncStep('🧹 Clean Markdown', cleanMarkdownFiles, 'Markdown cleaned');
-  await runSyncStep('🗄️  Clean Database', cleanDatabaseTaskTitles, 'Database cleaned');
   await runSyncStep('📋 Clean Plan Tasks', cleanPlanFileTasks, 'Plan tasks cleaned');
   await runSyncStep('🗓️  Cancel Old Plan Tasks', cancelOldPlanTasks, 'Old plan tasks canceled');
   await runSyncStep('📥 Process Inbox', processInbox, 'Inbox processed');
@@ -1356,11 +1310,6 @@ switch (command) {
     (async () => {
       await runSyncStep('🔍 Database Health', checkDatabaseHealth, 'Database verified');
       await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
-
-      if (!process.env.SKIP_MARKDOWN_CLEAN) {
-        await runSyncStep('🧹 Clean Markdown', cleanMarkdownFiles, 'Markdown cleaned');
-      }
-
       await runSyncStep('📥 Process Inbox', processInbox, 'Inbox processed');
       process.exit(0);
     })();
@@ -1372,8 +1321,6 @@ switch (command) {
     (async () => {
       await checkDatabaseHealth();
       checkVaultExists();
-      await cleanMarkdownFiles();
-      await cleanDatabaseTaskTitles();
       await cleanPlanFileTasks();
       await processInbox();
       printStatus('Quick sync completed!');
@@ -1487,7 +1434,6 @@ ${chalk.gray('Description:')}
 
 ${chalk.gray('Data sources synced:')}
   • Vault files
-  • Markdown formatting cleanup
   • Local task manager
   • Email inbox
   • Calendar events

@@ -1,9 +1,60 @@
 /**
- * CLI utilities for parsing arguments and displaying errors.
+ * CLI utilities for parsing arguments and displaying output.
  * Shared across all binary commands.
  */
 
 import chalk from 'chalk';
+
+// ============================================================================
+// Output Utilities
+// ============================================================================
+
+/**
+ * Print a success/status message in green.
+ * @param {string} message
+ */
+export function printStatus(message) {
+  console.log(chalk.green(`✓ ${message}`));
+}
+
+/**
+ * Print an error message in red to stderr.
+ * @param {string} message
+ */
+export function printError(message) {
+  console.error(chalk.red(`✗ ${message}`));
+}
+
+/**
+ * Print an info message in blue.
+ * @param {string} message
+ */
+export function printInfo(message) {
+  console.log(chalk.blue(`ℹ ${message}`));
+}
+
+/**
+ * Print a warning message in yellow.
+ * @param {string} message
+ */
+export function printWarning(message) {
+  console.log(chalk.yellow(`⚠ ${message}`));
+}
+
+/**
+ * Print a section header with decorative lines.
+ * @param {string} message
+ */
+export function printHeader(message) {
+  console.log('');
+  console.log(chalk.blue('═══════════════════════════════════════'));
+  console.log(chalk.blue.bold(message));
+  console.log(chalk.blue('═══════════════════════════════════════'));
+}
+
+// ============================================================================
+// Argument Parsing
+// ============================================================================
 
 /**
  * Parse command line arguments into a structured object.
