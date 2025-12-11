@@ -5,7 +5,6 @@ name = "markdownlint-cleanup"
 displayName = "Markdownlint Cleanup"
 description = "Auto-fix markdown formatting issues using markdownlint-cli2"
 type = "utility"
-access = "read-write"
 
 requiredEnv = []
 

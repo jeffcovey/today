@@ -15,7 +15,8 @@ const { getFullConfig } = await import('../src/config.js');
 const {
   discoverPlugins,
   getPluginSources,
-  getEnabledPlugins
+  getEnabledPlugins,
+  getPluginAccess
 } = await import('../src/plugin-loader.js');
 
 describe('Plugin Loader', () => {
@@ -38,9 +39,21 @@ describe('Plugin Loader', () => {
       expect(timeTracking).toHaveProperty('name', 'markdown-time-tracking');
       expect(timeTracking).toHaveProperty('displayName', 'Markdown Time Tracking');
       expect(timeTracking).toHaveProperty('type', 'time-logs');
-      expect(timeTracking).toHaveProperty('access', 'read-write');
       expect(timeTracking).toHaveProperty('commands');
       expect(timeTracking.commands).toHaveProperty('read');
+      expect(timeTracking.commands).toHaveProperty('write');
+    });
+
+    test('should derive access from commands via getPluginAccess', async () => {
+      const plugins = await discoverPlugins();
+      const timeTracking = plugins.get('markdown-time-tracking');
+      const dayoneDiary = plugins.get('dayone-diary');
+
+      // markdown-time-tracking has both read and write
+      expect(getPluginAccess(timeTracking)).toBe('read-write');
+
+      // dayone-diary has only read
+      expect(getPluginAccess(dayoneDiary)).toBe('read-only');
     });
 
     test('should include plugin path in metadata', async () => {

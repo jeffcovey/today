@@ -5,7 +5,6 @@ name = "streaks-habits"
 displayName = "Streaks Habits"
 description = "Daily habit tracking from the Streaks iOS app"
 type = "habits"
-access = "read-only"
 
 requiredEnv = []
 

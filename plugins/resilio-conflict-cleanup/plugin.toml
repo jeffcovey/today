@@ -5,7 +5,6 @@ name = "resilio-conflict-cleanup"
 displayName = "Resilio Conflict Cleanup"
 description = "Clean up sync conflict files created by Resilio Sync"
 type = "utility"
-access = "read-write"
 
 requiredEnv = []
 

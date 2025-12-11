@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { discoverPlugins } from '../src/plugin-loader.js';
+import { discoverPlugins, getPluginAccess } from '../src/plugin-loader.js';
 import { getSchema } from '../src/plugin-schemas.js';
 
 // Discover plugins before tests run
@@ -21,8 +21,9 @@ describe('All Plugins', () => {
       expect(plugin.displayName).toBeDefined();
       expect(plugin.description).toBeDefined();
       expect(plugin.type).toBeDefined();
-      expect(plugin.access).toBeDefined();
-      expect(['read-only', 'write-only', 'read-write']).toContain(plugin.access);
+      // access is now derived from commands, not stored in plugin.toml
+      const access = getPluginAccess(plugin);
+      expect(['read-only', 'write-only', 'read-write', 'none']).toContain(access);
     });
 
     test('should have read command if not read-only external data', () => {

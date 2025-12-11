@@ -100,6 +100,21 @@ export async function getPlugin(name) {
 }
 
 /**
+ * Derive plugin access level from its commands
+ * @param {object} plugin - Plugin object with commands
+ * @returns {'read-only'|'read-write'|'none'}
+ */
+export function getPluginAccess(plugin) {
+  const hasRead = !!plugin.commands?.read;
+  const hasWrite = !!plugin.commands?.write;
+
+  if (hasRead && hasWrite) return 'read-write';
+  if (hasRead) return 'read-only';
+  if (hasWrite) return 'write-only';
+  return 'none';
+}
+
+/**
  * Get all enabled plugins with their sources
  * @returns {Promise<Array<{plugin: object, sources: Array}>>}
  */
@@ -293,7 +308,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
   const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
-  if (sourceConfig.auto_add_topics && taggableField && plugin.access === 'read-write') {
+  if (sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
     try {
       const updater = createFileBasedUpdater(PROJECT_ROOT);
       taggingResult = await runAutoTagger({
@@ -510,7 +525,7 @@ export async function getPluginDataForAI() {
         displayName: plugin.displayName || plugin.name,
         description: plugin.description,
         type: plugin.type,
-        access: plugin.access,
+        access: getPluginAccess(plugin),
         source: sourceName,
         tableName,
         // Plugin's instructions for AI (from plugin.toml), with config values interpolated
@@ -550,7 +565,7 @@ export async function getAllPluginAiInstructions() {
       displayName: plugin.displayName || name,
       description: plugin.description,
       type: plugin.type,
-      access: plugin.access,
+      access: getPluginAccess(plugin),
       aiInstructions: plugin.aiInstructions || null
     });
   }

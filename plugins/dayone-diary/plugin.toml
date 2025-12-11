@@ -5,7 +5,6 @@ name = "dayone-diary"
 displayName = "Day One Diary"
 description = "Diary entries from Day One app JSON export"
 type = "diary"
-access = "read-only"
 
 requiredEnv = []
 

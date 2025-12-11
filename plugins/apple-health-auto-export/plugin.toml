@@ -5,7 +5,6 @@ name = "apple-health-auto-export"
 displayName = "Apple Health Auto Export"
 description = "Health metrics from iOS Health app via Auto Export"
 type = "health-metrics"
-access = "read-only"
 
 requiredEnv = []
 

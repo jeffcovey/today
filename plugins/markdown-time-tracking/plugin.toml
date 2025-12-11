@@ -5,7 +5,6 @@ name = "markdown-time-tracking"
 displayName = "Markdown Time Tracking"
 description = "Sync local markdown time tracking files to database"
 type = "time-logs"
-access = "read-write"
 
 requiredEnv = []
 
