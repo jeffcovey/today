@@ -352,36 +352,6 @@ function checkSkeletonUpdates() {
 }
 
 // ============================================================================
-// Dependency Check
-// ============================================================================
-
-function checkDependencies() {
-  const lastCheckFile = '.last-dep-check';
-  const todayDate = new Date().toISOString().split('T')[0];
-
-  if (process.env.SKIP_DEP_CHECK === 'true') return;
-
-  try {
-    if (fs.existsSync(lastCheckFile)) {
-      const lastCheck = fs.readFileSync(lastCheckFile, 'utf8').trim();
-      if (lastCheck === todayDate) return;
-    }
-  } catch {
-    // Continue
-  }
-
-  console.log('🔍 Checking for dependency updates (timeout in 10s)...');
-  try {
-    execSync('timeout 10 bin/update-deps --quiet', { stdio: 'pipe' });
-  } catch {
-    console.log('⚠️  Dependency check timed out, continuing...');
-  }
-
-  fs.writeFileSync(lastCheckFile, todayDate);
-  console.log();
-}
-
-// ============================================================================
 // Sync
 // ============================================================================
 
@@ -1088,9 +1058,8 @@ async function main() {
     }
   }
 
-  // Check dependencies once per day (unless in non-interactive mode)
+  // Check skeleton updates (unless in non-interactive mode)
   if (!nonInteractive) {
-    checkDependencies();
     checkSkeletonUpdates();
   }
 

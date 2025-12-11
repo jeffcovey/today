@@ -6,6 +6,7 @@
     "email": "./bin/email"
   },
   "scripts": {
+    "prepare": "lefthook install",
     "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' npx jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
+    "lefthook": "^2.0.9",
     "markdownlint-cli2": "^0.19.1"
   },
   "overrides": {
