@@ -230,9 +230,9 @@ async function cmdSync(pluginName, sourceName, options = {}) {
       process.exit(1);
     }
 
-    // Check if plugin has a sync command
-    if (!plugin.commands?.sync) {
-      console.log(chalk.yellow(`Plugin ${pluginName} does not have a sync command.`));
+    // Check if plugin has a read command
+    if (!plugin.commands?.read) {
+      console.log(chalk.yellow(`Plugin ${pluginName} does not have a read command.`));
       console.log(chalk.gray('This plugin provides read-only access to external data.'));
       return;
     }
@@ -268,8 +268,8 @@ async function cmdSync(pluginName, sourceName, options = {}) {
     // Sync all enabled plugins (optionally filtered by type)
     const enabledPlugins = await getEnabledPlugins();
 
-    // Filter to plugins that have sync commands
-    let syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.sync);
+    // Filter to plugins that have read commands
+    let syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.read);
 
     // Apply type filter if specified
     if (typeFilter) {
@@ -767,7 +767,7 @@ async function cmdInfo(pluginName) {
   console.log(`Type: ${plugin.type}`);
   console.log(`Access: ${plugin.access}`);
 
-  if (plugin.commands?.sync) {
+  if (plugin.commands?.read) {
     console.log(`Sync: ${chalk.green('yes')}`);
   } else {
     console.log(`Sync: ${chalk.gray('no (read-only, external data)')}`);

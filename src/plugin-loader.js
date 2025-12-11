@@ -128,9 +128,9 @@ export function isPluginConfigured(pluginName) {
 }
 
 /**
- * Run a plugin command (e.g., sync) and return parsed JSON output
+ * Run a plugin command (e.g., read, write) and return parsed JSON output
  * @param {object} plugin - Plugin metadata from plugin.toml
- * @param {string} command - Command name (e.g., 'sync')
+ * @param {string} command - Command name (e.g., 'read', 'write')
  * @param {object} sourceConfig - Source configuration from config.toml
  * @param {object} extraEnv - Additional environment variables
  * @returns {{success: boolean, data?: any, error?: string}}
@@ -206,8 +206,8 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   const syncMeta = getSyncMetadata(db, sourceId);
   const lastSyncTime = syncMeta?.last_synced_at || null;
 
-  // Run the sync command with last sync time and source ID
-  const result = runPluginCommand(plugin, 'sync', sourceConfig, {
+  // Run the read command with last sync time and source ID
+  const result = runPluginCommand(plugin, 'read', sourceConfig, {
     LAST_SYNC_TIME: lastSyncTime || '',
     SOURCE_ID: sourceId
   });
@@ -309,9 +309,9 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
       // Flush any file changes
       updater.flush();
 
-      // If we tagged entries, sync again to update database
+      // If we tagged entries, read again to update database
       if (taggingResult.tagged > 0) {
-        const resyncResult = runPluginCommand(plugin, 'sync', sourceConfig, {
+        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '', // Force full re-read of modified files
           SOURCE_ID: sourceId
         });
@@ -453,7 +453,7 @@ export async function getPluginDataForAI() {
 
   for (const { plugin, sources } of enabledPlugins) {
     for (const { sourceName, config } of sources) {
-      const tableName = plugin.commands?.sync
+      const tableName = plugin.commands?.read
         ? `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`
         : null;
 

@@ -40,7 +40,7 @@ describe('Plugin Loader', () => {
       expect(timeTracking).toHaveProperty('type', 'time-logs');
       expect(timeTracking).toHaveProperty('access', 'read-write');
       expect(timeTracking).toHaveProperty('commands');
-      expect(timeTracking.commands).toHaveProperty('sync');
+      expect(timeTracking.commands).toHaveProperty('read');
     });
 
     test('should include plugin path in metadata', async () => {

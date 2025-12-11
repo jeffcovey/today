@@ -33,7 +33,7 @@ Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #t
 """
 
 [commands]
-sync = "./sync.js"
+read = "./read.js"
 write = "./write.js"
 
 [settings]

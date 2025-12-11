@@ -25,7 +25,7 @@ Configure rules in .markdownlint.jsonc at the project root.
 """
 
 [commands]
-sync = "./sync.js"
+read = "./read.js"
 
 [settings]
 directory = { type = "string", default = "vault/**/*.md", description = "Glob pattern for files to lint" }

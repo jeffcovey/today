@@ -25,32 +25,33 @@ describe('All Plugins', () => {
       expect(['read-only', 'write-only', 'read-write']).toContain(plugin.access);
     });
 
-    test('should have sync command if not read-only external data', () => {
-      // Plugins with sync commands should have them defined
-      if (plugin.commands?.sync) {
-        expect(plugin.commands.sync).toBeDefined();
+    test('should have read command if not read-only external data', () => {
+      // Plugins with read commands should have them defined
+      if (plugin.commands?.read) {
+        expect(plugin.commands.read).toBeDefined();
       }
-      // Read-only plugins without sync are valid (e.g., apple-health-auto-export)
+      // Read-only plugins without read are valid (e.g., apple-health-auto-export)
       // They provide AI instructions for querying external data
     });
 
-    test('should have sync command that exists and is executable if defined', () => {
-      // Skip if no sync command (read-only plugins)
-      if (!plugin.commands?.sync) {
+    test('should have read command that exists and is executable if defined', () => {
+      // Skip if no read command (read-only plugins)
+      if (!plugin.commands?.read) {
         return;
       }
-      const syncPath = path.join(plugin._path, plugin.commands.sync);
-      expect(fs.existsSync(syncPath)).toBe(true);
+      const readPath = path.join(plugin._path, plugin.commands.read);
+      expect(fs.existsSync(readPath)).toBe(true);
 
-      const stats = fs.statSync(syncPath);
+      const stats = fs.statSync(readPath);
       // Check if file has execute permission (owner, group, or other)
       const isExecutable = (stats.mode & 0o111) !== 0;
       expect(isExecutable).toBe(true);
     });
 
-    test('should have a schema defined for its type if it has sync', () => {
-      // Only plugins that sync data need schemas
-      if (!plugin.commands?.sync) {
+    test('should have a schema defined for its type if it stores data', () => {
+      // Only plugins that read and store data need schemas
+      // Utility plugins don't store data, they just run cleanup operations
+      if (!plugin.commands?.read || plugin.type === 'utility') {
         return;
       }
       const schema = getSchema(plugin.type);

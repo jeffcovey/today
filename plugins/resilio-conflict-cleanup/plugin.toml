@@ -27,7 +27,7 @@ Run `bin/plugins sync resilio-conflict-cleanup` to clean up conflicts.
 """
 
 [commands]
-sync = "./sync.js"
+read = "./read.js"
 
 [settings]
 directory = { type = "string", default = "vault", description = "Directory to scan for conflict files" }
