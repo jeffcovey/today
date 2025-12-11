@@ -954,67 +954,6 @@ function checkVaultExists() {
   return true;
 }
 
-function cleanupSyncConflicts() {
-  printInfo('Checking for sync-conflict files...');
-
-  try {
-    const conflictFiles = execSync('find vault -name "*sync-conflict-*" -type f 2>/dev/null', {
-      encoding: 'utf8'
-    })
-      .trim()
-      .split('\n')
-      .filter(f => f);
-
-    if (conflictFiles.length === 0) {
-      printInfo('No sync-conflict files found');
-      return true;
-    }
-
-    printInfo(`Found ${conflictFiles.length} sync-conflict file(s)`);
-    let removedCount = 0;
-
-    for (const conflictFile of conflictFiles) {
-      // Extract original filename
-      const originalFile = conflictFile.replace(/\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}/, '');
-
-      if (fs.existsSync(originalFile)) {
-        // Compare files
-        try {
-          execSync(`diff -q "${originalFile}" "${conflictFile}"`, { stdio: 'ignore' });
-          // Files are identical
-          fs.unlinkSync(conflictFile);
-          removedCount++;
-          printInfo(`  ✓ Removed duplicate: ${path.basename(conflictFile)}`);
-        } catch {
-          // Files differ, check timestamps
-          const originalStat = fs.statSync(originalFile);
-          const conflictStat = fs.statSync(conflictFile);
-
-          if (conflictStat.mtimeMs < originalStat.mtimeMs) {
-            fs.unlinkSync(conflictFile);
-            removedCount++;
-            printInfo(`  ✓ Removed older conflict: ${path.basename(conflictFile)}`);
-          }
-        }
-      } else {
-        // Original doesn't exist, restore conflict file
-        fs.renameSync(conflictFile, originalFile);
-        removedCount++;
-        printInfo(`  ✓ Restored missing file: ${path.basename(originalFile)}`);
-      }
-    }
-
-    if (removedCount > 0) {
-      printInfo(`Cleaned up ${removedCount} sync-conflict file(s)`);
-    }
-
-    return true;
-  } catch (error) {
-    printError(`Conflict cleanup failed: ${error.message}`);
-    return false;
-  }
-}
-
 function cleanMarkdownFiles() {
   printInfo('Cleaning markdown files with markdownlint...');
 
@@ -1265,7 +1204,6 @@ async function main() {
 
   // Critical path operations
   await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
-  await runSyncStep('🗑️  Cleanup Conflicts', cleanupSyncConflicts, 'Sync conflicts cleaned');
   await runSyncStep('🧹 Clean Markdown', cleanMarkdownFiles, 'Markdown cleaned');
   await runSyncStep('🗄️  Clean Database', cleanDatabaseTaskTitles, 'Database cleaned');
   await runSyncStep('📋 Clean Plan Tasks', cleanPlanFileTasks, 'Plan tasks cleaned');
@@ -1434,7 +1372,6 @@ switch (command) {
     (async () => {
       await checkDatabaseHealth();
       checkVaultExists();
-      await cleanupSyncConflicts();
       await cleanMarkdownFiles();
       await cleanDatabaseTaskTitles();
       await cleanPlanFileTasks();
@@ -1442,20 +1379,6 @@ switch (command) {
       printStatus('Quick sync completed!');
       process.exit(0);
     })();
-    break;
-
-  case '--cleanup-conflicts':
-    // Only cleanup sync-conflict files
-    printHeader('🗑️  Cleanup Sync Conflicts');
-    cleanupSyncConflicts()
-      .then(() => {
-        printStatus('Sync conflicts cleaned successfully!');
-        process.exit(0);
-      })
-      .catch((error) => {
-        printError(`Sync conflict cleanup failed: ${error.message}`);
-        process.exit(1);
-      });
     break;
 
   case '--process-inbox-only':
@@ -1552,7 +1475,6 @@ ${chalk.gray('Usage:')}
   bin/sync --plugins [name,name,...]    Sync specific plugins (or all if no names)
   bin/sync --cancel-old-plan-tasks      Clean up old plan files
   bin/sync --cancel-old-plan-tasks FILE Clean up specific plan file
-  bin/sync --cleanup-conflicts          Remove duplicate sync-conflict files
   bin/sync --vault                      Check vault and process inbox
   bin/sync --quick                      Quick sync (tasks and inbox only)
   bin/sync --process-inbox-only         Only process inbox files
@@ -1564,7 +1486,7 @@ ${chalk.gray('Description:')}
   database, task management, and plan file cleanup.
 
 ${chalk.gray('Data sources synced:')}
-  • Vault files (via Resilio Sync)
+  • Vault files
   • Markdown formatting cleanup
   • Local task manager
   • Email inbox

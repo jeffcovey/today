@@ -220,6 +220,16 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     };
   }
 
+  // Utility plugins don't store data - just run and report results
+  if (plugin.type === 'utility') {
+    const data = result.data || {};
+    return {
+      success: true,
+      count: data.cleaned || 0,
+      message: data.message || `Utility plugin completed (${data.cleaned || 0} items processed)`
+    };
+  }
+
   // Plugin can return either:
   // - Array of entries (legacy full sync)
   // - Object with { entries: [], files_processed: [], incremental: true }

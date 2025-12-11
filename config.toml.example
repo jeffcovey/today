@@ -176,3 +176,7 @@
 
 # [plugins.streaks-habits.default]
 # enabled = true
+
+# [plugins.resilio-conflict-cleanup.default]
+# enabled = true
+# directory = "vault"
