@@ -22,6 +22,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { ensureHealthyDatabase } from '../src/db-health.js';
+import {
+  formatDate,
+  formatDateTime,
+  getWeekNumber,
+  getQuarterNumber,
+  addDaysToDate,
+} from '../src/date-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,12 +78,8 @@ function printHeader(message) {
 async function cancelOldPlanTasks(specificFile = null) {
   printInfo(specificFile ? `Processing specific file: ${specificFile}` : 'Checking for old plan files to clean up...');
 
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-  // Calculate one week ago (we only clean files from the last week)
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const weekAgoDate = oneWeekAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = formatDate(new Date());
+  const weekAgoDate = formatDate(addDaysToDate(new Date(), -7));
 
   // Find all plan files or use specific file
   let planFiles = [];
@@ -732,7 +735,7 @@ async function processInboxFile(filePath) {
   const destPath = path.join(destDir, basename);
 
   if (fs.existsSync(destPath)) {
-    moveToTrash(filePath, 'duplicate');
+    moveToTrash(filePath);
     printInfo(`  • Duplicate file moved to trash: ${basename}`);
   } else {
     fs.renameSync(filePath, destPath);
@@ -754,8 +757,8 @@ function processProgressNote(filePath, content, basename) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const week = getWeekNumber(date);
-  const quarter = Math.ceil((date.getMonth() + 1) / 3);
+  const week = String(getWeekNumber(date)).padStart(2, '0');
+  const quarter = getQuarterNumber(date);
 
   const planFile = `vault/plans/${year}_Q${quarter}_${month}_W${week}_${day}.md`;
 
@@ -813,8 +816,8 @@ function processConcernNote(filePath, content, basename) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const week = getWeekNumber(date);
-  const quarter = Math.ceil((date.getMonth() + 1) / 3);
+  const week = String(getWeekNumber(date)).padStart(2, '0');
+  const quarter = getQuarterNumber(date);
 
   const planFile = `vault/plans/${year}_Q${quarter}_${month}_W${week}_${day}.md`;
 
@@ -875,26 +878,18 @@ function processTaskOnlyFile(filePath, content) {
   const taskCount = (content.match(/^-\s*\[[x ]\]/gm) || []).length;
   printInfo(`  • Task-only file → Added ${taskCount} task(s) to tasks.md`);
 
-  moveToTrash(filePath, 'tasks-processed');
+  moveToTrash(filePath);
 }
 
-function moveToTrash(filePath, reason = 'processed') {
-  const trashDir = path.join(projectRoot, 'vault/notes/.trash', new Date().toISOString().split('T')[0]);
+function moveToTrash(filePath) {
+  const todayStr = formatDate(new Date());
+  const trashDir = path.join(projectRoot, 'vault/notes/.trash', todayStr);
   fs.mkdirSync(trashDir, { recursive: true });
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
   const basename = path.basename(filePath);
-  const trashPath = path.join(trashDir, `${timestamp}-${basename}`);
+  const trashPath = path.join(trashDir, `${todayStr}-${basename}`);
 
   fs.renameSync(filePath, trashPath);
-}
-
-function getWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
 // ============================================================================
@@ -1257,13 +1252,16 @@ async function main() {
   console.log(chalk.blue('╚═══════════════════════════════════════╝'));
   console.log('');
   console.log('Synchronizing all data sources...');
-  console.log(`Started at: ${new Date().toISOString().replace('T', ' ').split('.')[0]}`);
+  console.log(`Started at: ${formatDateTime(new Date())}`);
   console.log('');
 
   printInfo('Running all sync operations synchronously...');
 
   // Database health check (must be first - other operations depend on it)
   await runSyncStep('🔍 Database Health', checkDatabaseHealth, 'Database verified');
+
+  // Plugin sync (early - plugins are the primary sync mechanism)
+  await runSyncStep('🔌 Plugin Sync', syncPlugins, 'Plugins synced');
 
   // Critical path operations
   await runSyncStep('📝 Vault Check', checkVaultExists, 'Vault directory verified');
@@ -1312,9 +1310,6 @@ async function main() {
     await runSyncStep('📔 Day One Diary', syncDiary, 'Diary synced');
   }
 
-  // Plugin sync (time tracking, etc.)
-  await runSyncStep('🔌 Plugin Sync', syncPlugins, 'Plugins synced');
-
   // OGM monitoring (if configured)
   if (fs.existsSync('.env') && (fs.readFileSync('.env', 'utf8').includes('GITHUB_ACCESS_TOKEN=') || fs.readFileSync('.env', 'utf8').includes('SENTRY_AUTH_TOKEN='))) {
     await runSyncStep('🌐 OGM Monitoring', syncOgmMonitoring, 'OGM data synced');
@@ -1322,7 +1317,7 @@ async function main() {
 
   printStatus('All sync operations completed!');
   console.log('');
-  console.log(`Completed at: ${new Date().toISOString().replace('T', ' ').split('.')[0]}`);
+  console.log(`Completed at: ${formatDateTime(new Date())}`);
   console.log('');
   console.log('Next step: Run \'bin/today\' to get AI suggestions on what to do today');
 }
