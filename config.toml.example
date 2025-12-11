@@ -191,5 +191,12 @@
 
 # [plugins.github-issues.default]
 # enabled = true
+# repository = "owner/repo"
 # include_closed = false
+# limit = 100
+
+# [plugins.front-conversations.default]
+# enabled = true
+# inbox_ids = ""  # Comma-separated inbox IDs, or empty for all
+# include_archived = false
 # limit = 100
