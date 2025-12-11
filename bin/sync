@@ -165,16 +165,22 @@ async function generateDailySummary(fileDate, filePath) {
       dataSources.push(`DAILY PLAN FILE:\n${fileContent}`);
     }
 
-    // 2. Read time tracking
-    const yearMonth = fileDate.substring(0, 7);
-    const timeTrackingFile = `vault/logs/time-tracking/${yearMonth}.md`;
-    if (fs.existsSync(timeTrackingFile)) {
-      const timeContent = fs.readFileSync(timeTrackingFile, 'utf-8');
-      const dayEntries = timeContent.split('\n').filter(line => line.startsWith(fileDate));
-      if (dayEntries.length > 0) {
-        dataSources.push(`TIME TRACKING:\n${dayEntries.join('\n')}`);
+    // 2. Get time tracking via bin/track (queries database)
+    try {
+      const timeTracking = execSync(`bin/db-query custom "
+        SELECT start_time, end_time, duration_minutes, description FROM time_logs
+        WHERE date(start_time) = '${fileDate}'
+        ORDER BY start_time
+      "`, { encoding: 'utf8' });
+      const timeData = JSON.parse(timeTracking);
+      if (timeData && timeData.length > 0) {
+        const formatted = timeData.map(e => {
+          const mins = e.duration_minutes || 0;
+          return `${e.start_time.substring(11, 16)} (${mins}m): ${e.description}`;
+        }).join('\n');
+        dataSources.push(`TIME TRACKING:\n${formatted}`);
       }
-    }
+    } catch (e) { }
 
     // 3. Query calendar events
     try {

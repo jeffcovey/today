@@ -290,6 +290,7 @@ async function cmdStatus() {
 async function cmdToday(options = {}) {
   const db = getDatabase();
   const today = getTodayDate();
+  const currentTime = getCurrentTimeISO();
 
   // Validate source filter if provided
   if (options.source) {
@@ -300,6 +301,36 @@ async function cmdToday(options = {}) {
     }
     // Show which sources we're querying
     console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Check for running timers first
+  let runningQuery = `
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `;
+  if (options.source) {
+    runningQuery = `
+      SELECT start_time, description, source
+      FROM time_logs
+      WHERE end_time IS NULL AND source LIKE ?
+      ORDER BY start_time DESC
+    `;
+  }
+  const runningTimers = options.source
+    ? db.prepare(runningQuery).all(`%${options.source}%`)
+    : db.prepare(runningQuery).all();
+
+  if (runningTimers.length > 0) {
+    console.log(chalk.cyan('⏱  Currently Tracking'));
+    console.log('');
+    for (const timer of runningTimers) {
+      const duration = calculateDurationMinutes(timer.start_time, currentTime);
+      console.log(`  ${chalk.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
+      console.log(`    ${timer.description}`);
+    }
     console.log('');
   }
 
@@ -324,7 +355,10 @@ async function cmdToday(options = {}) {
 
   const entries = db.prepare(query).all(...params);
 
-  if (entries.length === 0) {
+  // Filter out running timers from completed entries display
+  const completedEntries = entries.filter(e => e.end_time !== null);
+
+  if (completedEntries.length === 0 && runningTimers.length === 0) {
     console.log(chalk.blue('ℹ') + ' No time entries for today');
     return;
   }
@@ -332,10 +366,15 @@ async function cmdToday(options = {}) {
   console.log(chalk.cyan("Today's Time Tracking") + ` (${today})`);
   console.log('');
 
+  if (completedEntries.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No completed entries yet');
+    return;
+  }
+
   let totalMinutes = 0;
   const topicMinutes = {};
 
-  for (const entry of entries) {
+  for (const entry of completedEntries) {
     const { start_time, end_time, duration_minutes, description } = entry;
     const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
 
@@ -348,9 +387,8 @@ async function cmdToday(options = {}) {
 
     // Display entry
     const startDisplay = formatTime(start_time);
-    const endDisplay = end_time ? formatTime(end_time) : 'now';
-    const symbol = end_time ? chalk.green('✓') : chalk.yellow('⏱');
-    console.log(`  ${symbol} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
+    const endDisplay = formatTime(end_time);
+    console.log(`  ${chalk.green('✓')} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
     console.log(`    ${description}`);
   }
 

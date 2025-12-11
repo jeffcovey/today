@@ -150,6 +150,14 @@ bin/today                              # Create daily plan from template
 # - [ ] Task title 🔺 ⏳ 2025-09-20    # Priority + scheduled date
 # - [ ] Task title 📅 2025-09-21 🔁 every week  # Due date + recurrence
 
+# Time tracking
+bin/track status                       # Show running timer(s)
+bin/track today                        # Show today's time entries + running timers
+bin/track week                         # Show this week's time summary
+bin/track start "Description #topic/x" # Start a timer
+bin/track stop                         # Stop current timer
+bin/track add 30m "Description #topic/x"  # Add completed time entry
+
 # Calendar time blocking (use TIME_BLOCKING_CALENDAR_ID)
 bin/calendar add --title "Task" --date "YYYY-MM-DD" "HH:MM" "HH:MM" --calendar "$TIME_BLOCKING_CALENDAR_ID"
 bin/calendar list-calendars            # Show available calendars
