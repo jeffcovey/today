@@ -344,13 +344,13 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
  */
 const TYPE_TO_TABLE = {
   'time-logs': 'time_logs',
+  'diary': 'diary',
   // Add other types as migrations are created:
   // 'tasks': 'tasks',
   // 'events': 'events',
   // 'email': 'email',
   // 'people': 'people',
   // 'habits': 'habits',
-  // 'diary': 'diary',
 };
 
 /**
@@ -407,6 +407,35 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
           entry.end_time || null,
           entry.duration_minutes || 0,
           entry.description || null
+        );
+      }
+    });
+
+    insertAll();
+    return entries.length;
+  }
+
+  if (pluginType === 'diary') {
+    // Diary uses INSERT OR REPLACE with unique IDs - no need to delete first
+    // Plugin only sends new/modified entries when doing incremental sync
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO ${tableName}
+      (id, source, date, text, metadata)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const insertAll = db.transaction(() => {
+      for (const entry of entries) {
+        // Use plugin-provided ID or generate from source + date
+        const id = entry.id
+          ? `${sourceId}:${entry.id}`
+          : `${sourceId}:${entry.date}`;
+        insert.run(
+          id,
+          sourceId,
+          entry.date,
+          entry.text,
+          entry.metadata || null
         );
       }
     });

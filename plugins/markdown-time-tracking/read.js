@@ -71,7 +71,6 @@ for (const file of filesToSync) {
     const [start, end, description] = parts;
     if (!start || !description) continue;
 
-    const topics = (description.match(/#topic\/[a-z_]+/g) || []).join(' ');
     const duration = calculateDuration(start.trim(), end?.trim());
 
     entries.push({
@@ -80,8 +79,7 @@ for (const file of filesToSync) {
       start_time: start.trim(),
       end_time: end?.trim() || null,
       duration_minutes: duration,
-      description: description.trim(),
-      topics: topics || null
+      description: description.trim()
     });
   }
 }
@@ -111,8 +109,7 @@ if (fs.existsSync(currentTimerFile)) {
           start_time: startTime,
           end_time: null,
           duration_minutes: 0,
-          description: description,
-          topics: (description.match(/#topic\/[a-z_]+/g) || []).join(' ') || null
+          description: description
         });
       }
     }

@@ -1057,23 +1057,6 @@ function syncContacts() {
   }
 }
 
-function syncDiary() {
-  if (!fs.existsSync('vault/logs/Journal.json')) {
-    return true; // Skip if no diary
-  }
-
-  printInfo('Syncing Day One diary...');
-
-  try {
-    execSync('bin/diary-sync.cjs', { stdio: 'pipe' });
-    printInfo('Diary synced');
-    return true;
-  } catch (error) {
-    printError(`Diary sync failed: ${error.message}`);
-    return false;
-  }
-}
-
 async function syncPlugins() {
   printInfo('Syncing enabled plugins...');
 
@@ -1197,10 +1180,7 @@ async function main() {
   // Contacts sync
   await runSyncStep('👥 Contacts Sync', syncContacts, 'Contacts synced');
 
-  // Diary sync (if Journal.json exists)
-  if (fs.existsSync('vault/logs/Journal.json')) {
-    await runSyncStep('📔 Day One Diary', syncDiary, 'Diary synced');
-  }
+  // Diary sync is now handled by the dayone-diary plugin (synced above with other plugins)
 
   // OGM monitoring (if configured)
   if (fs.existsSync('.env') && (fs.readFileSync('.env', 'utf8').includes('GITHUB_ACCESS_TOKEN=') || fs.readFileSync('.env', 'utf8').includes('SENTRY_AUTH_TOKEN='))) {

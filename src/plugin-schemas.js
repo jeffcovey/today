@@ -62,10 +62,53 @@ export const schemas = {
       }
     },
     indexes: ['source', 'start_time']
+  },
+
+  'diary': {
+    table: 'diary',
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (generated if not provided)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., dayone-diary/default)'
+      },
+      date: {
+        sqlType: 'DATETIME NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'When the entry was written (ISO 8601)'
+      },
+      text: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'The diary entry content'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (location, weather, starred, tags, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'date']
   }
-  // Add other plugin types here as we implement them:
-  // 'habits': { table: 'habits', fields: {...}, indexes: [...] },
-  // 'events': { table: 'events', fields: {...}, indexes: [...] },
 };
 
 /**

@@ -184,3 +184,7 @@
 # [plugins.markdownlint-cleanup.default]
 # enabled = true
 # directory = "vault/**/*.md"
+
+# [plugins.dayone-diary.default]
+# enabled = true
+# journal_file = "vault/logs/Journal.json"

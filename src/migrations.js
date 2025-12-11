@@ -74,10 +74,14 @@ export class MigrationManager {
     return result?.version || 0;
   }
 
-  async applyMigration(version, description, migrationFn) {
-    const currentVersion = this.getCurrentVersion();
+  isMigrationApplied(version) {
+    const result = this.db.prepare('SELECT 1 FROM schema_version WHERE version = ?').get(version);
+    return !!result;
+  }
 
-    if (version <= currentVersion) {
+  async applyMigration(version, description, migrationFn) {
+    // Check if this specific version has been applied (not just max version)
+    if (this.isMigrationApplied(version)) {
       return false;
     }
 
