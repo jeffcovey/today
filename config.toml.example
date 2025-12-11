@@ -188,3 +188,8 @@
 # [plugins.dayone-diary.default]
 # enabled = true
 # journal_file = "vault/logs/Journal.json"
+
+# [plugins.github-issues.default]
+# enabled = true
+# include_closed = false
+# limit = 100

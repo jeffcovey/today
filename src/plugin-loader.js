@@ -360,6 +360,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 const TYPE_TO_TABLE = {
   'time-logs': 'time_logs',
   'diary': 'diary',
+  'issues': 'issues',
   // Add other types as migrations are created:
   // 'tasks': 'tasks',
   // 'events': 'events',
@@ -450,6 +451,36 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
           sourceId,
           entry.date,
           entry.text,
+          entry.metadata || null
+        );
+      }
+    });
+
+    insertAll();
+    return entries.length;
+  }
+
+  if (pluginType === 'issues') {
+    // Issues uses INSERT OR REPLACE with unique IDs
+    // Plugin only sends new/modified issues when doing incremental sync
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO ${tableName}
+      (id, source, title, state, opened_at, url, body, metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertAll = db.transaction(() => {
+      for (const entry of entries) {
+        // Use plugin-provided ID (required for issues)
+        const id = `${sourceId}:${entry.id}`;
+        insert.run(
+          id,
+          sourceId,
+          entry.title,
+          entry.state,
+          entry.opened_at,
+          entry.url || null,
+          entry.body || null,
           entry.metadata || null
         );
       }

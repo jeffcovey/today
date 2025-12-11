@@ -108,6 +108,70 @@ export const schemas = {
       }
     },
     indexes: ['source', 'date']
+  },
+
+  'issues': {
+    table: 'issues',
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: true,
+        description: 'Unique identifier (issue number, key like PROJ-123, etc.)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., github-issues/today)'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Issue title'
+      },
+      state: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Issue state (open, closed)'
+      },
+      opened_at: {
+        sqlType: 'DATETIME NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'When the issue was opened (ISO 8601)'
+      },
+      url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'URL to the issue'
+      },
+      body: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Issue description/body'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (labels, assignees, milestone, closed_at, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Database record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Database record update timestamp'
+      }
+    },
+    indexes: ['source', 'state', 'opened_at']
   }
 };
 
