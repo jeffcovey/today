@@ -14,65 +14,22 @@ import {
   subtractSecondsISO,
   formatTime
 } from '../src/date-utils.js';
+import {
+  parseDuration,
+  formatDurationMinutes,
+  calculateDurationMinutes
+} from '../src/duration-utils.js';
+import {
+  parseArgs,
+  showSourceError,
+  showSourceFilterError
+} from '../src/cli-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 
 const TIMEZONE = getConfiguredTimezone();
-
-// Format duration in seconds to human readable
-function formatDuration(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
-
-// Calculate duration in minutes between two timestamps
-function calculateDuration(start, end) {
-  try {
-    const startEpoch = new Date(start).getTime() / 1000;
-    const endEpoch = new Date(end).getTime() / 1000;
-    return Math.floor((endEpoch - startEpoch) / 60);
-  } catch {
-    return 0;
-  }
-}
-
-// Parse natural language duration to minutes
-function parseDuration(input) {
-  input = input.toLowerCase().replace(/\s+/g, '');
-
-  // Decimal hours (e.g., "1.5h", "0.5hours")
-  const decimalHours = input.match(/^(\d+\.?\d*)h(ours?)?$/);
-  if (decimalHours) {
-    return Math.floor(parseFloat(decimalHours[1]) * 60);
-  }
-
-  // Hours + minutes (e.g., "2h30m", "1h15m")
-  const hoursMinutes = input.match(/(\d+)h(ours?)?(\d+)m(inutes?|ins?)?/);
-  if (hoursMinutes) {
-    return parseInt(hoursMinutes[1]) * 60 + parseInt(hoursMinutes[3]);
-  }
-
-  // Just hours (e.g., "2h", "2hours")
-  const justHours = input.match(/^(\d+)h(ours?)?$/);
-  if (justHours) {
-    return parseInt(justHours[1]) * 60;
-  }
-
-  // Just minutes (e.g., "20m", "35minutes")
-  const justMinutes = input.match(/^(\d+)m(inutes?|ins?)?$/);
-  if (justMinutes) {
-    return parseInt(justMinutes[1]);
-  }
-
-  return 0;
-}
 
 // Start tracking
 async function cmdStart(description, options = {}) {
@@ -108,8 +65,8 @@ async function cmdStart(description, options = {}) {
 
   if (runningTimer) {
     const currentTime = getCurrentTimeISO();
-    const duration = calculateDuration(runningTimer.start_time, currentTime);
-    const durationFormatted = formatDuration(duration * 60);
+    const duration = calculateDurationMinutes(runningTimer.start_time, currentTime);
+    const durationFormatted = formatDurationMinutes(duration);
 
     console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${runningTimer.description} (${durationFormatted})`);
 
@@ -201,8 +158,8 @@ async function cmdStop(options = {}) {
   }
 
   const endTime = getCurrentTimeISO();
-  const duration = calculateDuration(timerToStop.start_time, endTime);
-  const durationFormatted = formatDuration(duration * 60);
+  const duration = calculateDurationMinutes(timerToStop.start_time, endTime);
+  const durationFormatted = formatDurationMinutes(duration);
 
   // Complete the entry
   const entry = {
@@ -226,21 +183,6 @@ async function cmdStop(options = {}) {
   }
 
   console.log(chalk.green('✓') + ` Stopped: ${timerToStop.description} (${durationFormatted})`);
-}
-
-// Helper to display source errors consistently
-function showSourceError(error, availableSources) {
-  console.error(chalk.red('✗') + ` ${error}`);
-  console.log('');
-  if (availableSources && availableSources.length > 0) {
-    console.log('Available sources:');
-    for (const { sourceId, enabled } of availableSources) {
-      const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
-      console.log(`  ${sourceId} (${status})`);
-    }
-  }
-  console.log('');
-  console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
 }
 
 // Add command - add a completed entry
@@ -300,7 +242,7 @@ async function cmdAdd(durationStr, options = {}) {
     process.exit(1);
   }
 
-  const durationFormatted = formatDuration(durationMinutes * 60);
+  const durationFormatted = formatDurationMinutes(durationMinutes);
   console.log(chalk.green('✓') + ` Added: ${description} (${durationFormatted})`);
 
   console.log(chalk.blue('ℹ') + ` Time range: ${formatTime(startTime)} - ${formatTime(endTime)}`);
@@ -330,8 +272,8 @@ async function cmdStatus() {
 
   for (const timer of runningTimers) {
     const { start_time, description, source } = timer;
-    const duration = calculateDuration(start_time, currentTime);
-    const durationFormatted = formatDuration(duration * 60);
+    const duration = calculateDurationMinutes(start_time, currentTime);
+    const durationFormatted = formatDurationMinutes(duration);
 
     console.log('  ' + chalk.green(description));
     console.log(`  Started: ${formatTime(start_time)}`);
@@ -353,19 +295,7 @@ async function cmdToday(options = {}) {
   if (options.source) {
     const { sources, allSources } = await getSourcesForType('time-logs', options.source);
     if (sources.length === 0) {
-      console.log(chalk.red('✗') + ` No sources matching "${options.source}"`);
-      console.log('');
-      if (allSources.length > 0) {
-        console.log('Available time-logs sources:');
-        for (const { sourceId, enabled } of allSources) {
-          const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
-          console.log(`  ${sourceId} (${status})`);
-        }
-      } else {
-        console.log('No time-logs plugins found.');
-      }
-      console.log('');
-      console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
+      showSourceFilterError(options.source, 'time-logs', allSources);
       return;
     }
     // Show which sources we're querying
@@ -407,7 +337,7 @@ async function cmdToday(options = {}) {
 
   for (const entry of entries) {
     const { start_time, end_time, duration_minutes, description } = entry;
-    const duration = duration_minutes || calculateDuration(start_time, end_time);
+    const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
 
     if (!description) continue;
 
@@ -420,7 +350,7 @@ async function cmdToday(options = {}) {
     const startDisplay = formatTime(start_time);
     const endDisplay = end_time ? formatTime(end_time) : 'now';
     const symbol = end_time ? chalk.green('✓') : chalk.yellow('⏱');
-    console.log(`  ${symbol} ${startDisplay} - ${endDisplay} (${formatDuration(duration * 60)})`);
+    console.log(`  ${symbol} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
     console.log(`    ${description}`);
   }
 
@@ -430,12 +360,12 @@ async function cmdToday(options = {}) {
     console.log(chalk.cyan('By Topic:'));
     const sorted = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
     for (const [topic, mins] of sorted) {
-      console.log(`  ${topic}: ${formatDuration(mins * 60)}`);
+      console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
     }
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
+  console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
 }
 
 // Week command - queries time_logs table
@@ -446,19 +376,7 @@ async function cmdWeek(options = {}) {
   if (options.source) {
     const { sources, allSources } = await getSourcesForType('time-logs', options.source);
     if (sources.length === 0) {
-      console.log(chalk.red('✗') + ` No sources matching "${options.source}"`);
-      console.log('');
-      if (allSources.length > 0) {
-        console.log('Available time-logs sources:');
-        for (const { sourceId, enabled } of allSources) {
-          const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
-          console.log(`  ${sourceId} (${status})`);
-        }
-      } else {
-        console.log('No time-logs plugins found.');
-      }
-      console.log('');
-      console.log(`Run ${chalk.cyan('bin/plugins configure')} to set up plugins.`);
+      showSourceFilterError(options.source, 'time-logs', allSources);
       return;
     }
     // Show which sources we're querying
@@ -505,7 +423,7 @@ async function cmdWeek(options = {}) {
 
   for (const entry of entries) {
     const { start_time, duration_minutes, description } = entry;
-    const duration = duration_minutes || calculateDuration(start_time, entry.end_time);
+    const duration = duration_minutes || calculateDurationMinutes(start_time, entry.end_time);
 
     if (!description) continue;
 
@@ -521,7 +439,7 @@ async function cmdWeek(options = {}) {
   console.log(chalk.cyan('By Day:'));
   const sortedDays = Object.entries(dayMinutes).sort((a, b) => a[0].localeCompare(b[0]));
   for (const [day, mins] of sortedDays) {
-    console.log(`  ${day}: ${formatDuration(mins * 60)}`);
+    console.log(`  ${day}: ${formatDurationMinutes(mins)}`);
   }
 
   // Summary by topic
@@ -529,11 +447,11 @@ async function cmdWeek(options = {}) {
   console.log(chalk.cyan('By Topic:'));
   const sortedTopics = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
   for (const [topic, mins] of sortedTopics) {
-    console.log(`  ${topic}: ${formatDuration(mins * 60)}`);
+    console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${formatDuration(totalMinutes * 60)}`);
+  console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
 }
 
 // Sync command - delegates to plugin system for all time-logs plugins
@@ -558,43 +476,6 @@ async function cmdSync() {
       process.exit(1);
     }
   }
-}
-
-// Parse arguments
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const result = {
-    command: null,
-    positional: [],
-    options: {}
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-        result.options[key] = args[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const key = arg.slice(1);
-      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-        result.options[key] = args[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (!result.command) {
-      result.command = arg;
-    } else {
-      result.positional.push(arg);
-    }
-  }
-
-  return result;
 }
 
 // Main command handler
