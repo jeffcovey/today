@@ -6,30 +6,20 @@ import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType, getWritableSource, writeEntryAndSync } from '../src/plugin-loader.js';
+import {
+  getConfiguredTimezone,
+  getCurrentTimeISO,
+  getTodayDate,
+  getWeekAgoDate,
+  subtractSecondsISO,
+  formatTime
+} from '../src/date-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 
-// Get timezone from config
-function getTimezone() {
-  try {
-    const result = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
-    return result || 'America/New_York';
-  } catch {
-    return 'America/New_York';
-  }
-}
-
-const TIMEZONE = getTimezone();
-
-// Get current time in configured timezone
-function getCurrentTime() {
-  const cmd = `TZ="${TIMEZONE}" date '+%Y-%m-%dT%H:%M:%S%z'`;
-  const timestamp = execSync(cmd, { encoding: 'utf8' }).trim();
-  // Add colon in timezone offset (e.g., -0400 -> -04:00)
-  return timestamp.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-}
+const TIMEZONE = getConfiguredTimezone();
 
 // Format duration in seconds to human readable
 function formatDuration(seconds) {
@@ -117,7 +107,7 @@ async function cmdStart(description, options = {}) {
   `).get(source.sourceId);
 
   if (runningTimer) {
-    const currentTime = getCurrentTime();
+    const currentTime = getCurrentTimeISO();
     const duration = calculateDuration(runningTimer.start_time, currentTime);
     const durationFormatted = formatDuration(duration * 60);
 
@@ -143,7 +133,7 @@ async function cmdStart(description, options = {}) {
   }
 
   // Start new timer (entry with NULL end_time)
-  const startTime = getCurrentTime();
+  const startTime = getCurrentTimeISO();
   const entry = {
     start_time: startTime,
     end_time: null,
@@ -210,7 +200,7 @@ async function cmdStop(options = {}) {
     process.exit(1);
   }
 
-  const endTime = getCurrentTime();
+  const endTime = getCurrentTimeISO();
   const duration = calculateDuration(timerToStop.start_time, endTime);
   const durationFormatted = formatDuration(duration * 60);
 
@@ -282,26 +272,11 @@ async function cmdAdd(durationStr, options = {}) {
     process.exit(1);
   }
 
-  const endTime = getCurrentTime();
+  const endTime = getCurrentTimeISO();
   const durationSeconds = durationMinutes * 60;
 
   // Calculate start time
-  let startTime;
-  try {
-    startTime = execSync(`TZ="${TIMEZONE}" date -d "${durationSeconds} seconds ago" '+%Y-%m-%dT%H:%M:%S%z'`,
-      { encoding: 'utf8' }).trim();
-    startTime = startTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-  } catch {
-    // Try macOS format
-    try {
-      startTime = execSync(`TZ="${TIMEZONE}" date -v-${durationSeconds}S '+%Y-%m-%dT%H:%M:%S%z'`,
-        { encoding: 'utf8' }).trim();
-      startTime = startTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-    } catch {
-      console.error(chalk.red('✗') + ' Could not calculate start time');
-      process.exit(1);
-    }
-  }
+  const startTime = subtractSecondsISO(new Date(), durationSeconds);
 
   // Write entry via plugin and sync
   const entry = {
@@ -328,23 +303,7 @@ async function cmdAdd(durationStr, options = {}) {
   const durationFormatted = formatDuration(durationMinutes * 60);
   console.log(chalk.green('✓') + ` Added: ${description} (${durationFormatted})`);
 
-  try {
-    const startDisplay = new Date(startTime).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: TIMEZONE
-    });
-    const endDisplay = new Date(endTime).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: TIMEZONE
-    });
-    console.log(chalk.blue('ℹ') + ` Time range: ${startDisplay} - ${endDisplay}`);
-  } catch {
-    // Ignore time display errors
-  }
+  console.log(chalk.blue('ℹ') + ` Time range: ${formatTime(startTime)} - ${formatTime(endTime)}`);
 }
 
 // Status command - queries DB for running timers (end_time IS NULL)
@@ -367,7 +326,7 @@ async function cmdStatus() {
   console.log(chalk.cyan('⏱') + '  Currently tracking:');
   console.log('');
 
-  const currentTime = getCurrentTime();
+  const currentTime = getCurrentTimeISO();
 
   for (const timer of runningTimers) {
     const { start_time, description, source } = timer;
@@ -375,19 +334,7 @@ async function cmdStatus() {
     const durationFormatted = formatDuration(duration * 60);
 
     console.log('  ' + chalk.green(description));
-
-    try {
-      const startDisplay = new Date(start_time).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: TIMEZONE
-      });
-      console.log(`  Started: ${startDisplay}`);
-    } catch {
-      console.log(`  Started: ${start_time}`);
-    }
-
+    console.log(`  Started: ${formatTime(start_time)}`);
     console.log(`  Duration: ${durationFormatted}`);
     console.log(`  Source: ${chalk.gray(source)}`);
 
@@ -400,7 +347,7 @@ async function cmdStatus() {
 // Today command - queries time_logs table
 async function cmdToday(options = {}) {
   const db = getDatabase();
-  const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+  const today = getTodayDate();
 
   // Validate source filter if provided
   if (options.source) {
@@ -470,29 +417,11 @@ async function cmdToday(options = {}) {
     topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
 
     // Display entry
-    try {
-      const startTime = new Date(start_time).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: TIMEZONE
-      });
-      const endDisplay = end_time
-        ? new Date(end_time).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: TIMEZONE
-          })
-        : 'now';
-
-      const symbol = end_time ? chalk.green('✓') : chalk.yellow('⏱');
-      console.log(`  ${symbol} ${startTime} - ${endDisplay} (${formatDuration(duration * 60)})`);
-      console.log(`    ${description}`);
-    } catch {
-      console.log(`  ${start_time} - ${end_time || 'now'} (${formatDuration(duration * 60)})`);
-      console.log(`    ${description}`);
-    }
+    const startDisplay = formatTime(start_time);
+    const endDisplay = end_time ? formatTime(end_time) : 'now';
+    const symbol = end_time ? chalk.green('✓') : chalk.yellow('⏱');
+    console.log(`  ${symbol} ${startDisplay} - ${endDisplay} (${formatDuration(duration * 60)})`);
+    console.log(`    ${description}`);
   }
 
   // Summary by topic
@@ -538,19 +467,8 @@ async function cmdWeek(options = {}) {
   }
 
   // Calculate week start (7 days ago)
-  let weekStart;
-  try {
-    weekStart = execSync(`TZ="${TIMEZONE}" date -d '7 days ago' '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
-  } catch {
-    try {
-      weekStart = execSync(`TZ="${TIMEZONE}" date -v-7d '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
-    } catch {
-      console.error(chalk.red('✗') + ' Could not calculate week start');
-      process.exit(1);
-    }
-  }
-
-  const today = execSync(`TZ="${TIMEZONE}" date '+%Y-%m-%d'`, { encoding: 'utf8' }).trim();
+  const weekStart = getWeekAgoDate();
+  const today = getTodayDate();
 
   // Build query with optional source filter
   let query = `
