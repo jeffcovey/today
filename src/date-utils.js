@@ -3,7 +3,7 @@
  * Provides standardized date formatting and calculations.
  */
 
-import { format, getWeek, getQuarter, startOfWeek, endOfWeek, addDays, subSeconds, parseISO } from 'date-fns';
+import { format, getWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 import { getFullConfig } from './config.js';
 
@@ -287,4 +287,42 @@ export function formatTime(date, timezone) {
  */
 export function formatTimeRange(start, end, timezone) {
   return `${formatTime(start, timezone)} - ${formatTime(end, timezone)}`;
+}
+
+/**
+ * Get the start of today (midnight) in the configured timezone as a Unix timestamp.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {number} Unix timestamp in milliseconds for start of today
+ */
+export function getStartOfDayTimestamp(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  const startOfToday = dfStartOfDay(now);
+  return new TZDate(startOfToday, tz).getTime();
+}
+
+/**
+ * Format a date/time for full display (e.g., "Thursday, December 11, 2025 at 10:30 AM EST").
+ * @param {Date|string} date - Date object or ISO string
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Formatted full datetime string
+ */
+export function formatFullDateTime(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, "EEEE, MMMM d, yyyy 'at' h:mm a zzz");
+}
+
+/**
+ * Get timezone offset string (e.g., "-05:00").
+ * @param {Date|string} [date] - Optional date (defaults to now)
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Timezone offset
+ */
+export function getTimezoneOffset(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = date ? (typeof date === 'string' ? parseISO(date) : date) : new Date();
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, 'xxx');
 }

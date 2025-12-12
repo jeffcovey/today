@@ -162,8 +162,9 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
   }
 
   try {
+    // Run from project root so relative paths in plugins work correctly
     const output = execSync(fullPath, {
-      cwd: plugin._path,
+      cwd: PROJECT_ROOT,
       encoding: 'utf8',
       env: {
         ...process.env,
@@ -242,6 +243,17 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
       success: true,
       count: data.cleaned || 0,
       message: data.message || `Utility plugin completed (${data.cleaned || 0} items processed)`
+    };
+  }
+
+  // Context plugins provide ephemeral data - no database storage
+  if (plugin.type === 'context') {
+    const data = result.data || {};
+    const count = data.count || (Array.isArray(data.files) ? data.files.length : 0);
+    return {
+      success: true,
+      count,
+      message: data.message || `${count} item(s) available`
     };
   }
 
@@ -756,4 +768,40 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
   }
 
   return { success: true, source };
+}
+
+/**
+ * Get aggregated AI instructions by plugin type
+ * Combines user instructions from all enabled sources of each type
+ * @returns {Promise<Map<string, {sources: string[], instructions: string[]}>>}
+ */
+export async function getAIInstructionsByType() {
+  const enabledPlugins = await getEnabledPlugins();
+  const byType = new Map();
+
+  for (const { plugin, sources } of enabledPlugins) {
+    const pluginType = plugin.type;
+    if (!pluginType) continue;
+
+    if (!byType.has(pluginType)) {
+      byType.set(pluginType, { sources: [], instructions: [] });
+    }
+
+    const typeData = byType.get(pluginType);
+
+    for (const { sourceName, config } of sources) {
+      const sourceId = `${plugin.name}/${sourceName}`;
+      typeData.sources.push(sourceId);
+
+      // Add user's custom AI instructions if present (with source info)
+      if (config.ai_instructions) {
+        typeData.instructions.push({
+          sourceId,
+          text: config.ai_instructions.trim()
+        });
+      }
+    }
+  }
+
+  return byType;
 }

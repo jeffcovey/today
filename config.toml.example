@@ -14,8 +14,8 @@
 #   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
 # timezone = "America/New_York"
 
-# Your home location (used in daily reviews)
-# home_location = "Your City, State"
+# Your current location (update when traveling)
+# location = "Your City, State"
 
 # =============================================================================
 # User Profile (for personalized daily reviews)
@@ -27,6 +27,9 @@
 
 # Your email (used for git commits in devcontainer)
 # email = "your@email.com"
+
+# Your home location (where you normally live)
+# home_location = "Your City, State"
 
 # Brief description of your work/focus (shown in daily reviews)
 # vocation = "Software engineer focused on web applications"
@@ -207,3 +210,8 @@
 # project = ""  # Optional: filter to specific project
 # query = "is:unresolved"
 # limit = 100
+
+# [plugins.vault-changes.default]
+# enabled = true
+# directory = "vault"
+# excludeDirs = ".sync,templates,.git,.git.nosync,.obsidian,.trash"

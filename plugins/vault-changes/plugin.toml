@@ -1,0 +1,31 @@
+# Vault Changes Plugin
+# Reports files changed or added today in the vault
+
+name = "vault-changes"
+displayName = "Vault Changes"
+description = "Report files changed or added today in the vault"
+type = "context"
+
+requiredEnv = []
+
+longDescription = """
+Scans the vault directory for markdown files that have been modified or added today.
+
+This is useful for providing context to AI assistants about recent activity in your notes.
+
+Output includes:
+- File path
+- Title (extracted from first heading)
+- Modification time
+
+Files are sorted by modification time (most recent first).
+
+Run `bin/plugins sync vault-changes` or use the CLI `bin/vault-changes` to see today's changes.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+directory = { type = "string", default = "vault", description = "Directory to scan for changed files" }
+excludeDirs = { type = "string", default = ".sync,templates,.git,.git.nosync,.obsidian,.trash", description = "Comma-separated list of directories to exclude" }

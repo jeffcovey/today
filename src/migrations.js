@@ -26,26 +26,29 @@ const systemMigrations = [
 /**
  * Build migrations from plugin type schemas
  * Each schema becomes a numbered migration in order of definition
+ * Plugin types without tables (like 'context') are skipped
  */
 function buildMigrations() {
-  const pluginMigrations = Object.keys(schemas).map((type, index) => {
-    const table = getTableName(type);
-    const columns = getSqlColumns(type);
-    const indexes = getIndexes(type);
+  const pluginMigrations = Object.keys(schemas)
+    .filter(type => getTableName(type) !== null) // Skip types without tables
+    .map((type, index) => {
+      const table = getTableName(type);
+      const columns = getSqlColumns(type);
+      const indexes = getIndexes(type);
 
-    return {
-      version: index + 1,
-      description: `Create ${table} table for ${type} plugin type`,
-      fn: (db) => {
-        db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
+      return {
+        version: index + 1,
+        description: `Create ${table} table for ${type} plugin type`,
+        fn: (db) => {
+          db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
       ${columns}
     )`);
-        for (const col of indexes) {
-          db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_${col} ON ${table}(${col})`);
+          for (const col of indexes) {
+            db.exec(`CREATE INDEX IF NOT EXISTS idx_${table}_${col} ON ${table}(${col})`);
+          }
         }
-      }
-    };
-  });
+      };
+    });
 
   // Combine plugin and system migrations, sorted by version
   return [...pluginMigrations, ...systemMigrations].sort((a, b) => a.version - b.version);

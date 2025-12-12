@@ -401,6 +401,10 @@ async function configurePlugin(plugin, pluginName) {
     console.log('');
     console.log(chalk.cyan(`Configuring ${plugin.displayName || plugin.name}`));
     console.log(chalk.gray(plugin.description));
+    if (plugin.longDescription) {
+      console.log('');
+      console.log(plugin.longDescription.trim());
+    }
 
     // Refresh configured sources each iteration
     let allConfiguredSources = [];

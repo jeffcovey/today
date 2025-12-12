@@ -14,6 +14,17 @@
 export const schemas = {
   'time-logs': {
     table: 'time_logs',
+    ai: {
+      name: 'Time Tracking',
+      description: `Time logs record when a user began and ended an activity.
+They reflect what the user *actually did*, and are more
+determinative than lists of what was planned for a given
+time or whether or not a task has been checked off.
+They should be considered the truth of what was done.`,
+      defaultCommand: 'bin/track today',
+      queryInstructions: `Commands: bin/track today, bin/track week, bin/track status, bin/track start "desc", bin/track stop
+SQL: SELECT * FROM time_logs WHERE DATE(start_time) = DATE('now', 'localtime') ORDER BY start_time DESC`
+    },
     fields: {
       id: {
         sqlType: 'TEXT PRIMARY KEY',
@@ -66,6 +77,23 @@ export const schemas = {
 
   'diary': {
     table: 'diary',
+    ai: {
+      name: 'Diary / Journal',
+      description: `Diaries are journals capturing thoughts, experiences, and reflections.
+They may be personal or for work purposes, and may have many uses —
+goal tracking, end-of-day summaries, mental wellness, etc. Use them
+for understanding the user's mood, context, and personal history.
+
+"On this day" queries show entries from the same date in previous
+years. They may be of nostalgic interest to the user, or may prompt
+a connection with current circumstances.
+
+Some diary sources include metadata with an entry's location,
+weather, associated photos, tags, etc.`,
+      defaultCommand: 'bin/diary today',
+      queryInstructions: `Commands: bin/diary today, bin/diary week, bin/diary search "term", bin/diary on-this-day, bin/diary stats
+SQL: SELECT DATE(date) as day, SUBSTR(text, 1, 200) as preview FROM diary ORDER BY date DESC LIMIT 10`
+    },
     fields: {
       id: {
         sqlType: 'TEXT PRIMARY KEY',
@@ -112,6 +140,17 @@ export const schemas = {
 
   'issues': {
     table: 'issues',
+    ai: {
+      name: 'Issues & Tickets',
+      description: `Issues are bugs, feature requests, and support tickets from external
+systems like Zendesk, GitHub, Sentry, Front, etc.
+- Each source tracks a different project or system
+- State is 'open' or 'closed'
+- Metadata contains source-specific details (labels, assignees, error counts, etc.)`,
+      defaultCommand: 'bin/issues open',
+      queryInstructions: `Commands: bin/issues open, bin/issues show <id>, bin/issues open --source github-issues
+SQL: SELECT source, title, state, opened_at FROM issues WHERE state = 'open' ORDER BY opened_at DESC`
+    },
     fields: {
       id: {
         sqlType: 'TEXT PRIMARY KEY',
@@ -172,6 +211,24 @@ export const schemas = {
       }
     },
     indexes: ['source', 'state', 'opened_at']
+  },
+
+  'context': {
+    // Context plugins don't store data in a database table
+    // They run commands and return ephemeral output for AI context
+    table: null,
+    ai: {
+      name: 'Contextual Information',
+      description: `"context" is real-time contextual data from various sources.
+Plugins of this type may provide any sort of data the user
+wants to keep track of. Examples:
+- Files changed or added today in the vault
+- Other dynamic context that doesn't require persistent storage`,
+      defaultCommand: 'bin/context show',
+      queryInstructions: `Context plugins provide ephemeral data that doesn't persist in the database.
+These plugins do not save to the database.`
+    },
+    fields: {}
   }
 };
 
@@ -344,4 +401,79 @@ export function getSchema(pluginType) {
  */
 export function getPluginTypes() {
   return Object.keys(schemas);
+}
+
+/**
+ * Get AI metadata for a plugin type
+ * @param {string} pluginType
+ * @returns {object|null} { name, description, defaultCommand, queryInstructions }
+ */
+export function getAIMetadata(pluginType) {
+  return schemas[pluginType]?.ai || null;
+}
+
+/**
+ * Generate AI context block for a plugin type
+ * Includes description, schema, query instructions, and user instructions
+ *
+ * @param {string} pluginType - The plugin type (e.g., 'time-logs')
+ * @param {object} options
+ * @param {Array<{sourceId: string, text: string}>} options.userInstructions - User's custom AI instructions
+ * @param {string} options.currentData - Output from running the default command
+ * @returns {string} Formatted context block for AI prompt
+ */
+export function generateAIContextBlock(pluginType, options = {}) {
+  const schema = schemas[pluginType];
+  if (!schema || !schema.ai) return '';
+
+  const { userInstructions = [], currentData } = options;
+  const { name, description, defaultCommand, queryInstructions } = schema.ai;
+
+  const lines = [];
+
+  // Header
+  lines.push(`## SOURCE: ${name}`);
+  lines.push('');
+
+  // Description
+  lines.push(description);
+  lines.push('');
+
+  // Query instructions
+  lines.push('**To investigate further:**');
+  lines.push(queryInstructions);
+  lines.push('');
+
+  // Schema for direct SQL queries (skip for utility plugins which have no table)
+  if (schema.table && Object.keys(schema.fields).length > 0) {
+    lines.push('**Database schema:**');
+    lines.push('```sql');
+    lines.push(`-- Table: ${schema.table}`);
+    for (const [fieldName, field] of Object.entries(schema.fields)) {
+      const nullable = field.sqlType.includes('NOT NULL') ? '' : ' (nullable)';
+      lines.push(`-- ${fieldName}: ${field.description}${nullable}`);
+    }
+    lines.push('```');
+    lines.push('');
+  }
+
+  // User instructions (if any)
+  if (userInstructions && userInstructions.length > 0) {
+    lines.push('**Specific instructions from the user:**');
+    for (const { sourceId, text } of userInstructions) {
+      lines.push(`From ${sourceId}:`);
+      lines.push(`> ${text.replace(/\n/g, '\n> ')}`);
+      lines.push('');
+    }
+  }
+
+  // Current data
+  if (currentData) {
+    lines.push(`**Current data** (from \`${defaultCommand}\`):`);
+    lines.push('```');
+    lines.push(currentData.trim());
+    lines.push('```');
+  }
+
+  return lines.join('\n');
 }
