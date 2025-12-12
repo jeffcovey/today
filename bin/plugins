@@ -13,7 +13,8 @@ import {
   discoverPlugins,
   getPluginSources,
   getEnabledPlugins,
-  syncPluginSource
+  syncPluginSource,
+  getSyncMetadata
 } from '../src/plugin-loader.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
@@ -220,6 +221,9 @@ async function cmdSync(pluginName, sourceName, options = {}) {
   // Get type filter from options
   const typeFilter = options.type || options.t;
 
+  // Staleness check: skip sync if data is fresh (--if-stale <minutes>)
+  const staleMinutes = options['if-stale'] ? parseInt(options['if-stale'], 10) : null;
+
   if (pluginName) {
     // Sync specific plugin
     const plugins = await discoverPlugins();
@@ -290,8 +294,25 @@ async function cmdSync(pluginName, sourceName, options = {}) {
     console.log(chalk.cyan(`Syncing plugins${typeMsg}...`));
     console.log('');
 
+    let skippedCount = 0;
     for (const { plugin, sources } of syncablePlugins) {
       for (const { sourceName: src, config } of sources) {
+        const sourceId = `${plugin.name}/${src}`;
+
+        // Check staleness if --if-stale is specified
+        if (staleMinutes !== null) {
+          const syncMeta = getSyncMetadata(db, sourceId);
+          if (syncMeta?.last_synced_at) {
+            const lastSync = new Date(syncMeta.last_synced_at + 'Z');
+            const ageMs = Date.now() - lastSync.getTime();
+            const ageMinutes = ageMs / 1000 / 60;
+            if (ageMinutes < staleMinutes) {
+              skippedCount++;
+              continue; // Skip - data is fresh
+            }
+          }
+        }
+
         console.log(`  ${plugin.name}/${src}...`);
         const result = await syncPluginSource(plugin, src, config, context);
 
@@ -301,6 +322,10 @@ async function cmdSync(pluginName, sourceName, options = {}) {
           console.log(chalk.red(`    ✗ ${result.message}`));
         }
       }
+    }
+
+    if (skippedCount > 0 && staleMinutes !== null) {
+      console.log(chalk.gray(`  (${skippedCount} source(s) skipped - synced within ${staleMinutes} minutes)`));
     }
   }
 }

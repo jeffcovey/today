@@ -12,11 +12,62 @@ import https from 'https';
 import http from 'http';
 import { google } from 'googleapis';
 import { getDatabase } from '../src/database-service.js';
+import { getFullConfig } from '../src/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
+
+// Get the most recent sync time for events
+function getLastSyncTime(db) {
+  try {
+    const result = db.prepare(`
+      SELECT MAX(last_synced_at) as latest
+      FROM sync_metadata
+      WHERE source LIKE 'public-calendars/%'
+    `).get();
+    return result?.latest ? new Date(result.latest + 'Z') : null;
+  } catch {
+    return null;
+  }
+}
+
+// Quiet sync - ensures database is current before read operations
+// Only syncs if data is older than 5 minutes
+function ensureSync(db) {
+  const STALE_MINUTES = 5;
+  const lastSync = getLastSyncTime(db);
+
+  if (lastSync) {
+    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
+    if (ageMinutes < STALE_MINUTES) {
+      return; // Data is fresh, skip sync
+    }
+  }
+
+  try {
+    execSync('bin/plugins sync --type events', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  } catch {
+    // Silently ignore sync errors for read operations
+  }
+}
+
+// Format time ago string
+function formatTimeAgo(date) {
+  if (!date) return 'never';
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
 
 class CalendarSync {
   constructor() {
@@ -26,7 +77,8 @@ class CalendarSync {
 
     // Get timezone from config.toml
     try {
-      this.defaultTimezone = execSync('bin/get-config timezone', { encoding: 'utf-8' }).trim();
+      const config = getFullConfig();
+      this.defaultTimezone = config.timezone || 'America/New_York';
     } catch (error) {
       console.warn('Warning: Could not read timezone from config.toml, using America/New_York');
       this.defaultTimezone = 'America/New_York';
@@ -451,34 +503,9 @@ class CalendarSync {
       allEvents.push(...localEvents);
     }
     
-    // Fetch public calendar URLs from configuration
-    const calendarsConfigPath = path.join(__dirname, '..', 'config', 'calendars.json');
-    try {
-      const configContent = await fs.readFile(calendarsConfigPath, 'utf-8');
-      const config = JSON.parse(configContent);
-      
-      if (config.public_calendars && config.public_calendars.length > 0) {
-        console.log(`📅 Fetching ${config.public_calendars.length} public calendar(s)...`);
-        
-        // Fetch all public calendars in parallel
-        const publicCalendarPromises = config.public_calendars
-          .filter(cal => cal.enabled !== false)
-          .map(cal => this.fetchRemoteICal(cal.url, cal.name));
-        
-        const publicCalendarResults = await Promise.all(publicCalendarPromises);
-        
-        // Flatten and add to all events
-        for (const events of publicCalendarResults) {
-          allEvents.push(...events);
-        }
-      }
-    } catch (error) {
-      // Config file doesn't exist or is invalid - that's OK
-      if (error.code !== 'ENOENT') {
-        console.log('   Note: calendars.json not found or invalid');
-      }
-    }
-    
+    // Note: Public calendars are now synced via the plugin system (bin/plugins sync --type events)
+    // The sync command calls bin/plugins sync before this legacy method
+
     // Combine all events
     allEvents.push(...googleEvents, ...icloudEvents, ...macEvents);
     
@@ -560,11 +587,12 @@ class CalendarSync {
     return allEvents;
   }
 
-  // Get events from database
+  // Get events from database (queries both old calendar_events and new events tables)
   async getEventsForSummary() {
     try {
-      return this.db.prepare(`
-        SELECT * FROM calendar_events 
+      // First try the new events table (from plugin system)
+      const newEvents = this.db.prepare(`
+        SELECT * FROM events
         WHERE start_date >= datetime('now', '-1 month')
           AND start_date <= datetime('now', '+6 months')
         ORDER BY start_date
@@ -581,6 +609,36 @@ class CalendarSync {
         description: event.description,
         allDay: event.all_day === 1
       }));
+
+      // Also include events from old calendar_events table (Google Calendar, etc.)
+      let oldEvents = [];
+      try {
+        oldEvents = this.db.prepare(`
+          SELECT * FROM calendar_events
+          WHERE start_date >= datetime('now', '-1 month')
+            AND start_date <= datetime('now', '+6 months')
+          ORDER BY start_date
+        `).all().map(event => ({
+          id: event.id,
+          source: event.source,
+          calendar: event.calendar_name,
+          title: event.title,
+          start: event.start_date,
+          end: event.end_date,
+          startTimeZone: event.start_timezone,
+          endTimeZone: event.end_timezone,
+          location: event.location,
+          description: event.description,
+          allDay: event.all_day === 1
+        }));
+      } catch {
+        // Old table may not exist yet
+      }
+
+      // Combine and sort by start date
+      const allEvents = [...newEvents, ...oldEvents];
+      allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
+      return allEvents;
     } catch (error) {
       console.error('Error getting calendar events from database:', error.message);
       return [];
@@ -1094,27 +1152,113 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     switch (command) {
       case 'sync':
+        // Sync public calendars via plugin system
+        console.log('Syncing public calendars...');
+        execSync('bin/plugins sync --type events', {
+          encoding: 'utf8',
+          stdio: 'inherit'
+        });
+        // Also sync Google Calendar etc. via legacy method
         await calSync.sync();
         break;
       
     case 'today':
+      ensureSync(calSync.db);
       const events = await calSync.getEventsForSummary();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+
+      // Include events that span today (start <= today < end) or start today
       const todayEvents = events.filter(event => {
-        const eventDate = new Date(event.start);
-        return eventDate >= today && eventDate < tomorrow;
+        const startDate = new Date(event.start);
+        const endDate = new Date(event.end);
+        // Event spans today if: start <= today AND end > today
+        // Or event starts today: start >= today AND start < tomorrow
+        return (startDate < tomorrow && endDate > today);
       });
-      
-      console.log(JSON.stringify(todayEvents, null, 2));
+
+      if (todayEvents.length === 0) {
+        console.log('No events for today.');
+      } else {
+        console.log(`📅 Today's Events (${todayEvents.length}):\n`);
+        for (const event of todayEvents) {
+          const startDate = new Date(event.start);
+          if (event.allDay) {
+            console.log(`  • ${event.title}`);
+          } else {
+            const time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            console.log(`  • ${time} - ${event.title}`);
+          }
+          if (event.calendar) console.log(`    📆 ${event.calendar}`);
+          if (event.location) console.log(`    📍 ${event.location}`);
+          if (event.description) {
+            // Show full first line of description (for URLs etc)
+            const firstLine = event.description.split('\n')[0];
+            console.log(`    ${firstLine}`);
+          }
+          console.log('');
+        }
+      }
+
+      // Show sync status
+      const lastSync = getLastSyncTime(calSync.db);
+      console.log(`Last synced: ${formatTimeAgo(lastSync)}. Run 'bin/calendar sync' to refresh.`);
       break;
       
     case 'week':
+      ensureSync(calSync.db);
       const weekEvents = await calSync.getEventsForSummary();
-      console.log(JSON.stringify(weekEvents, null, 2));
+      const weekStart = new Date();
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+
+      // Filter to events within the next 7 days
+      const upcomingEvents = weekEvents.filter(event => {
+        const startDate = new Date(event.start);
+        const endDate = new Date(event.end);
+        return (startDate < weekEnd && endDate > weekStart);
+      });
+
+      if (upcomingEvents.length === 0) {
+        console.log('No events for the next 7 days.');
+      } else {
+        console.log(`📅 This Week's Events (${upcomingEvents.length}):\n`);
+
+        // Group by date
+        const byDate = {};
+        for (const event of upcomingEvents) {
+          const startDate = new Date(event.start);
+          const dateKey = startDate.toISOString().split('T')[0];
+          if (!byDate[dateKey]) byDate[dateKey] = [];
+          byDate[dateKey].push(event);
+        }
+
+        for (const dateKey of Object.keys(byDate).sort()) {
+          const date = new Date(dateKey + 'T12:00:00');
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+          console.log(`${dayName}:`);
+
+          for (const event of byDate[dateKey]) {
+            const startDate = new Date(event.start);
+            if (event.allDay) {
+              console.log(`  • ${event.title}`);
+            } else {
+              const time = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+              console.log(`  • ${time} - ${event.title}`);
+            }
+            if (event.calendar) console.log(`    📆 ${event.calendar}`);
+            if (event.location) console.log(`    📍 ${event.location}`);
+          }
+          console.log('');
+        }
+      }
+
+      // Show sync status
+      const weekLastSync = getLastSyncTime(calSync.db);
+      console.log(`Last synced: ${formatTimeAgo(weekLastSync)}. Run 'bin/calendar sync' to refresh.`);
       break;
     
     case 'add':

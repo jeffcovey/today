@@ -5,7 +5,7 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig } from './config.js';
-import { validateEntries } from './plugin-schemas.js';
+import { validateEntries, getTableName, schemas } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -186,11 +186,38 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
 /**
  * Get last sync metadata for a source
  */
-function getSyncMetadata(db, sourceId) {
+export function getSyncMetadata(db, sourceId) {
   try {
     return db.prepare('SELECT * FROM sync_metadata WHERE source = ?').get(sourceId);
   } catch {
     // Table might not exist yet
+    return null;
+  }
+}
+
+/**
+ * Get the most recent sync time for a plugin type
+ * @param {object} db - Database instance
+ * @param {string} pluginType - Plugin type (e.g., 'events', 'time-logs')
+ * @returns {Date|null} - Most recent sync time, or null if never synced
+ */
+export function getLatestSyncTimeForType(db, pluginType) {
+  try {
+    // Get the table name for this plugin type
+    const tableName = getTableName(pluginType);
+    if (!tableName) return null;
+
+    // Get the latest sync time for sources that have entries in the target table
+    const latestResult = db.prepare(`
+      SELECT sm.last_synced_at
+      FROM sync_metadata sm
+      WHERE EXISTS (SELECT 1 FROM ${tableName} e WHERE e.source = sm.source)
+      ORDER BY sm.last_synced_at DESC
+      LIMIT 1
+    `).get();
+
+    return latestResult ? new Date(latestResult.last_synced_at + 'Z') : null;
+  } catch {
     return null;
   }
 }
@@ -366,26 +393,11 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 }
 
 /**
- * Map plugin types to their standardized table names
- * Tables are created by migrations, not by plugins
- */
-const TYPE_TO_TABLE = {
-  'time-logs': 'time_logs',
-  'diary': 'diary',
-  'issues': 'issues',
-  // Add other types as migrations are created:
-  // 'tasks': 'tasks',
-  // 'events': 'events',
-  // 'email': 'email',
-  // 'people': 'people',
-  // 'habits': 'habits',
-};
-
-/**
  * Get the standardized table name for a plugin type
+ * Uses the schema definitions as the single source of truth
  */
 function getTableNameForType(pluginType) {
-  return TYPE_TO_TABLE[pluginType] || null;
+  return getTableName(pluginType);
 }
 
 /**
@@ -399,111 +411,92 @@ function getTableNameForType(pluginType) {
  * @returns {number} Number of entries inserted
  */
 function insertEntries(db, tableName, pluginType, entries, sourceId, filesProcessed) {
-  if (pluginType === 'time-logs') {
-    // For incremental sync, only delete entries from the specific files that were re-processed
-    // For full sync (filesProcessed is null), delete all entries for this source
-    if (filesProcessed && filesProcessed.length > 0) {
-      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
-      for (const file of filesProcessed) {
-        // IDs are in format: sourceId:filepath:start_time
-        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
-      }
-    } else if (!filesProcessed) {
-      // Full sync: delete all entries for this source
-      db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+  const schema = schemas[pluginType];
+  if (!schema || !schema.fields) {
+    return 0;
+  }
+
+  // Handle deletion strategy based on plugin type and incremental sync
+  if (pluginType === 'time-logs' && filesProcessed && filesProcessed.length > 0) {
+    // For time-logs incremental sync, only delete entries from re-processed files
+    const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
+    for (const file of filesProcessed) {
+      deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
     }
-    // If filesProcessed is empty array, nothing to delete (no files changed)
+  } else if (!filesProcessed || pluginType === 'events') {
+    // Full sync: delete all entries for this source
+    db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+  }
+  // For diary/issues with empty filesProcessed array, nothing to delete (incremental)
 
-    const insert = db.prepare(`
-      INSERT OR REPLACE INTO ${tableName}
-      (id, source, start_time, end_time, duration_minutes, description)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    const insertAll = db.transaction(() => {
-      for (const entry of entries) {
-        // Generate ID from source + entry.id (which may include filepath) + start_time
-        // This allows incremental deletes by file
-        // Format: sourceId:filepath:start_time or sourceId:start_time (legacy)
-        const id = entry.id
-          ? `${sourceId}:${entry.id}`
-          : `${sourceId}:${entry.start_time}`;
-        insert.run(
-          id,
-          sourceId,
-          entry.start_time,
-          entry.end_time || null,
-          entry.duration_minutes || 0,
-          entry.description || null
-        );
-      }
-    });
-
-    insertAll();
-    return entries.length;
+  // Build column list from schema (excluding dbOnly fields like created_at, updated_at)
+  const columns = [];
+  const fieldNames = [];
+  for (const [name, field] of Object.entries(schema.fields)) {
+    if (name === 'created_at' || name === 'updated_at') continue; // Let DB handle these
+    columns.push(name);
+    if (!field.dbOnly) {
+      fieldNames.push(name);
+    }
   }
 
-  if (pluginType === 'diary') {
-    // Diary uses INSERT OR REPLACE with unique IDs - no need to delete first
-    // Plugin only sends new/modified entries when doing incremental sync
-    const insert = db.prepare(`
-      INSERT OR REPLACE INTO ${tableName}
-      (id, source, date, text, metadata)
-      VALUES (?, ?, ?, ?, ?)
-    `);
+  const placeholders = columns.map(() => '?').join(', ');
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO ${tableName}
+    (${columns.join(', ')})
+    VALUES (${placeholders})
+  `);
 
-    const insertAll = db.transaction(() => {
-      for (const entry of entries) {
-        // Use plugin-provided ID or generate from source + date
-        const id = entry.id
-          ? `${sourceId}:${entry.id}`
-          : `${sourceId}:${entry.date}`;
-        insert.run(
-          id,
-          sourceId,
-          entry.date,
-          entry.text,
-          entry.metadata || null
-        );
+  // Determine which field to use for generating IDs if not provided
+  const idFallbackField = schema.fields.start_time ? 'start_time'
+    : schema.fields.date ? 'date'
+    : schema.fields.start_date ? 'start_date'
+    : null;
+
+  const insertAll = db.transaction(() => {
+    for (const entry of entries) {
+      // Generate ID: use plugin-provided ID or generate from source + fallback field
+      let id;
+      if (entry.id) {
+        id = `${sourceId}:${entry.id}`;
+      } else if (idFallbackField && entry[idFallbackField]) {
+        // For events, include title in ID for uniqueness
+        if (pluginType === 'events' && entry.title) {
+          id = `${sourceId}:${entry[idFallbackField]}:${entry.title}`;
+        } else {
+          id = `${sourceId}:${entry[idFallbackField]}`;
+        }
+      } else {
+        id = `${sourceId}:${Date.now()}`;
       }
-    });
 
-    insertAll();
-    return entries.length;
-  }
+      // Build values array matching column order
+      const values = columns.map(col => {
+        if (col === 'id') return id;
+        if (col === 'source') return sourceId;
 
-  if (pluginType === 'issues') {
-    // Issues uses INSERT OR REPLACE with unique IDs
-    // Plugin only sends new/modified issues when doing incremental sync
-    const insert = db.prepare(`
-      INSERT OR REPLACE INTO ${tableName}
-      (id, source, title, state, opened_at, url, body, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+        const value = entry[col];
+        const field = schema.fields[col];
 
-    const insertAll = db.transaction(() => {
-      for (const entry of entries) {
-        // Use plugin-provided ID (required for issues)
-        const id = `${sourceId}:${entry.id}`;
-        insert.run(
-          id,
-          sourceId,
-          entry.title,
-          entry.state,
-          entry.opened_at,
-          entry.url || null,
-          entry.body || null,
-          entry.metadata || null
-        );
-      }
-    });
+        // Handle null/undefined
+        if (value === undefined || value === null) {
+          return field?.required ? '' : null;
+        }
 
-    insertAll();
-    return entries.length;
-  }
+        // Handle boolean -> integer conversion for SQLite
+        if (field?.jsType === 'boolean') {
+          return value ? 1 : 0;
+        }
 
-  // Add other plugin types as migrations are created
-  return 0;
+        return value;
+      });
+
+      insert.run(...values);
+    }
+  });
+
+  insertAll();
+  return entries.length;
 }
 
 /**

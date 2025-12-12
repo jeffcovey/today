@@ -215,3 +215,24 @@
 # enabled = true
 # directory = "vault"
 # excludeDirs = ".sync,templates,.git,.git.nosync,.obsidian,.trash"
+
+# [plugins.public-calendars.tripit]
+# enabled = true
+# name = "TripIt"
+# url = "https://www.tripit.com/feed/ical/private/YOUR_KEY/tripit.ics"
+# days_back = 7
+# days_forward = 90
+# ai_instructions = """
+# This calendar has confirmed travel plans.
+# Remind me to pack the day before each trip.
+# """
+
+# [plugins.public-calendars.airbnb]
+# enabled = true
+# name = "Airbnb"
+# url = "https://www.airbnb.com/calendar/ical/YOUR_LISTING_ID.ics?s=YOUR_SECRET"
+# ai_instructions = """
+# These are guest bookings. Check-in is at 3pm, checkout at noon.
+# Remind me to prepare the room before check-in and plan cleaning
+# after checkout.
+# """

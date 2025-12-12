@@ -229,6 +229,100 @@ wants to keep track of. Examples:
 These plugins do not save to the database.`
     },
     fields: {}
+  },
+
+  // NOTE: New plugin types should be added at the END to get new migration version numbers
+  'events': {
+    table: 'events',
+    ai: {
+      name: 'Calendar Events',
+      description: `Events may be synced from many sources. Try to distinguish between
+the user's personal events and calendars that just suggest events of
+possible interest. Use calendar data to understand the user's schedule
+and availability, and to look for timing conflicts and anything that needs
+preparation.`,
+      defaultCommand: 'bin/calendar today',
+      queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar sync
+SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: true,
+        description: 'Unique event identifier'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., public-calendars/tripit)'
+      },
+      calendar_name: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Name of the calendar this event belongs to'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Event title/summary'
+      },
+      start_date: {
+        sqlType: 'DATETIME NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Event start time (ISO 8601)'
+      },
+      end_date: {
+        sqlType: 'DATETIME NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Event end time (ISO 8601)'
+      },
+      start_timezone: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Timezone for start time (e.g., America/New_York)'
+      },
+      end_timezone: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Timezone for end time'
+      },
+      location: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Event location'
+      },
+      description: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Event description/notes'
+      },
+      all_day: {
+        sqlType: 'BOOLEAN DEFAULT 0',
+        jsType: 'boolean',
+        required: false,
+        description: 'Whether this is an all-day event'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'start_date', 'end_date']
   }
 };
 

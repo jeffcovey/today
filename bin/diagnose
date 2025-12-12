@@ -64,11 +64,11 @@ echo ""
 
 # Check calendar configuration
 echo "📅 Calendar Configuration:"
-if [ -f config/calendars.json ]; then
-    CAL_COUNT=$(grep -c '"url"' config/calendars.json 2>/dev/null || echo "0")
-    echo "  ✅ config/calendars.json exists ($CAL_COUNT calendars)"
+CAL_COUNT=$(grep -c '\[plugins.public-calendars\.' config.toml 2>/dev/null || echo "0")
+if [ "$CAL_COUNT" -gt 0 ]; then
+    echo "  ✅ $CAL_COUNT public calendar(s) configured in config.toml"
 else
-    echo "  ❌ config/calendars.json missing"
+    echo "  ⚠️  No public calendars configured in config.toml"
 fi
 if [ ! -z "$GOOGLE_SERVICE_ACCOUNT_KEY" ]; then
     echo "  ✅ GOOGLE_SERVICE_ACCOUNT_KEY is set"
@@ -155,8 +155,8 @@ if [ "$BETTER_SQLITE_FOUND" = false ]; then
     echo "  - Native modules: Run 'npm rebuild better-sqlite3'"
 fi
 
-if [ ! -f config/calendars.json ]; then
-    echo "  - Calendar config: Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
+if [ "$CAL_COUNT" -eq 0 ]; then
+    echo "  - Calendar config: Add [plugins.public-calendars.<name>] sections to config.toml"
 fi
 
 if ! command -v claude &> /dev/null; then
