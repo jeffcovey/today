@@ -114,6 +114,7 @@ async function cmdStart(description, options = {}) {
 
 // Stop command
 async function cmdStop(options = {}) {
+  ensureSync();
   const db = getDatabase();
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
@@ -250,6 +251,7 @@ async function cmdAdd(durationStr, options = {}) {
 
 // Status command - queries DB for running timers (end_time IS NULL)
 async function cmdStatus() {
+  ensureSync();
   const db = getDatabase();
 
   // Query for all running timers across all sources
@@ -288,6 +290,7 @@ async function cmdStatus() {
 
 // Today command - queries time_logs table
 async function cmdToday(options = {}) {
+  ensureSync();
   const db = getDatabase();
   const today = getTodayDate();
   const currentTime = getCurrentTimeISO();
@@ -408,6 +411,7 @@ async function cmdToday(options = {}) {
 
 // Week command - queries time_logs table
 async function cmdWeek(options = {}) {
+  ensureSync();
   const db = getDatabase();
 
   // Validate source filter if provided
@@ -490,6 +494,18 @@ async function cmdWeek(options = {}) {
 
   console.log('');
   console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+}
+
+// Quiet sync - ensures database is current before read operations
+function ensureSync() {
+  try {
+    execSync('bin/plugins sync --type time-logs', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  } catch {
+    // Silently ignore sync errors for read operations
+  }
 }
 
 // Sync command - delegates to plugin system for all time-logs plugins
