@@ -5,7 +5,7 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig } from './config.js';
-import { validateEntries, getTableName, schemas } from './plugin-schemas.js';
+import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -220,6 +220,79 @@ export function getLatestSyncTimeForType(db, pluginType) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Ensure data for a plugin type is synced before read operations.
+ * Silently syncs if data is stale or has never been synced.
+ * @param {object} db - Database instance
+ * @param {string} pluginType - Plugin type (e.g., 'events', 'time-logs', 'issues')
+ * @param {object} options - Options
+ * @param {number} options.staleMinutes - Minutes before data is considered stale (uses schema default if not specified)
+ * @param {boolean} options.force - Force sync even if not stale (default: false)
+ * @returns {boolean} - True if sync was performed, false if data was fresh
+ */
+export function ensureSyncForType(db, pluginType, options = {}) {
+  const { staleMinutes = getStaleMinutes(pluginType), force = false } = options;
+
+  if (!force) {
+    const lastSync = getLatestSyncTimeForType(db, pluginType);
+
+    // staleMinutes of 0 means always sync
+    if (staleMinutes > 0 && lastSync) {
+      const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
+      if (ageMinutes < staleMinutes) {
+        return false; // Data is fresh
+      }
+    }
+  }
+
+  try {
+    execSync(`bin/plugins sync --type ${pluginType}`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch {
+    // Silently ignore sync errors for read operations
+    return false;
+  }
+}
+
+/**
+ * Format a "time ago" string
+ * @param {Date} date
+ * @returns {string}
+ */
+function formatTimeAgo(date) {
+  if (!date) return 'never';
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Get sync status message for a plugin type
+ * @param {object} db - Database instance
+ * @param {string} pluginType - Plugin type (e.g., 'events', 'time-logs', 'issues')
+ * @returns {string} Formatted status message
+ */
+export function getSyncStatusMessage(db, pluginType) {
+  const lastSync = getLatestSyncTimeForType(db, pluginType);
+  const staleMinutes = getStaleMinutes(pluginType);
+
+  // For types that sync on every read, just show that info
+  if (staleMinutes === 0) {
+    return `Syncs on every read.\nRun 'bin/plugins sync' to force a full refresh.`;
+  }
+
+  const timeAgo = formatTimeAgo(lastSync);
+  return `Last synced: ${timeAgo} (auto-syncs after ${staleMinutes}m).\nRun 'bin/plugins sync' to refresh.`;
 }
 
 /**

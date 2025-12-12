@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { getDatabase } from '../src/database-service.js';
-import { getSourcesForType, getWritableSource, writeEntryAndSync } from '../src/plugin-loader.js';
+import { getSourcesForType, getWritableSource, writeEntryAndSync, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import {
   getConfiguredTimezone,
   getCurrentTimeISO,
@@ -407,6 +407,8 @@ async function cmdToday(options = {}) {
 
   console.log('');
   console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log('');
+  console.log(getSyncStatusMessage(db, 'time-logs'));
 }
 
 // Week command - queries time_logs table
@@ -494,18 +496,14 @@ async function cmdWeek(options = {}) {
 
   console.log('');
   console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log('');
+  console.log(getSyncStatusMessage(db, 'time-logs'));
 }
 
 // Quiet sync - ensures database is current before read operations
 function ensureSync() {
-  try {
-    execSync('bin/plugins sync --type time-logs', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-  } catch {
-    // Silently ignore sync errors for read operations
-  }
+  const db = getDatabase();
+  ensureSyncForType(db, 'time-logs');
 }
 
 // Restart command - start a new timer with the same description as the most recent entry

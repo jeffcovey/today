@@ -206,6 +206,32 @@ async function cmdStatus() {
 }
 
 async function cmdSync(pluginName, sourceName, options = {}) {
+  // Handle help flag
+  if (options.help || options.h) {
+    console.log(`
+Usage: bin/plugins sync [plugin-name] [source-name] [options]
+
+Sync data from plugins to the database.
+
+Arguments:
+  plugin-name    Sync only this plugin (optional)
+  source-name    Sync only this source within the plugin (optional)
+
+Options:
+  --type TYPE    Sync only plugins of this type (e.g., events, issues, time-logs)
+
+Examples:
+  bin/plugins sync                        # Sync all enabled plugins
+  bin/plugins sync --type events          # Sync only calendar/event plugins
+  bin/plugins sync github-issues          # Sync only github-issues plugin
+  bin/plugins sync github-issues today    # Sync only the 'today' source
+
+Note: CLI tools (bin/calendar, bin/issues, etc.) auto-sync stale data before
+displaying results. Use 'bin/plugins sync' to force an immediate refresh.
+`);
+    return;
+  }
+
   // Ensure database is healthy and migrations are run
   const healthResult = await ensureHealthyDatabase({ verbose: false });
   if (!healthResult.success) {

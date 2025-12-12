@@ -14,6 +14,7 @@
 export const schemas = {
   'time-logs': {
     table: 'time_logs',
+    staleMinutes: 0, // Always sync - timers can start/stop any moment
     ai: {
       name: 'Time Tracking',
       description: `Time logs record when a user began and ended an activity.
@@ -77,6 +78,7 @@ SQL: SELECT * FROM time_logs WHERE DATE(start_time) = DATE('now', 'localtime') O
 
   'diary': {
     table: 'diary',
+    staleMinutes: 60, // Diary entries don't change often
     ai: {
       name: 'Diary / Journal',
       description: `Diaries are journals capturing thoughts, experiences, and reflections.
@@ -140,6 +142,7 @@ SQL: SELECT DATE(date) as day, SUBSTR(text, 1, 200) as preview FROM diary ORDER 
 
   'issues': {
     table: 'issues',
+    staleMinutes: 10, // Issues don't change as frequently
     ai: {
       name: 'Issues & Tickets',
       description: `Issues are bugs, feature requests, and support tickets from external
@@ -217,6 +220,7 @@ SQL: SELECT source, title, state, opened_at FROM issues WHERE state = 'open' ORD
     // Context plugins don't store data in a database table
     // They run commands and return ephemeral output for AI context
     table: null,
+    staleMinutes: 0, // Always fresh - context is ephemeral
     ai: {
       name: 'Contextual Information',
       description: `"context" is real-time contextual data from various sources.
@@ -234,6 +238,7 @@ These plugins do not save to the database.`
   // NOTE: New plugin types should be added at the END to get new migration version numbers
   'events': {
     table: 'events',
+    staleMinutes: 5, // Calendar events change occasionally
     ai: {
       name: 'Calendar Events',
       description: `Events may be synced from many sources. Try to distinguish between
@@ -508,6 +513,34 @@ export function getPluginTypes() {
  */
 export function getAIMetadata(pluginType) {
   return schemas[pluginType]?.ai || null;
+}
+
+/**
+ * Stale thresholds for plugin types not yet in full schema
+ * These will be moved into schemas when full schema support is added
+ */
+const staleMinutesByType = {
+  'habits': 30,         // Habits sync daily, don't need frequent updates
+  'health-metrics': 60, // Health data syncs periodically from phone
+  'utility': 0,         // Utility plugins run on-demand, always fresh
+};
+
+/**
+ * Get stale threshold for a plugin type
+ * @param {string} pluginType
+ * @returns {number} Minutes before data is considered stale (default: 5)
+ */
+export function getStaleMinutes(pluginType) {
+  // Check full schema first
+  if (schemas[pluginType]?.staleMinutes !== undefined) {
+    return schemas[pluginType].staleMinutes;
+  }
+  // Check fallback table for types without full schemas
+  if (staleMinutesByType[pluginType] !== undefined) {
+    return staleMinutesByType[pluginType];
+  }
+  // Default for unknown types
+  return 5;
 }
 
 /**

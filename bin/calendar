@@ -7,7 +7,7 @@ autoDotenvx();
 
 import { execSync } from 'child_process';
 import { getDatabase } from '../src/database-service.js';
-import { discoverPlugins, getPluginSources, getPluginAccess } from '../src/plugin-loader.js';
+import { discoverPlugins, getPluginSources, getPluginAccess, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfiguredTimezone, formatTime } from '../src/date-utils.js';
 
 // Get configured timezone
@@ -62,53 +62,9 @@ async function getDefaultWritableSource() {
   return null;
 }
 
-// Get the most recent sync time for events
-function getLastSyncTime(db) {
-  try {
-    const result = db.prepare(`
-      SELECT MAX(last_synced_at) as latest
-      FROM sync_metadata
-      WHERE source LIKE '%calendar%'
-    `).get();
-    return result?.latest ? new Date(result.latest + 'Z') : null;
-  } catch {
-    return null;
-  }
-}
-
 // Quiet sync - ensures database is current before read operations
 function ensureSync(db) {
-  const STALE_MINUTES = 5;
-  const lastSync = getLastSyncTime(db);
-
-  if (lastSync) {
-    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
-    if (ageMinutes < STALE_MINUTES) {
-      return;
-    }
-  }
-
-  try {
-    execSync('bin/plugins sync --type events', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-  } catch {
-    // Silently ignore sync errors for read operations
-  }
-}
-
-// Format time ago string
-function formatTimeAgo(date) {
-  if (!date) return 'never';
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  ensureSyncForType(db, 'events');
 }
 
 // Get events from database
@@ -255,8 +211,7 @@ async function cmdToday(db) {
     }
   }
 
-  const lastSync = getLastSyncTime(db);
-  console.log(`Last synced: ${formatTimeAgo(lastSync)}. Run 'bin/calendar sync' to refresh.`);
+  console.log(getSyncStatusMessage(db, 'events'));
 }
 
 async function cmdWeek(db) {
@@ -300,8 +255,7 @@ async function cmdWeek(db) {
     }
   }
 
-  const lastSync = getLastSyncTime(db);
-  console.log(`Last synced: ${formatTimeAgo(lastSync)}. Run 'bin/calendar sync' to refresh.`);
+  console.log(getSyncStatusMessage(db, 'events'));
 }
 
 async function cmdSync() {
