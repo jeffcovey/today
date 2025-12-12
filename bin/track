@@ -508,6 +508,34 @@ function ensureSync() {
   }
 }
 
+// Restart command - start a new timer with the same description as the most recent entry
+async function cmdRestart(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Find the most recent completed entry
+  const lastEntry = db.prepare(`
+    SELECT description, source
+    FROM time_logs
+    WHERE end_time IS NOT NULL
+    ORDER BY end_time DESC
+    LIMIT 1
+  `).get();
+
+  if (!lastEntry) {
+    console.error(chalk.red('✗') + ' No previous entries to restart');
+    process.exit(1);
+  }
+
+  console.log(chalk.blue('ℹ') + ` Restarting: ${lastEntry.description}`);
+
+  // Extract plugin name from source for filtering
+  const [pluginName] = lastEntry.source.split('/');
+
+  // Use cmdStart with the same description
+  await cmdStart(lastEntry.description, { source: options.source || pluginName });
+}
+
 // Sync command - delegates to plugin system for all time-logs plugins
 async function cmdSync() {
   console.log(chalk.blue('ℹ') + ' Syncing time-logs plugins to database...');
@@ -557,6 +585,9 @@ switch (command) {
   case 'sync':
     await cmdSync();
     break;
+  case 'restart':
+    await cmdRestart(options);
+    break;
   default:
     console.log('Time Tracking CLI');
     console.log('');
@@ -565,6 +596,7 @@ switch (command) {
     console.log('Commands:');
     console.log('  start DESC [--source]       Start tracking time (include #topic/tags in description)');
     console.log('  stop [--source]             Stop current timer');
+    console.log('  restart [--source]          Start a new timer with the same description as the last entry');
     console.log('  add DURATION DESC [--source] Add entry for work you forgot to track');
     console.log('  status                      Show current timer status');
     console.log('  today [--source NAME]       Show today\'s entries');

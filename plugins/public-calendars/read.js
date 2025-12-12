@@ -15,10 +15,24 @@ const calUrl = config.url;
 const daysBack = config.days_back || 7;
 const daysForward = config.days_forward || 90;
 
+// Check for --date argument (for historical queries)
+const dateArg = process.argv.find(arg => arg.startsWith('--date='));
+const queryDate = dateArg ? dateArg.split('=')[1] : null;
+
 // Calculate date range
-const now = new Date();
-const rangeStart = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-const rangeEnd = new Date(now.getTime() + daysForward * 24 * 60 * 60 * 1000);
+let rangeStart, rangeEnd;
+if (queryDate) {
+  // Query specific date
+  rangeStart = new Date(queryDate);
+  rangeStart.setHours(0, 0, 0, 0);
+  rangeEnd = new Date(queryDate);
+  rangeEnd.setHours(23, 59, 59, 999);
+} else {
+  // Normal sync range
+  const now = new Date();
+  rangeStart = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+  rangeEnd = new Date(now.getTime() + daysForward * 24 * 60 * 60 * 1000);
+}
 
 async function main() {
   if (!calUrl) {

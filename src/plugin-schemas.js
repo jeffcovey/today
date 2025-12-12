@@ -243,7 +243,11 @@ and availability, and to look for timing conflicts and anything that needs
 preparation.`,
       defaultCommand: 'bin/calendar today',
       queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar sync
-SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20`
+SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20
+
+Note: Only recent events are synced to the database. For historical events,
+use: bin/calendar show <source> <date> (e.g., bin/calendar show personal 2023-01-15)
+Run 'bin/calendar list' to see available sources.`
     },
     fields: {
       id: {
