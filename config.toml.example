@@ -262,3 +262,9 @@
 # This is my work calendar.
 # Prioritize these events in daily planning.
 # """
+
+# [plugins.markdown-tasks.default]
+# enabled = true
+# directory = "vault"
+# exclude_paths = "templates,.obsidian"
+# include_completed = true

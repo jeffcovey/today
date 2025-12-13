@@ -17,29 +17,34 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawnSync } from 'child_process';
-import { createInterface } from 'readline';
-import { createHash } from 'crypto';
-import Anthropic from '@anthropic-ai/sdk';
+// DISABLED - used by vault init (createInterface), skeleton updates (createHash), API update (Anthropic)
+// import { createInterface } from 'readline';
+// import { createHash } from 'crypto';
+// import Anthropic from '@anthropic-ai/sdk';
 
 // Import shared modules
-import { getTimezone, getClaudeModel, getFullConfig } from '../src/config.js';
+// DISABLED - getClaudeModel used by API update feature
+// import { getTimezone, getClaudeModel, getFullConfig } from '../src/config.js';
+import { getTimezone, getFullConfig } from '../src/config.js';
 import { getAIInstructionsByType } from '../src/plugin-loader.js';
 import { getPluginTypes, getAIMetadata, generateAIContextBlock } from '../src/plugin-schemas.js';
 import { ensureHealthyDatabase } from '../src/db-health.js';
-import {
-  getStageInfo,
-  getDailyPlanPath,
-  getTemplateVariables,
-  applyTemplateVariables,
-} from '../src/plan-utils.js';
+// DISABLED - used by vault/template features
+// import {
+//   getStageInfo,
+//   getDailyPlanPath,
+//   getTemplateVariables,
+//   applyTemplateVariables,
+// } from '../src/plan-utils.js';
 import {
   getCurrentTime,
-  getDateComponents as getDateComponentsFromDateUtils,
-  addDaysToDate,
-  formatDate,
-  formatTime,
+  // DISABLED - used by vault/template features
+  // getDateComponents as getDateComponentsFromDateUtils,
+  // addDaysToDate,
+  // formatDate,
+  // formatTime,
   formatFullDateTime,
-  getTimezoneOffset,
+  // getTimezoneOffset,
 } from '../src/date-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,211 +55,211 @@ const projectRoot = path.dirname(__dirname);
 process.chdir(projectRoot);
 
 // ============================================================================
-// Date Helpers
+// Date Helpers (DISABLED - used by vault/template features)
 // ============================================================================
 
-/**
- * Get date components for plan file naming.
- * Uses timezone-aware utilities from src/date-utils.js.
- */
-function getDateComponents(targetDate = null) {
-  const timezone = getTimezone();
-  const date = targetDate || getCurrentTime(timezone);
-  const components = getDateComponentsFromDateUtils(date);
-
-  // Convert string components to integers where needed for compatibility
-  return {
-    year: parseInt(components.year),
-    month: parseInt(components.month),
-    day: parseInt(components.day),
-    week: parseInt(components.week),
-    quarter: components.quarter,
-    timezone
-  };
-}
-
-function getReviewFilePath(targetDate = null) {
-  return getDailyPlanPath(getDateComponents(targetDate));
-}
-
-/**
- * Get tomorrow's date in the configured timezone.
- * Uses timezone-aware utilities from src/date-utils.js.
- */
-function getTomorrowDate() {
-  const timezone = getTimezone();
-  const today = getCurrentTime(timezone);
-  return addDaysToDate(today, 1);
-}
-
-// ============================================================================
-// Vault Initialization
-// ============================================================================
-
-function checkVaultExists() {
-  if (fs.existsSync('vault')) return true;
-  if (!fs.existsSync('skeleton')) {
-    console.log('❌ Neither vault/ nor skeleton/ directory found.');
-    console.log('   Please ensure you have the complete Today repository.');
-    return false;
-  }
-
-  console.log('━'.repeat(60));
-  console.log('📁 Vault directory not found');
-  console.log('━'.repeat(60));
-  console.log();
-  console.log('The vault/ directory contains your personal notes, tasks, and plans.');
-  console.log('It is excluded from this repository because it\'s meant to be private.');
-  console.log();
-  console.log('Would you like to initialize a new vault from the skeleton template?');
-  console.log();
-
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-  return new Promise((resolve) => {
-    rl.question('Initialize vault? [y/N]: ', (answer) => {
-      rl.close();
-      if (answer.trim().toLowerCase() !== 'y') {
-        console.log();
-        console.log('Vault not initialized. You can manually copy the skeleton:');
-        console.log('  cp -r skeleton vault');
-        console.log();
-        resolve(false);
-        return;
-      }
-
-      console.log();
-      console.log('📦 Initializing vault from skeleton...');
-
-      try {
-        execSync('cp -r skeleton vault', { stdio: 'inherit' });
-        // Remove .gitkeep files
-        execSync('find vault -name ".gitkeep" -delete 2>/dev/null || true', { stdio: 'pipe' });
-        console.log('✅ Vault initialized successfully!');
-        console.log();
-        console.log('━'.repeat(60));
-        console.log('📝 Next steps:');
-        console.log('━'.repeat(60));
-        console.log();
-        console.log('1. Initialize a git repository for version control:');
-        console.log('   cd vault && git init && git add . && git commit -m \'Initial vault\'');
-        console.log();
-        console.log('2. Set up sync (optional but recommended):');
-        console.log('   - Resilio Sync, Syncthing, or a private git remote');
-        console.log();
-        console.log('3. If using Obsidian, install recommended plugins:');
-        console.log('   - Dataview, Tasks, Templater, Calendar, Periodic Notes');
-        console.log();
-        console.log('See vault/README.md for detailed documentation.');
-        console.log('━'.repeat(60));
-        console.log();
-        resolve(true);
-      } catch (e) {
-        console.log(`❌ Failed to initialize vault: ${e.message}`);
-        resolve(false);
-      }
-    });
-  });
-}
+// /**
+//  * Get date components for plan file naming.
+//  * Uses timezone-aware utilities from src/date-utils.js.
+//  */
+// function getDateComponents(targetDate = null) {
+//   const timezone = getTimezone();
+//   const date = targetDate || getCurrentTime(timezone);
+//   const components = getDateComponentsFromDateUtils(date);
+//
+//   // Convert string components to integers where needed for compatibility
+//   return {
+//     year: parseInt(components.year),
+//     month: parseInt(components.month),
+//     day: parseInt(components.day),
+//     week: parseInt(components.week),
+//     quarter: components.quarter,
+//     timezone
+//   };
+// }
+//
+// function getReviewFilePath(targetDate = null) {
+//   return getDailyPlanPath(getDateComponents(targetDate));
+// }
+//
+// /**
+//  * Get tomorrow's date in the configured timezone.
+//  * Uses timezone-aware utilities from src/date-utils.js.
+//  */
+// function getTomorrowDate() {
+//   const timezone = getTimezone();
+//   const today = getCurrentTime(timezone);
+//   return addDaysToDate(today, 1);
+// }
 
 // ============================================================================
-// Skeleton Updates Check
+// Vault Initialization (DISABLED - not yet migrated to plugin system)
 // ============================================================================
 
-function checkSkeletonUpdates() {
-  if (!fs.existsSync('vault') || !fs.existsSync('skeleton')) return;
-
-  const trackingFile = '.skeleton-hashes';
-  const trackedFiles = [
-    'scripts/time-tracking-widget.js',
-    'scripts/upcoming-events-widget.js',
-    'templates/daily-plan.md',
-    'templates/project.md',
-    '.obsidian/snippets/app-wide.css',
-  ];
-
-  // Load previous hashes
-  const previousHashes = {};
-  if (fs.existsSync(trackingFile)) {
-    try {
-      const content = fs.readFileSync(trackingFile, 'utf8');
-      for (const line of content.split('\n')) {
-        const parts = line.trim().split(':');
-        if (parts.length === 2) {
-          previousHashes[parts[0]] = parts[1];
-        }
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  const updatesAvailable = [];
-
-  for (const relPath of trackedFiles) {
-    const skeletonFile = path.join('skeleton', relPath);
-    const vaultFile = path.join('vault', relPath);
-
-    if (!fs.existsSync(skeletonFile)) continue;
-
-    // Calculate current skeleton hash
-    const currentHash = createHash('md5').update(fs.readFileSync(skeletonFile)).digest('hex');
-
-    // Check if skeleton has changed since last check
-    if (previousHashes[relPath] === currentHash) continue;
-
-    // Check if vault file exists and differs from skeleton
-    if (fs.existsSync(vaultFile)) {
-      const vaultHash = createHash('md5').update(fs.readFileSync(vaultFile)).digest('hex');
-      if (currentHash !== vaultHash) {
-        updatesAvailable.push(relPath);
-      }
-    }
-
-    // Update tracking
-    previousHashes[relPath] = currentHash;
-  }
-
-  // Save updated hashes
-  const hashLines = Object.entries(previousHashes).map(([k, v]) => `${k}:${v}`).join('\n');
-  fs.writeFileSync(trackingFile, hashLines);
-
-  if (updatesAvailable.length > 0) {
-    console.log('━'.repeat(60));
-    console.log('📦 Skeleton updates available');
-    console.log('━'.repeat(60));
-    console.log();
-    console.log('The following skeleton files have been updated:');
-    for (const p of updatesAvailable) {
-      console.log(`  - ${p}`);
-    }
-    console.log();
-    console.log('To review and merge updates:');
-    console.log('  diff vault/<file> skeleton/<file>');
-    console.log('  cp skeleton/<file> vault/<file>');
-    console.log();
-    console.log('━'.repeat(60));
-    console.log();
-  }
-}
+// function checkVaultExists() {
+//   if (fs.existsSync('vault')) return true;
+//   if (!fs.existsSync('skeleton')) {
+//     console.log('❌ Neither vault/ nor skeleton/ directory found.');
+//     console.log('   Please ensure you have the complete Today repository.');
+//     return false;
+//   }
+//
+//   console.log('━'.repeat(60));
+//   console.log('📁 Vault directory not found');
+//   console.log('━'.repeat(60));
+//   console.log();
+//   console.log('The vault/ directory contains your personal notes, tasks, and plans.');
+//   console.log('It is excluded from this repository because it\'s meant to be private.');
+//   console.log();
+//   console.log('Would you like to initialize a new vault from the skeleton template?');
+//   console.log();
+//
+//   const rl = createInterface({ input: process.stdin, output: process.stdout });
+//
+//   return new Promise((resolve) => {
+//     rl.question('Initialize vault? [y/N]: ', (answer) => {
+//       rl.close();
+//       if (answer.trim().toLowerCase() !== 'y') {
+//         console.log();
+//         console.log('Vault not initialized. You can manually copy the skeleton:');
+//         console.log('  cp -r skeleton vault');
+//         console.log();
+//         resolve(false);
+//         return;
+//       }
+//
+//       console.log();
+//       console.log('📦 Initializing vault from skeleton...');
+//
+//       try {
+//         execSync('cp -r skeleton vault', { stdio: 'inherit' });
+//         // Remove .gitkeep files
+//         execSync('find vault -name ".gitkeep" -delete 2>/dev/null || true', { stdio: 'pipe' });
+//         console.log('✅ Vault initialized successfully!');
+//         console.log();
+//         console.log('━'.repeat(60));
+//         console.log('📝 Next steps:');
+//         console.log('━'.repeat(60));
+//         console.log();
+//         console.log('1. Initialize a git repository for version control:');
+//         console.log('   cd vault && git init && git add . && git commit -m \'Initial vault\'');
+//         console.log();
+//         console.log('2. Set up sync (optional but recommended):');
+//         console.log('   - Resilio Sync, Syncthing, or a private git remote');
+//         console.log();
+//         console.log('3. If using Obsidian, install recommended plugins:');
+//         console.log('   - Dataview, Tasks, Templater, Calendar, Periodic Notes');
+//         console.log();
+//         console.log('See vault/README.md for detailed documentation.');
+//         console.log('━'.repeat(60));
+//         console.log();
+//         resolve(true);
+//       } catch (e) {
+//         console.log(`❌ Failed to initialize vault: ${e.message}`);
+//         resolve(false);
+//       }
+//     });
+//   });
+// }
 
 // ============================================================================
-// Sync
+// Skeleton Updates Check (DISABLED - not yet migrated to plugin system)
 // ============================================================================
 
-function runSync(skipSync = false) {
-  if (skipSync) {
-    console.log('⏭️  Skipping sync step');
-    return;
-  }
+// function checkSkeletonUpdates() {
+//   if (!fs.existsSync('vault') || !fs.existsSync('skeleton')) return;
+//
+//   const trackingFile = '.skeleton-hashes';
+//   const trackedFiles = [
+//     'scripts/time-tracking-widget.js',
+//     'scripts/upcoming-events-widget.js',
+//     'templates/daily-plan.md',
+//     'templates/project.md',
+//     '.obsidian/snippets/app-wide.css',
+//   ];
+//
+//   // Load previous hashes
+//   const previousHashes = {};
+//   if (fs.existsSync(trackingFile)) {
+//     try {
+//       const content = fs.readFileSync(trackingFile, 'utf8');
+//       for (const line of content.split('\n')) {
+//         const parts = line.trim().split(':');
+//         if (parts.length === 2) {
+//           previousHashes[parts[0]] = parts[1];
+//         }
+//       }
+//     } catch {
+//       // Ignore
+//     }
+//   }
+//
+//   const updatesAvailable = [];
+//
+//   for (const relPath of trackedFiles) {
+//     const skeletonFile = path.join('skeleton', relPath);
+//     const vaultFile = path.join('vault', relPath);
+//
+//     if (!fs.existsSync(skeletonFile)) continue;
+//
+//     // Calculate current skeleton hash
+//     const currentHash = createHash('md5').update(fs.readFileSync(skeletonFile)).digest('hex');
+//
+//     // Check if skeleton has changed since last check
+//     if (previousHashes[relPath] === currentHash) continue;
+//
+//     // Check if vault file exists and differs from skeleton
+//     if (fs.existsSync(vaultFile)) {
+//       const vaultHash = createHash('md5').update(fs.readFileSync(vaultFile)).digest('hex');
+//       if (currentHash !== vaultHash) {
+//         updatesAvailable.push(relPath);
+//       }
+//     }
+//
+//     // Update tracking
+//     previousHashes[relPath] = currentHash;
+//   }
+//
+//   // Save updated hashes
+//   const hashLines = Object.entries(previousHashes).map(([k, v]) => `${k}:${v}`).join('\n');
+//   fs.writeFileSync(trackingFile, hashLines);
+//
+//   if (updatesAvailable.length > 0) {
+//     console.log('━'.repeat(60));
+//     console.log('📦 Skeleton updates available');
+//     console.log('━'.repeat(60));
+//     console.log();
+//     console.log('The following skeleton files have been updated:');
+//     for (const p of updatesAvailable) {
+//       console.log(`  - ${p}`);
+//     }
+//     console.log();
+//     console.log('To review and merge updates:');
+//     console.log('  diff vault/<file> skeleton/<file>');
+//     console.log('  cp skeleton/<file> vault/<file>');
+//     console.log();
+//     console.log('━'.repeat(60));
+//     console.log();
+//   }
+// }
 
-  console.log('🔄 Syncing data sources...');
-  try {
-    execSync('bin/sync', { stdio: 'inherit' });
-  } catch {
-    // Continue even if sync fails
-  }
-}
+// ============================================================================
+// Sync (DISABLED - replaced by plugin system: bin/plugins sync)
+// ============================================================================
+
+// function runSync(skipSync = false) {
+//   if (skipSync) {
+//     console.log('⏭️  Skipping sync step');
+//     return;
+//   }
+//
+//   console.log('🔄 Syncing data sources...');
+//   try {
+//     execSync('bin/sync', { stdio: 'inherit' });
+//   } catch {
+//     // Continue even if sync fails
+//   }
+// }
 
 // ============================================================================
 // Database Check
@@ -275,425 +280,426 @@ async function checkAndRecoverDatabase() {
 }
 
 // ============================================================================
-// Claude Auth Check
+// Claude Auth Check (DISABLED - can be re-enabled when needed)
 // ============================================================================
 
-function checkClaudeAuth() {
-  console.log('🔐 Checking Claude authentication...');
-  try {
-    const result = spawnSync('claude', ['-p', 'Say "ok"'], { encoding: 'utf8' });
-    const output = (result.stdout || '') + (result.stderr || '');
-
-    if (output.includes('Invalid API key') || output.includes('Please run /login') || output.includes('not authenticated')) {
-      console.log('\n⚠️  Claude CLI is not authenticated!');
-      console.log('━'.repeat(50));
-      console.log('\nClaude is essential for daily reviews.');
-      console.log('Please authenticate now by running:\n');
-      console.log('  claude\n');
-      console.log('Then follow the browser prompt to login.');
-      console.log('After authentication, run \'bin/today\' again.');
-      console.log('━'.repeat(50));
-      process.exit(1);
-    }
-
-    console.log('✅ Claude is authenticated\n');
-  } catch {
-    console.log('✅ Claude check passed\n');
-  }
-}
-
-// ============================================================================
-// Time Tracking Widgets
-// ============================================================================
-
-function ensureTimeTrackingWidgets(dryRun = false) {
-  console.log('⏱️  Checking time tracking widgets...');
-
-  const { year, month, week, quarter, timezone } = getDateComponents();
-
-  // Define plan files with their date ranges
-  const quarterEndDays = [31, 30, 30, 31];
-  const quarterNum = parseInt(quarter.slice(1));
-  const planFiles = [
-    [`vault/plans/${year}_00.md`, `${year}-01-01`, `${year}-12-31`, 'Year'],
-    [`vault/plans/${year}_${quarter}_00.md`,
-    `${year}-${String((quarterNum - 1) * 3 + 1).padStart(2, '0')}-01`,
-    `${year}-${String(quarterNum * 3).padStart(2, '0')}-${quarterEndDays[quarterNum - 1]}`,
-      quarter],
-    [`vault/plans/${year}_${quarter}_${String(month).padStart(2, '0')}_00.md`,
-    `${year}-${String(month).padStart(2, '0')}-01`,
-    `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`,
-    new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long' })],
-    [`vault/plans/${year}_${quarter}_${String(month).padStart(2, '0')}_W${String(week).padStart(2, '0')}_00.md`,
-      null, null, `Week ${week}`],
-  ];
-
-  // Calculate week start/end for the week file
-  try {
-    const weekStart = execSync(`TZ=${timezone} date -d "$(date +%Y-W${String(week).padStart(2, '0')}-1)" "+%Y-%m-%d"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-    const weekEnd = execSync(`TZ=${timezone} date -d "${weekStart} +6 days" "+%Y-%m-%d"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-    planFiles[3][1] = weekStart;
-    planFiles[3][2] = weekEnd;
-  } catch {
-    // Skip week file if we can't calculate dates
-  }
-
-  const filesUpdated = [];
-
-  for (const [filePath, startDate, endDate, periodName] of planFiles) {
-    if (!fs.existsSync(filePath)) continue;
-    if (!startDate || !endDate) continue;
-
-    const content = fs.readFileSync(filePath, 'utf8');
-
-    // Check if time tracking widget already exists
-    if (content.includes('scripts/time-tracking-widget')) continue;
-    if (/## ⏱️ Time Tracking/.test(content)) continue;
-
-    const widgetSection = `
-## ⏱️ Time Tracking - ${periodName}
-
-\`\`\`dataviewjs
-await dv.view("scripts/time-tracking-widget", { startDate: '${startDate}', endDate: '${endDate}' });
-\`\`\`
-`;
-
-    const updatedContent = content.trimEnd() + '\n' + widgetSection + '\n';
-
-    if (dryRun) {
-      console.log(`   Would add time tracking to: ${filePath}`);
-    } else {
-      fs.writeFileSync(filePath, updatedContent);
-      filesUpdated.push([periodName, filePath]);
-    }
-  }
-
-  if (filesUpdated.length > 0 && !dryRun) {
-    console.log(`✅ Added time tracking widgets to ${filesUpdated.length} file(s):`);
-    for (const [periodName, filePath] of filesUpdated) {
-      console.log(`   ${periodName}: ${filePath}`);
-    }
-  } else {
-    console.log('✅ All plan files have time tracking widgets');
-  }
-
-  console.log();
-}
+// function checkClaudeAuth() {
+//   console.log('🔐 Checking Claude authentication...');
+//   try {
+//     const result = spawnSync('claude', ['-p', 'Say "ok"'], { encoding: 'utf8' });
+//     const output = (result.stdout || '') + (result.stderr || '');
+//
+//     if (output.includes('Invalid API key') || output.includes('Please run /login') || output.includes('not authenticated')) {
+//       console.log('\n⚠️  Claude CLI is not authenticated!');
+//       console.log('━'.repeat(50));
+//       console.log('\nClaude is essential for daily reviews.');
+//       console.log('Please authenticate now by running:\n');
+//       console.log('  claude\n');
+//       console.log('Then follow the browser prompt to login.');
+//       console.log('After authentication, run \'bin/today\' again.');
+//       console.log('━'.repeat(50));
+//       process.exit(1);
+//     }
+//
+//     console.log('✅ Claude is authenticated\n');
+//   } catch {
+//     console.log('✅ Claude check passed\n');
+//   }
+// }
 
 // ============================================================================
-// Template Processing
+// Time Tracking Widgets (DISABLED - depends on vault/template features)
 // ============================================================================
 
-function createFileFromTemplate(filePath, targetDate, isTomorrow = false) {
-  const templateFile = 'vault/templates/daily-plan.md';
-  if (!fs.existsSync(templateFile)) return;
-
-  // Ensure directory exists
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-
-  let content = fs.readFileSync(templateFile, 'utf8');
-
-  // Use shared utilities for template variables
-  const replacements = getTemplateVariables(targetDate);
-  content = applyTemplateVariables(content, replacements);
-
-  // Add draft note for tomorrow's plan
-  if (isTomorrow) {
-    const [, stageFocus] = getStageInfo(targetDate);
-    const draftNote = '\n> [!info] Draft Plan\n> This is a preliminary plan for tomorrow. It will be refined throughout today.\n\n';
-    content = content.replace('**Theme:** ' + stageFocus, '**Theme:** ' + stageFocus + draftNote);
-  }
-
-  fs.writeFileSync(filePath, content);
-}
-
-function createReviewFromTemplate() {
-  const filesCreated = [];
-
-  // Create for today
-  const todayFile = getReviewFilePath();
-  if (!fs.existsSync(todayFile)) {
-    console.log('📝 Creating today\'s plan from template...');
-    createFileFromTemplate(todayFile, new Date(), false);
-    filesCreated.push(['today', todayFile]);
-  }
-
-  // Create for tomorrow
-  const tomorrow = getTomorrowDate();
-  const tomorrowFile = getReviewFilePath(tomorrow);
-  if (!fs.existsSync(tomorrowFile)) {
-    console.log('📝 Creating tomorrow\'s plan from template...');
-    createFileFromTemplate(tomorrowFile, tomorrow, true);
-    filesCreated.push(['tomorrow', tomorrowFile]);
-  }
-
-  if (filesCreated.length > 0) {
-    console.log('✅ Created review files:');
-    for (const [label, p] of filesCreated) {
-      console.log(`   ${label.charAt(0).toUpperCase() + label.slice(1)}: ${p}`);
-    }
-    console.log();
-  }
-
-  return todayFile;
-}
+// function ensureTimeTrackingWidgets(dryRun = false) {
+//   console.log('⏱️  Checking time tracking widgets...');
+//
+//   const { year, month, week, quarter, timezone } = getDateComponents();
+//
+//   // Define plan files with their date ranges
+//   const quarterEndDays = [31, 30, 30, 31];
+//   const quarterNum = parseInt(quarter.slice(1));
+//   const planFiles = [
+//     [`vault/plans/${year}_00.md`, `${year}-01-01`, `${year}-12-31`, 'Year'],
+//     [`vault/plans/${year}_${quarter}_00.md`,
+//     `${year}-${String((quarterNum - 1) * 3 + 1).padStart(2, '0')}-01`,
+//     `${year}-${String(quarterNum * 3).padStart(2, '0')}-${quarterEndDays[quarterNum - 1]}`,
+//       quarter],
+//     [`vault/plans/${year}_${quarter}_${String(month).padStart(2, '0')}_00.md`,
+//     `${year}-${String(month).padStart(2, '0')}-01`,
+//     `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`,
+//     new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long' })],
+//     [`vault/plans/${year}_${quarter}_${String(month).padStart(2, '0')}_W${String(week).padStart(2, '0')}_00.md`,
+//       null, null, `Week ${week}`],
+//   ];
+//
+//   // Calculate week start/end for the week file
+//   try {
+//     const weekStart = execSync(`TZ=${timezone} date -d "$(date +%Y-W${String(week).padStart(2, '0')}-1)" "+%Y-%m-%d"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+//     const weekEnd = execSync(`TZ=${timezone} date -d "${weekStart} +6 days" "+%Y-%m-%d"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+//     planFiles[3][1] = weekStart;
+//     planFiles[3][2] = weekEnd;
+//   } catch {
+//     // Skip week file if we can't calculate dates
+//   }
+//
+//   const filesUpdated = [];
+//
+//   for (const [filePath, startDate, endDate, periodName] of planFiles) {
+//     if (!fs.existsSync(filePath)) continue;
+//     if (!startDate || !endDate) continue;
+//
+//     const content = fs.readFileSync(filePath, 'utf8');
+//
+//     // Check if time tracking widget already exists
+//     if (content.includes('scripts/time-tracking-widget')) continue;
+//     if (/## ⏱️ Time Tracking/.test(content)) continue;
+//
+//     const widgetSection = `
+// ## ⏱️ Time Tracking - ${periodName}
+//
+// \`\`\`dataviewjs
+// await dv.view("scripts/time-tracking-widget", { startDate: '${startDate}', endDate: '${endDate}' });
+// \`\`\`
+// `;
+//
+//     const updatedContent = content.trimEnd() + '\n' + widgetSection + '\n';
+//
+//     if (dryRun) {
+//       console.log(`   Would add time tracking to: ${filePath}`);
+//     } else {
+//       fs.writeFileSync(filePath, updatedContent);
+//       filesUpdated.push([periodName, filePath]);
+//     }
+//   }
+//
+//   if (filesUpdated.length > 0 && !dryRun) {
+//     console.log(`✅ Added time tracking widgets to ${filesUpdated.length} file(s):`);
+//     for (const [periodName, filePath] of filesUpdated) {
+//       console.log(`   ${periodName}: ${filePath}`);
+//     }
+//   } else {
+//     console.log('✅ All plan files have time tracking widgets');
+//   }
+//
+//   console.log();
+// }
 
 // ============================================================================
-// API Update
+// Template Processing (DISABLED - depends on vault/template features)
 // ============================================================================
 
-async function updateReviewFile(dryRun = false) {
-  const apiKey = process.env.TODAY_ANTHROPIC_KEY;
-  if (!apiKey) {
-    console.log('❌ TODAY_ANTHROPIC_KEY not found in environment');
-    console.log('Please ensure it\'s set in .env and encrypted with dotenvx');
-    process.exit(1);
-  }
+// function createFileFromTemplate(filePath, targetDate, isTomorrow = false) {
+//   const templateFile = 'vault/templates/daily-plan.md';
+//   if (!fs.existsSync(templateFile)) return;
+//
+//   // Ensure directory exists
+//   fs.mkdirSync(path.dirname(filePath), { recursive: true });
+//
+//   let content = fs.readFileSync(templateFile, 'utf8');
+//
+//   // Use shared utilities for template variables
+//   const replacements = getTemplateVariables(targetDate);
+//   content = applyTemplateVariables(content, replacements);
+//
+//   // Add draft note for tomorrow's plan
+//   if (isTomorrow) {
+//     const [, stageFocus] = getStageInfo(targetDate);
+//     const draftNote = '\n> [!info] Draft Plan\n> This is a preliminary plan for tomorrow. It will be refined throughout today.\n\n';
+//     content = content.replace('**Theme:** ' + stageFocus, '**Theme:** ' + stageFocus + draftNote);
+//   }
+//
+//   fs.writeFileSync(filePath, content);
+// }
 
-  ensureTimeTrackingWidgets(dryRun);
+// DISABLED - depends on template/vault features above
+// function createReviewFromTemplate() {
+//   const filesCreated = [];
+//
+//   // Create for today
+//   const todayFile = getReviewFilePath();
+//   if (!fs.existsSync(todayFile)) {
+//     console.log('📝 Creating today\'s plan from template...');
+//     createFileFromTemplate(todayFile, new Date(), false);
+//     filesCreated.push(['today', todayFile]);
+//   }
+//
+//   // Create for tomorrow
+//   const tomorrow = getTomorrowDate();
+//   const tomorrowFile = getReviewFilePath(tomorrow);
+//   if (!fs.existsSync(tomorrowFile)) {
+//     console.log('📝 Creating tomorrow\'s plan from template...');
+//     createFileFromTemplate(tomorrowFile, tomorrow, true);
+//     filesCreated.push(['tomorrow', tomorrowFile]);
+//   }
+//
+//   if (filesCreated.length > 0) {
+//     console.log('✅ Created review files:');
+//     for (const [label, p] of filesCreated) {
+//       console.log(`   ${label.charAt(0).toUpperCase() + label.slice(1)}: ${p}`);
+//     }
+//     console.log();
+//   }
+//
+//   return todayFile;
+// }
 
-  // Update today's file
-  const todayFile = getReviewFilePath();
-  if (!fs.existsSync(todayFile)) {
-    console.log(`⚠️  Today's file not found: ${todayFile}`);
-    console.log('Skipping today\'s update');
-  } else {
-    console.log(`📊 Updating today's plan: ${todayFile}...`);
-    if (dryRun) console.log('🔍 DRY RUN MODE - No changes will be made');
-    await updateSingleFile(todayFile, false, dryRun, apiKey);
-  }
+// ============================================================================
+// API Update (DISABLED - depends on template/vault features and Anthropic import)
+// ============================================================================
 
-  // Update tomorrow's file
-  const tomorrow = getTomorrowDate();
-  const tomorrowFile = getReviewFilePath(tomorrow);
-  if (!fs.existsSync(tomorrowFile)) {
-    console.log(`⚠️  Tomorrow's file not found: ${tomorrowFile}`);
-    console.log('Skipping tomorrow\'s update');
-  } else {
-    console.log(`📊 Updating tomorrow's plan: ${tomorrowFile}...`);
-    await updateSingleFile(tomorrowFile, true, dryRun, apiKey);
-  }
-}
+// async function updateReviewFile(dryRun = false) {
+//   const apiKey = process.env.TODAY_ANTHROPIC_KEY;
+//   if (!apiKey) {
+//     console.log('❌ TODAY_ANTHROPIC_KEY not found in environment');
+//     console.log('Please ensure it\'s set in .env and encrypted with dotenvx');
+//     process.exit(1);
+//   }
+//
+//   ensureTimeTrackingWidgets(dryRun);
+//
+//   // Update today's file
+//   const todayFile = getReviewFilePath();
+//   if (!fs.existsSync(todayFile)) {
+//     console.log(`⚠️  Today's file not found: ${todayFile}`);
+//     console.log('Skipping today\'s update');
+//   } else {
+//     console.log(`📊 Updating today's plan: ${todayFile}...`);
+//     if (dryRun) console.log('🔍 DRY RUN MODE - No changes will be made');
+//     await updateSingleFile(todayFile, false, dryRun, apiKey);
+//   }
+//
+//   // Update tomorrow's file
+//   const tomorrow = getTomorrowDate();
+//   const tomorrowFile = getReviewFilePath(tomorrow);
+//   if (!fs.existsSync(tomorrowFile)) {
+//     console.log(`⚠️  Tomorrow's file not found: ${tomorrowFile}`);
+//     console.log('Skipping tomorrow\'s update');
+//   } else {
+//     console.log(`📊 Updating tomorrow's plan: ${tomorrowFile}...`);
+//     await updateSingleFile(tomorrowFile, true, dryRun, apiKey);
+//   }
+// }
 
-async function updateSingleFile(reviewFile, isTomorrow, dryRun, apiKey) {
-  // Gather data from all plugin types (including utility)
-  const dailyData = await getDataContext();
-
-  const originalContent = fs.readFileSync(reviewFile, 'utf8');
-  const backupContent = originalContent;
-  const originalLines = originalContent.split('\n').length;
-
-  const timezone = getTimezone();
-  const now = getCurrentTime(timezone);
-  const currentTime = formatTime(now, timezone);
-  const currentDate = formatDate(now);
-  const tzOffset = getTimezoneOffset(now, timezone);
-
-  let prompt;
-  if (isTomorrow) {
-    prompt = `You are updating TOMORROW's daily plan with fresh priorities from the database.
-
-CURRENT TIME: ${currentTime} ET
-CURRENT DATE: ${currentDate}
-
-CURRENT FILE CONTENT (Tomorrow's Plan):
-${originalContent}
-
-CURRENT DATABASE DATA (tasks, events, emails, etc.):
-${dailyData.slice(0, 5000)}
-
-YOUR TASK:
-Refresh the "Top Priorities" section with current database data.
-This is a DRAFT plan for tomorrow that gets refined throughout today.
-
-Focus on:
-1. Overdue tasks that will carry into tomorrow
-2. Tasks scheduled for tomorrow
-3. Calendar events scheduled for tomorrow
-4. High-priority items that need attention
-
-RETURN A JSON OBJECT with updated priorities section:
-{
-  "priorities_update": "### 🚨 Critical (Do First)\\n\\n- [ ] Task 1\\n- [ ] Task 2\\n\\n### ⚡ Quick Wins...\\n",
-  "notes": "Brief note about what changed"
-}
-
-IMPORTANT:
-- Keep it lightweight - this is a draft
-- Focus on actionable items
-- Use simple checkboxes: "- [ ] Task description"
-- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
-- Created date (➕) is fine - scripts add this automatically
-- Plan files use simple tasks - scheduling belongs in project/topic files only`;
-  } else {
-    prompt = `You are updating TODAY's daily plan with a progress update.
-
-CURRENT TIME: ${currentTime} ET
-CURRENT DATE: ${currentDate}
-
-CURRENT FILE CONTENT:
-${originalContent}
-
-CURRENT DATABASE DATA (tasks, events, emails, etc.):
-${dailyData.slice(0, 5000)}
-
-YOUR TASK:
-Create a new Progress Update section to append to the end of the file.
-Compare the current file with the database to see what's changed or been accomplished.
-
-🚨 CRITICAL: The database includes DETAILED TIME TRACKING DATA showing what work has been done today.
-   - Time tracking is THE GROUND TRUTH of productivity
-   - Physical work, meetings, coordination, deep work sessions are all tracked there
-   - NEVER assume "zero progress" without checking the time tracking data first
-   - Checkbox completions are NOT the primary measure of productivity
-
-This should summarize:
-1. What's been accomplished since the last update - CHECK TIME TRACKING DATA FIRST (tasks checked off, workouts done, meetings attended, time tracked)
-2. Current status of high-priority items
-3. Any new events, emails, or tasks that need attention
-4. Overall progress and any blockers
-
-RETURN A JSON OBJECT:
-{
-  "progress_update": "<!-- PROGRESS_UPDATE -->\\n> [!success] 📊 Progress Update (${currentTime})\\n>\\n> *${currentDate} HH:MM ${tzOffset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers\\n<!-- /PROGRESS_UPDATE -->",
-  "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
-}
-
-NOTE: The progress_update should use the callout format with:
-- "<!-- PROGRESS_UPDATE -->" as the opening marker
-- "> [!success] 📊 Progress Update (TIME)" as the header
-- "> " prefix for all lines in the callout
-- "*italicized timestamp*" on the second line
-- "<!-- /PROGRESS_UPDATE -->" as the closing marker
-
-IMPORTANT:
-- Create a MEANINGFUL progress update - there's always something to report
-- Look at completed tasks in the file (marked [x]) since the last Progress Update
-- The update should be 2-4 bullet points, concise but informative
-- Only mark tasks as done if you see clear evidence (like workout exercises checked off)
-- Use the exact timezone offset in the timestamp: ${tzOffset}
-- Use simple checkboxes: "- [ ] Task description"
-- DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
-- Created date (➕) is fine - scripts add this automatically`;
-  }
-
-  const client = new Anthropic({ apiKey });
-
-  try {
-    const model = getClaudeModel();
-    const response = await client.messages.create({
-      model,
-      max_tokens: 2000,
-      temperature: 0,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    let responseText = response.content[0].text;
-
-    // Try to parse as JSON
-    let edits;
-    try {
-      let jsonStr;
-      if (responseText.includes('```json')) {
-        jsonStr = responseText.split('```json')[1].split('```')[0];
-      } else if (responseText.includes('```')) {
-        jsonStr = responseText.split('```')[1].split('```')[0];
-      } else if (responseText.includes('{')) {
-        const start = responseText.indexOf('{');
-        let count = 0;
-        let end = start;
-        for (let i = start; i < responseText.length; i++) {
-          if (responseText[i] === '{') count++;
-          else if (responseText[i] === '}') {
-            count--;
-            if (count === 0) {
-              end = i + 1;
-              break;
-            }
-          }
-        }
-        jsonStr = responseText.slice(start, end);
-      } else {
-        jsonStr = responseText;
-      }
-      edits = JSON.parse(jsonStr);
-    } catch (e) {
-      console.log(`⚠️  Failed to parse Claude's response as JSON: ${e.message}`);
-      console.log(`Response: ${responseText.slice(0, 200)}...`);
-      process.exit(1);
-    }
-
-    let updatedContent = originalContent;
-
-    if (isTomorrow) {
-      if (edits.priorities_update) {
-        const replacement = `## 📋 Top Priorities\n\n${edits.priorities_update}\n`;
-        updatedContent = updatedContent.replace(/## 📋 Top Priorities\n\n.*?(?=\n## |$)/s, replacement);
-      }
-    } else {
-      if (edits.progress_update) {
-        updatedContent = updatedContent.trimEnd() + '\n\n' + edits.progress_update + '\n';
-      }
-
-      if (edits.tasks_to_check) {
-        for (const task of edits.tasks_to_check) {
-          const escapedTask = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const uncheckedPattern = new RegExp(`- \\[ \\] ${escapedTask}`);
-          if (uncheckedPattern.test(updatedContent)) {
-            updatedContent = updatedContent.replace(uncheckedPattern, `- [x] ${task} ✅ ${currentDate}`);
-          }
-        }
-      }
-    }
-
-    // SAFETY CHECKS
-    const updatedLines = updatedContent.split('\n').length;
-    if (updatedLines < originalLines * 0.9) {
-      console.log(`⚠️  Safety check failed: Updated file has ${updatedLines} lines vs original ${originalLines}`);
-      console.log('Aborting update to prevent data loss');
-      process.exit(1);
-    }
-
-    if (updatedContent.length < originalContent.length * 0.9) {
-      console.log('⚠️  Safety check failed: Updated content is too short');
-      console.log(`Original: ${originalContent.length} chars, Updated: ${updatedContent.length} chars`);
-      process.exit(1);
-    }
-
-    if (dryRun) {
-      console.log('\n📊 Data context sent to AI:');
-      console.log('─'.repeat(60));
-      console.log(dailyData.slice(0, 5000));
-      console.log('─'.repeat(60));
-      console.log('\n📝 AI response (proposed changes):');
-      if (isTomorrow) {
-        console.log(`Priorities update:\n${(edits.priorities_update || 'None').slice(0, 200)}...`);
-        console.log(`\nNotes: ${edits.notes || 'None'}`);
-      } else {
-        console.log(`Progress update to append:\n${edits.progress_update || 'None'}`);
-        console.log(`\nTasks to check: ${JSON.stringify(edits.tasks_to_check || [])}`);
-      }
-      console.log('\n✅ Dry run complete - no changes made');
-    } else {
-      fs.writeFileSync(reviewFile, updatedContent);
-
-      if (updatedContent !== originalContent) {
-        const fileType = isTomorrow ? "tomorrow's plan" : "today's plan";
-        console.log(`✅ Updated ${fileType}: ${reviewFile}`);
-      } else {
-        console.log(`⚠️  API returned no changes - ${reviewFile} unchanged`);
-        console.log('This might indicate the AI couldn\'t determine what to update.');
-      }
-    }
-  } catch (e) {
-    console.error(`❌ Error: ${e.message}`);
-    if (!dryRun) {
-      console.log('Restoring original content...');
-      fs.writeFileSync(reviewFile, backupContent);
-    }
-    process.exit(1);
-  }
-}
+// async function updateSingleFile(reviewFile, isTomorrow, dryRun, apiKey) {
+//   // Gather data from all plugin types (including utility)
+//   const dailyData = await getDataContext();
+//
+//   const originalContent = fs.readFileSync(reviewFile, 'utf8');
+//   const backupContent = originalContent;
+//   const originalLines = originalContent.split('\n').length;
+//
+//   const timezone = getTimezone();
+//   const now = getCurrentTime(timezone);
+//   const currentTime = formatTime(now, timezone);
+//   const currentDate = formatDate(now);
+//   const tzOffset = getTimezoneOffset(now, timezone);
+//
+//   let prompt;
+//   if (isTomorrow) {
+//     prompt = `You are updating TOMORROW's daily plan with fresh priorities from the database.
+//
+// CURRENT TIME: ${currentTime} ET
+// CURRENT DATE: ${currentDate}
+//
+// CURRENT FILE CONTENT (Tomorrow's Plan):
+// ${originalContent}
+//
+// CURRENT DATABASE DATA (tasks, events, emails, etc.):
+// ${dailyData.slice(0, 5000)}
+//
+// YOUR TASK:
+// Refresh the "Top Priorities" section with current database data.
+// This is a DRAFT plan for tomorrow that gets refined throughout today.
+//
+// Focus on:
+// 1. Overdue tasks that will carry into tomorrow
+// 2. Tasks scheduled for tomorrow
+// 3. Calendar events scheduled for tomorrow
+// 4. High-priority items that need attention
+//
+// RETURN A JSON OBJECT with updated priorities section:
+// {
+//   "priorities_update": "### 🚨 Critical (Do First)\\n\\n- [ ] Task 1\\n- [ ] Task 2\\n\\n### ⚡ Quick Wins...\\n",
+//   "notes": "Brief note about what changed"
+// }
+//
+// IMPORTANT:
+// - Keep it lightweight - this is a draft
+// - Focus on actionable items
+// - Use simple checkboxes: "- [ ] Task description"
+// - DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+// - Created date (➕) is fine - scripts add this automatically
+// - Plan files use simple tasks - scheduling belongs in project/topic files only`;
+//   } else {
+//     prompt = `You are updating TODAY's daily plan with a progress update.
+//
+// CURRENT TIME: ${currentTime} ET
+// CURRENT DATE: ${currentDate}
+//
+// CURRENT FILE CONTENT:
+// ${originalContent}
+//
+// CURRENT DATABASE DATA (tasks, events, emails, etc.):
+// ${dailyData.slice(0, 5000)}
+//
+// YOUR TASK:
+// Create a new Progress Update section to append to the end of the file.
+// Compare the current file with the database to see what's changed or been accomplished.
+//
+// 🚨 CRITICAL: The database includes DETAILED TIME TRACKING DATA showing what work has been done today.
+//    - Time tracking is THE GROUND TRUTH of productivity
+//    - Physical work, meetings, coordination, deep work sessions are all tracked there
+//    - NEVER assume "zero progress" without checking the time tracking data first
+//    - Checkbox completions are NOT the primary measure of productivity
+//
+// This should summarize:
+// 1. What's been accomplished since the last update - CHECK TIME TRACKING DATA FIRST (tasks checked off, workouts done, meetings attended, time tracked)
+// 2. Current status of high-priority items
+// 3. Any new events, emails, or tasks that need attention
+// 4. Overall progress and any blockers
+//
+// RETURN A JSON OBJECT:
+// {
+//   "progress_update": "<!-- PROGRESS_UPDATE -->\\n> [!success] 📊 Progress Update (${currentTime})\\n>\\n> *${currentDate} HH:MM ${tzOffset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers\\n<!-- /PROGRESS_UPDATE -->",
+//   "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
+// }
+//
+// NOTE: The progress_update should use the callout format with:
+// - "<!-- PROGRESS_UPDATE -->" as the opening marker
+// - "> [!success] 📊 Progress Update (TIME)" as the header
+// - "> " prefix for all lines in the callout
+// - "*italicized timestamp*" on the second line
+// - "<!-- /PROGRESS_UPDATE -->" as the closing marker
+//
+// IMPORTANT:
+// - Create a MEANINGFUL progress update - there's always something to report
+// - Look at completed tasks in the file (marked [x]) since the last Progress Update
+// - The update should be 2-4 bullet points, concise but informative
+// - Only mark tasks as done if you see clear evidence (like workout exercises checked off)
+// - Use the exact timezone offset in the timestamp: ${tzOffset}
+// - Use simple checkboxes: "- [ ] Task description"
+// - DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
+// - Created date (➕) is fine - scripts add this automatically`;
+//   }
+//
+//   const client = new Anthropic({ apiKey });
+//
+//   try {
+//     const model = getClaudeModel();
+//     const response = await client.messages.create({
+//       model,
+//       max_tokens: 2000,
+//       temperature: 0,
+//       messages: [{ role: 'user', content: prompt }],
+//     });
+//
+//     let responseText = response.content[0].text;
+//
+//     // Try to parse as JSON
+//     let edits;
+//     try {
+//       let jsonStr;
+//       if (responseText.includes('```json')) {
+//         jsonStr = responseText.split('```json')[1].split('```')[0];
+//       } else if (responseText.includes('```')) {
+//         jsonStr = responseText.split('```')[1].split('```')[0];
+//       } else if (responseText.includes('{')) {
+//         const start = responseText.indexOf('{');
+//         let count = 0;
+//         let end = start;
+//         for (let i = start; i < responseText.length; i++) {
+//           if (responseText[i] === '{') count++;
+//           else if (responseText[i] === '}') {
+//             count--;
+//             if (count === 0) {
+//               end = i + 1;
+//               break;
+//             }
+//           }
+//         }
+//         jsonStr = responseText.slice(start, end);
+//       } else {
+//         jsonStr = responseText;
+//       }
+//       edits = JSON.parse(jsonStr);
+//     } catch (e) {
+//       console.log(`⚠️  Failed to parse Claude's response as JSON: ${e.message}`);
+//       console.log(`Response: ${responseText.slice(0, 200)}...`);
+//       process.exit(1);
+//     }
+//
+//     let updatedContent = originalContent;
+//
+//     if (isTomorrow) {
+//       if (edits.priorities_update) {
+//         const replacement = `## 📋 Top Priorities\n\n${edits.priorities_update}\n`;
+//         updatedContent = updatedContent.replace(/## 📋 Top Priorities\n\n.*?(?=\n## |$)/s, replacement);
+//       }
+//     } else {
+//       if (edits.progress_update) {
+//         updatedContent = updatedContent.trimEnd() + '\n\n' + edits.progress_update + '\n';
+//       }
+//
+//       if (edits.tasks_to_check) {
+//         for (const task of edits.tasks_to_check) {
+//           const escapedTask = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+//           const uncheckedPattern = new RegExp(`- \\[ \\] ${escapedTask}`);
+//           if (uncheckedPattern.test(updatedContent)) {
+//             updatedContent = updatedContent.replace(uncheckedPattern, `- [x] ${task} ✅ ${currentDate}`);
+//           }
+//         }
+//       }
+//     }
+//
+//     // SAFETY CHECKS
+//     const updatedLines = updatedContent.split('\n').length;
+//     if (updatedLines < originalLines * 0.9) {
+//       console.log(`⚠️  Safety check failed: Updated file has ${updatedLines} lines vs original ${originalLines}`);
+//       console.log('Aborting update to prevent data loss');
+//       process.exit(1);
+//     }
+//
+//     if (updatedContent.length < originalContent.length * 0.9) {
+//       console.log('⚠️  Safety check failed: Updated content is too short');
+//       console.log(`Original: ${originalContent.length} chars, Updated: ${updatedContent.length} chars`);
+//       process.exit(1);
+//     }
+//
+//     if (dryRun) {
+//       console.log('\n📊 Data context sent to AI:');
+//       console.log('─'.repeat(60));
+//       console.log(dailyData.slice(0, 5000));
+//       console.log('─'.repeat(60));
+//       console.log('\n📝 AI response (proposed changes):');
+//       if (isTomorrow) {
+//         console.log(`Priorities update:\n${(edits.priorities_update || 'None').slice(0, 200)}...`);
+//         console.log(`\nNotes: ${edits.notes || 'None'}`);
+//       } else {
+//         console.log(`Progress update to append:\n${edits.progress_update || 'None'}`);
+//         console.log(`\nTasks to check: ${JSON.stringify(edits.tasks_to_check || [])}`);
+//       }
+//       console.log('\n✅ Dry run complete - no changes made');
+//     } else {
+//       fs.writeFileSync(reviewFile, updatedContent);
+//
+//       if (updatedContent !== originalContent) {
+//         const fileType = isTomorrow ? "tomorrow's plan" : "today's plan";
+//         console.log(`✅ Updated ${fileType}: ${reviewFile}`);
+//       } else {
+//         console.log(`⚠️  API returned no changes - ${reviewFile} unchanged`);
+//         console.log('This might indicate the AI couldn\'t determine what to update.');
+//       }
+//     }
+//   } catch (e) {
+//     console.error(`❌ Error: ${e.message}`);
+//     if (!dryRun) {
+//       console.log('Restoring original content...');
+//       fs.writeFileSync(reviewFile, backupContent);
+//     }
+//     process.exit(1);
+//   }
+// }
 
 // ============================================================================
 // Interactive Session
@@ -821,8 +827,9 @@ async function getContextPluginsData(typeData) {
 }
 
 async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false) {
-  const todayFile = getReviewFilePath();
-  const tomorrowFile = getReviewFilePath(getTomorrowDate());
+  // DISABLED - depends on getReviewFilePath/getTomorrowDate
+  // const todayFile = getReviewFilePath();
+  // const tomorrowFile = getReviewFilePath(getTomorrowDate());
   const timezone = getTimezone();
 
   const now = getCurrentTime(timezone);
@@ -919,13 +926,15 @@ ${contextSection}`;
   // Session end summary
   console.log('\n' + '━'.repeat(50));
   console.log('✅ Claude session ended\n');
-  console.log('📝 Your plans are in:');
-  console.log(`   Today: ${todayFile}`);
-  console.log(`   Tomorrow: ${tomorrowFile}\n`);
+  // DISABLED - depends on getReviewFilePath/getTomorrowDate
+  // console.log('📝 Your plans are in:');
+  // console.log(`   Today: ${todayFile}`);
+  // console.log(`   Tomorrow: ${tomorrowFile}\n`);
   console.log('💡 Continue tracking progress with:');
   console.log('   bin/mark-done \'task description\'');
   console.log('   bin/progress \'note\'');
-  console.log('   bin/today update  # Update both files with progress');
+  // DISABLED - update command depends on disabled features
+  // console.log('   bin/today update  # Update both files with progress');
   console.log('━'.repeat(50) + '\n');
 }
 
@@ -942,20 +951,18 @@ Usage:
 Commands:
   (none)      Start interactive daily review session with Claude
   now         Quick "what should I do right now?" session
-  init        Initialize review file hierarchy (create today/tomorrow plans)
-  update      Update review files via Anthropic API (non-interactive)
   dry-run     Show the prompt that would be sent to Claude (no API call)
+  init        (DISABLED) Initialize review file hierarchy
+  update      (DISABLED) Update review files via Anthropic API
 
 Options:
-  --no-sync         Skip the data sync step
   --non-interactive Run in non-interactive mode (for automation)
   -h, --help        Show this help message
 
 Examples:
   bin/today                           # Start daily review
   bin/today now                       # Quick "what should I do now?" session
-  bin/today update                    # Update plans via API
-  bin/today --no-sync                 # Skip sync, start review
+  bin/today dry-run                   # Show prompt without running Claude
   bin/today "fix the bug in login"    # Focused session with specific request
 
 Files:
@@ -991,40 +998,44 @@ async function main() {
     }
   }
 
-  const directRequest = request.length > 0 ? request.join(' ') : null;
+  let directRequest = request.length > 0 ? request.join(' ') : null;
 
-  // Check if vault exists (unless in non-interactive mode)
-  if (!nonInteractive) {
-    const vaultExists = await checkVaultExists();
-    if (!vaultExists) {
-      console.log('Cannot continue without vault directory.');
-      process.exit(1);
-    }
-  }
+  // DISABLED - checkVaultExists not yet migrated to plugin system
+  // // Check if vault exists (unless in non-interactive mode)
+  // if (!nonInteractive) {
+  //   const vaultExists = await checkVaultExists();
+  //   if (!vaultExists) {
+  //     console.log('Cannot continue without vault directory.');
+  //     process.exit(1);
+  //   }
+  // }
 
-  // Check skeleton updates (unless in non-interactive mode)
-  if (!nonInteractive) {
-    checkSkeletonUpdates();
-  }
+  // DISABLED - checkSkeletonUpdates not yet migrated to plugin system
+  // // Check skeleton updates (unless in non-interactive mode)
+  // if (!nonInteractive) {
+  //   checkSkeletonUpdates();
+  // }
 
   // Always check database health first (except for help which returns early)
   await checkAndRecoverDatabase();
 
-  // Handle init command
-  if (command === 'init') {
-    console.log('📅 Initializing review file hierarchy...');
-    createReviewFromTemplate();
-    console.log('✅ Review hierarchy is ready!');
-    return;
-  }
+  // DISABLED - init command depends on template features
+  // // Handle init command
+  // if (command === 'init') {
+  //   console.log('📅 Initializing review file hierarchy...');
+  //   createReviewFromTemplate();
+  //   console.log('✅ Review hierarchy is ready!');
+  //   return;
+  // }
 
-  // Handle update command
-  if (command === 'update') {
-    console.log('📊 Running automated review update...');
-    if (!noSync) runSync();
-    await updateReviewFile(false);
-    return;
-  }
+  // DISABLED - update command depends on API update features
+  // // Handle update command
+  // if (command === 'update') {
+  //   console.log('📊 Running automated review update...');
+  //   if (!noSync) runSync();
+  //   await updateReviewFile(false);
+  //   return;
+  // }
 
   // Handle dry-run command - show what prompt would be sent to AI
   if (command === 'dry-run') {
@@ -1045,20 +1056,23 @@ async function main() {
     console.log('📊 Starting daily review process...');
   }
 
-  // Check Claude authentication (unless non-interactive)
-  if (!nonInteractive) {
-    checkClaudeAuth();
-  }
+  // DISABLED - checkClaudeAuth not yet migrated
+  // // Check Claude authentication (unless non-interactive)
+  // if (!nonInteractive) {
+  //   checkClaudeAuth();
+  // }
 
-  // Run sync (unless skipped)
-  if (!noSync) {
-    runSync(false);
-  } else {
-    console.log('⚠️  Skipping sync (--no-sync flag provided)');
-  }
+  // DISABLED - runSync replaced by bin/plugins sync
+  // // Run sync (unless skipped)
+  // if (!noSync) {
+  //   runSync(false);
+  // } else {
+  //   console.log('⚠️  Skipping sync (--no-sync flag provided)');
+  // }
 
-  // Create review file from template if needed
-  createReviewFromTemplate();
+  // DISABLED - createReviewFromTemplate depends on template features
+  // // Create review file from template if needed
+  // createReviewFromTemplate();
 
   // Run the appropriate session
   await runInteractiveSession(directRequest, nonInteractive);

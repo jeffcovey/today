@@ -1,0 +1,37 @@
+# Markdown Tasks Plugin
+# Syncs Obsidian-style markdown tasks to database
+
+name = "markdown-tasks"
+displayName = "Markdown Tasks"
+description = "Sync Obsidian-style markdown tasks to database"
+type = "tasks"
+
+requiredEnv = []
+
+longDescription = """
+Syncs tasks from markdown files in your vault to the database.
+
+Tasks use Obsidian Tasks plugin format:
+```
+- [ ] Task title 🔺 #stage/front-stage #topic/programming ➕ 2025-12-09 📅 2025-12-15
+- [x] Completed task ✅ 2025-12-10
+```
+
+Supported markers:
+- Priority: 🔺 (highest), ⏫ (high), 🔼 (medium), 🔽 (low), ⏬ (lowest)
+- Stage: #stage/front-stage, #stage/back-stage, #stage/off-stage
+- Topics: #topic/topic-name (multiple allowed)
+- Dates: ➕ (created), 📅 (due), ⏳ (scheduled), ✅ (completed)
+- Recurrence: 🔁 every day/week/month/etc.
+"""
+
+aiInstructions = ""
+
+[commands]
+read = "./read.js"
+# write = "./write.js"  # TODO: implement write support
+
+[settings]
+directory = { type = "string", default = "vault", description = "Root directory to scan for tasks" }
+exclude_paths = { type = "string", default = "templates,.obsidian", description = "Comma-separated paths to exclude" }
+include_completed = { type = "boolean", default = true, description = "Include completed tasks in sync" }

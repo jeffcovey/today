@@ -235,7 +235,6 @@ These plugins do not save to the database.`
     fields: {}
   },
 
-  // NOTE: New plugin types should be added at the END to get new migration version numbers
   'events': {
     table: 'events',
     staleMinutes: 5, // Calendar events change occasionally
@@ -332,7 +331,89 @@ Run 'bin/calendar list' to see available sources.`
       }
     },
     indexes: ['source', 'start_date', 'end_date']
+  },
+
+  'tasks': {
+    table: 'tasks',
+    staleMinutes: 5, // Tasks change moderately often
+    ai: {
+      name: 'Tasks',
+      description: `Tasks are to-do items from various sources (Obsidian markdown, Todoist, Asana, etc.).
+Each task has a status (open or completed), optional priority, and optional due date.
+Source-specific fields like project, tags, recurrence, and assignee are in metadata.`,
+      defaultCommand: 'bin/tasks today',
+      queryInstructions: `Commands: bin/tasks list, bin/tasks list --today, bin/tasks list --stage front-stage, bin/tasks add "task"
+SQL: SELECT title, status, priority, due_date FROM tasks WHERE status = 'open' ORDER BY due_date NULLS LAST, priority`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: true,
+        description: 'Unique identifier (e.g., file:line or external system ID)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., markdown-tasks/local)'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Task title/description'
+      },
+      status: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Task status: open or completed'
+      },
+      priority: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Priority level: highest, high, medium, low, lowest'
+      },
+      due_date: {
+        sqlType: 'DATE',
+        jsType: 'string',
+        required: false,
+        description: 'Due date (YYYY-MM-DD)'
+      },
+      completed_at: {
+        sqlType: 'DATETIME',
+        jsType: 'string',
+        required: false,
+        description: 'When the task was completed (ISO 8601)'
+      },
+      description: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Extended notes/body text'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (tags, project, assignee, recurrence, stage, topics, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'status', 'due_date', 'priority']
   }
+
+  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
 };
 
 /**

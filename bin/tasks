@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
 import { program } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -13,6 +15,86 @@ import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Standard terminal width for wrapping
+const TERMINAL_WIDTH = 80;
+const BULLET_INDENT = '   '; // 3 spaces to align with emoji bullet
+
+// Priority emoji map (shared across commands)
+const PRIORITY_EMOJI = {
+  highest: '🔺',
+  high: '⏫',
+  medium: '🔼',
+  low: '🔽',
+  lowest: '⏬'
+};
+
+/**
+ * Wrap text to fit terminal width, with proper indentation for continuation lines.
+ * URLs and long unbreakable strings go on their own line.
+ */
+function wrapTaskLine(bullet, title, dueSuffix = '') {
+  const fullText = title + dueSuffix;
+
+  // Width available after bullet and space
+  const contentWidth = TERMINAL_WIDTH - 3; // "🔺 " = 3 visible chars (emoji + space)
+
+  // If it fits on one line, just return it
+  if (fullText.length <= contentWidth) {
+    return `${bullet} ${fullText}`;
+  }
+
+  // Split into words, keeping URLs intact
+  const words = fullText.split(/(\s+)/).filter(w => w.trim());
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const isUrl = word.match(/^https?:\/\//);
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+    if (isUrl) {
+      // URLs go on their own line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      lines.push(word);
+      currentLine = '';
+    } else if (testLine.length <= contentWidth) {
+      currentLine = testLine;
+    } else {
+      // Word doesn't fit, start new line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  // Format with bullet on first line, indent on continuation
+  return lines.map((line, i) => {
+    if (i === 0) {
+      return `${bullet} ${line}`;
+    }
+    return `${BULLET_INDENT}${line}`;
+  }).join('\n');
+}
+
+/**
+ * Print a list of tasks with wrapping
+ */
+function printTasks(tasks) {
+  console.log('');
+  for (const task of tasks) {
+    const bullet = PRIORITY_EMOJI[task.priority] || '  ';
+    const dateSuffix = task.due_date ? chalk.yellow(` 📅 ${task.due_date}`) : '';
+    console.log(wrapTaskLine(bullet, task.title, dateSuffix));
+  }
+}
 
 // Helper function to find markdown files containing tasks
 function findMarkdownFilesWithTasks() {
@@ -29,12 +111,8 @@ function ensureDateAdded(line) {
     return line;
   }
 
-  // Get current date in YYYY-MM-DD format
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const dateAdded = `➕ ${year}-${month}-${day}`;
+  // Get current date in YYYY-MM-DD format using timezone-aware utility
+  const dateAdded = `➕ ${getTodayDate()}`;
 
   // Insert date added before priority markers if they exist
   if (line.match(/🔺|⏫|🔼|🔽|⏬/)) {
@@ -65,45 +143,84 @@ program
   .description('Task management for Today system')
   .version('1.0.0');
 
-// Sync command - updates markdown_tasks cache and generates topic files
+// Sync command - syncs tasks via plugin system
 program
   .command('sync')
-  .description('Update markdown tasks cache and generate topic files')
+  .description('Sync tasks from all enabled task plugins')
   .action(async () => {
+    console.log(chalk.blue('ℹ') + ' Syncing tasks plugins to database...');
+
     try {
-      console.log(chalk.blue('Syncing tasks...'));
-
-      // Step 1: Update the markdown_tasks cache
-      console.log(chalk.blue('1. Updating markdown tasks cache...'));
-      execSync('node bin/tasks update-cache', {
-        encoding: 'utf8',
-        stdio: 'inherit'
-      });
-
-      // Step 2: Generate topic files
-      console.log(chalk.blue('\n2. Generating topic files...'));
-      execSync('node bin/tasks generate-topics', {
-        encoding: 'utf8',
-        stdio: 'inherit'
-      });
-
-      console.log(chalk.green('\n✓ Sync complete'));
+      const result = execSync('bin/plugins sync --type tasks', { encoding: 'utf8' });
+      // Strip dotenvx output and show result
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
     } catch (error) {
-      console.error(chalk.red('Error syncing tasks:'), error.message);
-      process.exit(1);
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(chalk.yellow('⚠') + ' No tasks plugins are enabled.');
+        console.log('');
+        console.log('To sync tasks, configure a plugin:');
+        console.log('');
+        console.log('  ' + chalk.cyan('bin/plugins configure'));
+      } else {
+        console.error(chalk.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
     }
   });
 
-// List command - uses markdown_tasks cache
+// Today command - shorthand for list --today
+program
+  .command('today')
+  .description('Show tasks due/scheduled for today or earlier')
+  .action(async () => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    const today = getTodayDate();
+
+    const sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE status = 'open'
+        AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    const tasks = db.prepare(sql).all(today, today);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ' No tasks due today');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} tasks due today or earlier`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// List command - queries tasks table from plugin system
 program
   .command('list')
-  .description('List tasks from markdown files')
+  .description('List tasks from database')
   .option('-t, --today', 'Show tasks due/scheduled today')
   .option('--stage <stage>', 'Filter by stage (front-stage, back-stage, off-stage)')
   .option('--topic <topic>', 'Filter by topic')
   .option('-a, --all', 'Include completed tasks')
   .option('-l, --legend', 'Show legend for symbols')
   .option('-n, --limit <number>', 'Limit number of tasks shown', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     if (options.legend) {
       console.log(chalk.bold('\nTask List Legend:'));
@@ -122,109 +239,73 @@ program
     }
 
     const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
 
-    try {
-      // Build query based on options
-      let conditions = ["file_path NOT LIKE 'vault/.%'", "file_path NOT LIKE '%/templates/%'"];
-      const params = [];
+    // Build query based on options
+    let conditions = [];
+    const params = [];
 
-      if (!options.all) {
-        conditions.push("line_text LIKE '- [ ]%'");  // Only uncompleted tasks
-      } else {
-        conditions.push("(line_text LIKE '- [ ]%' OR line_text LIKE '- [x]%')");
-      }
-
-      if (options.stage) {
-        conditions.push("line_text LIKE ?");
-        params.push(`%#stage/${options.stage}%`);
-      }
-
-      if (options.topic) {
-        conditions.push("line_text LIKE ?");
-        params.push(`%#topic/${options.topic}%`);
-      }
-
-      if (options.today) {
-        const today = new Date().toISOString().split('T')[0];
-        conditions.push("(line_text LIKE ? OR line_text LIKE ?)");
-        params.push(`%📅 ${today}%`, `%⏳ ${today}%`);
-      }
-
-      let sql = `SELECT file_path, line_number, line_text FROM markdown_tasks WHERE ${conditions.join(' AND ')} ORDER BY file_path, line_number`;
-
-      if (options.limit) {
-        sql += ` LIMIT ${options.limit}`;
-      }
-
-      const tasks = db.all(sql, ...params);
-
-      if (tasks.length === 0) {
-        console.log(chalk.gray('No tasks found'));
-        console.log(chalk.gray('Run "bin/tasks update-cache" to refresh the cache'));
-        return;
-      }
-
-      // Extract and display tasks
-      const table = new Table({
-        head: ['Pri', 'Task', 'File'],
-        colWidths: [5, 55, 30],
-        wordWrap: true
-      });
-
-      for (const task of tasks) {
-        // Extract priority
-        let priority = '  ';
-        if (task.line_text.includes('🔺')) priority = '🔺';
-        else if (task.line_text.includes('⏫')) priority = '⏫';
-        else if (task.line_text.includes('🔼')) priority = '🔼';
-        else if (task.line_text.includes('🔽')) priority = '🔽';
-        else if (task.line_text.includes('⏬')) priority = '⏬';
-
-        // Extract task title (remove checkbox, dates, tags, priority)
-        let title = task.line_text
-          .replace(/^- \[[x ]\] /, '')
-          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-          .replace(/#\w+\/[\w-]+/g, '')
-          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
-          .replace(/🔁 .+$/g, '')
-          .trim();
-
-        // Truncate long titles
-        if (title.length > 52) {
-          title = title.substring(0, 49) + '...';
-        }
-
-        // Shorten file path for display
-        let filePath = task.file_path.replace('vault/', '');
-        if (filePath.length > 27) {
-          filePath = '...' + filePath.substring(filePath.length - 24);
-        }
-
-        table.push([priority, title, filePath]);
-      }
-
-      console.log(table.toString());
-      console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
-
-      // Show stage distribution
-      const stageCounts = { 'front-stage': 0, 'back-stage': 0, 'off-stage': 0, 'untagged': 0 };
-      for (const task of tasks) {
-        if (task.line_text.includes('#stage/front-stage')) stageCounts['front-stage']++;
-        else if (task.line_text.includes('#stage/back-stage')) stageCounts['back-stage']++;
-        else if (task.line_text.includes('#stage/off-stage')) stageCounts['off-stage']++;
-        else stageCounts['untagged']++;
-      }
-
-      console.log(chalk.gray('\nBy Stage:'));
-      console.log(chalk.gray(`  👥 front-stage: ${stageCounts['front-stage']}`));
-      console.log(chalk.gray(`  🔧 back-stage: ${stageCounts['back-stage']}`));
-      console.log(chalk.gray(`  🌴 off-stage: ${stageCounts['off-stage']}`));
-      if (stageCounts['untagged'] > 0) {
-        console.log(chalk.gray(`  ❓ untagged: ${stageCounts['untagged']}`));
-      }
-    } finally {
-      await db.close();
+    if (!options.all) {
+      conditions.push("status = 'open'");
     }
+
+    if (options.stage) {
+      conditions.push("json_extract(metadata, '$.stage') = ?");
+      params.push(options.stage);
+    }
+
+    if (options.topic) {
+      // Topics are stored as JSON array in metadata
+      conditions.push("json_extract(metadata, '$.topics') LIKE ?");
+      params.push(`%${options.topic}%`);
+    }
+
+    if (options.today) {
+      const today = getTodayDate();
+      conditions.push("(due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)");
+      params.push(today, today);
+    }
+
+    if (options.source) {
+      conditions.push("source LIKE ?");
+      params.push(`%${options.source}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Order by priority then due date
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      ${whereClause}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ' No tasks found');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} tasks`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
 // Add command - appends task to vault/tasks/tasks.md
@@ -1179,79 +1260,61 @@ ${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null
     process.exit(0);
   });
 
-// Search command - searches markdown_tasks cache
+// Search command - searches tasks table
 program
   .command('search <query>')
-  .description('Search for tasks in markdown files')
+  .description('Search for tasks by title')
   .option('-a, --all', 'Include completed tasks')
   .option('-n, --limit <number>', 'Limit number of results', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
   .action(async (query, options) => {
     const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
 
-    try {
-      let sql = `
-        SELECT file_path, line_number, line_text
-        FROM markdown_tasks
-        WHERE line_text LIKE ?
-          AND file_path NOT LIKE 'vault/.%'
-          AND file_path NOT LIKE '%/templates/%'
-      `;
+    const conditions = ['title LIKE ?'];
+    const params = [`%${query}%`];
 
-      if (!options.all) {
-        sql += " AND line_text LIKE '- [ ]%'";
-      }
-
-      sql += ' ORDER BY file_path, line_number';
-
-      if (options.limit) {
-        sql += ` LIMIT ${options.limit}`;
-      }
-
-      const searchPattern = `%${query}%`;
-      const tasks = db.all(sql, searchPattern);
-
-      if (tasks.length === 0) {
-        console.log(chalk.yellow(`No tasks found matching "${query}"`));
-        return;
-      }
-
-      console.log(chalk.blue(`\nFound ${tasks.length} task(s) matching "${query}":\n`));
-
-      const table = new Table({
-        head: ['Task', 'File', 'Line'],
-        colWidths: [50, 30, 6],
-        wordWrap: true
-      });
-
-      for (const task of tasks) {
-        // Extract task title
-        let title = task.line_text
-          .replace(/^- \[[x ]\] /, '')
-          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-          .replace(/#\w+\/[\w-]+/g, '')
-          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
-          .replace(/🔁 .+$/g, '')
-          .trim();
-
-        if (title.length > 47) {
-          title = title.substring(0, 44) + '...';
-        }
-
-        let filePath = task.file_path.replace('vault/', '');
-        if (filePath.length > 27) {
-          filePath = '...' + filePath.substring(filePath.length - 24);
-        }
-
-        table.push([title, filePath, task.line_number]);
-      }
-
-      console.log(table.toString());
-    } catch (error) {
-      console.error(chalk.red('Error searching tasks:'), error.message);
-      process.exit(1);
-    } finally {
-      await db.close();
+    if (!options.all) {
+      conditions.push("status = 'open'");
     }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No tasks matching "${query}"`);
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} results for "${query}"`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
 // Note: projects command removed - project management now through vault/projects/*.md files

@@ -490,8 +490,9 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
   }
 
   // Handle deletion strategy based on plugin type and incremental sync
-  if (pluginType === 'time-logs' && filesProcessed && filesProcessed.length > 0) {
-    // For time-logs incremental sync, only delete entries from re-processed files
+  if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
+    // For file-based plugins, delete entries from re-processed files before re-inserting
+    // This handles line number shifts when files are edited
     const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
     for (const file of filesProcessed) {
       deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
