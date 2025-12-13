@@ -341,9 +341,9 @@ Run 'bin/calendar list' to see available sources.`
       description: `Tasks are to-do items from various sources (Obsidian markdown, Todoist, Asana, etc.).
 Each task has a status (open or completed), optional priority, and optional due date.
 Source-specific fields like project, tags, recurrence, and assignee are in metadata.`,
-      defaultCommand: 'bin/tasks today',
-      queryInstructions: `Commands: bin/tasks list, bin/tasks list --today, bin/tasks list --stage front-stage, bin/tasks add "task"
-SQL: SELECT title, status, priority, due_date FROM tasks WHERE status = 'open' ORDER BY due_date NULLS LAST, priority`
+      defaultCommand: 'bin/tasks today ; bin/tasks recent -d 2',
+      queryInstructions: `Commands: bin/tasks list, bin/tasks today, bin/tasks add "task", bin/tasks complete "id" --title "title"
+SQL: SELECT id, title, priority, due_date FROM tasks WHERE status = 'open'`
     },
     fields: {
       id: {

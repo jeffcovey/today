@@ -313,8 +313,9 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount) {
  * @param {object} context - { db, vaultPath }
  * @returns {Promise<{success: boolean, count: number, message: string}>}
  */
-export async function syncPluginSource(plugin, sourceName, sourceConfig, context) {
+export async function syncPluginSource(plugin, sourceName, sourceConfig, context, options = {}) {
   const { db } = context;
+  const { fileFilter } = options;
   // Source identifier for the `source` column (e.g., "markdown-time-tracking/default")
   const sourceId = `${plugin.name}/${sourceName}`;
 
@@ -322,11 +323,19 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   const syncMeta = getSyncMetadata(db, sourceId);
   const lastSyncTime = syncMeta?.last_synced_at || null;
 
-  // Run the read command with last sync time and source ID
-  const result = runPluginCommand(plugin, 'read', sourceConfig, {
+  // Build environment variables for read command
+  const envVars = {
     LAST_SYNC_TIME: lastSyncTime || '',
     SOURCE_ID: sourceId
-  });
+  };
+
+  // If file filter specified, pass it to read command for targeted sync
+  if (fileFilter) {
+    envVars.FILE_FILTER = fileFilter;
+  }
+
+  // Run the read command with last sync time and source ID
+  const result = runPluginCommand(plugin, 'read', sourceConfig, envVars);
 
   if (!result.success) {
     return {
@@ -456,12 +465,153 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     }
   }
 
+  // Run auto-archive first if enabled (removes completed tasks, rebalances files)
+  let archiveResult = null;
+  if (sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
+    try {
+      archiveResult = await runAutoArchive({
+        plugin,
+        sourceName,
+        sourceConfig
+      });
+
+      // If we archived/rebalanced, read again to update database
+      if (archiveResult.files_modified?.length > 0) {
+        const fileFilter = archiveResult.files_modified.join(',');
+        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        });
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to archiving
+      console.warn(`Warning: Auto-archive failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto date-created if enabled (never fails the sync)
+  let dateCreatedResult = null;
+  if (sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
+    try {
+      dateCreatedResult = await runAutoDateCreated({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we added dates, read again to update database
+      if (dateCreatedResult.added > 0 && dateCreatedResult.files_modified?.length > 0) {
+        const fileFilter = dateCreatedResult.files_modified.join(',');
+        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        });
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to date adding
+      console.warn(`Warning: Auto date-created failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto-classification if enabled (never fails the sync)
+  let classificationResult = null;
+  const supportsStageClassification = plugin.settings?.supports_stage_classification?.default !== false;
+  if (sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
+    try {
+      classificationResult = await runAutoStageClassification({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we classified entries, read again to update database
+      if (classificationResult.classified > 0 && classificationResult.files_modified?.length > 0) {
+        const fileFilter = classificationResult.files_modified.join(',');
+        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        });
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to classification
+      console.warn(`Warning: Auto-classification failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto-priority if enabled (never fails the sync)
+  let priorityResult = null;
+  const supportsPriorityClassification = plugin.settings?.supports_priority_classification?.default !== false;
+  if (sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
+    try {
+      priorityResult = await runAutoPriority({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we prioritized entries, read again to update database
+      if (priorityResult.prioritized > 0 && priorityResult.files_modified?.length > 0) {
+        const fileFilter = priorityResult.files_modified.join(',');
+        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        });
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to priority assignment
+      console.warn(`Warning: Auto-priority failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
   const incrementalMsg = isIncremental ? ' (incremental)' : '';
+  const archiveMsg = archiveResult?.archived ? `, archived ${archiveResult.archived}` : '';
+  const rebalanceMsg = archiveResult?.rebalanced ? `, rebalanced` : '';
   const taggingMsg = taggingResult?.tagged ? `, tagged ${taggingResult.tagged}` : '';
+  const dateMsg = dateCreatedResult?.added ? `, dated ${dateCreatedResult.added}` : '';
+  const classifyMsg = classificationResult?.classified ? `, classified ${classificationResult.classified}` : '';
+  const priorityMsg = priorityResult?.prioritized ? `, prioritized ${priorityResult.prioritized}` : '';
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${taggingMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 
@@ -808,7 +958,7 @@ export async function getWritableSource(pluginType, sourceFilter = null) {
  * @param {string} pluginType - Plugin type (e.g., 'time-logs')
  * @param {object} entry - Entry data to write
  * @param {object} options - { sourceFilter, db, vaultPath, onSync }
- * @returns {Promise<{success: boolean, error?: string, availableSources?: Array}>}
+ * @returns {Promise<{success: boolean, error?: string, availableSources?: Array, writeResult?: object}>}
  */
 export async function writeEntryAndSync(pluginType, entry, options = {}) {
   const { sourceFilter, db, vaultPath, onSync } = options;
@@ -828,13 +978,209 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
   }
 
   // Sync if db context provided
-  if (db) {
+  if (db && writeResult.data?.needs_sync !== false) {
     if (onSync) onSync();
     const context = { db, vaultPath };
-    await syncPluginSource(source.plugin, source.sourceName, source.config, context);
+
+    // If write result includes a file path, sync only that file
+    // This avoids a full sync when we know exactly what changed
+    const fileFilter = writeResult.data?.file
+      ? path.relative(PROJECT_ROOT, writeResult.data.file)
+      : null;
+
+    await syncPluginSource(source.plugin, source.sourceName, source.config, context, { fileFilter });
   }
 
-  return { success: true, source };
+  return { success: true, source, writeResult: writeResult.data };
+}
+
+/**
+ * Internal function for auto date-created during sync
+ * Called when auto_add_date_created is enabled in source config
+ * @param {object} options - { db, plugin, sourceName, sourceConfig, tableName }
+ * @returns {Promise<{added: number, files_modified: string[]}>}
+ */
+async function runAutoDateCreated(options) {
+  const { db, plugin, sourceName, sourceConfig, tableName } = options;
+  const sourceId = `${plugin.name}/${sourceName}`;
+
+  // Query for tasks without created date
+  const tasks = db.prepare(`
+    SELECT id, title, metadata
+    FROM ${tableName}
+    WHERE source = ?
+      AND status = 'open'
+      AND json_extract(metadata, '$.created_date') IS NULL
+  `).all(sourceId);
+
+  if (tasks.length === 0) {
+    return { added: 0, files_modified: [] };
+  }
+
+  // Prepare task data for the write command
+  const tasksForDateCreated = tasks.map(task => {
+    const metadata = JSON.parse(task.metadata || '{}');
+    return {
+      id: task.id,
+      title: task.title,
+      file_path: metadata.file_path,
+      line_number: metadata.line_number
+    };
+  });
+
+  // Call the write command with add-date-created action
+  const writeResult = await writePluginEntry(plugin.name, sourceName, {
+    action: 'add-date-created',
+    tasks: tasksForDateCreated
+  });
+
+  if (!writeResult.success) {
+    throw new Error(writeResult.error);
+  }
+
+  return {
+    added: writeResult.data?.added || 0,
+    files_modified: writeResult.data?.files_modified || []
+  };
+}
+
+/**
+ * Internal function for auto-priority during sync
+ * Called when auto_add_priority is enabled in source config
+ * @param {object} options - { db, plugin, sourceName, sourceConfig, tableName }
+ * @returns {Promise<{prioritized: number, files_modified: string[], used_ai: boolean}>}
+ */
+async function runAutoPriority(options) {
+  const { db, plugin, sourceName, sourceConfig, tableName } = options;
+  const sourceId = `${plugin.name}/${sourceName}`;
+
+  // Query for tasks without priority
+  const tasks = db.prepare(`
+    SELECT id, title, metadata
+    FROM ${tableName}
+    WHERE source = ?
+      AND status = 'open'
+      AND json_extract(metadata, '$.priority') IS NULL
+  `).all(sourceId);
+
+  if (tasks.length === 0) {
+    return { prioritized: 0, files_modified: [], used_ai: false };
+  }
+
+  // Prepare task data for the write command
+  const tasksForPriority = tasks.map(task => {
+    const metadata = JSON.parse(task.metadata || '{}');
+    return {
+      id: task.id,
+      title: task.title,
+      file_path: metadata.file_path,
+      line_number: metadata.line_number
+    };
+  });
+
+  // Call the write command with add-priority action
+  const writeResult = await writePluginEntry(plugin.name, sourceName, {
+    action: 'add-priority',
+    tasks: tasksForPriority,
+    use_ai: true // Always use AI for auto-priority
+  });
+
+  if (!writeResult.success) {
+    throw new Error(writeResult.error);
+  }
+
+  return {
+    prioritized: writeResult.data?.prioritized || 0,
+    files_modified: writeResult.data?.files_modified || [],
+    used_ai: writeResult.data?.used_ai || false
+  };
+}
+
+/**
+ * Internal function for auto-classification during sync
+ * Called when auto_classify_stages is enabled in source config
+ * @param {object} options - { db, plugin, sourceName, sourceConfig, tableName }
+ * @returns {Promise<{classified: number, files_modified: string[], used_ai: boolean}>}
+ */
+async function runAutoStageClassification(options) {
+  const { db, plugin, sourceName, sourceConfig, tableName } = options;
+  const sourceId = `${plugin.name}/${sourceName}`;
+
+  // Query for tasks without stage classification
+  const tasks = db.prepare(`
+    SELECT id, title, metadata
+    FROM ${tableName}
+    WHERE source = ?
+      AND status = 'open'
+      AND json_extract(metadata, '$.stage') IS NULL
+  `).all(sourceId);
+
+  if (tasks.length === 0) {
+    return { classified: 0, files_modified: [], used_ai: false };
+  }
+
+  // Prepare task data for the write command
+  const tasksForClassification = tasks.map(task => {
+    const metadata = JSON.parse(task.metadata || '{}');
+    return {
+      id: task.id,
+      title: task.title,
+      file_path: metadata.file_path,
+      line_number: metadata.line_number
+    };
+  });
+
+  // Call the write command with classify-stages action
+  const writeResult = await writePluginEntry(plugin.name, sourceName, {
+    action: 'classify-stages',
+    tasks: tasksForClassification,
+    use_ai: true // Always use AI for auto-classification
+  });
+
+  if (!writeResult.success) {
+    throw new Error(writeResult.error);
+  }
+
+  return {
+    classified: writeResult.data?.classified || 0,
+    files_modified: writeResult.data?.files_modified || [],
+    used_ai: writeResult.data?.used_ai || false
+  };
+}
+
+// Note: CLI commands for classify-stages, add-date-added, and prioritize-status
+// have been removed. These features are now config-driven:
+// - auto_classify_stages: Adds #stage/... tags during sync
+// - auto_add_date_created: Adds ➕ YYYY-MM-DD markers during sync
+// - auto_add_priority: Adds priority emojis during sync
+// - auto_archive_completed: Archives completed tasks and rebalances files during sync
+// Enable in config.toml under [plugins.markdown-tasks.<source>]
+
+/**
+ * Internal function for auto-archiving during sync
+ * Called when auto_archive_completed is enabled in source config
+ * Archives completed tasks and rebalances task files
+ * @param {object} options - { plugin, sourceName, sourceConfig }
+ * @returns {Promise<{archived: number, rebalanced: boolean, files_modified: string[]}>}
+ */
+async function runAutoArchive(options) {
+  const { plugin, sourceName, sourceConfig } = options;
+
+  // Call the write command with archive-completed action
+  const writeResult = await writePluginEntry(plugin.name, sourceName, {
+    action: 'archive-completed',
+    max_tasks_per_file: sourceConfig.max_tasks_per_file || 50
+  });
+
+  if (!writeResult.success) {
+    throw new Error(writeResult.error);
+  }
+
+  return {
+    archived: writeResult.data?.archived || 0,
+    rebalanced: writeResult.data?.rebalanced || false,
+    files_modified: writeResult.data?.files_modified || []
+  };
 }
 
 /**

@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
+const fileFilter = process.env.FILE_FILTER || '';  // Sync only specific file(s)
 
 const directory = config.directory || 'vault';
 const excludePaths = (config.exclude_paths || 'templates,.obsidian')
@@ -25,29 +26,45 @@ const rootDir = path.join(projectRoot, directory);
 // Parse last sync time
 const lastSyncDate = lastSyncTime ? new Date(lastSyncTime) : null;
 
-// Find markdown files with tasks using grep -r
-let filesWithTasks;
-try {
-  // Build exclude args for grep
-  const excludeArgs = excludePaths
-    .map(p => `--exclude-dir="${p}"`)
-    .join(' ');
+// Parse file filter (comma-separated list of relative paths)
+const filterFiles = fileFilter
+  ? fileFilter.split(',').map(f => path.join(projectRoot, f.trim()))
+  : null;
 
-  // Find files containing task checkboxes using grep -r
-  const cmd = `grep -rl ${excludeArgs} --include="*.md" "^- \\[[x ]\\]" "${rootDir}" 2>/dev/null || true`;
-  filesWithTasks = execSync(cmd, { encoding: 'utf8' })
-    .split('\n')
-    .filter(f => f.trim());
-} catch (error) {
-  console.error(JSON.stringify({ error: `Cannot find task files: ${error.message}` }));
-  process.exit(1);
+// Find markdown files with tasks
+let filesWithTasks;
+
+// If file filter is specified, only process those files
+if (filterFiles) {
+  filesWithTasks = filterFiles.filter(f => fs.existsSync(f));
+} else {
+  // Find all files with tasks using grep -r
+  try {
+    // Build exclude args for grep
+    const excludeArgs = excludePaths
+      .map(p => `--exclude-dir="${p}"`)
+      .join(' ');
+
+    // Find files containing task checkboxes using grep -r
+    const cmd = `grep -rl ${excludeArgs} --include="*.md" "^- \\[[x ]\\]" "${rootDir}" 2>/dev/null || true`;
+    filesWithTasks = execSync(cmd, { encoding: 'utf8' })
+      .split('\n')
+      .filter(f => f.trim());
+  } catch (error) {
+    console.error(JSON.stringify({ error: `Cannot find task files: ${error.message}` }));
+    process.exit(1);
+  }
 }
 
 // Check which files need syncing based on modification time
 let filesToSync = filesWithTasks;
 let isIncremental = false;
 
-if (lastSyncDate) {
+// If file filter is specified, always sync those files (skip mtime check)
+if (filterFiles) {
+  filesToSync = filesWithTasks;
+  isIncremental = true;  // Treat as incremental since we're targeting specific files
+} else if (lastSyncDate) {
   filesToSync = filesWithTasks.filter(f => {
     try {
       const stat = fs.statSync(f);

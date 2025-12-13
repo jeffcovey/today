@@ -734,6 +734,7 @@ async function getDataContext() {
       // Run the default command to get current data
       let currentData = '';
       try {
+        console.log(`  ${ai.defaultCommand}`);
         currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
           encoding: 'utf8',
           timeout: 10000
@@ -931,7 +932,6 @@ ${contextSection}`;
   // console.log(`   Today: ${todayFile}`);
   // console.log(`   Tomorrow: ${tomorrowFile}\n`);
   console.log('💡 Continue tracking progress with:');
-  console.log('   bin/mark-done \'task description\'');
   console.log('   bin/progress \'note\'');
   // DISABLED - update command depends on disabled features
   // console.log('   bin/today update  # Update both files with progress');
