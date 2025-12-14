@@ -1,5 +1,38 @@
 # Today
 
+> **Beta Testing Note (December 2025)**
+>
+> This project is transitioning to a plugin-based architecture. The documentation below will be revised to reflect these changes. For beta testers, here's how to get started:
+>
+> ```bash
+> # 1. Clone and install
+> git clone https://github.com/jeffcovey/today.git
+> cd today
+> npm install
+>
+> # 2. Copy config templates
+> cp config.toml.example config.toml
+> cp .env.example .env
+>
+> # 3. Configure plugins interactively
+> bin/plugins configure
+>
+> # 4. Sync data from your configured sources
+> bin/plugins sync
+>
+> # 5. Start a daily review session with Claude
+> bin/today
+> ```
+>
+> Key commands for exploring the system:
+> - `bin/plugins list` - See available plugins
+> - `bin/tasks today` - View today's tasks
+> - `bin/track today` - View time tracking
+> - `bin/habits today` - View habits (requires Streaks app)
+> - `bin/calendar today` - View calendar events
+
+---
+
 A personal command center for daily planning and productivity. Uses AI-assisted daily reviews, markdown-based task management, and integrations with email, calendar, and time tracking to help you decide what to do each day.
 
 <p align="center">

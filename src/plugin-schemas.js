@@ -245,7 +245,7 @@ the user's personal events and calendars that just suggest events of
 possible interest. Use calendar data to understand the user's schedule
 and availability, and to look for timing conflicts and anything that needs
 preparation.`,
-      defaultCommand: 'bin/calendar today',
+      defaultCommand: 'bin/calendar today ; bin/calendar week',
       queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar sync
 SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20
 
