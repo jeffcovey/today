@@ -92,7 +92,7 @@ a connection with current circumstances.
 
 Some diary sources include metadata with an entry's location,
 weather, associated photos, tags, etc.`,
-      defaultCommand: 'bin/diary today',
+      defaultCommand: 'bin/diary today ;bin/diary on-this-day',
       queryInstructions: `Commands: bin/diary today, bin/diary week, bin/diary search "term", bin/diary on-this-day, bin/diary stats
 SQL: SELECT DATE(date) as day, SUBSTR(text, 1, 200) as preview FROM diary ORDER BY date DESC LIMIT 10`
     },

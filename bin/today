@@ -734,7 +734,7 @@ async function getDataContext() {
       // Run the default command to get current data
       let currentData = '';
       try {
-        console.log(`  ${ai.defaultCommand}`);
+        console.log(`  ⏳ ${ai.name || pluginType}...`);
         currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
           encoding: 'utf8',
           timeout: 10000
@@ -836,7 +836,9 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   const now = getCurrentTime(timezone);
   const currentTime = formatFullDateTime(now, timezone);
 
+  console.log('📊 Gathering context...');
   const dataContext = await getDataContext();
+  console.log('✅ Context ready\n');
   const config = getFullConfig();
 
   // Build user profile section
@@ -906,9 +908,9 @@ ${contextSection}`;
     return;
   }
 
-  // Actually run Claude
+  // Actually run the AI session
   if (directRequest && nonInteractive) {
-    console.log('🤖 Running Claude in non-interactive mode...');
+    console.log('🤖 Running in non-interactive mode...');
     try {
       spawnSync('timeout', ['600', 'claude', '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
     } catch (e) {
@@ -916,17 +918,16 @@ ${contextSection}`;
       process.exit(1);
     }
   } else if (directRequest) {
-    console.log(`📊 Starting focused session: ${directRequest}\n`);
-    console.log('🤖 Starting Claude focused session...');
+    console.log('🤖 Starting session...');
     spawnSync('claude', [prompt], { stdio: 'inherit' });
   } else {
-    console.log('🤖 Starting Claude daily review session...');
+    console.log('🤖 Starting daily review...');
     spawnSync('claude', [prompt], { stdio: 'inherit' });
   }
 
   // Session end summary
   console.log('\n' + '━'.repeat(50));
-  console.log('✅ Claude session ended\n');
+  console.log('✅ Session ended\n');
   // DISABLED - depends on getReviewFilePath/getTomorrowDate
   // console.log('📝 Your plans are in:');
   // console.log(`   Today: ${todayFile}`);
@@ -949,11 +950,11 @@ Usage:
   bin/today [options] [command] [request]
 
 Commands:
-  (none)      Start interactive daily review session with Claude
+  (none)      Start interactive daily review session
   now         Quick "what should I do right now?" session
-  dry-run     Show the prompt that would be sent to Claude (no API call)
+  dry-run     Show the prompt that would be sent to the AI (no API call)
   init        (DISABLED) Initialize review file hierarchy
-  update      (DISABLED) Update review files via Anthropic API
+  update      (DISABLED) Update review files via API
 
 Options:
   --no-sync         Skip sync step (faster startup)
@@ -1040,7 +1041,6 @@ async function main() {
 
   // Handle dry-run command - show what prompt would be sent to AI
   if (command === 'dry-run') {
-    await checkAndRecoverDatabase();
     await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */);
     return;
   }

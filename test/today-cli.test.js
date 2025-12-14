@@ -99,8 +99,8 @@ describe('bin/today CLI', () => {
     test('should not actually start Claude session', () => {
       const result = runToday('dry-run --no-sync');
 
-      // Should not show session end messages (means it didn't run Claude)
-      expect(result.stdout).not.toContain('Claude session ended');
+      // Should not show session end messages (means it didn't run the AI)
+      expect(result.stdout).not.toContain('Session ended');
       // Should not actually write files
       expect(result.stdout).not.toMatch(/^Updated.*\.md/m);
     });
