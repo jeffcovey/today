@@ -956,6 +956,7 @@ Commands:
   update      (DISABLED) Update review files via Anthropic API
 
 Options:
+  --no-sync         Skip sync step (faster startup)
   --non-interactive Run in non-interactive mode (for automation)
   -h, --help        Show this help message
 

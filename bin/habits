@@ -1,0 +1,349 @@
+#!/usr/bin/env node
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import chalk from 'chalk';
+import { execSync } from 'child_process';
+
+// Status emoji map
+const STATUS_EMOJI = {
+  completed: '✅',
+  pending: '⏳',
+  skipped: '⏭️',
+  partial: '🔶'
+};
+
+program
+  .name('habits')
+  .description('Habit tracking for Today system');
+
+// Sync command - syncs habits via plugin system
+program
+  .command('sync')
+  .description('Sync habits from all enabled habit plugins')
+  .action(async () => {
+    console.log(chalk.blue('ℹ') + ' Syncing habits plugins to database...');
+
+    try {
+      const result = execSync('bin/plugins sync --type habits', { encoding: 'utf8' });
+      // Strip dotenvx output and show result
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
+    } catch (error) {
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(chalk.yellow('⚠') + ' No habits plugins are enabled.');
+        console.log('');
+        console.log('To sync habits, configure a plugin:');
+        console.log('');
+        console.log('  ' + chalk.cyan('bin/plugins configure'));
+      } else {
+        console.error(chalk.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
+    }
+  });
+
+// Today command - show today's habits
+program
+  .command('today')
+  .description('Show today\'s habits and their status')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'habits');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT habit_id, title, status, value, category, goal_type,
+             json_extract(metadata, '$.current_streak') as streak,
+             json_extract(metadata, '$.target_type') as target_type,
+             json_extract(metadata, '$.target_value') as target_value
+      FROM habits
+      WHERE date = ?
+    `;
+    const params = [today];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY status DESC, category, title`;
+
+    const habits = db.prepare(sql).all(...params);
+
+    if (habits.length === 0) {
+      console.log(chalk.blue('ℹ') + ' No habits for today');
+      console.log(getSyncStatusMessage(db, 'habits'));
+      return;
+    }
+
+    // Group by status and goal type
+    const pending = habits.filter(h => h.status === 'pending' && h.goal_type !== 'limit');
+    const completed = habits.filter(h => h.status === 'completed');
+    const limits = habits.filter(h => h.goal_type === 'limit' && h.status !== 'completed');
+    const other = habits.filter(h => !['pending', 'completed'].includes(h.status) && h.goal_type !== 'limit');
+
+    console.log('');
+    console.log(chalk.cyan(`Today's Habits`) + ` (${today})`);
+    console.log('');
+
+    // Helper to format habit line based on goal_type
+    const formatHabit = (h, showStreak = false) => {
+      let emoji = STATUS_EMOJI[h.status] || '❓';
+      let suffix = '';
+
+      if (h.goal_type === 'limit') {
+        // Limit habits: show value vs target
+        if (h.status === 'completed' || h.status === 'partial') {
+          emoji = '✅'; // Under the limit = success
+          if (h.value != null && h.target_value) {
+            const val = Number(h.value).toFixed(1).replace(/\.0$/, '');
+            suffix = chalk.gray(` (${val}/${h.target_value})`);
+          }
+        } else if (h.status === 'skipped') {
+          emoji = '❌'; // Exceeded limit
+        }
+      } else {
+        // Achieve habits
+        if (h.value && h.target_type === 'timer') {
+          suffix = chalk.gray(` (${formatDuration(h.value)})`);
+        }
+      }
+
+      if (showStreak && h.streak > 0) {
+        suffix += chalk.gray(` 🔥${h.streak}`);
+      }
+
+      return `  ${emoji} ${h.title}${suffix}`;
+    };
+
+    if (pending.length > 0) {
+      console.log(chalk.yellow('Pending:'));
+      for (const h of pending) {
+        const streakStr = h.streak > 0 ? chalk.gray(` (${h.streak} day streak)`) : '';
+        console.log(`  ${STATUS_EMOJI.pending} ${h.title}${streakStr}`);
+      }
+      console.log('');
+    }
+
+    if (completed.length > 0) {
+      console.log(chalk.green('Completed:'));
+      for (const h of completed) {
+        console.log(formatHabit(h, true));
+      }
+      console.log('');
+    }
+
+    if (limits.length > 0) {
+      console.log(chalk.blue('Limits:'));
+      for (const h of limits) {
+        console.log(formatHabit(h, true));
+      }
+      console.log('');
+    }
+
+    if (other.length > 0) {
+      console.log(chalk.gray('Skipped/Partial:'));
+      for (const h of other) {
+        console.log(formatHabit(h, false));
+      }
+      console.log('');
+    }
+
+    // Summary
+    console.log(chalk.gray(`${completed.length}/${habits.length} completed`));
+    console.log(getSyncStatusMessage(db, 'habits'));
+  });
+
+// List command - list all habits
+program
+  .command('list')
+  .description('List habits from database')
+  .option('-d, --date <date>', 'Show habits for specific date (YYYY-MM-DD)')
+  .option('-c, --category <category>', 'Filter by category')
+  .option('--status <status>', 'Filter by status (completed, pending, skipped)')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'habits');
+
+    const date = options.date || getTodayDate();
+
+    let conditions = ['date = ?'];
+    const params = [date];
+
+    if (options.category) {
+      conditions.push('category = ?');
+      params.push(options.category);
+    }
+
+    if (options.status) {
+      conditions.push('status = ?');
+      params.push(options.status);
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    const sql = `
+      SELECT habit_id, title, status, value, category,
+             json_extract(metadata, '$.current_streak') as streak
+      FROM habits
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY category, title
+    `;
+
+    const habits = db.prepare(sql).all(...params);
+
+    if (habits.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No habits found for ${date}`);
+      return;
+    }
+
+    console.log('');
+    let currentCategory = undefined; // Use undefined so null (uncategorized) is detected as change
+    for (const h of habits) {
+      if (h.category !== currentCategory) {
+        if (currentCategory !== undefined) console.log('');
+        console.log(chalk.cyan(h.category || 'Uncategorized'));
+        currentCategory = h.category;
+      }
+      const emoji = STATUS_EMOJI[h.status] || '❓';
+      const streakStr = h.streak > 0 ? chalk.gray(` 🔥${h.streak}`) : '';
+      console.log(`  ${emoji} ${h.title}${streakStr}`);
+    }
+
+    console.log('');
+    console.log(chalk.gray(`${habits.length} habits`));
+    console.log(getSyncStatusMessage(db, 'habits'));
+  });
+
+// Streaks command - show current streaks
+program
+  .command('streaks')
+  .description('Show current streaks for all habits')
+  .option('--min <days>', 'Minimum streak length to show', (val) => parseInt(val, 10), 1)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'habits');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT DISTINCT habit_id, title, category,
+             json_extract(metadata, '$.current_streak') as streak
+      FROM habits
+      WHERE date = ?
+    `;
+    const params = [today];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY streak DESC, title`;
+
+    const habits = db.prepare(sql).all(...params);
+
+    // Filter by minimum streak
+    const filtered = habits.filter(h => (h.streak || 0) >= options.min);
+
+    if (filtered.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No habits with streak >= ${options.min} days`);
+      return;
+    }
+
+    console.log('');
+    console.log(chalk.cyan('Current Streaks'));
+    console.log('');
+
+    for (const h of filtered) {
+      const streakBar = '🔥'.repeat(Math.min(h.streak, 5));
+      const extraDays = h.streak > 5 ? `+${h.streak - 5}` : '';
+      console.log(`  ${streakBar}${extraDays} ${h.title} (${h.streak} days)`);
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'habits'));
+  });
+
+// History command - show habit history
+program
+  .command('history <habit>')
+  .description('Show history for a specific habit')
+  .option('-d, --days <days>', 'Number of days to show', parseInt, 14)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (habitName, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'habits');
+
+    let sql = `
+      SELECT date, status, value,
+             json_extract(metadata, '$.target_type') as target_type
+      FROM habits
+      WHERE title LIKE ?
+    `;
+    const params = [`%${habitName}%`];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY date DESC LIMIT ?`;
+    params.push(options.days);
+
+    const entries = db.prepare(sql).all(...params);
+
+    if (entries.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No history found for "${habitName}"`);
+      return;
+    }
+
+    // Get the actual habit title from first entry
+    const firstEntry = db.prepare(`
+      SELECT title FROM habits WHERE title LIKE ? LIMIT 1
+    `).get(`%${habitName}%`);
+
+    console.log('');
+    console.log(chalk.cyan(firstEntry?.title || habitName));
+    console.log('');
+
+    for (const e of entries) {
+      const emoji = STATUS_EMOJI[e.status] || '❓';
+      const valueStr = e.value && e.target_type === 'timer'
+        ? ` (${formatDuration(e.value)})`
+        : '';
+      console.log(`  ${e.date} ${emoji}${valueStr}`);
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'habits'));
+  });
+
+// Helper: format duration in seconds to human readable
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0s';
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  if (minutes > 0) {
+    return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+  }
+  return `${secs}s`;
+}
+
+program.parse();

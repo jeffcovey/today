@@ -89,8 +89,7 @@ function printTasks(tasks) {
 
 program
   .name('tasks')
-  .description('Task management for Today system')
-  .version('1.0.0');
+  .description('Task management for Today system');
 
 // Sync command - syncs tasks via plugin system
 program

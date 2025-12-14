@@ -411,6 +411,94 @@ SQL: SELECT id, title, priority, due_date FROM tasks WHERE status = 'open'`
       }
     },
     indexes: ['source', 'status', 'due_date', 'priority']
+  },
+
+  'habits': {
+    table: 'habits',
+    staleMinutes: 30, // Habits sync from backup files, don't need frequent updates
+    ai: {
+      name: 'Habits',
+      description: `Habits are routines the user is trying to build or maintain.
+They may be something the user wants to do or wants to avoid.
+Each entry represents one habit on one day,
+with completion status and optional quantitative value.
+Use habit_id to group entries for the same habit across days.`,
+      defaultCommand: 'bin/habits streaks ; bin/habits today',
+      queryInstructions: `Commands: bin/habits today, bin/habits list, bin/habits streaks
+SQL: SELECT title, date, status, value FROM habits WHERE date = date('now') ORDER BY title`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: true,
+        description: 'Unique identifier (source:habit_uuid:date)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., streaks-habits/default)'
+      },
+      habit_id: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'The habit UUID, for grouping entries across days'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Habit name'
+      },
+      date: {
+        sqlType: 'DATE NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Date of this entry (YYYY-MM-DD)'
+      },
+      status: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Status for this day: completed, pending, skipped, partial'
+      },
+      goal_type: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Goal type: achieve (do more), limit (stay under), or null (boolean)'
+      },
+      value: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Achieved value (duration in seconds, count, etc.)'
+      },
+      category: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Category/group name'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (icon, target, streak_at_date, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'habit_id', 'date', 'status']
   }
 
   // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
