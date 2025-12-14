@@ -1,0 +1,58 @@
+# IMAP Email Plugin
+# Syncs emails from any IMAP server to the local database
+
+name = "imap-email"
+displayName = "IMAP Email"
+description = "Sync emails from any IMAP server (iCloud, Gmail, etc.)"
+type = "email"
+
+requiredEnv = []
+
+longDescription = """
+Syncs recent emails from IMAP servers to the local database for quick access
+and AI-powered analysis. Only emails from the configured time window are stored
+locally. For historical email queries, use the server search feature.
+
+Supports any IMAP server including:
+- iCloud Mail (imap.mail.me.com)
+- Gmail (imap.gmail.com)
+- Outlook/Hotmail (outlook.office365.com)
+- Yahoo Mail (imap.mail.yahoo.com)
+- Custom/self-hosted servers
+
+Credentials are stored in environment variables for security.
+"""
+
+aiInstructions = """
+Email data is synced from IMAP for the last {days_to_sync} days.
+For emails older than {days_to_sync} days, use: bin/email search --server "query"
+
+Common queries:
+- Recent unread: SELECT * FROM emails WHERE json_extract(flags, '$') NOT LIKE '%seen%' ORDER BY date DESC
+- From specific sender: SELECT * FROM emails WHERE from_address LIKE '%example.com%'
+- By folder: SELECT * FROM emails WHERE folder = 'INBOX'
+"""
+
+[commands]
+read = "./read.js"
+write = "./write.js"
+
+[settings]
+# IMAP server settings
+host = { type = "string", default = "", description = "IMAP server hostname (e.g., imap.mail.me.com)" }
+port = { type = "number", default = 993, description = "IMAP server port (993 for SSL)" }
+secure = { type = "boolean", default = true, description = "Use SSL/TLS connection" }
+
+# Authentication
+username = { type = "string", default = "", description = "IMAP username (usually email address)" }
+password_env = { type = "string", default = "EMAIL_PASSWORD", description = "Environment variable containing password" }
+
+# Sync settings
+days_to_sync = { type = "number", default = 30, description = "Number of days of email to sync and keep" }
+folders = { type = "string", default = "", description = "Comma-separated folders to sync (empty = auto-discover all)" }
+exclude_folders = { type = "string", default = "Junk,Trash,Deleted Messages,Deleted Items,Spam,[Gmail]/Spam,[Gmail]/Trash", description = "Folders to exclude from auto-discovery" }
+batch_size = { type = "number", default = 100, description = "Number of emails to fetch per batch" }
+
+# Content settings
+include_body = { type = "boolean", default = true, description = "Include full email body in sync" }
+max_body_size = { type = "number", default = 50000, description = "Max body size in chars (truncate larger)" }

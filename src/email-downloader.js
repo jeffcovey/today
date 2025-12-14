@@ -128,7 +128,7 @@ export class EmailDownloader {
               
               try {
                 // Check if already downloaded
-                const existing = this.cache.db.prepare('SELECT id FROM emails WHERE uid = ? AND folder = ?').get(message.uid, folder.path);
+                const existing = this.cache.db.prepare('SELECT id FROM email WHERE uid = ? AND folder = ?').get(message.uid, folder.path);
                 if (existing) {
                   continue;
                 }
@@ -178,11 +178,11 @@ export class EmailDownloader {
             // Wrap in a transaction for better performance and atomicity
             const syncDeletions = this.cache.db.transaction(() => {
               const localUIDs = this.cache.db.prepare(
-                'SELECT uid FROM emails WHERE folder = ? AND date >= ?'
+                'SELECT uid FROM email WHERE folder = ? AND date >= ?'
               ).all(folder.path, sinceDate.toISOString());
               
               let deletedCount = 0;
-              const deleteStmt = this.cache.db.prepare('DELETE FROM emails WHERE uid = ? AND folder = ?');
+              const deleteStmt = this.cache.db.prepare('DELETE FROM email WHERE uid = ? AND folder = ?');
               
               for (const localEmail of localUIDs) {
                 if (!serverUIDs.has(localEmail.uid)) {
@@ -286,7 +286,7 @@ export class EmailDownloader {
 
   async storeEmail(email) {
     const stmt = this.cache.db.prepare(`
-      INSERT OR REPLACE INTO emails (
+      INSERT OR REPLACE INTO email (
         uid, message_id, from_address, to_address, subject, date,
         headers, text_content, html_content, attachments, flags, size, raw_source, folder
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -317,7 +317,7 @@ export class EmailDownloader {
         MIN(date) as oldest,
         MAX(date) as newest,
         SUM(size) as total_size
-      FROM emails
+      FROM email
     `).get();
 
     // Get folder breakdown
@@ -325,7 +325,7 @@ export class EmailDownloader {
       SELECT 
         folder,
         COUNT(*) as count
-      FROM emails
+      FROM email
       GROUP BY folder
       ORDER BY count DESC
     `).all();

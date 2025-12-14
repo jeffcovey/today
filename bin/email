@@ -39,26 +39,150 @@ function loadTodayApiKey() {
 loadTodayApiKey();
 
 // Import commands
+// Note: EmailManager and EmailOrganizer commented out - see GitHub issues for chat/organize features
 Promise.all([
   import('../src/email-downloader.js'),
   import('../src/email-manager.js'),
-  import('../src/email-organizer.js')
-]).then(([{ EmailDownloader }, { EmailManager }, { EmailOrganizer }]) => {
+  // import('../src/email-organizer.js')  // TODO: Re-enable when organize plugin is ready
+]).then(([{ EmailDownloader }, { EmailManager }/*, { EmailOrganizer }*/]) => {
   program
     .name('email')
     .description('Email management CLI for downloading and managing emails');
 
   program
-    .command('download')
-    .description('Download emails from the last N days')
+    .command('download [emailId]')
+    .description('Download emails (or fetch specific email body by ID)')
     .option('-d, --days <number>', 'Number of days to download', '30')
     .option('-a, --account <email>', 'Email account to download from', process.env.EMAIL_ACCOUNT || 'jeff.covey@icloud.com')
-    .action(async (options) => {
+    .action(async (emailId, options) => {
       try {
-        console.log(chalk.blue(`📧 Downloading emails from the last ${options.days} days...`));
-        const downloader = new EmailDownloader();
-        await downloader.downloadEmails(options.account, parseInt(options.days));
-        process.exit(0); // Explicitly exit after successful download
+        if (emailId) {
+          // Fetch specific email body by ID
+          // ID format: source:folder:uid (e.g., imap-email/icloud:INBOX:196336)
+          const { ImapFlow } = await import('imapflow');
+          const { simpleParser } = await import('mailparser');
+          const Database = (await import('better-sqlite3')).default;
+          const toml = await import('smol-toml');
+          const fs = await import('fs');
+          const nodePath = await import('path');
+
+          // Parse the email ID
+          const match = emailId.match(/^([^:]+\/[^:]+):(.+):(\d+)$/);
+          if (!match) {
+            console.error(chalk.red('Invalid email ID format. Expected: source:folder:uid'));
+            console.error(chalk.gray('Example: imap-email/icloud:INBOX:196336'));
+            process.exit(1);
+          }
+
+          const [, sourceId, folder, uidStr] = match;
+          const uid = parseInt(uidStr);
+          const [pluginName, sourceName] = sourceId.split('/');
+
+          console.log(chalk.blue(`📧 Fetching email body: ${emailId}`));
+
+          // Load config to get IMAP settings
+          const configPath = nodePath.join(process.cwd(), 'config.toml');
+          const configContent = fs.readFileSync(configPath, 'utf-8');
+          const config = toml.parse(configContent);
+
+          const sourceConfig = config.plugins?.[pluginName]?.[sourceName];
+          if (!sourceConfig) {
+            console.error(chalk.red(`Source not found in config: ${sourceId}`));
+            process.exit(1);
+          }
+
+          const { host, port = 993, secure = true, username, password_env = 'EMAIL_PASSWORD' } = sourceConfig;
+          const password = process.env[password_env];
+
+          if (!password) {
+            console.error(chalk.red(`Password not found in ${password_env}`));
+            process.exit(1);
+          }
+
+          // Connect to IMAP
+          const client = new ImapFlow({
+            host,
+            port,
+            secure,
+            auth: { user: username, pass: password },
+            logger: false
+          });
+
+          await client.connect();
+          const lock = await client.getMailboxLock(folder);
+
+          try {
+            const message = await client.fetchOne(uid, { source: true }, { uid: true });
+
+            if (!message || !message.source) {
+              console.error(chalk.red('Email not found or no content'));
+              process.exit(1);
+            }
+
+            const parsed = await simpleParser(message.source);
+            let textContent = parsed.text || '';
+            let htmlContent = parsed.html || '';
+            const attachments = parsed.attachments?.map(a => ({
+              filename: a.filename,
+              contentType: a.contentType,
+              size: a.size
+            })) || [];
+
+            const maxBodySize = 50000;
+            if (textContent.length > maxBodySize) {
+              textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
+            }
+            if (htmlContent.length > maxBodySize) {
+              htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
+            }
+
+            const snippet = textContent
+              ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
+              : '';
+
+            // Update database
+            const dbPath = nodePath.join(process.cwd(), '.data', 'today.db');
+            const db = new Database(dbPath);
+
+            const result = db.prepare(`
+              UPDATE email
+              SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
+                  metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
+              WHERE id = ?
+            `).run(
+              snippet,
+              textContent,
+              htmlContent,
+              attachments.length > 0 ? JSON.stringify(attachments) : null,
+              emailId
+            );
+
+            db.close();
+
+            if (result.changes > 0) {
+              console.log(chalk.green('✓ Email body fetched and saved'));
+              console.log(chalk.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
+              if (attachments.length > 0) {
+                console.log(chalk.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+              }
+            } else {
+              console.log(chalk.yellow('Email not found in database'));
+            }
+
+          } finally {
+            lock.release();
+            await client.logout();
+          }
+
+          process.exit(0);
+
+        } else {
+          // Original download behavior
+          console.log(chalk.blue(`📧 Downloading emails from the last ${options.days} days...`));
+          const downloader = new EmailDownloader();
+          await downloader.downloadEmails(options.account, parseInt(options.days));
+          process.exit(0);
+        }
       } catch (error) {
         console.error(chalk.red('Error downloading emails:'), error.message);
         process.exit(1);
@@ -147,46 +271,175 @@ Promise.all([
     });
 
   program
-    .command('chat')
-    .description('Have a conversation about your emails')
-    .action(async () => {
+    .command('search <query>')
+    .description('Search emails (use --server for historical IMAP search)')
+    .option('-s, --server', 'Search IMAP server directly (for historical emails)')
+    .option('-f, --folder <folder>', 'Limit to specific folder (default: search all)')
+    .option('-l, --limit <number>', 'Max results to return', '20')
+    .action(async (query, options) => {
       try {
-        console.log(chalk.blue('💬 Email Conversation Mode'));
-        console.log(chalk.gray('Examples:'));
-        console.log(chalk.gray('  • "Show me emails from GitHub"'));
-        console.log(chalk.gray('  • "Delete all emails about Patreon"'));
-        console.log(chalk.gray('  • "How many emails from last week?"'));
-        console.log(chalk.gray('  • "Move Heroku emails to a folder"'));
-        console.log(chalk.gray('  • "Summarize my recent emails"\n'));
+        if (options.server) {
+          // Search IMAP server directly
+          console.log(chalk.blue(`🔍 Searching IMAP server for: ${query}`));
+          const { ImapFlow } = await import('imapflow');
 
-        const manager = new EmailManager();
-        await manager.conversationMode();
+          const client = new ImapFlow({
+            host: 'imap.mail.me.com',  // TODO: Read from config
+            port: 993,
+            secure: true,
+            auth: {
+              user: process.env.EMAIL_ACCOUNT || 'jeff.covey@icloud.com',
+              pass: process.env.EMAIL_PASSWORD
+            },
+            logger: false
+          });
+
+          await client.connect();
+
+          // Determine which folders to search
+          let foldersToSearch = [];
+          if (options.folder) {
+            foldersToSearch = [options.folder];
+          } else {
+            // Search common folders
+            const allFolders = await client.list();
+            const priorityFolders = ['INBOX', 'Sent Messages', 'Sent', 'Archive'];
+            foldersToSearch = allFolders
+              .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
+              .map(f => f.path)
+              .sort((a, b) => {
+                const aIdx = priorityFolders.indexOf(a);
+                const bIdx = priorityFolders.indexOf(b);
+                if (aIdx >= 0 && bIdx >= 0) return aIdx - bIdx;
+                if (aIdx >= 0) return -1;
+                if (bIdx >= 0) return 1;
+                return 0;
+              });
+          }
+
+          const allResults = [];
+          const limit = parseInt(options.limit);
+
+          for (const folder of foldersToSearch) {
+            if (allResults.length >= limit) break;
+
+            try {
+              const lock = await client.getMailboxLock(folder);
+              try {
+                for await (const msg of client.fetch(
+                  { or: [
+                    { subject: query },
+                    { from: query },
+                    { body: query }
+                  ]},
+                  { envelope: true, size: true }
+                )) {
+                  allResults.push({
+                    uid: msg.uid,
+                    folder: folder,
+                    subject: msg.envelope?.subject || '(no subject)',
+                    from: msg.envelope?.from?.[0]?.address || 'unknown',
+                    date: msg.envelope?.date
+                  });
+                }
+              } finally {
+                lock.release();
+              }
+            } catch (e) {
+              // Skip folders we can't access
+            }
+          }
+
+          await client.logout();
+
+          if (allResults.length === 0) {
+            console.log(chalk.yellow('No emails found matching your query.'));
+          } else {
+            // Sort by date descending (most recent first)
+            allResults.sort((a, b) => {
+              const dateA = a.date ? new Date(a.date).getTime() : 0;
+              const dateB = b.date ? new Date(b.date).getTime() : 0;
+              return dateB - dateA;
+            });
+
+            const results = allResults.slice(0, limit);
+            console.log(chalk.green(`\n📧 Found ${allResults.length} emails on server (showing ${results.length}):\n`));
+            results.forEach((email, i) => {
+              const date = email.date ? new Date(email.date).toLocaleDateString() : 'unknown';
+              console.log(`${i + 1}. ${chalk.bold(email.subject)}`);
+              console.log(`   From: ${email.from} | Date: ${date} | Folder: ${email.folder}`);
+            });
+          }
+        } else {
+          // Search local database
+          console.log(chalk.blue(`🔍 Searching local cache for: ${query}`));
+          const manager = new EmailManager();
+          const emails = await manager.getLocalEmails({
+            content: query,
+            limit: parseInt(options.limit)
+          });
+
+          if (emails.length === 0) {
+            console.log(chalk.yellow('No emails found. Try --server to search IMAP directly.'));
+          } else {
+            console.log(chalk.green(`\n📧 Found ${emails.length} emails:\n`));
+            emails.forEach((email, i) => {
+              const date = new Date(email.date).toLocaleDateString();
+              console.log(`${i + 1}. ${chalk.bold(email.subject || '(no subject)')}`);
+              console.log(`   From: ${email.from_address} | Date: ${date}`);
+            });
+          }
+        }
+        process.exit(0);
       } catch (error) {
-        console.error(chalk.red('Error in conversation mode:'), error.message);
-        console.error(chalk.gray('Stack trace:'), error.stack);
-        // Don't exit on error, just return
-      }
-    });
-
-  program
-    .command('organize')
-    .description('Organize inbox emails into stage-based folders')
-    .action(async () => {
-      try {
-        console.log(chalk.blue('📁 Organizing emails by stage...'));
-        console.log(chalk.gray('This will categorize emails into:'));
-        console.log(chalk.gray('  • _Front Stage: Meetings, calls, support, communications'));
-        console.log(chalk.gray('  • _Back Stage: Maintenance, bills, bug fixes, organizing'));
-        console.log(chalk.gray('  • _Off Stage: Personal time, nature, friends, reading\n'));
-
-        const organizer = new EmailOrganizer();
-        await organizer.run();
-        process.exit(0); // Explicitly exit after successful completion
-      } catch (error) {
-        console.error(chalk.red('Error organizing emails:'), error.message);
+        console.error(chalk.red('Error searching emails:'), error.message);
         process.exit(1);
       }
     });
+
+  // TODO: Move chat feature to separate plugin - see GitHub issue #60
+  // program
+  //   .command('chat')
+  //   .description('Have a conversation about your emails')
+  //   .action(async () => {
+  //     try {
+  //       console.log(chalk.blue('💬 Email Conversation Mode'));
+  //       console.log(chalk.gray('Examples:'));
+  //       console.log(chalk.gray('  • "Show me emails from GitHub"'));
+  //       console.log(chalk.gray('  • "Delete all emails about Patreon"'));
+  //       console.log(chalk.gray('  • "How many emails from last week?"'));
+  //       console.log(chalk.gray('  • "Move Heroku emails to a folder"'));
+  //       console.log(chalk.gray('  • "Summarize my recent emails"\n'));
+  //
+  //       const manager = new EmailManager();
+  //       await manager.conversationMode();
+  //     } catch (error) {
+  //       console.error(chalk.red('Error in conversation mode:'), error.message);
+  //       console.error(chalk.gray('Stack trace:'), error.stack);
+  //       // Don't exit on error, just return
+  //     }
+  //   });
+
+  // TODO: Move organize feature to separate plugin - see GitHub issue #61
+  // program
+  //   .command('organize')
+  //   .description('Organize inbox emails into stage-based folders')
+  //   .action(async () => {
+  //     try {
+  //       console.log(chalk.blue('📁 Organizing emails by stage...'));
+  //       console.log(chalk.gray('This will categorize emails into:'));
+  //       console.log(chalk.gray('  • _Front Stage: Meetings, calls, support, communications'));
+  //       console.log(chalk.gray('  • _Back Stage: Maintenance, bills, bug fixes, organizing'));
+  //       console.log(chalk.gray('  • _Off Stage: Personal time, nature, friends, reading\n'));
+  //
+  //       const organizer = new EmailOrganizer();
+  //       await organizer.run();
+  //       process.exit(0); // Explicitly exit after successful completion
+  //     } catch (error) {
+  //       console.error(chalk.red('Error organizing emails:'), error.message);
+  //       process.exit(1);
+  //     }
+  //   });
 
   program.parse();
 }).catch(error => {

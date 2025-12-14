@@ -275,3 +275,39 @@ enabled = true
 # directory = "vault"
 # exclude_paths = "templates,.obsidian"
 # include_completed = true
+
+# -----------------------------------------------------------------------------
+# IMAP Email (sync from any IMAP server)
+# -----------------------------------------------------------------------------
+# Store EMAIL_PASSWORD in .env (use app-specific password for iCloud/Gmail)
+
+# Example: iCloud Mail
+# [plugins.imap-email.icloud]
+# enabled = true
+# host = "imap.mail.me.com"
+# username = "your@icloud.com"
+# password_env = "EMAIL_PASSWORD"
+# days_to_sync = 30
+# folders = "INBOX"
+
+# Example: Gmail (requires app-specific password)
+# [plugins.imap-email.gmail]
+# enabled = true
+# host = "imap.gmail.com"
+# username = "your@gmail.com"
+# password_env = "GMAIL_PASSWORD"
+# days_to_sync = 30
+# folders = "INBOX,[Gmail]/Sent Mail"
+
+# Example: Custom IMAP server
+# [plugins.imap-email.work]
+# enabled = true
+# host = "mail.example.com"
+# port = 993
+# secure = true
+# username = "user@example.com"
+# password_env = "WORK_EMAIL_PASSWORD"
+# days_to_sync = 14
+# folders = "INBOX,Sent"
+# include_body = true
+# max_body_size = 50000

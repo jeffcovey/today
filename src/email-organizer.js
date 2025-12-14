@@ -206,7 +206,7 @@ export class EmailOrganizer {
 
     // Get all emails from INBOX in local database
     const emails = this.cache.db.prepare(`
-      SELECT * FROM emails
+      SELECT * FROM email
       WHERE folder = 'INBOX'
       ORDER BY date DESC
     `).all();
