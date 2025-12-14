@@ -1,0 +1,50 @@
+# Front Conversations Plugin
+# Syncs conversations from Front as issues
+
+name = "front-conversations"
+displayName = "Front Conversations"
+description = "Support conversations from Front (frontapp.com)"
+type = "issues"
+
+requiredEnv = ["FRONT_API_TOKEN"]
+
+longDescription = """
+Syncs conversations from Front as issues using the Front Core API.
+
+## Setup
+
+1. Go to Front: Settings > Developers > API Tokens
+2. Click "Create API token"
+3. Name it descriptively (e.g., "Today System Sync")
+4. Select scope with conversation read access
+5. Copy the token and add to your .env file:
+   FRONT_API_TOKEN=your_token_here
+
+## Schema Mapping
+
+Conversations are mapped to the issues schema:
+- subject -> title
+- status -> state (open/archived)
+- created_at -> opened_at
+- assignee, tags, recipient -> metadata
+"""
+
+aiInstructions = """
+Front conversations are support tickets from customers.
+Query using the issues table with source LIKE '%front%'.
+
+The metadata JSON contains:
+- assignee: Who is handling the conversation
+- tags: Applied tags/labels
+- recipient: Customer email/handle
+- status_category: resolved, open, etc.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+inbox_ids = { type = "string", required = false, description = "Comma-separated inbox IDs to sync (omit for all inboxes)" }
+assignee = { type = "string", required = false, description = "Filter by assignee email (omit for all assignees)" }
+include_archived = { type = "boolean", default = false, description = "Include archived conversations" }
+limit = { type = "number", default = 100, description = "Maximum conversations to sync" }

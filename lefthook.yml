@@ -1,0 +1,63 @@
+# Lefthook configuration
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    secrets:
+      run: |
+        # Check for potential secrets in staged content
+        against=$(git rev-parse --verify HEAD 2>/dev/null || git hash-object -t tree /dev/null)
+
+        patterns='sk-ant-api[a-zA-Z0-9_-]{40,}|ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{22,}|-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24}'
+        exclude='\.env\.example|NATURAL_LANGUAGE_SEARCH\.md|TAILSCALE_SETUP\.md'
+
+        matches=$(git diff --cached --diff-filter=ACMR -U0 $against | grep -E "^\+" | grep -v "^+++" | grep -E "$patterns" | grep -vE "$exclude" || true)
+
+        if [ -n "$matches" ]; then
+          echo "ERROR: Potential secret detected:"
+          echo "$matches" | head -5
+          echo ""
+          echo "Commit blocked. Use --no-verify to bypass (review carefully first!)"
+          exit 1
+        fi
+
+        # Check for sensitive filenames
+        sensitive=$(git diff --cached --name-only --diff-filter=A $against | grep -iE '(^|/)(\.(env|env\.local|env\.production)|.*credentials.*\.json|.*secrets.*\.json|.*\.pem|.*\.key|id_rsa|id_ed25519)$' || true)
+
+        if [ -n "$sensitive" ]; then
+          echo "ERROR: Potentially sensitive file(s) being added:"
+          echo "$sensitive"
+          exit 1
+        fi
+
+    lint-md:
+      glob: "*.md"
+      exclude: "^vault/"
+      run: |
+        echo "Auto-fixing markdown files with markdownlint..."
+        npx markdownlint-cli2 --fix {staged_files}
+        git add {staged_files}
+        echo "✅ Markdown files have been auto-fixed and staged"
+
+    test-related:
+      glob: "*.js"
+      root: "src/"
+      run: |
+        echo "JavaScript source files changed, running tests..."
+        npm test -- --bail --passWithNoTests --findRelatedTests {staged_files}
+        echo "✅ All tests passed!"
+
+pre-push:
+  commands:
+    outdated:
+      run: |
+        outdated_count=$(npm outdated 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')
+        if [ "$outdated_count" -gt "0" ]; then
+          echo "⚠️  $outdated_count outdated dependencies. Run 'npm outdated' for details."
+        fi
+      # Don't fail on outdated deps, just warn
+      fail_text: ""
+
+    all-tests:
+      run: npm test

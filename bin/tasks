@@ -1,109 +1,253 @@
 #!/usr/bin/env node
 
 import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
 import { program } from 'commander';
 import chalk from 'chalk';
-import Table from 'cli-table3';
-import fs from 'fs/promises';
-import fsSync from 'fs';
-import path from 'path';
 import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Standard terminal width for wrapping
+const TERMINAL_WIDTH = 80;
+const BULLET_INDENT = '   '; // 3 spaces to align with emoji bullet
 
-// Helper function to find markdown files containing tasks
-function findMarkdownFilesWithTasks() {
-  // Use -exec instead of xargs to handle large number of files
-  return execSync('find vault/ -name "*.md" -type f ! -path "*/.*" -not -path "*/templates/*" -exec grep -l "^- \\[ \\]" {} \\; 2>/dev/null || true', { encoding: 'utf8' })
-    .split('\n')
-    .filter(f => f);
+// Priority emoji map (shared across commands)
+const PRIORITY_EMOJI = {
+  highest: '🔺',
+  high: '⏫',
+  medium: '🔼',
+  low: '🔽',
+  lowest: '⏬'
+};
+
+/**
+ * Wrap text to fit terminal width, with proper indentation for continuation lines.
+ * URLs and long unbreakable strings go on their own line.
+ */
+function wrapTaskLine(bullet, title, dueSuffix = '') {
+  const fullText = title + dueSuffix;
+
+  // Width available after bullet and space
+  const contentWidth = TERMINAL_WIDTH - 3; // "🔺 " = 3 visible chars (emoji + space)
+
+  // If it fits on one line, just return it
+  if (fullText.length <= contentWidth) {
+    return `${bullet} ${fullText}`;
+  }
+
+  // Split into words, keeping URLs intact
+  const words = fullText.split(/(\s+)/).filter(w => w.trim());
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const isUrl = word.match(/^https?:\/\//);
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+    if (isUrl) {
+      // URLs go on their own line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      lines.push(word);
+      currentLine = '';
+    } else if (testLine.length <= contentWidth) {
+      currentLine = testLine;
+    } else {
+      // Word doesn't fit, start new line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  // Format with bullet on first line, indent on continuation
+  return lines.map((line, i) => {
+    if (i === 0) {
+      return `${bullet} ${line}`;
+    }
+    return `${BULLET_INDENT}${line}`;
+  }).join('\n');
 }
 
-// Helper function to ensure task has date added marker
-function ensureDateAdded(line) {
-  // Check if line already has date added marker
-  if (/➕ \d{4}-\d{2}-\d{2}/.test(line)) {
-    return line;
+/**
+ * Print a list of tasks with wrapping
+ */
+function printTasks(tasks) {
+  console.log('');
+  for (const task of tasks) {
+    const bullet = PRIORITY_EMOJI[task.priority] || '  ';
+    const dateSuffix = task.due_date ? chalk.yellow(` 📅 ${task.due_date}`) : '';
+    console.log(wrapTaskLine(bullet, task.title, dateSuffix));
   }
-
-  // Get current date in YYYY-MM-DD format
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const dateAdded = `➕ ${year}-${month}-${day}`;
-
-  // Insert date added before priority markers if they exist
-  if (line.match(/🔺|⏫|🔼|🔽|⏬/)) {
-    return line.replace(/(🔺|⏫|🔼|🔽|⏬)/, `${dateAdded} $1`);
-  }
-
-  // Insert before tags if they exist
-  if (line.includes('#')) {
-    return line.replace(/#/, `${dateAdded} #`);
-  }
-
-  // Insert before scheduled/due dates if they exist
-  if (line.match(/[📅⏳✅] \d{4}-\d{2}-\d{2}/)) {
-    return line.replace(/([📅⏳✅] \d{4}-\d{2}-\d{2})/, `${dateAdded} $1`);
-  }
-
-  // Insert before recurring marker if it exists
-  if (line.includes('🔁')) {
-    return line.replace(/🔁/, `${dateAdded} 🔁`);
-  }
-
-  // Otherwise append to the end
-  return `${line.trimEnd()} ${dateAdded}`;
 }
 
 program
   .name('tasks')
-  .description('Task management for Today system')
-  .version('1.0.0');
+  .description('Task management for Today system');
 
-// Sync command - updates markdown_tasks cache and generates topic files
+// Sync command - syncs tasks via plugin system
 program
   .command('sync')
-  .description('Update markdown tasks cache and generate topic files')
+  .description('Sync tasks from all enabled task plugins')
   .action(async () => {
+    console.log(chalk.blue('ℹ') + ' Syncing tasks plugins to database...');
+
     try {
-      console.log(chalk.blue('Syncing tasks...'));
-
-      // Step 1: Update the markdown_tasks cache
-      console.log(chalk.blue('1. Updating markdown tasks cache...'));
-      execSync('node bin/tasks update-cache', {
-        encoding: 'utf8',
-        stdio: 'inherit'
-      });
-
-      // Step 2: Generate topic files
-      console.log(chalk.blue('\n2. Generating topic files...'));
-      execSync('node bin/tasks generate-topics', {
-        encoding: 'utf8',
-        stdio: 'inherit'
-      });
-
-      console.log(chalk.green('\n✓ Sync complete'));
+      const result = execSync('bin/plugins sync --type tasks', { encoding: 'utf8' });
+      // Strip dotenvx output and show result
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
     } catch (error) {
-      console.error(chalk.red('Error syncing tasks:'), error.message);
-      process.exit(1);
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(chalk.yellow('⚠') + ' No tasks plugins are enabled.');
+        console.log('');
+        console.log('To sync tasks, configure a plugin:');
+        console.log('');
+        console.log('  ' + chalk.cyan('bin/plugins configure'));
+      } else {
+        console.error(chalk.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
     }
   });
 
-// List command - uses markdown_tasks cache
+// Today command - shorthand for list --today
+program
+  .command('today')
+  .description('Show tasks due/scheduled for today or earlier')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE status = 'open'
+        AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
+    `;
+    const params = [today, today];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += `
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ' No tasks due today');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} tasks due today or earlier`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// Recent command - show recently-added tasks
+program
+  .command('recent')
+  .description('Show recently-added tasks (by created date)')
+  .option('-d, --days <days>', 'Number of days to look back', parseInt, 7)
+  .option('-a, --all', 'Include completed tasks')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    // Calculate cutoff date and today's date
+    const today = getTodayDate();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - options.days);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+    let conditions = [
+      `json_extract(metadata, '$.created_date') >= ?`,
+      `json_extract(metadata, '$.created_date') <= ?`
+    ];
+    const params = [cutoffStr, today];
+
+    if (!options.all) {
+      conditions.push("status = 'open'");
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    const sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY json_extract(metadata, '$.created_date') DESC,
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END
+    `;
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No tasks created in the last ${options.days} days`);
+      return;
+    }
+
+    // Print with created date instead of due date
+    console.log('');
+    for (const task of tasks) {
+      const bullet = PRIORITY_EMOJI[task.priority] || '  ';
+      const metadata = task.metadata ? JSON.parse(task.metadata) : {};
+      const createdDate = metadata.created_date;
+      const dateSuffix = createdDate ? chalk.cyan(` ➕ ${createdDate}`) : '';
+      console.log(wrapTaskLine(bullet, task.title, dateSuffix));
+    }
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} tasks created in the last ${options.days} days`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// List command - queries tasks table from plugin system
 program
   .command('list')
-  .description('List tasks from markdown files')
+  .description('List tasks from database')
   .option('-t, --today', 'Show tasks due/scheduled today')
   .option('--stage <stage>', 'Filter by stage (front-stage, back-stage, off-stage)')
   .option('--topic <topic>', 'Filter by topic')
   .option('-a, --all', 'Include completed tasks')
   .option('-l, --legend', 'Show legend for symbols')
   .option('-n, --limit <number>', 'Limit number of tasks shown', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     if (options.legend) {
       console.log(chalk.bold('\nTask List Legend:'));
@@ -122,1136 +266,237 @@ program
     }
 
     const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
 
-    try {
-      // Build query based on options
-      let conditions = ["file_path NOT LIKE 'vault/.%'", "file_path NOT LIKE '%/templates/%'"];
-      const params = [];
+    // Build query based on options
+    let conditions = [];
+    const params = [];
 
-      if (!options.all) {
-        conditions.push("line_text LIKE '- [ ]%'");  // Only uncompleted tasks
-      } else {
-        conditions.push("(line_text LIKE '- [ ]%' OR line_text LIKE '- [x]%')");
-      }
-
-      if (options.stage) {
-        conditions.push("line_text LIKE ?");
-        params.push(`%#stage/${options.stage}%`);
-      }
-
-      if (options.topic) {
-        conditions.push("line_text LIKE ?");
-        params.push(`%#topic/${options.topic}%`);
-      }
-
-      if (options.today) {
-        const today = new Date().toISOString().split('T')[0];
-        conditions.push("(line_text LIKE ? OR line_text LIKE ?)");
-        params.push(`%📅 ${today}%`, `%⏳ ${today}%`);
-      }
-
-      let sql = `SELECT file_path, line_number, line_text FROM markdown_tasks WHERE ${conditions.join(' AND ')} ORDER BY file_path, line_number`;
-
-      if (options.limit) {
-        sql += ` LIMIT ${options.limit}`;
-      }
-
-      const tasks = db.all(sql, ...params);
-
-      if (tasks.length === 0) {
-        console.log(chalk.gray('No tasks found'));
-        console.log(chalk.gray('Run "bin/tasks update-cache" to refresh the cache'));
-        return;
-      }
-
-      // Extract and display tasks
-      const table = new Table({
-        head: ['Pri', 'Task', 'File'],
-        colWidths: [5, 55, 30],
-        wordWrap: true
-      });
-
-      for (const task of tasks) {
-        // Extract priority
-        let priority = '  ';
-        if (task.line_text.includes('🔺')) priority = '🔺';
-        else if (task.line_text.includes('⏫')) priority = '⏫';
-        else if (task.line_text.includes('🔼')) priority = '🔼';
-        else if (task.line_text.includes('🔽')) priority = '🔽';
-        else if (task.line_text.includes('⏬')) priority = '⏬';
-
-        // Extract task title (remove checkbox, dates, tags, priority)
-        let title = task.line_text
-          .replace(/^- \[[x ]\] /, '')
-          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-          .replace(/#\w+\/[\w-]+/g, '')
-          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
-          .replace(/🔁 .+$/g, '')
-          .trim();
-
-        // Truncate long titles
-        if (title.length > 52) {
-          title = title.substring(0, 49) + '...';
-        }
-
-        // Shorten file path for display
-        let filePath = task.file_path.replace('vault/', '');
-        if (filePath.length > 27) {
-          filePath = '...' + filePath.substring(filePath.length - 24);
-        }
-
-        table.push([priority, title, filePath]);
-      }
-
-      console.log(table.toString());
-      console.log(chalk.gray(`\nTotal: ${tasks.length} tasks`));
-
-      // Show stage distribution
-      const stageCounts = { 'front-stage': 0, 'back-stage': 0, 'off-stage': 0, 'untagged': 0 };
-      for (const task of tasks) {
-        if (task.line_text.includes('#stage/front-stage')) stageCounts['front-stage']++;
-        else if (task.line_text.includes('#stage/back-stage')) stageCounts['back-stage']++;
-        else if (task.line_text.includes('#stage/off-stage')) stageCounts['off-stage']++;
-        else stageCounts['untagged']++;
-      }
-
-      console.log(chalk.gray('\nBy Stage:'));
-      console.log(chalk.gray(`  👥 front-stage: ${stageCounts['front-stage']}`));
-      console.log(chalk.gray(`  🔧 back-stage: ${stageCounts['back-stage']}`));
-      console.log(chalk.gray(`  🌴 off-stage: ${stageCounts['off-stage']}`));
-      if (stageCounts['untagged'] > 0) {
-        console.log(chalk.gray(`  ❓ untagged: ${stageCounts['untagged']}`));
-      }
-    } finally {
-      await db.close();
+    if (!options.all) {
+      conditions.push("status = 'open'");
     }
+
+    if (options.stage) {
+      conditions.push("json_extract(metadata, '$.stage') = ?");
+      params.push(options.stage);
+    }
+
+    if (options.topic) {
+      // Topics are stored as JSON array in metadata
+      conditions.push("json_extract(metadata, '$.topics') LIKE ?");
+      params.push(`%${options.topic}%`);
+    }
+
+    if (options.today) {
+      const today = getTodayDate();
+      conditions.push("(due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)");
+      params.push(today, today);
+    }
+
+    if (options.source) {
+      conditions.push("source LIKE ?");
+      params.push(`%${options.source}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Order by priority then due date
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      ${whereClause}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ' No tasks found');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} tasks`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
-// Add command - appends task to vault/tasks/tasks.md
+// Add command - appends task via plugin system
 program
   .command('add <title>')
-  .description('Add a new task to vault/tasks/tasks.md')
+  .description('Add a new task')
   .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
+  .option('-s, --scheduled <date>', 'Set scheduled date (YYYY-MM-DD)')
   .option('-p, --priority <priority>', 'Set priority (highest, high, medium, low, lowest)', 'medium')
   .option('--stage <stage>', 'Set stage (front-stage, back-stage, off-stage)')
-  .option('-t, --topic <topic>', 'Add topic tag')
+  .option('-t, --topic <topic>', 'Add topic tag (can be used multiple times)', (val, acc) => [...acc, val], [])
+  .option('--source <source>', 'Plugin source to use (e.g., markdown-tasks/local)')
   .action(async (title, options) => {
+    // Dynamically import to avoid circular dependencies
+    const { writeEntryAndSync } = await import('../src/plugin-loader.js');
+    const db = getDatabase();
+
     try {
-      const tasksFile = path.join(__dirname, '..', 'vault', 'tasks', 'tasks.md');
-
-      // Build task line
-      let taskLine = `- [ ] ${title}`;
-
-      // Add date added marker
-      taskLine = ensureDateAdded(taskLine);
-
-      // Add priority emoji
-      const priorityMap = {
-        highest: '🔺',
-        high: '⏫',
-        medium: '🔼',
-        low: '🔽',
-        lowest: '⏬'
+      const entry = {
+        action: 'add',
+        title,
+        priority: options.priority,
+        stage: options.stage,
+        topics: options.topic,
+        due_date: options.date,
+        scheduled_date: options.scheduled
       };
-      const priorityEmoji = priorityMap[options.priority] || '🔼';
-      taskLine = taskLine.replace(/^(- \[ \] .+?)( ➕)/, `$1 ${priorityEmoji}$2`);
 
-      // Add stage tag
-      if (options.stage) {
-        taskLine += ` #stage/${options.stage}`;
+      const result = await writeEntryAndSync('tasks', entry, {
+        db,
+        sourceFilter: options.source
+      });
+
+      if (!result.success) {
+        console.error(chalk.red('✗') + ` ${result.error}`);
+        process.exit(1);
       }
 
-      // Add topic tag
-      if (options.topic) {
-        taskLine += ` #topic/${options.topic}`;
+      console.log(chalk.green('✓') + ' Added task');
+      if (result.writeResult?.line) {
+        console.log(chalk.gray(`  ${result.writeResult.line}`));
       }
-
-      // Add due date
-      if (options.date) {
-        taskLine += ` 📅 ${options.date}`;
-      }
-
-      // Append to tasks.md
-      let content = '';
-      try {
-        content = await fs.readFile(tasksFile, 'utf8');
-      } catch (err) {
-        // File doesn't exist yet
-      }
-
-      const lines = content.split('\n').filter(l => l.trim());
-      lines.push(taskLine);
-
-      await fs.writeFile(tasksFile, lines.join('\n') + '\n');
-
-      console.log(chalk.green(`✓ Added task to vault/tasks/tasks.md`));
-      console.log(chalk.gray(`  ${taskLine}`));
-      console.log(chalk.gray('  Run "bin/tasks update-cache" to refresh the cache'));
     } catch (error) {
       console.error(chalk.red('Error adding task:'), error.message);
       process.exit(1);
     }
   });
 
-// Note: update and done commands removed - tasks are now edited directly in markdown files
-// Use Obsidian or any text editor to modify tasks in vault/tasks/*.md files
-
-// Classify stages command - works with markdown files
+// Complete command - marks a task as done via plugin system
 program
-  .command('classify-stages [file]')
-  .description('Add stage tags to tasks using AI analysis')
-  .option('--all', 'Reclassify all tasks (not just unclassified)')
-  .option('-v, --verbose', 'Show detailed output')
-  .option('--limit <number>', 'Limit number of tasks to process (for testing)', parseInt)
-  .option('--no-ai', 'Use simple keyword matching instead of AI')
-  .action(async (file, options) => {
-    console.log(chalk.blue('🎭 Classifying task stages in markdown files...'));
-
-    // Check if AI is available and desired
-    const useAI = !options.noAi && (() => {
-      try {
-        execSync('which claude', { encoding: 'utf8' });
-        return true;
-      } catch {
-        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
-        return false;
-      }
-    })();
-
-    // Get tasks from cache that need stage classification
-    console.log(chalk.gray('  Finding tasks needing stage classification from cache...'));
+  .command('complete <id>')
+  .description('Mark a task as completed (id from database, e.g., markdown-tasks/local:vault/tasks/tasks.md:44)')
+  .option('--title <title>', 'Task title for verification (safer matching)')
+  .action(async (id, options) => {
+    const { writeEntryAndSync } = await import('../src/plugin-loader.js');
     const db = getDatabase();
 
-    let query = `
-      SELECT file_path, line_number, line_text
-      FROM markdown_tasks
-      WHERE line_text LIKE '- [ ]%'
-        AND file_path NOT LIKE 'vault/.%'
-        AND file_path NOT LIKE '%/templates/%'
-    `;
-
-    if (file) {
-      query += ` AND file_path = ?`;
+    // Parse source from full ID (e.g., "markdown-tasks/local:vault/tasks/tasks.md:44")
+    // Format: "plugin/source:plugin_specific_id"
+    const firstColon = id.indexOf(':');
+    if (firstColon === -1) {
+      console.error(chalk.red('✗') + ' Invalid ID format. Expected: plugin/source:id (e.g., markdown-tasks/local:vault/tasks/tasks.md:44)');
+      process.exit(1);
     }
 
-    if (!options.all) {
-      query += ` AND line_text NOT LIKE '%#stage/%'`;
-    }
-
-    query += ` ORDER BY file_path, line_number`;
-
-    const tasksFromCache = file ? db.all(query, file) : db.all(query);
-    db.close();
-
-    if (tasksFromCache.length === 0) {
-      console.log(chalk.gray('No tasks needing stage classification found'));
-      process.exit(0);
-    }
-
-    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing stage classification`));
-
-    let totalClassified = 0;
-    let globalTasksProcessed = 0;
-
-    // Apply global limit if specified
-    let tasksToProcess = tasksFromCache;
-    if (options.limit && tasksFromCache.length > options.limit) {
-      console.log(chalk.yellow(`  Limiting to first ${options.limit} tasks (found ${tasksFromCache.length})`));
-      tasksToProcess = tasksFromCache.slice(0, options.limit);
-    }
-
-    if (useAI) {
-      // AI-powered stage classification
-      const BATCH_SIZE = 20;
-
-      // Group tasks by file for efficient file operations
-      const tasksByFile = new Map();
-      for (const task of tasksToProcess) {
-        if (!tasksByFile.has(task.file_path)) {
-          tasksByFile.set(task.file_path, []);
-        }
-        tasksByFile.get(task.file_path).push(task);
-      }
-
-      for (const [filePath, fileTasks] of tasksByFile) {
-        // Check global limit
-        if (options.limit && globalTasksProcessed >= options.limit) {
-          console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks, stopping.`));
-          break;
-        }
-
-        console.log(chalk.gray(`  Processing ${fileTasks.length} tasks in ${filePath}`));
-
-        // Read file once
-        const content = fsSync.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
-
-        // Prepare tasks for classification
-        const tasksToClassify = fileTasks.map(task => ({
-          dbTask: task,
-          lineIndex: task.line_number - 1, // Convert to 0-based
-          title: task.line_text.replace(/^- \[ \] /, '')
-            .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-            .replace(/#\w+\/[\w-]+/g, '')
-            .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-            .replace(/🔁 .+$/g, '')
-            .trim(),
-          line: task.line_text
-        }));
-
-        // Process in batches
-        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
-          // Check global limit before processing each batch
-          if (options.limit && globalTasksProcessed >= options.limit) {
-            console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks during batch processing, stopping.`));
-            break;
-          }
-
-          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
-
-          const prompt = `Analyze these tasks and classify them into one of three stages based on their nature.
-
-The three stages are:
-- front-stage: Tasks involving direct interaction with others (meetings, calls, emails, presentations, customer support, networking)
-- back-stage: Solo work tasks (planning, coding, organizing, maintenance, documentation, research, analysis)
-- off-stage: Personal time tasks (self-care, health, exercise, relaxation, hobbies, personal relationships)
-
-Respond with a JSON array where each has:
-{"index": task_index, "stage": "front-stage|back-stage|off-stage"}
-
-Tasks:
-${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
-
-          try {
-            if (options.verbose) {
-              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
-            }
-
-            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-              encoding: 'utf8',
-              maxBuffer: 1024 * 1024 * 10,
-              timeout: 60000
-            });
-
-            const jsonMatch = result.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              const classifications = JSON.parse(jsonMatch[0]);
-
-              for (const cls of classifications) {
-                const task = batch[cls.index - i]; // Use batch index, not global index
-                globalTasksProcessed++; // Count each task processed
-                const stage = `#stage/${cls.stage}`;
-
-                if (!task.line.includes(stage)) {
-                  let newLine = task.line;
-
-                  // Ensure date added marker exists first
-                  newLine = ensureDateAdded(newLine);
-
-                  // Insert stage after priority emoji if present
-                  const priorityMatch = newLine.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
-                  if (priorityMatch) {
-                    newLine = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
-                  } else {
-                    // Insert before dates or at end
-                    const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                    if (dateMatch) {
-                      newLine = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
-                    } else {
-                      newLine = `${newLine} ${stage}`;
-                    }
-                  }
-
-                  lines[task.lineIndex] = newLine;
-                  modified = true;
-                  totalClassified++;
-                }
-              }
-            }
-          } catch (error) {
-            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
-          }
-        }
-
-        if (modified) {
-          fsSync.writeFileSync(filePath, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${filePath}`));
-          }
-
-          // Update cache with modified lines
-          const db2 = getDatabase();
-          for (const task of tasksToClassify) {
-            if (lines[task.lineIndex] !== task.line) {
-              db2.run(
-                'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
-                lines[task.lineIndex],
-                filePath,
-                task.lineIndex + 1
-              );
-            }
-          }
-          db2.close();
-        }
-      }
-    } else {
-      // Fallback to keyword-based classification using cache
-      const tasksByFile = new Map();
-      for (const task of tasksToProcess) {
-        if (!tasksByFile.has(task.file_path)) {
-          tasksByFile.set(task.file_path, []);
-        }
-        tasksByFile.get(task.file_path).push(task);
-      }
-
-      for (const [filePath, fileTasks] of tasksByFile) {
-        const content = fsSync.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
-
-        // Process only the tasks from cache for this file
-        for (const task of fileTasks) {
-          const i = task.line_number - 1; // Convert to 0-based
-          const line = lines[i];
-          if (line && line.match(/^- \[ \] /) && (options.all || !line.match(/#stage\//))) {
-            let title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-
-            let stage = '';
-            if (title.match(/\b(meeting|call|email|support|customer|present|interview)\b/i)) {
-              stage = '#stage/front-stage';
-            } else if (title.match(/\b(fix|bug|maintain|organize|plan|bill|document|setup)\b/i)) {
-              stage = '#stage/back-stage';
-            } else if (title.match(/\b(personal|health|exercise|read|friend|family|relax|self)\b/i)) {
-              stage = '#stage/off-stage';
-            } else {
-              stage = '#stage/back-stage';
-            }
-
-            if (!lines[i].includes(stage)) {
-              let newLine = line;
-
-              // Ensure date added marker exists first
-              newLine = ensureDateAdded(newLine);
-
-              const priorityMatch = newLine.match(/(.*?)(🔺|⏫|🔼|🔽|⏬)(.*)/);
-              if (priorityMatch) {
-                lines[i] = `${priorityMatch[1]}${priorityMatch[2]} ${stage}${priorityMatch[3]}`;
-              } else {
-                const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                if (dateMatch) {
-                  lines[i] = `${dateMatch[1]} ${stage} ${dateMatch[2]}`;
-                } else {
-                  lines[i] = `${newLine} ${stage}`;
-                }
-              }
-              modified = true;
-              totalClassified++;
-            }
-          }
-        }
-
-        if (modified) {
-          fsSync.writeFileSync(filePath, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${filePath}`));
-          }
-
-          // Update cache with modified lines
-          const db2 = getDatabase();
-          for (const task of fileTasks) {
-            const i = task.line_number - 1;
-            if (lines[i] !== task.line_text) {
-              db2.run(
-                'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
-                lines[i],
-                filePath,
-                task.line_number
-              );
-            }
-          }
-          db2.close();
-        }
-      }
-    }
-
-    console.log(chalk.green(`✓ Classified ${totalClassified} task(s) with stage tags`));
-    process.exit(0);
-  });
-
-// Add topics command - works with markdown files
-program
-  .command('add-topics [file]')
-  .description('Add topic tags to tasks using AI analysis')
-  .option('--all', 'Reassign topics to all tasks (not just unassigned)')
-  .option('-v, --verbose', 'Show detailed output')
-  .option('--limit <number>', 'Limit number of tasks to process (for testing)', parseInt)
-  .option('--no-ai', 'Use simple keyword matching instead of AI')
-  .action(async (file, options) => {
-    console.log(chalk.blue('🏷️  Adding topic tags to tasks in markdown files...'));
-
-    // Check if AI is available and desired
-    const useAI = !options.noAi && (() => {
-      try {
-        execSync('which claude', { encoding: 'utf8' });
-        return true;
-      } catch {
-        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
-        return false;
-      }
-    })();
-
-    // Dynamically extract available topics from markdown_tasks database
-    console.log(chalk.gray('  Extracting available topics from database...'));
-    const db = getDatabase();
-    const tasksWithTopics = db.all(`
-      SELECT DISTINCT line_text
-      FROM markdown_tasks
-      WHERE line_text LIKE '%#topic/%'
-    `);
-
-    const topicSet = new Set();
-    for (const task of tasksWithTopics) {
-      const topicMatches = task.line_text.match(/#topic\/([a-z0-9_-]+)/g);
-      if (topicMatches) {
-        for (const match of topicMatches) {
-          const topic = match.replace('#topic/', '');
-          topicSet.add(topic);
-        }
-      }
-    }
-
-    const availableTopics = Array.from(topicSet).sort();
-    console.log(chalk.gray(`  Found ${availableTopics.length} unique topics in database`));
-
-    // Get tasks from cache that need topic classification
-    console.log(chalk.gray('  Finding tasks needing topic classification from cache...'));
-
-    let query = `
-      SELECT file_path, line_number, line_text
-      FROM markdown_tasks
-      WHERE line_text LIKE '- [ ]%'
-        AND file_path NOT LIKE 'vault/.%'
-        AND file_path NOT LIKE '%/templates/%'
-    `;
-
-    if (file) {
-      query += ` AND file_path = ?`;
-    }
-
-    if (!options.all) {
-      query += ` AND line_text NOT LIKE '%#topic/%'`;
-    }
-
-    query += ` ORDER BY file_path, line_number`;
-
-    const tasksFromCache = file ? db.all(query, file) : db.all(query);
-    db.close();
-
-    if (tasksFromCache.length === 0) {
-      console.log(chalk.gray('No tasks needing topic classification found'));
-      process.exit(0);
-    }
-
-    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing topic classification`));
-
-    let totalTopicsAdded = 0;
-    let globalTasksProcessed = 0;
-
-    // Apply global limit if specified
-    let tasksToProcess = tasksFromCache;
-    if (options.limit && tasksFromCache.length > options.limit) {
-      console.log(chalk.yellow(`  Limiting to first ${options.limit} tasks (found ${tasksFromCache.length})`));
-      tasksToProcess = tasksFromCache.slice(0, options.limit);
-    }
-
-    if (useAI) {
-      // AI-powered topic classification with global batching
-      const BATCH_SIZE = 30; // Larger batches for efficiency
-
-      // Prepare all tasks for classification at once
-      console.log(chalk.gray('  Preparing all tasks for AI classification...'));
-      const allTasksToClassify = tasksToProcess.map(task => ({
-        dbTask: task,
-        lineIndex: task.line_number - 1, // Convert to 0-based
-        title: task.line_text.replace(/^- \[ \] /, '')
-          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-          .replace(/#\w+\/[\w-]+/g, '')
-          .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-          .replace(/🔁 .+$/g, '')
-          .trim(),
-        line: task.line_text
-      }));
-
-      // Process all tasks in large batches (global batching for efficiency)
-      for (let i = 0; i < allTasksToClassify.length; i += BATCH_SIZE) {
-        const batch = allTasksToClassify.slice(i, Math.min(i + BATCH_SIZE, allTasksToClassify.length));
-
-        const prompt = `Analyze these tasks and suggest 1-2 relevant topics for each from the available list.
-
-Available topics: ${availableTopics.join(', ')}
-
-For each task, choose the most relevant topic(s) based on:
-- Keywords that match topic areas
-- The nature of the work (technical, personal, organizational)
-- Related areas involved
-
-Respond with a JSON array where each has:
-{"index": task_index, "topics": ["topic1", "topic2"]}
-
-If no topics clearly apply, use an empty array.
-Only use topics from the available list.
-
-Tasks:
-${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
-
-        try {
-          if (options.verbose) {
-            console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(allTasksToClassify.length/BATCH_SIZE)} (${batch.length} tasks)...`);
-          }
-
-          const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-              encoding: 'utf8',
-              maxBuffer: 1024 * 1024 * 10,
-              timeout: 60000
-            });
-
-          const jsonMatch = result.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const classifications = JSON.parse(jsonMatch[0]);
-
-            // Apply results to tasks (store changes for later file updates)
-            for (const cls of classifications) {
-              const task = batch[cls.index - i]; // Use batch index, not global index
-              globalTasksProcessed++; // Count each task processed
-
-              if (cls.topics && cls.topics.length > 0) {
-                let newLine = task.line;
-
-                // Ensure date added marker exists first
-                newLine = ensureDateAdded(newLine);
-
-                // Add topics
-                for (const topic of cls.topics.slice(0, 2)) { // Max 2 topics
-                  if (availableTopics.includes(topic) && !newLine.includes(`#topic/${topic}`)) {
-                    const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
-                    if (stageMatch) {
-                      newLine = `${stageMatch[1]} #topic/${topic}${stageMatch[2]}`;
-                    } else {
-                      const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                      if (dateMatch) {
-                        newLine = `${dateMatch[1]} #topic/${topic} ${dateMatch[2]}`;
-                      } else {
-                        newLine = `${newLine} #topic/${topic}`;
-                      }
-                    }
-                    totalTopicsAdded++;
-                  }
-                }
-
-                // Store the updated line in the task for later file processing
-                if (newLine !== task.line) {
-                  task.updatedLine = newLine;
-                }
-              }
-            }
-          }
-        } catch (error) {
-            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
-          }
-        }
-
-      // After all AI processing, update files with changes
-      console.log(chalk.gray('  Applying changes to files...'));
-      const fileChanges = new Map();
-
-      // Group updated tasks by file
-      for (const task of allTasksToClassify) {
-        if (task.updatedLine) {
-          if (!fileChanges.has(task.dbTask.file_path)) {
-            fileChanges.set(task.dbTask.file_path, []);
-          }
-          fileChanges.get(task.dbTask.file_path).push(task);
-        }
-      }
-
-      // Apply changes to each file
-      const db2 = getDatabase();
-      for (const [filePath, tasksWithChanges] of fileChanges) {
-        try {
-          const content = fsSync.readFileSync(filePath, 'utf8');
-          const lines = content.split('\n');
-          let modified = false;
-
-          for (const task of tasksWithChanges) {
-            lines[task.lineIndex] = task.updatedLine;
-            modified = true;
-
-            // Update cache
-            db2.run(
-              'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
-              task.updatedLine,
-              filePath,
-              task.lineIndex + 1
-            );
-          }
-
-          if (modified) {
-            fsSync.writeFileSync(filePath, lines.join('\n'));
-            if (options.verbose) {
-              console.log(chalk.gray(`  Updated: ${filePath} (${tasksWithChanges.length} tasks)`));
-            }
-          }
-        } catch (error) {
-          console.error(chalk.yellow(`  Failed to update file ${filePath}: ${error.message}`));
-        }
-      }
-      db2.close();
-    } else {
-      // Fallback to keyword-based classification using cache
-      const tasksByFile = new Map();
-      for (const task of tasksToProcess) {
-        if (!tasksByFile.has(task.file_path)) {
-          tasksByFile.set(task.file_path, []);
-        }
-        tasksByFile.get(task.file_path).push(task);
-      }
-
-      for (const [filePath, fileTasks] of tasksByFile) {
-        const content = fsSync.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/#topic\//))) {
-            let title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-
-            const topics = [];
-            if (title.match(/\b(health|exercise|doctor|medical|diet|wellness)\b/i)) topics.push('#topic/health');
-            if (title.match(/\b(code|program|debug|fix|develop|git|api)\b/i)) topics.push('#topic/programming');
-            if (title.match(/\b(oldergay|ogm|website|discourse|forum)\b/i)) topics.push('#topic/ogm');
-            if (title.match(/\b(ai|claude|gpt|chatgpt|llm|machine learning)\b/i)) topics.push('#topic/ai');
-            if (title.match(/\b(money|bill|tax|payment|finance|invest)\b/i)) topics.push('#topic/finance');
-            if (title.match(/\b(house|home|clean|repair|maintenance|chore)\b/i)) topics.push('#topic/home');
-            if (title.match(/\b(friend|family|social|meet|relationship)\b/i)) topics.push('#topic/social');
-            if (title.match(/\b(learn|read|course|study|research|book)\b/i)) topics.push('#topic/learning');
-            if (title.match(/\b(travel|trip|flight|hotel|vacation)\b/i)) topics.push('#topic/travel');
-            if (title.match(/\b(buy|shop|order|purchase|amazon)\b/i)) topics.push('#topic/shopping');
-
-            if (topics.length > 0) {
-              let newLine = line;
-
-              // Ensure date added marker exists first
-              newLine = ensureDateAdded(newLine);
-
-              for (const topic of topics) {
-                if (!newLine.includes(topic)) {
-                  const stageMatch = newLine.match(/(.*#stage\/[\w-]+)(.*)/);
-                  if (stageMatch) {
-                    newLine = `${stageMatch[1]} ${topic}${stageMatch[2]}`;
-                  } else {
-                    const dateMatch = newLine.match(/(.*?)([📅⏳✅] \d{4}-\d{2}-\d{2}.*)/);
-                    if (dateMatch) {
-                      newLine = `${dateMatch[1]} ${topic} ${dateMatch[2]}`;
-                    } else {
-                      newLine = `${newLine} ${topic}`;
-                    }
-                  }
-                  totalTopicsAdded++;
-                }
-              }
-              if (newLine !== line) {
-                lines[i] = newLine;
-                modified = true;
-              }
-            }
-          }
-        }
-
-        if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
-          }
-        }
-      }
-    }
-
-    console.log(chalk.green(`✓ Added ${totalTopicsAdded} topic tag(s) to tasks`));
-    process.exit(0);
-  });
-
-// Add date added command - works with markdown files
-program
-  .command('add-date-added [file]')
-  .description('Add date added markers (➕ YYYY-MM-DD) to tasks without them')
-  .option('-v, --verbose', 'Show detailed output')
-  .action(async (file, options) => {
-    console.log(chalk.blue('📅 Adding date added markers to tasks...'));
-
-    // Get tasks from cache that need date added markers
-    console.log(chalk.gray('  Finding tasks needing date added markers from cache...'));
-    const db = getDatabase();
-
-    let query = `
-      SELECT file_path, line_number, line_text
-      FROM markdown_tasks
-      WHERE line_text LIKE '- [ ]%'
-        AND file_path NOT LIKE 'vault/.%'
-        AND file_path NOT LIKE '%/templates/%'
-        AND line_text NOT LIKE '%➕ ____-__-__%'
-    `;
-
-    if (file) {
-      query += ` AND file_path = ?`;
-    }
-
-    query += ` ORDER BY file_path, line_number`;
-
-    const tasksFromCache = file ? db.all(query, file) : db.all(query);
-    db.close();
-
-    if (tasksFromCache.length === 0) {
-      console.log(chalk.gray('No tasks needing date added markers found'));
-      process.exit(0);
-    }
-
-    console.log(chalk.gray(`  Found ${tasksFromCache.length} tasks needing date added markers`));
-
-    let totalAdded = 0;
-
-    // Group tasks by file for efficient file operations
-    const tasksByFile = new Map();
-    for (const task of tasksFromCache) {
-      if (!tasksByFile.has(task.file_path)) {
-        tasksByFile.set(task.file_path, []);
-      }
-      tasksByFile.get(task.file_path).push(task);
-    }
-
-    for (const [filePath, fileTasks] of tasksByFile) {
-      const content = fsSync.readFileSync(filePath, 'utf8');
-      const lines = content.split('\n');
-      let modified = false;
-
-      // Process only the tasks from cache for this file
-      for (const task of fileTasks) {
-        const i = task.line_number - 1; // Convert to 0-based
-        const line = lines[i];
-        if (line && line.match(/^- \[ \] /)) {
-          const newLine = ensureDateAdded(line);
-          if (newLine !== line) {
-            lines[i] = newLine;
-            modified = true;
-            totalAdded++;
-          }
-        }
-      }
-
-      if (modified) {
-        fsSync.writeFileSync(filePath, lines.join('\n'));
-        if (options.verbose) {
-          console.log(chalk.gray(`  Updated: ${filePath} (${fileTasks.filter((t, idx) => lines[t.line_number - 1] !== t.line_text).length} tasks)`));
-        }
-
-        // Update cache with modified lines
-        const db2 = getDatabase();
-        for (const task of fileTasks) {
-          const i = task.line_number - 1;
-          if (lines[i] !== task.line_text) {
-            db2.run(
-              'UPDATE markdown_tasks SET line_text = ? WHERE file_path = ? AND line_number = ?',
-              lines[i],
-              filePath,
-              task.line_number
-            );
-          }
-        }
-        db2.close();
-      }
-    }
-
-    console.log(chalk.green(`✓ Added date added markers to ${totalAdded} task(s)`));
-    process.exit(0);
-  });
-
-// Prioritize status command - works with markdown files
-program
-  .command('prioritize-status [file]')
-  .description('Add priority emojis to tasks using AI analysis')
-  .option('--all', 'Reprioritize all tasks (not just unprioritized)')
-  .option('-v, --verbose', 'Show detailed output')
-  .option('--limit <number>', 'Limit number of tasks to process (for testing)', parseInt)
-  .option('--no-ai', 'Use simple keyword matching instead of AI')
-  .action(async (file, options) => {
-    console.log(chalk.blue('🎯 Adding priority emojis to tasks in markdown files...'));
-
-    // Check if AI is available and desired
-    const useAI = !options.noAi && (() => {
-      try {
-        execSync('which claude', { encoding: 'utf8' });
-        return true;
-      } catch {
-        console.log(chalk.yellow('⚠️  Claude CLI not available - falling back to keyword matching'));
-        return false;
-      }
-    })();
-
-    // Find files to process
-    const files = file ? [file] : findMarkdownFilesWithTasks();
-
-    if (files.length === 0) {
-      console.log(chalk.gray('No task files found'));
-      process.exit(0);
-    }
-
-    let totalPrioritized = 0;
-    let globalTasksProcessed = 0;
-
-    if (useAI) {
-      // AI-powered prioritization
-      const BATCH_SIZE = 20;
-
-      for (const file of files) {
-        // Check global limit
-        if (options.limit && globalTasksProcessed >= options.limit) {
-          console.log(chalk.yellow(`  Reached global limit of ${options.limit} tasks, stopping.`));
-          break;
-        }
-        const content = fsSync.readFileSync(file, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
-
-        // Collect tasks needing prioritization
-        const tasksToClassify = [];
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
-            const title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-            tasksToClassify.push({ lineIndex: i, title, line });
-          }
-        }
-
-        if (tasksToClassify.length === 0) continue;
-
-        // Apply global limit if specified
-        if (options.limit) {
-          const remainingSlots = options.limit - globalTasksProcessed;
-          if (remainingSlots <= 0) continue;
-
-          if (tasksToClassify.length > remainingSlots) {
-            console.log(chalk.yellow(`  Limiting to ${remainingSlots} tasks (found ${tasksToClassify.length}, ${globalTasksProcessed}/${options.limit} processed so far)`));
-            tasksToClassify.splice(remainingSlots);
-          }
-        }
-
-        // Process in batches
-        for (let i = 0; i < tasksToClassify.length; i += BATCH_SIZE) {
-          const batch = tasksToClassify.slice(i, Math.min(i + BATCH_SIZE, tasksToClassify.length));
-
-          const prompt = `Analyze these tasks and assign priority emojis based on urgency and importance.
-
-Use EXACTLY these priority emojis:
-- 🔺 (Highest) - Urgent and critical (health emergencies, critical deadlines, system failures)
-- ⏫ (High) - Important and time-sensitive (upcoming deadlines, scheduled meetings, important fixes)
-- 🔼 (Medium) - Regular priority (most daily tasks, routine work)
-- 🔽 (Low) - Nice to have (someday/maybe items, research, exploration)
-- ⏬ (Lowest) - Reference or optional (archived ideas, distant future)
-
-Respond with a JSON array where each has:
-{"index": task_index, "priority": "emoji"}
-
-Tasks:
-${JSON.stringify(batch.map((t, idx) => ({index: idx + i, title: t.title})), null, 2)}`;
-
-          try {
-            if (options.verbose) {
-              console.log(`  Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(tasksToClassify.length/BATCH_SIZE)}...`);
-            }
-
-            const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-              encoding: 'utf8',
-              maxBuffer: 1024 * 1024 * 10,
-              timeout: 60000 // 1 minute timeout per batch
-            });
-
-            const jsonMatch = result.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              const classifications = JSON.parse(jsonMatch[0]);
-
-              for (const cls of classifications) {
-                const task = tasksToClassify[cls.index];
-                globalTasksProcessed++; // Count each task processed
-
-                // Ensure date added marker exists first
-                let lineWithDate = ensureDateAdded(task.line);
-
-                const cleanLine = lineWithDate.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
-                const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
-                if (taskMatch) {
-                  lines[task.lineIndex] = `${taskMatch[1].trim()} ${cls.priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
-                  modified = true;
-                  totalPrioritized++;
-                }
-              }
-            }
-          } catch (error) {
-            console.error(chalk.yellow(`  Failed to process batch: ${error.message}`));
-          }
-        }
-
-        if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
-          }
-        }
-      }
-    } else {
-      // Fallback to keyword-based prioritization
-      for (const file of files) {
-        const content = fsSync.readFileSync(file, 'utf8');
-        const lines = content.split('\n');
-        let modified = false;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.match(/^- \[ \] /) && (options.all || !line.match(/🔺|⏫|🔼|🔽|⏬/))) {
-            let title = line.replace(/^- \[ \] /, '')
-              .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-              .replace(/#\w+\/[\w-]+/g, '')
-              .replace(/[📅⏳✅] \d{4}-\d{2}-\d{2}/g, '')
-              .replace(/🔁 .+$/g, '')
-              .trim();
-
-            let priority = '';
-            if (title.match(/\b(urgent|critical|emergency|asap|immediately|blocker)\b/i)) {
-              priority = '🔺';
-            } else if (title.match(/\b(important|high|soon|priority|deadline)\b/i)) {
-              priority = '⏫';
-            } else if (title.match(/\b(someday|maybe|consider|explore|research)\b/i)) {
-              priority = '🔽';
-            } else if (title.match(/\b(due|scheduled|meeting|call|appointment)\b/i)) {
-              priority = '⏫';
-            } else {
-              priority = '🔼';
-            }
-
-            // Ensure date added marker exists first
-            let lineWithDate = ensureDateAdded(line);
-
-            const cleanLine = lineWithDate.replace(/🔺|⏫|🔼|🔽|⏬/g, '').trim();
-            const taskMatch = cleanLine.match(/^(- \[ \] [^#📅⏳✅🔁]+)(.*)/);
-            if (taskMatch) {
-              lines[i] = `${taskMatch[1].trim()} ${priority}${taskMatch[2] ? ' ' + taskMatch[2].trim() : ''}`;
-              modified = true;
-              totalPrioritized++;
-            }
-          }
-        }
-
-        if (modified) {
-          fsSync.writeFileSync(file, lines.join('\n'));
-          if (options.verbose) {
-            console.log(chalk.gray(`  Updated: ${file}`));
-          }
-        }
-      }
-    }
-
-    console.log(chalk.green(`✓ Prioritized ${totalPrioritized} task(s) with emoji indicators`));
-    process.exit(0);
-  });
-
-// Search command - searches markdown_tasks cache
-program
-  .command('search <query>')
-  .description('Search for tasks in markdown files')
-  .option('-a, --all', 'Include completed tasks')
-  .option('-n, --limit <number>', 'Limit number of results', parseInt)
-  .action(async (query, options) => {
-    const db = getDatabase();
+    const source = id.substring(0, firstColon);
+    const pluginId = id.substring(firstColon + 1);
 
     try {
-      let sql = `
-        SELECT file_path, line_number, line_text
-        FROM markdown_tasks
-        WHERE line_text LIKE ?
-          AND file_path NOT LIKE 'vault/.%'
-          AND file_path NOT LIKE '%/templates/%'
-      `;
+      const entry = {
+        action: 'complete',
+        id: pluginId,
+        title: options.title
+      };
 
-      if (!options.all) {
-        sql += " AND line_text LIKE '- [ ]%'";
-      }
-
-      sql += ' ORDER BY file_path, line_number';
-
-      if (options.limit) {
-        sql += ` LIMIT ${options.limit}`;
-      }
-
-      const searchPattern = `%${query}%`;
-      const tasks = db.all(sql, searchPattern);
-
-      if (tasks.length === 0) {
-        console.log(chalk.yellow(`No tasks found matching "${query}"`));
-        return;
-      }
-
-      console.log(chalk.blue(`\nFound ${tasks.length} task(s) matching "${query}":\n`));
-
-      const table = new Table({
-        head: ['Task', 'File', 'Line'],
-        colWidths: [50, 30, 6],
-        wordWrap: true
+      const result = await writeEntryAndSync('tasks', entry, {
+        db,
+        sourceFilter: source
       });
 
-      for (const task of tasks) {
-        // Extract task title
-        let title = task.line_text
-          .replace(/^- \[[x ]\] /, '')
-          .replace(/🔺|⏫|🔼|🔽|⏬/g, '')
-          .replace(/#\w+\/[\w-]+/g, '')
-          .replace(/[📅⏳✅➕] \d{4}-\d{2}-\d{2}/g, '')
-          .replace(/🔁 .+$/g, '')
-          .trim();
-
-        if (title.length > 47) {
-          title = title.substring(0, 44) + '...';
-        }
-
-        let filePath = task.file_path.replace('vault/', '');
-        if (filePath.length > 27) {
-          filePath = '...' + filePath.substring(filePath.length - 24);
-        }
-
-        table.push([title, filePath, task.line_number]);
+      if (!result.success) {
+        console.error(chalk.red('✗') + ` ${result.error}`);
+        process.exit(1);
       }
 
-      console.log(table.toString());
+      console.log(chalk.green('✓') + ' Completed task');
+      if (result.writeResult?.new_line) {
+        console.log(chalk.gray(`  ${result.writeResult.new_line}`));
+      }
     } catch (error) {
-      console.error(chalk.red('Error searching tasks:'), error.message);
+      console.error(chalk.red('Error completing task:'), error.message);
       process.exit(1);
-    } finally {
-      await db.close();
     }
+  });
+
+// Auto-enhancement commands removed - these features are now config-driven:
+// - auto_classify_stages: Adds #stage/... tags during sync
+// - auto_add_date_created: Adds ➕ YYYY-MM-DD markers during sync
+// - auto_add_priority: Adds priority emojis during sync
+// Enable these in config.toml under [plugins.markdown-tasks.local]
+
+// TODO: Revisit add-topics when implementing system-wide tagging
+// - Should work across all taggable plugin types (tasks, time-logs, diary)
+// - Add auto_add_topics config option for sync-time tagging
+
+// Note: update-cache and generate-topics commands have been removed
+// These relied on the legacy markdown_tasks table
+// Use 'bin/plugins sync --type tasks' instead for syncing to the tasks table
+
+// Search command - searches tasks table
+program
+  .command('search <query>')
+  .description('Search for tasks by title')
+  .option('-a, --all', 'Include completed tasks')
+  .option('-n, --limit <number>', 'Limit number of results', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (query, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    const conditions = ['title LIKE ?'];
+    const params = [`%${query}%`];
+
+    if (!options.all) {
+      conditions.push("status = 'open'");
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(chalk.blue('ℹ') + ` No tasks matching "${query}"`);
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(chalk.gray(`${tasks.length} results for "${query}"`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
 // Note: projects command removed - project management now through vault/projects/*.md files
@@ -1259,364 +504,7 @@ program
 // Note: check-consistency command removed - task-id based consistency checking is deprecated
 // Tasks are now managed directly through markdown files with Obsidian Tasks plugin
 
-// Update markdown cache command
-program
-  .command('update-cache')
-  .description('Update markdown tasks cache from all .md files')
-  .action(async () => {
-    console.log(chalk.blue('Updating markdown tasks cache...'));
-
-    const db = getDatabase();
-
-    try {
-      console.log('Clearing existing markdown_tasks cache...');
-
-      // Clear existing cache
-      db.run('DELETE FROM markdown_tasks');
-
-      console.log('Finding markdown files...');
-
-      // Find all markdown files in vault/ excluding hidden directories
-      const findCmd = `find vault/ -name "*.md" -type f ! -path "*/.*"`;
-      const files = execSync(findCmd, { encoding: 'utf8' })
-        .split('\n')
-        .filter(Boolean);
-
-      console.log(`Found ${files.length} markdown files to process`);
-
-      let totalTasks = 0;
-      let processedFiles = 0;
-
-      // Use database service for inserts (simplified schema - no is_done column)
-      const insertTask = (filePath, lineNum, line) => {
-        db.run(`INSERT INTO markdown_tasks (file_path, line_number, line_text) VALUES (?, ?, ?)`,
-               filePath, lineNum, line);
-      };
-
-      // Process files in batches
-      const batchSize = 50;
-      for (let i = 0; i < files.length; i += batchSize) {
-        const batch = files.slice(i, i + batchSize);
-
-        for (const filePath of batch) {
-          try {
-            const content = await fs.readFile(filePath, 'utf8');
-            const lines = content.split('\n');
-
-            for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-              const line = lines[lineNum];
-
-              // Check if this is a task line
-              if (line.match(/^\s*- \[[ x]\]/)) {
-                insertTask(filePath, lineNum + 1, line);
-                totalTasks++;
-              }
-            }
-
-            processedFiles++;
-            if (processedFiles % 100 === 0) {
-              console.log(`Processed ${processedFiles}/${files.length} files (${totalTasks} tasks so far)`);
-            }
-          } catch (err) {
-            console.error(`Error processing ${filePath}: ${err.message}`);
-          }
-        }
-      }
-
-      console.log(`\n✅ Processed ${processedFiles} files, found ${totalTasks} tasks`);
-
-      // Show statistics (parse done status from line text)
-      const stats = db.get(`
-        SELECT
-          COUNT(*) as total,
-          SUM(CASE WHEN line_text LIKE '%- [x]%' THEN 1 ELSE 0 END) as done,
-          SUM(CASE WHEN line_text LIKE '%- [ ]%' THEN 1 ELSE 0 END) as undone
-        FROM markdown_tasks
-      `);
-
-      console.log(`📊 Cache contains: ${stats.total} total tasks (${stats.done} done, ${stats.undone} undone)`);
-
-      const topicStats = db.get(`
-        SELECT COUNT(*) as count
-        FROM markdown_tasks
-        WHERE line_text LIKE '%#topic/%' AND line_text LIKE '%- [ ]%'
-      `);
-
-      console.log(`🏷️  ${topicStats.count} undone tasks with topics`);
-
-    } catch (error) {
-      console.error(chalk.red('Error updating cache:'), error.message);
-      process.exit(1);
-    } finally {
-      // Close database connection to allow process to exit
-      await db.close();
-    }
-  });
-
-// Generate topic files command
-program
-  .command('generate-topics')
-  .description('Generate topic files from markdown tasks cache')
-  .action(async () => {
-    console.log(chalk.blue('Generating topic files from markdown_tasks cache...'));
-
-    const db = getDatabase();
-
-    try {
-      // Get all tasks with topics from cache (excluding hidden directories)
-      const tasksWithTopics = db.all(`
-        SELECT DISTINCT line_text
-        FROM markdown_tasks
-        WHERE line_text LIKE '%#topic/%'
-          AND line_text LIKE '%- [ ]%'
-          AND file_path NOT LIKE 'vault/.%'
-      `);
-
-      console.log(`Found ${tasksWithTopics.length} undone tasks with topics`);
-
-      // Extract all unique topics
-      const topicSet = new Set();
-      for (const task of tasksWithTopics) {
-        const topicMatches = task.line_text.match(/#topic\/([a-z0-9_-]+)/g);
-        if (topicMatches) {
-          for (const match of topicMatches) {
-            const topic = match.replace('#topic/', '');
-            topicSet.add(topic);
-          }
-        }
-      }
-
-      const topics = Array.from(topicSet).sort();
-      console.log(`Found ${topics.length} unique topics`);
-
-      // Create vault/topics directory
-      const topicsDir = path.join(__dirname, '..', 'vault', 'topics');
-      try {
-        await fs.mkdir(topicsDir, { recursive: true });
-      } catch (err) {
-        // Directory might already exist
-      }
-
-      // Get existing topic files to clean up
-      const existingFiles = await fs.readdir(topicsDir).catch(() => []);
-      const expectedFiles = new Set(topics.map(topic => `${topic}.md`));
-
-      let createdFiles = 0;
-      let removedFiles = 0;
-
-      // Create topic files
-      for (const topic of topics) {
-        const fileName = `${topic}.md`;
-        const filePath = path.join(topicsDir, fileName);
-
-        // Convert underscores to spaces and capitalize for display
-        const displayName = topic
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-
-        const content = `# ${displayName}
-
-\`\`\`tasks
-filter by function task.tags.join(',').includes('#topic/${topic}')
-not done
-sort by happens
-sort by priority
-group by path
-\`\`\`
-`;
-
-        await fs.writeFile(filePath, content);
-        createdFiles++;
-      }
-
-      // Remove obsolete topic files
-      for (const existingFile of existingFiles) {
-        if (!expectedFiles.has(existingFile) && existingFile.endsWith('.md')) {
-          const filePath = path.join(topicsDir, existingFile);
-          await fs.unlink(filePath);
-          removedFiles++;
-          console.log(`Removed obsolete topic file: ${existingFile}`);
-        }
-      }
-
-      console.log(`\n✅ Generated ${createdFiles} topic files`);
-      if (removedFiles > 0) {
-        console.log(`🗑️  Removed ${removedFiles} obsolete topic files`);
-      }
-
-      // Show top topics by task count
-      console.log('\nTop 10 topics by task count:');
-      for (const topic of topics.slice(0, 10)) {
-        const count = db.get(`
-          SELECT COUNT(*) as count
-          FROM markdown_tasks
-          WHERE line_text LIKE '%#topic/${topic}%'
-            AND line_text LIKE '%- [ ]%'
-            AND file_path NOT LIKE 'vault/.%'
-        `);
-        console.log(`  • ${topic}: ${count.count} tasks`);
-      }
-
-    } catch (error) {
-      console.error(chalk.red('Error generating topics:'), error.message);
-      process.exit(1);
-    } finally {
-      // Close database connection to allow process to exit
-      await db.close();
-    }
-  });
-
-// Archive completed tasks command
-program
-  .command('archive-completed')
-  .description('Move completed tasks from tasks-*.md files to tasks-archive.md and rebalance tasks.md')
-  .option('-v, --verbose', 'Show detailed output')
-  .action(async (options) => {
-    console.log(chalk.blue('📦 Archiving completed tasks and rebalancing...'));
-
-    try {
-      const tasksDir = path.join(__dirname, '..', 'vault', 'tasks');
-      const archiveFile = path.join(tasksDir, 'tasks-archive.md');
-      const tasksFile = path.join(tasksDir, 'tasks.md');
-
-      // Read current archive file
-      let archiveContent = '';
-      try {
-        archiveContent = await fs.readFile(archiveFile, 'utf8');
-      } catch (err) {
-        // Archive file doesn't exist yet
-        console.log(chalk.gray('Creating new tasks-archive.md file'));
-      }
-
-      let archiveTasks = archiveContent.split('\n').filter(line => line.trim());
-      let totalArchived = 0;
-
-      // Find all task files including tasks.md and repeating.md
-      const allFiles = await fs.readdir(tasksDir);
-      const taskFiles = allFiles
-        .filter(f => f === 'tasks.md' || f === 'repeating.md' || f.match(/^tasks-\d+\.md$/))
-        .map(f => path.join(tasksDir, f))
-        .sort(); // Sort to process tasks.md first
-
-      if (taskFiles.length === 0) {
-        console.log(chalk.gray('No task files found to archive'));
-        return;
-      }
-
-      console.log(chalk.gray(`Checking ${taskFiles.length} task files (including repeating.md)...`));
-
-      // Process each task file - archive completed tasks
-      for (const filePath of taskFiles) {
-        const content = await fs.readFile(filePath, 'utf8');
-        const lines = content.split('\n');
-
-        // Separate completed from incomplete tasks
-        const completedTasks = [];
-        const remainingLines = [];
-
-        for (const line of lines) {
-          if (line.match(/^- \[x\]/i)) {
-            completedTasks.push(line);
-            totalArchived++;
-          } else if (line.trim()) {
-            remainingLines.push(line);
-          }
-        }
-
-        // Add completed tasks to archive
-        if (completedTasks.length > 0) {
-          archiveTasks = archiveTasks.concat(completedTasks);
-
-          // Write back remaining tasks
-          await fs.writeFile(filePath, remainingLines.join('\n') + '\n');
-
-          if (options.verbose) {
-            console.log(chalk.gray(`  ${path.basename(filePath)}: archived ${completedTasks.length} tasks`));
-          }
-        }
-      }
-
-      if (totalArchived > 0) {
-        // Write updated archive file
-        await fs.writeFile(archiveFile, archiveTasks.join('\n') + '\n');
-        console.log(chalk.green(`✓ Archived ${totalArchived} completed task(s) to tasks-archive.md`));
-      } else {
-        console.log(chalk.gray('No completed tasks to archive'));
-      }
-
-      // Now rebalance tasks.md if it exceeds 50 tasks
-      try {
-        const tasksContent = await fs.readFile(tasksFile, 'utf8');
-        const tasksLines = tasksContent.split('\n').filter(line => line.trim());
-
-        if (tasksLines.length > 50) {
-          console.log(chalk.blue(`\n📊 Rebalancing tasks.md (${tasksLines.length} tasks > 50 limit)...`));
-
-          // Keep first 50, move the rest
-          const toKeep = tasksLines.slice(0, 50);
-          const toMove = tasksLines.slice(50);
-
-          // Find existing numbered files and their task counts
-          const numberedFiles = allFiles
-            .filter(f => f.match(/^tasks-(\d+)\.md$/))
-            .map(f => {
-              const num = parseInt(f.match(/^tasks-(\d+)\.md$/)[1]);
-              return { num, file: f };
-            })
-            .sort((a, b) => a.num - b.num);
-
-          // Find a file with room (< 50 tasks) or create a new one
-          let targetFile = null;
-          let targetNum = null;
-
-          for (const { num, file } of numberedFiles) {
-            const filePath = path.join(tasksDir, file);
-            const content = await fs.readFile(filePath, 'utf8');
-            const lines = content.split('\n').filter(line => line.trim());
-
-            if (lines.length < 50) {
-              targetFile = filePath;
-              targetNum = num;
-              break;
-            }
-          }
-
-          // If no file has room, create a new one
-          if (!targetFile) {
-            targetNum = numberedFiles.length > 0 ? numberedFiles[numberedFiles.length - 1].num + 1 : 1;
-            targetFile = path.join(tasksDir, `tasks-${targetNum}.md`);
-            await fs.writeFile(targetFile, '');
-            console.log(chalk.gray(`  Created new file: tasks-${targetNum}.md`));
-          }
-
-          // Read target file and append tasks
-          const targetContent = await fs.readFile(targetFile, 'utf8');
-          const targetLines = targetContent.split('\n').filter(line => line.trim());
-          const combinedLines = targetLines.concat(toMove);
-
-          // Write files
-          await fs.writeFile(tasksFile, toKeep.join('\n') + '\n');
-          await fs.writeFile(targetFile, combinedLines.join('\n') + '\n');
-
-          console.log(chalk.green(`✓ Moved ${toMove.length} tasks from tasks.md to tasks-${targetNum}.md`));
-          console.log(chalk.gray(`  tasks.md now has ${toKeep.length} tasks`));
-          console.log(chalk.gray(`  tasks-${targetNum}.md now has ${combinedLines.length} tasks`));
-        }
-      } catch (err) {
-        // tasks.md might not exist yet
-        if (options.verbose) {
-          console.log(chalk.gray('  tasks.md not found or empty, skipping rebalance'));
-        }
-      }
-
-    } catch (error) {
-      console.error(chalk.red('Error archiving tasks:'), error.message);
-      process.exit(1);
-    }
-
-    // Exit cleanly
-    process.exit(0);
-  });
+// Note: archive-completed command removed - now config-driven via auto_archive_completed
+// Enable in config.toml under [plugins.markdown-tasks.<source>]
 
 program.parse();

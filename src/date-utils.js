@@ -3,7 +3,9 @@
  * Provides standardized date formatting and calculations.
  */
 
-import { format, getWeek, getQuarter, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
+import { format, getWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
+import { TZDate } from '@date-fns/tz';
+import { getFullConfig } from './config.js';
 
 /**
  * Format a date as YYYY-MM-DD.
@@ -169,4 +171,158 @@ export function getDayName(date) {
 export function getShortDayName(date) {
   const d = typeof date === 'string' ? parseISO(date) : date;
   return format(d, 'EEE');
+}
+
+// =============================================================================
+// Timezone-aware functions
+// =============================================================================
+
+/**
+ * Get the configured timezone from config.toml.
+ * Falls back to system timezone if not configured.
+ * @returns {string} IANA timezone identifier (e.g., "America/New_York")
+ */
+export function getConfiguredTimezone() {
+  try {
+    const config = getFullConfig();
+    return config.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+}
+
+/**
+ * Get current time in the configured timezone.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {TZDate} Current time as TZDate
+ */
+export function getCurrentTime(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  return new TZDate(new Date(), tz);
+}
+
+/**
+ * Format a date as ISO 8601 with timezone offset (e.g., "2025-12-10T19:31:32-05:00").
+ * This is the format used by time tracking entries.
+ * @param {Date|string} date - Date object or ISO string
+ * @param {string} [timezone] - Optional timezone (defaults to configured timezone)
+ * @returns {string} ISO 8601 datetime with timezone offset
+ */
+export function formatISO8601(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, "yyyy-MM-dd'T'HH:mm:ssxxx");
+}
+
+/**
+ * Get current time formatted as ISO 8601 with timezone offset.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Current time as ISO 8601 string
+ */
+export function getCurrentTimeISO(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  return format(now, "yyyy-MM-dd'T'HH:mm:ssxxx");
+}
+
+/**
+ * Get today's date as YYYY-MM-DD in the configured timezone.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Today's date
+ */
+export function getTodayDate(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  return format(now, 'yyyy-MM-dd');
+}
+
+/**
+ * Subtract seconds from a date in a timezone.
+ * Useful for calculating start time from duration.
+ * @param {Date|string} date - Date object or ISO string
+ * @param {number} seconds - Number of seconds to subtract
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Resulting time as ISO 8601 string
+ */
+export function subtractSecondsISO(date, seconds, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const tzDate = new TZDate(d, tz);
+  const result = subSeconds(tzDate, seconds);
+  return format(new TZDate(result, tz), "yyyy-MM-dd'T'HH:mm:ssxxx");
+}
+
+/**
+ * Get the start of a week range (7 days ago) in the configured timezone.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Date 7 days ago as YYYY-MM-DD
+ */
+export function getWeekAgoDate(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  const weekAgo = addDays(now, -7);
+  return format(new TZDate(weekAgo, tz), 'yyyy-MM-dd');
+}
+
+/**
+ * Format a time for display (e.g., "7:31 PM").
+ * @param {Date|string} date - Date object or ISO string
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Formatted time
+ */
+export function formatTime(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, 'h:mm a');
+}
+
+/**
+ * Format a time range for display (e.g., "7:31 PM - 8:45 PM").
+ * @param {Date|string} start - Start time
+ * @param {Date|string} end - End time
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Formatted time range
+ */
+export function formatTimeRange(start, end, timezone) {
+  return `${formatTime(start, timezone)} - ${formatTime(end, timezone)}`;
+}
+
+/**
+ * Get the start of today (midnight) in the configured timezone as a Unix timestamp.
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {number} Unix timestamp in milliseconds for start of today
+ */
+export function getStartOfDayTimestamp(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  const startOfToday = dfStartOfDay(now);
+  return new TZDate(startOfToday, tz).getTime();
+}
+
+/**
+ * Format a date/time for full display (e.g., "Thursday, December 11, 2025 at 10:30 AM EST").
+ * @param {Date|string} date - Date object or ISO string
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Formatted full datetime string
+ */
+export function formatFullDateTime(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, "EEEE, MMMM d, yyyy 'at' h:mm a zzz");
+}
+
+/**
+ * Get timezone offset string (e.g., "-05:00").
+ * @param {Date|string} [date] - Optional date (defaults to now)
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {string} Timezone offset
+ */
+export function getTimezoneOffset(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = date ? (typeof date === 'string' ? parseISO(date) : date) : new Date();
+  const tzDate = new TZDate(d, tz);
+  return format(tzDate, 'xxx');
 }

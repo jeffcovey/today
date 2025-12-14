@@ -91,22 +91,8 @@ else
 fi
 echo ""
 
-# Step 4: Check for config files
-echo "Step 4: Configuration Files"
-echo "---------------------------"
-
-if [ -f config/calendars.json ]; then
-    CAL_COUNT=$(grep -c '"url"' config/calendars.json 2>/dev/null || echo "0")
-    echo "✅ Calendar config found ($CAL_COUNT calendars)"
-else
-    echo "⚠️  No calendar config (optional)"
-    echo "   Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
-fi
-
-echo ""
-
-# Step 5: Claude CLI
-echo "Step 5: Claude CLI Authentication"
+# Step 4: Claude CLI
+echo "Step 4: Claude CLI Authentication"
 echo "---------------------------------"
 if command -v claude &> /dev/null; then
     echo "✅ Claude CLI is installed"
@@ -140,7 +126,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 SUCCESS_COUNT=0
 [ ! -z "$DOTENV_PRIVATE_KEY" ] && ((SUCCESS_COUNT++))
 [ ! -z "$TEST_VAR" ] && ((SUCCESS_COUNT++))
-[ -f config/calendars.json ] && ((SUCCESS_COUNT++))
 
 if [ $SUCCESS_COUNT -ge 2 ]; then
     echo "✅ Basic setup complete!"
@@ -159,6 +144,5 @@ else
     echo "  2. Test with: npx dotenvx get --all"
     echo ""
     echo "Optional steps:"
-    echo "  - Copy config/calendars.json.example to config/calendars.json and add your calendar URLs"
     echo "  - Authenticate Claude CLI"
 fi

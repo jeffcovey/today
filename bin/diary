@@ -1,0 +1,436 @@
+#!/usr/bin/env node
+
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import chalk from 'chalk';
+import { getDatabase } from '../src/database-service.js';
+import { getSourcesForType } from '../src/plugin-loader.js';
+import {
+  getTodayDate,
+  getWeekAgoDate,
+  formatDate
+} from '../src/date-utils.js';
+import {
+  parseArgs,
+  showSourceFilterError
+} from '../src/cli-utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+
+// Today command - show today's diary entries
+async function cmdToday(options = {}) {
+  const db = getDatabase();
+  const today = getTodayDate();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('diary', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'diary', allSources);
+      return;
+    }
+    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    WHERE date(date) = ?
+    ORDER BY date
+  `;
+  const params = [today];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE date(date) = ? AND source LIKE ?
+      ORDER BY date
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No diary entries for today');
+    return;
+  }
+
+  console.log(chalk.cyan("Today's Diary Entries") + ` (${today})`);
+  console.log('');
+
+  for (const entry of entries) {
+    displayEntry(entry);
+  }
+}
+
+// Week command - show this week's diary entries
+async function cmdWeek(options = {}) {
+  const db = getDatabase();
+  const weekStart = getWeekAgoDate();
+  const today = getTodayDate();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('diary', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'diary', allSources);
+      return;
+    }
+    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    WHERE date(date) >= ? AND date(date) <= ?
+    ORDER BY date DESC
+  `;
+  const params = [weekStart, today];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE date(date) >= ? AND date(date) <= ? AND source LIKE ?
+      ORDER BY date DESC
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No diary entries for this week');
+    return;
+  }
+
+  console.log(chalk.cyan("This Week's Diary Entries") + ` (${weekStart} to ${today})`);
+  console.log('');
+
+  for (const entry of entries) {
+    displayEntry(entry);
+  }
+
+  console.log('');
+  console.log(chalk.cyan('Total:') + ` ${entries.length} entries`);
+}
+
+// Recent command - show recent entries
+async function cmdRecent(options = {}) {
+  const db = getDatabase();
+  const limit = options.limit || 5;
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('diary', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'diary', allSources);
+      return;
+    }
+    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    ORDER BY date DESC
+    LIMIT ?
+  `;
+  const params = [limit];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE source LIKE ?
+      ORDER BY date DESC
+      LIMIT ?
+    `;
+    params.unshift(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No diary entries found');
+    return;
+  }
+
+  console.log(chalk.cyan('Recent Diary Entries'));
+  console.log('');
+
+  for (const entry of entries) {
+    displayEntry(entry);
+  }
+}
+
+// Search command - search diary entries
+async function cmdSearch(searchTerm, options = {}) {
+  if (!searchTerm) {
+    console.error(chalk.red('✗') + ' Usage: diary search "search term" [--limit N]');
+    process.exit(1);
+  }
+
+  const db = getDatabase();
+  const limit = options.limit || 10;
+
+  // Build query with optional source filter
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    WHERE text LIKE ?
+    ORDER BY date DESC
+    LIMIT ?
+  `;
+  const params = [`%${searchTerm}%`, limit];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE text LIKE ? AND source LIKE ?
+      ORDER BY date DESC
+      LIMIT ?
+    `;
+    params.splice(1, 0, `%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ` No entries matching "${searchTerm}"`);
+    return;
+  }
+
+  console.log(chalk.cyan(`Search Results for "${searchTerm}"`));
+  console.log('');
+
+  for (const entry of entries) {
+    displayEntry(entry, searchTerm);
+  }
+
+  console.log('');
+  console.log(chalk.cyan('Found:') + ` ${entries.length} entries`);
+}
+
+// On-this-day command - show entries from this date in previous years
+async function cmdOnThisDay(options = {}) {
+  const db = getDatabase();
+  const today = new Date();
+  const monthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    WHERE substr(date, 6, 5) = ?
+    ORDER BY date DESC
+  `;
+  const params = [monthDay];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE substr(date, 6, 5) = ? AND source LIKE ?
+      ORDER BY date DESC
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(chalk.blue('ℹ') + ` No entries on this day (${monthDay}) in previous years`);
+    return;
+  }
+
+  console.log(chalk.cyan(`On This Day (${monthDay})`));
+  console.log('');
+
+  for (const entry of entries) {
+    displayEntry(entry);
+  }
+
+  console.log('');
+  console.log(chalk.cyan('Total:') + ` ${entries.length} entries across ${new Set(entries.map(e => e.date.substring(0, 4))).size} years`);
+}
+
+// Stats command - show diary statistics
+async function cmdStats() {
+  const db = getDatabase();
+
+  const stats = db.prepare(`
+    SELECT
+      COUNT(*) as total_entries,
+      COUNT(DISTINCT date(date)) as unique_days,
+      MIN(date) as earliest_entry,
+      MAX(date) as latest_entry,
+      COUNT(CASE WHEN json_extract(metadata, '$.starred') = 1 THEN 1 END) as starred_entries,
+      COUNT(DISTINCT json_extract(metadata, '$.location.localityName')) as unique_locations
+    FROM diary
+  `).get();
+
+  const recentStats = db.prepare(`
+    SELECT
+      COUNT(CASE WHEN date(date) >= date('now', '-7 days') THEN 1 END) as recent_week,
+      COUNT(CASE WHEN date(date) >= date('now', '-30 days') THEN 1 END) as recent_month,
+      COUNT(CASE WHEN date(date) >= date('now', '-365 days') THEN 1 END) as recent_year
+    FROM diary
+  `).get();
+
+  console.log(chalk.cyan('Diary Statistics'));
+  console.log('');
+  console.log(`  Total entries: ${chalk.green(stats.total_entries)}`);
+  console.log(`  Unique days: ${chalk.green(stats.unique_days)}`);
+  console.log(`  Date range: ${stats.earliest_entry?.substring(0, 10)} to ${stats.latest_entry?.substring(0, 10)}`);
+  console.log('');
+  console.log(`  Recent entries:`);
+  console.log(`    Last 7 days: ${recentStats.recent_week}`);
+  console.log(`    Last 30 days: ${recentStats.recent_month}`);
+  console.log(`    Last year: ${recentStats.recent_year}`);
+  console.log('');
+  console.log(`  Starred entries: ${stats.starred_entries || 0}`);
+  console.log(`  Unique locations: ${stats.unique_locations || 0}`);
+}
+
+// Sync command - delegates to plugin system
+async function cmdSync() {
+  console.log(chalk.blue('ℹ') + ' Syncing diary plugins to database...');
+
+  try {
+    const result = execSync('bin/plugins sync --type diary', { encoding: 'utf8' });
+    // Strip dotenvx output and show result
+    const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+    console.log(lines.join('\n'));
+  } catch (error) {
+    if (error.stdout?.includes('No plugins of type')) {
+      console.log(chalk.yellow('⚠') + ' No diary plugins are enabled.');
+      console.log('');
+      console.log('To sync diary data, configure a plugin:');
+      console.log('');
+      console.log('  ' + chalk.cyan('bin/plugins configure'));
+    } else {
+      console.error(chalk.red('✗') + ' Sync failed:', error.message);
+      process.exit(1);
+    }
+  }
+}
+
+// Helper to display a single entry
+function displayEntry(entry, highlightTerm = null) {
+  const { date, text, metadata } = entry;
+  const dateStr = date.substring(0, 10);
+  const timeStr = date.substring(11, 16);
+
+  // Parse metadata
+  let meta = {};
+  try {
+    meta = metadata ? JSON.parse(metadata) : {};
+  } catch (e) {}
+
+  // Header line with date and location
+  let header = chalk.yellow(`${dateStr} ${timeStr}`);
+  if (meta.location?.localityName) {
+    header += chalk.gray(` • ${meta.location.localityName}`);
+  }
+  if (meta.starred) {
+    header += chalk.yellow(' ⭐');
+  }
+
+  console.log(header);
+
+  // Weather info if available
+  if (meta.weather?.conditionsDescription) {
+    const temp = meta.weather.temperatureCelsius;
+    const tempF = temp !== undefined ? Math.round(temp * 9/5 + 32) : null;
+    const weatherStr = tempF !== null
+      ? `${meta.weather.conditionsDescription}, ${tempF}°F`
+      : meta.weather.conditionsDescription;
+    console.log(chalk.gray(`  ${weatherStr}`));
+  }
+
+  // Entry text (truncated for list view)
+  let displayText = text;
+
+  // Highlight search term if provided
+  if (highlightTerm) {
+    const regex = new RegExp(`(${highlightTerm})`, 'gi');
+    displayText = displayText.replace(regex, chalk.yellow('$1'));
+  }
+
+  // Truncate long entries
+  const maxLength = 500;
+  if (displayText.length > maxLength) {
+    displayText = displayText.substring(0, maxLength) + '...';
+  }
+
+  // Indent the text
+  const lines = displayText.split('\n').map(l => '  ' + l);
+  console.log(lines.join('\n'));
+  console.log('');
+}
+
+// Main command handler
+const { command, positional, options } = parseArgs();
+
+switch (command) {
+  case 'today':
+    await cmdToday(options);
+    break;
+  case 'week':
+    await cmdWeek(options);
+    break;
+  case 'recent':
+    await cmdRecent(options);
+    break;
+  case 'search':
+    await cmdSearch(positional.join(' '), options);
+    break;
+  case 'on-this-day':
+  case 'otd':
+    await cmdOnThisDay(options);
+    break;
+  case 'stats':
+    await cmdStats();
+    break;
+  case 'sync':
+    await cmdSync();
+    break;
+  default:
+    console.log('Diary CLI');
+    console.log('');
+    console.log('Usage: diary [command] [options]');
+    console.log('');
+    console.log('Commands:');
+    console.log('  today [--source NAME]       Show today\'s entries');
+    console.log('  week [--source NAME]        Show this week\'s entries');
+    console.log('  recent [--limit N]          Show recent entries (default: 5)');
+    console.log('  search TERM [--limit N]     Search entries');
+    console.log('  on-this-day, otd            Show entries from this date in past years');
+    console.log('  stats                       Show diary statistics');
+    console.log('  sync                        Sync all diary plugins to database');
+    console.log('');
+    console.log('Options:');
+    console.log('  --source NAME               Filter by plugin source');
+    console.log('  --limit N                   Limit number of results');
+    console.log('');
+    console.log('Examples:');
+    console.log('  diary today');
+    console.log('  diary week');
+    console.log('  diary recent --limit 10');
+    console.log('  diary search "Florida"');
+    console.log('  diary on-this-day');
+    console.log('  diary stats');
+    console.log('');
+}

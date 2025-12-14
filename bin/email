@@ -46,8 +46,7 @@ Promise.all([
 ]).then(([{ EmailDownloader }, { EmailManager }, { EmailOrganizer }]) => {
   program
     .name('email')
-    .description('Email management CLI for downloading and managing emails')
-    .version('1.0.0');
+    .description('Email management CLI for downloading and managing emails');
 
   program
     .command('download')

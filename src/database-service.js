@@ -30,9 +30,6 @@ export class DatabaseService {
     this.dbPath = path.resolve(dbPath);
     this.localDb = null;
 
-    // Configuration
-    this.readOnly = options.readOnly || false;
-
     this.init();
 
     // Store as singleton

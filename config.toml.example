@@ -14,8 +14,8 @@
 #   - Common abbreviations: "EST", "PST", "GMT" (converted to DST-aware zones)
 # timezone = "America/New_York"
 
-# Your home location (used in daily reviews)
-# home_location = "Your City, State"
+# Your current location (update when traveling)
+# location = "Your City, State"
 
 # =============================================================================
 # User Profile (for personalized daily reviews)
@@ -27,6 +27,9 @@
 
 # Your email (used for git commits in devcontainer)
 # email = "your@email.com"
+
+# Your home location (where you normally live)
+# home_location = "Your City, State"
 
 # Brief description of your work/focus (shown in daily reviews)
 # vocation = "Software engineer focused on web applications"
@@ -129,6 +132,24 @@
 # ]
 
 # =============================================================================
+# Tags / Topics (Optional)
+# =============================================================================
+# Define your preferred topic tags for categorizing entries.
+# These are used by plugins with auto_add_topics enabled.
+# Tags discovered in existing data are also used, so this list is additive.
+
+[tags]
+# topics = [
+#   "programming",
+#   "meetings",
+#   "email",
+#   "reading",
+#   "exercise",
+#   "personal_admin",
+#   "learning",
+# ]
+
+# =============================================================================
 # Plugins
 # =============================================================================
 # Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
@@ -158,3 +179,92 @@
 
 # [plugins.streaks-habits.default]
 # enabled = true
+
+# [plugins.resilio-conflict-cleanup.default]
+# enabled = true
+# directory = "vault"
+
+# [plugins.markdownlint-cleanup.default]
+# enabled = true
+# directory = "vault/**/*.md"
+
+# [plugins.dayone-diary.default]
+# enabled = true
+# journal_file = "vault/logs/Journal.json"
+
+# [plugins.github-issues.default]
+# enabled = true
+# repository = "owner/repo"
+# include_closed = false
+# limit = 100
+
+# [plugins.front-conversations.default]
+# enabled = true
+# inbox_ids = ""  # Comma-separated inbox IDs, or empty for all
+# include_archived = false
+# limit = 100
+
+# [plugins.sentry-issues.default]
+# enabled = true
+# organization = "your-org-slug"
+# project = ""  # Optional: filter to specific project
+# query = "is:unresolved"
+# limit = 100
+
+# [plugins.vault-changes.default]
+# enabled = true
+# directory = "vault"
+# excludeDirs = ".sync,templates,.git,.git.nosync,.obsidian,.trash"
+
+# -----------------------------------------------------------------------------
+# Public Calendars (iCal feeds - read-only)
+# -----------------------------------------------------------------------------
+# Sync events from public iCal URLs (TripIt, Airbnb, etc.)
+
+# [plugins.public-calendars.tripit]
+# enabled = true
+# name = "TripIt"
+# url = "https://www.tripit.com/feed/ical/private/YOUR_KEY/tripit.ics"
+# days_back = 7
+# days_forward = 90
+# ai_instructions = """
+# This calendar has confirmed travel plans.
+# Remind me to pack the day before each trip.
+# """
+
+# [plugins.public-calendars.airbnb]
+# enabled = true
+# name = "Airbnb"
+# url = "https://www.airbnb.com/calendar/ical/YOUR_LISTING_ID.ics?s=YOUR_SECRET"
+# ai_instructions = """
+# These are guest bookings. Check-in is at 3pm, checkout at noon.
+# Remind me to prepare the room before check-in and plan cleaning
+# after checkout.
+# """
+
+# -----------------------------------------------------------------------------
+# Google Calendar (read/write via service account)
+# -----------------------------------------------------------------------------
+# Sync events from Google Calendar. Run 'bin/plugins info google-calendar' for setup.
+# Use source names with bin/calendar: 'bin/calendar add "Meeting" -c personal ...'
+
+# [plugins.google-calendar.personal]
+# enabled = true
+# calendar_id = "your-email@gmail.com"
+# days_back = 7
+# days_forward = 30
+
+# [plugins.google-calendar.work]
+# enabled = true
+# calendar_id = "work-calendar-id@group.calendar.google.com"
+# days_forward = 14
+# ai_instructions = """
+# This is my work calendar.
+# Prioritize these events in daily planning.
+# """
+
+# [plugins.markdown-tasks.default]
+# enabled = true
+# directory = "vault"
+# exclude_paths = "templates,.obsidian"
+# include_completed = true

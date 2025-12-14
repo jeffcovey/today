@@ -1,0 +1,50 @@
+# Markdown Tasks Plugin
+# Syncs Obsidian-style markdown tasks to database
+
+name = "markdown-tasks"
+displayName = "Markdown Tasks"
+description = "Sync Obsidian-style markdown tasks to database"
+type = "tasks"
+
+requiredEnv = []
+
+longDescription = """
+Syncs tasks from markdown files in your vault to the database.
+
+Tasks use Obsidian Tasks plugin format:
+```
+- [ ] Task title 🔺 #stage/front-stage #topic/programming ➕ 2025-12-09 📅 2025-12-15
+- [x] Completed task ✅ 2025-12-10
+```
+
+Supported markers:
+- Priority: 🔺 (highest), ⏫ (high), 🔼 (medium), 🔽 (low), ⏬ (lowest)
+- Stage: #stage/front-stage, #stage/back-stage, #stage/off-stage
+- Topics: #topic/topic-name (multiple allowed)
+- Dates: ➕ (created), 📅 (due), ⏳ (scheduled), ✅ (completed)
+- Recurrence: 🔁 every day/week/month/etc.
+"""
+
+aiInstructions = ""
+
+[commands]
+read = "./read.js"
+write = "./write.js"
+
+[settings]
+directory = { type = "string", default = "vault", description = "Root directory to scan for tasks" }
+exclude_paths = { type = "string", default = "templates,.obsidian", description = "Comma-separated paths to exclude" }
+include_completed = { type = "boolean", default = true, description = "Include completed tasks in sync" }
+default_task_file = { type = "string", default = "vault/tasks/tasks.md", description = "Default file for new tasks" }
+
+# Classification capabilities (plugin declares support)
+supports_stage_classification = { type = "boolean", default = true, description = "Plugin can classify tasks by stage" }
+supports_topic_classification = { type = "boolean", default = true, description = "Plugin can add topic tags to tasks" }
+supports_priority_classification = { type = "boolean", default = true, description = "Plugin can assign priority to tasks" }
+
+# Auto-enhancement on sync (user enables per-source)
+auto_classify_stages = { type = "boolean", default = false, description = "Automatically add stage tags to tasks on sync" }
+auto_add_date_created = { type = "boolean", default = false, description = "Automatically add created date (➕) to tasks on sync" }
+auto_add_priority = { type = "boolean", default = false, description = "Automatically add priority emojis to tasks on sync" }
+auto_archive_completed = { type = "boolean", default = false, description = "Automatically archive completed tasks and rebalance files on sync" }
+max_tasks_per_file = { type = "number", default = 50, description = "Maximum tasks per file before rebalancing to numbered files" }

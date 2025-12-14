@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+
+/**
+ * Context CLI - Display contextual information from context plugins
+ *
+ * Context plugins provide ephemeral data that doesn't persist in the database.
+ * They generate real-time contextual information for AI and daily reviews.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
+import chalk from 'chalk';
+import { getSourcesForType } from '../src/plugin-loader.js';
+import { parseArgs } from '../src/cli-utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+
+/**
+ * Run a single context plugin and return its output
+ */
+async function runContextPlugin(pluginName, sourceId) {
+  const pluginPath = path.join(PROJECT_ROOT, 'plugins', pluginName);
+  const readScript = path.join(pluginPath, 'read.js');
+
+  if (!fs.existsSync(readScript)) {
+    return null;
+  }
+
+  try {
+    // Run from project root so relative paths work correctly
+    const output = execSync(`node "${readScript}"`, {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8',
+      timeout: 30000
+    });
+
+    return JSON.parse(output);
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+/**
+ * Format vault-changes plugin output
+ */
+function formatVaultChanges(data) {
+  if (!data.files || data.files.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No files changed today');
+    return;
+  }
+
+  console.log(chalk.cyan('Files Changed Today') + ` (${data.count} files)`);
+  console.log('');
+
+  for (const file of data.files) {
+    const time = new Date(file.mtimeMs).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    if (file.title) {
+      console.log(`  ${chalk.gray(time)} ${chalk.white(file.path)}`);
+      console.log(`         ${chalk.yellow(file.title)}`);
+    } else {
+      console.log(`  ${chalk.gray(time)} ${chalk.white(file.path)}`);
+    }
+  }
+}
+
+/**
+ * Default formatter for unknown context plugins
+ */
+function formatDefault(pluginName, data) {
+  console.log(chalk.cyan(pluginName));
+  console.log('');
+  console.log(JSON.stringify(data, null, 2));
+}
+
+// Default command - show all context plugin outputs
+async function cmdDefault(options = {}) {
+  const { sources, allSources } = await getSourcesForType('context', options.source);
+
+  if (sources.length === 0) {
+    if (options.source) {
+      console.log(chalk.yellow('⚠') + ` No context plugins matching "${options.source}"`);
+      console.log('');
+      console.log('Available sources:');
+      for (const s of allSources) {
+        console.log(`  - ${s.sourceId}`);
+      }
+    } else {
+      console.log(chalk.blue('ℹ') + ' No context plugins enabled');
+      console.log('');
+      console.log('Context plugins provide real-time information like vault changes.');
+      console.log('Enable them in config.toml under [plugins.<name>.<source>]');
+    }
+    return;
+  }
+
+  for (let i = 0; i < sources.length; i++) {
+    const { sourceId, plugin } = sources[i];
+    const pluginName = plugin.name;
+
+    const data = await runContextPlugin(pluginName, sourceId);
+
+    if (!data) {
+      console.log(chalk.yellow('⚠') + ` Could not run ${pluginName}`);
+      continue;
+    }
+
+    if (data.error) {
+      console.log(chalk.red('✗') + ` ${pluginName}: ${data.error}`);
+      continue;
+    }
+
+    // Use specific formatter if available
+    if (pluginName === 'vault-changes') {
+      formatVaultChanges(data);
+    } else {
+      formatDefault(pluginName, data);
+    }
+
+    // Add separator between plugins
+    if (i < sources.length - 1) {
+      console.log('');
+      console.log(chalk.gray('─'.repeat(50)));
+      console.log('');
+    }
+  }
+}
+
+// List command - show available context plugins
+async function cmdList() {
+  const { sources } = await getSourcesForType('context');
+
+  if (sources.length === 0) {
+    console.log(chalk.blue('ℹ') + ' No context plugins enabled');
+    return;
+  }
+
+  console.log(chalk.cyan('Context Plugins'));
+  console.log('');
+
+  for (const { sourceId, pluginName, config } of sources) {
+    console.log(`  ${chalk.green('●')} ${sourceId}`);
+    if (config?.description) {
+      console.log(`    ${chalk.gray(config.description)}`);
+    }
+  }
+}
+
+// Help text
+function showHelp() {
+  console.log('Context CLI');
+  console.log('');
+  console.log('Usage: context <command> [options]');
+  console.log('');
+  console.log('Commands:');
+  console.log('  show [--source NAME]        Show all context plugin outputs');
+  console.log('  list                        List available context plugins');
+  console.log('');
+  console.log('Options:');
+  console.log('  --source NAME               Filter by plugin source');
+  console.log('  -h, --help                  Show this help');
+  console.log('');
+  console.log('Context plugins provide ephemeral data (not stored in database):');
+  console.log('  - vault-changes: Files modified or added today');
+  console.log('');
+  console.log('Examples:');
+  console.log('  context show                Show all context');
+  console.log('  context list                List enabled plugins');
+  console.log('  context show --source vault Filter by source name');
+  console.log('');
+}
+
+// Main command handler
+const { command, options } = parseArgs();
+
+// Handle help flag
+if (options.help || options.h) {
+  showHelp();
+  process.exit(0);
+}
+
+switch (command) {
+  case 'show':
+    await cmdDefault(options);
+    break;
+  case 'list':
+    await cmdList();
+    break;
+  default:
+    showHelp();
+}

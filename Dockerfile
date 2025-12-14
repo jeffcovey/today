@@ -19,7 +19,6 @@ RUN npm install --build-from-source
 COPY src/ ./src/
 COPY bin/ ./bin/
 COPY config/ ./config/
-COPY TODAY.md ./
 
 # Make all CLI scripts executable
 RUN chmod +x ./bin/*

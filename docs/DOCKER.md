@@ -11,7 +11,7 @@ git clone https://github.com/OlderGay-Men/today.git
 cd today
 ```
 
-2. Run the setup script:
+1. Run the setup script:
 
 ```bash
 bin/docker-setup
@@ -37,7 +37,6 @@ Inside the container, run your commands:
 bin/sync       # Sync all data sources
 bin/today      # Run daily review with Claude
 bin/status     # Check task progress
-bin/mark-done  # Mark tasks as complete
 ```
 
 ### Updating

@@ -426,17 +426,18 @@ setup_calendar() {
     # Public Calendar URLs
     echo "🌐 Public Calendar URLs"
     echo "-----------------------"
-    if [ -f config/calendars.json ]; then
-        CALENDAR_COUNT=$(grep -c '"url"' config/calendars.json 2>/dev/null || echo "0")
-        print_status "✅ Found $CALENDAR_COUNT public calendar URL(s) configured"
-        echo "   Edit config/calendars.json to add/remove calendars"
+    CALENDAR_COUNT=$(grep -c '\[plugins.public-calendars\.' config.toml 2>/dev/null || echo "0")
+    if [ "$CALENDAR_COUNT" -gt 0 ]; then
+        print_status "✅ Found $CALENDAR_COUNT public calendar(s) configured in config.toml"
+        echo "   Edit config.toml to add/remove calendars"
     else
         echo "ℹ️  No public calendars configured"
         echo ""
-        echo "To add public calendar URLs:"
-        echo "1. Copy config/calendars.json.example to config/calendars.json"
-        echo "2. Add your calendar URLs (from Airbnb, TripIt, etc.)"
-        echo "3. Set 'enabled': true/false for each calendar"
+        echo "To add public calendar URLs, add to config.toml:"
+        echo "  [plugins.public-calendars.tripit]"
+        echo "  enabled = true"
+        echo "  name = \"TripIt\""
+        echo "  url = \"https://www.tripit.com/feed/ical/...\""
     fi
     echo ""
     

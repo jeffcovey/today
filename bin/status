@@ -50,6 +50,5 @@ fi
 echo "📝 Review file: $REVIEW_FILE"
 echo ""
 echo "Commands:"
-echo "  bin/mark-done <task or number>  # Mark task as complete"
 echo "  bin/today                        # Get updated recommendations"
 echo "  bin/progress <note>              # Add a progress note"

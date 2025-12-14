@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { discoverPlugins } from '../src/plugin-loader.js';
+import { discoverPlugins, getPluginAccess } from '../src/plugin-loader.js';
 import { getSchema } from '../src/plugin-schemas.js';
 
 // Discover plugins before tests run
@@ -21,46 +21,48 @@ describe('All Plugins', () => {
       expect(plugin.displayName).toBeDefined();
       expect(plugin.description).toBeDefined();
       expect(plugin.type).toBeDefined();
-      expect(plugin.access).toBeDefined();
-      expect(['read-only', 'write-only', 'read-write']).toContain(plugin.access);
+      // access is now derived from commands, not stored in plugin.toml
+      const access = getPluginAccess(plugin);
+      expect(['read-only', 'write-only', 'read-write', 'none']).toContain(access);
     });
 
-    test('should have sync command if not read-only external data', () => {
-      // Plugins with sync commands should have them defined
-      if (plugin.commands?.sync) {
-        expect(plugin.commands.sync).toBeDefined();
+    test('should have read command if not read-only external data', () => {
+      // Plugins with read commands should have them defined
+      if (plugin.commands?.read) {
+        expect(plugin.commands.read).toBeDefined();
       }
-      // Read-only plugins without sync are valid (e.g., apple-health-auto-export)
+      // Read-only plugins without read are valid (e.g., apple-health-auto-export)
       // They provide AI instructions for querying external data
     });
 
-    test('should have sync command that exists and is executable if defined', () => {
-      // Skip if no sync command (read-only plugins)
-      if (!plugin.commands?.sync) {
+    test('should have read command that exists and is executable if defined', () => {
+      // Skip if no read command (read-only plugins)
+      if (!plugin.commands?.read) {
         return;
       }
-      const syncPath = path.join(plugin._path, plugin.commands.sync);
-      expect(fs.existsSync(syncPath)).toBe(true);
+      const readPath = path.join(plugin._path, plugin.commands.read);
+      expect(fs.existsSync(readPath)).toBe(true);
 
-      const stats = fs.statSync(syncPath);
+      const stats = fs.statSync(readPath);
       // Check if file has execute permission (owner, group, or other)
       const isExecutable = (stats.mode & 0o111) !== 0;
       expect(isExecutable).toBe(true);
     });
 
-    test('should have a schema defined for its type if it has sync', () => {
-      // Only plugins that sync data need schemas
-      if (!plugin.commands?.sync) {
+    test('should have a schema defined for its type if it stores data', () => {
+      // Only plugins that read and store data need schemas
+      // Utility plugins don't store data, they just run cleanup operations
+      if (!plugin.commands?.read || plugin.type === 'utility') {
         return;
       }
       const schema = getSchema(plugin.type);
       expect(schema).not.toBeNull();
     });
 
-    test('should have configSchema if it has config options', () => {
-      // configSchema is optional, but if present should be an object
-      if (plugin.configSchema) {
-        expect(typeof plugin.configSchema).toBe('object');
+    test('should have settings if it has config options', () => {
+      // settings is optional, but if present should be an object
+      if (plugin.settings) {
+        expect(typeof plugin.settings).toBe('object');
       }
     });
   });

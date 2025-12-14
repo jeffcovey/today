@@ -26,7 +26,6 @@ alias gl='git log --oneline -10'
 alias sync='bin/sync'
 alias today='bin/today'
 alias status='bin/status'
-alias mark='bin/mark-done'
 alias progress='bin/progress'
 
 # Configure git identity from config.toml if available
@@ -59,7 +58,6 @@ echo "Quick commands:"
 echo "  today    - Run daily review"
 echo "  sync     - Sync all data"
 echo "  status   - Check task progress"
-echo "  mark     - Mark task as done"
 echo "  gp       - Git pull"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

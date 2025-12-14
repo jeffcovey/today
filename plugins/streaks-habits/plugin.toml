@@ -1,48 +1,51 @@
 # Streaks Habits Plugin
-# Provides AI access to habit tracking data from the Streaks iOS app
+# Syncs habit tracking data from the Streaks iOS app backup files
 
 name = "streaks-habits"
 displayName = "Streaks Habits"
 description = "Daily habit tracking from the Streaks iOS app"
 type = "habits"
-access = "read-only"
 
 requiredEnv = []
 
 longDescription = """
-Provides access to daily habit data from the Streaks iOS app (https://streaksapp.com).
+Syncs habits from Streaks app backup files (.streaks) to the database.
 
-Streaks is a habit tracking app that helps you build good habits by tracking daily tasks.
-It syncs uncompleted tasks to a markdown file in your vault.
+Streaks is a habit tracking app for iOS (https://streaksapp.com).
+Export your data by going to Settings > Data > Export in the app.
+Save the .streaks file to your vault/logs directory.
 
-Setup:
-1. Install Streaks on your iOS device from the App Store
-2. Configure Streaks to export to your vault via Shortcuts or manual export
-3. The export file should be saved to `vault/logs/Streaks.md`
+The plugin reads the latest .streaks file and extracts:
+- Habit definitions (name, category, target type)
+- Completion history for the last N days (configurable)
+- Current streak calculations
 
-The file contains one habit per line, with optional duration:
-- Simple habit: `Do Tai Chi Standing`
-- Habit with duration: `Read Offline, 2m 30s`
-- Apple Health linked (♥︎ prefix): `♥︎ Walk 6,500 Steps`
-
-Items in this file are uncompleted habits for the day.
+Each database entry represents one habit on one day.
 """
 
 aiInstructions = """
-Daily habit data from Streaks is in `vault/logs/Streaks.md`.
+Habit data from Streaks shows daily completion status for recurring habits.
 
-Format: One habit per line
-- Simple: `Habit name`
-- With duration: `Habit name, Xm Ys`
-- Apple Health linked: `♥︎ Habit name` (these sync with Apple Health)
+Key fields:
+- title: Habit name
+- date: Which day (YYYY-MM-DD)
+- status: completed, pending, skipped, or partial
+- value: Duration in seconds (for timer-based habits)
+- category: Habit category/group
+- metadata.current_streak: Days in a row completed
 
-The file shows UNCOMPLETED habits for today. An empty file means all habits are done.
+Query today's habits:
+  SELECT title, status, json_extract(metadata, '$.current_streak') as streak
+  FROM habits WHERE date = date('now') ORDER BY status, title
 
-When reviewing daily progress:
-1. Read `vault/logs/Streaks.md` to see remaining habits
-2. Habits with ♥︎ prefix are linked to Apple Health metrics
-3. Suggest scheduling time blocks for uncompleted habits
+Find habits with long streaks:
+  SELECT DISTINCT title, json_extract(metadata, '$.current_streak') as streak
+  FROM habits WHERE date = date('now') ORDER BY streak DESC
 """
 
-# No sync command - data arrives via Streaks app export
-# No configSchema needed - file location is fixed
+[commands]
+read = "./read.js"
+
+[settings]
+logs_directory = { type = "string", default = "vault/logs", description = "Directory containing .streaks backup files" }
+retention_days = { type = "number", default = 30, description = "Days of history to keep in database" }
