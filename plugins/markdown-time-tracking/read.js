@@ -24,21 +24,27 @@ const cutoffYearMonth = cutoffDate.toISOString().substring(0, 7);
 // Parse last sync time
 const lastSyncDate = lastSyncTime ? new Date(lastSyncTime) : null;
 
-// Find markdown files
-let allFiles;
-try {
-  allFiles = fs.readdirSync(timeDir)
-    .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
-    .filter(f => f.substring(0, 7) >= cutoffYearMonth)
-    .map(f => ({
-      name: f,
-      path: path.join(timeDir, f),
-      relativePath: path.join(directory, f)
-    }));
-} catch (error) {
-  console.error(JSON.stringify({ error: `Cannot read directory: ${error.message}` }));
-  process.exit(1);
+// Check if directory exists
+if (!fs.existsSync(timeDir)) {
+  console.log(JSON.stringify({
+    entries: [],
+    metadata: {
+      message: `Time tracking directory not found: ${directory}`,
+      hint: 'Create the directory and add YYYY-MM.md files with time entries'
+    }
+  }));
+  process.exit(0);
 }
+
+// Find markdown files
+const allFiles = fs.readdirSync(timeDir)
+  .filter(f => f.match(/^\d{4}-\d{2}\.md$/))
+  .filter(f => f.substring(0, 7) >= cutoffYearMonth)
+  .map(f => ({
+    name: f,
+    path: path.join(timeDir, f),
+    relativePath: path.join(directory, f)
+  }));
 
 // Check which files need syncing based on modification time
 let filesToSync = allFiles;

@@ -23,6 +23,18 @@ const includeCompleted = config.include_completed !== false;
 
 const rootDir = path.join(projectRoot, directory);
 
+// Check if directory exists
+if (!fs.existsSync(rootDir)) {
+  console.log(JSON.stringify({
+    entries: [],
+    metadata: {
+      message: `Tasks directory not found: ${directory}`,
+      hint: 'Create the directory and add .md files with Obsidian-style tasks'
+    }
+  }));
+  process.exit(0);
+}
+
 // Parse last sync time
 const lastSyncDate = lastSyncTime ? new Date(lastSyncTime) : null;
 
