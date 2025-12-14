@@ -266,6 +266,11 @@ process.chdir(projectRoot);
 // ============================================================================
 
 async function checkAndRecoverDatabase() {
+  // Skip in tests for faster execution
+  if (process.env.SKIP_DB_HEALTH) {
+    return;
+  }
+
   console.log('🔍 Checking database health...');
   const result = await ensureHealthyDatabase({ verbose: true });
 

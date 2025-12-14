@@ -188,13 +188,6 @@
 # enabled = true
 # directory = "vault/**/*.md"
 
-# Database cleanup runs automatically to prevent disk bloat
-# Disable by setting enabled = false
-[plugins.database-cleanup.default]
-enabled = true
-# max_backups = 5         # Keep at most 5 backup files
-# max_data_size_mb = 500  # Clean up when .data exceeds 500 MB
-
 # [plugins.dayone-diary.default]
 # enabled = true
 # journal_file = "vault/logs/Journal.json"
