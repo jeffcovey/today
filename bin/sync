@@ -19,7 +19,6 @@ import fs from 'fs';
 import { execSync, spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
 import { ensureHealthyDatabase } from '../src/db-health.js';
 import {
   formatDate,
@@ -29,6 +28,7 @@ import {
   addDaysToDate,
 } from '../src/date-utils.js';
 import {
+  colors,
   printStatus,
   printError,
   printInfo,
@@ -1113,9 +1113,9 @@ async function runSyncStep(header, func, successMsg) {
 
 async function main() {
   console.log('');
-  console.log(chalk.blue('╔═══════════════════════════════════════╗'));
-  console.log(chalk.blue('║       TODAY - Full Data Sync          ║'));
-  console.log(chalk.blue('╚═══════════════════════════════════════╝'));
+  console.log(colors.blue('╔═══════════════════════════════════════╗'));
+  console.log(colors.blue('║       TODAY - Full Data Sync          ║'));
+  console.log(colors.blue('╚═══════════════════════════════════════╝'));
   console.log('');
   console.log('Synchronizing all data sources...');
   console.log(`Started at: ${formatDateTime(new Date())}`);
@@ -1254,7 +1254,7 @@ switch (command) {
           fs.writeFileSync(weekFile, content);
           printStatus('Weekly summary generated successfully!');
           console.log('');
-          console.log(chalk.gray('Summary:'));
+          console.log(colors.gray('Summary:'));
           console.log(summary);
           console.log('');
         } else {
@@ -1378,9 +1378,9 @@ switch (command) {
   case '--help':
   case '-h':
     console.log(`
-${chalk.bold('Today - Full Data Sync')}
+${colors.bold('Today - Full Data Sync')}
 
-${chalk.gray('Usage:')}
+${colors.gray('Usage:')}
   bin/sync                              Run full sync
   bin/sync --plugins [name,name,...]    Sync specific plugins (or all if no names)
   bin/sync --cancel-old-plan-tasks      Clean up old plan files
@@ -1391,11 +1391,11 @@ ${chalk.gray('Usage:')}
   bin/sync --quick-email                Download last 24 hours of email
   bin/sync --help                       Show this help
 
-${chalk.gray('Description:')}
+${colors.gray('Description:')}
   Synchronizes all data sources for the Today system including vault files,
   database, task management, and plan file cleanup.
 
-${chalk.gray('Data sources synced:')}
+${colors.gray('Data sources synced:')}
   • Vault files
   • Local task manager
   • Email inbox

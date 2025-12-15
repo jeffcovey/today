@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import chalk from 'chalk';
+import { colors } from './cli-utils.js';
 import { ClaudeCLIAdapter } from './claude-cli-adapter.js';
 
 export class NaturalLanguageSearch {
@@ -121,7 +121,7 @@ Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
       try {
         return await this.searchWithOllama(items, query, databaseType);
       } catch (error) {
-        console.log(chalk.yellow('AI search not available, using basic search'));
+        console.log(colors.yellow('AI search not available, using basic search'));
         return this.basicSearch(items, query, databaseType);
       }
     }
@@ -257,7 +257,7 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(chalk.red('Ollama API error:'), errorText);
+        console.error(colors.red('Ollama API error:'), errorText);
         throw new Error('Ollama request failed');
       }
 
@@ -279,7 +279,7 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
         databaseType
       };
     } catch (error) {
-      console.error(chalk.red('Ollama error:'), error.message);
+      console.error(colors.red('Ollama error:'), error.message);
       throw error;
     }
   }
@@ -334,7 +334,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         // If that fails, look for a JSON array in the text
         const jsonMatch = content.match(/\[[\d,\s]+\]/);
         if (!jsonMatch) {
-          console.error(chalk.red('Could not parse Claude response:'), content);
+          console.error(colors.red('Could not parse Claude response:'), content);
           throw new Error('Invalid response format');
         }
         indices = JSON.parse(jsonMatch[0]);
@@ -351,8 +351,8 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         databaseType
       };
     } catch (error) {
-      console.error(chalk.red('Claude API error:'), error.message);
-      console.log(chalk.yellow('Falling back to basic search'));
+      console.error(colors.red('Claude API error:'), error.message);
+      console.log(colors.yellow('Falling back to basic search'));
       return this.basicSearch(items, query, databaseType);
     }
   }
@@ -424,7 +424,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
 
     // If no matches, return random sample
     if (results.length === 0 && items.length > 0) {
-      console.log(chalk.yellow('No keyword matches found, returning random items'));
+      console.log(colors.yellow('No keyword matches found, returning random items'));
       const shuffled = [...items].sort(() => Math.random() - 0.5);
       return {
         results: shuffled.slice(0, 10),

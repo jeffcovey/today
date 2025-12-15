@@ -1,5 +1,5 @@
 import { ImapFlow } from 'imapflow';
-import chalk from 'chalk';
+import { colors } from './cli-utils.js';
 import { SQLiteCache } from './sqlite-cache.js';
 import { NaturalLanguageSearch } from './natural-language-search.js';
 // TODO: Replace inquirer usage with @clack/prompts when this file is updated
@@ -33,13 +33,13 @@ export class EmailManager {
     });
 
     await this.client.connect();
-    console.log(chalk.green('✅ Connected to email server'));
+    console.log(colors.green('✅ Connected to email server'));
   }
 
   async disconnect() {
     if (this.client) {
       await this.client.logout();
-      console.log(chalk.green('✅ Disconnected from email server'));
+      console.log(colors.green('✅ Disconnected from email server'));
     }
   }
 
@@ -196,7 +196,7 @@ export class EmailManager {
     try {
       // Move messages
       await this.client.messageMove(uids, targetFolder, { uid: true });
-      console.log(chalk.green(`✅ Moved ${uids.length} emails to ${targetFolder}`));
+      console.log(colors.green(`✅ Moved ${uids.length} emails to ${targetFolder}`));
 
       // Update local database to reflect the move
       try {
@@ -207,7 +207,7 @@ export class EmailManager {
         }
       } catch (dbError) {
         // Don't throw the error - the move succeeded, this is just local bookkeeping
-        console.log(chalk.yellow(`Note: Could not update local cache: ${dbError.message}`));
+        console.log(colors.yellow(`Note: Could not update local cache: ${dbError.message}`));
       }
     } finally {
       lock.release();
@@ -236,12 +236,12 @@ export class EmailManager {
       await this.moveEmailsFromFolder(uids, sourceFolder, trashPath);
     } catch (error) {
       // If move fails, try marking as deleted
-      console.log(chalk.yellow(`Could not move to ${trashPath}: ${error.message}`));
-      console.log(chalk.yellow('Marking as deleted instead...'));
+      console.log(colors.yellow(`Could not move to ${trashPath}: ${error.message}`));
+      console.log(colors.yellow('Marking as deleted instead...'));
       const lock = await this.client.getMailboxLock(sourceFolder);
       try {
         await this.client.messageFlagsAdd(uids, ['\\Deleted'], { uid: true });
-        console.log(chalk.green(`✅ Marked ${uids.length} emails as deleted`));
+        console.log(colors.green(`✅ Marked ${uids.length} emails as deleted`));
       } finally {
         lock.release();
       }
@@ -252,10 +252,10 @@ export class EmailManager {
   async conversationMode() {
     this.inConversationMode = true;
 
-    console.log(chalk.blue('\n💬 Email Conversation Mode'));
-    console.log(chalk.gray('Ask questions about your emails or request actions.'));
-    console.log(chalk.gray('Type "exit" to return to main menu.'));
-    console.log(chalk.gray('Use ↑↓ arrow keys to navigate command history.\n'));
+    console.log(colors.blue('\n💬 Email Conversation Mode'));
+    console.log(colors.gray('Ask questions about your emails or request actions.'));
+    console.log(colors.gray('Type "exit" to return to main menu.'));
+    console.log(colors.gray('Use ↑↓ arrow keys to navigate command history.\n'));
 
     // Check if we're in an interactive terminal
     const isInteractive = process.stdin.isTTY;
@@ -269,7 +269,7 @@ export class EmailManager {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: chalk.blue('You: '),
+      prompt: colors.blue('You: '),
       historySize: 100,
       removeHistoryDuplicates: true,
       terminal: true  // Ensure terminal mode is enabled for arrow keys
@@ -308,9 +308,9 @@ export class EmailManager {
         // Save history before exiting
         try {
           await fs.writeFile(historyFile, commandHistory.join('\n'));
-          console.log(chalk.gray(`Saved ${commandHistory.length} commands to history`));
+          console.log(colors.gray(`Saved ${commandHistory.length} commands to history`));
         } catch (error) {
-          console.error(chalk.red('Error saving history:'), error.message);
+          console.error(colors.red('Error saving history:'), error.message);
         }
         rl.close();
         return;
@@ -329,15 +329,15 @@ export class EmailManager {
         rl.pause();
         await this.handleConversation(query);
       } catch (error) {
-        console.error(chalk.red('Error:'), error.message);
-        console.error(chalk.gray('Stack trace:'), error.stack);
+        console.error(colors.red('Error:'), error.message);
+        console.error(colors.gray('Stack trace:'), error.stack);
       } finally {
         // Resume the readline interface
         if (!rl.closed) {
           rl.resume();
           rl.prompt();
         } else {
-          console.log(chalk.yellow('Readline interface was closed unexpectedly'));
+          console.log(colors.yellow('Readline interface was closed unexpectedly'));
         }
       }
     };
@@ -345,14 +345,14 @@ export class EmailManager {
     // Handle line input
     rl.on('line', (line) => {
       processQuery(line).catch(error => {
-        console.error(chalk.red('Query processing error:'), error.message);
+        console.error(colors.red('Query processing error:'), error.message);
         rl.prompt();
       });
     });
 
     // Handle errors
     rl.on('error', (error) => {
-      console.error(chalk.red('Readline error:'), error.message);
+      console.error(colors.red('Readline error:'), error.message);
       if (!rl.closed) {
         rl.prompt();
       }
@@ -361,7 +361,7 @@ export class EmailManager {
     // Create a promise that will resolve when the interface closes
     const closePromise = new Promise(resolve => {
       rl.on('close', async () => {
-        console.log(chalk.gray('\nExiting conversation mode...'));
+        console.log(colors.gray('\nExiting conversation mode...'));
         // Save history on any close event (including Ctrl+C)
         try {
           await fs.writeFile(historyFile, commandHistory.join('\n'));
@@ -383,7 +383,7 @@ export class EmailManager {
 
     // Handle SIGINT (Ctrl+C) gracefully
     rl.on('SIGINT', async () => {
-      console.log(chalk.gray('\n\nExiting...'));
+      console.log(colors.gray('\n\nExiting...'));
       await saveHistory();
       rl.close();
     });
@@ -437,7 +437,7 @@ export class EmailManager {
         folder: 'INBOX',
         limit: 10000
       });
-      console.log(chalk.blue(`\n📊 You have ${emails.length} emails in your INBOX\n`));
+      console.log(colors.blue(`\n📊 You have ${emails.length} emails in your INBOX\n`));
       return;
     }
 
@@ -456,7 +456,7 @@ export class EmailManager {
         });
 
         if (emails.length === 0) {
-          console.log(chalk.yellow(`No emails found from ${fromAddress}`));
+          console.log(colors.yellow(`No emails found from ${fromAddress}`));
           return;
         }
 
@@ -484,7 +484,7 @@ export class EmailManager {
           }
 
           await this.disconnect();
-          console.log(chalk.green(`✅ Successfully archived ${emails.length} emails\n`));
+          console.log(colors.green(`✅ Successfully archived ${emails.length} emails\n`));
         }
 
         // Restore readline after inquirer
@@ -506,11 +506,11 @@ export class EmailManager {
         .filter(s => s.length > 0);
 
       if (subjects.length === 0) {
-        console.log(chalk.yellow('No email subjects specified'));
+        console.log(colors.yellow('No email subjects specified'));
         return;
       }
 
-      console.log(chalk.gray(`Looking for emails with subjects: ${subjects.join(', ')}...`));
+      console.log(colors.gray(`Looking for emails with subjects: ${subjects.join(', ')}...`));
 
       // Get all recent emails to search through
       const allEmails = await this.getLocalEmails({
@@ -527,11 +527,11 @@ export class EmailManager {
       });
 
       if (matchingEmails.length === 0) {
-        console.log(chalk.yellow('No emails found matching those subjects'));
+        console.log(colors.yellow('No emails found matching those subjects'));
         return;
       }
 
-      console.log(chalk.blue(`\nFound ${matchingEmails.length} emails to delete:`));
+      console.log(colors.blue(`\nFound ${matchingEmails.length} emails to delete:`));
       matchingEmails.forEach(email => {
         console.log(`  • ${email.subject}`);
       });
@@ -539,27 +539,27 @@ export class EmailManager {
       const { confirm } = await inquirer.prompt([{
         type: 'confirm',
         name: 'confirm',
-        message: chalk.red(`⚠️  Delete these ${matchingEmails.length} emails?`),
+        message: colors.red(`⚠️  Delete these ${matchingEmails.length} emails?`),
         default: false
       }]);
 
       if (confirm) {
         try {
           await this.connect(process.env.EMAIL_ACCOUNT);
-          console.log(chalk.yellow(`Deleting ${matchingEmails.length} emails...`));
+          console.log(colors.yellow(`Deleting ${matchingEmails.length} emails...`));
 
           const uids = matchingEmails.map(e => e.uid).filter(uid => uid);
           if (uids.length > 0) {
             await this.deleteEmails(uids);
-            console.log(chalk.green(`✅ Deleted ${uids.length} emails\n`));
+            console.log(colors.green(`✅ Deleted ${uids.length} emails\n`));
           }
 
           await this.disconnect();
         } catch (error) {
-          console.error(chalk.red('Error deleting emails:'), error.message);
+          console.error(colors.red('Error deleting emails:'), error.message);
         }
       } else {
-        console.log(chalk.gray('Deletion cancelled\n'));
+        console.log(colors.gray('Deletion cancelled\n'));
       }
 
       // Restore readline after inquirer
@@ -582,7 +582,7 @@ export class EmailManager {
         });
 
         if (emails.length === 0) {
-          console.log(chalk.yellow(`No emails found from ${fromAddress}`));
+          console.log(colors.yellow(`No emails found from ${fromAddress}`));
           return;
         }
 
@@ -610,7 +610,7 @@ export class EmailManager {
           }
 
           await this.disconnect();
-          console.log(chalk.green(`✅ Successfully deleted ${emails.length} emails\n`));
+          console.log(colors.green(`✅ Successfully deleted ${emails.length} emails\n`));
         }
 
         // Restore readline after inquirer
@@ -635,22 +635,22 @@ export class EmailManager {
         });
 
         if (emails.length === 0) {
-          console.log(chalk.yellow(`No emails found from ${sender}`));
+          console.log(colors.yellow(`No emails found from ${sender}`));
           return;
         }
 
-        console.log(chalk.green(`\n📧 Subjects of emails from ${sender}:\n`));
+        console.log(colors.green(`\n📧 Subjects of emails from ${sender}:\n`));
       } else {
         emails = await this.getLocalEmails({ limit: 20 });
-        console.log(chalk.green(`\n📧 Recent email subjects:\n`));
+        console.log(colors.green(`\n📧 Recent email subjects:\n`));
       }
 
       emails.forEach((email, i) => {
         const date = new Date(email.date).toLocaleDateString();
         const subject = email.subject || '(no subject)';
         const from = email.from_name || email.from_address;
-        console.log(`${i + 1}. ${chalk.bold(subject)}`);
-        console.log(`   From: ${chalk.gray(from)} | Date: ${date}\n`);
+        console.log(`${i + 1}. ${colors.bold(subject)}`);
+        console.log(`   From: ${colors.gray(from)} | Date: ${date}\n`);
       });
 
       return;
@@ -669,17 +669,17 @@ export class EmailManager {
         });
 
         if (emails.length === 0) {
-          console.log(chalk.yellow(`No emails found from ${sender}`));
+          console.log(colors.yellow(`No emails found from ${sender}`));
           return;
         }
 
-        console.log(chalk.green(`\n📧 Found ${emails.length} emails from ${sender}:\n`));
+        console.log(colors.green(`\n📧 Found ${emails.length} emails from ${sender}:\n`));
 
         emails.forEach((email, i) => {
           const date = new Date(email.date).toLocaleDateString();
           const subject = email.subject || '(no subject)';
 
-          console.log(`${i + 1}. ${chalk.bold(subject)}`);
+          console.log(`${i + 1}. ${colors.bold(subject)}`);
           console.log(`   Date: ${date}\n`);
         });
 
@@ -708,17 +708,17 @@ export class EmailManager {
         .slice(0, 10); // Top 10
 
       if (sorted.length === 0) {
-        console.log(chalk.yellow('No emails found in INBOX'));
+        console.log(colors.yellow('No emails found in INBOX'));
         return;
       }
 
-      console.log(chalk.blue(`\n📊 Top senders by message count:\n`));
+      console.log(colors.blue(`\n📊 Top senders by message count:\n`));
 
       sorted.forEach(([key, count], i) => {
         const [name, address] = key.split('|||');
-        console.log(`${i + 1}. ${chalk.bold(name)} - ${chalk.cyan(count + ' messages')}`);
+        console.log(`${i + 1}. ${colors.bold(name)} - ${colors.cyan(count + ' messages')}`);
         if (name !== address) {
-          console.log(`   ${chalk.gray(address)}`);
+          console.log(`   ${colors.gray(address)}`);
         }
         console.log();
       });
@@ -744,11 +744,11 @@ export class EmailManager {
       });
 
       if (senderMap.size === 0) {
-        console.log(chalk.yellow('No emails found in INBOX'));
+        console.log(colors.yellow('No emails found in INBOX'));
         return;
       }
 
-      console.log(chalk.blue(`\n📧 Unique senders in INBOX (${senderMap.size} total):\n`));
+      console.log(colors.blue(`\n📧 Unique senders in INBOX (${senderMap.size} total):\n`));
 
       let count = 0;
       senderMap.forEach((name, address) => {
@@ -756,15 +756,15 @@ export class EmailManager {
         if (count <= 20) { // Show first 20
           // Format based on whether we have a separate name
           if (name && name !== address && !name.includes(address)) {
-            console.log(`  ${count}. ${chalk.bold(name)} <${chalk.gray(address)}>`);
+            console.log(`  ${count}. ${colors.bold(name)} <${colors.gray(address)}>`);
           } else {
-            console.log(`  ${count}. ${chalk.gray(address)}`);
+            console.log(`  ${count}. ${colors.gray(address)}`);
           }
         }
       });
 
       if (senderMap.size > 20) {
-        console.log(chalk.gray(`\n  ... and ${senderMap.size - 20} more`));
+        console.log(colors.gray(`\n  ... and ${senderMap.size - 20} more`));
       }
       console.log(); // Add final newline
 
@@ -804,22 +804,22 @@ export class EmailManager {
         
         if (emails.length > 0) {
           // Let Claude filter based on natural language
-          console.log(chalk.gray('🤖 Using AI to understand your request...'));
+          console.log(colors.gray('🤖 Using AI to understand your request...'));
           
           // Debug mode - show what we're sending to Claude
           if (process.env.DEBUG_AI) {
-            console.log(chalk.gray(`Sending ${emails.length} emails to AI for filtering`));
-            console.log(chalk.gray(`Sample: ${emails[0].from_address} - ${emails[0].subject}`));
+            console.log(colors.gray(`Sending ${emails.length} emails to AI for filtering`));
+            console.log(colors.gray(`Sample: ${emails[0].from_address} - ${emails[0].subject}`));
           }
           
           const filteredEmails = await this.nlSearch.filterWithClaude(emails, query, 'emails');
           
           if (process.env.DEBUG_AI) {
-            console.log(chalk.gray(`AI returned ${filteredEmails.length} emails`));
+            console.log(colors.gray(`AI returned ${filteredEmails.length} emails`));
           }
           
           if (filteredEmails.length === 0) {
-            console.log(chalk.yellow('No emails found matching your criteria.'));
+            console.log(colors.yellow('No emails found matching your criteria.'));
             return;
           }
           
@@ -828,7 +828,7 @@ export class EmailManager {
           return;
         }
       } catch (error) {
-        console.log(chalk.yellow('AI filtering failed, falling back to basic search...'));
+        console.log(colors.yellow('AI filtering failed, falling back to basic search...'));
         // Fall through to original intent-based handling
       }
     }
@@ -892,8 +892,8 @@ User query: "${query}"`;
       const jsonMatch = intentResponse.match(/\{[\s\S]*\}/);
       intent = JSON.parse(jsonMatch[0]);
     } catch (error) {
-      console.log(chalk.yellow('Could not determine intent, using basic search fallback'));
-      console.log(chalk.gray(`Error: ${error.message}`));
+      console.log(colors.yellow('Could not determine intent, using basic search fallback'));
+      console.log(colors.gray(`Error: ${error.message}`));
 
       // Fallback to simple keyword-based intent detection
       const lowerQuery = query.toLowerCase();
@@ -943,7 +943,7 @@ User query: "${query}"`;
         break;
         
       default:
-        console.log(chalk.yellow('I\'m not sure how to help with that. Try asking about finding, deleting, or moving emails.'));
+        console.log(colors.yellow('I\'m not sure how to help with that. Try asking about finding, deleting, or moving emails.'));
     }
   }
 
@@ -952,20 +952,20 @@ User query: "${query}"`;
     const emails = preFilteredEmails || await this.getLocalEmails({ ...this.buildFilter(params), limit: 10 });
 
     if (emails.length === 0) {
-      console.log(chalk.yellow('No emails found matching your criteria.'));
+      console.log(colors.yellow('No emails found matching your criteria.'));
       return;
     }
 
     // In conversation mode, just display the emails without interactive selection
     if (this.inConversationMode) {
-      console.log(chalk.green(`\n📧 Found ${emails.length} matching emails:\n`));
+      console.log(colors.green(`\n📧 Found ${emails.length} matching emails:\n`));
 
       emails.forEach((email, i) => {
         const date = new Date(email.date).toLocaleDateString();
         const subject = email.subject || '(no subject)';
         const from = email.from_name || email.from_address;
 
-        console.log(`${i + 1}. ${chalk.bold(subject)}`);
+        console.log(`${i + 1}. ${colors.bold(subject)}`);
         console.log(`   From: ${from} | Date: ${date}\n`);
       });
 
@@ -973,7 +973,7 @@ User query: "${query}"`;
     }
 
     // For non-conversation mode, show interactive selection
-    console.log(chalk.green(`\nFound ${emails.length} emails:`));
+    console.log(colors.green(`\nFound ${emails.length} emails:`));
 
     // Create choices for checkbox selection
     const emailChoices = emails.map((email, i) => {
@@ -981,7 +981,7 @@ User query: "${query}"`;
       const subject = email.subject || '(no subject)';
       const from = email.from_address.replace(/^"(.+)".*$/, '$1'); // Extract name from quoted email
       return {
-        name: `${chalk.bold(subject)} - ${from} (${date})`,
+        name: `${colors.bold(subject)} - ${from} (${date})`,
         value: email,
         short: subject.substring(0, 50)
       };
@@ -989,7 +989,7 @@ User query: "${query}"`;
 
     // Add cancel option
     emailChoices.push({
-      name: chalk.gray('[ Cancel ]'),
+      name: colors.gray('[ Cancel ]'),
       value: '__cancel__'
     });
 
@@ -1013,11 +1013,11 @@ User query: "${query}"`;
 
     // Check if cancelled
     if (selectedEmails.includes('__cancel__') || selectedEmails.length === 0) {
-      console.log(chalk.gray('Cancelled'));
+      console.log(colors.gray('Cancelled'));
       return;
     }
 
-    console.log(chalk.blue(`\nSelected ${selectedEmails.length} email${selectedEmails.length > 1 ? 's' : ''}`));
+    console.log(colors.blue(`\nSelected ${selectedEmails.length} email${selectedEmails.length > 1 ? 's' : ''}`));
 
     // Ask what to do with selected emails
     const { action } = await inquirer.prompt([{
@@ -1035,23 +1035,23 @@ User query: "${query}"`;
     if (action === 'view') {
       if (selectedEmails.length === 1) {
         const email = selectedEmails[0];
-        console.log(chalk.blue('\n--- Email Details ---'));
-        console.log(chalk.bold('From:'), email.from_address);
-        console.log(chalk.bold('To:'), email.to_address);
-        console.log(chalk.bold('Subject:'), email.subject);
-        console.log(chalk.bold('Date:'), new Date(email.date).toString());
-        console.log(chalk.bold('\nContent:'));
+        console.log(colors.blue('\n--- Email Details ---'));
+        console.log(colors.bold('From:'), email.from_address);
+        console.log(colors.bold('To:'), email.to_address);
+        console.log(colors.bold('Subject:'), email.subject);
+        console.log(colors.bold('Date:'), new Date(email.date).toString());
+        console.log(colors.bold('\nContent:'));
         console.log(email.text_content?.substring(0, 500) + '...\n');
       } else {
         // For multiple emails, show them one by one with navigation
         for (let i = 0; i < selectedEmails.length; i++) {
           const email = selectedEmails[i];
-          console.log(chalk.blue(`\n--- Email ${i + 1} of ${selectedEmails.length} ---`));
-          console.log(chalk.bold('From:'), email.from_address);
-          console.log(chalk.bold('To:'), email.to_address);
-          console.log(chalk.bold('Subject:'), email.subject);
-          console.log(chalk.bold('Date:'), new Date(email.date).toString());
-          console.log(chalk.bold('\nContent:'));
+          console.log(colors.blue(`\n--- Email ${i + 1} of ${selectedEmails.length} ---`));
+          console.log(colors.bold('From:'), email.from_address);
+          console.log(colors.bold('To:'), email.to_address);
+          console.log(colors.bold('Subject:'), email.subject);
+          console.log(colors.bold('Date:'), new Date(email.date).toString());
+          console.log(colors.bold('\nContent:'));
           console.log(email.text_content?.substring(0, 500) + '...\n');
           
           if (i < selectedEmails.length - 1) {
@@ -1119,7 +1119,7 @@ User query: "${query}"`;
     const emails = await this.getLocalEmails(filter);
     
     if (emails.length === 0) {
-      console.log(chalk.yellow('No emails found to delete.'));
+      console.log(colors.yellow('No emails found to delete.'));
       return;
     }
 
@@ -1142,7 +1142,7 @@ User query: "${query}"`;
     const emails = await this.getLocalEmails(filter);
     
     if (emails.length === 0) {
-      console.log(chalk.yellow('No emails found to move.'));
+      console.log(colors.yellow('No emails found to move.'));
       return;
     }
 
@@ -1177,21 +1177,21 @@ User query: "${query}"`;
   async handleCount(params) {
     const filter = this.buildFilter(params);
     const emails = await this.getLocalEmails(filter);
-    console.log(chalk.green(`📊 Found ${emails.length} emails matching your criteria.`));
+    console.log(colors.green(`📊 Found ${emails.length} emails matching your criteria.`));
   }
 
   async handleListFolders() {
     await this.connect(process.env.EMAIL_ACCOUNT);
     const folders = await this.getFolders();
     
-    console.log(chalk.blue('\n📁 Email Folders:'));
+    console.log(colors.blue('\n📁 Email Folders:'));
     folders.forEach(folder => {
       let special = '';
       if (folder.specialUse) {
         if (Array.isArray(folder.specialUse)) {
-          special = chalk.gray(` (${folder.specialUse.join(', ')})`);
+          special = colors.gray(` (${folder.specialUse.join(', ')})`);
         } else {
-          special = chalk.gray(` (${folder.specialUse})`);
+          special = colors.gray(` (${folder.specialUse})`);
         }
       }
       console.log(`  • ${folder.path}${special}`);
@@ -1202,11 +1202,11 @@ User query: "${query}"`;
 
   async handleListFolderContents(params) {
     if (!params.folder) {
-      console.log(chalk.yellow('Please specify which folder you want to see.'));
+      console.log(colors.yellow('Please specify which folder you want to see.'));
       return;
     }
 
-    console.log(chalk.blue(`\n📂 Checking folder: ${params.folder}`));
+    console.log(colors.blue(`\n📂 Checking folder: ${params.folder}`));
     
     // First check if we have emails from that folder in local database
     const localEmails = await this.getLocalEmails({ 
@@ -1215,14 +1215,14 @@ User query: "${query}"`;
     });
 
     if (localEmails.length > 0) {
-      console.log(chalk.green(`Found ${localEmails.length} cached emails from ${params.folder}:`));
+      console.log(colors.green(`Found ${localEmails.length} cached emails from ${params.folder}:`));
       localEmails.forEach((email, i) => {
         const date = new Date(email.date).toLocaleDateString();
-        console.log(`${i + 1}. ${chalk.bold(email.subject || '(no subject)')} - ${email.from_address} (${date})`);
+        console.log(`${i + 1}. ${colors.bold(email.subject || '(no subject)')} - ${email.from_address} (${date})`);
       });
     } else {
-      console.log(chalk.yellow(`No cached emails from ${params.folder}.`));
-      console.log(chalk.gray('Note: Only emails from INBOX are downloaded by default.'));
+      console.log(colors.yellow(`No cached emails from ${params.folder}.`));
+      console.log(colors.gray('Note: Only emails from INBOX are downloaded by default.'));
       
       // Offer to download from this folder
       const { download } = await inquirer.prompt([{
@@ -1233,7 +1233,7 @@ User query: "${query}"`;
       }]);
 
       if (download) {
-        console.log(chalk.blue(`Downloading emails from ${params.folder}...`));
+        console.log(colors.blue(`Downloading emails from ${params.folder}...`));
         await this.connect(process.env.EMAIL_ACCOUNT);
         
         try {
@@ -1249,14 +1249,14 @@ User query: "${query}"`;
           });
           
           if (newEmails.length > 0) {
-            console.log(chalk.green(`\nDownloaded ${newEmails.length} emails:`));
+            console.log(colors.green(`\nDownloaded ${newEmails.length} emails:`));
             newEmails.forEach((email, i) => {
               const date = new Date(email.date).toLocaleDateString();
-              console.log(`${i + 1}. ${chalk.bold(email.subject || '(no subject)')} - ${email.from_address} (${date})`);
+              console.log(`${i + 1}. ${colors.bold(email.subject || '(no subject)')} - ${email.from_address} (${date})`);
             });
           }
         } catch (error) {
-          console.error(chalk.red('Error downloading from folder:'), error.message);
+          console.error(colors.red('Error downloading from folder:'), error.message);
         } finally {
           await this.disconnect();
         }
@@ -1269,7 +1269,7 @@ User query: "${query}"`;
     const emails = await this.getLocalEmails({ ...filter, limit: 20 });
     
     if (emails.length === 0) {
-      console.log(chalk.yellow('No recent emails to summarize.'));
+      console.log(colors.yellow('No recent emails to summarize.'));
       return;
     }
 
@@ -1286,7 +1286,7 @@ User query: "${query}"`;
       { maxTokens: 500 }
     );
 
-    console.log(chalk.blue('\n📧 Email Summary:'));
+    console.log(colors.blue('\n📧 Email Summary:'));
     console.log(summary);
   }
 
@@ -1325,14 +1325,14 @@ User query: "${query}"`;
     }
 
     // Run download in background without blocking
-    console.log(chalk.gray('🔄 Checking for new emails in background...'));
+    console.log(colors.gray('🔄 Checking for new emails in background...'));
     
     import('./email-downloader.js').then(({ EmailDownloader }) => {
       const downloader = new EmailDownloader();
       // Download last 7 days in background with silent mode
       downloader.downloadEmails(process.env.EMAIL_ACCOUNT, 7, { background: true })
         .then(() => {
-          console.log(chalk.gray('✅ Background email sync completed'));
+          console.log(colors.gray('✅ Background email sync completed'));
         })
         .catch(error => {
           // Silently handle errors in background mode

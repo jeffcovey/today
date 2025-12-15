@@ -20,6 +20,33 @@ const systemMigrations = [
         )
       `);
     }
+  },
+  {
+    version: 101,
+    description: 'Add extra_data column to sync_metadata for incremental sync state',
+    fn: (db) => {
+      db.exec(`ALTER TABLE sync_metadata ADD COLUMN extra_data TEXT`);
+    }
+  },
+  {
+    version: 102,
+    description: 'Drop legacy unused tables',
+    fn: (db) => {
+      const legacyTables = [
+        'cache_metadata',
+        'database_cache',
+        'project_cache',
+        'project_pillar_mapping',
+        'status_groups_cache',
+        'streaks_data',
+        'tag_cache',
+        'temporal_sync',
+        'time_entries_sync'
+      ];
+      for (const table of legacyTables) {
+        db.exec(`DROP TABLE IF EXISTS ${table}`);
+      }
+    }
   }
 ];
 

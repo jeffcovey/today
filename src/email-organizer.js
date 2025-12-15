@@ -1,5 +1,5 @@
 import { ImapFlow } from 'imapflow';
-import chalk from 'chalk';
+import { colors } from './cli-utils.js';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -86,18 +86,18 @@ export class EmailOrganizer {
     });
 
     await this.client.connect();
-    console.log(chalk.green('✅ Connected to iCloud IMAP'));
+    console.log(colors.green('✅ Connected to iCloud IMAP'));
   }
 
   async disconnect() {
     if (this.client) {
       await this.client.logout();
-      console.log(chalk.green('✅ Disconnected'));
+      console.log(colors.green('✅ Disconnected'));
     }
   }
 
   async createFolders() {
-    console.log(chalk.blue('\n📁 Creating stage folders...'));
+    console.log(colors.blue('\n📁 Creating stage folders...'));
 
     for (const folder of Object.values(FOLDERS)) {
       try {
@@ -106,16 +106,16 @@ export class EmailOrganizer {
         const exists = list.some(f => f.path === folder);
 
         if (exists) {
-          console.log(chalk.gray(`  ✓ ${folder} already exists`));
+          console.log(colors.gray(`  ✓ ${folder} already exists`));
         } else {
           await this.client.mailboxCreate(folder);
-          console.log(chalk.green(`  ✓ Created ${folder}`));
+          console.log(colors.green(`  ✓ Created ${folder}`));
         }
       } catch (error) {
         if (error.message.includes('already exists')) {
-          console.log(chalk.gray(`  ✓ ${folder} already exists`));
+          console.log(colors.gray(`  ✓ ${folder} already exists`));
         } else {
-          console.log(chalk.yellow(`  ⚠ Could not create ${folder}: ${error.message}`));
+          console.log(colors.yellow(`  ⚠ Could not create ${folder}: ${error.message}`));
         }
       }
     }
@@ -202,7 +202,7 @@ export class EmailOrganizer {
   }
 
   async organizeInbox() {
-    console.log(chalk.blue('\n📧 Categorizing inbox emails...'));
+    console.log(colors.blue('\n📧 Categorizing inbox emails...'));
 
     // Get all emails from INBOX in local database
     const emails = this.cache.db.prepare(`
@@ -211,7 +211,7 @@ export class EmailOrganizer {
       ORDER BY date DESC
     `).all();
 
-    console.log(chalk.gray(`Found ${emails.length} emails in INBOX`));
+    console.log(colors.gray(`Found ${emails.length} emails in INBOX`));
 
     // Group emails by target folder
     const moveGroups = {
@@ -228,19 +228,19 @@ export class EmailOrganizer {
     }
 
     // Show summary
-    console.log(chalk.blue('\n📊 Categorization summary:'));
+    console.log(colors.blue('\n📊 Categorization summary:'));
     for (const [folder, uids] of Object.entries(moveGroups)) {
       if (uids.length > 0) {
-        console.log(chalk.cyan(`  ${folder}: ${uids.length} emails`));
+        console.log(colors.cyan(`  ${folder}: ${uids.length} emails`));
       }
     }
 
     const totalToMove = Object.values(moveGroups).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(chalk.gray(`  Remaining in INBOX: ${emails.length - totalToMove} emails`));
+    console.log(colors.gray(`  Remaining in INBOX: ${emails.length - totalToMove} emails`));
 
     // Move emails
     if (totalToMove > 0) {
-      console.log(chalk.blue('\n📦 Moving emails to stage folders...'));
+      console.log(colors.blue('\n📦 Moving emails to stage folders...'));
 
       const lock = await this.client.getMailboxLock('INBOX');
       try {
@@ -257,7 +257,7 @@ export class EmailOrganizer {
                 stmt.run(folder, uid, 'INBOX');
               }
 
-              console.log(chalk.green(`  ✓ Moved ${batch.length} emails to ${folder} (${i + batch.length}/${uids.length})`));
+              console.log(colors.green(`  ✓ Moved ${batch.length} emails to ${folder} (${i + batch.length}/${uids.length})`));
             }
           }
         }
@@ -265,9 +265,9 @@ export class EmailOrganizer {
         lock.release();
       }
 
-      console.log(chalk.green(`\n✅ Successfully organized ${totalToMove} emails into stage folders`));
+      console.log(colors.green(`\n✅ Successfully organized ${totalToMove} emails into stage folders`));
     } else {
-      console.log(chalk.yellow('\n⚠ No emails matched categorization rules'));
+      console.log(colors.yellow('\n⚠ No emails matched categorization rules'));
     }
   }
 
@@ -278,7 +278,7 @@ export class EmailOrganizer {
       await this.organizeInbox();
       await this.disconnect();
     } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
+      console.error(colors.red('Error:'), error.message);
       console.error(error.stack);
       throw error;
     } finally {

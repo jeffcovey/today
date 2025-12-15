@@ -3,7 +3,6 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType } from '../src/plugin-loader.js';
 import {
@@ -12,6 +11,7 @@ import {
   formatDate
 } from '../src/date-utils.js';
 import {
+  colors,
   parseArgs,
   showSourceFilterError
 } from '../src/cli-utils.js';
@@ -32,7 +32,7 @@ async function cmdToday(options = {}) {
       showSourceFilterError(options.source, 'diary', allSources);
       return;
     }
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -58,11 +58,11 @@ async function cmdToday(options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No diary entries for today');
+    console.log(colors.blue('ℹ') + ' No diary entries for today');
     return;
   }
 
-  console.log(chalk.cyan("Today's Diary Entries") + ` (${today})`);
+  console.log(colors.cyan("Today's Diary Entries") + ` (${today})`);
   console.log('');
 
   for (const entry of entries) {
@@ -83,7 +83,7 @@ async function cmdWeek(options = {}) {
       showSourceFilterError(options.source, 'diary', allSources);
       return;
     }
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -109,11 +109,11 @@ async function cmdWeek(options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No diary entries for this week');
+    console.log(colors.blue('ℹ') + ' No diary entries for this week');
     return;
   }
 
-  console.log(chalk.cyan("This Week's Diary Entries") + ` (${weekStart} to ${today})`);
+  console.log(colors.cyan("This Week's Diary Entries") + ` (${weekStart} to ${today})`);
   console.log('');
 
   for (const entry of entries) {
@@ -121,7 +121,7 @@ async function cmdWeek(options = {}) {
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${entries.length} entries`);
+  console.log(colors.cyan('Total:') + ` ${entries.length} entries`);
 }
 
 // Recent command - show recent entries
@@ -136,7 +136,7 @@ async function cmdRecent(options = {}) {
       showSourceFilterError(options.source, 'diary', allSources);
       return;
     }
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -163,11 +163,11 @@ async function cmdRecent(options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No diary entries found');
+    console.log(colors.blue('ℹ') + ' No diary entries found');
     return;
   }
 
-  console.log(chalk.cyan('Recent Diary Entries'));
+  console.log(colors.cyan('Recent Diary Entries'));
   console.log('');
 
   for (const entry of entries) {
@@ -178,7 +178,7 @@ async function cmdRecent(options = {}) {
 // Search command - search diary entries
 async function cmdSearch(searchTerm, options = {}) {
   if (!searchTerm) {
-    console.error(chalk.red('✗') + ' Usage: diary search "search term" [--limit N]');
+    console.error(colors.red('✗') + ' Usage: diary search "search term" [--limit N]');
     process.exit(1);
   }
 
@@ -209,11 +209,11 @@ async function cmdSearch(searchTerm, options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ` No entries matching "${searchTerm}"`);
+    console.log(colors.blue('ℹ') + ` No entries matching "${searchTerm}"`);
     return;
   }
 
-  console.log(chalk.cyan(`Search Results for "${searchTerm}"`));
+  console.log(colors.cyan(`Search Results for "${searchTerm}"`));
   console.log('');
 
   for (const entry of entries) {
@@ -221,7 +221,7 @@ async function cmdSearch(searchTerm, options = {}) {
   }
 
   console.log('');
-  console.log(chalk.cyan('Found:') + ` ${entries.length} entries`);
+  console.log(colors.cyan('Found:') + ` ${entries.length} entries`);
 }
 
 // On-this-day command - show entries from this date in previous years
@@ -251,11 +251,11 @@ async function cmdOnThisDay(options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ` No entries on this day (${monthDay}) in previous years`);
+    console.log(colors.blue('ℹ') + ` No entries on this day (${monthDay}) in previous years`);
     return;
   }
 
-  console.log(chalk.cyan(`On This Day (${monthDay})`));
+  console.log(colors.cyan(`On This Day (${monthDay})`));
   console.log('');
 
   for (const entry of entries) {
@@ -263,7 +263,7 @@ async function cmdOnThisDay(options = {}) {
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${entries.length} entries across ${new Set(entries.map(e => e.date.substring(0, 4))).size} years`);
+  console.log(colors.cyan('Total:') + ` ${entries.length} entries across ${new Set(entries.map(e => e.date.substring(0, 4))).size} years`);
 }
 
 // Stats command - show diary statistics
@@ -289,10 +289,10 @@ async function cmdStats() {
     FROM diary
   `).get();
 
-  console.log(chalk.cyan('Diary Statistics'));
+  console.log(colors.cyan('Diary Statistics'));
   console.log('');
-  console.log(`  Total entries: ${chalk.green(stats.total_entries)}`);
-  console.log(`  Unique days: ${chalk.green(stats.unique_days)}`);
+  console.log(`  Total entries: ${colors.green(stats.total_entries)}`);
+  console.log(`  Unique days: ${colors.green(stats.unique_days)}`);
   console.log(`  Date range: ${stats.earliest_entry?.substring(0, 10)} to ${stats.latest_entry?.substring(0, 10)}`);
   console.log('');
   console.log(`  Recent entries:`);
@@ -306,7 +306,7 @@ async function cmdStats() {
 
 // Sync command - delegates to plugin system
 async function cmdSync() {
-  console.log(chalk.blue('ℹ') + ' Syncing diary plugins to database...');
+  console.log(colors.blue('ℹ') + ' Syncing diary plugins to database...');
 
   try {
     const result = execSync('bin/plugins sync --type diary', { encoding: 'utf8' });
@@ -315,13 +315,13 @@ async function cmdSync() {
     console.log(lines.join('\n'));
   } catch (error) {
     if (error.stdout?.includes('No plugins of type')) {
-      console.log(chalk.yellow('⚠') + ' No diary plugins are enabled.');
+      console.log(colors.yellow('⚠') + ' No diary plugins are enabled.');
       console.log('');
       console.log('To sync diary data, configure a plugin:');
       console.log('');
-      console.log('  ' + chalk.cyan('bin/plugins configure'));
+      console.log('  ' + colors.cyan('bin/plugins configure'));
     } else {
-      console.error(chalk.red('✗') + ' Sync failed:', error.message);
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
       process.exit(1);
     }
   }
@@ -340,12 +340,12 @@ function displayEntry(entry, highlightTerm = null) {
   } catch (e) {}
 
   // Header line with date and location
-  let header = chalk.yellow(`${dateStr} ${timeStr}`);
+  let header = colors.yellow(`${dateStr} ${timeStr}`);
   if (meta.location?.localityName) {
-    header += chalk.gray(` • ${meta.location.localityName}`);
+    header += colors.gray(` • ${meta.location.localityName}`);
   }
   if (meta.starred) {
-    header += chalk.yellow(' ⭐');
+    header += colors.yellow(' ⭐');
   }
 
   console.log(header);
@@ -357,7 +357,7 @@ function displayEntry(entry, highlightTerm = null) {
     const weatherStr = tempF !== null
       ? `${meta.weather.conditionsDescription}, ${tempF}°F`
       : meta.weather.conditionsDescription;
-    console.log(chalk.gray(`  ${weatherStr}`));
+    console.log(colors.gray(`  ${weatherStr}`));
   }
 
   // Entry text (truncated for list view)
@@ -366,7 +366,7 @@ function displayEntry(entry, highlightTerm = null) {
   // Highlight search term if provided
   if (highlightTerm) {
     const regex = new RegExp(`(${highlightTerm})`, 'gi');
-    displayText = displayText.replace(regex, chalk.yellow('$1'));
+    displayText = displayText.replace(regex, colors.yellow('$1'));
   }
 
   // Truncate long entries

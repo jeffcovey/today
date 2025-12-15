@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import chalk from 'chalk';
+import { colors } from './cli-utils.js';
 
 export class LocalLLM {
   constructor() {
@@ -41,15 +41,15 @@ export class LocalLLM {
             this.model = models[0].name.split(':')[0];
           }
           
-          console.log(chalk.green(`✓ Using remote Ollama at ${ollamaHost} with model: ${this.model}`));
+          console.log(colors.green(`✓ Using remote Ollama at ${ollamaHost} with model: ${this.model}`));
           this.initialized = true;
         } else {
-          console.log(chalk.yellow(`No models available at ${ollamaHost}`));
-          console.log(chalk.gray('Pull a model in the Ollama container: docker exec ollama ollama pull tinyllama'));
+          console.log(colors.yellow(`No models available at ${ollamaHost}`));
+          console.log(colors.gray('Pull a model in the Ollama container: docker exec ollama ollama pull tinyllama'));
         }
       } catch (e) {
-        console.log(chalk.yellow(`Cannot connect to Ollama at ${ollamaHost}`));
-        console.log(chalk.gray('Make sure the Ollama service is running: docker-compose up -d ollama'));
+        console.log(colors.yellow(`Cannot connect to Ollama at ${ollamaHost}`));
+        console.log(colors.gray('Make sure the Ollama service is running: docker-compose up -d ollama'));
       }
       return;
     }
@@ -83,7 +83,7 @@ export class LocalLLM {
       }
       
       if (this.model) {
-        console.log(chalk.green(`✓ Using Ollama with model: ${this.model}`));
+        console.log(colors.green(`✓ Using Ollama with model: ${this.model}`));
         this.initialized = true;
       }
     } catch (e) {
@@ -92,9 +92,9 @@ export class LocalLLM {
 
     // If no local LLM available, provide instructions
     if (!this.initialized) {
-      console.log(chalk.yellow('No local LLM found. To enable free AI features:'));
-      console.log(chalk.gray('  1. Install Ollama: curl -fsSL https://ollama.com/install.sh | sh'));
-      console.log(chalk.gray('  2. Pull a model: ollama pull phi3'));
+      console.log(colors.yellow('No local LLM found. To enable free AI features:'));
+      console.log(colors.gray('  1. Install Ollama: curl -fsSL https://ollama.com/install.sh | sh'));
+      console.log(colors.gray('  2. Pull a model: ollama pull phi3'));
     }
   }
 
@@ -112,14 +112,14 @@ export class LocalLLM {
     } catch (e) {
       // If using remote host (Docker service), don't try to start locally
       if (process.env.OLLAMA_HOST) {
-        console.log(chalk.yellow(`⚠ Cannot connect to Ollama at ${ollamaHost}`));
-        console.log(chalk.gray('Make sure the Ollama service is running'));
+        console.log(colors.yellow(`⚠ Cannot connect to Ollama at ${ollamaHost}`));
+        console.log(colors.gray('Make sure the Ollama service is running'));
         return false;
       }
       
       // Server not running locally, try to start it
       try {
-        console.log(chalk.gray('Starting Ollama server...'));
+        console.log(colors.gray('Starting Ollama server...'));
         // Start ollama serve in background, redirect output to avoid noise
         execSync('ollama serve > /dev/null 2>&1 &', { shell: '/bin/bash' });
         // Give it a moment to start
@@ -128,14 +128,14 @@ export class LocalLLM {
         // Verify it started
         try {
           execSync(`curl -s ${ollamaHost}/api/tags > /dev/null 2>&1`, { stdio: 'ignore' });
-          console.log(chalk.green('✓ Ollama server started'));
+          console.log(colors.green('✓ Ollama server started'));
           return true;
         } catch (verifyError) {
-          console.log(chalk.yellow('⚠ Ollama server may need manual start: ollama serve'));
+          console.log(colors.yellow('⚠ Ollama server may need manual start: ollama serve'));
           return false;
         }
       } catch (startError) {
-        console.log(chalk.yellow('⚠ Could not auto-start Ollama server'));
+        console.log(colors.yellow('⚠ Could not auto-start Ollama server'));
         return false;
       }
     }

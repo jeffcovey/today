@@ -3,10 +3,10 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import {
+  colors,
   parseArgs,
   showSourceFilterError
 } from '../src/cli-utils.js';
@@ -44,7 +44,7 @@ async function cmdOpen(options = {}) {
   `).all().map(r => r.source);
 
   if (sources.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No open issues');
+    console.log(colors.blue('ℹ') + ' No open issues');
     return;
   }
 
@@ -67,7 +67,7 @@ async function cmdOpen(options = {}) {
     `).get(source).count;
 
     // Display source header
-    console.log(chalk.cyan(`── ${source} `) + chalk.gray(`(${issues.length} of ${totalCount} open)`));
+    console.log(colors.cyan(`── ${source} `) + colors.gray(`(${issues.length} of ${totalCount} open)`));
     console.log('');
 
     for (const issue of issues) {
@@ -77,7 +77,7 @@ async function cmdOpen(options = {}) {
     totalShown += issues.length;
   }
 
-  console.log(chalk.cyan('Total:') + ` ${totalShown} issues shown`);
+  console.log(colors.cyan('Total:') + ` ${totalShown} issues shown`);
   console.log('');
   console.log(getSyncStatusMessage(db, 'issues'));
 }
@@ -95,7 +95,7 @@ async function cmdClosed(options = {}) {
       showSourceFilterError(options.source, 'issues', allSources);
       return;
     }
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -123,11 +123,11 @@ async function cmdClosed(options = {}) {
   const issues = db.prepare(query).all(...params);
 
   if (issues.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No closed issues');
+    console.log(colors.blue('ℹ') + ' No closed issues');
     return;
   }
 
-  console.log(chalk.cyan('Recently Closed Issues'));
+  console.log(colors.cyan('Recently Closed Issues'));
   console.log('');
 
   for (const issue of issues) {
@@ -138,7 +138,7 @@ async function cmdClosed(options = {}) {
 // Search command - search issues by title or body
 async function cmdSearch(searchTerm, options = {}) {
   if (!searchTerm) {
-    console.error(chalk.red('✗') + ' Usage: issues search "search term" [--limit N]');
+    console.error(colors.red('✗') + ' Usage: issues search "search term" [--limit N]');
     process.exit(1);
   }
 
@@ -170,11 +170,11 @@ async function cmdSearch(searchTerm, options = {}) {
   const issues = db.prepare(query).all(...params);
 
   if (issues.length === 0) {
-    console.log(chalk.blue('ℹ') + ` No issues matching "${searchTerm}"`);
+    console.log(colors.blue('ℹ') + ` No issues matching "${searchTerm}"`);
     return;
   }
 
-  console.log(chalk.cyan(`Search Results for "${searchTerm}"`));
+  console.log(colors.cyan(`Search Results for "${searchTerm}"`));
   console.log('');
 
   for (const issue of issues) {
@@ -182,13 +182,13 @@ async function cmdSearch(searchTerm, options = {}) {
   }
 
   console.log('');
-  console.log(chalk.cyan('Found:') + ` ${issues.length} issues`);
+  console.log(colors.cyan('Found:') + ` ${issues.length} issues`);
 }
 
 // Show command - show a specific issue by number
 async function cmdShow(issueId, options = {}) {
   if (!issueId) {
-    console.error(chalk.red('✗') + ' Usage: issues show <issue-number>');
+    console.error(colors.red('✗') + ' Usage: issues show <issue-number>');
     process.exit(1);
   }
 
@@ -204,7 +204,7 @@ async function cmdShow(issueId, options = {}) {
   `).get(`%${issueId}`);
 
   if (!issue) {
-    console.log(chalk.blue('ℹ') + ` Issue ${issueId} not found`);
+    console.log(colors.blue('ℹ') + ` Issue ${issueId} not found`);
     return;
   }
 
@@ -237,11 +237,11 @@ async function cmdStats() {
     LIMIT 10
   `).all();
 
-  console.log(chalk.cyan('Issue Statistics'));
+  console.log(colors.cyan('Issue Statistics'));
   console.log('');
-  console.log(`  Total issues: ${chalk.green(stats.total_issues)}`);
-  console.log(`  Open: ${chalk.yellow(stats.open_issues)}`);
-  console.log(`  Closed: ${chalk.gray(stats.closed_issues)}`);
+  console.log(`  Total issues: ${colors.green(stats.total_issues)}`);
+  console.log(`  Open: ${colors.yellow(stats.open_issues)}`);
+  console.log(`  Closed: ${colors.gray(stats.closed_issues)}`);
   console.log('');
   console.log(`  Date range: ${stats.oldest_issue?.substring(0, 10) || 'N/A'} to ${stats.newest_issue?.substring(0, 10) || 'N/A'}`);
 
@@ -256,7 +256,7 @@ async function cmdStats() {
 
 // Sync command - delegates to plugin system
 async function cmdSync() {
-  console.log(chalk.blue('ℹ') + ' Syncing issues plugins to database...');
+  console.log(colors.blue('ℹ') + ' Syncing issues plugins to database...');
 
   try {
     const result = execSync('bin/plugins sync --type issues', { encoding: 'utf8' });
@@ -265,13 +265,13 @@ async function cmdSync() {
     console.log(lines.join('\n'));
   } catch (error) {
     if (error.stdout?.includes('No plugins of type')) {
-      console.log(chalk.yellow('⚠') + ' No issues plugins are enabled.');
+      console.log(colors.yellow('⚠') + ' No issues plugins are enabled.');
       console.log('');
       console.log('To sync issues, configure a plugin:');
       console.log('');
-      console.log('  ' + chalk.cyan('bin/plugins configure'));
+      console.log('  ' + colors.cyan('bin/plugins configure'));
     } else {
-      console.error(chalk.red('✗') + ' Sync failed:', error.message);
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
       process.exit(1);
     }
   }
@@ -292,23 +292,23 @@ function displayIssue(issue, highlightTerm = null) {
   } catch (e) {}
 
   // State indicator
-  const stateIcon = state === 'open' ? chalk.green('●') : chalk.gray('●');
+  const stateIcon = state === 'open' ? colors.green('●') : colors.gray('●');
 
   // Labels
   const labels = meta.labels || [];
   const labelStr = labels.length > 0
-    ? ' ' + labels.map(l => chalk.blue(`[${l}]`)).join(' ')
+    ? ' ' + labels.map(l => colors.blue(`[${l}]`)).join(' ')
     : '';
 
   // Title with optional highlight
   let displayTitle = title;
   if (highlightTerm) {
     const regex = new RegExp(`(${highlightTerm})`, 'gi');
-    displayTitle = displayTitle.replace(regex, chalk.yellow('$1'));
+    displayTitle = displayTitle.replace(regex, colors.yellow('$1'));
   }
 
-  console.log(`${stateIcon} ${chalk.cyan('#' + issueNum)} ${displayTitle}${labelStr}`);
-  console.log(chalk.gray(`  opened ${dateStr}${url ? ' • ' + url : ''}`));
+  console.log(`${stateIcon} ${colors.cyan('#' + issueNum)} ${displayTitle}${labelStr}`);
+  console.log(colors.gray(`  opened ${dateStr}${url ? ' • ' + url : ''}`));
   console.log('');
 }
 
@@ -327,9 +327,9 @@ function displayIssueFull(issue) {
   } catch (e) {}
 
   // State indicator
-  const stateIcon = state === 'open' ? chalk.green('● open') : chalk.gray('● closed');
+  const stateIcon = state === 'open' ? colors.green('● open') : colors.gray('● closed');
 
-  console.log(chalk.cyan(`#${issueNum}`) + ` ${title}`);
+  console.log(colors.cyan(`#${issueNum}`) + ` ${title}`);
   console.log('');
   console.log(`  State: ${stateIcon}`);
   console.log(`  Opened: ${dateStr}`);
@@ -351,7 +351,7 @@ function displayIssueFull(issue) {
 
   if (body) {
     console.log('');
-    console.log(chalk.cyan('Description:'));
+    console.log(colors.cyan('Description:'));
     console.log('');
     // Indent body text
     const lines = body.split('\n').map(l => '  ' + l);

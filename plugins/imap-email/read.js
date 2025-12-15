@@ -3,6 +3,11 @@
 // IMAP Email Plugin - Read Command
 // Syncs emails from any IMAP server to the plugin schema format
 //
+// Supports incremental sync:
+// - Stores UIDVALIDITY and UIDNEXT per folder
+// - Only fetches new messages on subsequent syncs
+// - Falls back to full sync if UIDVALIDITY changes
+//
 // Two-phase sync:
 // 1. Fast metadata sync (envelope, flags, size) - runs in foreground
 // 2. Body fetch (smallest first) - runs in background if enabled
@@ -99,9 +104,35 @@ function getExistingEmailData(sourceId) {
   }
 }
 
+// Get stored folder state from sync_metadata
+function getFolderState(sourceId) {
+  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+  const dbPath = path.join(projectRoot, '.data', 'today.db');
+
+  try {
+    const db = new Database(dbPath, { readonly: true, timeout: 5000 });
+    db.pragma('busy_timeout = 5000');
+
+    const row = db.prepare(`
+      SELECT extra_data FROM sync_metadata WHERE source = ?
+    `).get(sourceId);
+
+    db.close();
+
+    if (row && row.extra_data) {
+      const data = JSON.parse(row.extra_data);
+      return data.folder_state || {};
+    }
+    return {};
+  } catch (err) {
+    return {};
+  }
+}
+
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const sourceId = process.env.SOURCE_ID || 'imap-email/default';
+const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 
 // Configuration with defaults
 const host = config.host;
@@ -149,7 +180,7 @@ const client = new ImapFlow({
   logger: false
 });
 
-// Calculate cutoff date
+// Calculate cutoff date for full syncs
 const sinceDate = new Date();
 sinceDate.setDate(sinceDate.getDate() - daysToSync);
 
@@ -160,23 +191,70 @@ const metadata = {
   total_fetched: 0,
   bodies_pending: 0,
   bodies_skipped: 0,
-  errors: []
+  errors: [],
+  incremental: false
 };
 
 // Will be populated with emails that already have bodies fetched (Map of id -> body content)
 let existingEmails = new Map();
 
-async function syncFolder(folderPath) {
-  console.error(`  📁 ${folderPath}...`);
+// Folder state for incremental sync
+let previousFolderState = {};
+const newFolderState = {};
 
+async function syncFolder(folderPath, isIncremental, lastState) {
   try {
     const lock = await client.getMailboxLock(folderPath);
     let folderCount = 0;
+    let syncType = 'full';
 
     try {
+      // Get current folder status
+      // Convert BigInt to Number (safe for UIDs which are typically < 2^53)
+      const status = client.mailbox;
+      const currentUidValidity = Number(status.uidValidity);
+      const currentUidNext = Number(status.uidNext);
+
+      // Determine sync strategy
+      let fetchQuery;
+
+      if (isIncremental && lastState && lastState.uidValidity === currentUidValidity) {
+        // UIDVALIDITY matches - we can do incremental sync
+        // Fetch only messages with UID >= last UIDNEXT
+        if (lastState.uidNext && currentUidNext > lastState.uidNext) {
+          fetchQuery = { uid: `${lastState.uidNext}:*` };
+          syncType = 'incremental';
+          console.error(`  📁 ${folderPath} (new: ${currentUidNext - lastState.uidNext})...`);
+        } else {
+          // No new messages
+          console.error(`  📁 ${folderPath} (no new)...`);
+          newFolderState[folderPath] = {
+            uidValidity: currentUidValidity,
+            uidNext: currentUidNext
+          };
+          metadata.folders_synced.push({ folder: folderPath, count: 0, type: 'skip' });
+          lock.release();
+          return;
+        }
+      } else {
+        // Full sync needed (first sync or UIDVALIDITY changed)
+        fetchQuery = { since: sinceDate };
+        if (lastState && lastState.uidValidity !== currentUidValidity) {
+          console.error(`  📁 ${folderPath} (UIDVALIDITY changed, full sync)...`);
+        } else {
+          console.error(`  📁 ${folderPath}...`);
+        }
+      }
+
+      // Store new folder state
+      newFolderState[folderPath] = {
+        uidValidity: currentUidValidity,
+        uidNext: currentUidNext
+      };
+
       // Fast metadata-only fetch
       for await (const message of client.fetch(
-        { since: sinceDate },
+        fetchQuery,
         {
           envelope: true,
           flags: true,
@@ -250,7 +328,7 @@ async function syncFolder(folderPath) {
         }
       }
 
-      metadata.folders_synced.push({ folder: folderPath, count: folderCount });
+      metadata.folders_synced.push({ folder: folderPath, count: folderCount, type: syncType });
       metadata.total_fetched += folderCount;
       console.error(`     ✓ ${folderCount} emails`);
 
@@ -266,9 +344,16 @@ async function syncFolder(folderPath) {
 
 async function main() {
   try {
+    // Check for incremental sync
+    const isIncremental = !!lastSyncTime;
+    if (isIncremental) {
+      previousFolderState = getFolderState(sourceId);
+      metadata.incremental = true;
+    }
+
     // Check which emails already have bodies to avoid re-fetching
     existingEmails = getExistingEmailData(sourceId);
-    if (existingEmails.size > 0) {
+    if (existingEmails.size > 0 && !isIncremental) {
       console.error(`  Found ${existingEmails.size} emails with bodies already fetched`);
     }
 
@@ -298,18 +383,29 @@ async function main() {
         })
         .map(f => f.path);
 
-      console.error(`  Auto-discovered ${foldersToSync.length} folders`);
+      if (!isIncremental) {
+        console.error(`  Auto-discovered ${foldersToSync.length} folders`);
+      }
     }
 
     // Sync each folder (metadata only - fast)
     for (const folder of foldersToSync) {
-      await syncFolder(folder);
+      const lastState = previousFolderState[folder];
+      await syncFolder(folder, isIncremental, lastState);
     }
 
     await client.logout();
 
     // Summary
-    console.error(`✓ Synced ${metadata.total_fetched} emails from ${metadata.folders_synced.length} folder(s)`);
+    const newCount = metadata.folders_synced.reduce((sum, f) =>
+      f.type === 'incremental' || f.type === 'full' ? sum + f.count : sum, 0);
+    const skippedFolders = metadata.folders_synced.filter(f => f.type === 'skip').length;
+
+    if (isIncremental && skippedFolders > 0) {
+      console.error(`✓ Synced ${newCount} new emails (${skippedFolders} folders unchanged)`);
+    } else {
+      console.error(`✓ Synced ${metadata.total_fetched} emails from ${metadata.folders_synced.length} folder(s)`);
+    }
 
     // Launch background body fetch if needed (only for emails without bodies)
     if (includeBody && emailsNeedingBodies.length > 0) {
@@ -319,7 +415,9 @@ async function main() {
       const existingFetcher = isBackgroundFetcherRunning();
       if (existingFetcher && existingFetcher.running) {
         console.error(`  ⏳ Background fetcher already running (PID ${existingFetcher.pid}) - skipping new fetch`);
-        console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
+        if (metadata.bodies_skipped > 0) {
+          console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
+        }
         metadata.bodies_pending = 0; // Don't report pending since we're not starting a new fetch
       } else {
         // Sort by size (smallest first) for faster initial results
@@ -350,6 +448,9 @@ async function main() {
     } else if (includeBody && metadata.bodies_skipped > 0) {
       console.error(`  ✓ All ${metadata.bodies_skipped} email bodies already fetched`);
     }
+
+    // Store folder state for next incremental sync
+    metadata.folder_state = newFolderState;
 
   } catch (error) {
     metadata.errors.push(`Connection error: ${error.message}`);

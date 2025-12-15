@@ -4,7 +4,7 @@ import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getTodayDate } from '../src/date-utils.js';
 import { program } from 'commander';
-import chalk from 'chalk';
+import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
 
 // Standard terminal width for wrapping
@@ -82,7 +82,7 @@ function printTasks(tasks) {
   console.log('');
   for (const task of tasks) {
     const bullet = PRIORITY_EMOJI[task.priority] || '  ';
-    const dateSuffix = task.due_date ? chalk.yellow(` 📅 ${task.due_date}`) : '';
+    const dateSuffix = task.due_date ? colors.yellow(` 📅 ${task.due_date}`) : '';
     console.log(wrapTaskLine(bullet, task.title, dateSuffix));
   }
 }
@@ -96,7 +96,7 @@ program
   .command('sync')
   .description('Sync tasks from all enabled task plugins')
   .action(async () => {
-    console.log(chalk.blue('ℹ') + ' Syncing tasks plugins to database...');
+    console.log(colors.blue('ℹ') + ' Syncing tasks plugins to database...');
 
     try {
       const result = execSync('bin/plugins sync --type tasks', { encoding: 'utf8' });
@@ -105,13 +105,13 @@ program
       console.log(lines.join('\n'));
     } catch (error) {
       if (error.stdout?.includes('No plugins of type')) {
-        console.log(chalk.yellow('⚠') + ' No tasks plugins are enabled.');
+        console.log(colors.yellow('⚠') + ' No tasks plugins are enabled.');
         console.log('');
         console.log('To sync tasks, configure a plugin:');
         console.log('');
-        console.log('  ' + chalk.cyan('bin/plugins configure'));
+        console.log('  ' + colors.cyan('bin/plugins configure'));
       } else {
-        console.error(chalk.red('✗') + ' Sync failed:', error.message);
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
         process.exit(1);
       }
     }
@@ -157,14 +157,14 @@ program
     const tasks = db.prepare(sql).all(...params);
 
     if (tasks.length === 0) {
-      console.log(chalk.blue('ℹ') + ' No tasks due today');
+      console.log(colors.blue('ℹ') + ' No tasks due today');
       return;
     }
 
     printTasks(tasks);
 
     console.log('');
-    console.log(chalk.gray(`${tasks.length} tasks due today or earlier`));
+    console.log(colors.gray(`${tasks.length} tasks due today or earlier`));
     console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
@@ -218,7 +218,7 @@ program
     const tasks = db.prepare(sql).all(...params);
 
     if (tasks.length === 0) {
-      console.log(chalk.blue('ℹ') + ` No tasks created in the last ${options.days} days`);
+      console.log(colors.blue('ℹ') + ` No tasks created in the last ${options.days} days`);
       return;
     }
 
@@ -228,12 +228,12 @@ program
       const bullet = PRIORITY_EMOJI[task.priority] || '  ';
       const metadata = task.metadata ? JSON.parse(task.metadata) : {};
       const createdDate = metadata.created_date;
-      const dateSuffix = createdDate ? chalk.cyan(` ➕ ${createdDate}`) : '';
+      const dateSuffix = createdDate ? colors.cyan(` ➕ ${createdDate}`) : '';
       console.log(wrapTaskLine(bullet, task.title, dateSuffix));
     }
 
     console.log('');
-    console.log(chalk.gray(`${tasks.length} tasks created in the last ${options.days} days`));
+    console.log(colors.gray(`${tasks.length} tasks created in the last ${options.days} days`));
     console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
@@ -250,8 +250,8 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     if (options.legend) {
-      console.log(chalk.bold('\nTask List Legend:'));
-      console.log(chalk.gray('─────────────────'));
+      console.log(colors.bold('\nTask List Legend:'));
+      console.log(colors.gray('─────────────────'));
       console.log('Priority symbols:');
       console.log('  🔺 = highest    ⏫ = high      🔼 = medium');
       console.log('  🔽 = low        ⏬ = lowest');
@@ -324,14 +324,14 @@ program
     const tasks = db.prepare(sql).all(...params);
 
     if (tasks.length === 0) {
-      console.log(chalk.blue('ℹ') + ' No tasks found');
+      console.log(colors.blue('ℹ') + ' No tasks found');
       return;
     }
 
     printTasks(tasks);
 
     console.log('');
-    console.log(chalk.gray(`${tasks.length} tasks`));
+    console.log(colors.gray(`${tasks.length} tasks`));
     console.log(getSyncStatusMessage(db, 'tasks'));
   });
 
@@ -367,16 +367,16 @@ program
       });
 
       if (!result.success) {
-        console.error(chalk.red('✗') + ` ${result.error}`);
+        console.error(colors.red('✗') + ` ${result.error}`);
         process.exit(1);
       }
 
-      console.log(chalk.green('✓') + ' Added task');
+      console.log(colors.green('✓') + ' Added task');
       if (result.writeResult?.line) {
-        console.log(chalk.gray(`  ${result.writeResult.line}`));
+        console.log(colors.gray(`  ${result.writeResult.line}`));
       }
     } catch (error) {
-      console.error(chalk.red('Error adding task:'), error.message);
+      console.error(colors.red('Error adding task:'), error.message);
       process.exit(1);
     }
   });
@@ -394,7 +394,7 @@ program
     // Format: "plugin/source:plugin_specific_id"
     const firstColon = id.indexOf(':');
     if (firstColon === -1) {
-      console.error(chalk.red('✗') + ' Invalid ID format. Expected: plugin/source:id (e.g., markdown-tasks/local:vault/tasks/tasks.md:44)');
+      console.error(colors.red('✗') + ' Invalid ID format. Expected: plugin/source:id (e.g., markdown-tasks/local:vault/tasks/tasks.md:44)');
       process.exit(1);
     }
 
@@ -414,16 +414,16 @@ program
       });
 
       if (!result.success) {
-        console.error(chalk.red('✗') + ` ${result.error}`);
+        console.error(colors.red('✗') + ` ${result.error}`);
         process.exit(1);
       }
 
-      console.log(chalk.green('✓') + ' Completed task');
+      console.log(colors.green('✓') + ' Completed task');
       if (result.writeResult?.new_line) {
-        console.log(chalk.gray(`  ${result.writeResult.new_line}`));
+        console.log(colors.gray(`  ${result.writeResult.new_line}`));
       }
     } catch (error) {
-      console.error(chalk.red('Error completing task:'), error.message);
+      console.error(colors.red('Error completing task:'), error.message);
       process.exit(1);
     }
   });
@@ -488,14 +488,14 @@ program
     const tasks = db.prepare(sql).all(...params);
 
     if (tasks.length === 0) {
-      console.log(chalk.blue('ℹ') + ` No tasks matching "${query}"`);
+      console.log(colors.blue('ℹ') + ` No tasks matching "${query}"`);
       return;
     }
 
     printTasks(tasks);
 
     console.log('');
-    console.log(chalk.gray(`${tasks.length} results for "${query}"`));
+    console.log(colors.gray(`${tasks.length} results for "${query}"`));
     console.log(getSyncStatusMessage(db, 'tasks'));
   });
 

@@ -3,7 +3,6 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import chalk from 'chalk';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType, getWritableSource, writeEntryAndSync, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import {
@@ -20,6 +19,7 @@ import {
   calculateDurationMinutes
 } from '../src/duration-utils.js';
 import {
+  colors,
   parseArgs,
   showSourceError,
   showSourceFilterError
@@ -34,7 +34,7 @@ const TIMEZONE = getConfiguredTimezone();
 // Start tracking
 async function cmdStart(description, options = {}) {
   if (!description) {
-    console.error(chalk.red('✗') + ' Usage: track start "Description with #topic/tags" [--source SOURCE]');
+    console.error(colors.red('✗') + ' Usage: track start "Description with #topic/tags" [--source SOURCE]');
     console.log('');
     console.log('Examples:');
     console.log('  track start "Deep work session #topic/programming"');
@@ -68,7 +68,7 @@ async function cmdStart(description, options = {}) {
     const duration = calculateDurationMinutes(runningTimer.start_time, currentTime);
     const durationFormatted = formatDurationMinutes(duration);
 
-    console.log(chalk.yellow('⚠') + ` Stopping previous timer: ${runningTimer.description} (${durationFormatted})`);
+    console.log(colors.yellow('⚠') + ` Stopping previous timer: ${runningTimer.description} (${durationFormatted})`);
 
     // Stop the previous timer
     const stopEntry = {
@@ -84,7 +84,7 @@ async function cmdStart(description, options = {}) {
     });
 
     if (!stopResult.success) {
-      console.error(chalk.red('✗') + ` Failed to stop previous timer: ${stopResult.error}`);
+      console.error(colors.red('✗') + ` Failed to stop previous timer: ${stopResult.error}`);
       process.exit(1);
     }
   }
@@ -104,12 +104,12 @@ async function cmdStart(description, options = {}) {
   });
 
   if (!result.success) {
-    console.error(chalk.red('✗') + ` Failed to start timer: ${result.error}`);
+    console.error(colors.red('✗') + ` Failed to start timer: ${result.error}`);
     process.exit(1);
   }
 
-  console.log(chalk.green('✓') + ` Started: ${description}`);
-  console.log(chalk.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
+  console.log(colors.green('✓') + ` Started: ${description}`);
+  console.log(colors.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
 }
 
 // Stop command
@@ -129,7 +129,7 @@ async function cmdStop(options = {}) {
   const runningTimers = db.prepare(query).all();
 
   if (runningTimers.length === 0) {
-    console.error(chalk.red('✗') + ' No timer running');
+    console.error(colors.red('✗') + ' No timer running');
     process.exit(1);
   }
 
@@ -138,7 +138,7 @@ async function cmdStop(options = {}) {
   if (options.source) {
     const matching = runningTimers.filter(t => t.source.includes(options.source));
     if (matching.length === 0) {
-      console.error(chalk.red('✗') + ` No running timer matching source "${options.source}"`);
+      console.error(colors.red('✗') + ` No running timer matching source "${options.source}"`);
       console.log('');
       console.log('Running timers:');
       for (const t of runningTimers) {
@@ -149,7 +149,7 @@ async function cmdStop(options = {}) {
     timerToStop = matching[0];
   } else if (runningTimers.length > 1) {
     // Multiple timers, require --source
-    console.error(chalk.red('✗') + ' Multiple timers running. Use --source to specify which one to stop.');
+    console.error(colors.red('✗') + ' Multiple timers running. Use --source to specify which one to stop.');
     console.log('');
     console.log('Running timers:');
     for (const t of runningTimers) {
@@ -165,7 +165,7 @@ async function cmdStop(options = {}) {
   // Warn if timer ran unusually long (likely forgotten)
   const LONG_TIMER_THRESHOLD_MINUTES = 240; // 4 hours
   if (duration > LONG_TIMER_THRESHOLD_MINUTES) {
-    console.log(chalk.yellow('⚠') + ` This timer ran for ${durationFormatted} - was it left running by mistake?`);
+    console.log(colors.yellow('⚠') + ` This timer ran for ${durationFormatted} - was it left running by mistake?`);
   }
 
   // Complete the entry
@@ -185,11 +185,11 @@ async function cmdStop(options = {}) {
   });
 
   if (!result.success) {
-    console.error(chalk.red('✗') + ` Failed to stop timer: ${result.error}`);
+    console.error(colors.red('✗') + ` Failed to stop timer: ${result.error}`);
     process.exit(1);
   }
 
-  console.log(chalk.green('✓') + ` Stopped: ${timerToStop.description} (${durationFormatted})`);
+  console.log(colors.green('✓') + ` Stopped: ${timerToStop.description} (${durationFormatted})`);
 }
 
 // Add command - add a completed entry
@@ -199,7 +199,7 @@ async function cmdAdd(durationStr, options = {}) {
   const description = descriptionParts.join(' ');
 
   if (!durationStr || !description) {
-    console.error(chalk.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE]');
+    console.error(colors.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE]');
     console.log('');
     console.log('Examples:');
     console.log('  track add 20m "Reviewing pull requests #topic/programming"');
@@ -215,7 +215,7 @@ async function cmdAdd(durationStr, options = {}) {
   const durationMinutes = parseDuration(durationStr);
 
   if (durationMinutes === 0) {
-    console.error(chalk.red('✗') + ` Could not parse duration: ${durationStr}`);
+    console.error(colors.red('✗') + ` Could not parse duration: ${durationStr}`);
     console.log('');
     console.log('Supported formats: 20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
     process.exit(1);
@@ -241,7 +241,7 @@ async function cmdAdd(durationStr, options = {}) {
     sourceFilter: options.source,
     db,
     vaultPath,
-    onSync: () => console.log(chalk.gray('Syncing...'))
+    onSync: () => console.log(colors.gray('Syncing...'))
   });
 
   if (!result.success) {
@@ -250,9 +250,9 @@ async function cmdAdd(durationStr, options = {}) {
   }
 
   const durationFormatted = formatDurationMinutes(durationMinutes);
-  console.log(chalk.green('✓') + ` Added: ${description} (${durationFormatted})`);
+  console.log(colors.green('✓') + ` Added: ${description} (${durationFormatted})`);
 
-  console.log(chalk.blue('ℹ') + ` Time range: ${formatTime(startTime)} - ${formatTime(endTime)}`);
+  console.log(colors.blue('ℹ') + ` Time range: ${formatTime(startTime)} - ${formatTime(endTime)}`);
 }
 
 // Status command - queries DB for running timers (end_time IS NULL)
@@ -269,11 +269,11 @@ async function cmdStatus() {
   `).all();
 
   if (runningTimers.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No timer running');
+    console.log(colors.blue('ℹ') + ' No timer running');
     return;
   }
 
-  console.log(chalk.cyan('⏱') + '  Currently tracking:');
+  console.log(colors.cyan('⏱') + '  Currently tracking:');
   console.log('');
 
   const currentTime = getCurrentTimeISO();
@@ -283,10 +283,10 @@ async function cmdStatus() {
     const duration = calculateDurationMinutes(start_time, currentTime);
     const durationFormatted = formatDurationMinutes(duration);
 
-    console.log('  ' + chalk.green(description));
+    console.log('  ' + colors.green(description));
     console.log(`  Started: ${formatTime(start_time)}`);
     console.log(`  Duration: ${durationFormatted}`);
-    console.log(`  Source: ${chalk.gray(source)}`);
+    console.log(`  Source: ${colors.gray(source)}`);
 
     if (runningTimers.length > 1) {
       console.log('');
@@ -309,7 +309,7 @@ async function cmdToday(options = {}) {
       return;
     }
     // Show which sources we're querying
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -333,11 +333,11 @@ async function cmdToday(options = {}) {
     : db.prepare(runningQuery).all();
 
   if (runningTimers.length > 0) {
-    console.log(chalk.cyan('⏱  Currently Tracking'));
+    console.log(colors.cyan('⏱  Currently Tracking'));
     console.log('');
     for (const timer of runningTimers) {
       const duration = calculateDurationMinutes(timer.start_time, currentTime);
-      console.log(`  ${chalk.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
+      console.log(`  ${colors.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
       console.log(`    ${timer.description}`);
     }
     console.log('');
@@ -368,15 +368,15 @@ async function cmdToday(options = {}) {
   const completedEntries = entries.filter(e => e.end_time !== null);
 
   if (completedEntries.length === 0 && runningTimers.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No time entries for today');
+    console.log(colors.blue('ℹ') + ' No time entries for today');
     return;
   }
 
-  console.log(chalk.cyan("Today's Time Tracking") + ` (${today})`);
+  console.log(colors.cyan("Today's Time Tracking") + ` (${today})`);
   console.log('');
 
   if (completedEntries.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No completed entries yet');
+    console.log(colors.blue('ℹ') + ' No completed entries yet');
     return;
   }
 
@@ -397,14 +397,14 @@ async function cmdToday(options = {}) {
     // Display entry
     const startDisplay = formatTime(start_time);
     const endDisplay = formatTime(end_time);
-    console.log(`  ${chalk.green('✓')} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
+    console.log(`  ${colors.green('✓')} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
     console.log(`    ${description}`);
   }
 
   // Summary by topic
   if (Object.keys(topicMinutes).length > 0) {
     console.log('');
-    console.log(chalk.cyan('By Topic:'));
+    console.log(colors.cyan('By Topic:'));
     const sorted = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
     for (const [topic, mins] of sorted) {
       console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
@@ -412,7 +412,7 @@ async function cmdToday(options = {}) {
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log(colors.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
   console.log('');
   console.log(getSyncStatusMessage(db, 'time-logs'));
 }
@@ -430,7 +430,7 @@ async function cmdWeek(options = {}) {
       return;
     }
     // Show which sources we're querying
-    console.log(chalk.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
     console.log('');
   }
 
@@ -460,11 +460,11 @@ async function cmdWeek(options = {}) {
   const entries = db.prepare(query).all(...params);
 
   if (entries.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No time entries for this week');
+    console.log(colors.blue('ℹ') + ' No time entries for this week');
     return;
   }
 
-  console.log(chalk.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
+  console.log(colors.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
   console.log('');
 
   let totalMinutes = 0;
@@ -486,7 +486,7 @@ async function cmdWeek(options = {}) {
   }
 
   // Summary by day
-  console.log(chalk.cyan('By Day:'));
+  console.log(colors.cyan('By Day:'));
   const sortedDays = Object.entries(dayMinutes).sort((a, b) => a[0].localeCompare(b[0]));
   for (const [day, mins] of sortedDays) {
     console.log(`  ${day}: ${formatDurationMinutes(mins)}`);
@@ -494,14 +494,14 @@ async function cmdWeek(options = {}) {
 
   // Summary by topic
   console.log('');
-  console.log(chalk.cyan('By Topic:'));
+  console.log(colors.cyan('By Topic:'));
   const sortedTopics = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
   for (const [topic, mins] of sortedTopics) {
     console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
   }
 
   console.log('');
-  console.log(chalk.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log(colors.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
   console.log('');
   console.log(getSyncStatusMessage(db, 'time-logs'));
 }
@@ -527,11 +527,11 @@ async function cmdRestart(options = {}) {
   `).get();
 
   if (!lastEntry) {
-    console.error(chalk.red('✗') + ' No previous entries to restart');
+    console.error(colors.red('✗') + ' No previous entries to restart');
     process.exit(1);
   }
 
-  console.log(chalk.blue('ℹ') + ` Restarting: ${lastEntry.description}`);
+  console.log(colors.blue('ℹ') + ` Restarting: ${lastEntry.description}`);
 
   // Extract plugin name from source for filtering
   const [pluginName] = lastEntry.source.split('/');
@@ -542,7 +542,7 @@ async function cmdRestart(options = {}) {
 
 // Sync command - delegates to plugin system for all time-logs plugins
 async function cmdSync() {
-  console.log(chalk.blue('ℹ') + ' Syncing time-logs plugins to database...');
+  console.log(colors.blue('ℹ') + ' Syncing time-logs plugins to database...');
 
   try {
     const result = execSync('bin/plugins sync --type time-logs', { encoding: 'utf8' });
@@ -552,13 +552,13 @@ async function cmdSync() {
   } catch (error) {
     // Check if it's just "no plugins" vs actual error
     if (error.stdout?.includes('No plugins of type')) {
-      console.log(chalk.yellow('⚠') + ' No time-logs plugins are enabled.');
+      console.log(colors.yellow('⚠') + ' No time-logs plugins are enabled.');
       console.log('');
       console.log('To sync time tracking data, configure a plugin:');
       console.log('');
-      console.log('  ' + chalk.cyan('bin/plugins configure'));
+      console.log('  ' + colors.cyan('bin/plugins configure'));
     } else {
-      console.error(chalk.red('✗') + ' Sync failed:', error.message);
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
       process.exit(1);
     }
   }

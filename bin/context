@@ -11,9 +11,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
-import chalk from 'chalk';
 import { getSourcesForType } from '../src/plugin-loader.js';
-import { parseArgs } from '../src/cli-utils.js';
+import { colors, parseArgs } from '../src/cli-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,11 +48,11 @@ async function runContextPlugin(pluginName, sourceId) {
  */
 function formatVaultChanges(data) {
   if (!data.files || data.files.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No files changed today');
+    console.log(colors.blue('ℹ') + ' No files changed today');
     return;
   }
 
-  console.log(chalk.cyan('Files Changed Today') + ` (${data.count} files)`);
+  console.log(colors.cyan('Files Changed Today') + ` (${data.count} files)`);
   console.log('');
 
   for (const file of data.files) {
@@ -63,10 +62,10 @@ function formatVaultChanges(data) {
     });
 
     if (file.title) {
-      console.log(`  ${chalk.gray(time)} ${chalk.white(file.path)}`);
-      console.log(`         ${chalk.yellow(file.title)}`);
+      console.log(`  ${colors.gray(time)} ${colors.white(file.path)}`);
+      console.log(`         ${colors.yellow(file.title)}`);
     } else {
-      console.log(`  ${chalk.gray(time)} ${chalk.white(file.path)}`);
+      console.log(`  ${colors.gray(time)} ${colors.white(file.path)}`);
     }
   }
 }
@@ -75,7 +74,7 @@ function formatVaultChanges(data) {
  * Default formatter for unknown context plugins
  */
 function formatDefault(pluginName, data) {
-  console.log(chalk.cyan(pluginName));
+  console.log(colors.cyan(pluginName));
   console.log('');
   console.log(JSON.stringify(data, null, 2));
 }
@@ -86,14 +85,14 @@ async function cmdDefault(options = {}) {
 
   if (sources.length === 0) {
     if (options.source) {
-      console.log(chalk.yellow('⚠') + ` No context plugins matching "${options.source}"`);
+      console.log(colors.yellow('⚠') + ` No context plugins matching "${options.source}"`);
       console.log('');
       console.log('Available sources:');
       for (const s of allSources) {
         console.log(`  - ${s.sourceId}`);
       }
     } else {
-      console.log(chalk.blue('ℹ') + ' No context plugins enabled');
+      console.log(colors.blue('ℹ') + ' No context plugins enabled');
       console.log('');
       console.log('Context plugins provide real-time information like vault changes.');
       console.log('Enable them in config.toml under [plugins.<name>.<source>]');
@@ -108,12 +107,12 @@ async function cmdDefault(options = {}) {
     const data = await runContextPlugin(pluginName, sourceId);
 
     if (!data) {
-      console.log(chalk.yellow('⚠') + ` Could not run ${pluginName}`);
+      console.log(colors.yellow('⚠') + ` Could not run ${pluginName}`);
       continue;
     }
 
     if (data.error) {
-      console.log(chalk.red('✗') + ` ${pluginName}: ${data.error}`);
+      console.log(colors.red('✗') + ` ${pluginName}: ${data.error}`);
       continue;
     }
 
@@ -127,7 +126,7 @@ async function cmdDefault(options = {}) {
     // Add separator between plugins
     if (i < sources.length - 1) {
       console.log('');
-      console.log(chalk.gray('─'.repeat(50)));
+      console.log(colors.gray('─'.repeat(50)));
       console.log('');
     }
   }
@@ -138,17 +137,17 @@ async function cmdList() {
   const { sources } = await getSourcesForType('context');
 
   if (sources.length === 0) {
-    console.log(chalk.blue('ℹ') + ' No context plugins enabled');
+    console.log(colors.blue('ℹ') + ' No context plugins enabled');
     return;
   }
 
-  console.log(chalk.cyan('Context Plugins'));
+  console.log(colors.cyan('Context Plugins'));
   console.log('');
 
   for (const { sourceId, pluginName, config } of sources) {
-    console.log(`  ${chalk.green('●')} ${sourceId}`);
+    console.log(`  ${colors.green('●')} ${sourceId}`);
     if (config?.description) {
-      console.log(`    ${chalk.gray(config.description)}`);
+      console.log(`    ${colors.gray(config.description)}`);
     }
   }
 }

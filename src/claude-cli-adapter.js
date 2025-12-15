@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import Anthropic from '@anthropic-ai/sdk';
-import chalk from 'chalk';
+import { colors } from './cli-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -37,14 +37,14 @@ export class ClaudeCLIAdapter {
     try {
       return await this.askClaudeCLI(systemPrompt, userQuery, options);
     } catch (cliError) {
-      console.log(chalk.yellow('Claude CLI failed, attempting API fallback...'));
+      console.log(colors.yellow('Claude CLI failed, attempting API fallback...'));
 
       // Try API fallback if available
       if (this.fallbackClient) {
         try {
           return await this.askClaudeAPI(systemPrompt, userQuery, options);
         } catch (apiError) {
-          console.error(chalk.red('Both Claude CLI and API failed'));
+          console.error(colors.red('Both Claude CLI and API failed'));
           throw new Error(`Claude access failed: CLI: ${cliError.message}, API: ${apiError.message}`);
         }
       }
@@ -174,7 +174,7 @@ Return ONLY the JSON array of matching items.`;
         return items;
       }
     } catch (error) {
-      console.error(chalk.red('filterWithClaude failed:'), error.message);
+      console.error(colors.red('filterWithClaude failed:'), error.message);
       // Fall back to returning all items if Claude fails entirely
       return items;
     }

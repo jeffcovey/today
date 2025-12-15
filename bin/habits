@@ -4,7 +4,7 @@ import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getTodayDate } from '../src/date-utils.js';
 import { program } from 'commander';
-import chalk from 'chalk';
+import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
 
 // Status emoji map
@@ -24,7 +24,7 @@ program
   .command('sync')
   .description('Sync habits from all enabled habit plugins')
   .action(async () => {
-    console.log(chalk.blue('ℹ') + ' Syncing habits plugins to database...');
+    console.log(colors.blue('ℹ') + ' Syncing habits plugins to database...');
 
     try {
       const result = execSync('bin/plugins sync --type habits', { encoding: 'utf8' });
@@ -33,13 +33,13 @@ program
       console.log(lines.join('\n'));
     } catch (error) {
       if (error.stdout?.includes('No plugins of type')) {
-        console.log(chalk.yellow('⚠') + ' No habits plugins are enabled.');
+        console.log(colors.yellow('⚠') + ' No habits plugins are enabled.');
         console.log('');
         console.log('To sync habits, configure a plugin:');
         console.log('');
-        console.log('  ' + chalk.cyan('bin/plugins configure'));
+        console.log('  ' + colors.cyan('bin/plugins configure'));
       } else {
-        console.error(chalk.red('✗') + ' Sync failed:', error.message);
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
         process.exit(1);
       }
     }
@@ -76,7 +76,7 @@ program
     const habits = db.prepare(sql).all(...params);
 
     if (habits.length === 0) {
-      console.log(chalk.blue('ℹ') + ' No habits for today');
+      console.log(colors.blue('ℹ') + ' No habits for today');
       console.log(getSyncStatusMessage(db, 'habits'));
       return;
     }
@@ -88,7 +88,7 @@ program
     const other = habits.filter(h => !['pending', 'completed'].includes(h.status) && h.goal_type !== 'limit');
 
     console.log('');
-    console.log(chalk.cyan(`Today's Habits`) + ` (${today})`);
+    console.log(colors.cyan(`Today's Habits`) + ` (${today})`);
     console.log('');
 
     // Helper to format habit line based on goal_type
@@ -102,7 +102,7 @@ program
           emoji = '✅'; // Under the limit = success
           if (h.value != null && h.target_value) {
             const val = Number(h.value).toFixed(1).replace(/\.0$/, '');
-            suffix = chalk.gray(` (${val}/${h.target_value})`);
+            suffix = colors.gray(` (${val}/${h.target_value})`);
           }
         } else if (h.status === 'skipped') {
           emoji = '❌'; // Exceeded limit
@@ -110,28 +110,28 @@ program
       } else {
         // Achieve habits
         if (h.value && h.target_type === 'timer') {
-          suffix = chalk.gray(` (${formatDuration(h.value)})`);
+          suffix = colors.gray(` (${formatDuration(h.value)})`);
         }
       }
 
       if (showStreak && h.streak > 0) {
-        suffix += chalk.gray(` 🔥${h.streak}`);
+        suffix += colors.gray(` 🔥${h.streak}`);
       }
 
       return `  ${emoji} ${h.title}${suffix}`;
     };
 
     if (pending.length > 0) {
-      console.log(chalk.yellow('Pending:'));
+      console.log(colors.yellow('Pending:'));
       for (const h of pending) {
-        const streakStr = h.streak > 0 ? chalk.gray(` (${h.streak} day streak)`) : '';
+        const streakStr = h.streak > 0 ? colors.gray(` (${h.streak} day streak)`) : '';
         console.log(`  ${STATUS_EMOJI.pending} ${h.title}${streakStr}`);
       }
       console.log('');
     }
 
     if (completed.length > 0) {
-      console.log(chalk.green('Completed:'));
+      console.log(colors.green('Completed:'));
       for (const h of completed) {
         console.log(formatHabit(h, true));
       }
@@ -139,7 +139,7 @@ program
     }
 
     if (limits.length > 0) {
-      console.log(chalk.blue('Limits:'));
+      console.log(colors.blue('Limits:'));
       for (const h of limits) {
         console.log(formatHabit(h, true));
       }
@@ -147,7 +147,7 @@ program
     }
 
     if (other.length > 0) {
-      console.log(chalk.gray('Skipped/Partial:'));
+      console.log(colors.gray('Skipped/Partial:'));
       for (const h of other) {
         console.log(formatHabit(h, false));
       }
@@ -155,7 +155,7 @@ program
     }
 
     // Summary
-    console.log(chalk.gray(`${completed.length}/${habits.length} completed`));
+    console.log(colors.gray(`${completed.length}/${habits.length} completed`));
     console.log(getSyncStatusMessage(db, 'habits'));
   });
 
@@ -202,7 +202,7 @@ program
     const habits = db.prepare(sql).all(...params);
 
     if (habits.length === 0) {
-      console.log(chalk.blue('ℹ') + ` No habits found for ${date}`);
+      console.log(colors.blue('ℹ') + ` No habits found for ${date}`);
       return;
     }
 
@@ -211,16 +211,16 @@ program
     for (const h of habits) {
       if (h.category !== currentCategory) {
         if (currentCategory !== undefined) console.log('');
-        console.log(chalk.cyan(h.category || 'Uncategorized'));
+        console.log(colors.cyan(h.category || 'Uncategorized'));
         currentCategory = h.category;
       }
       const emoji = STATUS_EMOJI[h.status] || '❓';
-      const streakStr = h.streak > 0 ? chalk.gray(` 🔥${h.streak}`) : '';
+      const streakStr = h.streak > 0 ? colors.gray(` 🔥${h.streak}`) : '';
       console.log(`  ${emoji} ${h.title}${streakStr}`);
     }
 
     console.log('');
-    console.log(chalk.gray(`${habits.length} habits`));
+    console.log(colors.gray(`${habits.length} habits`));
     console.log(getSyncStatusMessage(db, 'habits'));
   });
 
@@ -257,12 +257,12 @@ program
     const filtered = habits.filter(h => (h.streak || 0) >= options.min);
 
     if (filtered.length === 0) {
-      console.log(chalk.blue('ℹ') + ` No habits with streak >= ${options.min} days`);
+      console.log(colors.blue('ℹ') + ` No habits with streak >= ${options.min} days`);
       return;
     }
 
     console.log('');
-    console.log(chalk.cyan('Current Streaks'));
+    console.log(colors.cyan('Current Streaks'));
     console.log('');
 
     for (const h of filtered) {
@@ -304,7 +304,7 @@ program
     const entries = db.prepare(sql).all(...params);
 
     if (entries.length === 0) {
-      console.log(chalk.blue('ℹ') + ` No history found for "${habitName}"`);
+      console.log(colors.blue('ℹ') + ` No history found for "${habitName}"`);
       return;
     }
 
@@ -314,7 +314,7 @@ program
     `).get(`%${habitName}%`);
 
     console.log('');
-    console.log(chalk.cyan(firstEntry?.title || habitName));
+    console.log(colors.cyan(firstEntry?.title || habitName));
     console.log('');
 
     for (const e of entries) {

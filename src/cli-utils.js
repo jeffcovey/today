@@ -3,7 +3,49 @@
  * Shared across all binary commands.
  */
 
-import chalk from 'chalk';
+import pc from 'picocolors';
+
+// ============================================================================
+// Color Utilities
+// ============================================================================
+
+/**
+ * Color functions for CLI output.
+ * Use these instead of importing chalk directly.
+ *
+ * @example
+ * import { colors } from '../src/cli-utils.js';
+ * console.log(colors.green('Success!'));
+ * console.log(colors.bold(colors.blue('Header')));
+ */
+export const colors = {
+  // Basic colors
+  red: pc.red,
+  green: pc.green,
+  yellow: pc.yellow,
+  blue: pc.blue,
+  cyan: pc.cyan,
+  magenta: pc.magenta,
+  white: pc.white,
+  gray: pc.gray,
+
+  // Modifiers
+  bold: pc.bold,
+  dim: pc.dim,
+  italic: pc.italic,
+  underline: pc.underline,
+
+  // Background colors
+  bgRed: pc.bgRed,
+  bgGreen: pc.bgGreen,
+  bgYellow: pc.bgYellow,
+  bgBlue: pc.bgBlue,
+  bgCyan: pc.bgCyan,
+  bgMagenta: pc.bgMagenta,
+
+  // Reset
+  reset: pc.reset,
+};
 
 // ============================================================================
 // Output Utilities
@@ -14,7 +56,7 @@ import chalk from 'chalk';
  * @param {string} message
  */
 export function printStatus(message) {
-  console.log(chalk.green(`✓ ${message}`));
+  console.log(pc.green(`✓ ${message}`));
 }
 
 /**
@@ -22,7 +64,7 @@ export function printStatus(message) {
  * @param {string} message
  */
 export function printError(message) {
-  console.error(chalk.red(`✗ ${message}`));
+  console.error(pc.red(`✗ ${message}`));
 }
 
 /**
@@ -30,7 +72,7 @@ export function printError(message) {
  * @param {string} message
  */
 export function printInfo(message) {
-  console.log(chalk.blue(`ℹ ${message}`));
+  console.log(pc.blue(`ℹ ${message}`));
 }
 
 /**
@@ -38,7 +80,7 @@ export function printInfo(message) {
  * @param {string} message
  */
 export function printWarning(message) {
-  console.log(chalk.yellow(`⚠ ${message}`));
+  console.log(pc.yellow(`⚠ ${message}`));
 }
 
 /**
@@ -47,9 +89,9 @@ export function printWarning(message) {
  */
 export function printHeader(message) {
   console.log('');
-  console.log(chalk.blue('═══════════════════════════════════════'));
-  console.log(chalk.blue.bold(message));
-  console.log(chalk.blue('═══════════════════════════════════════'));
+  console.log(pc.blue('═══════════════════════════════════════'));
+  console.log(pc.bold(pc.blue(message)));
+  console.log(pc.blue('═══════════════════════════════════════'));
 }
 
 // ============================================================================
@@ -113,19 +155,19 @@ export function parseArgs(argv = process.argv.slice(2)) {
 export function showSourceError(error, availableSources, options = {}) {
   const { configCommand = 'bin/plugins configure' } = options;
 
-  console.error(chalk.red('✗') + ` ${error}`);
+  console.error(pc.red('✗') + ` ${error}`);
   console.log('');
 
   if (availableSources && availableSources.length > 0) {
     console.log('Available sources:');
     for (const { sourceId, enabled } of availableSources) {
-      const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
+      const status = enabled ? pc.green('enabled') : pc.gray('disabled');
       console.log(`  ${sourceId} (${status})`);
     }
   }
 
   console.log('');
-  console.log(`Run ${chalk.cyan(configCommand)} to set up plugins.`);
+  console.log(`Run ${pc.cyan(configCommand)} to set up plugins.`);
 }
 
 /**
@@ -141,13 +183,13 @@ export function showSourceError(error, availableSources, options = {}) {
 export function showSourceFilterError(sourceFilter, pluginType, allSources, options = {}) {
   const { configCommand = 'bin/plugins configure' } = options;
 
-  console.log(chalk.red('✗') + ` No sources matching "${sourceFilter}"`);
+  console.log(pc.red('✗') + ` No sources matching "${sourceFilter}"`);
   console.log('');
 
   if (allSources.length > 0) {
     console.log(`Available ${pluginType} sources:`);
     for (const { sourceId, enabled } of allSources) {
-      const status = enabled ? chalk.green('enabled') : chalk.gray('disabled');
+      const status = enabled ? pc.green('enabled') : pc.gray('disabled');
       console.log(`  ${sourceId} (${status})`);
     }
   } else {
@@ -155,5 +197,5 @@ export function showSourceFilterError(sourceFilter, pluginType, allSources, opti
   }
 
   console.log('');
-  console.log(`Run ${chalk.cyan(configCommand)} to set up plugins.`);
+  console.log(`Run ${pc.cyan(configCommand)} to set up plugins.`);
 }
