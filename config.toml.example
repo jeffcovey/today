@@ -304,3 +304,14 @@
 # folders = "INBOX,Sent"
 # include_body = true
 # max_body_size = 50000
+
+# -----------------------------------------------------------------------------
+# Healthchecks.io (monitor failing healthchecks as issues)
+# -----------------------------------------------------------------------------
+# Store HEALTHCHECKS_API_KEY in .env (get from healthchecks.io dashboard)
+
+# [plugins.healthchecks-io.default]
+# enabled = true
+# api_key_env = "HEALTHCHECKS_API_KEY"
+# include_passing = false  # Include passing checks as closed issues
+# include_paused = false   # Include paused checks

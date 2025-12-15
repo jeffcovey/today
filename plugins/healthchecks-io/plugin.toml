@@ -1,0 +1,35 @@
+# Healthchecks.io Plugin
+# Syncs healthcheck monitors as issues (failing checks = open issues)
+
+name = "healthchecks-io"
+displayName = "Healthchecks.io"
+description = "Monitor healthchecks from healthchecks.io"
+type = "issues"
+
+requiredEnv = ["HEALTHCHECKS_API_KEY"]
+
+longDescription = """
+Syncs healthcheck monitors from healthchecks.io to the issues table.
+Failing checks (down, grace, new) appear as open issues.
+Passing checks (up) appear as closed issues.
+Paused checks are excluded by default.
+
+Use the Healthchecks.io dashboard to create and manage monitors.
+This plugin provides read-only access to monitor status.
+"""
+
+aiInstructions = """
+Healthchecks.io monitors are synced as issues.
+- state='open' means the check is FAILING (down, grace, or new)
+- state='closed' means the check is PASSING (up)
+
+To see failing monitors: SELECT * FROM issues WHERE source LIKE 'healthchecks-io%' AND state = 'open'
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+api_key_env = { type = "string", default = "HEALTHCHECKS_API_KEY", description = "Environment variable containing API key" }
+include_passing = { type = "boolean", default = false, description = "Include passing (up) checks as closed issues" }
+include_paused = { type = "boolean", default = false, description = "Include paused checks" }
