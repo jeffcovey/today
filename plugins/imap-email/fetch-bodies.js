@@ -10,6 +10,28 @@ import fs from 'fs';
 import Database from 'better-sqlite3';
 import path from 'path';
 
+// Lock file to prevent multiple background fetchers
+const LOCK_FILE = '/tmp/imap-email-fetch.lock';
+
+function createLockFile(sourceId) {
+  fs.writeFileSync(LOCK_FILE, `${process.pid}:${sourceId}`, { mode: 0o644 });
+}
+
+function removeLockFile() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      fs.unlinkSync(LOCK_FILE);
+    }
+  } catch {
+    // Ignore errors during cleanup
+  }
+}
+
+// Clean up lock file on exit
+process.on('exit', removeLockFile);
+process.on('SIGTERM', () => { removeLockFile(); process.exit(0); });
+process.on('SIGINT', () => { removeLockFile(); process.exit(0); });
+
 const pendingFile = process.argv[2];
 
 if (!pendingFile || !fs.existsSync(pendingFile)) {
@@ -22,6 +44,9 @@ const { config, emails, sourceId } = JSON.parse(fs.readFileSync(pendingFile, 'ut
 
 // Clean up temp file
 fs.unlinkSync(pendingFile);
+
+// Create lock file
+createLockFile(sourceId);
 
 if (!emails || emails.length === 0) {
   console.error('No emails to fetch');

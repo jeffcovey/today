@@ -10,11 +10,51 @@
 import { ImapFlow } from 'imapflow';
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Lock file to prevent multiple background fetchers
+const LOCK_FILE = '/tmp/imap-email-fetch.lock';
+const LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes - assume stale if older
+
+function isBackgroundFetcherRunning() {
+  if (!fs.existsSync(LOCK_FILE)) return false;
+
+  try {
+    const stat = fs.statSync(LOCK_FILE);
+    const ageMs = Date.now() - stat.mtimeMs;
+
+    // If lock is too old, it's probably stale (crashed process)
+    if (ageMs > LOCK_MAX_AGE_MS) {
+      fs.unlinkSync(LOCK_FILE);
+      return false;
+    }
+
+    // Check if the PID in the lock file is still running
+    const content = fs.readFileSync(LOCK_FILE, 'utf-8').trim();
+    const [pid, sourceId] = content.split(':');
+
+    if (pid) {
+      try {
+        // Check if process is still running (signal 0 doesn't kill, just checks)
+        process.kill(parseInt(pid), 0);
+        return { running: true, pid, sourceId };
+      } catch {
+        // Process not running, remove stale lock
+        fs.unlinkSync(LOCK_FILE);
+        return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
 
 // Get existing email data (including bodies) to avoid re-fetching and preserve content
 function getExistingEmailData(sourceId) {
@@ -275,30 +315,37 @@ async function main() {
     if (includeBody && emailsNeedingBodies.length > 0) {
       metadata.bodies_pending = emailsNeedingBodies.length;
 
-      // Sort by size (smallest first) for faster initial results
-      emailsNeedingBodies.sort((a, b) => a.size - b.size);
-
-      // Write pending list to temp file for background process
-      // Include actual password since background process won't have dotenvx
-      const pendingFile = `/tmp/imap-bodies-${Date.now()}.json`;
-      const fs = await import('fs');
-      fs.writeFileSync(pendingFile, JSON.stringify({
-        config: { host, port, secure, username, password, maxBodySize },
-        emails: emailsNeedingBodies,
-        sourceId
-      }), { mode: 0o600 }); // Restrict permissions
-
-      // Spawn background process
-      const bgProcess = spawn('node', [path.join(__dirname, 'fetch-bodies.js'), pendingFile], {
-        detached: true,
-        stdio: 'ignore',
-        env: { ...process.env }
-      });
-      bgProcess.unref();
-
-      console.error(`  📥 Fetching ${emailsNeedingBodies.length} NEW bodies in background (smallest first)`);
-      if (metadata.bodies_skipped > 0) {
+      // Check if a background fetcher is already running
+      const existingFetcher = isBackgroundFetcherRunning();
+      if (existingFetcher && existingFetcher.running) {
+        console.error(`  ⏳ Background fetcher already running (PID ${existingFetcher.pid}) - skipping new fetch`);
         console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
+        metadata.bodies_pending = 0; // Don't report pending since we're not starting a new fetch
+      } else {
+        // Sort by size (smallest first) for faster initial results
+        emailsNeedingBodies.sort((a, b) => a.size - b.size);
+
+        // Write pending list to temp file for background process
+        // Include actual password since background process won't have dotenvx
+        const pendingFile = `/tmp/imap-bodies-${Date.now()}.json`;
+        fs.writeFileSync(pendingFile, JSON.stringify({
+          config: { host, port, secure, username, password, maxBodySize },
+          emails: emailsNeedingBodies,
+          sourceId
+        }), { mode: 0o600 }); // Restrict permissions
+
+        // Spawn background process
+        const bgProcess = spawn('node', [path.join(__dirname, 'fetch-bodies.js'), pendingFile], {
+          detached: true,
+          stdio: 'ignore',
+          env: { ...process.env }
+        });
+        bgProcess.unref();
+
+        console.error(`  📥 Fetching ${emailsNeedingBodies.length} NEW bodies in background (smallest first)`);
+        if (metadata.bodies_skipped > 0) {
+          console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
+        }
       }
     } else if (includeBody && metadata.bodies_skipped > 0) {
       console.error(`  ✓ All ${metadata.bodies_skipped} email bodies already fetched`);
