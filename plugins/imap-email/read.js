@@ -11,9 +11,53 @@ import { ImapFlow } from 'imapflow';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Get existing email data (including bodies) to avoid re-fetching and preserve content
+function getExistingEmailData(sourceId) {
+  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+  const dbPath = path.join(projectRoot, '.data', 'today.db');
+
+  try {
+    const db = new Database(dbPath, { readonly: true, timeout: 5000 });
+    db.pragma('busy_timeout = 5000');
+
+    // Get emails that already have bodies fetched, including their content
+    const existing = db.prepare(`
+      SELECT id, snippet, text_content, html_content, attachments
+      FROM email
+      WHERE source = ?
+        AND (json_extract(metadata, '$.needs_body') = false
+             OR text_content IS NOT NULL)
+    `).all(sourceId);
+
+    db.close();
+
+    // Return map of IDs (without source prefix) to their body content
+    // IDs in DB are like: "imap-email/icloud:INBOX:12345"
+    // We need to extract: "INBOX:12345"
+    const emailMap = new Map();
+    const prefix = sourceId + ':';
+    for (const row of existing) {
+      if (row.id.startsWith(prefix)) {
+        const localId = row.id.substring(prefix.length);
+        emailMap.set(localId, {
+          snippet: row.snippet,
+          text_content: row.text_content,
+          html_content: row.html_content,
+          attachments: row.attachments
+        });
+      }
+    }
+    return emailMap;
+  } catch (err) {
+    // Database might not exist yet on first run
+    return new Map();
+  }
+}
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -75,8 +119,12 @@ const metadata = {
   folders_synced: [],
   total_fetched: 0,
   bodies_pending: 0,
+  bodies_skipped: 0,
   errors: []
 };
+
+// Will be populated with emails that already have bodies fetched (Map of id -> body content)
+let existingEmails = new Map();
 
 async function syncFolder(folderPath) {
   console.error(`  📁 ${folderPath}...`);
@@ -112,8 +160,12 @@ async function syncFolder(folderPath) {
             if (message.flags.has('\\Deleted')) flags.push('deleted');
           }
 
+          const emailId = `${folderPath}:${message.uid}`;
+          const existingData = existingEmails.get(emailId);
+          const hasBody = !!existingData;
+
           const entry = {
-            id: `${folderPath}:${message.uid}`,
+            id: emailId,
             message_id: envelope.messageId || `uid-${message.uid}`,
             from_address: fromAddr ? (fromAddr.address || '') : '',
             from_name: fromAddr ? (fromAddr.name || '') : '',
@@ -127,27 +179,30 @@ async function syncFolder(folderPath) {
             folder: folderPath,
             flags: JSON.stringify(flags),
             size: message.size || 0,
-            snippet: null,  // Will be filled by background fetch
-            text_content: null,
-            html_content: null,
-            attachments: null,
+            // Preserve existing body content if already fetched
+            snippet: existingData?.snippet || null,
+            text_content: existingData?.text_content || null,
+            html_content: existingData?.html_content || null,
+            attachments: existingData?.attachments || null,
             metadata: JSON.stringify({
               uid: message.uid,
               modseq: message.modseq ? message.modseq.toString() : null,
-              needs_body: includeBody
+              needs_body: includeBody && !hasBody  // Don't mark as needing body if already fetched
             })
           };
 
           entries.push(entry);
           folderCount++;
 
-          // Track for background body fetch
-          if (includeBody) {
+          // Track for background body fetch (only if body not already fetched)
+          if (includeBody && !hasBody) {
             emailsNeedingBodies.push({
               folder: folderPath,
               uid: message.uid,
               size: message.size || 0
             });
+          } else if (includeBody && hasBody) {
+            metadata.bodies_skipped++;
           }
 
         } catch (parseError) {
@@ -171,6 +226,12 @@ async function syncFolder(folderPath) {
 
 async function main() {
   try {
+    // Check which emails already have bodies to avoid re-fetching
+    existingEmails = getExistingEmailData(sourceId);
+    if (existingEmails.size > 0) {
+      console.error(`  Found ${existingEmails.size} emails with bodies already fetched`);
+    }
+
     console.error(`Connecting to ${host}...`);
     await client.connect();
     console.error(`✓ Connected as ${username}`);
@@ -210,7 +271,7 @@ async function main() {
     // Summary
     console.error(`✓ Synced ${metadata.total_fetched} emails from ${metadata.folders_synced.length} folder(s)`);
 
-    // Launch background body fetch if needed
+    // Launch background body fetch if needed (only for emails without bodies)
     if (includeBody && emailsNeedingBodies.length > 0) {
       metadata.bodies_pending = emailsNeedingBodies.length;
 
@@ -235,7 +296,12 @@ async function main() {
       });
       bgProcess.unref();
 
-      console.error(`  📥 Fetching ${emailsNeedingBodies.length} bodies in background (smallest first)`);
+      console.error(`  📥 Fetching ${emailsNeedingBodies.length} NEW bodies in background (smallest first)`);
+      if (metadata.bodies_skipped > 0) {
+        console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
+      }
+    } else if (includeBody && metadata.bodies_skipped > 0) {
+      console.error(`  ✓ All ${metadata.bodies_skipped} email bodies already fetched`);
     }
 
   } catch (error) {
