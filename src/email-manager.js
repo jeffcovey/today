@@ -2,7 +2,7 @@ import { ImapFlow } from 'imapflow';
 import chalk from 'chalk';
 import { SQLiteCache } from './sqlite-cache.js';
 import { NaturalLanguageSearch } from './natural-language-search.js';
-import inquirer from 'inquirer';
+// TODO: Replace inquirer usage with @clack/prompts when this file is updated
 import readline from 'readline';
 import { promises as fs } from 'fs';
 import path from 'path';
