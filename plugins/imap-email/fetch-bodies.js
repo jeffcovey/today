@@ -35,10 +35,12 @@ if (!password) {
   process.exit(1);
 }
 
-// Open database
+// Open database with WAL mode and busy timeout for concurrent access
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const dbPath = path.join(projectRoot, '.data', 'today.db');
-const db = new Database(dbPath);
+const db = new Database(dbPath, { timeout: 30000 });
+db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 30000');
 
 // Create IMAP client
 const client = new ImapFlow({

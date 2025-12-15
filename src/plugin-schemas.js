@@ -513,9 +513,9 @@ server search command which queries the IMAP server directly.
 Emails have standard fields: from, to, cc, subject, date, folder, flags.
 The 'flags' field contains read/unread, flagged, answered status.
 The 'metadata' field contains IMAP-specific data like UID and labels.`,
-      defaultCommand: 'bin/email list --limit 40',
+      defaultCommand: 'bin/email list -d 2',
       queryInstructions: `Commands:
-- bin/email list [--limit N] [--from X] [--folder X] - List recent emails from local cache
+- bin/email list [-d N] [--limit N] [--from X] [--folder X] - List emails from from local cache
 - bin/email stats - Show email statistics
 - bin/email search --server "query" - Search IMAP server for historical emails (use for older mail)
 

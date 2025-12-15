@@ -27,11 +27,10 @@ const SYNC_METADATA_RETENTION_DAYS = 90;
 
 // Tables that indicate a legacy database needing rebuild
 // These are tables from the old schema that don't exist in the new plugin-based system
+// Note: cache_metadata and database_cache are still used by bin/email CLI
 const LEGACY_TABLES = [
   'todoist_sync_mapping',
   'markdown_sync',
-  'cache_metadata',
-  'database_cache',
 ];
 
 /**

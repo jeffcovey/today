@@ -832,7 +832,7 @@ async function getContextPluginsData(typeData) {
   return lines.length > 2 ? lines.join('\n') : null;
 }
 
-async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false) {
+async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, noSync = false) {
   // DISABLED - depends on getReviewFilePath/getTomorrowDate
   // const todayFile = getReviewFilePath();
   // const tomorrowFile = getReviewFilePath(getTomorrowDate());
@@ -841,9 +841,15 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   const now = getCurrentTime(timezone);
   const currentTime = formatFullDateTime(now, timezone);
 
-  console.log('📊 Gathering context...');
-  const dataContext = await getDataContext();
-  console.log('✅ Context ready\n');
+  // Skip expensive data gathering for dry-run with --no-sync (used in tests)
+  let dataContext;
+  if (dryRun && noSync) {
+    dataContext = '## Data Sources\n\n(Skipped with --no-sync flag)';
+  } else {
+    console.log('📊 Gathering context...');
+    dataContext = await getDataContext();
+    console.log('✅ Context ready\n');
+  }
   const config = getFullConfig();
 
   // Build user profile section
@@ -1046,7 +1052,7 @@ async function main() {
 
   // Handle dry-run command - show what prompt would be sent to AI
   if (command === 'dry-run') {
-    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */);
+    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */, noSync);
     return;
   }
 
@@ -1068,13 +1074,17 @@ async function main() {
   //   checkClaudeAuth();
   // }
 
-  // DISABLED - runSync replaced by bin/plugins sync
-  // // Run sync (unless skipped)
-  // if (!noSync) {
-  //   runSync(false);
-  // } else {
-  //   console.log('⚠️  Skipping sync (--no-sync flag provided)');
-  // }
+  // Run sync (unless skipped)
+  if (!noSync) {
+    console.log('🔄 Syncing data sources...');
+    try {
+      execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
+    } catch (error) {
+      console.error('⚠️  Sync completed with some errors');
+    }
+  } else {
+    console.log('⚠️  Skipping sync (--no-sync flag provided)');
+  }
 
   // DISABLED - createReviewFromTemplate depends on template features
   // // Create review file from template if needed

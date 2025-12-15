@@ -28,9 +28,9 @@ Email data is synced from IMAP for the last {days_to_sync} days.
 For emails older than {days_to_sync} days, use: bin/email search --server "query"
 
 Common queries:
-- Recent unread: SELECT * FROM emails WHERE json_extract(flags, '$') NOT LIKE '%seen%' ORDER BY date DESC
-- From specific sender: SELECT * FROM emails WHERE from_address LIKE '%example.com%'
-- By folder: SELECT * FROM emails WHERE folder = 'INBOX'
+- Recent unread: SELECT * FROM email WHERE json_extract(flags, '$') NOT LIKE '%seen%' ORDER BY date DESC
+- From specific sender: SELECT * FROM email WHERE from_address LIKE '%example.com%'
+- By folder: SELECT * FROM email WHERE folder = 'INBOX'
 """
 
 [commands]
