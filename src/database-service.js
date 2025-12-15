@@ -114,6 +114,24 @@ export class DatabaseService {
   }
 
   /**
+   * Execute a pragma command
+   */
+  pragma(sql, options) {
+    return this.localDb.pragma(sql, options);
+  }
+
+  /**
+   * Refresh the database connection to ensure fresh view of data.
+   * Call this after subprocess writes to ensure WAL changes are visible.
+   */
+  refresh() {
+    if (this.localDb) {
+      this.localDb.close();
+    }
+    this.init();
+  }
+
+  /**
    * Close database connections
    */
   async close() {

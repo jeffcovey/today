@@ -91,33 +91,31 @@ for (const file of filesToSync) {
 }
 
 // Also check current-timer.md for running timer
+// ALWAYS include this file regardless of mtime - running timers must be synced
+// to avoid race conditions where the timer is written, sync runs, then stop
+// can't find the timer because mtime < lastSyncDate
 const currentTimerFile = path.join(timeDir, 'current-timer.md');
 const currentTimerRelPath = path.join(directory, 'current-timer.md');
 
 if (fs.existsSync(currentTimerFile)) {
-  // Check if current-timer was modified since last sync (or always include if full sync)
-  const shouldIncludeTimer = !lastSyncDate || fs.statSync(currentTimerFile).mtime > lastSyncDate;
+  // Always include this file in filesProcessed
+  // This ensures the DB entry is deleted when timer is stopped (file becomes empty)
+  filesProcessed.push(currentTimerRelPath);
 
-  if (shouldIncludeTimer) {
-    // Always include this file in filesProcessed when modified
-    // This ensures the DB entry is deleted when timer is stopped (file becomes empty)
-    filesProcessed.push(currentTimerRelPath);
+  const content = fs.readFileSync(currentTimerFile, 'utf8').trim();
+  if (content) {
+    const lines = content.split('\n');
+    if (lines.length >= 2) {
+      const description = lines[0];
+      const startTime = lines[1];
 
-    const content = fs.readFileSync(currentTimerFile, 'utf8').trim();
-    if (content) {
-      const lines = content.split('\n');
-      if (lines.length >= 2) {
-        const description = lines[0];
-        const startTime = lines[1];
-
-        entries.push({
-          id: `${currentTimerRelPath}:0`,
-          start_time: startTime,
-          end_time: null,
-          duration_minutes: 0,
-          description: description
-        });
-      }
+      entries.push({
+        id: `${currentTimerRelPath}:0`,
+        start_time: startTime,
+        end_time: null,
+        duration_minutes: 0,
+        description: description
+      });
     }
   }
 }

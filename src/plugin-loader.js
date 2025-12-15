@@ -163,9 +163,11 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
 
   try {
     // Run from project root so relative paths in plugins work correctly
+    // Explicitly pipe all stdio to prevent stderr from leaking to terminal
     const output = execSync(fullPath, {
       cwd: PROJECT_ROOT,
       encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
         PROJECT_ROOT,
@@ -178,8 +180,26 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
     const data = JSON.parse(output);
     return { success: true, data };
   } catch (error) {
-    const message = error.stderr || error.message;
-    return { success: false, error: message };
+    // Distinguish between execSync errors (command failed) and JSON parse errors
+    if (error.status !== undefined) {
+      // execSync error - command exited with non-zero status
+      // Extract just the error message, not all progress output from stderr
+      const stderr = error.stderr || '';
+      // Look for actual error lines (starting with "Error:" or containing "error")
+      const errorLines = stderr.split('\n').filter(line =>
+        line.toLowerCase().includes('error') ||
+        line.startsWith('Error:') ||
+        line.includes('failed') ||
+        line.includes('ECONNREFUSED') ||
+        line.includes('ETIMEDOUT')
+      );
+      const message = errorLines.length > 0
+        ? errorLines[errorLines.length - 1].trim()  // Use last error line
+        : `Command exited with status ${error.status}`;
+      return { success: false, error: message };
+    }
+    // JSON parse error or other JavaScript error
+    return { success: false, error: error.message };
   }
 }
 
@@ -252,6 +272,9 @@ export function ensureSyncForType(db, pluginType, options = {}) {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
+    // Refresh the database connection to ensure subprocess writes are visible
+    // This closes and reopens the connection, guaranteeing a fresh view of WAL data
+    db.refresh();
     return true;
   } catch {
     // Silently ignore sync errors for read operations
@@ -298,11 +321,11 @@ export function getSyncStatusMessage(db, pluginType) {
 /**
  * Update sync metadata after a successful sync
  */
-function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount) {
+function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null) {
   db.prepare(`
-    INSERT OR REPLACE INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count)
-    VALUES (?, datetime('now'), ?, ?)
-  `).run(sourceId, JSON.stringify(filesProcessed), entriesCount);
+    INSERT OR REPLACE INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
+    VALUES (?, datetime('now'), ?, ?, ?)
+  `).run(sourceId, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
 }
 
 /**
@@ -368,17 +391,19 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 
   // Plugin can return either:
   // - Array of entries (legacy full sync)
-  // - Object with { entries: [], files_processed: [], incremental: true }
+  // - Object with { entries: [], files_processed: [], incremental: true, metadata: {} }
   let entries;
   let filesProcessed = null;
   let isIncremental = false;
+  let pluginMetadata = null;
 
   if (Array.isArray(result.data)) {
     entries = result.data;
   } else if (result.data && Array.isArray(result.data.entries)) {
     entries = result.data.entries;
     filesProcessed = result.data.files_processed || null;
-    isIncremental = result.data.incremental === true;
+    isIncremental = result.data.incremental === true || result.data.metadata?.incremental === true;
+    pluginMetadata = result.data.metadata || null;
   } else {
     return {
       success: false,
@@ -423,8 +448,9 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   // Insert entries with source identifier
   const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
 
-  // Update sync metadata
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count);
+  // Update sync metadata (including plugin-specific state like folder_state for IMAP)
+  const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
@@ -600,6 +626,11 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
       console.warn(`Warning: Auto-priority failed for ${sourceId}: ${error.message}`);
     }
   }
+
+  // Force WAL checkpoint to ensure writes are visible to other processes
+  // Critical for rapid timer start/stop cycles in different processes
+  // FULL mode waits for readers to finish, ensuring consistency without truncating WAL
+  db.pragma('wal_checkpoint(FULL)');
 
   const incrementalMsg = isIncremental ? ' (incremental)' : '';
   const archiveMsg = archiveResult?.archived ? `, archived ${archiveResult.archived}` : '';
