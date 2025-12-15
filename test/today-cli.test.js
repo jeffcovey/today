@@ -21,6 +21,8 @@ function runToday(args = '', options = {}) {
         ...process.env,
         // Skip dependency checks in tests for faster execution
         SKIP_DEP_CHECK: 'true',
+        // Skip database health checks in tests for faster execution
+        SKIP_DB_HEALTH: 'true',
       },
       ...options,
     });

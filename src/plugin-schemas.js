@@ -499,6 +499,148 @@ SQL: SELECT title, date, status, value FROM habits WHERE date = date('now') ORDE
       }
     },
     indexes: ['source', 'habit_id', 'date', 'status']
+  },
+
+  'email': {
+    table: 'email',
+    staleMinutes: 15, // Email changes moderately often
+    ai: {
+      name: 'Email',
+      description: `Email messages synced from IMAP servers. Only recent emails (configured days)
+are stored locally for quick access. For historical email searches, use the
+server search command which queries the IMAP server directly.
+
+Emails have standard fields: from, to, cc, subject, date, folder, flags.
+The 'flags' field contains read/unread, flagged, answered status.
+The 'metadata' field contains IMAP-specific data like UID and labels.`,
+      defaultCommand: 'bin/email list -d 2',
+      queryInstructions: `Commands:
+- bin/email list [-d N] [--limit N] [--from X] [--folder X] - List emails from from local cache
+- bin/email stats - Show email statistics
+- bin/email search --server "query" - Search IMAP server for historical emails (use for older mail)
+
+SQL: SELECT subject, from_address, date, folder FROM email WHERE date > datetime('now', '-7 days') ORDER BY date DESC`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (generated from source:message_id)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., imap-email/personal)'
+      },
+      message_id: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'RFC 5322 Message-ID header'
+      },
+      from_address: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Sender email address'
+      },
+      from_name: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Sender display name'
+      },
+      to_addresses: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Recipients as JSON array'
+      },
+      cc_addresses: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'CC recipients as JSON array'
+      },
+      reply_to: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Reply-To address'
+      },
+      subject: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Email subject line'
+      },
+      date: {
+        sqlType: 'DATETIME NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Sent/received timestamp (ISO 8601)'
+      },
+      folder: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Mailbox/folder name (e.g., INBOX, Sent)'
+      },
+      flags: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of flags: seen, flagged, answered, draft, deleted'
+      },
+      size: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Email size in bytes'
+      },
+      snippet: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Short preview text (first ~200 chars of body)'
+      },
+      text_content: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Full plain text body'
+      },
+      html_content: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Full HTML body'
+      },
+      attachments: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of attachment metadata (filename, type, size)'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for IMAP-specific data (uid, labels, headers, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'date', 'folder', 'from_address']
   }
 
   // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers

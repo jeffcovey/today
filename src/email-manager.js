@@ -45,7 +45,7 @@ export class EmailManager {
 
   // Get emails from local database
   async getLocalEmails(filter = {}) {
-    let query = 'SELECT * FROM emails';
+    let query = 'SELECT * FROM email';
     const conditions = [];
     const params = [];
 
