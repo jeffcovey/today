@@ -13,6 +13,7 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
 const logsDirectory = config.logs_directory || 'vault/logs';
 const retentionDays = config.retention_days || 30;
+const cleanupOldFiles = config.cleanup_old_files || false;
 
 const logsDir = path.join(projectRoot, logsDirectory);
 
@@ -33,6 +34,28 @@ function findLatestStreaksFile() {
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
   return files[0]?.path || null;
+}
+
+// Delete all .streaks files except the latest one
+function cleanupOldStreaksFiles(latestFile) {
+  if (!fs.existsSync(logsDir)) return [];
+
+  const deleted = [];
+  const files = fs.readdirSync(logsDir)
+    .filter(f => f.endsWith('.streaks'))
+    .map(f => path.join(logsDir, f))
+    .filter(f => f !== latestFile);
+
+  for (const file of files) {
+    try {
+      fs.unlinkSync(file);
+      deleted.push(path.basename(file));
+    } catch (error) {
+      // Ignore deletion errors
+    }
+  }
+
+  return deleted;
 }
 
 // Parse date from YYYYMMDD integer to YYYY-MM-DD string
@@ -274,6 +297,12 @@ for (const task of data.tasks || []) {
   }
 }
 
+// Cleanup old files if enabled
+let deletedFiles = [];
+if (cleanupOldFiles) {
+  deletedFiles = cleanupOldStreaksFiles(streaksFile);
+}
+
 // Output
 console.log(JSON.stringify({
   entries: entries,
@@ -283,6 +312,7 @@ console.log(JSON.stringify({
     entries_count: entries.length,
     retention_days: retentionDays,
     cutoff_date: formatDate(cutoffInt),
-    app_version: data.app
+    app_version: data.app,
+    deleted_files: deletedFiles.length > 0 ? deletedFiles : undefined
   }
 }));

@@ -49,3 +49,4 @@ read = "./read.js"
 [settings]
 logs_directory = { type = "string", default = "vault/logs", description = "Directory containing .streaks backup files" }
 retention_days = { type = "number", default = 30, description = "Days of history to keep in database" }
+cleanup_old_files = { type = "boolean", default = false, description = "Delete all .streaks files except the latest one after reading" }
