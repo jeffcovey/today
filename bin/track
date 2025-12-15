@@ -162,6 +162,12 @@ async function cmdStop(options = {}) {
   const duration = calculateDurationMinutes(timerToStop.start_time, endTime);
   const durationFormatted = formatDurationMinutes(duration);
 
+  // Warn if timer ran unusually long (likely forgotten)
+  const LONG_TIMER_THRESHOLD_MINUTES = 240; // 4 hours
+  if (duration > LONG_TIMER_THRESHOLD_MINUTES) {
+    console.log(chalk.yellow('⚠') + ` This timer ran for ${durationFormatted} - was it left running by mistake?`);
+  }
+
   // Complete the entry
   const entry = {
     start_time: timerToStop.start_time,
