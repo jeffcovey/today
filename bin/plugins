@@ -19,7 +19,7 @@ import {
 } from '../src/plugin-loader.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
-import { ensureHealthyDatabase } from '../src/db-health.js';
+import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -28,6 +28,18 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.toml');
 const CONFIG_EXAMPLE_PATH = path.join(PROJECT_ROOT, 'config.toml.example');
+
+/**
+ * Check if an error is a database corruption error that warrants recreation
+ */
+function isDatabaseCorruptionError(error) {
+  const message = error?.message || String(error);
+  return message.includes('database disk image is malformed') ||
+         message.includes('disk I/O error') ||
+         message.includes('file is not a database') ||
+         message.includes('database is locked') ||
+         message.includes('unable to open database');
+}
 
 /**
  * Ensure config.toml has entries for all available plugins.
@@ -206,49 +218,17 @@ async function cmdStatus() {
   }
 }
 
-async function cmdSync(pluginName, sourceName, options = {}) {
-  // Handle help flag
-  if (options.help || options.h) {
-    console.log(`
-Usage: bin/plugins sync [plugin-name] [source-name] [options]
-
-Sync data from plugins to the database.
-
-Arguments:
-  plugin-name    Sync only this plugin (optional)
-  source-name    Sync only this source within the plugin (optional)
-
-Options:
-  --type TYPE    Sync only plugins of this type (e.g., events, issues, time-logs)
-
-Examples:
-  bin/plugins sync                        # Sync all enabled plugins
-  bin/plugins sync --type events          # Sync only calendar/event plugins
-  bin/plugins sync github-issues          # Sync only github-issues plugin
-  bin/plugins sync github-issues today    # Sync only the 'today' source
-
-Note: CLI tools (bin/calendar, bin/issues, etc.) auto-sync stale data before
-displaying results. Use 'bin/plugins sync' to force an immediate refresh.
-`);
-    return;
-  }
-
-  // Ensure database is healthy and migrations are run
-  const healthResult = await ensureHealthyDatabase({ verbose: false });
-  if (!healthResult.success) {
-    console.error(colors.red('Database health check failed'));
-    process.exit(1);
-  }
-
-  const db = getDatabase();
-  const vaultPath = path.join(PROJECT_ROOT, 'vault');
-
-  const context = { db, vaultPath };
-
-  // Get type filter from options
+/**
+ * Execute the actual sync operation
+ * @param {object} context - { db, vaultPath }
+ * @param {string|null} pluginName - Specific plugin to sync (or null for all)
+ * @param {string|null} sourceName - Specific source within plugin (or null for all)
+ * @param {object} options - Sync options
+ * @returns {Promise<void>}
+ */
+async function runSyncOperation(context, pluginName, sourceName, options) {
+  const { db } = context;
   const typeFilter = options.type || options.t;
-
-  // Staleness check: skip sync if data is fresh (--if-stale <minutes>)
   const staleMinutes = options['if-stale'] ? parseInt(options['if-stale'], 10) : null;
 
   if (pluginName) {
@@ -361,6 +341,87 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
   // needs to immediately see the changes we just wrote
   // FULL mode waits for readers to finish, ensuring consistency without truncating WAL
   db.pragma('wal_checkpoint(FULL)');
+}
+
+async function cmdSync(pluginName, sourceName, options = {}) {
+  // Handle help flag
+  if (options.help || options.h) {
+    console.log(`
+Usage: bin/plugins sync [plugin-name] [source-name] [options]
+
+Sync data from plugins to the database.
+
+Arguments:
+  plugin-name    Sync only this plugin (optional)
+  source-name    Sync only this source within the plugin (optional)
+
+Options:
+  --type TYPE    Sync only plugins of this type (e.g., events, issues, time-logs)
+
+Examples:
+  bin/plugins sync                        # Sync all enabled plugins
+  bin/plugins sync --type events          # Sync only calendar/event plugins
+  bin/plugins sync github-issues          # Sync only github-issues plugin
+  bin/plugins sync github-issues today    # Sync only the 'today' source
+
+Note: CLI tools (bin/calendar, bin/issues, etc.) auto-sync stale data before
+displaying results. Use 'bin/plugins sync' to force an immediate refresh.
+`);
+    return;
+  }
+
+  // Ensure database is healthy and migrations are run
+  let healthResult = await ensureHealthyDatabase({ verbose: true });
+  if (!healthResult.success) {
+    console.error(colors.red('Database health check failed'));
+    process.exit(1);
+  }
+
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  // Attempt sync with automatic recovery on database corruption
+  let retryCount = 0;
+  const maxRetries = 1;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const db = getDatabase();
+      const context = { db, vaultPath };
+      await runSyncOperation(context, pluginName, sourceName, options);
+      return; // Success - exit the retry loop
+    } catch (error) {
+      if (isDatabaseCorruptionError(error) && retryCount < maxRetries) {
+        retryCount++;
+        console.log('');
+        console.log(colors.yellow(`⚠️  Database error detected: ${error.message}`));
+        console.log(colors.cyan('🔄 Recreating database and retrying sync...'));
+        console.log('');
+
+        // Close existing connection and clear singleton
+        try {
+          const db = getDatabase();
+          await db.close();
+        } catch {
+          // Ignore close errors
+        }
+
+        // Recreate the database from scratch
+        const recreated = await createFreshDatabase();
+        if (!recreated) {
+          console.error(colors.red('Failed to recreate database'));
+          process.exit(1);
+        }
+
+        console.log(colors.green('✅ Database recreated successfully'));
+        console.log('');
+
+        // Continue to retry
+      } else {
+        // Non-recoverable error or max retries exceeded
+        throw error;
+      }
+    }
+  }
 }
 
 /**
