@@ -315,3 +315,8 @@
 # api_key_env = "HEALTHCHECKS_API_KEY"
 # include_passing = false  # Include passing checks as closed issues
 # include_paused = false   # Include paused checks
+
+# [plugins.markdown-routines.default]
+# enabled = true
+# routines_directory = "vault/routines"
+# history_limit = 30

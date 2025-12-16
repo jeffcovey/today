@@ -639,10 +639,13 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   const dateMsg = dateCreatedResult?.added ? `, dated ${dateCreatedResult.added}` : '';
   const classifyMsg = classificationResult?.classified ? `, classified ${classificationResult.classified}` : '';
   const priorityMsg = priorityResult?.prioritized ? `, prioritized ${priorityResult.prioritized}` : '';
+  const createdSampleMsg = pluginMetadata?.created_sample
+    ? `\n    Created sample: ${pluginMetadata.created_sample}`
+    : '';
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 

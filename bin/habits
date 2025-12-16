@@ -111,6 +111,8 @@ program
         // Achieve habits
         if (h.value && h.target_type === 'timer') {
           suffix = colors.gray(` (${formatDuration(h.value)})`);
+        } else if (h.target_type === 'steps' && h.value != null && h.target_value) {
+          suffix = colors.gray(` (${h.value}/${h.target_value} steps)`);
         }
       }
 
@@ -124,8 +126,16 @@ program
     if (pending.length > 0) {
       console.log(colors.yellow('Pending:'));
       for (const h of pending) {
-        const streakStr = h.streak > 0 ? colors.gray(` (${h.streak} day streak)`) : '';
-        console.log(`  ${STATUS_EMOJI.pending} ${h.title}${streakStr}`);
+        let suffix = '';
+        // Show steps for routines
+        if (h.target_type === 'steps' && h.target_value) {
+          const done = h.value || 0;
+          suffix = colors.gray(` (${done}/${h.target_value} steps)`);
+        }
+        if (h.streak > 0) {
+          suffix += colors.gray(` (${h.streak} day streak)`);
+        }
+        console.log(`  ${STATUS_EMOJI.pending} ${h.title}${suffix}`);
       }
       console.log('');
     }
