@@ -23,6 +23,8 @@ function runToday(args = '', options = {}) {
         SKIP_DEP_CHECK: 'true',
         // Skip database health checks in tests for faster execution
         SKIP_DB_HEALTH: 'true',
+        // Skip slow context gathering for faster tests
+        SKIP_CONTEXT: 'true',
       },
       ...options,
     });

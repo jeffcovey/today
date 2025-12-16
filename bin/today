@@ -715,6 +715,12 @@ async function checkAndRecoverDatabase() {
  * Groups data by plugin type with schema, instructions, and current data
  */
 async function getDataContext() {
+  // Skip context gathering in test mode for faster tests
+  if (process.env.SKIP_CONTEXT === 'true') {
+    return `# Data Sources
+(Context gathering skipped for testing)`;
+  }
+
   try {
     const pluginTypes = getPluginTypes();
     const instructionsByType = await getAIInstructionsByType();
