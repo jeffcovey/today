@@ -21,7 +21,7 @@ const PROJECT_ROOT = path.dirname(__dirname);
 /**
  * Run a single context plugin and return its output
  */
-async function runContextPlugin(pluginName, sourceId) {
+async function runContextPlugin(pluginName, sourceId, sourceConfig) {
   const pluginPath = path.join(PROJECT_ROOT, 'plugins', pluginName);
   const readScript = path.join(pluginPath, 'read.js');
 
@@ -34,7 +34,13 @@ async function runContextPlugin(pluginName, sourceId) {
     const output = execSync(`node "${readScript}"`, {
       cwd: PROJECT_ROOT,
       encoding: 'utf8',
-      timeout: 30000
+      timeout: 30000,
+      env: {
+        ...process.env,
+        PROJECT_ROOT,
+        PLUGIN_CONFIG: JSON.stringify(sourceConfig || {}),
+        SOURCE_ID: sourceId
+      }
     });
 
     return JSON.parse(output);
@@ -72,11 +78,18 @@ function formatVaultChanges(data) {
 
 /**
  * Default formatter for unknown context plugins
+ * Plugins can provide a 'context' field with pre-formatted text
  */
 function formatDefault(pluginName, data) {
   console.log(colors.cyan(pluginName));
   console.log('');
-  console.log(JSON.stringify(data, null, 2));
+
+  // If plugin provides a 'context' field, display it formatted
+  if (data.context) {
+    console.log(data.context);
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
 }
 
 // Default command - show all context plugin outputs
@@ -101,10 +114,10 @@ async function cmdDefault(options = {}) {
   }
 
   for (let i = 0; i < sources.length; i++) {
-    const { sourceId, plugin } = sources[i];
+    const { sourceId, plugin, config } = sources[i];
     const pluginName = plugin.name;
 
-    const data = await runContextPlugin(pluginName, sourceId);
+    const data = await runContextPlugin(pluginName, sourceId, config);
 
     if (!data) {
       console.log(colors.yellow('⚠') + ` Could not run ${pluginName}`);
@@ -168,6 +181,7 @@ function showHelp() {
   console.log('');
   console.log('Context plugins provide ephemeral data (not stored in database):');
   console.log('  - vault-changes: Files modified or added today');
+  console.log('  - weather-context: Current weather and forecast');
   console.log('');
   console.log('Examples:');
   console.log('  context show                Show all context');

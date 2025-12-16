@@ -320,3 +320,8 @@
 # enabled = true
 # routines_directory = "vault/routines"
 # history_limit = 30
+
+# [plugins.weather-context.default]
+# enabled = true
+# location = ""
+# units = "imperial"
