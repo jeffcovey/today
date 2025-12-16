@@ -325,3 +325,11 @@
 # enabled = true
 # location = ""
 # units = "imperial"
+
+# [plugins.markdown-diary.default]
+# enabled = true
+# diary_directory = "vault/diary"
+
+# [plugins.icloud-conflict-cleanup.default]
+# enabled = true
+# directory = "vault"

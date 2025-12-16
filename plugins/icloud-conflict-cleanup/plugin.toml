@@ -1,0 +1,32 @@
+# iCloud Conflict Cleanup Plugin
+# Cleans up duplicate files created by iCloud Drive sync
+
+name = "icloud-conflict-cleanup"
+displayName = "iCloud Conflict Cleanup"
+description = "Clean up duplicate files created by iCloud Drive sync"
+type = "utility"
+
+requiredEnv = []
+
+longDescription = """
+Cleans up duplicate files created by iCloud Drive sync.
+
+When iCloud detects a conflict (same file edited on multiple devices), it creates
+files with the pattern: `filename 2.ext` (or `filename 3.ext`, etc.)
+
+This plugin:
+1. Finds all files matching `* [0-9].ext` pattern in the vault
+2. For each duplicate file:
+   - If original exists and files are identical: deletes the duplicate
+   - If original exists and duplicate is older: deletes the duplicate (stale)
+   - If original doesn't exist: restores the duplicate as the original
+   - If files differ and duplicate is newer: keeps it for manual review
+
+Run `bin/plugins sync icloud-conflict-cleanup` to clean up duplicates.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+directory = { type = "string", default = "vault", description = "Directory to scan for duplicate files" }

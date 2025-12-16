@@ -26,7 +26,7 @@ alias gl='git log --oneline -10'
 alias sync='bin/sync'
 alias today='bin/today'
 alias status='bin/status'
-alias progress='bin/progress'
+alias diary='bin/diary'
 
 # Configure git identity from config.toml if available
 if ! git config user.email > /dev/null 2>&1; then

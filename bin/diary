@@ -2,6 +2,7 @@
 
 import { execSync } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType } from '../src/plugin-loader.js';
@@ -15,6 +16,15 @@ import {
   parseArgs,
   showSourceFilterError
 } from '../src/cli-utils.js';
+import { getFullConfig } from '../src/config.js';
+
+// Entry type emoji map
+const TYPE_EMOJI = {
+  gratitude: '🙏',
+  progress: '📈',
+  concern: '😟',
+  journal: '📝'
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -327,6 +337,92 @@ async function cmdSync() {
   }
 }
 
+// Add command - add a new diary entry
+async function cmdAdd(type, text, options = {}) {
+  const validTypes = ['gratitude', 'progress', 'concern', 'journal'];
+  if (!validTypes.includes(type)) {
+    console.error(colors.red('✗') + ` Invalid type "${type}". Use: ${validTypes.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!text) {
+    console.error(colors.red('✗') + ' Please provide text for the entry');
+    process.exit(1);
+  }
+
+  const config = getFullConfig();
+  const diaryDir = path.join(PROJECT_ROOT, config.plugins?.['markdown-diary']?.default?.diary_directory || 'vault/diary');
+  const today = getTodayDate();
+  const filePath = path.join(diaryDir, `${today}.md`);
+
+  // Ensure directory exists
+  if (!fs.existsSync(diaryDir)) {
+    fs.mkdirSync(diaryDir, { recursive: true });
+  }
+
+  // Get current time
+  const now = new Date();
+  const timeStr = now.toTimeString().slice(0, 5); // HH:MM
+
+  // Read or create file
+  let content = '';
+  if (fs.existsSync(filePath)) {
+    content = fs.readFileSync(filePath, 'utf8');
+  } else {
+    // Create new file with front matter
+    content = `---
+date: ${today}
+---
+
+`;
+  }
+
+  // Find or create the section
+  const sectionName = type.charAt(0).toUpperCase() + type.slice(1);
+  const sectionHeader = `## ${sectionName}`;
+
+  if (!content.includes(sectionHeader)) {
+    // Add section at the end
+    content = content.trimEnd() + `\n\n${sectionHeader}\n`;
+  }
+
+  // Add the entry
+  if (type === 'gratitude') {
+    // Gratitude: simple bullet (no timestamp)
+    const insertPoint = content.indexOf(sectionHeader) + sectionHeader.length;
+    const beforeSection = content.slice(0, insertPoint);
+    const afterSection = content.slice(insertPoint);
+
+    // Find the end of the gratitude section (next ## or end of file)
+    const nextSectionMatch = afterSection.match(/\n## /);
+    const sectionEnd = nextSectionMatch ? nextSectionMatch.index : afterSection.length;
+
+    const sectionContent = afterSection.slice(0, sectionEnd);
+    const restContent = afterSection.slice(sectionEnd);
+
+    content = beforeSection + sectionContent.trimEnd() + `\n- ${text}\n` + restContent;
+  } else {
+    // Timestamped entry (progress, concern, journal)
+    const insertPoint = content.indexOf(sectionHeader) + sectionHeader.length;
+    const beforeSection = content.slice(0, insertPoint);
+    const afterSection = content.slice(insertPoint);
+
+    // Find the end of the section (next ## or end of file)
+    const nextSectionMatch = afterSection.match(/\n## /);
+    const sectionEnd = nextSectionMatch ? nextSectionMatch.index : afterSection.length;
+
+    const sectionContent = afterSection.slice(0, sectionEnd);
+    const restContent = afterSection.slice(sectionEnd);
+
+    content = beforeSection + sectionContent.trimEnd() + `\n\n### ${timeStr}\n${text}\n` + restContent;
+  }
+
+  fs.writeFileSync(filePath, content, 'utf8');
+
+  const emoji = TYPE_EMOJI[type];
+  console.log(colors.green('✓') + ` Added ${emoji} ${type} entry to ${filePath}`);
+}
+
 // Helper to display a single entry
 function displayEntry(entry, highlightTerm = null) {
   const { date, text, metadata } = entry;
@@ -339,8 +435,12 @@ function displayEntry(entry, highlightTerm = null) {
     meta = metadata ? JSON.parse(metadata) : {};
   } catch (e) {}
 
+  // Entry type prefix
+  const entryType = meta.type || '';
+  const typeEmoji = TYPE_EMOJI[entryType] || '📄';
+
   // Header line with date and location
-  let header = colors.yellow(`${dateStr} ${timeStr}`);
+  let header = `${typeEmoji} ` + colors.yellow(`${dateStr} ${timeStr}`);
   if (meta.location?.localityName) {
     header += colors.gray(` • ${meta.location.localityName}`);
   }
@@ -407,6 +507,12 @@ switch (command) {
   case 'sync':
     await cmdSync();
     break;
+  case 'add':
+    // diary add <type> <text>
+    const addType = positional[0];
+    const addText = positional.slice(1).join(' ');
+    await cmdAdd(addType, addText, options);
+    break;
   default:
     console.log('Diary CLI');
     console.log('');
@@ -420,6 +526,13 @@ switch (command) {
     console.log('  on-this-day, otd            Show entries from this date in past years');
     console.log('  stats                       Show diary statistics');
     console.log('  sync                        Sync all diary plugins to database');
+    console.log('  add TYPE TEXT               Add a new entry (gratitude, progress, concern, journal)');
+    console.log('');
+    console.log('Entry Types:');
+    console.log('  🙏 gratitude    Things you\'re grateful for (no timestamp)');
+    console.log('  📈 progress     Work accomplishments (timestamped)');
+    console.log('  😟 concern      Worries or issues to address (timestamped)');
+    console.log('  📝 journal      Free-form reflection (timestamped)');
     console.log('');
     console.log('Options:');
     console.log('  --source NAME               Filter by plugin source');
@@ -432,5 +545,9 @@ switch (command) {
     console.log('  diary search "Florida"');
     console.log('  diary on-this-day');
     console.log('  diary stats');
+    console.log('  diary add gratitude "cool December breezes"');
+    console.log('  diary add progress "Finished the markdown-diary plugin"');
+    console.log('  diary add concern "Need to review quarterly finances"');
+    console.log('  diary add journal "Reflecting on a productive day..."');
     console.log('');
 }

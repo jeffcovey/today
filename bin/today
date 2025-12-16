@@ -957,10 +957,8 @@ ${contextSection}`;
   // console.log('📝 Your plans are in:');
   // console.log(`   Today: ${todayFile}`);
   // console.log(`   Tomorrow: ${tomorrowFile}\n`);
-  console.log('💡 Continue tracking progress with:');
-  console.log('   bin/progress \'note\'');
-  // DISABLED - update command depends on disabled features
-  // console.log('   bin/today update  # Update both files with progress');
+  console.log('💡 Track progress with:');
+  console.log('   bin/diary add progress \'note\'');
   console.log('━'.repeat(50) + '\n');
 }
 
