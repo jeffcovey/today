@@ -47,11 +47,23 @@ async function getChangedFilesFromVaultChanges() {
       return null;
     }
 
-    // Check if there's any baseline data
+    // Check if there's any baseline data - if not, run vault-changes to initialize
     const countResult = db.prepare('SELECT COUNT(*) as count FROM vault_files').get();
     if (!countResult || countResult.count === 0) {
       db.close();
-      return null;
+      // Run vault-changes plugin to initialize baseline
+      try {
+        console.error('No vault-changes baseline found, initializing...');
+        execSync('node plugins/vault-changes/read.js', {
+          cwd: PROJECT_ROOT,
+          stdio: ['pipe', 'pipe', 'inherit']
+        });
+        console.error('Baseline initialized - subsequent runs will be incremental');
+        // Return empty array - first run just established baseline
+        return [];
+      } catch {
+        return null; // Fall back to full scan
+      }
     }
 
     // Get start of today
