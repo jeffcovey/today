@@ -438,10 +438,6 @@ program
 // - Should work across all taggable plugin types (tasks, time-logs, diary)
 // - Add auto_add_topics config option for sync-time tagging
 
-// Note: update-cache and generate-topics commands have been removed
-// These relied on the legacy markdown_tasks table
-// Use 'bin/plugins sync --type tasks' instead for syncing to the tasks table
-
 // Search command - searches tasks table
 program
   .command('search <query>')
