@@ -180,7 +180,7 @@ class DigitalOceanDeploy {
 
     // Sync config files
     printInfo('Syncing configuration files...');
-    this.rsyncToRemote('./', `${this.deployPath}/`, '--include=.env', '--include=.env.keys', '--exclude=*');
+    this.rsyncToRemote('./', `${this.deployPath}/`, '--include=.env', '--include=.env.keys', '--include=config.toml', '--exclude=*');
 
     // Configure git
     this.sshCmd(`git config --global --add safe.directory ${this.deployPath}`, { check: false });
