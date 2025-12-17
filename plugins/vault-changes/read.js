@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import Database from 'better-sqlite3';
 import { getStartOfDayTimestamp } from '../../src/date-utils.js';
 
@@ -82,6 +83,85 @@ function extractTitle(filepath) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Check if directory is a git repository
+ */
+function isGitRepo(dir) {
+  // Check for .git or .git.nosync (for synced repos)
+  return fs.existsSync(path.join(dir, '.git')) ||
+         fs.existsSync(path.join(dir, '.git.nosync'));
+}
+
+/**
+ * Run git command in directory, return output or null on error
+ */
+function git(dir, args) {
+  try {
+    return execSync(`git ${args}`, {
+      cwd: dir,
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get git status information for the vault
+ */
+function getGitInfo(dir) {
+  if (!isGitRepo(dir)) return null;
+
+  const info = {
+    isRepo: true,
+    branch: null,
+    uncommitted: { staged: 0, unstaged: 0, untracked: 0 },
+    unpushed: 0,
+    todayCommits: []
+  };
+
+  // Current branch
+  info.branch = git(dir, 'branch --show-current');
+
+  // Uncommitted changes
+  const status = git(dir, 'status --porcelain');
+  if (status) {
+    for (const line of status.split('\n')) {
+      if (!line) continue;
+      const index = line[0];
+      const worktree = line[1];
+
+      if (index === '?' && worktree === '?') {
+        info.uncommitted.untracked++;
+      } else {
+        if (index !== ' ' && index !== '?') info.uncommitted.staged++;
+        if (worktree !== ' ' && worktree !== '?') info.uncommitted.unstaged++;
+      }
+    }
+  }
+
+  // Unpushed commits (if tracking remote)
+  const unpushed = git(dir, 'rev-list @{upstream}..HEAD --count 2>/dev/null');
+  if (unpushed && !isNaN(parseInt(unpushed))) {
+    info.unpushed = parseInt(unpushed);
+  }
+
+  // Commits made today
+  const today = new Date().toISOString().split('T')[0];
+  const todayLog = git(dir, `log --since="${today} 00:00:00" --format="%h|%s|%cr" --no-merges`);
+  if (todayLog) {
+    for (const line of todayLog.split('\n')) {
+      if (!line) continue;
+      const [hash, subject, relTime] = line.split('|');
+      info.todayCommits.push({ hash, subject, relTime });
+    }
+  }
+
+  return info;
 }
 
 /**
@@ -273,6 +353,45 @@ function read() {
     }
   }
 
+  // Add git information if vault is a git repo
+  const gitInfo = getGitInfo(directory);
+  if (gitInfo) {
+    contextLines.push('');
+    contextLines.push('### Git Status');
+    contextLines.push('');
+    contextLines.push(`Branch: \`${gitInfo.branch || 'unknown'}\``);
+
+    // Uncommitted changes
+    const { staged, unstaged, untracked } = gitInfo.uncommitted;
+    const uncommittedTotal = staged + unstaged + untracked;
+    if (uncommittedTotal > 0) {
+      const parts = [];
+      if (staged > 0) parts.push(`${staged} staged`);
+      if (unstaged > 0) parts.push(`${unstaged} unstaged`);
+      if (untracked > 0) parts.push(`${untracked} untracked`);
+      contextLines.push(`**Uncommitted changes:** ${parts.join(', ')}`);
+    } else {
+      contextLines.push('Working tree clean');
+    }
+
+    // Unpushed commits
+    if (gitInfo.unpushed > 0) {
+      contextLines.push(`**Unpushed commits:** ${gitInfo.unpushed}`);
+    }
+
+    // Today's commits
+    if (gitInfo.todayCommits.length > 0) {
+      contextLines.push('');
+      contextLines.push(`**Commits today** (${gitInfo.todayCommits.length}):`);
+      for (const commit of gitInfo.todayCommits.slice(0, 5)) {
+        contextLines.push(`- \`${commit.hash}\` ${commit.subject} (${commit.relTime})`);
+      }
+      if (gitInfo.todayCommits.length > 5) {
+        contextLines.push(`- ... and ${gitInfo.todayCommits.length - 5} more`);
+      }
+    }
+  }
+
   console.log(JSON.stringify({
     context: contextLines.join('\n'),
     mode: 'content-aware',
@@ -281,6 +400,7 @@ function read() {
     modified: changes.modified,
     deleted: changes.deleted,
     touched: changes.touched,
+    git: gitInfo,
     trackedFiles: storedFiles.length,
     message: `${totalChanges} change(s) detected`
   }));
