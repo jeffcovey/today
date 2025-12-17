@@ -51,44 +51,25 @@ async function runCommand(command, description) {
 const jobs = [
     {
         schedule: '*/10 * * * *', // Every 10 minutes
-        command: 'bin/sync --quick || true', // Quick sync (GitHub vault and tasks only)
-        description: 'Quick sync'
+        command: 'bin/plugins sync || true', // Sync all plugins
+        description: 'Plugin sync'
     },
-    {
-        schedule: '30 * * * *', // Every hour at :30 (half past) EST
-        command: 'bin/sync ; bin/tasks classify-stages ; bin/tasks prioritize-status ; bin/tasks add-topics ; bin/track add-topics || true', // Full sync + task management + time tracking
-        description: 'Full sync, task management, and time tracking auto-tagging'
-    },
-    {
-        schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EST
-        command: 'bin/today update || true',
-        description: 'Update today and tomorrow daily plans with Claude API'
-    },
-    {
-        schedule: '0 2 * * *', // Daily at 2 AM EST
-        command: 'bin/vault-snapshot || true', // Backup vault daily
-        description: 'Daily vault snapshot backup'
-    },
+    // TODO: Re-enable after bin/today is updated (see #73)
     // {
-    //     schedule: '*/5 * * * *', // Every 5 minutes
-    //     command: 'bin/vault-auto-sync || true',
-    //     description: 'Vault git sync'
+    //     schedule: '0 6,8,10,12,14,16,18,20 * * *', // Every 2 hours on the hour - 6AM, 8AM, 10AM, 12PM, 2PM, 4PM, 6PM, 8PM EST
+    //     command: 'bin/today update || true',
+    //     description: 'Update today and tomorrow daily plans with Claude API'
     // },
-    {
-        schedule: '0 * * * *', // Every hour
-        command: 'journalctl --vacuum-time=24h > /dev/null 2>&1 || true',
-        description: 'Clean up old systemd logs'
-    },
-    {
-        schedule: '0 4 * * *', // Daily at 4 AM EST
-        command: 'systemctl restart vault-watcher || true',
-        description: 'Restart vault-watcher to ensure latest code'
-    },
-    {
-        schedule: '15 * * * *', // Every hour at :15 (quarter past) EST
-        command: 'bin/tasks update-cache || true',
-        description: 'Refresh markdown tasks cache'
-    },
+    // Removed: bin/vault-snapshot - see #75 for plugin migration
+    // Removed: bin/vault-auto-sync - legacy, replaced by Resilio Sync
+    // Removed: journalctl cleanup - handled by bin/droplet-maintenance
+    // Removed: bin/tasks update-cache - legacy, task cache no longer used
+    // TODO: Review vault-watcher restart (see #76)
+    // {
+    //     schedule: '0 4 * * *', // Daily at 4 AM EST
+    //     command: 'systemctl restart vault-watcher || true',
+    //     description: 'Restart vault-watcher to ensure latest code'
+    // },
     {
         schedule: '0 */6 * * *', // Every 6 hours EST
         command: 'bin/droplet-maintenance || true',
@@ -99,21 +80,19 @@ const jobs = [
         command: 'systemctl restart resilio-sync || true',
         description: 'Restart Resilio Sync to prevent stale connections'
     },
-    {
-        schedule: '*/15 * * * *', // Every 15 minutes
-        command: 'bin/droplet-monitor || true',
-        description: 'Monitor droplet health'
-    },
-    {
-        schedule: '0 1 * * *', // Daily at 1 AM EST
-        command: 'bin/tasks archive-completed || true',
-        description: 'Archive completed tasks'
-    },
-    {
-        schedule: '0 12 * * *', // Daily at 12 PM (noon) EST
-        command: 'bin/email organize || true',
-        description: 'Organize inbox emails by stage'
-    }
+    // TODO: Re-enable after inbox processing is updated (see #74)
+    // {
+    //     schedule: '*/15 * * * *', // Every 15 minutes
+    //     command: 'bin/droplet-monitor || true',
+    //     description: 'Monitor droplet health'
+    // },
+    // Removed: bin/tasks archive-completed - moved to plugins (streaks-habits)
+    // TODO: Review bin/email organize (see #77)
+    // {
+    //     schedule: '0 12 * * *', // Daily at 12 PM (noon) EST
+    //     command: 'bin/email organize || true',
+    //     description: 'Organize inbox emails by stage'
+    // },
 ];
 
 // Note: node-cron has known bugs with the timezone option (memory leaks, doesn't work properly)
