@@ -114,6 +114,7 @@ async function cmdStart(description, options = {}) {
 
 // Stop command
 async function cmdStop(options = {}) {
+  process.stdout.write(colors.gray('Syncing... '));
   ensureSync();
   const db = getDatabase();
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
@@ -178,11 +179,13 @@ async function cmdStop(options = {}) {
   // Extract plugin name from the source ID for filtering
   const [pluginName] = timerToStop.source.split('/');
 
+  process.stdout.write(colors.gray('Saving... '));
   const result = await writeEntryAndSync('time-logs', entry, {
     sourceFilter: pluginName,
     db,
     vaultPath
   });
+  console.log(colors.gray('Done'));
 
   if (!result.success) {
     console.error(colors.red('✗') + ` Failed to stop timer: ${result.error}`);
