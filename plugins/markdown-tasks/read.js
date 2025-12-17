@@ -3,10 +3,14 @@
 // Sync tasks from markdown files (Obsidian Tasks format)
 // Input: Config via environment variables (PLUGIN_CONFIG as JSON)
 // Output: JSON object with entries and metadata
+//
+// Uses vault-changes for efficient incremental sync - only processes
+// files that have actually changed instead of grepping entire vault.
 
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -45,12 +49,41 @@ const filterFiles = fileFilter
 
 // Find markdown files with tasks
 let filesWithTasks;
+let isIncremental = false;
 
 // If file filter is specified, only process those files
 if (filterFiles) {
   filesWithTasks = filterFiles.filter(f => fs.existsSync(f));
+  isIncremental = true;
+} else if (lastSyncDate) {
+  // Use vault-changes for efficient incremental sync
+  const baselineStatus = getBaselineStatus();
+  if (baselineStatus.exists) {
+    // Get files changed today from vault-changes
+    const changedFiles = getChangedFilePaths({
+      directory: rootDir,
+      todayOnly: true,
+      includeGit: false
+    });
+    // Filter to only include files that might have tasks
+    filesWithTasks = changedFiles.filter(f => {
+      // Skip excluded paths
+      const relativePath = path.relative(rootDir, f);
+      return !excludePaths.some(exc => relativePath.startsWith(exc));
+    });
+    isIncremental = true;
+  } else {
+    // No baseline yet - fall back to grep for first run
+    filesWithTasks = findAllTaskFiles();
+    isIncremental = true;
+  }
 } else {
-  // Find all files with tasks using grep -r
+  // Full sync - find all files with tasks using grep -r
+  filesWithTasks = findAllTaskFiles();
+}
+
+// Helper function to find all task files via grep
+function findAllTaskFiles() {
   try {
     // Build exclude args for grep
     const excludeArgs = excludePaths
@@ -59,7 +92,7 @@ if (filterFiles) {
 
     // Find files containing task checkboxes using grep -r
     const cmd = `grep -rl ${excludeArgs} --include="*.md" "^- \\[[x ]\\]" "${rootDir}" 2>/dev/null || true`;
-    filesWithTasks = execSync(cmd, { encoding: 'utf8' })
+    return execSync(cmd, { encoding: 'utf8' })
       .split('\n')
       .filter(f => f.trim());
   } catch (error) {
@@ -68,25 +101,8 @@ if (filterFiles) {
   }
 }
 
-// Check which files need syncing based on modification time
+// Files to sync are those we found
 let filesToSync = filesWithTasks;
-let isIncremental = false;
-
-// If file filter is specified, always sync those files (skip mtime check)
-if (filterFiles) {
-  filesToSync = filesWithTasks;
-  isIncremental = true;  // Treat as incremental since we're targeting specific files
-} else if (lastSyncDate) {
-  filesToSync = filesWithTasks.filter(f => {
-    try {
-      const stat = fs.statSync(f);
-      return stat.mtime > lastSyncDate;
-    } catch {
-      return false;
-    }
-  });
-  isIncremental = true;
-}
 
 // Parse entries from files that need syncing
 const entries = [];

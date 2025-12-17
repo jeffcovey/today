@@ -10,11 +10,13 @@
  * - Concerns: ### HH:MM blocks (timestamped, multi-paragraph)
  * - Journal: ### HH:MM blocks (timestamped, multi-paragraph)
  *
- * Supports incremental sync: only processes files modified since LAST_SYNC_TIME
+ * Uses vault-changes for efficient incremental sync - only processes
+ * diary files that have actually changed.
  */
 
 import fs from 'fs';
 import path from 'path';
+import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -196,29 +198,53 @@ function processDiaryFile(filePath) {
 const entries = [];
 const errors = [];
 const processed = [];
+let isIncremental = false;
 
 // Create diary directory if it doesn't exist
 if (!fs.existsSync(diaryDir)) {
   fs.mkdirSync(diaryDir, { recursive: true });
 }
 
-// Process diary files
-const diaryFiles = fs.existsSync(diaryDir)
-  ? fs.readdirSync(diaryDir)
-      .filter(f => f.endsWith('.md') && /^\d{4}-\d{2}-\d{2}\.md$/.test(f))
-      .map(f => path.join(diaryDir, f))
-  : [];
+// Get list of diary files to process
+let diaryFiles = [];
+
+if (lastSyncDate) {
+  // Use vault-changes for efficient incremental sync
+  const baselineStatus = getBaselineStatus();
+  if (baselineStatus.exists) {
+    // Get changed files from vault-changes
+    const changedFiles = getChangedFilePaths({
+      directory: diaryDir,
+      todayOnly: true,
+      includeGit: false
+    });
+    // Filter to only diary files (YYYY-MM-DD.md pattern)
+    diaryFiles = changedFiles.filter(f => /^\d{4}-\d{2}-\d{2}\.md$/.test(path.basename(f)));
+    isIncremental = true;
+  } else {
+    // No baseline yet - process all diary files modified since last sync
+    diaryFiles = fs.existsSync(diaryDir)
+      ? fs.readdirSync(diaryDir)
+          .filter(f => f.endsWith('.md') && /^\d{4}-\d{2}-\d{2}\.md$/.test(f))
+          .map(f => path.join(diaryDir, f))
+          .filter(f => {
+            const stats = fs.statSync(f);
+            return stats.mtime > lastSyncDate;
+          })
+      : [];
+    isIncremental = true;
+  }
+} else {
+  // Full sync - process all diary files
+  diaryFiles = fs.existsSync(diaryDir)
+    ? fs.readdirSync(diaryDir)
+        .filter(f => f.endsWith('.md') && /^\d{4}-\d{2}-\d{2}\.md$/.test(f))
+        .map(f => path.join(diaryDir, f))
+    : [];
+}
 
 for (const file of diaryFiles) {
   try {
-    // For incremental sync, skip files not modified since last sync
-    if (lastSyncDate) {
-      const stats = fs.statSync(file);
-      if (stats.mtime <= lastSyncDate) {
-        continue;
-      }
-    }
-
     const result = processDiaryFile(file);
     entries.push(...result.entries);
     processed.push({
@@ -236,7 +262,7 @@ for (const file of diaryFiles) {
 // Output
 console.log(JSON.stringify({
   entries: entries,
-  incremental: !!lastSyncDate,
+  incremental: isIncremental,
   metadata: {
     diary_files: diaryFiles.length,
     entries_count: entries.length,
