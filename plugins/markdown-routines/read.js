@@ -19,6 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseRecurrence, getCurrentPeriodStart, formatDate, isNewPeriod } from '../../src/recurrence-parser.js';
+import { TZDate } from '@date-fns/tz';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -27,13 +28,35 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const routinesDirectory = config.routines_directory || 'vault/routines';
 const historyLimit = config.history_limit || 30;
 
+// Get timezone from global config
+const globalConfigPath = path.join(projectRoot, 'config.toml');
+let configuredTimezone = 'America/New_York'; // Default
+try {
+  const tomlContent = fs.readFileSync(globalConfigPath, 'utf8');
+  const tzMatch = tomlContent.match(/^timezone\s*=\s*"([^"]+)"/m);
+  if (tzMatch) {
+    configuredTimezone = tzMatch[1];
+  }
+} catch {
+  // Use default
+}
+
 const routinesDir = path.join(projectRoot, routinesDirectory);
 
-// Get today's date
+// Get today's date in the configured timezone
 function getToday() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
+  const now = new TZDate(new Date(), configuredTimezone);
+  // Create a date-only representation (midnight in the configured timezone)
+  return new TZDate(now.getFullYear(), now.getMonth(), now.getDate(), configuredTimezone);
+}
+
+// Get today's date string in YYYY-MM-DD format
+function getTodayStr() {
+  const now = new TZDate(new Date(), configuredTimezone);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Parse YAML front matter from markdown
@@ -268,14 +291,20 @@ function processRoutine(filePath, today) {
 
   // Get scheduled date from first task
   const scheduledDate = tasks[0]?.scheduledDate;
-  const todayStr = formatDate(today);
+  const todayStr = getTodayStr();
 
   let modified = false;
   let newBody = body;
   let newHistory = [...history];
 
   // Check if we need to reset (new period)
-  if (scheduledDate && isNewPeriod(recurrence, scheduledDate, today)) {
+  // Only reset if:
+  // 1. The scheduled date is in the past (before today)
+  // 2. We haven't already recorded history for this scheduled date
+  const scheduledDateIsBeforeToday = scheduledDate && scheduledDate < todayStr;
+  const alreadyHasHistoryForDate = history.some(h => h.date === scheduledDate);
+
+  if (scheduledDateIsBeforeToday && !alreadyHasHistoryForDate) {
     // Count completed tasks
     const completedTasks = tasks.filter(t => t.isCompleted).length;
 
