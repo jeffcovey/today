@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { getSourcesForType } from '../src/plugin-loader.js';
 import { colors, parseArgs } from '../src/cli-utils.js';
+import { formatTime } from '../src/date-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,26 +54,68 @@ async function runContextPlugin(pluginName, sourceId, sourceConfig) {
  * Format vault-changes plugin output
  */
 function formatVaultChanges(data) {
-  if (!data.files || data.files.length === 0) {
-    console.log(colors.blue('ℹ') + ' No files changed today');
+  // Handle initialization message
+  if (data.mode === 'initialized') {
+    console.log(colors.green('✓') + ` ${data.message}`);
     return;
   }
 
-  console.log(colors.cyan('Files Changed Today') + ` (${data.count} files)`);
+  const totalChanges = (data.added?.length || 0) + (data.modified?.length || 0) +
+                       (data.deleted?.length || 0) + (data.touched?.length || 0);
+
+  if (totalChanges === 0) {
+    console.log(colors.blue('ℹ') + ' No files changed');
+    console.log(colors.gray(`  Tracking ${data.trackedFiles || 0} files`));
+    return;
+  }
+
+  console.log(colors.cyan('Vault Changes') + ` (${totalChanges} changes)`);
   console.log('');
 
-  for (const file of data.files) {
-    const time = new Date(file.mtimeMs).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const formatFile = (file, prefix) => {
+    const time = file.mtimeMs
+      ? formatTime(new Date(file.mtimeMs))
+      : '     ';
+    const title = file.title ? ` - ${file.title}` : '';
+    console.log(`  ${prefix} ${colors.gray(time)} ${file.path}${colors.yellow(title)}`);
+  };
 
-    if (file.title) {
-      console.log(`  ${colors.gray(time)} ${colors.white(file.path)}`);
-      console.log(`         ${colors.yellow(file.title)}`);
-    } else {
-      console.log(`  ${colors.gray(time)} ${colors.white(file.path)}`);
+  if (data.added?.length > 0) {
+    console.log(colors.green('Added:'));
+    for (const file of data.added.slice(0, 10)) {
+      formatFile(file, colors.green('+'));
     }
+    if (data.added.length > 10) {
+      console.log(colors.gray(`  ... and ${data.added.length - 10} more`));
+    }
+    console.log('');
+  }
+
+  if (data.modified?.length > 0) {
+    console.log(colors.yellow('Modified:'));
+    for (const file of data.modified.slice(0, 10)) {
+      formatFile(file, colors.yellow('~'));
+    }
+    if (data.modified.length > 10) {
+      console.log(colors.gray(`  ... and ${data.modified.length - 10} more`));
+    }
+    console.log('');
+  }
+
+  if (data.deleted?.length > 0) {
+    console.log(colors.red('Deleted:'));
+    for (const file of data.deleted.slice(0, 10)) {
+      formatFile(file, colors.red('-'));
+    }
+    if (data.deleted.length > 10) {
+      console.log(colors.gray(`  ... and ${data.deleted.length - 10} more`));
+    }
+    console.log('');
+  }
+
+  if (data.touched?.length > 0) {
+    console.log(colors.gray('Touched (mtime changed, content same):'));
+    console.log(colors.gray(`  ${data.touched.length} file(s)`));
   }
 }
 

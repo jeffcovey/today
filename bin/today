@@ -827,28 +827,11 @@ async function getContextPluginsData(typeData) {
 
       const data = JSON.parse(output);
 
-      // Generic context field handler (used by weather-context and others)
+      // Context plugins should provide a 'context' field with pre-formatted text
       if (data.context) {
         lines.push(data.context);
         lines.push('');
-        continue;
       }
-
-      // Format vault-changes output
-      if (pluginName === 'vault-changes' && data.files && data.files.length > 0) {
-        lines.push(`### Files Changed Today`);
-        lines.push(`${data.count} file(s) modified or added today:`);
-        lines.push('');
-        for (const file of data.files) {
-          if (file.title) {
-            lines.push(`- **${file.path}**: ${file.title}`);
-          } else {
-            lines.push(`- **${file.path}**`);
-          }
-        }
-        lines.push('');
-      }
-      // Add other utility plugin formatters as needed
     } catch {
       // Silently continue if plugin fails
     }

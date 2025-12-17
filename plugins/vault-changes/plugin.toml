@@ -1,30 +1,29 @@
 # Vault Changes Plugin
-# Reports files changed or added today in the vault
+# Reports files changed or added today in the vault with content-aware detection
 
 name = "vault-changes"
 displayName = "Vault Changes"
-description = "Report files changed or added today in the vault"
+description = "Report files changed or added today in the vault with content-aware change detection"
 type = "context"
 
 requiredEnv = []
 
 longDescription = """
-Scans the vault directory for markdown files that have been modified or added today.
+Scans the vault directory for markdown files and tracks changes using content-aware detection.
 
-This is useful for providing context to AI assistants about recent activity in your notes.
+Compares current file checksums against stored values in the database to distinguish:
+- **added**: New files not previously tracked
+- **modified**: Files where content actually changed
+- **deleted**: Files that were tracked but no longer exist
+- **touched**: Files where mtime changed but content is identical
 
-Output includes:
-- File path
-- Title (extracted from first heading)
-- Modification time
-
-Files are sorted by modification time (most recent first).
-
-Run `bin/plugins sync vault-changes` or use the CLI `bin/vault-changes` to see today's changes.
+Use write command with `action: "update-baseline"` to save current state to database.
+This should be run after completing work to establish the new baseline.
 """
 
 [commands]
 read = "./read.js"
+write = "./write.js"
 
 [settings]
 directory = { type = "string", default = "vault", description = "Directory to scan for changed files" }

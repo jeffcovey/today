@@ -47,6 +47,26 @@ const systemMigrations = [
         db.exec(`DROP TABLE IF EXISTS ${table}`);
       }
     }
+  },
+  {
+    version: 103,
+    description: 'Create vault_files table for content-aware change tracking',
+    fn: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS vault_files (
+          id TEXT PRIMARY KEY,
+          source TEXT NOT NULL,
+          path TEXT NOT NULL,
+          checksum TEXT NOT NULL,
+          mtime_ms INTEGER,
+          title TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_files_source ON vault_files(source)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_files_path ON vault_files(path)`);
+    }
   }
 ];
 
