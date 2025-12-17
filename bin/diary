@@ -9,8 +9,10 @@ import { getSourcesForType } from '../src/plugin-loader.js';
 import {
   getTodayDate,
   getWeekAgoDate,
-  formatDate
+  formatDate,
+  getCurrentTime
 } from '../src/date-utils.js';
+import { format } from 'date-fns';
 import {
   colors,
   parseArgs,
@@ -360,9 +362,9 @@ async function cmdAdd(type, text, options = {}) {
     fs.mkdirSync(diaryDir, { recursive: true });
   }
 
-  // Get current time
-  const now = new Date();
-  const timeStr = now.toTimeString().slice(0, 5); // HH:MM
+  // Get current time in configured timezone
+  const now = getCurrentTime();
+  const timeStr = format(now, 'HH:mm');
 
   // Read or create file
   let content = '';
