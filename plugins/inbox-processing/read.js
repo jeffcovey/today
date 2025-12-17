@@ -88,20 +88,22 @@ function cleanupTrash() {
 }
 
 /**
- * Parse date from note content (e.g., "December 17, 2025 14:30")
+ * Parse date from note content (e.g., "December 17, 2025 14:30" or "December 17, 2025")
  */
 function parseDateFromContent(content) {
-  const dateMatch = content.match(/^[A-Za-z]+ \d+, \d+ \d+:\d+/m);
+  // Try with time first
+  let dateMatch = content.match(/^([A-Za-z]+ \d+, \d+)(?: (\d+:\d+))?/m);
   if (!dateMatch) return null;
 
-  const dateStr = dateMatch[0];
+  const dateStr = dateMatch[1];
+  const timeStr = dateMatch[2] || null;
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return null;
 
   return {
     date,
     dateStr,
-    timestamp: dateStr.match(/\d+:\d+/)?.[0] || 'Unknown',
+    timestamp: timeStr,
     formatted: format(date, 'yyyy-MM-dd')
   };
 }
@@ -161,6 +163,85 @@ function addToDiary(dateStr, sectionName, timestamp, content) {
 
   fs.writeFileSync(filePath, fileContent, 'utf-8');
   return filePath;
+}
+
+/**
+ * Add bullet items to diary file under a specific section (no timestamps)
+ */
+function addBulletsToDiary(dateStr, sectionName, bullets) {
+  const filePath = getDiaryFile(dateStr);
+  let fileContent = fs.readFileSync(filePath, 'utf-8');
+
+  const sectionHeader = `## ${sectionName}`;
+
+  // Add section if it doesn't exist
+  if (!fileContent.includes(sectionHeader)) {
+    fileContent = fileContent.trimEnd() + `\n\n${sectionHeader}\n`;
+  }
+
+  // Find the section and add the bullets
+  const insertPoint = fileContent.indexOf(sectionHeader) + sectionHeader.length;
+  const beforeSection = fileContent.slice(0, insertPoint);
+  const afterSection = fileContent.slice(insertPoint);
+
+  // Find the end of the section (next ## or end of file)
+  const nextSectionMatch = afterSection.match(/\n## /);
+  const sectionEnd = nextSectionMatch ? nextSectionMatch.index : afterSection.length;
+
+  const sectionContent = afterSection.slice(0, sectionEnd);
+  const restContent = afterSection.slice(sectionEnd);
+
+  // Add bullets
+  const bulletText = bullets.map(b => `- ${b}`).join('\n');
+  fileContent = beforeSection + sectionContent.trimEnd() + '\n' + bulletText + '\n' + restContent;
+
+  fs.writeFileSync(filePath, fileContent, 'utf-8');
+  return filePath;
+}
+
+/**
+ * Process a gratitude note - add bullets to diary file
+ */
+function processGratitudeNote(filePath, content, basename) {
+  const parsed = parseDateFromContent(content);
+
+  if (!parsed) {
+    return { action: 'skipped', reason: 'missing date', file: basename };
+  }
+
+  // Extract gratitude items - look for content after "I'm grateful for..."
+  const lines = content.split('\n');
+  const bullets = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip header, date line, and "I'm grateful for..." prompt
+    if (trimmed.startsWith('#') ||
+        trimmed.match(/^[A-Za-z]+ \d+, \d+/) ||
+        trimmed.toLowerCase().includes("i'm grateful for") ||
+        !trimmed) {
+      continue;
+    }
+    bullets.push(trimmed);
+  }
+
+  if (bullets.length === 0) {
+    return { action: 'skipped', reason: 'no gratitude items found', file: basename };
+  }
+
+  // Add to diary under "I'm grateful for..." section
+  const diaryFile = addBulletsToDiary(parsed.formatted, "I'm grateful for...", bullets);
+
+  // Move to trash
+  moveToTrash(filePath);
+
+  return {
+    action: 'processed',
+    type: 'gratitude',
+    items: bullets.length,
+    destination: path.basename(diaryFile),
+    file: basename
+  };
 }
 
 /**
@@ -280,6 +361,11 @@ function processInboxFile(filePath) {
   // Concern notes
   if (title === 'Concerns' || basename.includes('concerns')) {
     return processConcernNote(filePath, content, basename);
+  }
+
+  // Gratitude notes
+  if (title === 'Gratitude' || basename.includes('gratitude')) {
+    return processGratitudeNote(filePath, content, basename);
   }
 
   // Task files (only checkboxes)

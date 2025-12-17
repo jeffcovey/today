@@ -380,7 +380,8 @@ date: ${today}
   }
 
   // Find or create the section
-  const sectionName = type.charAt(0).toUpperCase() + type.slice(1);
+  // Gratitude uses special header "I'm grateful for..."
+  const sectionName = type === 'gratitude' ? "I'm grateful for..." : type.charAt(0).toUpperCase() + type.slice(1);
   const sectionHeader = `## ${sectionName}`;
 
   if (!content.includes(sectionHeader)) {
