@@ -191,14 +191,16 @@ The vault is designed to work standalone or with [Obsidian](https://obsidian.md/
 
 ### Inbox Processing
 
-The `vault/notes/inbox/` directory is a drop zone for quick capture. When you run `bin/sync`, files are automatically processed based on their content:
+The `vault/inbox/` directory is a drop zone for quick capture. The inbox-processing plugin automatically processes files based on their content:
 
 | File Type | Detection | Action |
 |-----------|-----------|--------|
-| **Progress notes** | First line is `# Progress` | Appended to today's plan file as a callout, archived to `notes/progress/` |
-| **Concern notes** | First line is `# Concerns` or filename contains "concerns" | Appended to today's plan file as a warning callout, archived to `notes/concerns/` |
-| **Task files** | Contains only checkbox lines (`- [ ]` or `- [x]`) | Tasks appended to `tasks/tasks.md`, original file trashed |
-| **Other notes** | Default | Moved to `notes/general/` |
+| **Progress notes** | First line is `# Progress` | Appended to diary file, moved to `.trash` |
+| **Concern notes** | First line is `# Concerns` or filename contains "concerns" | Appended to diary file, moved to `.trash` |
+| **Task files** | Contains only checkbox lines (`- [ ]` or `- [x]`) | Tasks appended to `tasks/tasks.md`, moved to `.trash` |
+| **Other notes** | Default | Left in inbox for user review |
+
+Processed files are kept in `vault/inbox/.trash/` for 7 days (configurable) before automatic deletion.
 
 #### Quick Capture with Mobile Apps
 
@@ -211,11 +213,11 @@ The inbox works great with quick-capture apps that can save files to a synced fo
 Title: Progress
 Body: {{date}} {{time}}
 {{draft}}
-Save to: vault/notes/inbox/progress-{{timestamp}}.md
+Save to: vault/inbox/progress-{{timestamp}}.md
 
 # Quick task action
 Body: - [ ] {{draft}}
-Save to: vault/notes/inbox/task-{{timestamp}}.md
+Save to: vault/inbox/task-{{timestamp}}.md
 ```
 
 **[TextExpander](https://textexpander.com/)** - Create snippets for note formats:

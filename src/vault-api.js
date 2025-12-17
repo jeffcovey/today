@@ -41,7 +41,7 @@ async function getApiKey() {
 }
 
 const API_KEY = await getApiKey();
-const INBOX_DIR = path.join(projectRoot, 'vault/notes/inbox');
+const INBOX_DIR = path.join(projectRoot, 'vault/inbox');
 
 // Ensure inbox directory exists
 await fs.mkdir(INBOX_DIR, { recursive: true }).catch(() => {});
@@ -287,7 +287,7 @@ app.post('/inbox/upload', authenticateApiKey, async (req, res) => {
     res.json({
       success: true,
       filename,
-      path: `vault/notes/inbox/${filename}`,
+      path: `vault/inbox/${filename}`,
       size: Buffer.byteLength(content, 'utf8')
     });
     

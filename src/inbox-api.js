@@ -16,7 +16,7 @@ app.use(express.text({ limit: '10mb' }));
 
 // Simple API key authentication (set in environment)
 const API_KEY = process.env.INBOX_API_KEY || crypto.randomBytes(32).toString('hex');
-const INBOX_DIR = path.join(projectRoot, 'vault/notes/inbox');
+const INBOX_DIR = path.join(projectRoot, 'vault/inbox');
 
 // Log the API key on startup (only in development)
 if (process.env.NODE_ENV !== 'production') {
@@ -92,7 +92,7 @@ app.post('/inbox/upload', authenticateApiKey, async (req, res) => {
     res.json({
       success: true,
       filename,
-      path: `vault/notes/inbox/${filename}`,
+      path: `vault/inbox/${filename}`,
       size: Buffer.byteLength(content, 'utf8')
     });
     

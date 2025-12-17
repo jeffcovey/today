@@ -333,3 +333,10 @@
 # [plugins.icloud-conflict-cleanup.default]
 # enabled = true
 # directory = "vault"
+
+# [plugins.inbox-processing.default]
+# enabled = true
+# inbox_directory = "vault/inbox"
+# diary_directory = "vault/diary"
+# tasks_file = "vault/tasks/tasks.md"
+# archive_processed = true
