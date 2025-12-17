@@ -211,9 +211,15 @@
 # query = "is:unresolved"
 # limit = 100
 
-# [plugins.vault-changes.default]
-# enabled = true
-# directory = "vault"
+# -----------------------------------------------------------------------------
+# Vault Changes (context display)
+# -----------------------------------------------------------------------------
+# Shows files modified today and git status. The underlying change tracking
+# is always available - disabling this only hides the context display.
+
+[plugins.vault-changes.default]
+enabled = true
+directory = "vault"
 # excludeDirs = ".sync,templates,.git,.git.nosync,.obsidian,.trash"
 
 # -----------------------------------------------------------------------------

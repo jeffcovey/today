@@ -149,7 +149,7 @@ function showHelp() {
   console.log('  -h, --help                  Show this help');
   console.log('');
   console.log('Context plugins provide ephemeral data (not stored in database):');
-  console.log('  - vault-changes: Files modified or added today');
+  console.log('  - vault-changes: Files modified today and git status');
   console.log('  - weather-context: Current weather and forecast');
   console.log('');
   console.log('Examples:');

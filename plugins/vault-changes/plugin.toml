@@ -1,24 +1,27 @@
 # Vault Changes Plugin
-# Reports files changed or added today in the vault with content-aware detection
+# Displays files changed in the vault and git status
 
 name = "vault-changes"
 displayName = "Vault Changes"
-description = "Report files changed or added today in the vault with content-aware change detection"
+description = "Shows files modified or added today, plus git status"
 type = "context"
 
 requiredEnv = []
 
 longDescription = """
-Scans the vault directory for markdown files and tracks changes using content-aware detection.
+Reports which vault files have changed today and provides git status information.
 
-Compares current file checksums against stored values in the database to distinguish:
-- **added**: New files not previously tracked
-- **modified**: Files where content actually changed
-- **deleted**: Files that were tracked but no longer exist
-- **touched**: Files where mtime changed but content is identical
+This plugin displays context about:
+- Files added, modified, or deleted today
+- Git branch, uncommitted changes, and unpushed commits
+- Today's commit history
 
-Use write command with `action: "update-baseline"` to save current state to database.
-This should be run after completing work to establish the new baseline.
+The underlying change tracking is handled by the core vault-changes module
+(src/vault-changes.js) which is always available to other plugins regardless
+of whether this display plugin is enabled.
+
+Disabling this plugin only hides the context display - it does not affect
+change tracking used by other plugins like markdownlint-cleanup.
 """
 
 [commands]
@@ -26,5 +29,5 @@ read = "./read.js"
 write = "./write.js"
 
 [settings]
-directory = { type = "string", default = "vault", description = "Directory to scan for changed files" }
-excludeDirs = { type = "string", default = ".sync,templates,.git,.git.nosync,.obsidian,.trash", description = "Comma-separated list of directories to exclude" }
+directory = { type = "string", default = "vault", description = "Directory to track" }
+excludeDirs = { type = "string", default = ".sync,templates,.git,.git.nosync,.obsidian,.trash", description = "Comma-separated directories to exclude" }
