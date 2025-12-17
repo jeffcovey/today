@@ -14,7 +14,15 @@ issues in your vault files.
 
 This plugin requires markdownlint-cli2 to be installed (included in devDependencies).
 
-Common fixes include:
+## Performance Optimization
+
+For best performance, enable the **vault-changes** plugin alongside this one.
+When vault-changes is enabled, markdownlint-cleanup will only process files
+that have actually changed today, instead of scanning all files. This can
+reduce sync time from minutes to seconds on large vaults.
+
+## Common Fixes
+
 - Consistent heading styles
 - Proper list indentation
 - Blank lines around headings and code blocks
