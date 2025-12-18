@@ -346,3 +346,8 @@ directory = "vault"
 # diary_directory = "vault/diary"
 # tasks_file = "vault/tasks/tasks.md"
 # archive_processed = true
+
+# [plugins.markdown-plans.default]
+# enabled = true
+# plans_directory = "vault/plans"
+# templates_directory = "vault/plans/templates"

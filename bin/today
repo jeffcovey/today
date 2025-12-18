@@ -17,14 +17,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync, spawnSync } from 'child_process';
-// DISABLED - used by vault init (createInterface), skeleton updates (createHash), API update (Anthropic)
+// DISABLED - used by vault init (createInterface) and skeleton updates (createHash)
 // import { createInterface } from 'readline';
 // import { createHash } from 'crypto';
-// import Anthropic from '@anthropic-ai/sdk';
 
 // Import shared modules
-// DISABLED - getClaudeModel used by API update feature
-// import { getTimezone, getClaudeModel, getFullConfig } from '../src/config.js';
 import { getTimezone, getFullConfig } from '../src/config.js';
 import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
 import { getPluginTypes, getAIMetadata, generateAIContextBlock } from '../src/plugin-schemas.js';
@@ -450,263 +447,6 @@ async function checkAndRecoverDatabase() {
 // }
 
 // ============================================================================
-// API Update (DISABLED - depends on template/vault features and Anthropic import)
-// ============================================================================
-
-// async function updateReviewFile(dryRun = false) {
-//   const apiKey = process.env.TODAY_ANTHROPIC_KEY;
-//   if (!apiKey) {
-//     console.log('❌ TODAY_ANTHROPIC_KEY not found in environment');
-//     console.log('Please ensure it\'s set in .env and encrypted with dotenvx');
-//     process.exit(1);
-//   }
-//
-//   ensureTimeTrackingWidgets(dryRun);
-//
-//   // Update today's file
-//   const todayFile = getReviewFilePath();
-//   if (!fs.existsSync(todayFile)) {
-//     console.log(`⚠️  Today's file not found: ${todayFile}`);
-//     console.log('Skipping today\'s update');
-//   } else {
-//     console.log(`📊 Updating today's plan: ${todayFile}...`);
-//     if (dryRun) console.log('🔍 DRY RUN MODE - No changes will be made');
-//     await updateSingleFile(todayFile, false, dryRun, apiKey);
-//   }
-//
-//   // Update tomorrow's file
-//   const tomorrow = getTomorrowDate();
-//   const tomorrowFile = getReviewFilePath(tomorrow);
-//   if (!fs.existsSync(tomorrowFile)) {
-//     console.log(`⚠️  Tomorrow's file not found: ${tomorrowFile}`);
-//     console.log('Skipping tomorrow\'s update');
-//   } else {
-//     console.log(`📊 Updating tomorrow's plan: ${tomorrowFile}...`);
-//     await updateSingleFile(tomorrowFile, true, dryRun, apiKey);
-//   }
-// }
-
-// async function updateSingleFile(reviewFile, isTomorrow, dryRun, apiKey) {
-//   // Gather data from all plugin types (including utility)
-//   const dailyData = await getDataContext();
-//
-//   const originalContent = fs.readFileSync(reviewFile, 'utf8');
-//   const backupContent = originalContent;
-//   const originalLines = originalContent.split('\n').length;
-//
-//   const timezone = getTimezone();
-//   const now = getCurrentTime(timezone);
-//   const currentTime = formatTime(now, timezone);
-//   const currentDate = formatDate(now);
-//   const tzOffset = getTimezoneOffset(now, timezone);
-//
-//   let prompt;
-//   if (isTomorrow) {
-//     prompt = `You are updating TOMORROW's daily plan with fresh priorities from the database.
-//
-// CURRENT TIME: ${currentTime} ET
-// CURRENT DATE: ${currentDate}
-//
-// CURRENT FILE CONTENT (Tomorrow's Plan):
-// ${originalContent}
-//
-// CURRENT DATABASE DATA (tasks, events, emails, etc.):
-// ${dailyData.slice(0, 5000)}
-//
-// YOUR TASK:
-// Refresh the "Top Priorities" section with current database data.
-// This is a DRAFT plan for tomorrow that gets refined throughout today.
-//
-// Focus on:
-// 1. Overdue tasks that will carry into tomorrow
-// 2. Tasks scheduled for tomorrow
-// 3. Calendar events scheduled for tomorrow
-// 4. High-priority items that need attention
-//
-// RETURN A JSON OBJECT with updated priorities section:
-// {
-//   "priorities_update": "### 🚨 Critical (Do First)\\n\\n- [ ] Task 1\\n- [ ] Task 2\\n\\n### ⚡ Quick Wins...\\n",
-//   "notes": "Brief note about what changed"
-// }
-//
-// IMPORTANT:
-// - Keep it lightweight - this is a draft
-// - Focus on actionable items
-// - Use simple checkboxes: "- [ ] Task description"
-// - DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
-// - Created date (➕) is fine - scripts add this automatically
-// - Plan files use simple tasks - scheduling belongs in project/topic files only`;
-//   } else {
-//     prompt = `You are updating TODAY's daily plan with a progress update.
-//
-// CURRENT TIME: ${currentTime} ET
-// CURRENT DATE: ${currentDate}
-//
-// CURRENT FILE CONTENT:
-// ${originalContent}
-//
-// CURRENT DATABASE DATA (tasks, events, emails, etc.):
-// ${dailyData.slice(0, 5000)}
-//
-// YOUR TASK:
-// Create a new Progress Update section to append to the end of the file.
-// Compare the current file with the database to see what's changed or been accomplished.
-//
-// 🚨 CRITICAL: The database includes DETAILED TIME TRACKING DATA showing what work has been done today.
-//    - Time tracking is THE GROUND TRUTH of productivity
-//    - Physical work, meetings, coordination, deep work sessions are all tracked there
-//    - NEVER assume "zero progress" without checking the time tracking data first
-//    - Checkbox completions are NOT the primary measure of productivity
-//
-// This should summarize:
-// 1. What's been accomplished since the last update - CHECK TIME TRACKING DATA FIRST (tasks checked off, workouts done, meetings attended, time tracked)
-// 2. Current status of high-priority items
-// 3. Any new events, emails, or tasks that need attention
-// 4. Overall progress and any blockers
-//
-// RETURN A JSON OBJECT:
-// {
-//   "progress_update": "<!-- PROGRESS_UPDATE -->\\n> [!success] 📊 Progress Update (${currentTime})\\n>\\n> *${currentDate} HH:MM ${tzOffset}*\\n>\\n> - Brief summary of what's been done\\n> - Current status\\n> - What's next or any blockers\\n<!-- /PROGRESS_UPDATE -->",
-//   "tasks_to_check": ["exact task text to mark done (only if you see clear evidence in the file they're completed)"]
-// }
-//
-// NOTE: The progress_update should use the callout format with:
-// - "<!-- PROGRESS_UPDATE -->" as the opening marker
-// - "> [!success] 📊 Progress Update (TIME)" as the header
-// - "> " prefix for all lines in the callout
-// - "*italicized timestamp*" on the second line
-// - "<!-- /PROGRESS_UPDATE -->" as the closing marker
-//
-// IMPORTANT:
-// - Create a MEANINGFUL progress update - there's always something to report
-// - Look at completed tasks in the file (marked [x]) since the last Progress Update
-// - The update should be 2-4 bullet points, concise but informative
-// - Only mark tasks as done if you see clear evidence (like workout exercises checked off)
-// - Use the exact timezone offset in the timestamp: ${tzOffset}
-// - Use simple checkboxes: "- [ ] Task description"
-// - DO NOT add due dates (📅), scheduled dates (⏳), or recurrence (🔁) to tasks
-// - Created date (➕) is fine - scripts add this automatically`;
-//   }
-//
-//   const client = new Anthropic({ apiKey });
-//
-//   try {
-//     const model = getClaudeModel();
-//     const response = await client.messages.create({
-//       model,
-//       max_tokens: 2000,
-//       temperature: 0,
-//       messages: [{ role: 'user', content: prompt }],
-//     });
-//
-//     let responseText = response.content[0].text;
-//
-//     // Try to parse as JSON
-//     let edits;
-//     try {
-//       let jsonStr;
-//       if (responseText.includes('```json')) {
-//         jsonStr = responseText.split('```json')[1].split('```')[0];
-//       } else if (responseText.includes('```')) {
-//         jsonStr = responseText.split('```')[1].split('```')[0];
-//       } else if (responseText.includes('{')) {
-//         const start = responseText.indexOf('{');
-//         let count = 0;
-//         let end = start;
-//         for (let i = start; i < responseText.length; i++) {
-//           if (responseText[i] === '{') count++;
-//           else if (responseText[i] === '}') {
-//             count--;
-//             if (count === 0) {
-//               end = i + 1;
-//               break;
-//             }
-//           }
-//         }
-//         jsonStr = responseText.slice(start, end);
-//       } else {
-//         jsonStr = responseText;
-//       }
-//       edits = JSON.parse(jsonStr);
-//     } catch (e) {
-//       console.log(`⚠️  Failed to parse Claude's response as JSON: ${e.message}`);
-//       console.log(`Response: ${responseText.slice(0, 200)}...`);
-//       process.exit(1);
-//     }
-//
-//     let updatedContent = originalContent;
-//
-//     if (isTomorrow) {
-//       if (edits.priorities_update) {
-//         const replacement = `## 📋 Top Priorities\n\n${edits.priorities_update}\n`;
-//         updatedContent = updatedContent.replace(/## 📋 Top Priorities\n\n.*?(?=\n## |$)/s, replacement);
-//       }
-//     } else {
-//       if (edits.progress_update) {
-//         updatedContent = updatedContent.trimEnd() + '\n\n' + edits.progress_update + '\n';
-//       }
-//
-//       if (edits.tasks_to_check) {
-//         for (const task of edits.tasks_to_check) {
-//           const escapedTask = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-//           const uncheckedPattern = new RegExp(`- \\[ \\] ${escapedTask}`);
-//           if (uncheckedPattern.test(updatedContent)) {
-//             updatedContent = updatedContent.replace(uncheckedPattern, `- [x] ${task} ✅ ${currentDate}`);
-//           }
-//         }
-//       }
-//     }
-//
-//     // SAFETY CHECKS
-//     const updatedLines = updatedContent.split('\n').length;
-//     if (updatedLines < originalLines * 0.9) {
-//       console.log(`⚠️  Safety check failed: Updated file has ${updatedLines} lines vs original ${originalLines}`);
-//       console.log('Aborting update to prevent data loss');
-//       process.exit(1);
-//     }
-//
-//     if (updatedContent.length < originalContent.length * 0.9) {
-//       console.log('⚠️  Safety check failed: Updated content is too short');
-//       console.log(`Original: ${originalContent.length} chars, Updated: ${updatedContent.length} chars`);
-//       process.exit(1);
-//     }
-//
-//     if (dryRun) {
-//       console.log('\n📊 Data context sent to AI:');
-//       console.log('─'.repeat(60));
-//       console.log(dailyData.slice(0, 5000));
-//       console.log('─'.repeat(60));
-//       console.log('\n📝 AI response (proposed changes):');
-//       if (isTomorrow) {
-//         console.log(`Priorities update:\n${(edits.priorities_update || 'None').slice(0, 200)}...`);
-//         console.log(`\nNotes: ${edits.notes || 'None'}`);
-//       } else {
-//         console.log(`Progress update to append:\n${edits.progress_update || 'None'}`);
-//         console.log(`\nTasks to check: ${JSON.stringify(edits.tasks_to_check || [])}`);
-//       }
-//       console.log('\n✅ Dry run complete - no changes made');
-//     } else {
-//       fs.writeFileSync(reviewFile, updatedContent);
-//
-//       if (updatedContent !== originalContent) {
-//         const fileType = isTomorrow ? "tomorrow's plan" : "today's plan";
-//         console.log(`✅ Updated ${fileType}: ${reviewFile}`);
-//       } else {
-//         console.log(`⚠️  API returned no changes - ${reviewFile} unchanged`);
-//         console.log('This might indicate the AI couldn\'t determine what to update.');
-//       }
-//     }
-//   } catch (e) {
-//     console.error(`❌ Error: ${e.message}`);
-//     if (!dryRun) {
-//       console.log('Restoring original content...');
-//       fs.writeFileSync(reviewFile, backupContent);
-//     }
-//     process.exit(1);
-//   }
-// }
-
-// ============================================================================
 // Interactive Session
 // ============================================================================
 
@@ -840,7 +580,7 @@ async function getContextPluginsData(typeData) {
   return lines.length > 2 ? lines.join('\n') : null;
 }
 
-async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, noSync = false) {
+async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false) {
   // DISABLED - depends on getReviewFilePath/getTomorrowDate
   // const todayFile = getReviewFilePath();
   // const tomorrowFile = getReviewFilePath(getTomorrowDate());
@@ -965,8 +705,6 @@ Commands:
   (none)      Start interactive daily review session
   now         Quick "what should I do right now?" session
   dry-run     Show the prompt that would be sent to the AI (no API call)
-  init        (DISABLED) Initialize review file hierarchy
-  update      (DISABLED) Update review files via API
 
 Options:
   --no-sync         Skip sync step (faster startup)
@@ -1042,18 +780,9 @@ async function main() {
   //   return;
   // }
 
-  // DISABLED - update command depends on API update features
-  // // Handle update command
-  // if (command === 'update') {
-  //   console.log('📊 Running automated review update...');
-  //   if (!noSync) runSync();
-  //   await updateReviewFile(false);
-  //   return;
-  // }
-
   // Handle dry-run command - show what prompt would be sent to AI
   if (command === 'dry-run') {
-    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */, noSync);
+    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */);
     return;
   }
 

@@ -53,8 +53,7 @@ describe('bin/today CLI', () => {
     test('should show all available commands', () => {
       const result = runToday('--help');
 
-      expect(result.stdout).toContain('init');
-      expect(result.stdout).toContain('update');
+      expect(result.stdout).toContain('now');
       expect(result.stdout).toContain('dry-run');
     });
 
