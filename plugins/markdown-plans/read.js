@@ -28,6 +28,7 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
 const plansDirectory = config.plans_directory || 'vault/plans';
 const templatesDirectory = config.templates_directory || 'vault/plans/templates';
+const linkDailyNotes = config.link_daily_notes !== false; // opt-out, default true
 const plansDir = path.join(projectRoot, plansDirectory);
 const templatesDir = path.join(projectRoot, templatesDirectory);
 
@@ -848,6 +849,80 @@ function updateTomorrowPlan(filePath, suggestions) {
 }
 
 /**
+ * Link today's plan to Obsidian's daily note
+ * Reads daily-notes.json config to find the correct folder and format
+ * Prepends a link to the plan file if not already present
+ */
+function linkPlanToDailyNote(planPath, date) {
+  if (!linkDailyNotes) return { linked: false, reason: 'disabled' };
+
+  const vaultPath = path.join(projectRoot, 'vault');
+  const dailyNotesConfigPath = path.join(vaultPath, '.obsidian', 'daily-notes.json');
+
+  // Check if daily-notes.json exists
+  if (!fs.existsSync(dailyNotesConfigPath)) {
+    return { linked: false, reason: 'no daily-notes config' };
+  }
+
+  let dailyNotesConfig;
+  try {
+    dailyNotesConfig = JSON.parse(fs.readFileSync(dailyNotesConfigPath, 'utf-8'));
+  } catch {
+    return { linked: false, reason: 'invalid daily-notes config' };
+  }
+
+  const folder = dailyNotesConfig.folder || '';
+  // Default format is YYYY-MM-DD, but respect config if present
+  const format = dailyNotesConfig.format || 'YYYY-MM-DD';
+
+  // Build the daily note filename based on format
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  // Simple format substitution (covers common cases)
+  let filename = format
+    .replace('YYYY', year)
+    .replace('MM', month)
+    .replace('DD', day)
+    .replace('M', date.getMonth() + 1)
+    .replace('D', date.getDate());
+  filename += '.md';
+
+  const dailyNotePath = path.join(vaultPath, folder, filename);
+
+  // Check if daily note exists
+  if (!fs.existsSync(dailyNotePath)) {
+    return { linked: false, reason: 'daily note not found', path: dailyNotePath };
+  }
+
+  // Read daily note content
+  let content = fs.readFileSync(dailyNotePath, 'utf-8');
+
+  // Build the link to the plan file (relative path within vault)
+  const planRelPath = path.relative(vaultPath, planPath).replace(/\\/g, '/');
+  const planBasename = path.basename(planPath, '.md');
+  const planLink = `[[${planRelPath.replace('.md', '')}|📋 Today's Plan]]`;
+
+  // Check if link already exists
+  if (content.includes(planLink) || content.includes(`[[${planRelPath.replace('.md', '')}`)) {
+    return { linked: false, reason: 'already linked' };
+  }
+
+  // Prepend link after frontmatter if present, otherwise at the top
+  const frontmatterMatch = content.match(/^---\n[\s\S]*?\n---\n/);
+  if (frontmatterMatch) {
+    const afterFrontmatter = frontmatterMatch[0].length;
+    content = content.slice(0, afterFrontmatter) + '\n' + planLink + '\n' + content.slice(afterFrontmatter);
+  } else {
+    content = planLink + '\n\n' + content;
+  }
+
+  fs.writeFileSync(dailyNotePath, content, 'utf-8');
+  return { linked: true, path: dailyNotePath };
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -861,12 +936,19 @@ async function main() {
     summaries_generated: [],
     done_today_fixed: [],
     tomorrow_updated: false,
+    daily_note_linked: null,
   };
 
   // Ensure today's daily plan exists
   const dailyResult = ensureDailyPlan(planPaths.day, today);
   if (dailyResult.created) {
     metadata.plans_created.push({ type: 'day', file: dailyResult.file });
+  }
+
+  // Link today's plan to Obsidian daily note
+  const linkResult = linkPlanToDailyNote(planPaths.day.path, today);
+  if (linkResult.linked) {
+    metadata.daily_note_linked = path.basename(linkResult.path);
   }
 
   // Ensure tomorrow's daily plan exists

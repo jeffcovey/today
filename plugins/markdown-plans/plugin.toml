@@ -25,3 +25,4 @@ read = "./read.js"
 [settings]
 plans_directory = { type = "string", default = "vault/plans", description = "Directory containing plan files" }
 templates_directory = { type = "string", default = "vault/plans/templates", description = "Directory containing plan templates" }
+link_daily_notes = { type = "boolean", default = true, description = "Add link to today's plan at top of Obsidian daily note" }
