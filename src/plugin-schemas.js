@@ -23,6 +23,7 @@ determinative than lists of what was planned for a given
 time or whether or not a task has been checked off.
 They should be considered the truth of what was done.`,
       defaultCommand: 'bin/track today',
+      dateCommand: 'bin/track --date $DATE',
       queryInstructions: `Commands: bin/track today, bin/track week, bin/track status, bin/track start "desc", bin/track stop
 SQL: SELECT * FROM time_logs WHERE DATE(start_time) = DATE('now', 'localtime') ORDER BY start_time DESC`
     },
@@ -93,6 +94,7 @@ a connection with current circumstances.
 Some diary sources include metadata with an entry's location,
 weather, associated photos, tags, etc.`,
       defaultCommand: 'bin/diary today ;bin/diary on-this-day',
+      dateCommand: 'bin/diary --date $DATE',
       queryInstructions: `Commands: bin/diary today, bin/diary week, bin/diary search "term", bin/diary on-this-day, bin/diary stats
 SQL: SELECT DATE(date) as day, SUBSTR(text, 1, 200) as preview FROM diary ORDER BY date DESC LIMIT 10`
     },
@@ -246,6 +248,7 @@ possible interest. Use calendar data to understand the user's schedule
 and availability, and to look for timing conflicts and anything that needs
 preparation.`,
       defaultCommand: 'bin/calendar today ; bin/calendar week',
+      dateCommand: 'bin/calendar --date $DATE',
       queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar sync
 SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20
 
@@ -342,6 +345,7 @@ Run 'bin/calendar list' to see available sources.`
 Each task has a status (open or completed), optional priority, and optional due date.
 Source-specific fields like project, tags, recurrence, and assignee are in metadata.`,
       defaultCommand: 'bin/tasks today ; bin/tasks recent -d 2',
+      dateCommand: 'bin/tasks --date $DATE',
       queryInstructions: `Commands: bin/tasks list, bin/tasks today, bin/tasks add "task", bin/tasks complete "id" --title "title"
 SQL: SELECT id, title, priority, due_date FROM tasks WHERE status = 'open'`
     },
@@ -424,6 +428,7 @@ Each entry represents one habit on one day,
 with completion status and optional quantitative value.
 Use habit_id to group entries for the same habit across days.`,
       defaultCommand: 'bin/habits streaks ; bin/habits today',
+      dateCommand: 'bin/habits --date $DATE',
       queryInstructions: `Commands: bin/habits today, bin/habits list, bin/habits streaks
 SQL: SELECT title, date, status, value FROM habits WHERE date = date('now') ORDER BY title`
     },
@@ -861,15 +866,17 @@ export function getStaleMinutes(pluginType) {
  * @param {string} pluginType - The plugin type (e.g., 'time-logs')
  * @param {object} options
  * @param {Array<{sourceId: string, text: string}>} options.userInstructions - User's custom AI instructions
- * @param {string} options.currentData - Output from running the default command
+ * @param {string} options.currentData - Output from running the command
+ * @param {string} options.commandUsed - The command that was run to get the data (defaults to defaultCommand)
  * @returns {string} Formatted context block for AI prompt
  */
 export function generateAIContextBlock(pluginType, options = {}) {
   const schema = schemas[pluginType];
   if (!schema || !schema.ai) return '';
 
-  const { userInstructions = [], currentData } = options;
+  const { userInstructions = [], currentData, commandUsed } = options;
   const { name, description, defaultCommand, queryInstructions } = schema.ai;
+  const displayCommand = commandUsed || defaultCommand;
 
   const lines = [];
 
@@ -909,9 +916,9 @@ export function generateAIContextBlock(pluginType, options = {}) {
     }
   }
 
-  // Current data
+  // Data section
   if (currentData) {
-    lines.push(`**Current data** (from \`${defaultCommand}\`):`);
+    lines.push(`**Data** (from \`${displayCommand}\`):`);
     lines.push('```');
     lines.push(currentData.trim());
     lines.push('```');

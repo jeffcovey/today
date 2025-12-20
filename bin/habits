@@ -356,4 +356,41 @@ function formatDuration(seconds) {
   return `${secs}s`;
 }
 
+// Handle --date option at top level (used by bin/today for historical queries)
+// Shows habits and their completion status for a specific date
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const db = getDatabase();
+  ensureSyncForType(db, 'habits');
+
+  const sql = `
+    SELECT habit_id, title, status, value, category, goal_type,
+           json_extract(metadata, '$.target_type') as target_type
+    FROM habits
+    WHERE date = ?
+    ORDER BY status DESC, category, title
+  `;
+
+  const habits = db.prepare(sql).all(targetDate);
+
+  if (habits.length === 0) {
+    console.log(`No habits for ${targetDate}`);
+  } else {
+    for (const h of habits) {
+      let emoji = STATUS_EMOJI[h.status] || '○';
+      if (h.goal_type === 'limit' && h.status === 'completed') emoji = '✓';
+
+      let suffix = '';
+      if (h.value && h.target_type === 'timer') {
+        suffix = `, ${formatDuration(h.value)}`;
+      }
+
+      const category = h.category ? `[${h.category}] ` : '';
+      console.log(`${emoji} ${category}${h.title}${suffix}`);
+    }
+  }
+  process.exit(0);
+}
+
 program.parse();

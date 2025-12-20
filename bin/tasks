@@ -503,4 +503,47 @@ program
 // Note: archive-completed command removed - now config-driven via auto_archive_completed
 // Enable in config.toml under [plugins.markdown-tasks.<source>]
 
+// Handle --date option at top level (used by bin/today for historical queries)
+// Shows tasks due, scheduled, or completed on a specific date
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const db = getDatabase();
+  ensureSyncForType(db, 'tasks');
+
+  // Query for tasks relevant to this date:
+  // - Due on this date
+  // - Scheduled for this date
+  // - Completed on this date
+  const sql = `
+    SELECT id, title, status, priority, due_date, completed_at, metadata, source
+    FROM tasks
+    WHERE due_date = ?
+       OR json_extract(metadata, '$.scheduled_date') = ?
+       OR date(completed_at) = ?
+    ORDER BY
+      status DESC,  -- completed first
+      CASE priority
+        WHEN 'highest' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'medium' THEN 3
+        WHEN 'low' THEN 4
+        WHEN 'lowest' THEN 5
+        ELSE 6
+      END
+  `;
+
+  const tasks = db.prepare(sql).all(targetDate, targetDate, targetDate);
+
+  if (tasks.length === 0) {
+    console.log(`No tasks for ${targetDate}`);
+  } else {
+    for (const task of tasks) {
+      const status = task.status === 'completed' ? '[x]' : '[ ]';
+      console.log(`${status} ${task.title}`);
+    }
+  }
+  process.exit(0);
+}
+
 program.parse();
