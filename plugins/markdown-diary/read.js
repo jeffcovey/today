@@ -66,7 +66,7 @@ function parseSections(body, fileDate) {
   };
 
   // Split by ## headers
-  const sectionRegex = /^## (I'm grateful for\.\.\.|Gratitude|Progress|Concerns?|Journal)\s*$/gim;
+  const sectionRegex = /^## (I'm grateful for(?:\.\.\.)?|Gratitude|Progress|Concerns?|Journal)\s*$/gim;
   const sectionMatches = [...body.matchAll(sectionRegex)];
 
   for (let i = 0; i < sectionMatches.length; i++) {
@@ -74,7 +74,7 @@ function parseSections(body, fileDate) {
     // Normalize section name: concerns -> concern, "i'm grateful for..." -> gratitude
     let sectionName = match[1].toLowerCase();
     if (sectionName === 'concerns') sectionName = 'concern';
-    if (sectionName === "i'm grateful for...") sectionName = 'gratitude';
+    if (sectionName.startsWith("i'm grateful for")) sectionName = 'gratitude';
     const startIndex = match.index + match[0].length;
     const endIndex = sectionMatches[i + 1]?.index || body.length;
     const sectionContent = body.slice(startIndex, endIndex).trim();
@@ -107,7 +107,7 @@ function parseGratitudeSection(content, fileDate) {
       if (text) {
         entries.push({
           date: `${fileDate}T00:00:00`,
-          text: text
+          text: `I'm grateful for ${text}`
         });
       }
     }

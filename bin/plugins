@@ -22,6 +22,7 @@ import { getDatabase } from '../src/database-service.js';
 import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { program } from 'commander';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -967,114 +968,53 @@ async function cmdInfo(pluginName) {
   console.log('');
 }
 
-function showHelp() {
-  console.log(`
-${colors.bold('Plugin Management CLI')}
+// Commander setup
+program
+  .name('plugins')
+  .description('Plugin management for Today system');
 
-Usage: plugins <command> [options]
+program
+  .command('list', { isDefault: true })
+  .description('Show all available plugins')
+  .action(async () => {
+    await cmdList();
+  });
 
-Commands:
-  list                      Show all available plugins
-  info <plugin>             Show detailed plugin documentation
-  status                    Show enabled plugins and their sources
-  configure [plugin]        Interactive plugin configuration
-  sync [plugin] [source]    Sync plugin data (all if no plugin specified)
-    --type <type>           Only sync plugins of a specific type (e.g., time-logs)
+program
+  .command('info')
+  .description('Show detailed plugin documentation')
+  .argument('<plugin>', 'Plugin name')
+  .action(async (pluginName) => {
+    await cmdInfo(pluginName);
+  });
 
-Examples:
-  plugins list
-  plugins info markdown-time-tracking
-  plugins status
-  plugins configure
-  plugins configure markdown-time-tracking
-  plugins sync
-  plugins sync --type time-logs
-  plugins sync markdown-time-tracking
-  plugins sync markdown-time-tracking local
+program
+  .command('status')
+  .description('Show enabled plugins and their sources')
+  .action(async () => {
+    await cmdStatus();
+  });
 
-Configuration:
-  Plugins are configured in config.toml:
+program
+  .command('configure')
+  .description('Interactive plugin configuration')
+  .argument('[plugin]', 'Plugin name (optional)')
+  .action(async (pluginName) => {
+    await cmdConfigure(pluginName);
+  });
 
-  [plugins.markdown-time-tracking.local]
-  enabled = true
-  days_to_sync = 365
-`);
-}
+program
+  .command('sync')
+  .description('Sync plugin data to database')
+  .argument('[plugin]', 'Plugin name (optional)')
+  .argument('[source]', 'Source name within plugin (optional)')
+  .option('-t, --type <type>', 'Only sync plugins of this type (e.g., time-logs, events)')
+  .option('--if-stale <minutes>', 'Only sync if data is older than N minutes')
+  .action(async (pluginName, sourceName, options) => {
+    await cmdSync(pluginName, sourceName, options);
+  });
 
-// Parse arguments
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const result = {
-    command: null,
-    positional: [],
-    options: {}
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      // Check if next arg is the value (not another flag)
-      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-        result.options[key] = args[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const key = arg.slice(1);
-      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-        result.options[key] = args[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (!result.command) {
-      result.command = arg;
-    } else {
-      result.positional.push(arg);
-    }
-  }
-
-  return result;
-}
-
-// Main
-const { command, positional, options } = parseArgs();
-const arg1 = positional[0];
-const arg2 = positional[1];
-
-// Ensure config.toml has entries for all plugins
+// Ensure config.toml has entries for all plugins before parsing
 await ensurePluginConfig();
 
-try {
-  switch (command) {
-    case 'list':
-      await cmdList();
-      break;
-    case 'info':
-      await cmdInfo(arg1);
-      break;
-    case 'status':
-      await cmdStatus();
-      break;
-    case 'configure':
-      await cmdConfigure(arg1);
-      break;
-    case 'sync':
-      await cmdSync(arg1, arg2, options);
-      break;
-    case '--help':
-    case '-h':
-    case undefined:
-      showHelp();
-      break;
-    default:
-      console.error(colors.red(`Unknown command: ${command}`));
-      showHelp();
-      process.exit(1);
-  }
-} catch (error) {
-  console.error(colors.red('Error:'), error.message);
-  process.exit(1);
-}
+program.parse();

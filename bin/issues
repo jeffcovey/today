@@ -7,9 +7,9 @@ import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import {
   colors,
-  parseArgs,
   showSourceFilterError
 } from '../src/cli-utils.js';
+import { program } from 'commander';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -359,53 +359,59 @@ function displayIssueFull(issue) {
   }
 }
 
-// Main command handler
-const { command, positional, options } = parseArgs();
+// Commander setup
+program
+  .name('issues')
+  .description('Issue tracking for Today system');
 
-switch (command) {
-  case 'open':
-  case undefined:
-  case '':
+program
+  .command('open', { isDefault: true })
+  .description('Show open issues')
+  .option('--limit <n>', 'Limit issues per source', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdOpen(options);
-    break;
-  case 'closed':
+  });
+
+program
+  .command('closed')
+  .description('Show recently closed issues')
+  .option('--limit <n>', 'Limit number of results', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdClosed(options);
-    break;
-  case 'search':
-    await cmdSearch(positional.join(' '), options);
-    break;
-  case 'show':
-    await cmdShow(positional[0], options);
-    break;
-  case 'stats':
+  });
+
+program
+  .command('search')
+  .description('Search issues by title or body')
+  .argument('<term...>', 'Search term')
+  .option('--limit <n>', 'Limit number of results', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (termParts, options) => {
+    await cmdSearch(termParts.join(' '), options);
+  });
+
+program
+  .command('show')
+  .description('Show a specific issue')
+  .argument('<number>', 'Issue number')
+  .action(async (issueId) => {
+    await cmdShow(issueId);
+  });
+
+program
+  .command('stats')
+  .description('Show issue statistics')
+  .action(async () => {
     await cmdStats();
-    break;
-  case 'sync':
+  });
+
+program
+  .command('sync')
+  .description('Sync all issues plugins to database')
+  .action(async () => {
     await cmdSync();
-    break;
-  default:
-    console.log('Issues CLI');
-    console.log('');
-    console.log('Usage: issues [command] [options]');
-    console.log('');
-    console.log('Commands:');
-    console.log('  open [--limit N]            Show open issues (default)');
-    console.log('  closed [--limit N]          Show recently closed issues');
-    console.log('  search TERM [--limit N]     Search issues by title or body');
-    console.log('  show <number>               Show a specific issue');
-    console.log('  stats                       Show issue statistics');
-    console.log('  sync                        Sync all issues plugins to database');
-    console.log('');
-    console.log('Options:');
-    console.log('  --source NAME               Filter by plugin source');
-    console.log('  --limit N                   Limit number of results');
-    console.log('');
-    console.log('Examples:');
-    console.log('  issues                      # Show open issues');
-    console.log('  issues open --limit 10');
-    console.log('  issues closed');
-    console.log('  issues search "bug"');
-    console.log('  issues show 52');
-    console.log('  issues stats');
-    console.log('');
-}
+  });
+
+program.parse();

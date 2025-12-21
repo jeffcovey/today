@@ -9,6 +9,7 @@ import { execSync } from 'child_process';
 import { getDatabase } from '../src/database-service.js';
 import { discoverPlugins, getPluginSources, getPluginAccess, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfiguredTimezone, formatTime } from '../src/date-utils.js';
+import { program } from 'commander';
 
 // Get configured timezone
 const TIMEZONE = getConfiguredTimezone();
@@ -177,6 +178,31 @@ function parseEventArgs(args) {
   }
 
   return event;
+}
+
+// Date command - show events for a specific date
+async function cmdDate(db, targetDate) {
+  ensureSync(db);
+
+  // Parse target date to get start and end of day
+  const startOfDay = new Date(targetDate + 'T00:00:00');
+  const endOfDay = new Date(targetDate + 'T23:59:59');
+
+  const events = getEventsForRange(db, startOfDay, endOfDay);
+
+  if (events.length === 0) {
+    console.log(`No events for ${targetDate}`);
+    return;
+  }
+
+  for (const event of events) {
+    if (event.allDay) {
+      console.log(`all-day: ${event.title}${event.calendar ? ` [${event.calendar}]` : ''}`);
+    } else {
+      const time = formatTime(event.start, TIMEZONE);
+      console.log(`${time}: ${event.title}${event.location ? ` @ ${event.location}` : ''}${event.calendar ? ` [${event.calendar}]` : ''}`);
+    }
+  }
 }
 
 // Commands
@@ -618,240 +644,155 @@ async function cmdSyncTimeTracking(sourceArg, daysBack = 2) {
   }
 }
 
-// CLI
+// Commander setup
 const db = getDatabase();
-const command = process.argv[2];
 
-try {
-  switch (command) {
-    case 'sync':
-      await cmdSync();
-      break;
+program
+  .name('calendar')
+  .description('Calendar management for Today system');
 
-    case 'today':
-      await cmdToday(db);
-      break;
+program
+  .command('sync')
+  .description('Sync all calendars via plugin system')
+  .action(async () => {
+    await cmdSync();
+  });
 
-    case 'week':
-      await cmdWeek(db);
-      break;
+program
+  .command('today', { isDefault: true })
+  .description('Show today\'s events')
+  .action(async () => {
+    await cmdToday(db);
+  });
 
-    case 'add': {
-      const args = process.argv.slice(3);
-      if (args.length === 0 || args.includes('--help')) {
-        console.log(`
-Usage: calendar add [options]
+program
+  .command('week')
+  .description('Show this week\'s events')
+  .action(async () => {
+    await cmdWeek(db);
+  });
 
-Options:
-  --title, -t <title>         Event title (required)
-  --date, -d <date> <start> <end>  Date and times (e.g., "2025-09-05" "20:00" "21:00")
-  --start <datetime>          Start datetime (ISO format)
-  --end <datetime>            End datetime (ISO format)
-  --location, -l <location>   Event location
-  --description <desc>        Event description
-  --timezone, --tz <tz>       Timezone (default: ${TIMEZONE})
-  --calendar, -c <source>     Calendar source name (run 'calendar list' to see options)
+program
+  .command('list')
+  .aliases(['list-calendars', 'calendars'])
+  .description('List configured calendar sources')
+  .action(async () => {
+    const allSources = await getAllCalendarSources();
 
-Examples:
-  calendar add --title "Meeting" --date "2025-09-05" "20:00" "21:00" --location "Office"
-  calendar add "Focus Block" -c time-blocking --date "2025-12-15" "14:00" "16:00"
-        `);
-      } else {
-        await cmdAdd(args);
+    if (allSources.length === 0) {
+      console.log('No calendar sources configured.');
+      console.log('');
+      console.log('Add calendars in config.toml. Run "bin/plugins list" to see available plugins.');
+    } else {
+      console.log('📅 Configured Calendar Sources:\n');
+
+      // Group by plugin
+      const byPlugin = {};
+      for (const s of allSources) {
+        if (!byPlugin[s.plugin]) byPlugin[s.plugin] = [];
+        byPlugin[s.plugin].push(s);
       }
-      break;
-    }
 
-    case 'update': {
-      const eventId = process.argv[3];
-      const args = process.argv.slice(4);
-      if (!eventId || eventId === '--help' || args.length === 0) {
-        console.log(`
-Usage: calendar update <event-id> [options]
+      const defaultSource = await getDefaultWritableSource();
 
-Options (only specified fields will be updated):
-  --title, -t <title>         New event title
-  --date, -d <date> <start> <end>  New date and times
-  --start <datetime>          New start datetime
-  --end <datetime>            New end datetime
-  --location, -l <location>   New location
-  --description <desc>        New description
-  --calendar, -c <source>     Calendar source name
+      for (const [plugin, sources] of Object.entries(byPlugin)) {
+        const access = getPluginAccess(sources[0].pluginMeta);
+        const writeSupport = access === 'read-write' ? ' (read/write)' : ' (read-only)';
 
-Example:
-  calendar update abc123 --date "2025-09-07" "17:00" "19:00" -c personal
-        `);
-      } else {
-        await cmdUpdate(eventId, args);
-      }
-      break;
-    }
-
-    case 'delete': {
-      const eventId = process.argv[3];
-      const calendarArgIdx = process.argv.findIndex(a => a === '-c' || a === '--calendar');
-      const calendarArg = calendarArgIdx > 0 ? process.argv[calendarArgIdx + 1] : null;
-
-      if (!eventId || eventId === '--help') {
-        console.log(`
-Usage: calendar delete <event-id> [-c <source>]
-
-Delete an event from a calendar.
-If no calendar is specified, tries to look up from database or uses default.
-
-Example:
-  calendar delete abc123
-  calendar delete abc123 -c time-blocking
-        `);
-      } else {
-        await cmdDelete(eventId, calendarArg);
-      }
-      break;
-    }
-
-    case 'show':
-    case 'get': {
-      const sourceArg = process.argv[3];
-      const dateStr = process.argv[4];
-      if (!sourceArg || sourceArg === '--help') {
-        console.log(`
-Usage: calendar show <source> [date]
-
-Fetch events directly from a calendar source for a specific date.
-Useful for historical events not in the synced database.
-Date format: YYYY-MM-DD (default: today)
-
-Run 'calendar list' to see available sources.
-
-Examples:
-  calendar show personal
-  calendar show personal 2023-01-15
-  calendar show airbnb-1 2024-06-01
-        `);
-      } else {
-        await cmdShow(sourceArg, dateStr);
-      }
-      break;
-    }
-
-    case 'cleanup': {
-      const sourceArg = process.argv[3];
-      const daysToKeep = parseInt(process.argv[4]) || 0;
-      if (!sourceArg || sourceArg === '--help') {
-        console.log(`
-Usage: calendar cleanup <source> [days-to-keep]
-
-Delete past events from a calendar.
-Only works with calendars that support write operations.
-
-Arguments:
-  source        - Calendar source name (run 'calendar list' to see options)
-  days-to-keep  - Number of recent days to keep (default: 0)
-
-Example:
-  calendar cleanup time-blocking
-  calendar cleanup time-blocking 2
-        `);
-      } else {
-        await cmdCleanup(sourceArg, daysToKeep);
-      }
-      break;
-    }
-
-    case 'sync-time-tracking':
-    case 'sync-tracking': {
-      const sourceArg = process.argv[3];
-      const daysBack = parseInt(process.argv[4]) || 2;
-      if (!sourceArg || sourceArg === '--help') {
-        console.log(`
-Usage: calendar sync-time-tracking <source> [days-back]
-
-Sync time tracking entries with a calendar.
-Uses ⏱️ emoji prefix to identify time tracking entries.
-Only works with calendars that support write operations.
-
-Arguments:
-  source     - Calendar source name (run 'calendar list' to see options)
-  days-back  - Number of days to look back (default: 2)
-
-Example:
-  calendar sync-time-tracking time-blocking
-  calendar sync-time-tracking time-blocking 3
-        `);
-      } else {
-        await cmdSyncTimeTracking(sourceArg, daysBack);
-      }
-      break;
-    }
-
-    case 'list':
-    case 'list-calendars':
-    case 'calendars': {
-      const allSources = await getAllCalendarSources();
-
-      if (allSources.length === 0) {
-        console.log('No calendar sources configured.');
+        console.log(`${plugin}${writeSupport}:`);
+        for (const s of sources) {
+          const isDefault = defaultSource && s.name === defaultSource.name && s.plugin === defaultSource.plugin;
+          const displayName = s.config.name || s.config.calendar_id || s.name;
+          console.log(`  ${s.name}${isDefault ? ' (default)' : ''}`);
+          console.log(`    ${displayName}`);
+        }
         console.log('');
-        console.log('Add calendars in config.toml. Run "bin/plugins list" to see available plugins.');
-      } else {
-        console.log('📅 Configured Calendar Sources:\n');
-
-        // Group by plugin
-        const byPlugin = {};
-        for (const s of allSources) {
-          if (!byPlugin[s.plugin]) byPlugin[s.plugin] = [];
-          byPlugin[s.plugin].push(s);
-        }
-
-        const defaultSource = await getDefaultWritableSource();
-
-        for (const [plugin, sources] of Object.entries(byPlugin)) {
-          // Check if plugin supports write using pluginMeta
-          const access = getPluginAccess(sources[0].pluginMeta);
-          const writeSupport = access === 'read-write' ? ' (read/write)' : ' (read-only)';
-
-          console.log(`${plugin}${writeSupport}:`);
-          for (const s of sources) {
-            const isDefault = defaultSource && s.name === defaultSource.name && s.plugin === defaultSource.plugin;
-            const displayName = s.config.name || s.config.calendar_id || s.name;
-            console.log(`  ${s.name}${isDefault ? ' (default)' : ''}`);
-            console.log(`    ${displayName}`);
-          }
-          console.log('');
-        }
-
-        console.log('Use source names with commands:');
-        console.log('  calendar show personal 2023-01-15   # Historical lookup');
-        console.log('  calendar add "Meeting" -c personal  # Create event');
       }
-      break;
+
+      console.log('Use source names with commands:');
+      console.log('  calendar show personal 2023-01-15   # Historical lookup');
+      console.log('  calendar add "Meeting" -c personal  # Create event');
     }
+  });
 
-    default:
-      console.log(`
-Usage: calendar [command]
+program
+  .command('add')
+  .description('Add a new event')
+  .option('-t, --title <title>', 'Event title')
+  .option('-d, --date <date>', 'Date (YYYY-MM-DD)')
+  .option('--start <datetime>', 'Start datetime (ISO format)')
+  .option('--end <datetime>', 'End datetime (ISO format)')
+  .option('-l, --location <location>', 'Event location')
+  .option('--description <desc>', 'Event description')
+  .option('--tz, --timezone <tz>', `Timezone (default: ${TIMEZONE})`)
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .allowUnknownOption() // Allow positional title and time arguments
+  .action(async (options, cmd) => {
+    // Pass all raw args to parseEventArgs for backward compatibility
+    const args = process.argv.slice(3);
+    await cmdAdd(args);
+  });
 
-Commands:
-  sync              - Sync all calendars via plugin system
-  today             - Show today's events
-  week              - Show this week's events
-  list              - List configured calendar sources
-  add               - Add a new event (-c <source> to specify calendar)
-  update            - Update an existing event
-  delete            - Delete an event
-  show              - Fetch events from a source for a specific date
-  cleanup           - Delete past events from a calendar
-  sync-time-tracking - Sync time tracking entries with calendar
+program
+  .command('update')
+  .description('Update an existing event')
+  .argument('<event-id>', 'Event ID to update')
+  .option('-t, --title <title>', 'New event title')
+  .option('-d, --date <date>', 'New date')
+  .option('--start <datetime>', 'New start datetime')
+  .option('--end <datetime>', 'New end datetime')
+  .option('-l, --location <location>', 'New location')
+  .option('--description <desc>', 'New description')
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .allowUnknownOption()
+  .action(async (eventId, options, cmd) => {
+    const args = process.argv.slice(4);
+    await cmdUpdate(eventId, args);
+  });
 
-Use -c/--calendar with source names (e.g., -c personal, -c time-blocking)
-Run 'calendar list' to see available calendars.
+program
+  .command('delete')
+  .description('Delete an event')
+  .argument('<event-id>', 'Event ID to delete')
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .action(async (eventId, options) => {
+    await cmdDelete(eventId, options.calendar);
+  });
 
-For detailed help on any command:
-  calendar <command> --help
-      `);
-  }
+program
+  .command('show')
+  .alias('get')
+  .description('Fetch events from a source for a specific date')
+  .argument('<source>', 'Calendar source name')
+  .argument('[date]', 'Date (YYYY-MM-DD, default: today)')
+  .action(async (source, date) => {
+    await cmdShow(source, date);
+  });
+
+program
+  .command('cleanup')
+  .description('Delete past events from a calendar')
+  .argument('<source>', 'Calendar source name')
+  .argument('[days-to-keep]', 'Number of recent days to keep', (val) => parseInt(val, 10), 0)
+  .action(async (source, daysToKeep) => {
+    await cmdCleanup(source, daysToKeep);
+  });
+
+program
+  .command('sync-time-tracking')
+  .alias('sync-tracking')
+  .description('Sync time tracking entries with a calendar')
+  .argument('<source>', 'Calendar source name')
+  .argument('[days-back]', 'Number of days to look back', (val) => parseInt(val, 10), 2)
+  .action(async (source, daysBack) => {
+    await cmdSyncTimeTracking(source, daysBack);
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  await cmdDate(db, process.argv[dateArgIdx + 1]);
   process.exit(0);
-} catch (error) {
-  console.error('Error:', error.message);
-  process.exit(1);
 }
+
+program.parse();

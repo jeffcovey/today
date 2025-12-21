@@ -20,6 +20,35 @@ dotenvx.config();
 // Singleton instance
 let instance = null;
 
+// Track if we've set up signal handlers
+let signalHandlersInstalled = false;
+
+/**
+ * Install signal handlers to properly close database on exit
+ * This prevents WAL corruption from incomplete checkpoints
+ */
+function installSignalHandlers() {
+  if (signalHandlersInstalled) return;
+  signalHandlersInstalled = true;
+
+  const cleanup = () => {
+    if (instance) {
+      try {
+        // Force a WAL checkpoint before closing
+        instance.localDb?.pragma('wal_checkpoint(TRUNCATE)');
+        instance.localDb?.close();
+      } catch {
+        // Ignore errors during cleanup
+      }
+      instance = null;
+    }
+  };
+
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(130); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+}
+
 export class DatabaseService {
   constructor(dbPath = '.data/today.db', options = {}) {
     // Return existing instance if available (singleton pattern)
@@ -52,6 +81,9 @@ export class DatabaseService {
     this.localDb.pragma('journal_mode = WAL');
     this.localDb.pragma('busy_timeout = 30000');
     this.localDb.pragma('foreign_keys = OFF');
+
+    // Install signal handlers to ensure clean shutdown
+    installSignalHandlers();
   }
 
   /**

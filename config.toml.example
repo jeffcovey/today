@@ -44,23 +44,6 @@
 # wind_down_hours = 2
 
 # =============================================================================
-# Stage Themes (Day-of-Week Focus Areas)
-# =============================================================================
-# Customize which days are for different types of work.
-# "front" = outward-facing work (meetings, calls, emails, support)
-# "back" = maintenance work (bills, bug fixes, organizing, admin)
-# "off" = personal time (nature, friends, reading, hobbies)
-
-[stages]
-# monday = "front"
-# tuesday = "off"
-# wednesday = "front"
-# thursday = "back"
-# friday = "off"
-# saturday = "front"
-# sunday = "back"
-
-# =============================================================================
 # Hosting / Guest Rooms (Optional)
 # =============================================================================
 # If you host guests (Airbnb, etc.), configure check-in/out times
@@ -101,35 +84,6 @@
 
 [deployment]
 # domain = "today.example.com"
-
-# =============================================================================
-# Email Categorization Patterns (Optional)
-# =============================================================================
-# These patterns are used by the email organizer to sort emails into
-# Front Stage (work/support), Back Stage (maintenance/bills), and Off Stage (personal)
-# Add email addresses or domain patterns that match each stage
-
-[email.front_stage]
-# Front Stage: Meetings, calls, support, emails, communications
-# patterns = [
-#   "support@yourcompany.com",
-#   "@yourcompany.com",
-# ]
-
-[email.back_stage]
-# Back Stage: Maintenance, bills, bug fixes, organizing
-# patterns = [
-#   "alerts@yourbank.com",
-#   "@github.com",
-#   "notifications@github.com",
-# ]
-
-[email.off_stage]
-# Off Stage: Personal time, nature, friends, reading, entertainment
-# patterns = [
-#   "@amazon.com",
-#   "@gmail.com",
-# ]
 
 # =============================================================================
 # Tags / Topics (Optional)
@@ -351,3 +305,22 @@ directory = "vault"
 # enabled = true
 # plans_directory = "vault/plans"
 # templates_directory = "vault/plans/templates"
+
+# [plugins.stages.default]
+# enabled = true
+# front_stage_name = "Front Stage"
+# front_stage_description = "Outward-facing work: meetings, calls, emails, support, communications"
+# front_stage_tag = "#stage/front-stage"
+# back_stage_name = "Back Stage"
+# back_stage_description = "Maintenance work: bills, bug fixes, organizing, admin tasks"
+# back_stage_tag = "#stage/back-stage"
+# off_stage_name = "Off Stage"
+# off_stage_description = "Personal time: nature, friends, reading, hobbies, rest"
+# off_stage_tag = "#stage/off-stage"
+# monday = "front"
+# tuesday = "off"
+# wednesday = "front"
+# thursday = "back"
+# friday = "off"
+# saturday = "front"
+# sunday = "back"

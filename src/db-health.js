@@ -43,22 +43,10 @@ export function checkDatabaseHealth() {
     return { healthy: false, reason: 'Database file does not exist' };
   }
 
-  // Check for orphaned WAL/SHM files with issues
-  // An empty WAL file with existing SHM indicates incomplete checkpoint
-  if (fs.existsSync(WAL_PATH) && fs.existsSync(SHM_PATH)) {
-    try {
-      const walSize = fs.statSync(WAL_PATH).size;
-      if (walSize === 0) {
-        return {
-          healthy: false,
-          corrupted: true,
-          reason: 'Empty WAL file with SHM present (incomplete checkpoint)'
-        };
-      }
-    } catch {
-      // Continue with other checks
-    }
-  }
+  // Note: We previously checked for "empty WAL + SHM" as corruption indicator,
+  // but this is actually a normal state after wal_checkpoint(TRUNCATE).
+  // The real test for corruption is the integrity_check pragma below.
+  // Orphaned WAL/SHM files are cleaned up automatically by SQLite on next open.
 
   let db;
   try {
