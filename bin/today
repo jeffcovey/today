@@ -24,8 +24,9 @@ import { execSync, spawnSync } from 'child_process';
 // Import shared modules
 import { getTimezone, getFullConfig } from '../src/config.js';
 import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
-import { getPluginTypes, getAIMetadata, generateAIContextBlock } from '../src/plugin-schemas.js';
+import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from '../src/plugin-schemas.js';
 import { ensureHealthyDatabase } from '../src/db-health.js';
+import { getDatabase } from '../src/database-service.js';
 // DISABLED - used by vault/template features
 // import {
 //   getStageInfo,
@@ -39,7 +40,7 @@ import {
   // getDateComponents as getDateComponentsFromDateUtils,
   // addDaysToDate,
   // formatDate,
-  // formatTime,
+  formatTime,
   formatFullDateTime,
   // getTimezoneOffset,
 } from '../src/date-utils.js';
@@ -530,6 +531,71 @@ Each section shows current data and instructions for querying more.
 }
 
 /**
+ * Get data context for a specific date using CLI commands
+ * Used for generating summaries of past days
+ * Uses dateCommand from schema to call each CLI with --date
+ */
+async function getDataContextForDate(targetDate) {
+  const sections = [];
+  const pluginTypes = getPluginTypes();
+
+  // Only include types relevant for historical data (have dateCommand defined)
+  const historicalTypes = ['time-logs', 'diary', 'events', 'tasks', 'habits'];
+
+  for (const pluginType of pluginTypes) {
+    if (!historicalTypes.includes(pluginType)) continue;
+
+    const schema = schemas[pluginType];
+    if (!schema || !schema.ai?.dateCommand) continue;
+
+    // Build the command with $DATE substituted
+    const command = schema.ai.dateCommand.replace('$DATE', targetDate);
+
+    try {
+      const output = execSync(command, {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        timeout: 30000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      // Filter out dotenvx noise and empty lines
+      const cleanOutput = output.split('\n')
+        .filter(line => !line.includes('[dotenvx'))
+        .join('\n')
+        .trim();
+
+      if (!cleanOutput || cleanOutput.includes('No ')) continue;
+
+      // Generate the full context block using the schema system
+      const block = generateAIContextBlock(pluginType, {
+        userInstructions: [],
+        currentData: cleanOutput,
+        commandUsed: command
+      });
+
+      if (block) {
+        sections.push(block);
+      }
+    } catch {
+      // Command failed - skip this type
+    }
+  }
+
+  if (sections.length === 0) {
+    return `# Data Sources\n(No data found for ${targetDate})`;
+  }
+
+  const intro = `# Data Sources for ${targetDate}
+
+The following data was retrieved for the specified date.
+
+`;
+
+  return intro + sections.join('\n\n---\n\n');
+}
+
+/**
  * Get data from context plugins by running their read commands
  */
 async function getContextPluginsData(typeData) {
@@ -580,7 +646,7 @@ async function getContextPluginsData(typeData) {
   return lines.length > 2 ? lines.join('\n') : null;
 }
 
-async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false) {
+async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null) {
   // DISABLED - depends on getReviewFilePath/getTomorrowDate
   // const todayFile = getReviewFilePath();
   // const tomorrowFile = getReviewFilePath(getTomorrowDate());
@@ -589,9 +655,15 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   const now = getCurrentTime(timezone);
   const currentTime = formatFullDateTime(now, timezone);
 
-  // Gather context from plugins
-  console.log('📊 Gathering context...');
-  const dataContext = await getDataContext();
+  // Gather context from plugins or database (for specific dates)
+  let dataContext;
+  if (targetDate) {
+    console.log(`📊 Gathering context for ${targetDate}...`);
+    dataContext = await getDataContextForDate(targetDate);
+  } else {
+    console.log('📊 Gathering context...');
+    dataContext = await getDataContext();
+  }
   console.log('✅ Context ready\n');
   const config = getFullConfig();
 
@@ -609,8 +681,12 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   if (profile.bed_time) profileLines.push(`- **Bed time**: ${profile.bed_time}`);
 
   // Build the context section (user info and data sources)
+  const timeInfo = targetDate
+    ? `- **Target Date**: ${targetDate}\n- **Generated At**: ${currentTime} (${timezone})`
+    : `- **Current Time**: ${currentTime} (${timezone})`;
+
   const contextSection = `## Pre-Computed Context
-- **Current Time**: ${currentTime}
+${timeInfo}
 
 ## Database
 - **Path**: .data/today.db (SQLite)
@@ -620,6 +696,12 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
 ${profileLines.join('\n')}
 
 ${dataContext}`;
+
+  // Dry run with --date: just output data context (for consumption by other tools)
+  if (dryRun && targetDate) {
+    console.log(contextSection);
+    return;
+  }
 
   // Build the prompt
   let prompt;
@@ -707,6 +789,7 @@ Commands:
   dry-run     Show the prompt that would be sent to the AI (no API call)
 
 Options:
+  --date DATE       Target date (YYYY-MM-DD) - queries historical data
   --no-sync         Skip sync step (faster startup)
   --non-interactive Run in non-interactive mode (for automation)
   -h, --help        Show this help message
@@ -715,6 +798,7 @@ Examples:
   bin/today                           # Start daily review
   bin/today now                       # Quick "what should I do now?" session
   bin/today dry-run                   # Show prompt without running Claude
+  bin/today dry-run --date 2025-12-15 # Show prompt for a specific date
   bin/today "fix the bug in login"    # Focused session with specific request
 
 Files:
@@ -737,12 +821,16 @@ async function main() {
   let request = [];
   let noSync = false;
   let nonInteractive = false;
+  let targetDate = null;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--no-sync') {
       noSync = true;
     } else if (args[i] === '--non-interactive') {
       nonInteractive = true;
+    } else if (args[i] === '--date' && args[i + 1]) {
+      targetDate = args[i + 1];
+      i++; // Skip the next arg (the date value)
     } else if (!command && ['init', 'update', 'dry-run', 'now'].includes(args[i])) {
       command = args[i];
     } else {
@@ -782,7 +870,7 @@ async function main() {
 
   // Handle dry-run command - show what prompt would be sent to AI
   if (command === 'dry-run') {
-    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */);
+    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */, targetDate);
     return;
   }
 
@@ -804,8 +892,10 @@ async function main() {
   //   checkClaudeAuth();
   // }
 
-  // Run sync (unless skipped)
-  if (!noSync) {
+  // Run sync (unless skipped or using historical date)
+  if (targetDate) {
+    console.log('⚠️  Skipping sync (using historical date)');
+  } else if (!noSync) {
     console.log('🔄 Syncing data sources...');
     try {
       execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
@@ -821,7 +911,7 @@ async function main() {
   // createReviewFromTemplate();
 
   // Run the appropriate session
-  await runInteractiveSession(directRequest, nonInteractive);
+  await runInteractiveSession(directRequest, nonInteractive, false, targetDate);
 }
 
 main().catch((e) => {

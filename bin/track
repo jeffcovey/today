@@ -20,10 +20,10 @@ import {
 } from '../src/duration-utils.js';
 import {
   colors,
-  parseArgs,
   showSourceError,
   showSourceFilterError
 } from '../src/cli-utils.js';
+import { program } from 'commander';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -297,6 +297,66 @@ async function cmdStatus() {
   }
 }
 
+// Date command - queries time_logs table for a specific date
+async function cmdDate(targetDate, options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'time-logs', allSources);
+      return;
+    }
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE date(start_time) = ?
+    ORDER BY start_time
+  `;
+  const params = [targetDate];
+
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE date(start_time) = ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(colors.blue('ℹ') + ` No time entries for ${targetDate}`);
+    return;
+  }
+
+  let totalMinutes = 0;
+
+  for (const entry of entries) {
+    const { start_time, end_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
+
+    if (!description) continue;
+
+    totalMinutes += duration;
+
+    // Display entry
+    const startDisplay = formatTime(start_time);
+    const endDisplay = end_time ? formatTime(end_time) : 'running';
+    console.log(`${startDisplay} (${formatDurationMinutes(duration)}): ${description}`);
+  }
+
+  console.log('');
+  console.log(`Total: ${formatDurationMinutes(totalMinutes)}`);
+}
+
 // Today command - queries time_logs table
 async function cmdToday(options = {}) {
   ensureSync();
@@ -567,63 +627,84 @@ async function cmdSync() {
   }
 }
 
-// Main command handler
-const { command, positional, options } = parseArgs();
+// Commander setup
+program
+  .name('track')
+  .description('Time tracking for Today system');
 
-switch (command) {
-  case 'start':
-    await cmdStart(positional.join(' '), options);
-    break;
-  case 'stop':
+program
+  .command('start')
+  .description('Start tracking time (include #topic/tags in description)')
+  .argument('<description...>', 'Description with #topic/tags')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (descriptionParts, options) => {
+    await cmdStart(descriptionParts.join(' '), options);
+  });
+
+program
+  .command('stop')
+  .description('Stop current timer')
+  .option('--source <source>', 'Plugin source filter')
+  .action(async (options) => {
     await cmdStop(options);
-    break;
-  case 'add':
-    await cmdAdd(positional[0], { ...options, _positional: positional.slice(1) });
-    break;
-  case 'status':
-    await cmdStatus();
-    break;
-  case 'today':
-    await cmdToday(options);
-    break;
-  case 'week':
-    await cmdWeek(options);
-    break;
-  case 'sync':
-    await cmdSync();
-    break;
-  case 'restart':
+  });
+
+program
+  .command('restart')
+  .description('Start a new timer with the same description as the last entry')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (options) => {
     await cmdRestart(options);
-    break;
-  default:
-    console.log('Time Tracking CLI');
-    console.log('');
-    console.log('Usage: track [command] [options]');
-    console.log('');
-    console.log('Commands:');
-    console.log('  start DESC [--source]       Start tracking time (include #topic/tags in description)');
-    console.log('  stop [--source]             Stop current timer');
-    console.log('  restart [--source]          Start a new timer with the same description as the last entry');
-    console.log('  add DURATION DESC [--source] Add entry for work you forgot to track');
-    console.log('  status                      Show current timer status');
-    console.log('  today [--source NAME]       Show today\'s entries');
-    console.log('  week [--source NAME]        Show this week\'s entries');
-    console.log('  sync                        Sync all time-logs plugins to database');
-    console.log('');
-    console.log('Options:');
-    console.log('  --source NAME               Filter by plugin source (e.g., markdown-time-tracking)');
-    console.log('');
-    console.log('Examples:');
-    console.log('  track start "Deep work session #topic/programming"');
-    console.log('  track stop');
-    console.log('  track add 20m "Code review #topic/programming"');
-    console.log('  track add 1.5h "Reading #topic/learning"');
-    console.log('  track status');
-    console.log('  track today');
-    console.log('  track today --source toggl');
-    console.log('  track week --source markdown');
-    console.log('');
-    console.log('Duration formats for \'add\' command:');
-    console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
-    console.log('');
+  });
+
+program
+  .command('add')
+  .description('Add entry for work you forgot to track')
+  .argument('<duration>', 'Duration (e.g., 20m, 1.5h, 2h30m)')
+  .argument('<description...>', 'Description with #topic/tags')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (duration, descriptionParts, options) => {
+    await cmdAdd(duration, { ...options, _positional: descriptionParts });
+  });
+
+program
+  .command('status', { isDefault: true })
+  .description('Show current timer status')
+  .action(async () => {
+    await cmdStatus();
+  });
+
+program
+  .command('today')
+  .description('Show today\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdToday(options);
+  });
+
+program
+  .command('week')
+  .description('Show this week\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdWeek(options);
+  });
+
+program
+  .command('sync')
+  .description('Sync all time-logs plugins to database')
+  .action(async () => {
+    await cmdSync();
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const sourceArgIdx = process.argv.findIndex(a => a === '--source');
+  const source = sourceArgIdx > 0 ? process.argv[sourceArgIdx + 1] : undefined;
+  await cmdDate(targetDate, { source });
+  process.exit(0);
 }
+
+program.parse();

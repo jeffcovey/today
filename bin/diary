@@ -15,9 +15,9 @@ import {
 import { format } from 'date-fns';
 import {
   colors,
-  parseArgs,
   showSourceFilterError
 } from '../src/cli-utils.js';
+import { program } from 'commander';
 import { getFullConfig } from '../src/config.js';
 
 // Entry type emoji map
@@ -31,6 +31,51 @@ const TYPE_EMOJI = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
+
+// Date command - show diary entries for a specific date
+async function cmdDate(targetDate, options = {}) {
+  const db = getDatabase();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('diary', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'diary', allSources);
+      return;
+    }
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT date, text, metadata, source
+    FROM diary
+    WHERE date(date) = ?
+    ORDER BY date
+  `;
+  const params = [targetDate];
+
+  if (options.source) {
+    query = `
+      SELECT date, text, metadata, source
+      FROM diary
+      WHERE date(date) = ? AND source LIKE ?
+      ORDER BY date
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(colors.blue('ℹ') + ` No diary entries for ${targetDate}`);
+    return;
+  }
+
+  for (const entry of entries) {
+    // Display just the text without full metadata for historical queries
+    console.log(entry.text);
+  }
+}
 
 // Today command - show today's diary entries
 async function cmdToday(options = {}) {
@@ -484,73 +529,87 @@ function displayEntry(entry, highlightTerm = null) {
   console.log('');
 }
 
-// Main command handler
-const { command, positional, options } = parseArgs();
+// Commander setup
+program
+  .name('diary')
+  .description('Diary management for Today system');
 
-switch (command) {
-  case 'today':
+program
+  .command('today', { isDefault: true })
+  .description('Show today\'s diary entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdToday(options);
-    break;
-  case 'week':
+  });
+
+program
+  .command('week')
+  .description('Show this week\'s diary entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdWeek(options);
-    break;
-  case 'recent':
+  });
+
+program
+  .command('recent')
+  .description('Show recent diary entries')
+  .option('--limit <n>', 'Number of entries to show', (val) => parseInt(val, 10), 5)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdRecent(options);
-    break;
-  case 'search':
-    await cmdSearch(positional.join(' '), options);
-    break;
-  case 'on-this-day':
-  case 'otd':
+  });
+
+program
+  .command('search')
+  .description('Search diary entries')
+  .argument('<term...>', 'Search term')
+  .option('--limit <n>', 'Max results to show', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (termParts, options) => {
+    await cmdSearch(termParts.join(' '), options);
+  });
+
+program
+  .command('on-this-day')
+  .alias('otd')
+  .description('Show entries from this date in previous years')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
     await cmdOnThisDay(options);
-    break;
-  case 'stats':
+  });
+
+program
+  .command('stats')
+  .description('Show diary statistics')
+  .action(async () => {
     await cmdStats();
-    break;
-  case 'sync':
+  });
+
+program
+  .command('sync')
+  .description('Sync all diary plugins to database')
+  .action(async () => {
     await cmdSync();
-    break;
-  case 'add':
-    // diary add <type> <text>
-    const addType = positional[0];
-    const addText = positional.slice(1).join(' ');
-    await cmdAdd(addType, addText, options);
-    break;
-  default:
-    console.log('Diary CLI');
-    console.log('');
-    console.log('Usage: diary [command] [options]');
-    console.log('');
-    console.log('Commands:');
-    console.log('  today [--source NAME]       Show today\'s entries');
-    console.log('  week [--source NAME]        Show this week\'s entries');
-    console.log('  recent [--limit N]          Show recent entries (default: 5)');
-    console.log('  search TERM [--limit N]     Search entries');
-    console.log('  on-this-day, otd            Show entries from this date in past years');
-    console.log('  stats                       Show diary statistics');
-    console.log('  sync                        Sync all diary plugins to database');
-    console.log('  add TYPE TEXT               Add a new entry (gratitude, progress, concern, journal)');
-    console.log('');
-    console.log('Entry Types:');
-    console.log('  🙏 gratitude    Things you\'re grateful for (no timestamp)');
-    console.log('  📈 progress     Work accomplishments (timestamped)');
-    console.log('  😟 concern      Worries or issues to address (timestamped)');
-    console.log('  📝 journal      Free-form reflection (timestamped)');
-    console.log('');
-    console.log('Options:');
-    console.log('  --source NAME               Filter by plugin source');
-    console.log('  --limit N                   Limit number of results');
-    console.log('');
-    console.log('Examples:');
-    console.log('  diary today');
-    console.log('  diary week');
-    console.log('  diary recent --limit 10');
-    console.log('  diary search "Florida"');
-    console.log('  diary on-this-day');
-    console.log('  diary stats');
-    console.log('  diary add gratitude "cool December breezes"');
-    console.log('  diary add progress "Finished the markdown-diary plugin"');
-    console.log('  diary add concern "Need to review quarterly finances"');
-    console.log('  diary add journal "Reflecting on a productive day..."');
-    console.log('');
+  });
+
+program
+  .command('add')
+  .description('Add a new diary entry (gratitude, progress, concern, journal)')
+  .argument('<type>', 'Entry type: gratitude, progress, concern, or journal')
+  .argument('<text...>', 'Entry text')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (type, textParts, options) => {
+    await cmdAdd(type, textParts.join(' '), options);
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const sourceArgIdx = process.argv.findIndex(a => a === '--source');
+  const source = sourceArgIdx > 0 ? process.argv[sourceArgIdx + 1] : undefined;
+  await cmdDate(targetDate, { source });
+  process.exit(0);
 }
+
+program.parse();

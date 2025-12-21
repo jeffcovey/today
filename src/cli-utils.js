@@ -1,6 +1,8 @@
 /**
- * CLI utilities for parsing arguments and displaying output.
+ * CLI utilities for displaying output and common error handling.
  * Shared across all binary commands.
+ *
+ * Note: All CLIs use 'commander' for argument parsing.
  */
 
 import pc from 'picocolors';
@@ -95,53 +97,8 @@ export function printHeader(message) {
 }
 
 // ============================================================================
-// Argument Parsing
+// Source Error Utilities
 // ============================================================================
-
-/**
- * Parse command line arguments into a structured object.
- * Handles --long-options, -s short options, commands, and positional args.
- *
- * @param {string[]} [argv] - Arguments to parse (defaults to process.argv.slice(2))
- * @returns {Object} Parsed arguments
- * @returns {string|null} return.command - The command (first non-option arg)
- * @returns {string[]} return.positional - Remaining positional arguments
- * @returns {Object} return.options - Options as key-value pairs
- */
-export function parseArgs(argv = process.argv.slice(2)) {
-  const result = {
-    command: null,
-    positional: [],
-    options: {}
-  };
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      if (i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-        result.options[key] = argv[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (arg.startsWith('-') && arg.length === 2) {
-      const key = arg.slice(1);
-      if (i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
-        result.options[key] = argv[i + 1];
-        i++;
-      } else {
-        result.options[key] = true;
-      }
-    } else if (!result.command) {
-      result.command = arg;
-    } else {
-      result.positional.push(arg);
-    }
-  }
-
-  return result;
-}
 
 /**
  * Display a plugin source error with available sources.
