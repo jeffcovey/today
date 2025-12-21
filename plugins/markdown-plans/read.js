@@ -486,6 +486,43 @@ function fixDoneTodayInPastFiles(today, maxDaysBack = 7) {
 }
 
 /**
+ * Remove DUE_TODAY section from past daily plan files
+ * This section shows tasks due "before tomorrow" which becomes stale after the day passes
+ */
+function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
+  const removed = [];
+
+  for (let i = 1; i <= maxDaysBack; i++) {
+    const pastDate = new Date(today);
+    pastDate.setDate(pastDate.getDate() - i);
+
+    const planInfo = getPlanFilePaths(pastDate);
+    if (!fs.existsSync(planInfo.day.path)) continue;
+
+    let content = fs.readFileSync(planInfo.day.path, 'utf-8');
+
+    // Check if file still has DUE_TODAY section
+    if (!content.includes('<!-- DUE_TODAY:')) continue;
+
+    // Remove the entire DUE_TODAY section
+    const newContent = content.replace(
+      /<!-- DUE_TODAY:[\s\S]*?<!-- \/DUE_TODAY -->\n*/g,
+      ''
+    );
+
+    if (newContent !== content) {
+      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      removed.push({
+        file: path.basename(planInfo.day.path),
+        date: formatDateStr(pastDate),
+      });
+    }
+  }
+
+  return removed;
+}
+
+/**
  * Map of plugin types to their primary date column for filtering
  */
 const dateColumnMap = {
@@ -935,6 +972,7 @@ async function main() {
     plans_created: [],
     summaries_generated: [],
     done_today_fixed: [],
+    due_today_removed: [],
     tomorrow_updated: false,
     daily_note_linked: null,
   };
@@ -965,6 +1003,12 @@ async function main() {
   const fixedFiles = fixDoneTodayInPastFiles(today, 7);
   if (fixedFiles.length > 0) {
     metadata.done_today_fixed = fixedFiles;
+  }
+
+  // Remove DUE_TODAY section from past daily files
+  const removedDueToday = removeDueTodayFromPastFiles(today, 7);
+  if (removedDueToday.length > 0) {
+    metadata.due_today_removed = removedDueToday;
   }
 
   // Generate summaries for past days that are missing them
