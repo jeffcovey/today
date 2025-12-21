@@ -388,7 +388,7 @@ function needsSummary(filePath) {
 }
 
 /**
- * Add summary to a plan file's frontmatter
+ * Add summary to a plan file's frontmatter and add display callout
  */
 function addSummaryToFile(filePath, summary) {
   let content = fs.readFileSync(filePath, 'utf-8');
@@ -410,7 +410,55 @@ function addSummaryToFile(filePath, summary) {
     );
   }
 
+  // Add Day Summary callout in TODAY_FOCUS section if not already present
+  const summaryCallout = '> [!summary] Day Summary\n> `=this.daily_summary`';
+  if (!content.includes('[!summary] Day Summary')) {
+    content = content.replace(
+      /<!-- \/TODAY_FOCUS -->/,
+      `${summaryCallout}\n<!-- /TODAY_FOCUS -->`
+    );
+  }
+
   fs.writeFileSync(filePath, content, 'utf-8');
+}
+
+/**
+ * Add Day Summary callout to past files that have summaries but are missing the callout
+ */
+function addSummaryCalloutToPastFiles(today, maxDaysBack = 7) {
+  const added = [];
+
+  for (let i = 1; i <= maxDaysBack; i++) {
+    const pastDate = new Date(today);
+    pastDate.setDate(pastDate.getDate() - i);
+
+    const planInfo = getPlanFilePaths(pastDate);
+    if (!fs.existsSync(planInfo.day.path)) continue;
+
+    let content = fs.readFileSync(planInfo.day.path, 'utf-8');
+    const { frontmatter } = parseFrontmatter(content);
+
+    // Skip if no summary or already has callout
+    if (!frontmatter.daily_summary || frontmatter.daily_summary.trim() === '') continue;
+    if (content.includes('[!summary] Day Summary')) continue;
+
+    // Add the callout
+    const summaryCallout = '> [!summary] Day Summary\n> `=this.daily_summary`';
+    const newContent = content.replace(
+      /<!-- \/TODAY_FOCUS -->/,
+      `${summaryCallout}\n<!-- /TODAY_FOCUS -->`
+    );
+
+    if (newContent !== content) {
+      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      added.push({
+        file: path.basename(planInfo.day.path),
+        date: formatDateStr(pastDate),
+      });
+    }
+  }
+
+  return added;
 }
 
 /**
@@ -973,6 +1021,7 @@ async function main() {
     summaries_generated: [],
     done_today_fixed: [],
     due_today_removed: [],
+    summary_callouts_added: [],
     tomorrow_updated: false,
     daily_note_linked: null,
   };
@@ -1009,6 +1058,12 @@ async function main() {
   const removedDueToday = removeDueTodayFromPastFiles(today, 7);
   if (removedDueToday.length > 0) {
     metadata.due_today_removed = removedDueToday;
+  }
+
+  // Add Day Summary callout to past files that have summaries but are missing it
+  const addedCallouts = addSummaryCalloutToPastFiles(today, 7);
+  if (addedCallouts.length > 0) {
+    metadata.summary_callouts_added = addedCallouts;
   }
 
   // Generate summaries for past days that are missing them
