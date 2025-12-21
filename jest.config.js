@@ -1,6 +1,15 @@
+import { existsSync, readFileSync } from 'fs';
+
+// Read local mount targets to exclude from Jest
+const localMountsPath = '.local-mounts.json';
+const localMounts = existsSync(localMountsPath)
+  ? JSON.parse(readFileSync(localMountsPath, 'utf8')).targets || []
+  : [];
+
 export default {
   testEnvironment: 'node',
   transform: {},
+  modulePathIgnorePatterns: localMounts.map(t => `<rootDir>/${t}/`),
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },

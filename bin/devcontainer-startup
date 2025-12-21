@@ -6,15 +6,19 @@ echo "=== DevContainer Startup ==="
 echo "Project: $(basename "$(pwd)")"
 echo "Time: $(date)"
 
+# Setup local mounts from mounts.local (if configured)
+if [ -f ".devcontainer/setup-mounts.sh" ]; then
+    bash .devcontainer/setup-mounts.sh
+fi
+
 # Run setup scripts using unified setup command
 if [ -f "bin/setup" ]; then
     echo "Setting up SSH..."
     bash bin/setup --ssh || echo "SSH setup failed, continuing..."
-    
+
     echo "Setting up Tailscale hostname..."
     bash bin/setup --tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
 fi
-
 
 # Check vault mount status
 if [ -d "/workspaces/today/vault" ]; then
