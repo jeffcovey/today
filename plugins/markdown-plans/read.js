@@ -280,6 +280,110 @@ function ensureDailyPlan(planInfo, date) {
 }
 
 /**
+ * Get all plan files sorted chronologically by filename
+ * Filenames are designed to sort chronologically (YYYY_Q#_MM_W##_DD.md)
+ */
+function getSortedPlanFiles() {
+  if (!fs.existsSync(plansDir)) return [];
+
+  const files = fs.readdirSync(plansDir)
+    .filter(f => f.endsWith('.md') && /^\d{4}_/.test(f))
+    .sort();
+
+  return files;
+}
+
+/**
+ * Get previous and next plan files for a given plan file
+ */
+function getPrevNextPlans(currentFile) {
+  const files = getSortedPlanFiles();
+  const currentIndex = files.indexOf(currentFile);
+
+  if (currentIndex === -1) return { prev: null, next: null };
+
+  const prev = currentIndex > 0 ? files[currentIndex - 1] : null;
+  const next = currentIndex < files.length - 1 ? files[currentIndex + 1] : null;
+
+  return { prev, next };
+}
+
+/**
+ * Build Obsidian navigation links for prev/next plans
+ * Uses float:right for the Next link to right-justify it
+ */
+function buildNavLinks(currentFile) {
+  const { prev, next } = getPrevNextPlans(currentFile);
+
+  if (!prev && !next) return null;
+
+  const parts = [];
+
+  if (prev) {
+    const prevName = prev.replace('.md', '');
+    parts.push(`[[plans/${prevName}|← Previous]]`);
+  }
+
+  if (next) {
+    const nextName = next.replace('.md', '');
+    parts.push(`<span style="float: right;">[[plans/${nextName}|Next →]]</span>`);
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * Add navigation links to a plan file if not already present
+ */
+function addNavigationLinks(filePath) {
+  const filename = path.basename(filePath);
+  const navLinks = buildNavLinks(filename);
+
+  if (!navLinks) return false;
+
+  let content = fs.readFileSync(filePath, 'utf-8');
+
+  // Check if navigation already exists
+  if (content.includes('← Previous') || content.includes('Next →')) {
+    return false;
+  }
+
+  // Add navigation after the header line (# Daily Plan - ... or # Weekly Plan - ... etc)
+  const headerMatch = content.match(/^(# .+)$/m);
+  if (headerMatch) {
+    const newContent = content.replace(
+      headerMatch[0],
+      `${headerMatch[0]}\n${navLinks}`
+    );
+
+    if (newContent !== content) {
+      fs.writeFileSync(filePath, newContent, 'utf-8');
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Add navigation links to all plan files that are missing them
+ */
+function addNavigationToAllFiles() {
+  const added = [];
+  const files = getSortedPlanFiles();
+
+  for (const file of files) {
+    const filePath = path.join(plansDir, file);
+
+    if (addNavigationLinks(filePath)) {
+      added.push({ file });
+    }
+  }
+
+  return added;
+}
+
+/**
  * Generate AI summary for a specific date
  * Uses bin/today dry-run --date to get the full context for that date
  */
@@ -557,6 +661,46 @@ function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
       /<!-- DUE_TODAY:[\s\S]*?<!-- \/DUE_TODAY -->\n*/g,
       ''
     );
+
+    if (newContent !== content) {
+      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      removed.push({
+        file: path.basename(planInfo.day.path),
+        date: formatDateStr(pastDate),
+      });
+    }
+  }
+
+  return removed;
+}
+
+/**
+ * Remove unedited Reflection section from past daily plan files
+ * Only removes if the placeholder text was never changed
+ */
+function removeEmptyReflectionFromPastFiles(today, maxDaysBack = 7) {
+  const removed = [];
+
+  // The exact unedited placeholder pattern
+  const emptyReflectionPattern = /<!-- REFLECTION: End of day notes and insights -->\n## 💭 Reflection\n\n\*End of day: What went well\? What could improve\? Any insights\?\*\n<!-- \/REFLECTION -->\n*/g;
+
+  for (let i = 1; i <= maxDaysBack; i++) {
+    const pastDate = new Date(today);
+    pastDate.setDate(pastDate.getDate() - i);
+
+    const planInfo = getPlanFilePaths(pastDate);
+    if (!fs.existsSync(planInfo.day.path)) continue;
+
+    let content = fs.readFileSync(planInfo.day.path, 'utf-8');
+
+    // Check if file has the unedited reflection section
+    if (!emptyReflectionPattern.test(content)) continue;
+
+    // Reset regex state
+    emptyReflectionPattern.lastIndex = 0;
+
+    // Remove the unedited reflection section
+    const newContent = content.replace(emptyReflectionPattern, '');
 
     if (newContent !== content) {
       fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
@@ -1021,7 +1165,9 @@ async function main() {
     summaries_generated: [],
     done_today_fixed: [],
     due_today_removed: [],
+    empty_reflection_removed: [],
     summary_callouts_added: [],
+    navigation_added: [],
     tomorrow_updated: false,
     daily_note_linked: null,
   };
@@ -1060,10 +1206,22 @@ async function main() {
     metadata.due_today_removed = removedDueToday;
   }
 
+  // Remove unedited Reflection section from past daily files
+  const removedReflection = removeEmptyReflectionFromPastFiles(today, 7);
+  if (removedReflection.length > 0) {
+    metadata.empty_reflection_removed = removedReflection;
+  }
+
   // Add Day Summary callout to past files that have summaries but are missing it
   const addedCallouts = addSummaryCalloutToPastFiles(today, 7);
   if (addedCallouts.length > 0) {
     metadata.summary_callouts_added = addedCallouts;
+  }
+
+  // Add navigation links to all plan files that are missing them
+  const addedNavigation = addNavigationToAllFiles();
+  if (addedNavigation.length > 0) {
+    metadata.navigation_added = addedNavigation;
   }
 
   // Generate summaries for past days that are missing them
