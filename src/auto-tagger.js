@@ -14,12 +14,15 @@ import path from 'path';
 import { getFullConfig } from './config.js';
 
 /**
- * Check if Claude CLI is available
+ * Check if Anthropic API is available via environment variable
  */
 function isAIAvailable() {
   try {
-    execSync('which claude', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    return true;
+    const apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null || npx dotenvx get ANTHROPIC_API_KEY 2>/dev/null', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+    return apiKey.length > 0;
   } catch {
     return false;
   }
@@ -118,6 +121,14 @@ function suggestTopics(entries, availableTopics, field) {
   const suggestions = new Map();
   const BATCH_SIZE = 30;
 
+  // Get model from config or use default
+  let model = 'claude-haiku-4-5-20251001';
+  try {
+    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
+    if (configModel) model = configModel;
+  } catch { /* use default */ }
+  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
+
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, Math.min(i + BATCH_SIZE, entries.length));
 
@@ -137,12 +148,16 @@ Entries:
 ${JSON.stringify(batch.map((e, idx) => ({ index: idx, text: e[field] })), null, 2)}`;
 
     try {
-      const result = execSync(`claude --print '${prompt.replace(/'/g, "'\\''")}'`, {
-        encoding: 'utf8',
-        maxBuffer: 1024 * 1024 * 10,
-        timeout: 60000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+      // Use Anthropic API directly instead of claude CLI to avoid cluttering history
+      const tempPromptFile = `/tmp/auto-tagger-prompt-${Date.now()}.txt`;
+      fs.writeFileSync(tempPromptFile, prompt);
+
+      const result = execSync(
+        `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 1000, temperature: 0, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
+        { encoding: 'utf8', timeout: 60000 }
+      );
+
+      fs.unlinkSync(tempPromptFile);
 
       const jsonMatch = result.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
@@ -191,7 +206,7 @@ export async function runAutoTagger(options) {
 
   // Check if AI is available
   if (!isAIAvailable()) {
-    console.warn('Warning: Claude CLI not available - skipping auto-tagging');
+    console.warn('Warning: Anthropic API key not found - skipping auto-tagging');
     return result;
   }
 
