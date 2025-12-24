@@ -324,3 +324,9 @@ directory = "vault"
 # friday = "off"
 # saturday = "front"
 # sunday = "back"
+
+# [plugins.markdown-projects.default]
+# enabled = true
+# directory = "vault/projects"
+# exclude_paths = "templates,zz-attachments"
+# completed_folder = "completed"

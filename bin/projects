@@ -1,0 +1,468 @@
+#!/usr/bin/env node
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+import { execSync } from 'child_process';
+
+// Priority emoji map
+const PRIORITY_EMOJI = {
+  highest: '🔺',
+  high: '⏫',
+  medium: '🔼',
+  low: '🔽',
+  lowest: '⏬'
+};
+
+// Status emoji map
+const STATUS_EMOJI = {
+  planning: '📝',
+  active: '🟢',
+  on_hold: '⏸️',
+  completed: '✅',
+  archived: '📦'
+};
+
+program
+  .name('projects')
+  .description('Project management for Today system');
+
+// Sync command
+program
+  .command('sync')
+  .description('Sync projects from all enabled project plugins')
+  .action(async () => {
+    console.log(colors.blue('ℹ') + ' Syncing projects plugins to database...');
+
+    try {
+      const result = execSync('bin/plugins sync --type projects', { encoding: 'utf8' });
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
+    } catch (error) {
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(colors.yellow('⚠') + ' No projects plugins are enabled.');
+        console.log('');
+        console.log('To sync projects, configure a plugin:');
+        console.log('');
+        console.log('  ' + colors.cyan('bin/plugins configure'));
+      } else {
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
+    }
+  });
+
+// List command - default, shows active projects
+program
+  .command('list', { isDefault: true })
+  .description('List projects from database')
+  .option('-a, --all', 'Include completed and archived projects')
+  .option('-s, --status <status>', 'Filter by status (planning, active, on_hold, completed, archived)')
+  .option('-t, --topic <topic>', 'Filter by topic')
+  .option('-p, --priority <priority>', 'Filter by priority')
+  .option('--review', 'Show only projects with review tracking')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    let conditions = [];
+    const params = [];
+
+    // Default: exclude completed and archived
+    if (!options.all && !options.status) {
+      conditions.push("status NOT IN ('completed', 'archived')");
+    }
+
+    if (options.status) {
+      conditions.push('status = ?');
+      params.push(options.status);
+    }
+
+    if (options.topic) {
+      conditions.push('topic = ?');
+      params.push(options.topic);
+    }
+
+    if (options.priority) {
+      conditions.push('priority = ?');
+      params.push(options.priority);
+    }
+
+    if (options.review) {
+      conditions.push('review_frequency IS NOT NULL');
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT id, title, status, priority, topic, due_date, progress,
+             review_frequency, last_reviewed
+      FROM projects
+      ${whereClause}
+      ORDER BY
+        CASE status
+          WHEN 'active' THEN 1
+          WHEN 'planning' THEN 2
+          WHEN 'on_hold' THEN 3
+          WHEN 'completed' THEN 4
+          WHEN 'archived' THEN 5
+          ELSE 6
+        END,
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        title
+    `;
+
+    const projects = db.prepare(sql).all(...params);
+
+    if (projects.length === 0) {
+      console.log(colors.blue('ℹ') + ' No projects found');
+      return;
+    }
+
+    console.log('');
+
+    // Group by status
+    const byStatus = {};
+    for (const project of projects) {
+      if (!byStatus[project.status]) {
+        byStatus[project.status] = [];
+      }
+      byStatus[project.status].push(project);
+    }
+
+    for (const [status, statusProjects] of Object.entries(byStatus)) {
+      const statusEmoji = STATUS_EMOJI[status] || '●';
+      console.log(colors.bold(`${statusEmoji} ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')} (${statusProjects.length})`));
+      console.log('');
+
+      for (const project of statusProjects) {
+        const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+        const progressStr = project.progress ? colors.cyan(` [${project.progress}%]`) : '';
+        const topicStr = project.topic ? colors.gray(` #${project.topic}`) : '';
+        const dueStr = project.due_date ? colors.yellow(` 📅 ${project.due_date}`) : '';
+
+        console.log(`  ${priorityEmoji} ${project.title}${progressStr}${topicStr}${dueStr}`);
+      }
+      console.log('');
+    }
+
+    console.log(colors.gray(`${projects.length} projects`));
+    console.log(getSyncStatusMessage(db, 'projects'));
+  });
+
+// Show command - show details for a specific project
+program
+  .command('show <id>')
+  .description('Show details for a specific project')
+  .action(async (id) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Try exact match first, then partial match on title or id
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    console.log('');
+    console.log(colors.bold(project.title));
+    console.log(colors.gray('─'.repeat(40)));
+
+    console.log(`Status:   ${STATUS_EMOJI[project.status] || '●'} ${project.status}`);
+    if (project.priority) console.log(`Priority: ${PRIORITY_EMOJI[project.priority]} ${project.priority}`);
+    if (project.topic) console.log(`Topic:    #${project.topic}`);
+    if (project.progress) console.log(`Progress: ${project.progress}%`);
+    if (project.start_date) console.log(`Started:  ${project.start_date}`);
+    if (project.due_date) console.log(`Due:      ${project.due_date}`);
+
+    if (project.review_frequency) {
+      console.log('');
+      console.log(colors.bold('Review'));
+      console.log(`Frequency:    ${project.review_frequency}`);
+      console.log(`Last review:  ${project.last_reviewed || 'Never'}`);
+
+      // Check if overdue for review
+      if (project.last_reviewed) {
+        const daysSince = Math.floor((Date.now() - new Date(project.last_reviewed)) / (1000 * 60 * 60 * 24));
+        const thresholds = { daily: 1, weekly: 7, monthly: 30, quarterly: 90, yearly: 365 };
+        const threshold = thresholds[project.review_frequency] || 7;
+        if (daysSince > threshold) {
+          console.log(colors.yellow(`⚠ Overdue for review (${daysSince} days since last review)`));
+        }
+      }
+    }
+
+    if (project.description) {
+      console.log('');
+      console.log(colors.bold('Description'));
+      console.log(project.description);
+    }
+
+    // Show task count for this project
+    const metadata = project.metadata ? JSON.parse(project.metadata) : {};
+    const filePath = metadata.file_path || project.id;
+
+    const taskCount = db.prepare(`
+      SELECT
+        SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+      FROM tasks
+      WHERE id LIKE ?
+    `).get(`markdown-tasks/local:${filePath}:%`);
+
+    if (taskCount && (taskCount.open > 0 || taskCount.completed > 0)) {
+      console.log('');
+      console.log(colors.bold('Tasks'));
+      console.log(`Open:      ${taskCount.open || 0}`);
+      console.log(`Completed: ${taskCount.completed || 0}`);
+    }
+
+    console.log('');
+    console.log(colors.gray(`ID: ${project.id}`));
+  });
+
+// Tasks command - show tasks for a project
+program
+  .command('tasks <id>')
+  .description('Show tasks for a specific project')
+  .option('-a, --all', 'Include completed tasks')
+  .action(async (id, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+    ensureSyncForType(db, 'tasks');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    const metadata = project.metadata ? JSON.parse(project.metadata) : {};
+    const filePath = metadata.file_path || project.id;
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata
+      FROM tasks
+      WHERE id LIKE ?
+    `;
+    const params = [`markdown-tasks/local:${filePath}:%`];
+
+    if (!options.all) {
+      sql += " AND status = 'open'";
+    }
+
+    sql += `
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    const tasks = db.prepare(sql).all(...params);
+
+    console.log('');
+    console.log(colors.bold(project.title));
+    console.log(colors.gray('─'.repeat(40)));
+
+    if (tasks.length === 0) {
+      console.log(colors.blue('ℹ') + ' No tasks found for this project');
+      return;
+    }
+
+    for (const task of tasks) {
+      const bullet = task.status === 'completed' ? '✅' : (PRIORITY_EMOJI[task.priority] || '  ');
+      const dueStr = task.due_date ? colors.yellow(` 📅 ${task.due_date}`) : '';
+      console.log(`${bullet} ${task.title}${dueStr}`);
+    }
+
+    console.log('');
+    console.log(colors.gray(`${tasks.length} tasks`));
+  });
+
+// Review command - show projects needing review
+program
+  .command('review')
+  .description('Show projects overdue for review')
+  .action(async () => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    const today = getTodayDate();
+
+    // Get projects with review tracking that are overdue
+    const sql = `
+      SELECT id, title, status, priority, review_frequency, last_reviewed,
+             julianday(?) - julianday(last_reviewed) as days_since
+      FROM projects
+      WHERE status IN ('active', 'planning')
+        AND review_frequency IS NOT NULL
+        AND (
+          last_reviewed IS NULL
+          OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
+          OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
+          OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
+          OR (review_frequency = 'quarterly' AND julianday(?) - julianday(last_reviewed) >= 90)
+          OR (review_frequency = 'yearly' AND julianday(?) - julianday(last_reviewed) >= 365)
+        )
+      ORDER BY
+        CASE
+          WHEN last_reviewed IS NULL THEN 0
+          ELSE julianday(?) - julianday(last_reviewed)
+        END DESC
+    `;
+
+    const projects = db.prepare(sql).all(today, today, today, today, today, today, today);
+
+    if (projects.length === 0) {
+      console.log(colors.green('✓') + ' All projects are up to date on reviews!');
+      return;
+    }
+
+    console.log('');
+    console.log(colors.bold('Projects Needing Review'));
+    console.log(colors.gray('─'.repeat(40)));
+    console.log('');
+
+    for (const project of projects) {
+      const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+      const daysSince = project.days_since ? Math.floor(project.days_since) : null;
+      const reviewInfo = daysSince !== null
+        ? colors.yellow(` (${daysSince}d since last review)`)
+        : colors.red(' (never reviewed)');
+
+      console.log(`${priorityEmoji} ${project.title}${reviewInfo}`);
+      console.log(colors.gray(`   ${project.review_frequency} review`));
+    }
+
+    console.log('');
+    console.log(colors.gray(`${projects.length} projects need review`));
+    console.log(getSyncStatusMessage(db, 'projects'));
+  });
+
+// Stats command
+program
+  .command('stats')
+  .description('Show project statistics')
+  .action(async () => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    console.log('');
+    console.log(colors.bold('Project Statistics'));
+    console.log(colors.gray('─'.repeat(40)));
+
+    // Count by status
+    const byStatus = db.prepare(`
+      SELECT status, COUNT(*) as count
+      FROM projects
+      GROUP BY status
+      ORDER BY
+        CASE status
+          WHEN 'active' THEN 1
+          WHEN 'planning' THEN 2
+          WHEN 'on_hold' THEN 3
+          WHEN 'completed' THEN 4
+          WHEN 'archived' THEN 5
+        END
+    `).all();
+
+    console.log('');
+    console.log(colors.bold('By Status'));
+    for (const row of byStatus) {
+      const emoji = STATUS_EMOJI[row.status] || '●';
+      console.log(`  ${emoji} ${row.status}: ${row.count}`);
+    }
+
+    // Count by topic (top 10)
+    const byTopic = db.prepare(`
+      SELECT topic, COUNT(*) as count
+      FROM projects
+      WHERE topic IS NOT NULL
+      GROUP BY topic
+      ORDER BY count DESC
+      LIMIT 10
+    `).all();
+
+    if (byTopic.length > 0) {
+      console.log('');
+      console.log(colors.bold('By Topic (top 10)'));
+      for (const row of byTopic) {
+        console.log(`  #${row.topic}: ${row.count}`);
+      }
+    }
+
+    // Projects with due dates
+    const today = getTodayDate();
+    const upcoming = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM projects
+      WHERE status = 'active' AND due_date IS NOT NULL AND due_date >= ?
+    `).get(today);
+
+    const overdue = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM projects
+      WHERE status = 'active' AND due_date IS NOT NULL AND due_date < ?
+    `).get(today);
+
+    console.log('');
+    console.log(colors.bold('Deadlines'));
+    console.log(`  Upcoming: ${upcoming.count}`);
+    console.log(`  Overdue:  ${overdue.count}`);
+
+    // Review status
+    const needsReview = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM projects
+      WHERE status = 'active'
+        AND review_frequency IS NOT NULL
+        AND (
+          last_reviewed IS NULL
+          OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
+          OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
+          OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
+        )
+    `).get(today, today, today);
+
+    const withReview = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM projects
+      WHERE review_frequency IS NOT NULL
+    `).get();
+
+    console.log('');
+    console.log(colors.bold('Reviews'));
+    console.log(`  Projects with review tracking: ${withReview.count}`);
+    console.log(`  Needing review: ${needsReview.count}`);
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'projects'));
+  });
+
+program.parse();

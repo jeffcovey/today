@@ -646,6 +646,129 @@ SQL: SELECT subject, from_address, date, folder FROM email WHERE date > datetime
       }
     },
     indexes: ['source', 'date', 'folder', 'from_address']
+  },
+
+  'projects': {
+    table: 'projects',
+    staleMinutes: 30, // Projects don't change frequently
+    ai: {
+      name: 'Projects',
+      description: `Projects involve many tasks and phases, often extending over a considerable span of time. Since they are goals the user is trying to achieve, they are a high priority. Encourage the user to work on active projects every day. While day-to-day maintenance tasks may be necessary, encourage getting through them or postponing or delegating them, to get back on track with project progress. If projects have review schedules, remind the user when any are overdue for review.`,
+      defaultCommand: 'bin/projects list -s active ; bin/projects review',
+      queryInstructions: `Commands: bin/projects list, bin/projects show <id>, bin/projects tasks <id>, bin/projects review
+SQL: SELECT title, status, priority, due_date, progress FROM projects WHERE status = 'active' ORDER BY priority, due_date
+
+To find tasks for a markdown project:
+SELECT * FROM tasks WHERE id LIKE 'markdown-tasks/local:vault/projects/PROJECT_FILE.md:%' AND status = 'open'`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: true,
+        description: 'Unique identifier (file path for markdown, external ID for APIs)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., markdown-projects/local)'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Project name'
+      },
+      description: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Project description/goal'
+      },
+      status: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Project status: planning, active, on_hold, completed, archived'
+      },
+      priority: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Priority level: highest, high, medium, low, lowest'
+      },
+      topic: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Area/domain (health, home, personal, work, etc.) - aligns with #topic/* tags'
+      },
+      start_date: {
+        sqlType: 'DATE',
+        jsType: 'string',
+        required: false,
+        description: 'When the project started (YYYY-MM-DD)'
+      },
+      due_date: {
+        sqlType: 'DATE',
+        jsType: 'string',
+        required: false,
+        description: 'Target completion date (YYYY-MM-DD)'
+      },
+      completed_at: {
+        sqlType: 'DATETIME',
+        jsType: 'string',
+        required: false,
+        description: 'When the project was completed (ISO 8601)'
+      },
+      progress: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Percent complete (0-100)'
+      },
+      review_frequency: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'How often to review: daily, weekly, monthly, quarterly, yearly (optional - highlight when present)'
+      },
+      last_reviewed: {
+        sqlType: 'DATE',
+        jsType: 'string',
+        required: false,
+        description: 'When project was last reviewed (YYYY-MM-DD) (optional - highlight when present)'
+      },
+      url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Link to project in external system'
+      },
+      parent_id: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Parent project ID for sub-projects/hierarchies'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (cover_image, related_projects, custom fields, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'status', 'priority', 'due_date', 'topic']
   }
 
   // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
