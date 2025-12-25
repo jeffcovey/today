@@ -4,12 +4,18 @@ import cron from 'node-cron';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import { getTimezone } from './config.js';
 
 const execAsync = promisify(exec);
 
+// Set timezone from config.toml BEFORE any scheduling
+// This ensures cron jobs run in the configured timezone
+const configuredTimezone = getTimezone();
+process.env.TZ = configuredTimezone;
+
 console.log('📅 Today Scheduler starting...');
-console.log(`Timezone: ${process.env.TZ || 'UTC'}`);
-console.log(`Current time: ${new Date().toLocaleString()}`);
+console.log(`Timezone: ${configuredTimezone} (from config.toml)`);
+console.log(`Current time: ${new Date().toLocaleString('en-US', { timeZone: configuredTimezone })}`);
 
 async function runCommand(command, description) {
     // Check if sync is disabled due to missing data
@@ -96,8 +102,8 @@ const jobs = [
 ];
 
 // Note: node-cron has known bugs with the timezone option (memory leaks, doesn't work properly)
-// Instead, we rely on the TZ environment variable set in the systemd service
-// This makes cron expressions run in America/New_York timezone automatically
+// Instead, we set process.env.TZ from config.toml at startup (see above)
+// This makes cron expressions run in the configured timezone automatically
 
 jobs.forEach(job => {
     console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
