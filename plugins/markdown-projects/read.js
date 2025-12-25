@@ -227,6 +227,17 @@ for (const filePath of projectFiles) {
   if (frontmatter.related_projects) metadata.related_projects = frontmatter.related_projects;
   metadata.file_path = relativePath;
 
+  // Define how to query related items (tasks) for this project
+  // bin/projects will use this to find tasks generically
+  metadata.item_query = {
+    table: 'tasks',
+    id_pattern: `markdown-tasks/local:${relativePath}:%`,
+    title_field: 'title',
+    status_field: 'status',
+    status_open: 'open',
+    status_closed: 'completed'
+  };
+
   // Add any other frontmatter fields we didn't explicitly handle
   const handledFields = [
     'title', 'status', 'priority', 'category', 'topic',

@@ -330,3 +330,16 @@ directory = "vault"
 # directory = "vault/projects"
 # exclude_paths = "templates,zz-attachments"
 # completed_folder = "completed"
+
+# GitHub Projects V2 (requires: gh auth refresh -s read:project)
+# [plugins.github-projects.personal]
+# enabled = true
+# owner = "your-username"
+# type = "user"  # user, org, or repo
+# include_closed = false
+
+# [plugins.github-projects.work]
+# enabled = true
+# owner = "your-org"
+# type = "org"
+# include_closed = false

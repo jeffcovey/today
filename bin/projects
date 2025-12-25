@@ -25,6 +25,73 @@ const STATUS_EMOJI = {
   archived: '📦'
 };
 
+// Generic helper to get item counts from project metadata
+// Supports both inline items (github-projects) and item_query (markdown-projects)
+function getProjectItemCounts(db, metadata) {
+  // Inline items (e.g., github-projects stores items directly)
+  if (metadata.items && metadata.items.length > 0) {
+    const open = metadata.items.filter(i => i.state === 'open').length;
+    const closed = metadata.items.filter(i => i.state === 'closed' || i.state === 'merged').length;
+    return { open, closed };
+  }
+
+  // Query-based items (e.g., markdown-projects references tasks table)
+  if (metadata.item_query) {
+    const q = metadata.item_query;
+    const result = db.prepare(`
+      SELECT
+        SUM(CASE WHEN ${q.status_field} = ? THEN 1 ELSE 0 END) as open,
+        SUM(CASE WHEN ${q.status_field} = ? THEN 1 ELSE 0 END) as closed
+      FROM ${q.table}
+      WHERE id LIKE ?
+    `).get(q.status_open, q.status_closed, q.id_pattern);
+
+    if (result) {
+      return { open: result.open || 0, closed: result.closed || 0 };
+    }
+  }
+
+  return null;
+}
+
+// Generic helper to get items for a project
+// Returns array of { title, state, number?, repository?, url? }
+function getProjectItems(db, metadata, includeAll = false) {
+  // Inline items
+  if (metadata.items && metadata.items.length > 0) {
+    let items = metadata.items;
+    if (!includeAll) {
+      items = items.filter(i => i.state === 'open');
+    }
+    return items.map(i => ({
+      title: i.title,
+      state: i.state,
+      number: i.number,
+      repository: i.repository,
+      url: i.url || null
+    }));
+  }
+
+  // Query-based items
+  if (metadata.item_query) {
+    const q = metadata.item_query;
+    let sql = `SELECT id, ${q.title_field} as title, ${q.status_field} as status FROM ${q.table} WHERE id LIKE ?`;
+    if (!includeAll) {
+      sql += ` AND ${q.status_field} = '${q.status_open}'`;
+    }
+    sql += ` ORDER BY ${q.status_field}, ${q.title_field}`;
+
+    const rows = db.prepare(sql).all(q.id_pattern);
+    return rows.map(r => ({
+      title: r.title,
+      state: r.status === q.status_open ? 'open' : 'closed',
+      id: r.id
+    }));
+  }
+
+  return [];
+}
+
 program
   .name('projects')
   .description('Project management for Today system');
@@ -186,9 +253,10 @@ program
     console.log(`Status:   ${STATUS_EMOJI[project.status] || '●'} ${project.status}`);
     if (project.priority) console.log(`Priority: ${PRIORITY_EMOJI[project.priority]} ${project.priority}`);
     if (project.topic) console.log(`Topic:    #${project.topic}`);
-    if (project.progress) console.log(`Progress: ${project.progress}%`);
+    if (project.progress != null) console.log(`Progress: ${project.progress}%`);
     if (project.start_date) console.log(`Started:  ${project.start_date}`);
     if (project.due_date) console.log(`Due:      ${project.due_date}`);
+    if (project.url) console.log(`URL:      ${project.url}`);
 
     if (project.review_frequency) {
       console.log('');
@@ -213,38 +281,35 @@ program
       console.log(project.description);
     }
 
-    // Show task count for this project
+    // Show item count for this project
     const metadata = project.metadata ? JSON.parse(project.metadata) : {};
-    const filePath = metadata.file_path || project.id;
+    const itemCounts = getProjectItemCounts(db, metadata);
 
-    const taskCount = db.prepare(`
-      SELECT
-        SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open,
-        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-      FROM tasks
-      WHERE id LIKE ?
-    `).get(`markdown-tasks/local:${filePath}:%`);
-
-    if (taskCount && (taskCount.open > 0 || taskCount.completed > 0)) {
+    if (itemCounts && (itemCounts.open > 0 || itemCounts.closed > 0)) {
       console.log('');
-      console.log(colors.bold('Tasks'));
-      console.log(`Open:      ${taskCount.open || 0}`);
-      console.log(`Completed: ${taskCount.completed || 0}`);
+      console.log(colors.bold('Items'));
+      console.log(`Open:      ${itemCounts.open}`);
+      console.log(`Closed:    ${itemCounts.closed}`);
     }
 
     console.log('');
     console.log(colors.gray(`ID: ${project.id}`));
   });
 
-// Tasks command - show tasks for a project
+// Tasks command - show tasks/items for a project
 program
   .command('tasks <id>')
-  .description('Show tasks for a specific project')
-  .option('-a, --all', 'Include completed tasks')
+  .description('Show tasks/items for a specific project')
+  .option('-a, --all', 'Include completed tasks/items')
+  .option('--no-sync', 'Skip syncing before fetching items')
   .action(async (id, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
-    ensureSyncForType(db, 'tasks');
+
+    // Sync relevant sources for fresh data (unless --no-sync)
+    if (options.sync !== false) {
+      ensureSyncForType(db, 'projects');
+      ensureSyncForType(db, 'tasks');
+    }
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -258,51 +323,40 @@ program
     }
 
     const metadata = project.metadata ? JSON.parse(project.metadata) : {};
-    const filePath = metadata.file_path || project.id;
-
-    let sql = `
-      SELECT id, title, status, priority, due_date, metadata
-      FROM tasks
-      WHERE id LIKE ?
-    `;
-    const params = [`markdown-tasks/local:${filePath}:%`];
-
-    if (!options.all) {
-      sql += " AND status = 'open'";
-    }
-
-    sql += `
-      ORDER BY
-        CASE priority
-          WHEN 'highest' THEN 1
-          WHEN 'high' THEN 2
-          WHEN 'medium' THEN 3
-          WHEN 'low' THEN 4
-          WHEN 'lowest' THEN 5
-          ELSE 6
-        END,
-        due_date NULLS LAST
-    `;
-
-    const tasks = db.prepare(sql).all(...params);
 
     console.log('');
     console.log(colors.bold(project.title));
     console.log(colors.gray('─'.repeat(40)));
 
-    if (tasks.length === 0) {
-      console.log(colors.blue('ℹ') + ' No tasks found for this project');
+    // Get items using generic helper
+    const items = getProjectItems(db, metadata, options.all);
+
+    if (items.length === 0) {
+      console.log(colors.blue('ℹ') + ' No ' + (options.all ? '' : 'open ') + 'items found for this project');
+      if (!options.all) {
+        console.log(colors.gray('Use --all to include closed items'));
+      }
       return;
     }
 
-    for (const task of tasks) {
-      const bullet = task.status === 'completed' ? '✅' : (PRIORITY_EMOJI[task.priority] || '  ');
-      const dueStr = task.due_date ? colors.yellow(` 📅 ${task.due_date}`) : '';
-      console.log(`${bullet} ${task.title}${dueStr}`);
+    for (const item of items) {
+      const stateEmoji = item.state === 'open' ? '🔵' : '✅';
+      // Format differs slightly based on item type
+      if (item.number) {
+        // GitHub issue/PR
+        const repoStr = item.repository ? colors.gray(` (${item.repository})`) : '';
+        console.log(`${stateEmoji} #${item.number} ${item.title}${repoStr}`);
+      } else {
+        // Task from markdown
+        console.log(`${stateEmoji} ${item.title}`);
+      }
     }
 
     console.log('');
-    console.log(colors.gray(`${tasks.length} tasks`));
+    console.log(colors.gray(`${items.length} items`));
+    if (project.url) {
+      console.log(colors.cyan(`View: ${project.url}`));
+    }
   });
 
 // Review command - show projects needing review
