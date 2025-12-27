@@ -1,0 +1,695 @@
+/**
+ * Full-screen plugin configuration UI using ink (React for CLIs)
+ *
+ * Two-level navigation:
+ * 1. Main menu: List of plugins
+ * 2. Submenu: Sources for selected plugin
+ */
+
+import React, { useState } from 'react';
+import { render, Box, Text, useInput, useApp, useStdout } from 'ink';
+import { TextInput, Select, ConfirmInput } from '@inkjs/ui';
+import htm from 'htm';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+
+const html = htm.bind(React.createElement);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.dirname(__dirname);
+const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+
+// ============================================================================
+// Config helpers
+// ============================================================================
+
+function readConfig() {
+  try {
+    const content = fs.readFileSync(CONFIG_PATH, 'utf8');
+    return parseToml(content);
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(config) {
+  let tomlOutput = stringifyToml(config);
+  tomlOutput = tomlOutput.replace(
+    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
+    (match, prefix, content) => {
+      if (!content.includes('\\n')) return match;
+      const unescaped = content
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trimEnd(); // Remove trailing whitespace to prevent accumulation
+      return `${prefix}"""\n${unescaped}\n"""`;
+    }
+  );
+  const header = `# Configuration for Today system
+# Edit this file when your situation changes (e.g., when traveling)
+
+`;
+  fs.writeFileSync(CONFIG_PATH, header + tomlOutput);
+}
+
+function getPluginSources(pluginName) {
+  const config = readConfig();
+  return config.plugins?.[pluginName] || {};
+}
+
+function toggleSource(pluginName, sourceName, enabled) {
+  const config = readConfig();
+  if (!config.plugins) config.plugins = {};
+  if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
+  if (!config.plugins[pluginName][sourceName]) config.plugins[pluginName][sourceName] = {};
+  config.plugins[pluginName][sourceName].enabled = enabled;
+  writeConfig(config);
+}
+
+function deleteSource(pluginName, sourceName) {
+  const config = readConfig();
+  if (config.plugins?.[pluginName]?.[sourceName]) {
+    delete config.plugins[pluginName][sourceName];
+    if (Object.keys(config.plugins[pluginName]).length === 0) {
+      delete config.plugins[pluginName];
+    }
+    writeConfig(config);
+  }
+}
+
+function updateSourceField(pluginName, sourceName, fieldName, value) {
+  const config = readConfig();
+  if (!config.plugins) config.plugins = {};
+  if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
+  if (!config.plugins[pluginName][sourceName]) config.plugins[pluginName][sourceName] = {};
+  if (value === '' || value === null || value === undefined) {
+    delete config.plugins[pluginName][sourceName][fieldName];
+  } else {
+    config.plugins[pluginName][sourceName][fieldName] = value;
+  }
+  writeConfig(config);
+}
+
+function createSource(pluginName, sourceName) {
+  const config = readConfig();
+  if (!config.plugins) config.plugins = {};
+  if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
+  config.plugins[pluginName][sourceName] = { enabled: true };
+  writeConfig(config);
+}
+
+// ============================================================================
+// Build plugin list for main menu
+// ============================================================================
+
+const TYPE_LABELS = {
+  'events': 'Calendars & Events',
+  'tasks': 'Tasks',
+  'projects': 'Projects',
+  'issues': 'Issues',
+  'diary': 'Diary & Notes',
+  'time-logs': 'Time Tracking',
+  'habits': 'Habits',
+  'health-metrics': 'Health',
+  'email': 'Email',
+  'context': 'Context',
+  'utility': 'Utilities',
+  'other': 'Other',
+};
+
+const TYPE_ORDER = ['events', 'tasks', 'projects', 'issues', 'diary', 'time-logs', 'habits', 'health-metrics', 'email', 'context', 'utility', 'other'];
+
+function buildPluginList(plugins) {
+  const config = readConfig();
+  const byType = {};
+
+  for (const [pluginName, plugin] of plugins) {
+    const sources = config.plugins?.[pluginName] || {};
+    const sourceNames = Object.keys(sources);
+    const enabledCount = sourceNames.filter(s => sources[s].enabled).length;
+    const type = plugin.type || 'other';
+
+    if (!byType[type]) byType[type] = [];
+    byType[type].push({
+      name: pluginName,
+      plugin: { ...plugin, name: pluginName },
+      sourceCount: sourceNames.length,
+      enabledCount,
+      type,
+    });
+  }
+
+  // Sort each type's plugins
+  for (const type of Object.keys(byType)) {
+    byType[type].sort((a, b) => {
+      if (a.enabledCount > 0 && b.enabledCount === 0) return -1;
+      if (b.enabledCount > 0 && a.enabledCount === 0) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  // Build flat list with headers
+  const displayList = [];
+  const pluginIndexMap = []; // Maps display index to plugin (null for headers)
+
+  for (const type of TYPE_ORDER) {
+    if (!byType[type] || byType[type].length === 0) continue;
+
+    // Add type header
+    displayList.push({ type: 'header', label: TYPE_LABELS[type] || type });
+    pluginIndexMap.push(null);
+
+    // Add plugins
+    for (const p of byType[type]) {
+      displayList.push({ type: 'plugin', plugin: p });
+      pluginIndexMap.push(p);
+    }
+  }
+
+  return { displayList, pluginIndexMap };
+}
+
+// ============================================================================
+// Build source list for submenu
+// ============================================================================
+
+function buildSourceList(pluginName, plugin) {
+  const sources = getPluginSources(pluginName);
+  const list = [];
+
+  for (const [sourceName, sourceConfig] of Object.entries(sources)) {
+    list.push({
+      sourceName,
+      enabled: sourceConfig.enabled === true,
+      config: sourceConfig,
+    });
+  }
+
+  // Sort: enabled first, then by name
+  list.sort((a, b) => {
+    if (a.enabled && !b.enabled) return -1;
+    if (b.enabled && !a.enabled) return 1;
+    return a.sourceName.localeCompare(b.sourceName);
+  });
+
+  return list;
+}
+
+// ============================================================================
+// Edit source dialog
+// ============================================================================
+
+function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel }) {
+  const [fieldIndex, setFieldIndex] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const settings = plugin.settings || {};
+  const fields = [
+    { key: 'enabled', label: 'Enabled', type: 'boolean', value: sourceConfig.enabled === true },
+  ];
+
+  for (const [key, def] of Object.entries(settings)) {
+    fields.push({
+      key,
+      label: def.description || key,
+      type: def.type || 'string',
+      required: def.required || false,
+      value: sourceConfig[key] ?? def.default ?? '',
+    });
+  }
+
+  const currentField = fields[fieldIndex];
+
+  useInput((input, key) => {
+    if (editing) return;
+    if (key.escape || input === 'q') {
+      onCancel();
+    } else if (key.downArrow || input === 'j') {
+      setFieldIndex(i => Math.min(i + 1, fields.length - 1));
+    } else if (key.upArrow || input === 'k') {
+      setFieldIndex(i => Math.max(i - 1, 0));
+    } else if (key.return) {
+      if (currentField.type === 'boolean') {
+        onSave(currentField.key, !currentField.value);
+      } else {
+        setEditValue(String(currentField.value || ''));
+        setEditing(true);
+      }
+    }
+  });
+
+  const handleSubmit = (value) => {
+    onSave(currentField.key, value);
+    setEditing(false);
+  };
+
+  const fieldRows = fields.map((f, i) => {
+    const isSelected = i === fieldIndex;
+    const displayValue = f.type === 'boolean' ? (f.value ? 'Yes' : 'No') : (f.value || '(not set)');
+    return html`
+      <${Box} key=${'field-' + f.key}>
+        <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${f.label}: </Text>
+        <${Text} color="green">${displayValue}</Text>
+        ${f.required ? html`<${Text} color="red"> *</Text>` : null}
+      </Box>
+    `;
+  });
+
+  return html`
+    <${Box} flexDirection="column" borderStyle="single" borderColor="cyan" paddingX=${1}>
+      <${Text} bold color="cyan">Edit: ${sourceName}</Text>
+      <${Box} marginTop=${1} flexDirection="column">${fieldRows}</Box>
+      ${editing ? html`
+        <${Box} marginTop=${1} borderStyle="single" borderColor="yellow" paddingX=${1} flexDirection="column">
+          <${Text} color="yellow">${currentField.label}</Text>
+          <${TextInput} defaultValue=${editValue} onSubmit=${handleSubmit} placeholder="Enter value..." />
+        </Box>
+      ` : html`
+        <${Box} marginTop=${1}>
+          <${Text} dimColor>↑↓: navigate │ Enter: edit │ Esc: back</Text>
+        </Box>
+      `}
+    </Box>
+  `;
+}
+
+// ============================================================================
+// Add source dialog
+// ============================================================================
+
+function AddSourceDialog({ pluginName, existingSources, onAdd, onCancel }) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+
+  useInput((input, key) => {
+    if (key.escape) {
+      onCancel();
+    }
+  });
+
+  const handleSubmit = (value) => {
+    const trimmed = value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (!trimmed) {
+      setError('Name is required');
+      return;
+    }
+    if (existingSources.includes(trimmed)) {
+      setError('Source already exists');
+      return;
+    }
+    onAdd(trimmed);
+  };
+
+  return html`
+    <${Box} flexDirection="column" borderStyle="single" borderColor="green" paddingX=${1}>
+      <${Text} bold color="green">Add New Source</Text>
+      <${Box} marginTop=${1}>
+        <${Text}>Source name: </Text>
+        <${TextInput} defaultValue=${name} onSubmit=${handleSubmit} placeholder="e.g., work, personal" />
+      </Box>
+      ${error ? html`<${Text} color="red">${error}</Text>` : null}
+      <${Box} marginTop=${1}>
+        <${Text} dimColor>Enter: create │ Esc: cancel</Text>
+      </Box>
+    </Box>
+  `;
+}
+
+// ============================================================================
+// Source list submenu
+// ============================================================================
+
+function SourceListView({ pluginName, plugin, onBack, visibleHeight }) {
+  const [sources, setSources] = useState(() => buildSourceList(pluginName, plugin));
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [mode, setMode] = useState('list'); // 'list', 'edit', 'add', 'delete'
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [focusPanel, setFocusPanel] = useState('sources'); // 'sources' or 'info'
+  const [infoScrollOffset, setInfoScrollOffset] = useState(0);
+
+  const refreshSources = () => setSources(buildSourceList(pluginName, plugin));
+  const selectedSource = sources[selectedIndex];
+
+  // Build description content as lines for scrolling
+  const description = plugin.description || '';
+  const longDescription = (plugin.longDescription || '').trim();
+  const fullDescription = description + (longDescription ? '\n\n' + longDescription : '');
+  const descriptionLines = fullDescription.split('\n');
+
+  // Calculate available heights
+  const listHeight = Math.max(3, visibleHeight - 4);
+  const infoHeight = Math.max(3, visibleHeight - 4);
+  const maxInfoScroll = Math.max(0, descriptionLines.length - infoHeight);
+
+  useInput((input, key) => {
+    if (mode !== 'list') return;
+
+    if (key.escape || input === 'q') {
+      onBack();
+    } else if (key.tab) {
+      // Toggle focus between panels
+      setFocusPanel(focusPanel === 'sources' ? 'info' : 'sources');
+    } else if (focusPanel === 'sources') {
+      // Source list navigation
+      if (key.downArrow || input === 'j') {
+        if (selectedIndex < sources.length - 1) {
+          setSelectedIndex(selectedIndex + 1);
+          if (selectedIndex + 1 >= scrollOffset + listHeight) {
+            setScrollOffset(scrollOffset + 1);
+          }
+        }
+      } else if (key.upArrow || input === 'k') {
+        if (selectedIndex > 0) {
+          setSelectedIndex(selectedIndex - 1);
+          if (selectedIndex - 1 < scrollOffset) {
+            setScrollOffset(scrollOffset - 1);
+          }
+        }
+      } else if (input === ' ' && selectedSource) {
+        toggleSource(pluginName, selectedSource.sourceName, !selectedSource.enabled);
+        refreshSources();
+      } else if (key.return && selectedSource) {
+        setMode('edit');
+      } else if (input === 'a') {
+        setMode('add');
+      } else if (input === 'd' && selectedSource) {
+        setMode('delete');
+      }
+    } else if (focusPanel === 'info') {
+      // Info panel scrolling
+      if (key.downArrow || input === 'j') {
+        setInfoScrollOffset(Math.min(infoScrollOffset + 1, maxInfoScroll));
+      } else if (key.upArrow || input === 'k') {
+        setInfoScrollOffset(Math.max(infoScrollOffset - 1, 0));
+      } else if (key.pageDown) {
+        setInfoScrollOffset(Math.min(infoScrollOffset + infoHeight, maxInfoScroll));
+      } else if (key.pageUp) {
+        setInfoScrollOffset(Math.max(infoScrollOffset - infoHeight, 0));
+      }
+    }
+  });
+
+  const handleEditSave = (fieldKey, value) => {
+    if (fieldKey === 'enabled') {
+      toggleSource(pluginName, selectedSource.sourceName, value);
+    } else {
+      updateSourceField(pluginName, selectedSource.sourceName, fieldKey, value);
+    }
+    refreshSources();
+  };
+
+  const handleAddSource = (sourceName) => {
+    createSource(pluginName, sourceName);
+    refreshSources();
+    setMode('list');
+  };
+
+  const handleDelete = (confirmed) => {
+    if (confirmed) {
+      deleteSource(pluginName, selectedSource.sourceName);
+      refreshSources();
+      setSelectedIndex(Math.max(0, selectedIndex - 1));
+    }
+    setMode('list');
+  };
+
+  if (mode === 'edit' && selectedSource) {
+    return html`
+      <${EditSourceDialog}
+        pluginName=${pluginName}
+        sourceName=${selectedSource.sourceName}
+        plugin=${plugin}
+        sourceConfig=${selectedSource.config}
+        onSave=${handleEditSave}
+        onCancel=${() => setMode('list')}
+      />
+    `;
+  }
+
+  if (mode === 'add') {
+    return html`
+      <${AddSourceDialog}
+        pluginName=${pluginName}
+        existingSources=${sources.map(s => s.sourceName)}
+        onAdd=${handleAddSource}
+        onCancel=${() => setMode('list')}
+      />
+    `;
+  }
+
+  if (mode === 'delete' && selectedSource) {
+    return html`
+      <${Box} flexDirection="column" borderStyle="single" borderColor="red" paddingX=${1}>
+        <${Text} bold color="red">Delete "${selectedSource.sourceName}"?</Text>
+        <${Box} marginTop=${1}>
+          <${ConfirmInput} onConfirm=${handleDelete} />
+        </Box>
+      </Box>
+    `;
+  }
+
+  // Source list with scroll indicators
+  const hasMoreSourcesAbove = scrollOffset > 0;
+  const hasMoreSourcesBelow = scrollOffset + listHeight < sources.length;
+  const sourceIndicators = (hasMoreSourcesAbove ? 1 : 0) + (hasMoreSourcesBelow ? 1 : 0);
+  const effectiveListHeight = Math.max(1, listHeight - sourceIndicators);
+  const visibleSources = sources.slice(scrollOffset, scrollOffset + effectiveListHeight);
+
+  const sourceRows = visibleSources.map((s, i) => {
+    const actualIndex = scrollOffset + i;
+    const isSelected = actualIndex === selectedIndex;
+    const status = s.enabled ? '✓' : '○';
+    const statusColor = s.enabled ? 'green' : 'gray';
+    return html`
+      <${Box} key=${'source-' + actualIndex + '-' + s.sourceName}>
+        <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}</Text>
+        <${Text} color=${statusColor}>${status} </Text>
+        <${Text} color=${isSelected ? 'cyan' : 'white'}>${s.sourceName}</Text>
+      </Box>
+    `;
+  });
+
+  // Info panel with scroll indicators
+  const hasMoreInfoAbove = infoScrollOffset > 0;
+  const hasMoreInfoBelow = infoScrollOffset + infoHeight < descriptionLines.length;
+  const infoIndicators = (hasMoreInfoAbove ? 1 : 0) + (hasMoreInfoBelow ? 1 : 0);
+  const effectiveInfoHeight = Math.max(1, infoHeight - infoIndicators);
+  const visibleDescLines = descriptionLines.slice(infoScrollOffset, infoScrollOffset + effectiveInfoHeight);
+
+  const displayName = plugin.displayName || pluginName;
+  const sourceBorderColor = focusPanel === 'sources' ? 'cyan' : 'gray';
+  const infoBorderColor = focusPanel === 'info' ? 'cyan' : 'gray';
+
+  return html`
+    <${Box} flexDirection="column">
+      <${Box} marginBottom=${1}>
+        <${Text} bold color="cyan">${displayName}</Text>
+        <${Text} dimColor> - Sources (${sources.length})</Text>
+      </Box>
+
+      <${Box} flexDirection="row" height=${visibleHeight}>
+        <${Box} flexDirection="column" borderStyle="single" borderColor=${sourceBorderColor} paddingX=${1} width="40%">
+          ${sources.length === 0 ? html`
+            <${Text} dimColor>No sources configured.</Text>
+            <${Text} dimColor>Press 'a' to add one.</Text>
+          ` : html`
+            <${React.Fragment}>
+              ${hasMoreSourcesAbove ? html`<${Text} color="cyan">  ▲ more</Text>` : null}
+              ${sourceRows}
+              ${hasMoreSourcesBelow ? html`<${Text} color="cyan">  ▼ more</Text>` : null}
+            </React.Fragment>
+          `}
+        </Box>
+
+        <${Box} flexDirection="column" borderStyle="single" borderColor=${infoBorderColor} paddingX=${1} marginLeft=${1} width="60%">
+          ${hasMoreInfoAbove ? html`<${Text} color="cyan">▲ more</Text>` : null}
+          ${visibleDescLines.map((line, i) => html`
+            <${Text} key=${'desc-' + (infoScrollOffset + i)} wrap="wrap" dimColor=${focusPanel !== 'info'}>${line || ' '}</Text>
+          `)}
+          ${hasMoreInfoBelow ? html`<${Text} color="cyan">▼ more</Text>` : null}
+        </Box>
+      </Box>
+
+      <${Box} marginTop=${1}>
+        <${Text} dimColor>Tab: switch panel │ ↑↓: ${focusPanel === 'sources' ? 'navigate' : 'scroll'} │ Space: toggle │ Enter: edit │ a: add │ d: delete │ Esc: back</Text>
+      </Box>
+    </Box>
+  `;
+}
+
+// ============================================================================
+// Main plugin list
+// ============================================================================
+
+function PluginsConfigApp({ plugins }) {
+  const { exit } = useApp();
+  const { stdout } = useStdout();
+  const [listData, setListData] = useState(() => buildPluginList(plugins));
+  const [selectedIndex, setSelectedIndex] = useState(() => {
+    // Start on first selectable item (skip header)
+    const { pluginIndexMap } = buildPluginList(plugins);
+    return pluginIndexMap.findIndex(p => p !== null);
+  });
+  const [selectedPlugin, setSelectedPlugin] = useState(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
+
+  const { displayList, pluginIndexMap } = listData;
+  const terminalHeight = stdout?.rows || 24;
+  const visibleHeight = Math.max(5, terminalHeight - 8);
+
+  const refreshPlugins = () => setListData(buildPluginList(plugins));
+
+  // Find next selectable index (skipping headers)
+  const findNextSelectable = (from, direction) => {
+    let idx = from + direction;
+    while (idx >= 0 && idx < displayList.length) {
+      if (pluginIndexMap[idx] !== null) return idx;
+      idx += direction;
+    }
+    return from; // Stay on current if no selectable found
+  };
+
+  // Count only selectable items for display
+  const selectableCount = pluginIndexMap.filter(p => p !== null).length;
+  const currentSelectableNum = pluginIndexMap.slice(0, selectedIndex + 1).filter(p => p !== null).length;
+
+  useInput((input, key) => {
+    if (selectedPlugin) return; // Submenu handles input
+
+    if (input === 'q' || (key.ctrl && input === 'c')) {
+      exit();
+    } else if (key.downArrow || input === 'j') {
+      const next = findNextSelectable(selectedIndex, 1);
+      if (next !== selectedIndex) {
+        setSelectedIndex(next);
+        // Calculate effective visible height (accounting for scroll indicators)
+        const hasBelow = scrollOffset + visibleHeight < displayList.length;
+        const hasAbove = scrollOffset > 0;
+        const indicators = (hasBelow ? 1 : 0) + (hasAbove ? 1 : 0);
+        const effHeight = Math.max(3, visibleHeight - indicators);
+        if (next >= scrollOffset + effHeight) {
+          setScrollOffset(next - effHeight + 1);
+        }
+      }
+    } else if (key.upArrow || input === 'k') {
+      const prev = findNextSelectable(selectedIndex, -1);
+      if (prev !== selectedIndex) {
+        setSelectedIndex(prev);
+        if (prev < scrollOffset) {
+          setScrollOffset(prev);
+        }
+      }
+    } else if (key.return) {
+      const plugin = pluginIndexMap[selectedIndex];
+      if (plugin) {
+        setSelectedPlugin(plugin);
+      }
+    }
+  });
+
+  const handleBack = () => {
+    setSelectedPlugin(null);
+    refreshPlugins();
+  };
+
+  // Show submenu if a plugin is selected
+  if (selectedPlugin) {
+    return html`
+      <${Box} flexDirection="column" padding=${1}>
+        <${SourceListView}
+          pluginName=${selectedPlugin.name}
+          plugin=${selectedPlugin.plugin}
+          onBack=${handleBack}
+          visibleHeight=${visibleHeight}
+        />
+      </Box>
+    `;
+  }
+
+  // Main plugin list - account for scroll indicators
+  const hasMoreAbove = scrollOffset > 0;
+  const hasMoreBelow = scrollOffset + visibleHeight < displayList.length;
+  const indicatorRows = (hasMoreAbove ? 1 : 0) + (hasMoreBelow ? 1 : 0);
+  const effectiveHeight = Math.max(3, visibleHeight - indicatorRows);
+  const visibleItems = displayList.slice(scrollOffset, scrollOffset + effectiveHeight);
+  const currentPlugin = pluginIndexMap[selectedIndex];
+  const description = currentPlugin?.plugin?.description || '';
+  const longDescription = currentPlugin?.plugin?.longDescription || '';
+
+  // Truncate long description
+  const maxDescLines = Math.max(3, visibleHeight - 4);
+  const descLines = (longDescription || '').trim().split('\n');
+  const truncatedDesc = descLines.length > maxDescLines
+    ? descLines.slice(0, maxDescLines).join('\n') + '\n...'
+    : (longDescription || '').trim();
+
+  // Build rows from displayList
+  const itemRows = visibleItems.map((item, i) => {
+    const actualIndex = scrollOffset + i;
+
+    if (item.type === 'header') {
+      return html`
+        <${Box} key=${'row-' + actualIndex + '-header'}>
+          <${Text} color="yellow" bold>── ${item.label} ──</Text>
+        </Box>
+      `;
+    }
+
+    const p = item.plugin;
+    const isSelected = actualIndex === selectedIndex;
+    const displayName = p.plugin.displayName || p.name;
+    const sourceInfo = p.enabledCount > 0
+      ? `${p.enabledCount} on`
+      : (p.sourceCount > 0 ? 'off' : '');
+    const sourceColor = p.enabledCount > 0 ? 'green' : 'gray';
+
+    return html`
+      <${Box} key=${'row-' + actualIndex + '-' + p.name}>
+        <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${displayName}</Text>
+        ${sourceInfo ? html`<${Text} color=${sourceColor}> (${sourceInfo})</Text>` : null}
+      </Box>
+    `;
+  });
+
+  return html`
+    <${Box} flexDirection="column" padding=${1}>
+      <${Box} marginBottom=${1}>
+        <${Text} bold color="white">Plugin Configuration</Text>
+        <${Text} dimColor>  (${currentSelectableNum}/${selectableCount})</Text>
+      </Box>
+
+      <${Box} flexDirection="row" height=${visibleHeight + 2}>
+        <${Box} flexDirection="column" borderStyle="single" borderColor="gray" paddingX=${1} width="50%">
+          ${hasMoreAbove ? html`<${Text} color="cyan">  ▲ more</Text>` : null}
+          ${itemRows}
+          ${hasMoreBelow ? html`<${Text} color="cyan">  ▼ more</Text>` : null}
+        </Box>
+
+        <${Box} flexDirection="column" borderStyle="single" borderColor="gray" paddingX=${1} marginLeft=${1} width="50%" overflowY="hidden">
+          <${Text} bold color="cyan">${currentPlugin?.plugin?.displayName || currentPlugin?.name || 'Info'}</Text>
+          ${description ? html`<${Text} wrap="wrap">${description}</Text>` : null}
+          ${truncatedDesc ? html`<${Box} marginTop=${1}><${Text} wrap="wrap" dimColor>${truncatedDesc}</Text></Box>` : null}
+        </Box>
+      </Box>
+
+      <${Box} marginTop=${1}>
+        <${Text} dimColor>↑↓: navigate │ Enter: configure sources │ q: quit</Text>
+      </Box>
+    </Box>
+  `;
+}
+
+// ============================================================================
+// Export
+// ============================================================================
+
+export async function runPluginsConfigure(plugins) {
+  const { waitUntilExit } = render(html`<${PluginsConfigApp} plugins=${plugins} />`);
+  await waitUntilExit();
+  console.log('\n✓ Plugin configuration complete.\n');
+}

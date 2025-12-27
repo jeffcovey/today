@@ -658,6 +658,7 @@ span of time. Since they are goals the user is trying to achieve, they are a
 high priority. Encourage the user to work on active projects every day. While
 day-to-day maintenance tasks may be necessary, encourage getting through those
 or postponing or delegating them, to get back on track with project progress.
+If the user has long-term goals, emphasize projects that contribute to reaching them.
 If projects have review schedules, remind the user when any are overdue for
 review.`,
       defaultCommand: 'bin/projects list -s active ; bin/projects review',

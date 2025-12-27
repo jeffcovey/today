@@ -10,6 +10,7 @@ import { execSync } from 'child_process';
 import * as p from '@clack/prompts';
 import color from 'picocolors';
 import { colors } from '../src/cli-utils.js';
+import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
 import {
   discoverPlugins,
   getPluginSources,
@@ -29,6 +30,36 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.toml');
 const CONFIG_EXAMPLE_PATH = path.join(PROJECT_ROOT, 'config.toml.example');
+
+/**
+ * Get the user's preferred editor
+ */
+function getEditor() {
+  return process.env.EDITOR || process.env.VISUAL || 'nano';
+}
+
+/**
+ * Edit text in an external editor
+ * @param {string} currentText - Current text content
+ * @param {string} filename - Suggested filename for the temp file
+ * @returns {string|null} - Edited text, or null if cancelled/unchanged
+ */
+function editInEditor(currentText, filename = 'edit.txt') {
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, filename);
+
+  try {
+    fs.writeFileSync(tmpFile, currentText || '');
+    const editor = getEditor();
+    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
+    const newText = fs.readFileSync(tmpFile, 'utf8');
+    fs.unlinkSync(tmpFile);
+    return newText;
+  } catch (error) {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    return null;
+  }
+}
 
 /**
  * Check if an error is a database corruption error that warrants recreation
@@ -425,46 +456,6 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
   }
 }
 
-/**
- * Get the user's preferred editor
- */
-function getEditor() {
-  return process.env.EDITOR || process.env.VISUAL || 'nano';
-}
-
-/**
- * Edit text in an external editor
- * @param {string} currentText - Current text content
- * @param {string} filename - Suggested filename for the temp file
- * @returns {string|null} - Edited text, or null if cancelled/unchanged
- */
-function editInEditor(currentText, filename = 'edit.txt') {
-  const editor = getEditor();
-  const tmpDir = os.tmpdir();
-  const tmpFile = path.join(tmpDir, `plugins-${Date.now()}-${filename}`);
-
-  try {
-    // Write current content to temp file
-    fs.writeFileSync(tmpFile, currentText || '');
-
-    // Open editor (blocking)
-    console.log(colors.gray(`Opening ${editor}... (save and close to continue)`));
-    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
-
-    // Read back the result
-    const newText = fs.readFileSync(tmpFile, 'utf8');
-
-    // Clean up
-    fs.unlinkSync(tmpFile);
-
-    return newText;
-  } catch (error) {
-    // Clean up on error
-    try { fs.unlinkSync(tmpFile); } catch {}
-    console.error(colors.red(`Editor failed: ${error.message}`));
-    return null;
-  }
-}
 
 async function cmdConfigure(pluginNameArg) {
   const plugins = await discoverPlugins();
@@ -474,49 +465,21 @@ async function cmdConfigure(pluginNameArg) {
     return;
   }
 
-  p.intro(color.bgCyan(color.black(' Plugin Configuration ')));
-
-  // Main loop - returns to plugin selection after configuring
-  while (true) {
-    let pluginName = pluginNameArg;
-
-    // If no plugin specified, let user choose
-    if (!pluginName) {
-      const pluginChoices = Array.from(plugins.values()).map((plugin) => ({
-        label: plugin.displayName || plugin.name,
-        value: plugin.name,
-        hint: plugin.description
-      }));
-
-      pluginName = await p.select({
-        message: 'Select a plugin to configure',
-        options: [
-          ...pluginChoices,
-          { label: color.dim('Exit'), value: '__exit__' }
-        ]
-      });
-
-      if (p.isCancel(pluginName) || pluginName === '__exit__') {
-        p.outro('Configuration complete');
-        return;
-      }
-    }
-
-    const plugin = plugins.get(pluginName);
+  // If a specific plugin is specified, use the old flow
+  if (pluginNameArg) {
+    p.intro(color.bgCyan(color.black(' Plugin Configuration ')));
+    const plugin = plugins.get(pluginNameArg);
     if (!plugin) {
-      p.cancel(`Plugin not found: ${pluginName}`);
+      p.cancel(`Plugin not found: ${pluginNameArg}`);
       process.exit(1);
     }
-
-    // Configure the selected plugin
-    const shouldExit = await configurePlugin(plugin, pluginName);
-
-    // If a specific plugin was passed as argument, exit after configuring it
-    if (pluginNameArg || shouldExit) {
-      p.outro('Configuration saved');
-      return;
-    }
+    await configurePlugin(plugin, pluginNameArg);
+    p.outro('Configuration saved');
+    return;
   }
+
+  // Interactive unified view (ink-based UI)
+  await runPluginsConfigure(plugins);
 }
 
 async function configurePlugin(plugin, pluginName) {
@@ -843,7 +806,8 @@ function formatMultilineStrings(tomlStr) {
       const unescaped = content
         .replace(/\\n/g, '\n')
         .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\');
+        .replace(/\\\\/g, '\\')
+        .trimEnd(); // Remove trailing whitespace to prevent accumulation
       return `${prefix}"""\n${unescaped}\n"""`;
     }
   );

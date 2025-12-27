@@ -23,6 +23,8 @@ import { execSync, spawnSync } from 'child_process';
 
 // Import shared modules
 import { getTimezone, getFullConfig } from '../src/config.js';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+import color from 'picocolors';
 import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from '../src/plugin-schemas.js';
 import { ensureHealthyDatabase } from '../src/db-health.js';
@@ -774,6 +776,12 @@ ${contextSection}`;
 }
 
 // ============================================================================
+// Configuration UI (ink-based React TUI)
+// ============================================================================
+
+import { runConfigure } from '../src/configure-ui.js';
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -785,6 +793,7 @@ Usage:
 
 Commands:
   (none)      Start interactive daily review session
+  configure   Open configuration UI for system settings
   now         Quick "what should I do right now?" session
   dry-run     Show the prompt that would be sent to the AI (no API call)
 
@@ -796,6 +805,7 @@ Options:
 
 Examples:
   bin/today                           # Start daily review
+  bin/today configure                 # Configure system settings
   bin/today now                       # Quick "what should I do now?" session
   bin/today dry-run                   # Show prompt without running Claude
   bin/today dry-run --date 2025-12-15 # Show prompt for a specific date
@@ -831,7 +841,7 @@ async function main() {
     } else if (args[i] === '--date' && args[i + 1]) {
       targetDate = args[i + 1];
       i++; // Skip the next arg (the date value)
-    } else if (!command && ['init', 'update', 'dry-run', 'now'].includes(args[i])) {
+    } else if (!command && ['init', 'update', 'dry-run', 'now', 'configure'].includes(args[i])) {
       command = args[i];
     } else {
       request.push(args[i]);
@@ -855,6 +865,12 @@ async function main() {
   // if (!nonInteractive) {
   //   checkSkeletonUpdates();
   // }
+
+  // Handle configure command - doesn't need database
+  if (command === 'configure') {
+    await runConfigure();
+    return;
+  }
 
   // Always check database health first (except for help which returns early)
   await checkAndRecoverDatabase();
