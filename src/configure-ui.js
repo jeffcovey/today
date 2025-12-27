@@ -10,6 +10,8 @@ import { TextInput, Select } from '@inkjs/ui';
 import htm from 'htm';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { discoverPlugins } from './plugin-loader.js';
@@ -22,6 +24,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+
+/**
+ * Editor helper for multi-line fields
+ */
+function getEditor() {
+  return process.env.EDITOR || process.env.VISUAL || 'nano';
+}
+
+function editInEditor(currentText, filename = 'edit.txt') {
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, filename);
+  try {
+    fs.writeFileSync(tmpFile, currentText || '');
+    const editor = getEditor();
+    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
+    const newText = fs.readFileSync(tmpFile, 'utf8');
+    fs.unlinkSync(tmpFile);
+    return newText.trimEnd();
+  } catch (error) {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    return null;
+  }
+}
 
 /**
  * Configuration sections and fields
@@ -62,6 +87,14 @@ const CONFIG_SECTIONS = [
           { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
           { value: 'claude-haiku-3-5-20241022', label: 'Claude Haiku 3.5 (Fastest)' },
         ]
+      },
+      {
+        key: 'ai_instructions',
+        label: 'AI Instructions',
+        path: ['ai', 'ai_instructions'],
+        default: '',
+        type: 'multiline',
+        description: 'General instructions included in every AI run'
       },
     ]
   },
@@ -186,7 +219,13 @@ function ConfigApp({ onAction }) {
       if (field.type === 'action') {
         // Trigger action callback and exit to allow action to run
         if (onAction) {
-          onAction(field.action);
+          onAction({ type: field.action });
+          exit();
+        }
+      } else if (field.type === 'multiline') {
+        // Trigger editor action for multiline fields
+        if (onAction) {
+          onAction({ type: 'openEditor', path: field.path, currentValue: currentValue || '' });
           exit();
         }
       } else if (field.type === 'select') {
@@ -240,9 +279,20 @@ function ConfigApp({ onAction }) {
     }
 
     const value = getConfigValue(config, f.path, f.default);
-    const displayValue = f.type === 'select'
-      ? (f.options?.find(o => o.value === value)?.label || value)
-      : value;
+    let displayValue;
+    let editHint = '';
+
+    if (f.type === 'select') {
+      displayValue = f.options?.find(o => o.value === value)?.label || value;
+    } else if (f.type === 'multiline') {
+      const lines = String(value || '').split('\n');
+      displayValue = value
+        ? (lines.length > 1 ? `${lines[0].slice(0, 30)}... (${lines.length} lines)` : lines[0].slice(0, 50))
+        : '(not set)';
+      editHint = ' [opens editor]';
+    } else {
+      displayValue = value;
+    }
 
     return html`
       <${Box} key=${'field-' + section.key + '-' + f.key}>
@@ -250,6 +300,7 @@ function ConfigApp({ onAction }) {
           ${isSelected ? '▸ ' : '  '}${f.label}:
         </${Text}>
         <${Text} color="green"> ${displayValue || '(not set)'}</${Text}>
+        ${isSelected && editHint ? html`<${Text} dimColor>${editHint}</${Text}>` : null}
       </${Box}>
     `;
   });
@@ -318,8 +369,26 @@ function ConfigApp({ onAction }) {
 }
 
 /**
- * Run the configuration UI
+ * Set a value in config using a path array (for use by runConfigure)
  */
+function setConfigValueAndSave(pathArr, value) {
+  const config = readConfig();
+  let obj = config;
+  for (let i = 0; i < pathArr.length - 1; i++) {
+    const key = pathArr[i];
+    if (!(key in obj)) {
+      obj[key] = {};
+    }
+    obj = obj[key];
+  }
+  if (value === '' || value === null || value === undefined) {
+    delete obj[pathArr[pathArr.length - 1]];
+  } else {
+    obj[pathArr[pathArr.length - 1]] = value;
+  }
+  writeConfig(config);
+}
+
 export async function runConfigure() {
   let pendingAction = null;
 
@@ -329,14 +398,28 @@ export async function runConfigure() {
       pendingAction = action;
     };
 
-    const { waitUntilExit, unmount } = render(html`<${ConfigApp} onAction=${handleAction} />`);
+    const { waitUntilExit } = render(html`<${ConfigApp} onAction=${handleAction} />`);
     await waitUntilExit();
 
     // Handle any pending action
-    if (pendingAction === 'openPluginConfig') {
+    if (pendingAction?.type === 'openPluginConfig') {
       pendingAction = null;
       const plugins = await discoverPlugins();
       await runPluginsConfigure(plugins);
+      // Loop continues - will re-render ConfigApp
+    } else if (pendingAction?.type === 'openEditor') {
+      const { path: fieldPath, currentValue } = pendingAction;
+      pendingAction = null;
+
+      // Open editor
+      const filename = `${fieldPath.join('-')}.txt`;
+      const newValue = editInEditor(currentValue || '', filename);
+
+      // Save if editor returned a value (not cancelled)
+      if (newValue !== null) {
+        setConfigValueAndSave(fieldPath, newValue);
+      }
+
       // Loop continues - will re-render ConfigApp
     } else {
       // No action or quit - exit the loop

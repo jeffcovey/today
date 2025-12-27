@@ -687,6 +687,12 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
     ? `- **Target Date**: ${targetDate}\n- **Generated At**: ${currentTime} (${timezone})`
     : `- **Current Time**: ${currentTime} (${timezone})`;
 
+  // Get user's general AI instructions
+  const aiInstructions = config.ai?.ai_instructions?.trim();
+  const aiInstructionsSection = aiInstructions
+    ? `\n## User Instructions\n${aiInstructions}\n`
+    : '';
+
   const contextSection = `## Pre-Computed Context
 ${timeInfo}
 
@@ -696,7 +702,7 @@ ${timeInfo}
 
 ## User Profile
 ${profileLines.join('\n')}
-
+${aiInstructionsSection}
 ${dataContext}`;
 
   // Dry run with --date: just output data context (for consumption by other tools)

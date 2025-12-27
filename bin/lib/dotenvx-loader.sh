@@ -22,7 +22,7 @@ auto_dotenvx() {
     
     if has_dotenvx_encryption && has_dotenvx_installed; then
         # Re-execute the current script with dotenvx
-        DOTENVX_RUNNING=1 exec npx dotenvx run --quiet -- "$0" "$@"
+        DOTENVX_RUNNING=1 exec npx dotenvx run --quiet --overload -- "$0" "$@"
     fi
 }
 

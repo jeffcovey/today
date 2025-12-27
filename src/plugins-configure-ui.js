@@ -12,6 +12,8 @@ import { TextInput, Select, ConfirmInput } from '@inkjs/ui';
 import htm from 'htm';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 
@@ -21,6 +23,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+
+// ============================================================================
+// Editor helper for multi-line fields
+// ============================================================================
+
+function getEditor() {
+  return process.env.EDITOR || process.env.VISUAL || 'nano';
+}
+
+function editInEditor(currentText, filename = 'edit.txt') {
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, filename);
+  try {
+    fs.writeFileSync(tmpFile, currentText || '');
+    const editor = getEditor();
+    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
+    const newText = fs.readFileSync(tmpFile, 'utf8');
+    fs.unlinkSync(tmpFile);
+    return newText.trimEnd();
+  } catch (error) {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    return null;
+  }
+}
 
 // ============================================================================
 // Config helpers
@@ -203,7 +229,7 @@ function buildSourceList(pluginName, plugin) {
 // Edit source dialog
 // ============================================================================
 
-function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel }) {
+function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor }) {
   const [fieldIndex, setFieldIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -223,6 +249,14 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     });
   }
 
+  // Add ai_instructions as the last field (available for all sources)
+  fields.push({
+    key: 'ai_instructions',
+    label: 'AI Instructions',
+    type: 'multiline',
+    value: sourceConfig.ai_instructions || '',
+  });
+
   const currentField = fields[fieldIndex];
 
   useInput((input, key) => {
@@ -236,6 +270,11 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     } else if (key.return) {
       if (currentField.type === 'boolean') {
         onSave(currentField.key, !currentField.value);
+      } else if (currentField.type === 'multiline') {
+        // Open external editor for multiline fields
+        if (onOpenEditor) {
+          onOpenEditor(currentField.key, currentField.value);
+        }
       } else {
         setEditValue(String(currentField.value || ''));
         setEditing(true);
@@ -250,11 +289,24 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
 
   const fieldRows = fields.map((f, i) => {
     const isSelected = i === fieldIndex;
-    const displayValue = f.type === 'boolean' ? (f.value ? 'Yes' : 'No') : (f.value || '(not set)');
+    let displayValue;
+    if (f.type === 'boolean') {
+      displayValue = f.value ? 'Yes' : 'No';
+    } else if (f.type === 'multiline') {
+      // Show truncated preview for multiline
+      const lines = String(f.value || '').split('\n');
+      displayValue = f.value
+        ? (lines.length > 1 ? `${lines[0].slice(0, 30)}... (${lines.length} lines)` : lines[0].slice(0, 50))
+        : '(not set)';
+    } else {
+      displayValue = f.value || '(not set)';
+    }
+    const editHint = f.type === 'multiline' ? ' [opens editor]' : '';
     return html`
       <${Box} key=${'field-' + f.key}>
         <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${f.label}: </Text>
         <${Text} color="green">${displayValue}</Text>
+        ${isSelected && editHint ? html`<${Text} dimColor>${editHint}</Text>` : null}
         ${f.required ? html`<${Text} color="red"> *</Text>` : null}
       </Box>
     `;
@@ -324,7 +376,7 @@ function AddSourceDialog({ pluginName, existingSources, onAdd, onCancel }) {
 // Source list submenu
 // ============================================================================
 
-function SourceListView({ pluginName, plugin, onBack, visibleHeight }) {
+function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorRequest }) {
   const [sources, setSources] = useState(() => buildSourceList(pluginName, plugin));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState('list'); // 'list', 'edit', 'add', 'delete'
@@ -418,6 +470,17 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight }) {
     setMode('list');
   };
 
+  const handleOpenEditor = (fieldKey, currentValue) => {
+    if (onEditorRequest) {
+      onEditorRequest({
+        pluginName,
+        sourceName: selectedSource.sourceName,
+        fieldKey,
+        currentValue,
+      });
+    }
+  };
+
   if (mode === 'edit' && selectedSource) {
     return html`
       <${EditSourceDialog}
@@ -427,6 +490,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight }) {
         sourceConfig=${selectedSource.config}
         onSave=${handleEditSave}
         onCancel=${() => setMode('list')}
+        onOpenEditor=${handleOpenEditor}
       />
     `;
   }
@@ -526,7 +590,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight }) {
 // Main plugin list
 // ============================================================================
 
-function PluginsConfigApp({ plugins }) {
+function PluginsConfigApp({ plugins, onEditorRequest }) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [listData, setListData] = useState(() => buildPluginList(plugins));
@@ -597,6 +661,13 @@ function PluginsConfigApp({ plugins }) {
     refreshPlugins();
   };
 
+  const handleEditorRequest = (request) => {
+    if (onEditorRequest) {
+      onEditorRequest(request);
+      exit();
+    }
+  };
+
   // Show submenu if a plugin is selected
   if (selectedPlugin) {
     return html`
@@ -606,6 +677,7 @@ function PluginsConfigApp({ plugins }) {
           plugin=${selectedPlugin.plugin}
           onBack=${handleBack}
           visibleHeight=${visibleHeight}
+          onEditorRequest=${handleEditorRequest}
         />
       </Box>
     `;
@@ -689,7 +761,35 @@ function PluginsConfigApp({ plugins }) {
 // ============================================================================
 
 export async function runPluginsConfigure(plugins) {
-  const { waitUntilExit } = render(html`<${PluginsConfigApp} plugins=${plugins} />`);
-  await waitUntilExit();
+  let pendingEditorRequest = null;
+
+  while (true) {
+    const handleEditorRequest = (request) => {
+      pendingEditorRequest = request;
+    };
+
+    const { waitUntilExit } = render(html`<${PluginsConfigApp} plugins=${plugins} onEditorRequest=${handleEditorRequest} />`);
+    await waitUntilExit();
+
+    // Handle any pending editor request
+    if (pendingEditorRequest) {
+      const { pluginName, sourceName, fieldKey, currentValue } = pendingEditorRequest;
+      pendingEditorRequest = null;
+
+      // Open editor
+      const newValue = editInEditor(currentValue || '', `${pluginName}-${sourceName}-${fieldKey}.txt`);
+
+      // Save if editor returned a value (not cancelled)
+      if (newValue !== null) {
+        updateSourceField(pluginName, sourceName, fieldKey, newValue);
+      }
+
+      // Loop continues - will re-render the UI
+    } else {
+      // No action or quit - exit the loop
+      break;
+    }
+  }
+
   console.log('\n✓ Plugin configuration complete.\n');
 }
