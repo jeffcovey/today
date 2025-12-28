@@ -1,350 +1,193 @@
 /**
- * AI Provider Abstraction Layer
+ * AI Provider Abstraction Layer using Vercel AI SDK
  *
- * Provides a common interface for different AI providers (Anthropic, OpenAI, Ollama, etc.)
- * allowing users to choose their preferred AI backend.
+ * Provides a common interface for different AI providers (Anthropic, OpenAI, Ollama, Google)
+ * using the Vercel AI SDK for unified API access and streaming support.
  *
  * Usage:
- *   import { getAIProvider, createCompletion } from './ai-provider.js';
+ *   import { createCompletion, streamCompletion } from './ai-provider.js';
  *
- *   // Get configured provider
- *   const provider = getAIProvider();
- *
- *   // Create a completion
+ *   // Simple completion
  *   const response = await createCompletion({
  *     messages: [{ role: 'user', content: 'Hello!' }],
  *     maxTokens: 1000,
  *   });
+ *
+ *   // Streaming completion
+ *   const stream = await streamCompletion({
+ *     messages: [{ role: 'user', content: 'Hello!' }],
+ *   });
+ *   for await (const chunk of stream.textStream) {
+ *     process.stdout.write(chunk);
+ *   }
  */
 
-import { getConfig, getFullConfig } from './config.js';
+import { generateText, streamText } from 'ai';
+import { getFullConfig } from './config.js';
+
+// Provider imports - these are loaded dynamically to avoid issues if not configured
+let anthropicProvider = null;
+let openaiProvider = null;
+let googleProvider = null;
+let ollamaProvider = null;
 
 /**
- * Base class for AI providers
+ * Get the Anthropic provider/model
  */
-class AIProvider {
-  constructor(config = {}) {
-    this.config = config;
+async function getAnthropicModel(modelName) {
+  if (!anthropicProvider) {
+    const { anthropic } = await import('@ai-sdk/anthropic');
+    anthropicProvider = anthropic;
   }
-
-  /**
-   * Create a chat completion
-   * @param {Object} options
-   * @param {Array} options.messages - Array of {role, content} messages
-   * @param {string} [options.system] - System prompt
-   * @param {number} [options.maxTokens=1000] - Maximum tokens to generate
-   * @param {number} [options.temperature=0] - Temperature (0-1)
-   * @param {string} [options.model] - Override the configured model
-   * @returns {Promise<string>} - The generated text
-   */
-  async complete(options) {
-    throw new Error('complete() must be implemented by provider');
-  }
-
-  /**
-   * Get the provider name
-   */
-  get name() {
-    throw new Error('name getter must be implemented by provider');
-  }
-
-  /**
-   * Check if the provider is available (has required credentials/connectivity)
-   */
-  async isAvailable() {
-    return false;
-  }
+  return anthropicProvider(modelName);
 }
 
 /**
- * Anthropic Claude provider
+ * Get the OpenAI provider/model
  */
-class AnthropicProvider extends AIProvider {
-  constructor(config = {}) {
-    super(config);
-    // Support both camelCase and snake_case config keys
-    this.apiKey = config.apiKey || config.api_key || process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
-    this.defaultModel = config.model || 'claude-sonnet-4-20250514';
-  }
-
-  get name() {
-    return 'anthropic';
-  }
-
-  async isAvailable() {
-    return !!this.apiKey;
-  }
-
-  async complete(options) {
-    if (!this.apiKey) {
-      throw new Error('Anthropic API key not configured. Set TODAY_ANTHROPIC_KEY or ANTHROPIC_API_KEY environment variable.');
-    }
-
-    // Dynamic import to avoid loading SDK if not needed
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey: this.apiKey });
-
-    const messages = options.messages || [];
-    const systemPrompt = options.system || '';
-
-    const response = await client.messages.create({
-      model: options.model || this.defaultModel,
-      max_tokens: options.maxTokens || 1000,
-      temperature: options.temperature ?? 0,
-      system: systemPrompt,
-      messages: messages,
+async function getOpenAIModel(modelName, options = {}) {
+  if (!openaiProvider) {
+    const { createOpenAI } = await import('@ai-sdk/openai');
+    openaiProvider = createOpenAI({
+      baseURL: options.baseURL || process.env.OPENAI_BASE_URL,
+      apiKey: options.apiKey || process.env.OPENAI_API_KEY,
     });
-
-    return response.content[0].text;
   }
+  return openaiProvider(modelName);
 }
 
 /**
- * OpenAI provider (GPT-4, etc.)
+ * Get the Google provider/model
  */
-class OpenAIProvider extends AIProvider {
-  constructor(config = {}) {
-    super(config);
-    // Support both camelCase and snake_case config keys
-    this.apiKey = config.apiKey || config.api_key || process.env.OPENAI_API_KEY;
-    this.defaultModel = config.model || 'gpt-4o';
-    this.baseURL = config.baseURL || config.base_url || process.env.OPENAI_BASE_URL;
+async function getGoogleModel(modelName) {
+  if (!googleProvider) {
+    const { google } = await import('@ai-sdk/google');
+    googleProvider = google;
   }
-
-  get name() {
-    return 'openai';
-  }
-
-  async isAvailable() {
-    return !!this.apiKey;
-  }
-
-  async complete(options) {
-    if (!this.apiKey) {
-      throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY environment variable.');
-    }
-
-    // Dynamic import to avoid loading SDK if not needed
-    const { default: OpenAI } = await import('openai');
-    const clientOptions = { apiKey: this.apiKey };
-    if (this.baseURL) {
-      clientOptions.baseURL = this.baseURL;
-    }
-    const client = new OpenAI(clientOptions);
-
-    const messages = [];
-
-    // Add system message if provided
-    if (options.system) {
-      messages.push({ role: 'system', content: options.system });
-    }
-
-    // Add user messages
-    if (options.messages) {
-      messages.push(...options.messages);
-    }
-
-    const response = await client.chat.completions.create({
-      model: options.model || this.defaultModel,
-      max_tokens: options.maxTokens || 1000,
-      temperature: options.temperature ?? 0,
-      messages: messages,
-    });
-
-    return response.choices[0].message.content;
-  }
+  return googleProvider(modelName);
 }
 
 /**
- * Ollama provider (local models)
+ * Get the Ollama provider/model
  */
-class OllamaProvider extends AIProvider {
-  constructor(config = {}) {
-    super(config);
-    // Support both camelCase and snake_case config keys
-    this.baseURL = config.baseURL || config.base_url || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-    this.defaultModel = config.model || 'llama3.2';
-  }
-
-  get name() {
-    return 'ollama';
-  }
-
-  async isAvailable() {
-    try {
-      const response = await fetch(`${this.baseURL}/api/tags`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(2000)
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async complete(options) {
-    const messages = [];
-
-    // Add system message if provided
-    if (options.system) {
-      messages.push({ role: 'system', content: options.system });
-    }
-
-    // Add user messages
-    if (options.messages) {
-      messages.push(...options.messages);
-    }
-
-    const response = await fetch(`${this.baseURL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: options.model || this.defaultModel,
-        messages: messages,
-        stream: false,
-        options: {
-          temperature: options.temperature ?? 0,
-          num_predict: options.maxTokens || 1000,
-        },
-      }),
+async function getOllamaModel(modelName, options = {}) {
+  if (!ollamaProvider) {
+    const { createOllama } = await import('ollama-ai-provider-v2');
+    ollamaProvider = createOllama({
+      baseURL: options.baseURL || process.env.OLLAMA_BASE_URL || 'http://localhost:11434/api',
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Ollama request failed: ${error}`);
-    }
-
-    const result = await response.json();
-    return result.message?.content || '';
   }
+  return ollamaProvider(modelName);
 }
 
-/**
- * Google Gemini provider
- */
-class GeminiProvider extends AIProvider {
-  constructor(config = {}) {
-    super(config);
-    // Support both camelCase and snake_case config keys
-    this.apiKey = config.apiKey || config.api_key || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-    this.defaultModel = config.model || 'gemini-1.5-flash';
-  }
-
-  get name() {
-    return 'gemini';
-  }
-
-  async isAvailable() {
-    return !!this.apiKey;
-  }
-
-  async complete(options) {
-    if (!this.apiKey) {
-      throw new Error('Google API key not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.');
-    }
-
-    // Dynamic import
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(this.apiKey);
-
-    const model = genAI.getGenerativeModel({
-      model: options.model || this.defaultModel,
-    });
-
-    // Build the prompt from messages
-    let prompt = '';
-    if (options.system) {
-      prompt += options.system + '\n\n';
-    }
-    for (const msg of (options.messages || [])) {
-      if (msg.role === 'user') {
-        prompt += msg.content;
-      }
-    }
-
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: options.maxTokens || 1000,
-        temperature: options.temperature ?? 0,
-      },
-    });
-
-    return result.response.text();
-  }
-}
-
-// Provider registry
-const providers = {
-  anthropic: AnthropicProvider,
-  openai: OpenAIProvider,
-  ollama: OllamaProvider,
-  gemini: GeminiProvider,
+// Default models for each provider
+const DEFAULT_MODELS = {
+  anthropic: 'claude-sonnet-4-20250514',
+  openai: 'gpt-4o',
+  google: 'gemini-1.5-flash',
+  ollama: 'llama3.2',
 };
 
-// Cached provider instance
-let cachedProvider = null;
-let cachedProviderName = null;
-
 /**
- * Get the configured AI provider
- * @param {string} [providerName] - Override the configured provider
- * @returns {AIProvider}
+ * Get the configured model for the current provider
+ * @returns {Promise<object>} - The AI SDK model object
  */
-export function getAIProvider(providerName = null) {
+async function getConfiguredModel() {
   const config = getFullConfig();
   const aiConfig = config.ai || {};
 
-  const name = providerName || aiConfig.provider || 'anthropic';
+  const providerName = aiConfig.provider || 'anthropic';
+  const modelName = aiConfig.model || DEFAULT_MODELS[providerName];
 
-  // Return cached provider if same name
-  if (cachedProvider && cachedProviderName === name) {
-    return cachedProvider;
+  switch (providerName) {
+    case 'anthropic':
+      return getAnthropicModel(modelName);
+    case 'openai':
+      return getOpenAIModel(modelName, {
+        baseURL: aiConfig.openai?.base_url || aiConfig.openai?.baseURL,
+        apiKey: aiConfig.openai?.api_key || aiConfig.openai?.apiKey,
+      });
+    case 'google':
+    case 'gemini':
+      return getGoogleModel(modelName);
+    case 'ollama':
+      return getOllamaModel(modelName, {
+        baseURL: aiConfig.ollama?.base_url || aiConfig.ollama?.baseURL,
+      });
+    default:
+      throw new Error(`Unknown AI provider: ${providerName}. Available: anthropic, openai, google, ollama`);
   }
-
-  const ProviderClass = providers[name];
-  if (!ProviderClass) {
-    throw new Error(`Unknown AI provider: ${name}. Available: ${Object.keys(providers).join(', ')}`);
-  }
-
-  // Get provider-specific config
-  const providerConfig = {
-    model: aiConfig.model || aiConfig.claude_model || aiConfig.api_model, // support legacy keys
-    ...aiConfig[name], // e.g., ai.ollama.base_url
-  };
-
-  cachedProvider = new ProviderClass(providerConfig);
-  cachedProviderName = name;
-
-  return cachedProvider;
 }
 
 /**
- * Clear the cached provider (useful for testing or config changes)
- */
-export function clearProviderCache() {
-  cachedProvider = null;
-  cachedProviderName = null;
-}
-
-/**
- * Convenience function to create a completion with the configured provider
- * @param {Object} options - Same options as AIProvider.complete()
- * @returns {Promise<string>}
+ * Create a completion (non-streaming)
+ * @param {Object} options
+ * @param {Array} options.messages - Array of {role, content} messages
+ * @param {string} [options.system] - System prompt
+ * @param {number} [options.maxTokens=1000] - Maximum tokens to generate
+ * @param {number} [options.temperature=0] - Temperature (0-1)
+ * @returns {Promise<string>} - The generated text
  */
 export async function createCompletion(options) {
-  const provider = getAIProvider();
-  return provider.complete(options);
+  const model = await getConfiguredModel();
+
+  const result = await generateText({
+    model,
+    system: options.system,
+    messages: options.messages || [],
+    maxTokens: options.maxTokens || 1000,
+    temperature: options.temperature ?? 0,
+  });
+
+  return result.text;
 }
 
 /**
- * Check if any AI provider is available
+ * Create a streaming completion
+ * @param {Object} options - Same as createCompletion
+ * @returns {Promise<object>} - Stream result with textStream property
+ */
+export async function streamCompletion(options) {
+  const model = await getConfiguredModel();
+
+  return streamText({
+    model,
+    system: options.system,
+    messages: options.messages || [],
+    maxTokens: options.maxTokens || 1000,
+    temperature: options.temperature ?? 0,
+  });
+}
+
+/**
+ * Check if the configured AI provider is available
  * @returns {Promise<boolean>}
  */
 export async function isAIAvailable() {
+  const config = getFullConfig();
+  const aiConfig = config.ai || {};
+  const providerName = aiConfig.provider || 'anthropic';
+
   try {
-    const provider = getAIProvider();
-    return await provider.isAvailable();
+    switch (providerName) {
+      case 'anthropic':
+        return !!(process.env.ANTHROPIC_API_KEY || process.env.TODAY_ANTHROPIC_KEY);
+      case 'openai':
+        return !!(process.env.OPENAI_API_KEY || aiConfig.openai?.api_key);
+      case 'google':
+      case 'gemini':
+        return !!(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || aiConfig.google?.api_key);
+      case 'ollama':
+        // Check if Ollama is reachable
+        const baseURL = aiConfig.ollama?.base_url || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        const response = await fetch(`${baseURL}/api/tags`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(2000),
+        });
+        return response.ok;
+      default:
+        return false;
+    }
   } catch {
     return false;
   }
@@ -378,14 +221,22 @@ export function getInteractiveModel() {
 }
 
 /**
- * Get the configured model for the current provider
+ * Get the configured model name for the current provider
  * @returns {string}
  */
-export function getConfiguredModel() {
+export function getConfiguredModelName() {
   const config = getFullConfig();
   const aiConfig = config.ai || {};
-  return aiConfig.model || aiConfig.claude_model || aiConfig.api_model || getAIProvider().defaultModel;
+  const providerName = aiConfig.provider || 'anthropic';
+  return aiConfig.model || DEFAULT_MODELS[providerName];
 }
 
-// Export provider classes for direct use if needed
-export { AIProvider, AnthropicProvider, OpenAIProvider, OllamaProvider, GeminiProvider };
+/**
+ * Clear cached providers (useful for testing or config changes)
+ */
+export function clearProviderCache() {
+  anthropicProvider = null;
+  openaiProvider = null;
+  googleProvider = null;
+  ollamaProvider = null;
+}

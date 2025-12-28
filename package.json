@@ -17,11 +17,15 @@
     "lint": "npm run lint:md"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.1",
+    "@ai-sdk/google": "^3.0.1",
+    "@ai-sdk/openai": "^3.0.1",
     "@anthropic-ai/sdk": "^0.71.2",
     "@clack/prompts": "^0.11.0",
     "@date-fns/tz": "^1.4.1",
     "@dotenvx/dotenvx": "^1.51.1",
     "@inkjs/ui": "^2.0.0",
+    "ai": "^6.0.3",
     "better-sqlite3": "^12.5.0",
     "blessed": "^0.1.81",
     "chokidar": "^5.0.0",
@@ -43,10 +47,12 @@
     "marked": "^17.0.1",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
+    "ollama-ai-provider-v2": "^1.5.5",
     "react": "^19.2.3",
     "smol-toml": "^1.5.2",
     "sqlite3": "^5.1.7",
-    "tsdav": "^2.1.5"
+    "tsdav": "^2.1.5",
+    "zod": "^4.2.1"
   },
   "type": "module",
   "engines": {
@@ -59,10 +65,6 @@
     "jest": "^30.2.0",
     "lefthook": "^2.0.9",
     "markdownlint-cli2": "^0.19.1"
-  },
-  "optionalDependencies": {
-    "openai": "^4.0.0",
-    "@google/generative-ai": "^0.21.0"
   },
   "overrides": {
     "nodemailer": "^7.0.11"

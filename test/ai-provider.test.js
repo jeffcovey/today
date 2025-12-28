@@ -8,19 +8,15 @@ jest.unstable_mockModule('../src/config.js', () => ({
 
 const { getFullConfig } = await import('../src/config.js');
 const {
-  getAIProvider,
   clearProviderCache,
-  createCompletion,
   isAIAvailable,
   getProviderName,
-  getConfiguredModel,
-  AnthropicProvider,
-  OpenAIProvider,
-  OllamaProvider,
-  GeminiProvider,
+  getInteractiveProviderName,
+  getInteractiveModel,
+  getConfiguredModelName,
 } = await import('../src/ai-provider.js');
 
-describe('AI Provider', () => {
+describe('AI Provider (Vercel AI SDK)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearProviderCache();
@@ -30,131 +26,11 @@ describe('AI Provider', () => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     delete process.env.GEMINI_API_KEY;
-  });
-
-  describe('getAIProvider', () => {
-    test('returns Anthropic provider by default', () => {
-      getFullConfig.mockReturnValue({});
-
-      const provider = getAIProvider();
-
-      expect(provider).toBeInstanceOf(AnthropicProvider);
-      expect(provider.name).toBe('anthropic');
-    });
-
-    test('returns configured provider', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'openai' }
-      });
-
-      const provider = getAIProvider();
-
-      expect(provider).toBeInstanceOf(OpenAIProvider);
-      expect(provider.name).toBe('openai');
-    });
-
-    test('returns Ollama provider when configured', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'ollama' }
-      });
-
-      const provider = getAIProvider();
-
-      expect(provider).toBeInstanceOf(OllamaProvider);
-      expect(provider.name).toBe('ollama');
-    });
-
-    test('returns Gemini provider when configured', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'gemini' }
-      });
-
-      const provider = getAIProvider();
-
-      expect(provider).toBeInstanceOf(GeminiProvider);
-      expect(provider.name).toBe('gemini');
-    });
-
-    test('throws error for unknown provider', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'unknown-provider' }
-      });
-
-      expect(() => getAIProvider()).toThrow('Unknown AI provider: unknown-provider');
-    });
-
-    test('caches provider instance', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'anthropic' }
-      });
-
-      const provider1 = getAIProvider();
-      const provider2 = getAIProvider();
-
-      expect(provider1).toBe(provider2);
-    });
-
-    test('allows override of provider name', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'anthropic' }
-      });
-
-      const provider = getAIProvider('openai');
-
-      expect(provider).toBeInstanceOf(OpenAIProvider);
-    });
-
-    test('passes provider-specific config with snake_case', () => {
-      getFullConfig.mockReturnValue({
-        ai: {
-          provider: 'ollama',
-          ollama: {
-            base_url: 'http://custom:11434'
-          }
-        }
-      });
-
-      const provider = getAIProvider();
-
-      expect(provider.baseURL).toBe('http://custom:11434');
-    });
-
-    test('uses model from config', () => {
-      getFullConfig.mockReturnValue({
-        ai: {
-          provider: 'anthropic',
-          model: 'claude-opus-4-20250514'
-        }
-      });
-
-      const provider = getAIProvider();
-
-      expect(provider.defaultModel).toBe('claude-opus-4-20250514');
-    });
-  });
-
-  describe('clearProviderCache', () => {
-    test('clears cached provider', () => {
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'anthropic' }
-      });
-
-      const provider1 = getAIProvider();
-      clearProviderCache();
-
-      getFullConfig.mockReturnValue({
-        ai: { provider: 'openai' }
-      });
-
-      const provider2 = getAIProvider();
-
-      expect(provider1).not.toBe(provider2);
-      expect(provider2).toBeInstanceOf(OpenAIProvider);
-    });
+    delete process.env.OLLAMA_BASE_URL;
   });
 
   describe('getProviderName', () => {
-    test('returns default provider name', () => {
+    test('returns default provider name (anthropic)', () => {
       getFullConfig.mockReturnValue({});
 
       expect(getProviderName()).toBe('anthropic');
@@ -167,38 +43,111 @@ describe('AI Provider', () => {
 
       expect(getProviderName()).toBe('ollama');
     });
+
+    test('returns openai when configured', () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'openai' }
+      });
+
+      expect(getProviderName()).toBe('openai');
+    });
+
+    test('returns google when configured', () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'google' }
+      });
+
+      expect(getProviderName()).toBe('google');
+    });
   });
 
-  describe('getConfiguredModel', () => {
+  describe('getInteractiveProviderName', () => {
+    test('returns default interactive provider (anthropic)', () => {
+      getFullConfig.mockReturnValue({});
+
+      expect(getInteractiveProviderName()).toBe('anthropic');
+    });
+
+    test('returns configured interactive provider', () => {
+      getFullConfig.mockReturnValue({
+        ai: { interactive_provider: 'openai' }
+      });
+
+      expect(getInteractiveProviderName()).toBe('openai');
+    });
+  });
+
+  describe('getInteractiveModel', () => {
+    test('returns default interactive model (sonnet)', () => {
+      getFullConfig.mockReturnValue({});
+
+      expect(getInteractiveModel()).toBe('sonnet');
+    });
+
+    test('returns configured interactive model', () => {
+      getFullConfig.mockReturnValue({
+        ai: { interactive_model: 'opus' }
+      });
+
+      expect(getInteractiveModel()).toBe('opus');
+    });
+  });
+
+  describe('getConfiguredModelName', () => {
     test('returns model from config', () => {
       getFullConfig.mockReturnValue({
         ai: { model: 'gpt-4o' }
       });
 
-      expect(getConfiguredModel()).toBe('gpt-4o');
+      expect(getConfiguredModelName()).toBe('gpt-4o');
     });
 
-    test('falls back to api_model', () => {
+    test('returns default model for anthropic', () => {
       getFullConfig.mockReturnValue({
-        ai: { api_model: 'claude-sonnet-4-20250514' }
+        ai: { provider: 'anthropic' }
       });
 
-      expect(getConfiguredModel()).toBe('claude-sonnet-4-20250514');
+      expect(getConfiguredModelName()).toBe('claude-sonnet-4-20250514');
     });
 
-    test('falls back to provider default', () => {
-      getFullConfig.mockReturnValue({});
+    test('returns default model for openai', () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'openai' }
+      });
 
-      // Default Anthropic provider has default model
-      expect(getConfiguredModel()).toBe('claude-sonnet-4-20250514');
+      expect(getConfiguredModelName()).toBe('gpt-4o');
+    });
+
+    test('returns default model for google', () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'google' }
+      });
+
+      expect(getConfiguredModelName()).toBe('gemini-1.5-flash');
+    });
+
+    test('returns default model for ollama', () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'ollama' }
+      });
+
+      expect(getConfiguredModelName()).toBe('llama3.2');
     });
   });
 
   describe('isAIAvailable', () => {
-    test('returns true when Anthropic API key is set', async () => {
+    test('returns true when Anthropic API key is set via TODAY_ANTHROPIC_KEY', async () => {
       process.env.TODAY_ANTHROPIC_KEY = 'test-key';
       getFullConfig.mockReturnValue({});
-      clearProviderCache();
+
+      const available = await isAIAvailable();
+
+      expect(available).toBe(true);
+    });
+
+    test('returns true when Anthropic API key is set via ANTHROPIC_API_KEY', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-key';
+      getFullConfig.mockReturnValue({});
 
       const available = await isAIAvailable();
 
@@ -207,7 +156,6 @@ describe('AI Provider', () => {
 
     test('returns false when no API key is set for Anthropic', async () => {
       getFullConfig.mockReturnValue({});
-      clearProviderCache();
 
       const available = await isAIAvailable();
 
@@ -219,7 +167,6 @@ describe('AI Provider', () => {
       getFullConfig.mockReturnValue({
         ai: { provider: 'openai' }
       });
-      clearProviderCache();
 
       const available = await isAIAvailable();
 
@@ -230,110 +177,51 @@ describe('AI Provider', () => {
       getFullConfig.mockReturnValue({
         ai: { provider: 'openai' }
       });
-      clearProviderCache();
 
       const available = await isAIAvailable();
 
       expect(available).toBe(false);
     });
+
+    test('returns true when Google API key is set', async () => {
+      process.env.GOOGLE_API_KEY = 'test-key';
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'google' }
+      });
+
+      const available = await isAIAvailable();
+
+      expect(available).toBe(true);
+    });
+
+    test('returns true when Gemini API key is set', async () => {
+      process.env.GEMINI_API_KEY = 'test-key';
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'gemini' }
+      });
+
+      const available = await isAIAvailable();
+
+      expect(available).toBe(true);
+    });
+
+    test('returns false when no API key is set for Google', async () => {
+      getFullConfig.mockReturnValue({
+        ai: { provider: 'google' }
+      });
+
+      const available = await isAIAvailable();
+
+      expect(available).toBe(false);
+    });
+
+    // Ollama availability check makes a network request, so we skip it in unit tests
+    // It would be tested in integration tests
   });
 
-  describe('AnthropicProvider', () => {
-    test('uses TODAY_ANTHROPIC_KEY env var', () => {
-      process.env.TODAY_ANTHROPIC_KEY = 'today-key';
-      process.env.ANTHROPIC_API_KEY = 'fallback-key';
-
-      const provider = new AnthropicProvider({});
-
-      expect(provider.apiKey).toBe('today-key');
-    });
-
-    test('falls back to ANTHROPIC_API_KEY', () => {
-      process.env.ANTHROPIC_API_KEY = 'fallback-key';
-
-      const provider = new AnthropicProvider({});
-
-      expect(provider.apiKey).toBe('fallback-key');
-    });
-
-    test('uses config apiKey over env vars', () => {
-      process.env.TODAY_ANTHROPIC_KEY = 'env-key';
-
-      const provider = new AnthropicProvider({ apiKey: 'config-key' });
-
-      expect(provider.apiKey).toBe('config-key');
-    });
-
-    test('has correct default model', () => {
-      const provider = new AnthropicProvider({});
-
-      expect(provider.defaultModel).toBe('claude-sonnet-4-20250514');
-    });
-  });
-
-  describe('OpenAIProvider', () => {
-    test('uses OPENAI_API_KEY env var', () => {
-      process.env.OPENAI_API_KEY = 'openai-key';
-
-      const provider = new OpenAIProvider({});
-
-      expect(provider.apiKey).toBe('openai-key');
-    });
-
-    test('has correct default model', () => {
-      const provider = new OpenAIProvider({});
-
-      expect(provider.defaultModel).toBe('gpt-4o');
-    });
-
-    test('supports custom base URL', () => {
-      const provider = new OpenAIProvider({ baseURL: 'https://custom.api.com' });
-
-      expect(provider.baseURL).toBe('https://custom.api.com');
-    });
-  });
-
-  describe('OllamaProvider', () => {
-    test('has correct default base URL', () => {
-      const provider = new OllamaProvider({});
-
-      expect(provider.baseURL).toBe('http://localhost:11434');
-    });
-
-    test('uses custom base URL from config', () => {
-      const provider = new OllamaProvider({ baseURL: 'http://remote:11434' });
-
-      expect(provider.baseURL).toBe('http://remote:11434');
-    });
-
-    test('has correct default model', () => {
-      const provider = new OllamaProvider({});
-
-      expect(provider.defaultModel).toBe('llama3.2');
-    });
-  });
-
-  describe('GeminiProvider', () => {
-    test('uses GOOGLE_API_KEY env var', () => {
-      process.env.GOOGLE_API_KEY = 'google-key';
-
-      const provider = new GeminiProvider({});
-
-      expect(provider.apiKey).toBe('google-key');
-    });
-
-    test('falls back to GEMINI_API_KEY', () => {
-      process.env.GEMINI_API_KEY = 'gemini-key';
-
-      const provider = new GeminiProvider({});
-
-      expect(provider.apiKey).toBe('gemini-key');
-    });
-
-    test('has correct default model', () => {
-      const provider = new GeminiProvider({});
-
-      expect(provider.defaultModel).toBe('gemini-1.5-flash');
+  describe('clearProviderCache', () => {
+    test('can be called without error', () => {
+      expect(() => clearProviderCache()).not.toThrow();
     });
   });
 });
