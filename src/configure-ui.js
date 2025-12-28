@@ -77,16 +77,49 @@ const CONFIG_SECTIONS = [
     title: 'AI Settings',
     fields: [
       {
-        key: 'claude_model',
-        label: 'Claude Model',
-        path: ['ai', 'claude_model'],
-        default: 'claude-sonnet-4-20250514',
+        key: 'provider',
+        label: 'Background Provider',
+        path: ['ai', 'provider'],
+        default: 'anthropic',
         type: 'select',
         options: [
-          { value: 'claude-opus-4-20250514', label: 'Claude Opus 4 (Most capable)' },
-          { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
-          { value: 'claude-haiku-3-5-20241022', label: 'Claude Haiku 3.5 (Fastest)' },
-        ]
+          { value: 'anthropic', label: 'Anthropic Claude' },
+          { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
+          { value: 'ollama', label: 'Ollama (Local models)' },
+          { value: 'gemini', label: 'Google Gemini' },
+        ],
+        description: 'AI for background tasks (summaries, tagging)'
+      },
+      {
+        key: 'model',
+        label: 'Background Model',
+        path: ['ai', 'model'],
+        default: '',
+        description: 'Model name (empty = provider default)'
+      },
+      {
+        key: 'interactive_provider',
+        label: 'Interactive Provider',
+        path: ['ai', 'interactive_provider'],
+        default: 'anthropic',
+        type: 'select',
+        options: [
+          { value: 'anthropic', label: 'Anthropic Claude' },
+        ],
+        description: 'AI for interactive sessions (bin/today)'
+      },
+      {
+        key: 'interactive_model',
+        label: 'Interactive Model',
+        path: ['ai', 'interactive_model'],
+        default: 'sonnet',
+        type: 'select',
+        options: [
+          { value: 'opus', label: 'Opus (Most capable)' },
+          { value: 'sonnet', label: 'Sonnet (Recommended)' },
+          { value: 'haiku', label: 'Haiku (Fastest)' },
+        ],
+        description: 'Model for interactive sessions'
       },
       {
         key: 'ai_instructions',

@@ -7,7 +7,12 @@ const __dirname = path.dirname(__filename);
 
 // Mock the config module
 jest.unstable_mockModule('../src/config.js', () => ({
-  getFullConfig: jest.fn()
+  getFullConfig: jest.fn().mockReturnValue({}),
+  getConfig: jest.fn(),
+  getApiModel: jest.fn().mockReturnValue('claude-sonnet-4-20250514'),
+  getInteractiveModel: jest.fn().mockReturnValue('sonnet'),
+  getTimezone: jest.fn().mockReturnValue('America/New_York'),
+  getClaudeModel: jest.fn().mockReturnValue('claude-sonnet-4-20250514'),
 }));
 
 // Import after mocking

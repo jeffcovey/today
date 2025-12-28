@@ -884,7 +884,6 @@ User query: "${query}"`;
 
     try {
       intentResponse = await this.nlSearch.askClaude(intentPrompt, query, {
-        model: 'claude-3-haiku-20240307',
         maxTokens: 500
       });
 

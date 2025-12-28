@@ -60,6 +60,10 @@
     "lefthook": "^2.0.9",
     "markdownlint-cli2": "^0.19.1"
   },
+  "optionalDependencies": {
+    "openai": "^4.0.0",
+    "@google/generative-ai": "^0.21.0"
+  },
   "overrides": {
     "nodemailer": "^7.0.11"
   }

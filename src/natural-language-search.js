@@ -1,64 +1,43 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { colors } from './cli-utils.js';
 import { ClaudeCLIAdapter } from './claude-cli-adapter.js';
+import { createCompletion, isAIAvailable, getAIProvider } from './ai-provider.js';
 
 export class NaturalLanguageSearch {
   constructor() {
-    // Check for TODAY_ANTHROPIC_KEY
-    const anthropicKey = process.env.TODAY_ANTHROPIC_KEY;
-    if (anthropicKey) {
-      this.client = new Anthropic({ apiKey: anthropicKey });
-      this.searchMethod = 'anthropic';
-      this.cliAdapter = null;
-    } else {
-      this.client = null;
-      this.searchMethod = 'claude-cli';
-      this.cliAdapter = new ClaudeCLIAdapter();
-    }
+    // Use provider abstraction - will be checked async when needed
+    this.searchMethod = 'provider';
+    this.cliAdapter = new ClaudeCLIAdapter();
   }
 
-  // Generic method to ask Claude a question
+  // Generic method to ask AI a question
   async askClaude(systemPrompt, userQuery, options = {}) {
-    // Use CLI adapter if no API client
+    // Try provider abstraction first
+    if (await isAIAvailable()) {
+      try {
+        return await createCompletion({
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userQuery }],
+          maxTokens: options.maxTokens || 1000,
+          temperature: options.temperature || 0,
+        });
+      } catch (error) {
+        console.error('AI provider error:', error);
+        // Fall back to CLI adapter
+      }
+    }
+
+    // Fall back to CLI adapter
     if (this.cliAdapter) {
       return await this.cliAdapter.askClaude(systemPrompt, userQuery, options);
     }
 
-    if (!this.client) {
-      throw new Error('Claude API not configured');
-    }
-
-    try {
-      const response = await this.client.messages.create({
-        model: options.model || 'claude-3-haiku-20240307',
-        max_tokens: options.maxTokens || 1000,
-        temperature: options.temperature || 0,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userQuery }
-        ]
-      });
-
-      return response.content[0].text;
-    } catch (error) {
-      console.error('Claude API error:', error);
-      throw error;
-    }
+    throw new Error('No AI provider configured');
   }
 
-  // Enhanced method to filter data using Claude's understanding
+  // Enhanced method to filter data using AI
   async filterWithClaude(items, query, itemType = 'emails') {
-    // Use CLI adapter if available
-    if (this.cliAdapter) {
-      return await this.cliAdapter.filterWithClaude(items, query, itemType);
-    }
+    const systemPrompt = `You are a smart filter for ${itemType}. The user will provide a natural language query and a list of items in JSON format.
 
-    if (!this.client) {
-      throw new Error('Claude API not configured');
-    }
-
-    const systemPrompt = `You are a smart filter for ${itemType}. The user will provide a natural language query and a list of items in JSON format. 
-    
 Your response must be ONLY a valid JSON array containing the items that match the user's query. No other text, explanation, or formatting.
 
 Use your understanding of natural language to interpret requests like:
@@ -80,50 +59,61 @@ Personal means: from an actual human writing to you specifically
 
 Return ONLY the JSON array. Example: [{"id": 1, ...}, {"id": 2, ...}]`;
 
-    try {
-      const response = await this.client.messages.create({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 4000,
-        temperature: 0,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: `Query: "${query}"\n\nItems to filter:\n${JSON.stringify(items, null, 2)}`
-          }
-        ]
-      });
+    // Try provider abstraction first
+    if (await isAIAvailable()) {
+      try {
+        const responseText = await createCompletion({
+          system: systemPrompt,
+          messages: [
+            {
+              role: 'user',
+              content: `Query: "${query}"\n\nItems to filter:\n${JSON.stringify(items, null, 2)}`
+            }
+          ],
+          maxTokens: 4000,
+          temperature: 0,
+        });
 
-      const responseText = response.content[0].text.trim();
+        // Try to extract JSON even if there's extra text
+        let jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          console.error('AI response was not JSON:', responseText.substring(0, 100) + '...');
+          return items;
+        }
 
-      // Try to extract JSON even if there's extra text
-      let jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.error('Claude response was not JSON:', responseText.substring(0, 100) + '...');
-        return items;
+        const filteredItems = JSON.parse(jsonMatch[0]);
+        return Array.isArray(filteredItems) ? filteredItems : [];
+      } catch (error) {
+        console.error('AI filtering error:', error.message);
       }
-
-      const filteredItems = JSON.parse(jsonMatch[0]);
-      return Array.isArray(filteredItems) ? filteredItems : [];
-    } catch (error) {
-      console.error('Claude filtering error:', error.message);
-      // Fall back to returning all items
-      return items;
     }
+
+    // Fall back to CLI adapter
+    if (this.cliAdapter) {
+      return await this.cliAdapter.filterWithClaude(items, query, itemType);
+    }
+
+    // Fall back to returning all items
+    return items;
   }
 
   // Search database items using available AI
   async searchItems(items, query, databaseType = 'tasks') {
-    if (this.searchMethod === 'anthropic' && this.client) {
-      return this.searchWithClaude(items, query, databaseType);
-    } else {
-      // Try Ollama first, fall back to basic search
+    // Try provider abstraction first
+    if (await isAIAvailable()) {
       try {
-        return await this.searchWithOllama(items, query, databaseType);
+        return await this.searchWithClaude(items, query, databaseType);
       } catch (error) {
-        console.log(colors.yellow('AI search not available, using basic search'));
-        return this.basicSearch(items, query, databaseType);
+        console.log(colors.yellow('AI provider failed, trying Ollama...'));
       }
+    }
+
+    // Try Ollama next
+    try {
+      return await this.searchWithOllama(items, query, databaseType);
+    } catch (error) {
+      console.log(colors.yellow('AI search not available, using basic search'));
+      return this.basicSearch(items, query, databaseType);
     }
   }
 
@@ -284,7 +274,7 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
     }
   }
 
-  // Search using Claude API - database-agnostic
+  // Search using AI provider - database-agnostic
   async searchWithClaude(items, query, databaseType = 'tasks') {
     try {
       const maxItems = 200;
@@ -299,10 +289,8 @@ Return ONLY comma-separated numbers, like: 0,5,12,3,8`;
         return `${index}: ${propsStr}`;
       }).join('\n');
 
-      // Ask Claude to analyze the query
-      const response = await this.client.messages.create({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 500,
+      // Ask AI to analyze the query
+      const content = await createCompletion({
         messages: [{
           role: 'user',
           content: `I have a ${databaseType} database and need help finding relevant items based on this query: "${query}"
@@ -319,13 +307,12 @@ ${itemSummaries}
 Please analyze the query intent and return a JSON array of the 10 most relevant item indices. Consider all properties and their values in context of what the user is looking for.
 
 Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
-        }]
+        }],
+        maxTokens: 500,
+        temperature: 0,
       });
 
-      const content = response.content[0].text;
-
       // Extract just the JSON array from the response
-      // Claude sometimes adds explanation text
       let indices;
       try {
         // First try direct parse
@@ -334,7 +321,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
         // If that fails, look for a JSON array in the text
         const jsonMatch = content.match(/\[[\d,\s]+\]/);
         if (!jsonMatch) {
-          console.error(colors.red('Could not parse Claude response:'), content);
+          console.error(colors.red('Could not parse AI response:'), content);
           throw new Error('Invalid response format');
         }
         indices = JSON.parse(jsonMatch[0]);
@@ -347,11 +334,11 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
       return {
         results: results.slice(0, 10),
         totalFound: results.length,
-        searchMethod: 'claude',
+        searchMethod: getAIProvider().name,
         databaseType
       };
     } catch (error) {
-      console.error(colors.red('Claude API error:'), error.message);
+      console.error(colors.red('AI search error:'), error.message);
       console.log(colors.yellow('Falling back to basic search'));
       return this.basicSearch(items, query, databaseType);
     }

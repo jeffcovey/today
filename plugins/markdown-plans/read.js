@@ -22,6 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
+import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
@@ -388,15 +389,8 @@ function addNavigationToAllFiles() {
  * Uses bin/today dry-run --date to get the full context for that date
  */
 async function generateDailySummary(dateStr, planFilePath) {
-  // Get API key
-  let apiKey = '';
-  try {
-    apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-
-  if (!apiKey || apiKey.includes('not set') || apiKey === '') {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
     return null;
   }
 
@@ -453,25 +447,13 @@ ${planContent ? `\n${planContent}` : ''}
 
 Write ONLY the 2-3 sentence summary for ${dateStr}, nothing else:`;
 
-  // Get model from config (use haiku for summaries - fast and cheap)
-  let model = 'claude-haiku-4-5-20251001';
+  // Call AI provider
   try {
-    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (configModel) model = configModel;
-  } catch { /* use default */ }
-  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
-
-  // Call API
-  try {
-    const tempPromptFile = `/tmp/summary-prompt-${Date.now()}.txt`;
-    fs.writeFileSync(tempPromptFile, prompt);
-
-    const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 300, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
-      { encoding: 'utf8', timeout: 30000 }
-    );
-
-    fs.unlinkSync(tempPromptFile);
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 300,
+      temperature: 0.7,
+    });
     return response.trim();
   } catch (error) {
     return null;
@@ -927,15 +909,8 @@ function needsPriorities(filePath) {
  * Generate AI suggestions for tomorrow's plan
  */
 async function generateTomorrowSuggestions(tomorrowStr, planFilePath) {
-  // Get API key
-  let apiKey = '';
-  try {
-    apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-
-  if (!apiKey || apiKey.includes('not set') || apiKey === '') {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
     return null;
   }
 
@@ -1002,25 +977,13 @@ PRIORITIES:
 
 Keep it concise and actionable. Tasks should be specific and achievable.`;
 
-  // Get model from config
-  let model = 'claude-haiku-4-5-20251001';
+  // Call AI provider
   try {
-    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (configModel) model = configModel;
-  } catch { /* use default */ }
-  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
-
-  // Call API
-  try {
-    const tempPromptFile = `/tmp/tomorrow-prompt-${Date.now()}.txt`;
-    fs.writeFileSync(tempPromptFile, prompt);
-
-    const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 500, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
-      { encoding: 'utf8', timeout: 30000 }
-    );
-
-    fs.unlinkSync(tempPromptFile);
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 500,
+      temperature: 0.7,
+    });
 
     // Parse response
     const focusMatch = response.match(/FOCUS:\s*(.+?)(?:\n|$)/);

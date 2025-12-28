@@ -59,10 +59,34 @@ export function getConfig(key) {
   return config[key];
 }
 
-export function getClaudeModel() {
-  // Priority: config.toml > env var > default
-  const configModel = getConfig('ai.claude_model');
+/**
+ * Get the model for interactive Claude Code CLI sessions.
+ * Returns model aliases like 'opus', 'sonnet', 'haiku'.
+ */
+export function getInteractiveModel() {
+  const configModel = getConfig('ai.interactive_model');
   if (configModel) return configModel;
+  return 'sonnet';
+}
+
+/**
+ * Get the model for API calls.
+ * Returns full model names like 'claude-sonnet-4-20250514'.
+ * @deprecated Use ai-provider.js instead for provider-agnostic AI access
+ */
+export function getApiModel() {
+  const configModel = getConfig('ai.model');
+  if (configModel) return configModel;
+  // Legacy fallbacks
+  const legacyModel = getConfig('ai.claude_model') || getConfig('ai.api_model');
+  if (legacyModel) return legacyModel;
   if (process.env.CLAUDE_MODEL) return process.env.CLAUDE_MODEL;
   return 'claude-sonnet-4-20250514';
+}
+
+/**
+ * @deprecated Use ai-provider.js instead
+ */
+export function getClaudeModel() {
+  return getApiModel();
 }
