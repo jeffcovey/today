@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+
+/**
+ * MCP Server Entry Point
+ *
+ * Starts the Today MCP server for integration with AI assistants.
+ *
+ * Usage:
+ *   bin/mcp-server
+ *
+ * Configure in Claude Desktop (~/.config/claude/claude_desktop_config.json):
+ *   {
+ *     "mcpServers": {
+ *       "today": {
+ *         "command": "/absolute/path/to/today/bin/mcp-server"
+ *       }
+ *     }
+ *   }
+ */
+
+import { startMCPServer } from '../src/mcp-server.js';
+
+// Start the server
+startMCPServer().catch((error) => {
+  console.error('Failed to start MCP server:', error);
+  process.exit(1);
+});
