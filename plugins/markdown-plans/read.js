@@ -281,15 +281,101 @@ function ensureDailyPlan(planInfo, date) {
 }
 
 /**
- * Get all plan files sorted chronologically by filename
- * Filenames are designed to sort chronologically (YYYY_Q#_MM_W##_DD.md)
+ * Extract date components from plan filename for sorting
+ * Pattern: YYYY_Q#_MM_W##_DD.md → { year, month, day }
+ * Week plans end in _00.md
+ */
+function parsePlanFilename(filename) {
+  // Daily plan: 2025_Q4_12_W01_29.md
+  const dailyMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W\d+_(\d{2})\.md$/);
+  if (dailyMatch) {
+    return {
+      year: parseInt(dailyMatch[1], 10),
+      month: parseInt(dailyMatch[2], 10),
+      day: parseInt(dailyMatch[3], 10),
+      isDaily: true,
+    };
+  }
+
+  // Week plan: 2025_Q4_12_W01_00.md
+  const weekMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W(\d+)_00\.md$/);
+  if (weekMatch) {
+    return {
+      year: parseInt(weekMatch[1], 10),
+      month: parseInt(weekMatch[2], 10),
+      week: parseInt(weekMatch[3], 10),
+      day: 0,
+      isWeekly: true,
+    };
+  }
+
+  // Month plan: 2025_Q4_12_00.md
+  const monthMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_00\.md$/);
+  if (monthMatch) {
+    return {
+      year: parseInt(monthMatch[1], 10),
+      month: parseInt(monthMatch[2], 10),
+      day: 0,
+      isMonthly: true,
+    };
+  }
+
+  // Quarter plan: 2025_Q4_00.md
+  const quarterMatch = filename.match(/^(\d{4})_Q(\d+)_00\.md$/);
+  if (quarterMatch) {
+    return {
+      year: parseInt(quarterMatch[1], 10),
+      quarter: parseInt(quarterMatch[2], 10),
+      month: 0,
+      day: 0,
+      isQuarterly: true,
+    };
+  }
+
+  // Year plan: 2025_00.md
+  const yearMatch = filename.match(/^(\d{4})_00\.md$/);
+  if (yearMatch) {
+    return {
+      year: parseInt(yearMatch[1], 10),
+      month: 0,
+      day: 0,
+      isYearly: true,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Get all plan files sorted chronologically by actual date
+ * Sorts by year, month, day to handle ISO week boundary issues
  */
 function getSortedPlanFiles() {
   if (!fs.existsSync(plansDir)) return [];
 
   const files = fs.readdirSync(plansDir)
-    .filter(f => f.endsWith('.md') && /^\d{4}_/.test(f))
-    .sort();
+    .filter(f => f.endsWith('.md') && /^\d{4}_/.test(f));
+
+  // Sort by actual date components, not alphabetically
+  files.sort((a, b) => {
+    const parsedA = parsePlanFilename(a);
+    const parsedB = parsePlanFilename(b);
+
+    // If we can't parse, fall back to alphabetical
+    if (!parsedA || !parsedB) return a.localeCompare(b);
+
+    // Sort by year first
+    if (parsedA.year !== parsedB.year) return parsedA.year - parsedB.year;
+
+    // Then by month (0 for yearly/quarterly plans goes first)
+    if (parsedA.month !== parsedB.month) return parsedA.month - parsedB.month;
+
+    // Then by day (0 for monthly/weekly plans goes first)
+    if (parsedA.day !== parsedB.day) return parsedA.day - parsedB.day;
+
+    // Fall back to alphabetical for same date
+    return a.localeCompare(b);
+  });
 
   return files;
 }
