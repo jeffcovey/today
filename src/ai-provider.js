@@ -22,6 +22,9 @@
  *   }
  */
 
+// Suppress AI SDK compatibility warnings (e.g., ollama v2 specification mode)
+globalThis.AI_SDK_LOG_WARNINGS = false;
+
 import { generateText, streamText } from 'ai';
 import { getFullConfig } from './config.js';
 
