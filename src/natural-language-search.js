@@ -1,6 +1,6 @@
 import { colors } from './cli-utils.js';
 import { ClaudeCLIAdapter } from './claude-cli-adapter.js';
-import { createCompletion, isAIAvailable, getAIProvider } from './ai-provider.js';
+import { createCompletion, isAIAvailable, getProviderName } from './ai-provider.js';
 
 export class NaturalLanguageSearch {
   constructor() {
@@ -334,7 +334,7 @@ Return ONLY a JSON array of numbers, like: [0, 5, 12, 3]`
       return {
         results: results.slice(0, 10),
         totalFound: results.length,
-        searchMethod: getAIProvider().name,
+        searchMethod: getProviderName(),
         databaseType
       };
     } catch (error) {

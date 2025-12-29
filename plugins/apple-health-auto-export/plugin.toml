@@ -4,7 +4,7 @@
 name = "apple-health-auto-export"
 displayName = "Apple Health Auto Export"
 description = "Health metrics from iOS Health app via Auto Export"
-type = "health-metrics"
+type = "health"
 
 requiredEnv = []
 
@@ -53,6 +53,3 @@ Common metric names:
 
 Only read and parse metrics relevant to the user's question.
 """
-
-# No sync command - data arrives via external sync (iCloud, Dropbox, etc.)
-# No settings needed - the file location is fixed at vault/logs/

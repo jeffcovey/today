@@ -967,7 +967,7 @@ export function getAIMetadata(pluginType) {
  */
 const staleMinutesByType = {
   'habits': 30,         // Habits sync daily, don't need frequent updates
-  'health-metrics': 60, // Health data syncs periodically from phone
+  'health': 60, // Health data syncs periodically from phone
   'utility': 0,         // Utility plugins run on-demand, always fresh
 };
 
