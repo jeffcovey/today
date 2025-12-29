@@ -1,5 +1,5 @@
 # Apple Health Auto Export Plugin
-# Provides AI access to health data exported from iOS Health app
+# Syncs health data exported from iOS Health app to database
 
 name = "apple-health-auto-export"
 displayName = "Apple Health Auto Export"
@@ -9,7 +9,7 @@ type = "health"
 requiredEnv = []
 
 longDescription = """
-Provides access to health data exported from the iOS Health app using the
+Syncs health data exported from the iOS Health app using the
 "Health Auto Export" app (https://www.healthyapps.dev/health-auto-export).
 
 Setup:
@@ -22,34 +22,40 @@ The export file contains metrics including:
 - Step counts and distance walked
 - Weight and body measurements
 - Heart rate and HRV
-- Sleep analysis
-- Workouts (type, duration, calories)
+- Sleep analysis (with sleep stages)
+- Active energy and exercise time
 - Nutrition (water, caffeine, alcohol)
 - And many more depending on your Health app data
 
-This plugin does not sync data - it tells the AI how to read the export files
-that are already synced to your vault via your preferred sync method.
+Each source in config.toml can have different settings:
+
+  [plugins.apple-health-auto-export.default]
+  enabled = true
+  logs_directory = "vault/logs"
+  retention_days = 30
 """
 
 aiInstructions = """
-Health data from Apple Health is available in `vault/logs/HealthAutoExport*.json`.
+Health data is synced to the health_metrics table. Query with SQL or use bin/health commands.
 
-To query health metrics:
-1. Find the most recent file matching `HealthAutoExport*.json` in `vault/logs/`
-2. Parse the JSON - structure is `data.metrics[]` where each metric has:
-   - `name`: metric identifier (e.g., `step_count`, `weight_body_mass`, `heart_rate`)
-   - `units`: measurement units
-   - `data[]`: array of readings with `date` and `qty` fields
+Common metric names in the database:
+- Activity: step_count, distance_walking_running, active_energy, flights_climbed
+- Heart: heart_rate, heart_rate_variability_sdnn, resting_heart_rate
+- Body: weight_body_mass, body_mass_index
+- Sleep: sleep_analysis (metadata has stages: rem, deep, core, awake)
+- Vitals: respiratory_rate, blood_oxygen_saturation
+- Nutrition: dietary_water, dietary_caffeine, alcohol_consumption
 
-Common metric names:
-- `step_count` - daily steps
-- `weight_body_mass` - weight in lbs
-- `heart_rate` - BPM readings
-- `heart_rate_variability_sdnn` - HRV in ms
-- `sleep_analysis` - sleep sessions
-- `dietary_water` - water intake
-- `dietary_caffeine` - caffeine in mg
-- `number_of_alcoholic_beverages` - alcohol consumption
-
-Only read and parse metrics relevant to the user's question.
+Example queries:
+- Recent weight: SELECT date, value FROM health_metrics WHERE metric_name = 'weight_body_mass' ORDER BY date DESC LIMIT 7
+- Today's steps: SELECT value FROM health_metrics WHERE metric_name = 'step_count' AND date = DATE('now', 'localtime')
+- Sleep this week: SELECT date, value as hours, metadata FROM health_metrics WHERE metric_name = 'sleep_analysis' AND date > DATE('now', '-7 days')
 """
+
+[commands]
+read = "./read.js"
+
+[settings]
+logs_directory = { type = "string", default = "vault/logs", description = "Directory containing HealthAutoExport JSON files" }
+retention_days = { type = "number", default = 30, description = "Days of health data to retain in database" }
+metrics_filter = { type = "string", default = "", description = "Comma-separated list of metrics to include (empty = all)" }

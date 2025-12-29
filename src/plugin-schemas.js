@@ -776,9 +776,89 @@ SELECT * FROM tasks WHERE id LIKE 'markdown-tasks/local:vault/projects/PROJECT_F
       }
     },
     indexes: ['source', 'status', 'priority', 'due_date', 'topic']
-  }
+  },
 
   // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
+
+  'health': {
+    table: 'health_metrics',
+    staleMinutes: 60, // Health data syncs periodically from phone
+    ai: {
+      name: 'Health Metrics',
+      description: `Health metrics from wearables and health apps (Apple Watch, Fitbit, Oura, etc.).
+Each entry is a single measurement of a specific metric at a specific time.
+Common metrics include steps, heart rate, weight, sleep, HRV, and more.
+
+Use this data to understand the user's physical health, activity patterns,
+and sleep quality. Look for trends over time rather than single data points.`,
+      defaultCommand: 'bin/health today',
+      dateCommand: 'bin/health --date $DATE',
+      queryInstructions: `Commands: bin/health today, bin/health metric <name>, bin/health list, bin/health summary
+SQL: SELECT metric_name, value, units, date FROM health_metrics WHERE date = DATE('now', 'localtime') ORDER BY metric_name
+
+Common metric names:
+- Activity: step_count, distance_walking_running, active_energy, flights_climbed
+- Heart: heart_rate, heart_rate_variability_sdnn, resting_heart_rate
+- Body: weight_body_mass, body_mass_index, body_fat_percentage
+- Sleep: sleep_analysis (metadata has stages: asleep, inBed, awake, REM, deep, core)
+- Vitals: respiratory_rate, blood_oxygen_saturation, body_temperature
+- Nutrition: dietary_water, dietary_caffeine, number_of_alcoholic_beverages`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (generated: source:metric:date)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., apple-health-auto-export/default)'
+      },
+      date: {
+        sqlType: 'DATE NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Date of measurement (YYYY-MM-DD)'
+      },
+      metric_name: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Metric identifier (e.g., step_count, heart_rate, weight_body_mass)'
+      },
+      value: {
+        sqlType: 'REAL NOT NULL',
+        jsType: 'number',
+        required: true,
+        description: 'Numeric measurement value'
+      },
+      units: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Unit of measurement (e.g., count, bpm, lbs, mg)'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (source_app, timezone, sleep_stages, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'date', 'metric_name']
+  }
 };
 
 /**
@@ -967,7 +1047,6 @@ export function getAIMetadata(pluginType) {
  */
 const staleMinutesByType = {
   'habits': 30,         // Habits sync daily, don't need frequent updates
-  'health': 60, // Health data syncs periodically from phone
   'utility': 0,         // Utility plugins run on-demand, always fresh
 };
 

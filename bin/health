@@ -1,0 +1,329 @@
+#!/usr/bin/env node
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+import { execSync } from 'child_process';
+
+// Metric display configuration
+const METRIC_DISPLAY = {
+  step_count: { emoji: '👟', label: 'Steps', format: v => Math.round(v).toLocaleString() },
+  distance_walking_running: { emoji: '🚶', label: 'Distance', format: v => `${v.toFixed(2)} mi` },
+  active_energy: { emoji: '🔥', label: 'Active Cal', format: v => `${Math.round(v)} kcal` },
+  apple_exercise_time: { emoji: '⏱️', label: 'Exercise', format: v => `${Math.round(v)} min` },
+  flights_climbed: { emoji: '🪜', label: 'Flights', format: v => Math.round(v) },
+  weight_body_mass: { emoji: '⚖️', label: 'Weight', format: v => `${v.toFixed(1)} lbs` },
+  heart_rate: { emoji: '❤️', label: 'Heart Rate', format: v => `${Math.round(v)} bpm` },
+  resting_heart_rate: { emoji: '💓', label: 'Resting HR', format: v => `${Math.round(v)} bpm` },
+  heart_rate_variability_sdnn: { emoji: '📈', label: 'HRV', format: v => `${Math.round(v)} ms` },
+  sleep_analysis: { emoji: '😴', label: 'Sleep', format: v => `${v.toFixed(1)} hrs` },
+  dietary_water: { emoji: '💧', label: 'Water', format: v => `${v.toFixed(1)} L` },
+  dietary_caffeine: { emoji: '☕', label: 'Caffeine', format: v => `${Math.round(v)} mg` },
+  alcohol_consumption: { emoji: '🍷', label: 'Alcohol', format: v => `${v.toFixed(1)} drinks` },
+  respiratory_rate: { emoji: '🌬️', label: 'Resp Rate', format: v => `${v.toFixed(1)} /min` },
+  blood_oxygen_saturation: { emoji: '🩸', label: 'SpO2', format: v => `${(v * 100).toFixed(0)}%` },
+};
+
+// Key metrics to show in "today" summary
+const KEY_METRICS = [
+  'step_count',
+  'active_energy',
+  'apple_exercise_time',
+  'sleep_analysis',
+  'weight_body_mass',
+  'resting_heart_rate',
+  'heart_rate_variability_sdnn',
+];
+
+program
+  .name('health')
+  .description('Health metrics for Today system');
+
+// Sync command
+program
+  .command('sync')
+  .description('Sync health data from all enabled health plugins')
+  .action(async () => {
+    console.log(colors.blue('ℹ') + ' Syncing health plugins to database...');
+
+    try {
+      const result = execSync('bin/plugins sync --type health', { encoding: 'utf8' });
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
+    } catch (error) {
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(colors.yellow('⚠') + ' No health plugins are enabled.');
+        console.log('');
+        console.log('To sync health data, configure a plugin:');
+        console.log('');
+        console.log('  ' + colors.cyan('bin/plugins configure'));
+      } else {
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
+    }
+  });
+
+// Today command - show today's key health metrics
+program
+  .command('today')
+  .description('Show today\'s key health metrics')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'health');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT metric_name, value, units, metadata
+      FROM health_metrics
+      WHERE date = ?
+    `;
+    const params = [today];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    const metrics = db.prepare(sql).all(...params);
+
+    if (metrics.length === 0) {
+      console.log(colors.blue('ℹ') + ' No health data for today');
+      console.log(getSyncStatusMessage(db, 'health'));
+      return;
+    }
+
+    // Build a map of metrics
+    const metricMap = {};
+    for (const m of metrics) {
+      metricMap[m.metric_name] = m;
+    }
+
+    console.log('');
+    console.log(colors.cyan('Today\'s Health') + ` (${today})`);
+    console.log('');
+
+    // Show key metrics first
+    for (const name of KEY_METRICS) {
+      const m = metricMap[name];
+      if (m) {
+        const display = METRIC_DISPLAY[name] || { emoji: '📊', label: name, format: v => v };
+        console.log(`  ${display.emoji} ${display.label}: ${display.format(m.value)}`);
+      }
+    }
+
+    // Count other metrics
+    const otherCount = metrics.length - KEY_METRICS.filter(k => metricMap[k]).length;
+    if (otherCount > 0) {
+      console.log('');
+      console.log(colors.gray(`  + ${otherCount} other metrics (run 'bin/health list' to see all)`));
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'health'));
+  });
+
+// List command - show all available metrics
+program
+  .command('list')
+  .description('List all available health metrics')
+  .option('-d, --date <date>', 'Show metrics for specific date (YYYY-MM-DD)')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'health');
+
+    const date = options.date || getTodayDate();
+
+    let sql = `
+      SELECT metric_name, value, units
+      FROM health_metrics
+      WHERE date = ?
+    `;
+    const params = [date];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY metric_name`;
+
+    const metrics = db.prepare(sql).all(...params);
+
+    if (metrics.length === 0) {
+      console.log(colors.blue('ℹ') + ` No health data for ${date}`);
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan(`Health Metrics`) + ` (${date})`);
+    console.log('');
+
+    for (const m of metrics) {
+      const display = METRIC_DISPLAY[m.metric_name] || { emoji: '📊', label: m.metric_name, format: v => v };
+      const value = display.format(m.value);
+      const unit = m.units && !display.format(m.value).includes(m.units) ? ` ${m.units}` : '';
+      console.log(`  ${display.emoji} ${display.label}: ${value}${unit}`);
+    }
+
+    console.log('');
+    console.log(colors.gray(`${metrics.length} metrics`));
+    console.log(getSyncStatusMessage(db, 'health'));
+  });
+
+// Metric command - show history for a specific metric
+program
+  .command('metric <name>')
+  .description('Show history for a specific metric')
+  .option('-d, --days <days>', 'Number of days to show', parseInt, 14)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (metricName, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'health');
+
+    let sql = `
+      SELECT date, value, units, metadata
+      FROM health_metrics
+      WHERE metric_name LIKE ?
+    `;
+    const params = [`%${metricName}%`];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY date DESC LIMIT ?`;
+    params.push(options.days);
+
+    const entries = db.prepare(sql).all(...params);
+
+    if (entries.length === 0) {
+      console.log(colors.blue('ℹ') + ` No data found for metric "${metricName}"`);
+      console.log('');
+      console.log('Available metrics:');
+      const available = db.prepare(`
+        SELECT DISTINCT metric_name FROM health_metrics ORDER BY metric_name
+      `).all();
+      for (const m of available.slice(0, 10)) {
+        console.log(`  - ${m.metric_name}`);
+      }
+      if (available.length > 10) {
+        console.log(`  ... and ${available.length - 10} more`);
+      }
+      return;
+    }
+
+    // Get the actual metric name from first entry
+    const actualName = db.prepare(`
+      SELECT metric_name FROM health_metrics WHERE metric_name LIKE ? LIMIT 1
+    `).get(`%${metricName}%`)?.metric_name || metricName;
+
+    const display = METRIC_DISPLAY[actualName] || { emoji: '📊', label: actualName, format: v => v };
+
+    console.log('');
+    console.log(`${display.emoji} ${colors.cyan(display.label)}`);
+    console.log('');
+
+    for (const e of entries) {
+      const value = display.format(e.value);
+      console.log(`  ${e.date}  ${value}`);
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'health'));
+  });
+
+// Summary command - show weekly/monthly summary
+program
+  .command('summary')
+  .description('Show health summary for the past week')
+  .option('-d, --days <days>', 'Number of days to summarize', parseInt, 7)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'health');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT metric_name,
+             AVG(value) as avg_value,
+             MIN(value) as min_value,
+             MAX(value) as max_value,
+             COUNT(*) as count
+      FROM health_metrics
+      WHERE date > DATE(?, '-' || ? || ' days')
+    `;
+    const params = [today, options.days];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` GROUP BY metric_name ORDER BY metric_name`;
+
+    const summaries = db.prepare(sql).all(...params);
+
+    if (summaries.length === 0) {
+      console.log(colors.blue('ℹ') + ` No health data for the past ${options.days} days`);
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan(`${options.days}-Day Health Summary`));
+    console.log('');
+
+    // Show key metrics with avg/min/max
+    for (const name of KEY_METRICS) {
+      const s = summaries.find(x => x.metric_name === name);
+      if (s) {
+        const display = METRIC_DISPLAY[name] || { emoji: '📊', label: name, format: v => v.toFixed(1) };
+        console.log(`  ${display.emoji} ${display.label}:`);
+        console.log(`     avg: ${display.format(s.avg_value)}  min: ${display.format(s.min_value)}  max: ${display.format(s.max_value)}`);
+      }
+    }
+
+    console.log('');
+    console.log(colors.gray(`${summaries.length} metrics tracked`));
+    console.log(getSyncStatusMessage(db, 'health'));
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const db = getDatabase();
+  ensureSyncForType(db, 'health');
+
+  const sql = `
+    SELECT metric_name, value, units
+    FROM health_metrics
+    WHERE date = ?
+    ORDER BY metric_name
+  `;
+
+  const metrics = db.prepare(sql).all(targetDate);
+
+  if (metrics.length === 0) {
+    console.log(`No health data for ${targetDate}`);
+  } else {
+    // Show key metrics only for historical view
+    for (const name of KEY_METRICS) {
+      const m = metrics.find(x => x.metric_name === name);
+      if (m) {
+        const display = METRIC_DISPLAY[name] || { emoji: '📊', label: name, format: v => v };
+        console.log(`${display.emoji} ${display.label}: ${display.format(m.value)}`);
+      }
+    }
+  }
+  process.exit(0);
+}
+
+program.parse();
