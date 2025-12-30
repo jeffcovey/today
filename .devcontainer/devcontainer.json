@@ -8,10 +8,6 @@
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/sshd:1": {
 			"version": "latest"
-		},
-		"ghcr.io/tailscale/codespace/tailscale:1": {
-			"version": "latest",
-			"authkey": "${localEnv:TAILSCALE_AUTHKEY}"
 		}
 	},
 	"customizations": {

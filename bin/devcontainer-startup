@@ -15,58 +15,21 @@ fi
 if [ -f "bin/setup" ]; then
     echo "Setting up SSH..."
     bash bin/setup --ssh || echo "SSH setup failed, continuing..."
-
-    echo "Setting up Tailscale hostname..."
-    bash bin/setup --tailscale-hostname || echo "Tailscale hostname setup failed, continuing..."
 fi
 
 # Check vault mount status
 if [ -d "/workspaces/today/vault" ]; then
     if [ -n "$(ls -A /workspaces/today/vault 2>/dev/null)" ]; then
         echo "✅ Vault mounted from host ($(ls /workspaces/today/vault | wc -l) items)"
-        echo "   Using host's iCloud vault - no sync needed in container"
     else
         echo "⚠️  Vault directory exists but appears empty"
-        echo "   Check if iCloud vault exists at: ~/Library/Mobile Documents/com~apple~CloudDocs/today-vault"
+        echo "   Configure mounts in .devcontainer/mounts.local"
     fi
 else
-    echo "❌ Vault not mounted - mount failed or iCloud vault doesn't exist"
-    echo "   Expected location: ~/Library/Mobile Documents/com~apple~CloudDocs/today-vault"
-    echo "   Creating empty vault directory..."
+    echo "ℹ️  No vault mounted - creating empty vault directory"
     mkdir -p /workspaces/today/vault
 fi
 
-# Skip Resilio Sync in container since we're using mounted vault
-echo "ℹ️  Skipping Resilio Sync in container - using mounted iCloud vault"
-
-# Note: code-server is not started automatically
-# Run 'bin/start-code-server' manually when needed for remote access
-
-# Create a summary file for easy access
-mkdir -p ~/.config/devcontainer
-cat > ~/.config/devcontainer/access-info.txt <<EOF
-=== DevContainer Access Information ===
-Generated: $(date)
-Project: $(basename "$(pwd)")
-
-SSH Access:
-  Port: 2222
-  Command: ssh -p 2222 user@<container-ip>
-
-Code Server Access:
-  Port: 8081
-  Tailscale IP: $(tailscale ip -4 2>/dev/null || echo "Not available")
-  URL: http://$(tailscale ip -4 2>/dev/null || echo "localhost"):8081
-
-To view this information again:
-  cat ~/.config/devcontainer/access-info.txt
-
-To restart code-server:
-  bin/start-code-server
-EOF
-
-echo ""
-echo "=== Access Information ==="
-cat ~/.config/devcontainer/access-info.txt
 echo ""
 echo "DevContainer startup complete!"
+echo "Run 'bin/today' to start an interactive session."

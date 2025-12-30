@@ -59,8 +59,6 @@ Unified setup script for development environment configurations
 Options:
     --config            Setup config.toml from example template
     --ssh               Setup SSH server for remote access
-    --tailscale         Setup Tailscale VPN for secure connectivity
-    --tailscale-hostname Configure Tailscale hostname
     --dotenvx           Setup dotenvx for encrypted environment sync
     --calendar          Setup calendar integrations (Google & iCloud)
     --all               Run all setup tasks
@@ -68,7 +66,6 @@ Options:
 
 Examples:
     setup --ssh          # Setup SSH server only
-    setup --tailscale    # Setup Tailscale only
     setup --dotenvx      # Setup encrypted env sync
     setup --calendar     # Setup calendar integrations
     setup --all          # Run all setups
@@ -131,58 +128,6 @@ EOF
     echo "   Port 2222"
     echo "   User node"
     echo ""
-}
-
-# Tailscale Setup Function
-setup_tailscale() {
-    print_status "Setting up Tailscale for remote access..."
-    echo ""
-    
-    # Check if Tailscale is installed
-    if ! command -v tailscale &> /dev/null; then
-        print_error "❌ Tailscale is not installed!"
-        echo "Please rebuild the devcontainer to install Tailscale."
-        return 1
-    fi
-    
-    # Check Tailscale status
-    STATUS=$(tailscale status --json 2>/dev/null || echo "{}")
-    
-    if echo "$STATUS" | grep -q '"BackendState":"Running"'; then
-        print_status "✅ Tailscale is already running!"
-        
-        # Get the Tailscale IP
-        TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "Not available")
-        HOSTNAME=$(hostname)
-        
-        echo ""
-        echo "📱 Connection Information:"
-        echo "=========================="
-        echo "Tailscale IP: $TAILSCALE_IP"
-        echo "Hostname: $HOSTNAME"
-        echo ""
-        echo "SSH Access: ssh node@$TAILSCALE_IP -p 2222"
-        echo ""
-    else
-        print_warning "⚠️  Tailscale needs authentication"
-        echo ""
-        
-        # Check for authkey
-        if [ -n "$TAILSCALE_AUTHKEY" ]; then
-            echo "Using provided auth key..."
-            sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --ssh
-        else
-            echo "To set up Tailscale, you have two options:"
-            echo ""
-            echo "Option 1: Interactive Login (Recommended for first time)"
-            echo "  Run: sudo tailscale up --ssh"
-            echo "  This will provide a URL to authenticate"
-            echo ""
-            echo "Option 2: Auth Key (For automated setup)"
-            echo "  Set TAILSCALE_AUTHKEY environment variable"
-            echo "  Then run this setup again"
-        fi
-    fi
 }
 
 # Dotenvx Setup Function
@@ -263,58 +208,6 @@ setup_dotenvx() {
         fi
     else
         print_error "❌ Encryption failed"
-        return 1
-    fi
-}
-
-# Tailscale Hostname Setup Function
-setup_tailscale_hostname() {
-    print_status "Configuring Tailscale hostname..."
-    
-    # Get project and host information
-    PROJECT_NAME=$(basename "$(pwd)")
-    HOST_MACHINE=$(hostname -s 2>/dev/null || hostname)
-    PARENT_HOST="${DEVCONTAINER_HOST_MACHINE:-unknown}"
-    
-    # Create a meaningful hostname
-    TAILSCALE_HOSTNAME="${PROJECT_NAME}-${PARENT_HOST}"
-    # Sanitize: lowercase, replace invalid chars with hyphens
-    TAILSCALE_HOSTNAME=$(echo "$TAILSCALE_HOSTNAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
-    # Truncate to 63 chars if needed
-    TAILSCALE_HOSTNAME=${TAILSCALE_HOSTNAME:0:63}
-    
-    echo "Setting Tailscale hostname to: $TAILSCALE_HOSTNAME"
-    
-    # Wait for Tailscale to be ready
-    echo "Waiting for Tailscale..."
-    for i in {1..30}; do
-        if tailscale status &>/dev/null; then
-            break
-        fi
-        sleep 1
-    done
-    
-    # Set the hostname if Tailscale is available
-    if command -v tailscale &> /dev/null && tailscale status &>/dev/null; then
-        echo "Tailscale is ready, attempting to set hostname..."
-        
-        # Get current status
-        CURRENT_HOSTNAME=$(tailscale status --json | jq -r '.Self.HostName' 2>/dev/null || echo "")
-        echo "Current hostname: $CURRENT_HOSTNAME"
-        echo "Desired hostname: $TAILSCALE_HOSTNAME"
-        
-        # Save the configuration for reference
-        mkdir -p ~/.config/tailscale
-        cat > ~/.config/tailscale/hostname.conf <<EOF
-PROJECT_NAME=$PROJECT_NAME
-PARENT_HOST=$PARENT_HOST
-DESIRED_HOSTNAME=$TAILSCALE_HOSTNAME
-TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
-EOF
-        
-        print_status "✅ Tailscale hostname configuration saved"
-    else
-        print_error "❌ Tailscale is not running"
         return 1
     fi
 }
@@ -506,12 +399,6 @@ case "$1" in
     --ssh)
         setup_ssh
         ;;
-    --tailscale)
-        setup_tailscale
-        ;;
-    --tailscale-hostname)
-        setup_tailscale_hostname
-        ;;
     --dotenvx)
         setup_dotenvx
         ;;
@@ -527,10 +414,6 @@ case "$1" in
         setup_config
         echo ""
         setup_ssh
-        echo ""
-        setup_tailscale
-        echo ""
-        setup_tailscale_hostname
         echo ""
         setup_dotenvx
         echo ""
