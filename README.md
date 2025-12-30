@@ -125,10 +125,6 @@ You can manage your plugins with `bin/today configure` (which just calls out to 
 
 ---
 
-<p align="center">
-  <img src="docs/images/daily-plan-example.png" alt="Daily Plan Example" width="500">
-</p>
-
 ## Features
 
 - **AI-Powered Daily Reviews** - Claude-assisted morning reviews that synthesize calendar events, tasks, emails, and time tracking into actionable daily plans
