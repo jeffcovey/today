@@ -21,7 +21,7 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install && chmod +x bin/* && npx dotenvx run -- .devcontainer/setup-ssh-keys.sh",
+	"postCreateCommand": "npm install && chmod +x bin/* && npx dotenvx run --overload -- .devcontainer/setup-ssh-keys.sh",
 	"postStartCommand": "bash bin/devcontainer-startup",
 	"containerEnv": {
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
@@ -30,13 +30,7 @@
 	"remoteEnv": {
 		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
 	},
-	"mounts": [
-		{
-			"source": "${localEnv:HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/vault",
-			"target": "/workspaces/today/vault",
-			"type": "bind"
-		}
-	],
+	"mounts": [],
 	"forwardPorts": [
 		2222,
 		8081

@@ -450,11 +450,7 @@ The scheduler (`src/scheduler.js`) automates daily operations:
 
 ### Running the Scheduler
 
-**Option 1: DigitalOcean Droplet** (recommended for always-on)
-
-See [DigitalOcean Deployment](docs/DIGITALOCEAN.md) for full instructions.
-
-**Option 2: Run Locally**
+**Option 1: Run Locally**
 
 ```bash
 # Run scheduler in foreground
@@ -466,7 +462,7 @@ pm2 start src/scheduler.js --name today-scheduler
 pm2 save
 ```
 
-**Option 3: System cron** (manual setup)
+**Option 2: System cron** (manual setup)
 
 ```bash
 # Edit crontab
@@ -523,7 +519,6 @@ npm run lint:md:fix            # Auto-fix markdown issues
 ## Documentation
 
 - [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
-- [DigitalOcean Deployment](docs/DIGITALOCEAN.md) - Deploy to a DigitalOcean droplet
 - [Vault README](skeleton/README.md) - Detailed vault documentation
 
 ## License

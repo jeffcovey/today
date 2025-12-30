@@ -1,5 +1,5 @@
 // Single source of truth for tag to emoji mappings
-// Used by both web-server.js and task-manager.js
+// Used by task-manager.js
 
 const tagToEmoji = {
   // Stages

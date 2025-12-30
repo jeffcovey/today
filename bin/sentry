@@ -28,7 +28,7 @@ class SentryClient
 
   def initialize(auth_token = nil)
     @auth_token = auth_token || ENV.fetch("SENTRY_AUTH_TOKEN", nil)
-    @organization = ENV.fetch("SENTRY_ORG", "oldergaymen")  # Note: no hyphen in the org slug
+    @organization = ENV.fetch("SENTRY_ORG")
     @project = ENV.fetch("SENTRY_PROJECT", "rails")
 
     if @auth_token.nil? || @auth_token.empty?
