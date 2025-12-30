@@ -791,7 +791,7 @@ Common metrics include steps, heart rate, weight, sleep, HRV, and more.
 
 Use this data to understand the user's physical health, activity patterns,
 and sleep quality. Look for trends over time rather than single data points.`,
-      defaultCommand: 'bin/health today',
+      defaultCommand: 'bin/health summary ; bin/health today',
       dateCommand: 'bin/health --date $DATE',
       queryInstructions: `Commands: bin/health today, bin/health metric <name>, bin/health list, bin/health summary
 SQL: SELECT metric_name, value, units, date FROM health_metrics WHERE date = DATE('now', 'localtime') ORDER BY metric_name
