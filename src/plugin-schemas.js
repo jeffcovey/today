@@ -858,6 +858,8 @@ Common metric names:
     indexes: ['source', 'date', 'metric_name']
   },
 
+  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
+
   'utility': {
     // Utility plugins perform maintenance tasks and don't store data
     // They have no AI context (ai: null) because there's nothing to query
@@ -866,9 +868,6 @@ Common metric names:
     ai: null, // No AI context - utility plugins are silent background tasks
     fields: {}
   }
-
-  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
-
 };
 
 /**
