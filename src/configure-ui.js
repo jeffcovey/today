@@ -70,6 +70,7 @@ const CONFIG_SECTIONS = [
       { key: 'vocation', label: 'Vocation/Role', path: ['profile', 'vocation'], default: '' },
       { key: 'wake_time', label: 'Wake Time (HH:MM)', path: ['profile', 'wake_time'], default: '06:00' },
       { key: 'bed_time', label: 'Bed Time (HH:MM)', path: ['profile', 'bed_time'], default: '22:00' },
+      { key: 'birthdate', label: 'Birthdate (YYYY-MM-DD)', path: ['profile', 'birthdate'], default: '' },
     ]
   },
   {

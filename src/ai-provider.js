@@ -39,8 +39,11 @@ let ollamaProvider = null;
  */
 async function getAnthropicModel(modelName) {
   if (!anthropicProvider) {
-    const { anthropic } = await import('@ai-sdk/anthropic');
-    anthropicProvider = anthropic;
+    const { createAnthropic } = await import('@ai-sdk/anthropic');
+    // Support both ANTHROPIC_API_KEY and TODAY_ANTHROPIC_KEY
+    anthropicProvider = createAnthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY || process.env.TODAY_ANTHROPIC_KEY,
+    });
   }
   return anthropicProvider(modelName);
 }

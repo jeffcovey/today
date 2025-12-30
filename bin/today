@@ -682,6 +682,7 @@ async function runInteractiveSession(directRequest = null, nonInteractive = fals
   if (profile.vocation) profileLines.push(`- **Vocation**: ${profile.vocation}`);
   if (profile.wake_time) profileLines.push(`- **Wake time**: ${profile.wake_time}`);
   if (profile.bed_time) profileLines.push(`- **Bed time**: ${profile.bed_time}`);
+  if (profile.birthdate) profileLines.push(`- **Birthdate**: ${profile.birthdate}`);
 
   // Build the context section (user info and data sources)
   const timeInfo = targetDate
