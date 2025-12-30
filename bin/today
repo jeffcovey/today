@@ -23,6 +23,7 @@ import { execSync, spawnSync } from 'child_process';
 
 // Import shared modules
 import { getTimezone, getFullConfig } from '../src/config.js';
+import { getInteractiveModel, getInteractiveProviderName } from '../src/ai-provider.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import color from 'picocolors';
 import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
@@ -753,20 +754,31 @@ ${contextSection}`;
   }
 
   // Actually run the AI session
+  const interactiveProvider = getInteractiveProviderName();
+  const model = getInteractiveModel();
+
+  // Check provider - currently only Claude Code CLI is supported
+  if (interactiveProvider !== 'anthropic') {
+    console.error(`Error: Interactive sessions only support 'anthropic' provider currently.`);
+    console.error(`Your config has: interactive_provider = "${interactiveProvider}"`);
+    console.error(`Please set interactive_provider = "anthropic" in config.toml`);
+    process.exit(1);
+  }
+
   if (directRequest && nonInteractive) {
     console.log('🤖 Running in non-interactive mode...');
     try {
-      spawnSync('timeout', ['600', 'claude', '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
+      spawnSync('timeout', ['600', 'claude', '--model', model, '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
     } catch (e) {
       console.error(`ERROR: Command timed out or failed after 10 minutes: ${e.message}`);
       process.exit(1);
     }
   } else if (directRequest) {
     console.log('🤖 Starting session...');
-    spawnSync('claude', [prompt], { stdio: 'inherit' });
+    spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
   } else {
     console.log('🤖 Starting daily review...');
-    spawnSync('claude', [prompt], { stdio: 'inherit' });
+    spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
   }
 
   // Session end summary

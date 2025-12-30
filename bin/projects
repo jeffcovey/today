@@ -126,7 +126,8 @@ program
   .command('list', { isDefault: true })
   .description('List projects from database')
   .option('-a, --all', 'Include completed and archived projects')
-  .option('-s, --status <status>', 'Filter by status (planning, active, on_hold, completed, archived)')
+  .option('-s, --source <source>', 'Filter by source (e.g., github-projects/ogm)')
+  .option('--status <status>', 'Filter by status (planning, active, on_hold, completed, archived)')
   .option('-t, --topic <topic>', 'Filter by topic')
   .option('-p, --priority <priority>', 'Filter by priority')
   .option('--review', 'Show only projects with review tracking')
@@ -140,6 +141,11 @@ program
     // Default: exclude completed and archived
     if (!options.all && !options.status) {
       conditions.push("status NOT IN ('completed', 'archived')");
+    }
+
+    if (options.source) {
+      conditions.push('source = ?');
+      params.push(options.source);
     }
 
     if (options.status) {

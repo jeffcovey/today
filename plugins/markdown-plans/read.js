@@ -22,6 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
+import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
@@ -280,15 +281,101 @@ function ensureDailyPlan(planInfo, date) {
 }
 
 /**
- * Get all plan files sorted chronologically by filename
- * Filenames are designed to sort chronologically (YYYY_Q#_MM_W##_DD.md)
+ * Extract date components from plan filename for sorting
+ * Pattern: YYYY_Q#_MM_W##_DD.md → { year, month, day }
+ * Week plans end in _00.md
+ */
+function parsePlanFilename(filename) {
+  // Daily plan: 2025_Q4_12_W01_29.md
+  const dailyMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W\d+_(\d{2})\.md$/);
+  if (dailyMatch) {
+    return {
+      year: parseInt(dailyMatch[1], 10),
+      month: parseInt(dailyMatch[2], 10),
+      day: parseInt(dailyMatch[3], 10),
+      isDaily: true,
+    };
+  }
+
+  // Week plan: 2025_Q4_12_W01_00.md
+  const weekMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W(\d+)_00\.md$/);
+  if (weekMatch) {
+    return {
+      year: parseInt(weekMatch[1], 10),
+      month: parseInt(weekMatch[2], 10),
+      week: parseInt(weekMatch[3], 10),
+      day: 0,
+      isWeekly: true,
+    };
+  }
+
+  // Month plan: 2025_Q4_12_00.md
+  const monthMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_00\.md$/);
+  if (monthMatch) {
+    return {
+      year: parseInt(monthMatch[1], 10),
+      month: parseInt(monthMatch[2], 10),
+      day: 0,
+      isMonthly: true,
+    };
+  }
+
+  // Quarter plan: 2025_Q4_00.md
+  const quarterMatch = filename.match(/^(\d{4})_Q(\d+)_00\.md$/);
+  if (quarterMatch) {
+    return {
+      year: parseInt(quarterMatch[1], 10),
+      quarter: parseInt(quarterMatch[2], 10),
+      month: 0,
+      day: 0,
+      isQuarterly: true,
+    };
+  }
+
+  // Year plan: 2025_00.md
+  const yearMatch = filename.match(/^(\d{4})_00\.md$/);
+  if (yearMatch) {
+    return {
+      year: parseInt(yearMatch[1], 10),
+      month: 0,
+      day: 0,
+      isYearly: true,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Get all plan files sorted chronologically by actual date
+ * Sorts by year, month, day to handle ISO week boundary issues
  */
 function getSortedPlanFiles() {
   if (!fs.existsSync(plansDir)) return [];
 
   const files = fs.readdirSync(plansDir)
-    .filter(f => f.endsWith('.md') && /^\d{4}_/.test(f))
-    .sort();
+    .filter(f => f.endsWith('.md') && /^\d{4}_/.test(f));
+
+  // Sort by actual date components, not alphabetically
+  files.sort((a, b) => {
+    const parsedA = parsePlanFilename(a);
+    const parsedB = parsePlanFilename(b);
+
+    // If we can't parse, fall back to alphabetical
+    if (!parsedA || !parsedB) return a.localeCompare(b);
+
+    // Sort by year first
+    if (parsedA.year !== parsedB.year) return parsedA.year - parsedB.year;
+
+    // Then by month (0 for yearly/quarterly plans goes first)
+    if (parsedA.month !== parsedB.month) return parsedA.month - parsedB.month;
+
+    // Then by day (0 for monthly/weekly plans goes first)
+    if (parsedA.day !== parsedB.day) return parsedA.day - parsedB.day;
+
+    // Fall back to alphabetical for same date
+    return a.localeCompare(b);
+  });
 
   return files;
 }
@@ -388,15 +475,8 @@ function addNavigationToAllFiles() {
  * Uses bin/today dry-run --date to get the full context for that date
  */
 async function generateDailySummary(dateStr, planFilePath) {
-  // Get API key
-  let apiKey = '';
-  try {
-    apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-
-  if (!apiKey || apiKey.includes('not set') || apiKey === '') {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
     return null;
   }
 
@@ -453,25 +533,13 @@ ${planContent ? `\n${planContent}` : ''}
 
 Write ONLY the 2-3 sentence summary for ${dateStr}, nothing else:`;
 
-  // Get model from config (use haiku for summaries - fast and cheap)
-  let model = 'claude-haiku-4-5-20251001';
+  // Call AI provider
   try {
-    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (configModel) model = configModel;
-  } catch { /* use default */ }
-  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
-
-  // Call API
-  try {
-    const tempPromptFile = `/tmp/summary-prompt-${Date.now()}.txt`;
-    fs.writeFileSync(tempPromptFile, prompt);
-
-    const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 300, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
-      { encoding: 'utf8', timeout: 30000 }
-    );
-
-    fs.unlinkSync(tempPromptFile);
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 300,
+      temperature: 0.7,
+    });
     return response.trim();
   } catch (error) {
     return null;
@@ -927,15 +995,8 @@ function needsPriorities(filePath) {
  * Generate AI suggestions for tomorrow's plan
  */
 async function generateTomorrowSuggestions(tomorrowStr, planFilePath) {
-  // Get API key
-  let apiKey = '';
-  try {
-    apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-
-  if (!apiKey || apiKey.includes('not set') || apiKey === '') {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
     return null;
   }
 
@@ -1002,25 +1063,13 @@ PRIORITIES:
 
 Keep it concise and actionable. Tasks should be specific and achievable.`;
 
-  // Get model from config
-  let model = 'claude-haiku-4-5-20251001';
+  // Call AI provider
   try {
-    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (configModel) model = configModel;
-  } catch { /* use default */ }
-  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
-
-  // Call API
-  try {
-    const tempPromptFile = `/tmp/tomorrow-prompt-${Date.now()}.txt`;
-    fs.writeFileSync(tempPromptFile, prompt);
-
-    const response = execSync(
-      `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 500, temperature: 0.7, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
-      { encoding: 'utf8', timeout: 30000 }
-    );
-
-    fs.unlinkSync(tempPromptFile);
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 500,
+      temperature: 0.7,
+    });
 
     // Parse response
     const focusMatch = response.match(/FOCUS:\s*(.+?)(?:\n|$)/);

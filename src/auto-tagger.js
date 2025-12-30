@@ -8,25 +8,12 @@
 // 4. Call plugin's update command to modify entries
 // 5. Failures are logged but never block sync
 
-import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { getFullConfig } from './config.js';
+import { createCompletion, isAIAvailable } from './ai-provider.js';
 
-/**
- * Check if Anthropic API is available via environment variable
- */
-function isAIAvailable() {
-  try {
-    const apiKey = execSync('npx dotenvx get TODAY_ANTHROPIC_KEY 2>/dev/null || npx dotenvx get ANTHROPIC_API_KEY 2>/dev/null', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    }).trim();
-    return apiKey.length > 0;
-  } catch {
-    return false;
-  }
-}
+// isAIAvailable is now imported from ai-provider.js
 
 /**
  * Get configured topics from config.toml [tags] section
@@ -115,19 +102,11 @@ function getUntaggedEntries(db, tableName, field, sourceId) {
  * @param {Array} entries - Entries to tag
  * @param {string[]} availableTopics - Topics to choose from
  * @param {string} field - Field name containing text
- * @returns {Map<string, string>} - Map of entry ID to suggested topic
+ * @returns {Promise<Map<string, string>>} - Map of entry ID to suggested topic
  */
-function suggestTopics(entries, availableTopics, field) {
+async function suggestTopics(entries, availableTopics, field) {
   const suggestions = new Map();
   const BATCH_SIZE = 30;
-
-  // Get model from config or use default
-  let model = 'claude-haiku-4-5-20251001';
-  try {
-    const configModel = execSync('bin/get-config ai.claude_model 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (configModel) model = configModel;
-  } catch { /* use default */ }
-  if (process.env.CLAUDE_MODEL) model = process.env.CLAUDE_MODEL;
 
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, Math.min(i + BATCH_SIZE, entries.length));
@@ -148,16 +127,12 @@ Entries:
 ${JSON.stringify(batch.map((e, idx) => ({ index: idx, text: e[field] })), null, 2)}`;
 
     try {
-      // Use Anthropic API directly instead of claude CLI to avoid cluttering history
-      const tempPromptFile = `/tmp/auto-tagger-prompt-${Date.now()}.txt`;
-      fs.writeFileSync(tempPromptFile, prompt);
-
-      const result = execSync(
-        `npx dotenvx run --quiet -- node -e "const Anthropic = require('@anthropic-ai/sdk'); const fs = require('fs'); const client = new Anthropic({ apiKey: process.env.TODAY_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY }); (async () => { const prompt = fs.readFileSync('${tempPromptFile}', 'utf-8'); const response = await client.messages.create({ model: '${model}', max_tokens: 1000, temperature: 0, messages: [{ role: 'user', content: prompt }] }); console.log(response.content[0].text.trim()); })();"`,
-        { encoding: 'utf8', timeout: 60000 }
-      );
-
-      fs.unlinkSync(tempPromptFile);
+      // Use the AI provider abstraction
+      const result = await createCompletion({
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 1000,
+        temperature: 0,
+      });
 
       const jsonMatch = result.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
@@ -205,8 +180,8 @@ export async function runAutoTagger(options) {
   }
 
   // Check if AI is available
-  if (!isAIAvailable()) {
-    console.warn('Warning: Anthropic API key not found - skipping auto-tagging');
+  if (!(await isAIAvailable())) {
+    console.warn('Warning: AI provider not available - skipping auto-tagging');
     return result;
   }
 
@@ -224,7 +199,7 @@ export async function runAutoTagger(options) {
   }
 
   // Get AI suggestions
-  const suggestions = suggestTopics(untaggedEntries, availableTopics, taggableField);
+  const suggestions = await suggestTopics(untaggedEntries, availableTopics, taggableField);
   if (suggestions.size === 0) {
     result.skipped = untaggedEntries.length;
     return result;

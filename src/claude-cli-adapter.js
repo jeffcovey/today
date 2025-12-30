@@ -3,24 +3,14 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import Anthropic from '@anthropic-ai/sdk';
 import { colors } from './cli-utils.js';
+import { createCompletion, isAIAvailable } from './ai-provider.js';
 
 const execAsync = promisify(exec);
 
 export class ClaudeCLIAdapter {
   constructor() {
     this.tempDir = path.join(os.tmpdir(), 'claude-email');
-    // Try to create an API client as fallback
-    this.fallbackClient = null;
-    const apiKey = process.env.TODAY_ANTHROPIC_KEY;
-    if (apiKey) {
-      try {
-        this.fallbackClient = new Anthropic({ apiKey });
-      } catch (e) {
-        // API client creation failed, will use CLI only
-      }
-    }
     this.cliTimeout = 30000; // 30 seconds default
   }
 
@@ -33,43 +23,27 @@ export class ClaudeCLIAdapter {
   }
 
   async askClaude(systemPrompt, userQuery, options = {}) {
-    // Try CLI first
+    // Try provider abstraction first (supports multiple AI backends)
+    if (await isAIAvailable()) {
+      try {
+        return await createCompletion({
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userQuery }],
+          maxTokens: options.maxTokens || 1000,
+          temperature: options.temperature || 0,
+        });
+      } catch (apiError) {
+        console.log(colors.yellow('AI provider failed, attempting CLI fallback...'));
+      }
+    }
+
+    // Fall back to CLI
     try {
       return await this.askClaudeCLI(systemPrompt, userQuery, options);
     } catch (cliError) {
-      console.log(colors.yellow('Claude CLI failed, attempting API fallback...'));
-
-      // Try API fallback if available
-      if (this.fallbackClient) {
-        try {
-          return await this.askClaudeAPI(systemPrompt, userQuery, options);
-        } catch (apiError) {
-          console.error(colors.red('Both Claude CLI and API failed'));
-          throw new Error(`Claude access failed: CLI: ${cliError.message}, API: ${apiError.message}`);
-        }
-      }
-
-      // No fallback available
-      throw cliError;
+      console.error(colors.red('All AI methods failed'));
+      throw new Error(`AI access failed: ${cliError.message}`);
     }
-  }
-
-  async askClaudeAPI(systemPrompt, userQuery, options = {}) {
-    if (!this.fallbackClient) {
-      throw new Error('No API client available');
-    }
-
-    const response = await this.fallbackClient.messages.create({
-      model: options.model || 'claude-3-haiku-20240307',
-      max_tokens: options.maxTokens || 1000,
-      temperature: options.temperature || 0,
-      system: systemPrompt,
-      messages: [
-        { role: 'user', content: userQuery }
-      ]
-    });
-
-    return response.content[0].text;
   }
 
   async askClaudeCLI(systemPrompt, userQuery, options = {}) {
@@ -93,7 +67,7 @@ Please provide a concise, direct response.`;
       let timeout;
 
       // Set a timeout (use shorter timeout if we have API fallback)
-      const timeoutDuration = this.fallbackClient ? 15000 : this.cliTimeout;
+      const timeoutDuration = this.cliTimeout;
       timeout = setTimeout(() => {
         claude.kill('SIGTERM');
         reject(new Error(`Claude CLI timed out after ${timeoutDuration / 1000} seconds`));
