@@ -11,12 +11,6 @@ if [ -f ".devcontainer/setup-mounts.sh" ]; then
     bash .devcontainer/setup-mounts.sh
 fi
 
-# Run setup scripts using unified setup command
-if [ -f "bin/setup" ]; then
-    echo "Setting up SSH..."
-    bash bin/setup --ssh || echo "SSH setup failed, continuing..."
-fi
-
 # Check vault mount status
 if [ -d "/workspaces/today/vault" ]; then
     if [ -n "$(ls -A /workspaces/today/vault 2>/dev/null)" ]; then

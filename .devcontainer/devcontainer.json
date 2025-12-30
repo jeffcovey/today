@@ -18,7 +18,7 @@
 		}
 	},
 	"postCreateCommand": "npm install && chmod +x bin/* && npx dotenvx run --overload -- .devcontainer/setup-ssh-keys.sh",
-	"postStartCommand": "bash bin/devcontainer-startup",
+	"postStartCommand": "bash .devcontainer/devcontainer-startup",
 	"containerEnv": {
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
 		"DEVCONTAINER_PROJECT": "today"
