@@ -1,6 +1,8 @@
 # Plugins
 
-Plugins integrate external data sources with the Today system. Some plugins sync data to SQLite tables; others provide AI instructions for querying external files.
+Plugins integrate external data sources with the Today system. Some plugins sync data to SQLite tables; others provide AI instructions for querying external files or perform utility cleanup tasks.
+
+> ⚠️ **Important:** The local SQLite database is only a **cache** of incoming data. It may be dropped and recreated at any time. If your plugin needs to write data, write it to the **source** (e.g., Todoist, Google Calendar, a markdown file), then read it back to the local database. Never treat the database as the source of truth.
 
 ## Directory Structure
 
@@ -8,10 +10,11 @@ Plugins integrate external data sources with the Today system. Some plugins sync
 plugins/
   markdown-time-tracking/
     plugin.toml      # Plugin metadata
-    sync.js          # Sync command (reads data, can be any executable)
-    write.sh         # Write command (creates/updates entries)
+    read.js          # Read command (reads data, can be any executable)
+    write.js         # Write command (creates/updates entries)
   apple-health-auto-export/
-    plugin.toml      # Plugin metadata (no sync - read-only)
+    plugin.toml      # Plugin metadata
+    read.js          # Read-only plugin (no write command)
 ```
 
 ## Configuration
@@ -24,15 +27,33 @@ enabled = true
 days_to_sync = 365
 directory = "vault/logs/time-tracking"
 auto_add_topics = true  # Enable AI-powered topic tagging
-ai_instructions = """
-Time tracking is THE GROUND TRUTH of productivity.
-ALWAYS check time tracking data BEFORE making progress assessments.
+aiInstructions = """
+To check current ongoing activity, read `{directory}/current-timer.md`.
+To see entries, read `{directory}/YYYY-MM.md` for the relevant month.
+
+Each line in the monthly file is: `START_ISO8601|END_ISO8601|Description #topic/tag`
+Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #topic/programming`
 """
 
 [plugins.apple-health-auto-export.default]
 enabled = true
+logs_directory = "vault/logs"
+retention_days = 30
 ai_instructions = """
-When I ask about health, always include yesterday's steps and current weight.
+Health data is synced to the health_metrics table. Query with SQL or use bin/health commands.
+
+Common metric names in the database:
+- Activity: step_count, distance_walking_running, active_energy, flights_climbed
+- Heart: heart_rate, heart_rate_variability_sdnn, resting_heart_rate
+- Body: weight_body_mass, body_mass_index
+- Sleep: sleep_analysis (metadata has stages: rem, deep, core, awake)
+- Vitals: respiratory_rate, blood_oxygen_saturation
+- Nutrition: dietary_water, dietary_caffeine, alcohol_consumption
+
+Example queries:
+- Recent weight: SELECT date, value FROM health_metrics WHERE metric_name = 'weight_body_mass' ORDER BY date DESC LIMIT 7
+- Today's steps: SELECT value FROM health_metrics WHERE metric_name = 'step_count' AND date = DATE('now', 'localtime')
+- Sleep this week: SELECT date, value as hours, metadata FROM health_metrics WHERE metric_name = 'sleep_analysis' AND date > DATE('now', '-7 days')
 """
 ```
 
@@ -103,7 +124,7 @@ The AI will also discover topics from existing tagged entries, so you don't need
 
 To support auto-tagging, your plugin needs:
 
-1. `access = "read-write"` in plugin.toml
+1. Both `read` and `write` commands in plugin.toml (makes it read-write)
 2. A `taggable_field` setting specifying which field to tag (defaults to `description`)
 3. Entry IDs that encode file location (e.g., `filepath:lineNum`) so the auto-tagger can locate and update entries
 
@@ -117,7 +138,6 @@ name = "my-plugin"
 displayName = "My Plugin"
 description = "Short description (shown in plugin list)"
 type = "time-logs"           # Data type (see Plugin Types below)
-access = "read-write"        # read-only, write-only, or read-write
 
 # Environment variables required to run
 requiredEnv = ["API_TOKEN"]
@@ -138,8 +158,8 @@ Query with: SELECT * FROM time_logs WHERE source LIKE 'my-plugin/%' AND date(sta
 
 # Commands - paths relative to plugin directory
 [commands]
-sync = "./sync.pl"           # Reads data, outputs JSON
-write = "./write.py"         # Creates/updates entries (optional)
+read = "./read.js"           # Reads data, outputs JSON
+write = "./write.js"         # Creates/updates entries (optional)
 
 # Configuration options with defaults
 # Format: name = { type = "string"|"number"|"boolean", default = value, description = "..." }
@@ -151,9 +171,9 @@ auto_add_topics = { type = "boolean", default = false, description = "Automatica
 taggable_field = { type = "string", default = "description", description = "Database field to add topic tags to" }
 ```
 
-## Writing a Sync Command
+## Writing a Read Command
 
-The sync command reads data and outputs JSON. It can be written in any language.
+The read command reads data and outputs JSON. It can be written in any language.
 
 **Input (environment variables):**
 - `PROJECT_ROOT`: Path to the project root
@@ -246,16 +266,31 @@ The write command creates or updates entries. It's required for `read-write` plu
 
 ## Plugin Types
 
-### time-logs
+Each plugin type has a defined schema. Data is stored in a shared table for that type. [plugin-schemas.js](/src/plugin-schemas.js) is the source of schema truth.
 
-Duration-based activity records for time tracking. Data is stored in the shared `time_logs` table.
+| Type | Table | Description |
+|------|-------|-------------|
+| `context` | *(none)* | Ephemeral AI context (weather, plans, day themes) |
+| `diary` | `diary` | Journal entries with date and text |
+| `email` | `email` | Email messages with headers and content |
+| `events` | `events` | Calendar events with start/end times |
+| `habits` | `habits` | Daily habit tracking with completion status |
+| `health` | `health_metrics` | Health measurements (steps, weight, sleep) |
+| `issues` | `issues` | Tickets, bugs, alerts from external systems |
+| `projects` | `projects` | Project tracking with status and progress |
+| `tasks` | `tasks` | To-do items with priority and due dates |
+| `time-logs` | `time_logs` | Time tracking entries with start/end times |
+| `utility` | *(none)* | Maintenance tasks (cleanup, linting) |
+
+### Example: time-logs
+
+Duration-based activity records for time tracking.
 
 **Required fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | start_time | string | ISO 8601 datetime with timezone |
-| description | string | Activity description |
 
 **Optional fields:**
 
@@ -264,6 +299,9 @@ Duration-based activity records for time tracking. Data is stored in the shared 
 | id | string | Unique identifier (recommended: `filepath:lineNum`) |
 | end_time | string | ISO 8601 datetime (null if timer running) |
 | duration_minutes | number | Computed from start/end times |
+| description | string | Activity description |
+
+See `src/plugin-schemas.js` for complete schema definitions for all types.
 
 ## CLI Commands
 
@@ -301,7 +339,7 @@ When editing a source, you can:
 
 1. Create directory: `mkdir plugins/my-plugin`
 2. Create `plugins/my-plugin/plugin.toml` with metadata
-3. Create sync command (e.g., `plugins/my-plugin/sync.js`)
+3. Create read command (e.g., `plugins/my-plugin/read.js`)
 4. Optionally create write command for read-write plugins
 5. Make scripts executable: `chmod +x plugins/my-plugin/*.js`
 6. Run `bin/plugins list` to verify discovery

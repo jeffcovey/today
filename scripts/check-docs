@@ -1,0 +1,151 @@
+#!/usr/bin/env node
+
+/**
+ * Check that documentation is in sync with code
+ *
+ * Currently checks:
+ * - Plugin types in plugins/README.md match src/plugin-schemas.js
+ *
+ * Exit codes:
+ * - 0: All checks pass
+ * - 1: Documentation is out of sync
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+
+// ANSI colors
+const RED = '\x1b[0;31m';
+const GREEN = '\x1b[0;32m';
+const YELLOW = '\x1b[1;33m';
+const NC = '\x1b[0m';
+
+let hasErrors = false;
+
+/**
+ * Extract plugin types from src/plugin-schemas.js
+ */
+function getSchemaTypes() {
+  const schemaPath = path.join(PROJECT_ROOT, 'src/plugin-schemas.js');
+  const content = fs.readFileSync(schemaPath, 'utf8');
+
+  // Match schema keys like 'time-logs': { or "context": {
+  const typeRegex = /['"]([a-z-]+)['"]\s*:\s*\{[\s\S]*?table:\s*(['"]([a-z_]+)['"]|null)/g;
+  const types = new Map();
+
+  let match;
+  while ((match = typeRegex.exec(content)) !== null) {
+    const typeName = match[1];
+    const tableName = match[3] || null; // null if table: null
+    types.set(typeName, tableName);
+  }
+
+  return types;
+}
+
+/**
+ * Extract documented plugin types from plugins/README.md
+ */
+function getDocumentedTypes() {
+  const readmePath = path.join(PROJECT_ROOT, 'plugins/README.md');
+  const content = fs.readFileSync(readmePath, 'utf8');
+
+  // Find the Plugin Types table
+  const tableMatch = content.match(/## Plugin Types[\s\S]*?\| Type \| Table \| Description \|[\s\S]*?\n\n/);
+  if (!tableMatch) {
+    console.error(`${RED}Error: Could not find Plugin Types table in plugins/README.md${NC}`);
+    return new Map();
+  }
+
+  const tableSection = tableMatch[0];
+
+  // Match rows like | `context` | *(none)* | ... |
+  const rowRegex = /\| `([a-z-]+)` \| ([^|]+) \|/g;
+  const types = new Map();
+
+  let match;
+  while ((match = rowRegex.exec(tableSection)) !== null) {
+    const typeName = match[1];
+    const tableCell = match[2].trim();
+    // Parse table name: `tablename` or *(none)*
+    const tableName = tableCell.startsWith('`')
+      ? tableCell.replace(/`/g, '')
+      : null;
+    types.set(typeName, tableName);
+  }
+
+  return types;
+}
+
+/**
+ * Check plugin types documentation
+ */
+function checkPluginTypes() {
+  console.log('Checking plugin types documentation...');
+
+  const schemaTypes = getSchemaTypes();
+  const docTypes = getDocumentedTypes();
+
+  const errors = [];
+  const warnings = [];
+
+  // Check for types in schema but not in docs
+  for (const [type, table] of schemaTypes) {
+    if (!docTypes.has(type)) {
+      errors.push(`Type '${type}' is in plugin-schemas.js but not documented in plugins/README.md`);
+    } else if (docTypes.get(type) !== table) {
+      const docTable = docTypes.get(type);
+      errors.push(`Type '${type}' table mismatch: schema has '${table}', docs say '${docTable}'`);
+    }
+  }
+
+  // Check for types in docs but not in schema
+  for (const [type] of docTypes) {
+    if (!schemaTypes.has(type)) {
+      warnings.push(`Type '${type}' is documented but not in plugin-schemas.js (may be outdated)`);
+    }
+  }
+
+  // Report results
+  if (errors.length === 0 && warnings.length === 0) {
+    console.log(`${GREEN}✓ Plugin types documentation is up to date${NC}`);
+    console.log(`  Found ${schemaTypes.size} types in schema, ${docTypes.size} documented`);
+    return true;
+  }
+
+  for (const error of errors) {
+    console.error(`${RED}✗ ${error}${NC}`);
+  }
+
+  for (const warning of warnings) {
+    console.warn(`${YELLOW}⚠ ${warning}${NC}`);
+  }
+
+  if (errors.length > 0) {
+    console.log(`\n${YELLOW}To fix: Update the Plugin Types table in plugins/README.md${NC}`);
+    hasErrors = true;
+    return false;
+  }
+
+  return true;
+}
+
+// Run checks
+console.log('=== Documentation Sync Check ===\n');
+
+checkPluginTypes();
+
+console.log('');
+
+if (hasErrors) {
+  console.log(`${RED}Documentation is out of sync with code.${NC}`);
+  process.exit(1);
+} else {
+  console.log(`${GREEN}All documentation checks passed.${NC}`);
+  process.exit(0);
+}

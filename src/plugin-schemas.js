@@ -778,8 +778,6 @@ SELECT * FROM tasks WHERE id LIKE 'markdown-tasks/local:vault/projects/PROJECT_F
     indexes: ['source', 'status', 'priority', 'due_date', 'topic']
   },
 
-  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
-
   'health': {
     table: 'health_metrics',
     staleMinutes: 60, // Health data syncs periodically from phone
@@ -858,6 +856,17 @@ Common metric names:
       }
     },
     indexes: ['source', 'date', 'metric_name']
+  },
+
+  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
+
+  'utility': {
+    // Utility plugins perform maintenance tasks and don't store data
+    // They have no AI context (ai: null) because there's nothing to query
+    table: null,
+    staleMinutes: 0, // Always run on-demand
+    ai: null, // No AI context - utility plugins are silent background tasks
+    fields: {}
   }
 };
 
@@ -1043,12 +1052,9 @@ export function getAIMetadata(pluginType) {
 
 /**
  * Stale thresholds for plugin types not yet in full schema
- * These will be moved into schemas when full schema support is added
+ * (Currently empty - all types are now in the main schema)
  */
-const staleMinutesByType = {
-  'habits': 30,         // Habits sync daily, don't need frequent updates
-  'utility': 0,         // Utility plugins run on-demand, always fresh
-};
+const staleMinutesByType = {};
 
 /**
  * Get stale threshold for a plugin type
