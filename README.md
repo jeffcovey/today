@@ -1,5 +1,90 @@
 # Today
 
+`today` pulls in all the information you track or which is flowing into your life, and hands it to an AI that helps you work and play. Any AI provider can be used, allowing whatever mixture of purely-local and cloud-based data sharing makes you comfortable.
+
+## Example
+
+```
+$ bin/today --no-sync --non-interactive now
+[dotenvx@1.51.1] injecting env (30) from .env
+[dotenvx@1.51.1] injecting env (0) from .env
+🔍 Checking database health...
+📊 Starting focused session: What should I do *right now*?
+⚠️  Skipping sync (--no-sync flag provided)
+📊 Gathering context...
+  ⏳ Time Tracking...
+  ⏳ Diary / Journal...
+  ⏳ Issues & Tickets...
+  ⏳ markdown-plans...
+  ⏳ stages...
+  ⏳ vault-changes...
+  ⏳ weather-context...
+  ⏳ Calendar Events...
+  ⏳ Tasks...
+  ⏳ Habits...
+  ⏳ Email...
+  ⏳ Projects...
+  ⏳ Health Metrics...
+✅ Context ready
+```
+
+> 🤖 Running in non-interactive mode...
+> Based on your current context, here's what you should do right now:
+> 
+> **Stop the time tracker** - You've been tracking "Answering hosting mail" for 26 minutes, but it sounds like you're done with that task.
+> 
+> **Wind down for the evening** - It's 7:19 PM and your bedtime is 9:30 PM. Today is an Off Stage (personal time) day, and you've already put in almost 5 hours of tracked work.
+> 
+> **Immediate priorities for the next 2 hours:**
+> 
+> 1. **Evening routine** - Your habits show 0/12 steps completed. This includes:
+>    - Lock the doors
+>    - Finish meal tracking
+>    - Start the fasting timer
+>    - Take your pills
+>    - Journal
+> 
+> 2. **30 minutes of gentle exercise** - This is on your daily plan and your Exercise habit (30 min) is still pending. A short walk or Apple Fitness+ session would check this off.
+> 
+> 3. **Read offline** - Your plan calls for 45 minutes between events, and your Read Offline habit shows only 2:45 completed. Even 20-30 minutes before bed would help.
+> 
+> **Note:** Your daily plan mentioned a Prime Gentlemen Mixer at 10 PM, but that's past your 9:30 PM bedtime. You may have already decided to skip it, or adjusted plans.
+> 
+> **One quick check:** The healthcheck `newsletter-continuous-catchup` went DOWN today. You might want to glance at that, though it can wait until tomorrow (a Back Stage day) if you prefer to keep tonight personal.
+> 
+> Want me to stop the time tracker or help with anything specific?
+
+Sessions can be interactive conversations or one-off suggestions like the above. You can run `bin/today` to start a session with general advice, or `bin/today "What do I need to do for my trip to St. Louis?"` to work on something particular.
+
+## Inputs
+
+Your information comes into the system through plugins. They are categorized into several types with matching binaries. Common data types are stored for each (email "From:", event "Location"), with metadata fields for source-specific types.
+
+Plugin types:
+
+- **Context** (`bin/context`): Weather, location, daily plans, day themes, etc.
+- **Diary** (`bin/diary`): Day One, Obsidian, Journey, etc.
+- **Email** (`bin/email`): Gmail, iCloud Mail, Fastmail, etc.
+- **Events** (`bin/calendar`): Google Calendar, Outlook, Airbnb, TripIt, etc.
+- **Habits** (`bin/habits`): Streaks, Habitica, Loop Habit Tracker, etc.
+- **Health** (`bin/health`): Apple Health, Fitbit, Oura, Garmin, etc.
+- **Issues** (`bin/issues`): GitHub, Jira, Linear, Sentry, etc.
+- **Projects** (`bin/projects`): GitHub Projects, Notion, Basecamp, etc.
+- **Tasks** (`bin/tasks`): Todoist, Things, Reminders, Obsidian, etc.
+- **Time Logs** (`bin/track`): Toggl, Clockify, Harvest, RescueTime, etc.
+- **Utility**: Inbox processing, file cleanup, linting, etc.
+
+You can configure multiple sources for each plugin, for example, for a work Gmail account and a personal Gmail account. You can add instructions for each source to tell the AI something about it ("This is my birthdays calendar. Remind me of these events one week in advance, and then the day of."). *Only some of the above-listed services already have [plugins](plugins/)!* Please share your own where you see a gap you want to fill! Others users will appreciate it. The [Plugin README](plugins/README.md) explains how to create plugins. Reach out at https://github.com/jeffcovey/today/discussions to share your work or ideas or to ask questions.
+
+You can manage your plugins with `bin/today configure` (which just calls out to `bin/plugins configure` if you want to go straight there), or edit ./config.toml directly. You can see what will be passed to the AI with `bin/today dry-run`.
+
+---
+
+
+## Obsidian
+
+# OLD
+
 > **Beta Testing Note (December 2025)**
 >
 > This project is transitioning to a plugin-based architecture. The documentation below will be revised to reflect these changes. For beta testers, here's how to get started:
@@ -32,8 +117,6 @@
 > - `bin/calendar today` - View calendar events
 
 ---
-
-A personal command center for daily planning and productivity. Uses AI-assisted daily reviews, markdown-based task management, and integrations with email, calendar, and time tracking to help you decide what to do each day.
 
 <p align="center">
   <img src="docs/images/daily-plan-example.png" alt="Daily Plan Example" width="500">
