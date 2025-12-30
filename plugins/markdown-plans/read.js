@@ -847,7 +847,8 @@ function getPlanningDataWithSchemas(targetDateStr, targetDayOfWeek) {
       query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE date >= date('${targetDateStr}', '-2 days') ORDER BY date DESC LIMIT 5`;
     } else if (pluginType === 'time-logs') {
       // Recent time logs for context
-      query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE date(start_time) >= date('${targetDateStr}', '-1 day') ORDER BY start_time DESC LIMIT 10`;
+      // Use SUBSTR to extract local date from timezone-aware timestamps (SQLite's date() converts to UTC)
+      query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE SUBSTR(start_time, 1, 10) >= date('${targetDateStr}', '-1 day') ORDER BY start_time DESC LIMIT 10`;
     } else if (pluginType === 'email') {
       // Skip email for planning - too noisy
       continue;

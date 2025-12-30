@@ -56,6 +56,13 @@ $ bin/today --no-sync --non-interactive now
 
 Sessions can be interactive conversations or one-off suggestions like the above. You can run `bin/today` to start a session with general advice, or `bin/today "What do I need to do for my trip to St. Louis?"` to work on something particular.
 
+The hope is:
+
+1. It pulls in everything you should know about, so nothing slips through the cracks.
+2. From your instructions about your goals and what's important to you, it suggests what to do next — whether it's "work like hell" or "go to the beach".
+3. It stays flexible with changing circumstances, helping you get the most out of right now.
+4. The more information you pour into it, the more it makes connections and thoughtful suggestions. ("Your diary said you're not getting outside enough. And you're up three pounds, and want to lose weight to take the pressure off your bad hip. Bob emailed about pickleball Friday morning. You wrote back that you couldn't, but the meeting you had then was canceled. Should we tell him you'll be there?")
+
 ## Inputs
 
 Your information comes into the system through plugins. They are categorized into several types with matching binaries. Common data types are stored for each (email "From:", event "Location"), with metadata fields for source-specific types.

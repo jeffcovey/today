@@ -38,7 +38,7 @@ import {
   ensureSyncForType,
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
-import { getTodayDate } from './date-utils.js';
+import { getTodayDate, sqlLocalDate } from './date-utils.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -701,7 +701,7 @@ export function createMCPServer() {
         const logs = db.prepare(`
           SELECT id, start_time, end_time, duration_minutes, description, source
           FROM time_logs
-          WHERE date(start_time) >= date(?, '-7 days')
+          WHERE ${sqlLocalDate('start_time')} >= date(?, '-7 days')
           ORDER BY start_time DESC
           LIMIT 50
         `).all(today);

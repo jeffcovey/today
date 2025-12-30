@@ -326,3 +326,26 @@ export function getTimezoneOffset(date, timezone) {
   const tzDate = new TZDate(d, tz);
   return format(tzDate, 'xxx');
 }
+
+// =============================================================================
+// SQL helpers for timezone-aware timestamps
+// =============================================================================
+
+/**
+ * Generate SQL snippet for extracting local date from ISO timestamps.
+ *
+ * SQLite's date() function converts timezone-aware timestamps to UTC before
+ * extracting the date, which causes entries after 7 PM Eastern to appear as
+ * the next day. This helper extracts the date portion directly from the
+ * ISO string, preserving the local date.
+ *
+ * @param {string} column - SQL column name containing ISO timestamp
+ * @returns {string} SQL snippet for extracting local date (YYYY-MM-DD)
+ *
+ * @example
+ * // Instead of: WHERE date(start_time) = '2025-12-29'
+ * // Use: WHERE ${sqlLocalDate('start_time')} = '2025-12-29'
+ */
+export function sqlLocalDate(column) {
+  return `SUBSTR(${column}, 1, 10)`;
+}

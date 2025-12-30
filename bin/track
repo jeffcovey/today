@@ -11,7 +11,8 @@ import {
   getTodayDate,
   getWeekAgoDate,
   subtractSecondsISO,
-  formatTime
+  formatTime,
+  sqlLocalDate
 } from '../src/date-utils.js';
 import {
   parseDuration,
@@ -312,10 +313,11 @@ async function cmdDate(targetDate, options = {}) {
   }
 
   // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
   let query = `
     SELECT start_time, end_time, duration_minutes, description, source
     FROM time_logs
-    WHERE date(start_time) = ?
+    WHERE ${sqlLocalDate('start_time')} = ?
     ORDER BY start_time
   `;
   const params = [targetDate];
@@ -324,7 +326,7 @@ async function cmdDate(targetDate, options = {}) {
     query = `
       SELECT start_time, end_time, duration_minutes, description, source
       FROM time_logs
-      WHERE date(start_time) = ? AND source LIKE ?
+      WHERE ${sqlLocalDate('start_time')} = ? AND source LIKE ?
       ORDER BY start_time
     `;
     params.push(`%${options.source}%`);
@@ -407,10 +409,11 @@ async function cmdToday(options = {}) {
   }
 
   // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
   let query = `
     SELECT start_time, end_time, duration_minutes, description, source
     FROM time_logs
-    WHERE date(start_time) = ?
+    WHERE ${sqlLocalDate('start_time')} = ?
     ORDER BY start_time
   `;
   const params = [today];
@@ -419,7 +422,7 @@ async function cmdToday(options = {}) {
     query = `
       SELECT start_time, end_time, duration_minutes, description, source
       FROM time_logs
-      WHERE date(start_time) = ? AND source LIKE ?
+      WHERE ${sqlLocalDate('start_time')} = ? AND source LIKE ?
       ORDER BY start_time
     `;
     params.push(`%${options.source}%`);
@@ -502,10 +505,11 @@ async function cmdWeek(options = {}) {
   const today = getTodayDate();
 
   // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
   let query = `
     SELECT start_time, end_time, duration_minutes, description, source
     FROM time_logs
-    WHERE date(start_time) >= ? AND date(start_time) <= ?
+    WHERE ${sqlLocalDate('start_time')} >= ? AND ${sqlLocalDate('start_time')} <= ?
     ORDER BY start_time
   `;
   const params = [weekStart, today];
@@ -514,7 +518,7 @@ async function cmdWeek(options = {}) {
     query = `
       SELECT start_time, end_time, duration_minutes, description, source
       FROM time_logs
-      WHERE date(start_time) >= ? AND date(start_time) <= ? AND source LIKE ?
+      WHERE ${sqlLocalDate('start_time')} >= ? AND ${sqlLocalDate('start_time')} <= ? AND source LIKE ?
       ORDER BY start_time
     `;
     params.push(`%${options.source}%`);
