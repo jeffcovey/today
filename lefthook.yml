@@ -48,6 +48,13 @@ pre-commit:
         npm test -- --bail --passWithNoTests --findRelatedTests {staged_files}
         echo "✅ All tests passed!"
 
+    check-docs:
+      glob: "{src/plugin-schemas.js,plugins/README.md}"
+      run: |
+        echo "Checking documentation is in sync with code..."
+        scripts/check-docs
+        echo "✅ Documentation checks passed!"
+
 pre-push:
   commands:
     outdated:

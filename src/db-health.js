@@ -34,19 +34,44 @@ const LEGACY_TABLES = [
 ];
 
 /**
+ * Clean up orphaned WAL/SHM files when main database is missing.
+ * These files can cause undefined SQLite behavior if left behind.
+ * @returns {boolean} True if any orphaned files were cleaned up
+ */
+function cleanOrphanedWalFiles() {
+  let cleaned = false;
+  for (const filePath of [WAL_PATH, SHM_PATH]) {
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+        cleaned = true;
+      } catch {
+        // Ignore deletion errors
+      }
+    }
+  }
+  return cleaned;
+}
+
+/**
  * Check if the database exists and has the required schema
  * @returns {Object} { healthy: boolean, reason?: string, version?: number, corrupted?: boolean }
  */
 export function checkDatabaseHealth() {
   // Check if database file exists
   if (!fs.existsSync(DB_PATH)) {
-    return { healthy: false, reason: 'Database file does not exist' };
+    // Clean up orphaned WAL/SHM files if they exist.
+    // These can cause undefined SQLite behavior when creating a new database.
+    const hadOrphanedFiles = cleanOrphanedWalFiles();
+    const reason = hadOrphanedFiles
+      ? 'Database file does not exist (cleaned orphaned WAL/SHM files)'
+      : 'Database file does not exist';
+    return { healthy: false, reason };
   }
 
   // Note: We previously checked for "empty WAL + SHM" as corruption indicator,
   // but this is actually a normal state after wal_checkpoint(TRUNCATE).
   // The real test for corruption is the integrity_check pragma below.
-  // Orphaned WAL/SHM files are cleaned up automatically by SQLite on next open.
 
   let db;
   try {
