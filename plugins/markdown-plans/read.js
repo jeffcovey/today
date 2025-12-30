@@ -1175,16 +1175,18 @@ function linkPlanToDailyNote(planPath, date) {
     return { linked: false, reason: 'daily note not found', path: dailyNotePath };
   }
 
-  // Read daily note content
-  let content = fs.readFileSync(dailyNotePath, 'utf-8');
-
   // Build the link to the plan file (relative path within vault)
   const planRelPath = path.relative(vaultPath, planPath).replace(/\\/g, '/');
   const planBasename = path.basename(planPath, '.md');
   const planLink = `[[${planRelPath.replace('.md', '')}|📋 Today's Plan]]`;
+  const planLinkPrefix = `[[${planRelPath.replace('.md', '')}`;
 
-  // Check if link already exists
-  if (content.includes(planLink) || content.includes(`[[${planRelPath.replace('.md', '')}`)) {
+  // Re-read file immediately before modification to get freshest content.
+  // This minimizes race conditions when multiple deployments sync simultaneously.
+  let content = fs.readFileSync(dailyNotePath, 'utf-8');
+
+  // Check if link already exists (on fresh content)
+  if (content.includes(planLink) || content.includes(planLinkPrefix)) {
     return { linked: false, reason: 'already linked' };
   }
 
@@ -1197,6 +1199,7 @@ function linkPlanToDailyNote(planPath, date) {
     content = planLink + '\n\n' + content;
   }
 
+  // Write immediately after read-modify
   fs.writeFileSync(dailyNotePath, content, 'utf-8');
   return { linked: true, path: dailyNotePath };
 }

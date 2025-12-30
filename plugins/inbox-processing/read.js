@@ -132,10 +132,12 @@ date: ${dateStr}
 }
 
 /**
- * Add entry to diary file under a specific section
+ * Apply a modification to a section in a diary file.
+ * Re-reads the file immediately before writing to minimize race conditions
+ * when multiple processes (e.g., local + remote deployments) may be syncing.
  */
-function addToDiary(dateStr, sectionName, timestamp, content) {
-  const filePath = getDiaryFile(dateStr);
+function modifyDiarySection(filePath, sectionName, modifyFn) {
+  // Re-read file immediately before modification to get freshest content
   let fileContent = fs.readFileSync(filePath, 'utf-8');
 
   const sectionHeader = `## ${sectionName}`;
@@ -145,7 +147,7 @@ function addToDiary(dateStr, sectionName, timestamp, content) {
     fileContent = fileContent.trimEnd() + `\n\n${sectionHeader}\n`;
   }
 
-  // Find the section and add the entry
+  // Find the section boundaries
   const insertPoint = fileContent.indexOf(sectionHeader) + sectionHeader.length;
   const beforeSection = fileContent.slice(0, insertPoint);
   const afterSection = fileContent.slice(insertPoint);
@@ -157,11 +159,25 @@ function addToDiary(dateStr, sectionName, timestamp, content) {
   const sectionContent = afterSection.slice(0, sectionEnd);
   const restContent = afterSection.slice(sectionEnd);
 
-  // Add timestamped entry
-  const newEntry = `\n\n### ${timestamp}\n${content}`;
-  fileContent = beforeSection + sectionContent.trimEnd() + newEntry + '\n' + restContent;
+  // Apply the modification
+  const newSectionContent = modifyFn(sectionContent);
+  fileContent = beforeSection + newSectionContent + restContent;
 
+  // Write immediately after read-modify
   fs.writeFileSync(filePath, fileContent, 'utf-8');
+}
+
+/**
+ * Add entry to diary file under a specific section
+ */
+function addToDiary(dateStr, sectionName, timestamp, content) {
+  const filePath = getDiaryFile(dateStr);
+  const newEntry = `\n\n### ${timestamp}\n${content}`;
+
+  modifyDiarySection(filePath, sectionName, (sectionContent) => {
+    return sectionContent.trimEnd() + newEntry + '\n';
+  });
+
   return filePath;
 }
 
@@ -170,32 +186,12 @@ function addToDiary(dateStr, sectionName, timestamp, content) {
  */
 function addBulletsToDiary(dateStr, sectionName, bullets) {
   const filePath = getDiaryFile(dateStr);
-  let fileContent = fs.readFileSync(filePath, 'utf-8');
-
-  const sectionHeader = `## ${sectionName}`;
-
-  // Add section if it doesn't exist
-  if (!fileContent.includes(sectionHeader)) {
-    fileContent = fileContent.trimEnd() + `\n\n${sectionHeader}\n`;
-  }
-
-  // Find the section and add the bullets
-  const insertPoint = fileContent.indexOf(sectionHeader) + sectionHeader.length;
-  const beforeSection = fileContent.slice(0, insertPoint);
-  const afterSection = fileContent.slice(insertPoint);
-
-  // Find the end of the section (next ## or end of file)
-  const nextSectionMatch = afterSection.match(/\n## /);
-  const sectionEnd = nextSectionMatch ? nextSectionMatch.index : afterSection.length;
-
-  const sectionContent = afterSection.slice(0, sectionEnd);
-  const restContent = afterSection.slice(sectionEnd);
-
-  // Add bullets
   const bulletText = bullets.map(b => `- ${b}`).join('\n');
-  fileContent = beforeSection + sectionContent.trimEnd() + '\n' + bulletText + '\n' + restContent;
 
-  fs.writeFileSync(filePath, fileContent, 'utf-8');
+  modifyDiarySection(filePath, sectionName, (sectionContent) => {
+    return sectionContent.trimEnd() + '\n' + bulletText + '\n';
+  });
+
   return filePath;
 }
 
