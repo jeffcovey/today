@@ -1,0 +1,507 @@
+#!/usr/bin/env node
+
+/**
+ * Today - Daily review and planning tool (main entry point)
+ *
+ * This file contains the actual implementation.
+ * It's loaded by bin/today after dependencies are verified.
+ */
+
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs';
+import path from 'path';
+import { execSync, spawnSync } from 'child_process';
+
+import { getTimezone, getFullConfig, configExists } from '../src/config.js';
+import { getInteractiveModel, getInteractiveProviderName } from '../src/ai-provider.js';
+import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
+import { program } from 'commander';
+import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from '../src/plugin-schemas.js';
+import { ensureHealthyDatabase } from '../src/db-health.js';
+import { getCurrentTime, formatFullDateTime } from '../src/date-utils.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.dirname(__dirname);
+
+process.chdir(projectRoot);
+
+async function checkAndRecoverDatabase() {
+  // Skip in tests for faster execution
+  if (process.env.SKIP_DB_HEALTH) {
+    return;
+  }
+
+  console.log('🔍 Checking database health...');
+  const result = await ensureHealthyDatabase({ verbose: true });
+
+  if (!result.success) {
+    console.error('❌ Database check failed');
+    process.exit(1);
+  }
+
+  if (result.recreated) {
+    console.log('ℹ️  Run bin/sync to populate data from external sources\n');
+  }
+}
+
+/**
+ * Build data context for AI prompt
+ * Groups data by plugin type with schema, instructions, and current data
+ */
+async function getDataContext() {
+  // Skip context gathering in test mode for faster tests
+  if (process.env.SKIP_CONTEXT === 'true') {
+    return `# Data Sources
+(Context gathering skipped for testing)`;
+  }
+
+  try {
+    const pluginTypes = getPluginTypes();
+    const instructionsByType = await getAIInstructionsByType();
+    const sections = [];
+
+    for (const pluginType of pluginTypes) {
+      const ai = getAIMetadata(pluginType);
+      if (!ai) continue;
+
+      // Context plugins are handled separately - run each plugin's read command
+      if (pluginType === 'context') {
+        const contextData = await getContextPluginsData(instructionsByType.get('context'));
+        if (contextData) {
+          sections.push(contextData);
+        }
+        continue;
+      }
+
+      const typeData = instructionsByType.get(pluginType);
+      if (!typeData || typeData.sources.length === 0) continue;
+
+      // Run the default command to get current data
+      let currentData = '';
+      try {
+        console.log(`  ⏳ ${ai.name || pluginType}...`);
+        currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
+          encoding: 'utf8',
+          timeout: 10000
+        });
+        // Filter out dotenvx noise
+        currentData = currentData.split('\n')
+          .filter(line => !line.includes('[dotenvx'))
+          .join('\n');
+      } catch {
+        currentData = '(No data available)';
+      }
+
+      // Generate context block
+      const block = generateAIContextBlock(pluginType, {
+        userInstructions: typeData.instructions,
+        currentData
+      });
+
+      if (block) {
+        sections.push(block);
+      }
+    }
+
+    if (sections.length === 0) return '';
+
+    const intro = `# Data Sources
+
+The following data is synced from external sources via the plugin system.
+Each section shows current data and instructions for querying more.
+
+- Run \`bin/plugins list\` to see available plugins
+- Run \`bin/plugins sync\` to refresh data from all sources
+- Run \`bin/plugins sync <plugin-name>\` to sync a specific plugin
+
+`;
+
+    return intro + sections.join('\n\n---\n\n');
+  } catch (error) {
+    // Silently fail if plugin system has issues
+    return '';
+  }
+}
+
+/**
+ * Get data context for a specific date using CLI commands
+ * Used for generating summaries of past days
+ * Uses dateCommand from schema to call each CLI with --date
+ */
+async function getDataContextForDate(targetDate) {
+  const sections = [];
+  const pluginTypes = getPluginTypes();
+
+  // Only include types relevant for historical data (have dateCommand defined)
+  const historicalTypes = ['time-logs', 'diary', 'events', 'tasks', 'habits'];
+
+  for (const pluginType of pluginTypes) {
+    if (!historicalTypes.includes(pluginType)) continue;
+
+    const schema = schemas[pluginType];
+    if (!schema || !schema.ai?.dateCommand) continue;
+
+    // Build the command with $DATE substituted
+    const command = schema.ai.dateCommand.replace('$DATE', targetDate);
+
+    try {
+      const output = execSync(command, {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        timeout: 30000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      // Filter out dotenvx noise and empty lines
+      const cleanOutput = output.split('\n')
+        .filter(line => !line.includes('[dotenvx'))
+        .join('\n')
+        .trim();
+
+      if (!cleanOutput || cleanOutput.includes('No ')) continue;
+
+      // Generate the full context block using the schema system
+      const block = generateAIContextBlock(pluginType, {
+        userInstructions: [],
+        currentData: cleanOutput,
+        commandUsed: command
+      });
+
+      if (block) {
+        sections.push(block);
+      }
+    } catch {
+      // Command failed - skip this type
+    }
+  }
+
+  if (sections.length === 0) {
+    return `# Data Sources\n(No data found for ${targetDate})`;
+  }
+
+  const intro = `# Data Sources for ${targetDate}
+
+The following data was retrieved for the specified date.
+
+`;
+
+  return intro + sections.join('\n\n---\n\n');
+}
+
+/**
+ * Get data from context plugins by running their read commands
+ */
+async function getContextPluginsData(typeData) {
+  if (!typeData || typeData.sources.length === 0) return null;
+
+  const lines = ['## Contextual Information', ''];
+
+  for (const sourceId of typeData.sources) {
+    try {
+      // sourceId format: "plugin-name/source-name"
+      const [pluginName, sourceName] = sourceId.split('/');
+      const pluginPath = path.join(projectRoot, 'plugins', pluginName);
+      const readScript = path.join(pluginPath, 'read.js');
+
+      if (!fs.existsSync(readScript)) continue;
+
+      // Get the source config for this plugin
+      const sources = getPluginSources(pluginName);
+      const sourceConfig = sources.find(s => s.sourceName === sourceName)?.config || {};
+
+      console.log(`  ⏳ ${pluginName}...`);
+
+      // Run from project root so relative paths work correctly
+      const output = execSync(`node "${readScript}"`, {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        timeout: 30000,
+        env: {
+          ...process.env,
+          PROJECT_ROOT: projectRoot,
+          PLUGIN_CONFIG: JSON.stringify(sourceConfig),
+          SOURCE_ID: sourceId
+        }
+      });
+
+      const data = JSON.parse(output);
+
+      // Context plugins should provide a 'context' field with pre-formatted text
+      if (data.context) {
+        lines.push(data.context);
+        lines.push('');
+      }
+    } catch {
+      // Silently continue if plugin fails
+    }
+  }
+
+  return lines.length > 2 ? lines.join('\n') : null;
+}
+
+async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null) {
+  const timezone = getTimezone();
+
+  const now = getCurrentTime(timezone);
+  const currentTime = formatFullDateTime(now, timezone);
+
+  // Gather context from plugins or database (for specific dates)
+  let dataContext;
+  if (targetDate) {
+    console.log(`📊 Gathering context for ${targetDate}...`);
+    dataContext = await getDataContextForDate(targetDate);
+  } else {
+    console.log('📊 Gathering context...');
+    dataContext = await getDataContext();
+  }
+  console.log('✅ Context ready\n');
+  const config = getFullConfig();
+
+  // Build user profile section
+  const profile = config.profile || {};
+  const profileLines = [];
+  if (profile.name) profileLines.push(`- **Name**: ${profile.name}`);
+  if (config.location) profileLines.push(`- **Location**: ${config.location}`);
+  if (profile.home_location && profile.home_location !== config.location) {
+    profileLines.push(`- **Home**: ${profile.home_location}`);
+  }
+  profileLines.push(`- **Timezone**: ${timezone}`);
+  if (profile.vocation) profileLines.push(`- **Vocation**: ${profile.vocation}`);
+  if (profile.wake_time) profileLines.push(`- **Wake time**: ${profile.wake_time}`);
+  if (profile.bed_time) profileLines.push(`- **Bed time**: ${profile.bed_time}`);
+  if (profile.birthdate) profileLines.push(`- **Birthdate**: ${profile.birthdate}`);
+
+  // Build the context section (user info and data sources)
+  const timeInfo = targetDate
+    ? `- **Target Date**: ${targetDate}\n- **Generated At**: ${currentTime} (${timezone})`
+    : `- **Current Time**: ${currentTime} (${timezone})`;
+
+  // Get user's general AI instructions
+  const aiInstructions = config.ai?.ai_instructions?.trim();
+  const aiInstructionsSection = aiInstructions
+    ? `\n## User Instructions\n${aiInstructions}\n`
+    : '';
+
+  const contextSection = `## Pre-Computed Context
+${timeInfo}
+
+## Database
+- **Path**: .data/today.db (SQLite)
+- **Direct queries**: sqlite3 .data/today.db "SELECT ..."
+
+## User Profile
+${profileLines.join('\n')}
+${aiInstructionsSection}
+${dataContext}`;
+
+  // Dry run with --date: just output data context (for consumption by other tools)
+  if (dryRun && targetDate) {
+    console.log(contextSection);
+    return;
+  }
+
+  // Build the prompt
+  let prompt;
+  const intro = `You are an agent helping a user. Information about the user and the user's context is provided below.`;
+
+  if (directRequest) {
+    const requestSection = `The user's request is:
+
+> ${directRequest}`;
+
+    if (nonInteractive) {
+      prompt = `${intro}
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- Complete the task WITHOUT asking for confirmation
+
+${requestSection}
+
+${contextSection}`;
+    } else {
+      prompt = `${intro}
+
+${requestSection}
+
+${contextSection}`;
+    }
+  } else {
+    prompt = `${intro}
+
+Look at the user's current situation and offer suggestions of what the user should do.
+
+${contextSection}`;
+  }
+
+  // Dry run - just output the prompt
+  if (dryRun) {
+    console.log(prompt);
+    return;
+  }
+
+  // Actually run the AI session
+  const interactiveProvider = getInteractiveProviderName();
+  const model = getInteractiveModel();
+
+  // Check provider - currently only Claude Code CLI is supported
+  if (interactiveProvider !== 'anthropic') {
+    console.error(`Error: Interactive sessions only support 'anthropic' provider currently.`);
+    console.error(`Your config has: interactive_provider = "${interactiveProvider}"`);
+    console.error(`Please set interactive_provider = "anthropic" in config.toml`);
+    process.exit(1);
+  }
+
+  if (directRequest && nonInteractive) {
+    console.log('🤖 Running in non-interactive mode...');
+    try {
+      spawnSync('timeout', ['600', 'claude', '--model', model, '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
+    } catch (e) {
+      console.error(`ERROR: Command timed out or failed after 10 minutes: ${e.message}`);
+      process.exit(1);
+    }
+  } else if (directRequest) {
+    console.log('🤖 Starting session...');
+    spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+  } else {
+    console.log('🤖 Starting daily review...');
+    spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+  }
+
+  console.log('\n' + '━'.repeat(50));
+  console.log('✅ Session ended\n');
+  console.log('💡 Track progress with:');
+  console.log('   bin/diary add progress \'note\'');
+  console.log('━'.repeat(50) + '\n');
+}
+
+import { runConfigure } from '../src/configure-ui.js';
+
+// ============================================================================
+// Shared setup for commands that need database/config
+// ============================================================================
+
+async function ensureConfigAndDatabase(options = {}) {
+  // Check if config.toml exists (skip for dry-run which is used for testing)
+  if (!configExists() && !options.skipConfigCheck) {
+    console.log('━'.repeat(60));
+    console.log('⚠️  No configuration found');
+    console.log('━'.repeat(60));
+    console.log();
+    console.log('Today needs to be configured before first use.');
+    console.log('Opening configuration wizard...');
+    console.log();
+    await runConfigure();
+
+    // After configure, check again
+    if (!configExists()) {
+      console.log('Configuration required. Please run: bin/today configure');
+      process.exit(1);
+    }
+    console.log();
+  }
+
+  // Check database health
+  await checkAndRecoverDatabase();
+}
+
+async function runSession(request, options) {
+  // Note: --no-sync sets options.sync = false (Commander's negated boolean pattern)
+  const { sync, nonInteractive, date: targetDate } = options;
+
+  // Display appropriate message
+  if (request) {
+    console.log(`📊 Starting focused session: ${request}`);
+  } else {
+    console.log('📊 Starting daily review process...');
+  }
+
+  // Run sync (unless skipped or using historical date)
+  if (targetDate) {
+    console.log('⚠️  Skipping sync (using historical date)');
+  } else if (sync !== false) {
+    console.log('🔄 Syncing data sources...');
+    try {
+      execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
+    } catch {
+      console.error('⚠️  Sync completed with some errors');
+    }
+  } else {
+    console.log('⚠️  Skipping sync (--no-sync flag provided)');
+  }
+
+  // Run the session
+  await runInteractiveSession(request, nonInteractive, false, targetDate);
+}
+
+// ============================================================================
+// Commander setup
+// ============================================================================
+
+// Helper to merge parent (global) options with command-specific options
+function mergeOptions(cmdOptions, cmd) {
+  const parentOpts = cmd?.parent?.opts() || {};
+  return { ...parentOpts, ...cmdOptions };
+}
+
+program
+  .name('today')
+  .description('AI-powered daily review and planning tool')
+  .version('1.0.0')
+  .enablePositionalOptions()
+  .passThroughOptions()
+  // Global options available to all commands
+  .option('--no-sync', 'Skip sync step (faster startup)')
+  .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data');
+
+// Default command - daily review with optional request
+program
+  .argument('[request...]', 'Optional request for focused session')
+  .action(async (requestParts, options) => {
+    await ensureConfigAndDatabase();
+    const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+    await runSession(request, options);
+  });
+
+// Configure command
+program
+  .command('configure')
+  .description('Open configuration UI for system settings')
+  .action(async () => {
+    await runConfigure();
+  });
+
+// Now command - quick "what should I do right now?"
+program
+  .command('now')
+  .description('Quick "what should I do right now?" session')
+  .option('--no-sync', 'Skip sync step')
+  .option('--non-interactive', 'Run in non-interactive mode')
+  .action(async (options, cmd) => {
+    const mergedOpts = mergeOptions(options, cmd);
+    await ensureConfigAndDatabase();
+    await runSession('What should I do *right now*?', mergedOpts);
+  });
+
+// Dry-run command - show prompt without calling AI
+program
+  .command('dry-run')
+  .description('Show the prompt that would be sent to the AI (no API call)')
+  .argument('[request...]', 'Optional request for focused session')
+  .option('--no-sync', 'Skip sync step')
+  .option('--non-interactive', 'Include non-interactive mode flags in prompt')
+  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+  .action(async (requestParts, options, cmd) => {
+    const mergedOpts = mergeOptions(options, cmd);
+    await ensureConfigAndDatabase({ skipConfigCheck: true });
+    const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+    await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date);
+  });
+
+program.parse();
