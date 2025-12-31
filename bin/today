@@ -49,8 +49,8 @@ if (!process.env.SKIP_DEP_CHECK) {
     try {
       execSyncBuiltin('npm install', { stdio: 'inherit', cwd: __bootstrapRoot });
       console.log('');
-      console.log('✅ Dependencies installed! Please run bin/today again.');
-      process.exit(0);
+      console.log('✅ Dependencies installed!');
+      console.log('');
     } catch (e) {
       console.error('❌ Failed to install dependencies:', e.message);
       console.error('   Please run: npm install');
@@ -493,17 +493,26 @@ async function runSession(request, options) {
 // Commander setup
 // ============================================================================
 
+// Helper to merge parent (global) options with command-specific options
+function mergeOptions(cmdOptions, cmd) {
+  const parentOpts = cmd?.parent?.opts() || {};
+  return { ...parentOpts, ...cmdOptions };
+}
+
 program
   .name('today')
   .description('AI-powered daily review and planning tool')
-  .version('1.0.0');
+  .version('1.0.0')
+  .enablePositionalOptions()
+  .passThroughOptions()
+  // Global options available to all commands
+  .option('--no-sync', 'Skip sync step (faster startup)')
+  .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data');
 
 // Default command - daily review with optional request
 program
   .argument('[request...]', 'Optional request for focused session')
-  .option('--no-sync', 'Skip sync step (faster startup)')
-  .option('--non-interactive', 'Run in non-interactive mode (for automation)')
-  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
   .action(async (requestParts, options) => {
     await ensureConfigAndDatabase();
     const request = requestParts.length > 0 ? requestParts.join(' ') : null;
@@ -524,9 +533,10 @@ program
   .description('Quick "what should I do right now?" session')
   .option('--no-sync', 'Skip sync step')
   .option('--non-interactive', 'Run in non-interactive mode')
-  .action(async (options) => {
+  .action(async (options, cmd) => {
+    const mergedOpts = mergeOptions(options, cmd);
     await ensureConfigAndDatabase();
-    await runSession('What should I do *right now*?', options);
+    await runSession('What should I do *right now*?', mergedOpts);
   });
 
 // Dry-run command - show prompt without calling AI
@@ -534,12 +544,14 @@ program
   .command('dry-run')
   .description('Show the prompt that would be sent to the AI (no API call)')
   .argument('[request...]', 'Optional request for focused session')
+  .option('--no-sync', 'Skip sync step')
   .option('--non-interactive', 'Include non-interactive mode flags in prompt')
   .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
-  .action(async (requestParts, options) => {
+  .action(async (requestParts, options, cmd) => {
+    const mergedOpts = mergeOptions(options, cmd);
     await ensureConfigAndDatabase({ skipConfigCheck: true });
     const request = requestParts.length > 0 ? requestParts.join(' ') : null;
-    await runInteractiveSession(request, options.nonInteractive, true, options.date);
+    await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date);
   });
 
 program.parse();

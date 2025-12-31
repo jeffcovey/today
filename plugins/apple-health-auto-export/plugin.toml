@@ -59,3 +59,4 @@ read = "./read.js"
 logs_directory = { type = "string", default = "vault/logs", description = "Directory containing HealthAutoExport JSON files" }
 retention_days = { type = "number", default = 30, description = "Days of health data to retain in database" }
 metrics_filter = { type = "string", default = "", description = "Comma-separated list of metrics to include (empty = all)" }
+cleanup_old_files = { type = "boolean", default = true, description = "Delete all HealthAutoExport files except the latest one after reading" }

@@ -18,6 +18,7 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const logsDirectory = config.logs_directory || 'vault/logs';
 const retentionDays = config.retention_days || 30;
+const cleanupOldFiles = config.cleanup_old_files !== false;
 
 // Metrics to include (if specified, otherwise include all)
 const metricsFilter = config.metrics_filter
@@ -48,6 +49,32 @@ function findLatestExportFile() {
     .sort((a, b) => b.endDate.localeCompare(a.endDate));
 
   return files[0]?.path || null;
+}
+
+/**
+ * Delete all HealthAutoExport files except the latest one
+ */
+function cleanupOldExportFiles(latestFile) {
+  const logsDir = path.join(projectRoot, logsDirectory);
+
+  if (!fs.existsSync(logsDir)) return [];
+
+  const deleted = [];
+  const files = fs.readdirSync(logsDir)
+    .filter(f => f.startsWith('HealthAutoExport-') && f.endsWith('.json'))
+    .map(f => path.join(logsDir, f))
+    .filter(f => f !== latestFile);
+
+  for (const file of files) {
+    try {
+      fs.unlinkSync(file);
+      deleted.push(path.basename(file));
+    } catch (error) {
+      // Ignore deletion errors
+    }
+  }
+
+  return deleted;
 }
 
 /**
@@ -197,6 +224,12 @@ function main() {
     return a.metric_name.localeCompare(b.metric_name);
   });
 
+  // Cleanup old files if enabled
+  let deletedFiles = [];
+  if (cleanupOldFiles) {
+    deletedFiles = cleanupOldExportFiles(exportFile);
+  }
+
   console.log(JSON.stringify({
     entries: allEntries,
     metadata: {
@@ -205,7 +238,8 @@ function main() {
       metrics_count: Object.keys(metricCounts).length,
       retention_days: retentionDays,
       cutoff_date: cutoffDate,
-      metrics: metricCounts
+      metrics: metricCounts,
+      deleted_files: deletedFiles.length > 0 ? deletedFiles : undefined
     }
   }));
 }
