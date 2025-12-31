@@ -13,7 +13,7 @@
 // Check for dependencies before any npm imports (must use only Node built-ins)
 import { existsSync, statSync } from 'fs';
 import { dirname, join } from 'path';
-import { execSync as execSyncBuiltin } from 'child_process';
+import { execSync as execSyncBuiltin, spawnSync as spawnSyncBuiltin } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __bootstrapFilename = fileURLToPath(import.meta.url);
@@ -49,8 +49,15 @@ if (!process.env.SKIP_DEP_CHECK) {
     try {
       execSyncBuiltin('npm install', { stdio: 'inherit', cwd: __bootstrapRoot });
       console.log('');
-      console.log('✅ Dependencies installed!');
+      console.log('✅ Dependencies installed! Restarting...');
       console.log('');
+      // Re-execute ourselves with the same arguments (modules are already resolved, can't continue)
+      const result = spawnSyncBuiltin(process.argv[0], process.argv.slice(1), {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        env: { ...process.env, SKIP_DEP_CHECK: 'true' }
+      });
+      process.exit(result.status || 0);
     } catch (e) {
       console.error('❌ Failed to install dependencies:', e.message);
       console.error('   Please run: npm install');
