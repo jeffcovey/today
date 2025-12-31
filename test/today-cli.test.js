@@ -44,7 +44,7 @@ describe('bin/today CLI', () => {
       const result = runToday('--help');
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('Today - Daily review and planning tool');
+      expect(result.stdout).toContain('AI-powered daily review and planning tool');
       expect(result.stdout).toContain('Usage:');
       expect(result.stdout).toContain('Commands:');
       expect(result.stdout).toContain('Options:');
@@ -67,7 +67,7 @@ describe('bin/today CLI', () => {
       const result = runToday('-h');
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain('Today - Daily review and planning tool');
+      expect(result.stdout).toContain('AI-powered daily review and planning tool');
     });
   });
 
@@ -120,13 +120,6 @@ describe('bin/today CLI', () => {
   });
 
   describe('date components', () => {
-    test('should reference correct plan file format in help', () => {
-      const result = runToday('--help');
-
-      // Should mention the file naming convention
-      expect(result.stdout).toContain('YYYY_QQ_MM_W##_DD.md');
-    });
-
     test('dry-run should include current time context', () => {
       const result = runToday('dry-run --no-sync');
 

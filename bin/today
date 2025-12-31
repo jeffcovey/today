@@ -20,8 +20,8 @@ import { execSync, spawnSync } from 'child_process';
 
 import { getTimezone, getFullConfig, configExists } from '../src/config.js';
 import { getInteractiveModel, getInteractiveProviderName } from '../src/ai-provider.js';
-import color from 'picocolors';
 import { getAIInstructionsByType, getPluginSources } from '../src/plugin-loader.js';
+import { program } from 'commander';
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from '../src/plugin-schemas.js';
 import { ensureHealthyDatabase } from '../src/db-health.js';
 import { getCurrentTime, formatFullDateTime } from '../src/date-utils.js';
@@ -383,89 +383,15 @@ ${contextSection}`;
   console.log('━'.repeat(50) + '\n');
 }
 
-// ============================================================================
-// Configuration UI (ink-based React TUI)
-// ============================================================================
-
 import { runConfigure } from '../src/configure-ui.js';
 
 // ============================================================================
-// Main
+// Shared setup for commands that need database/config
 // ============================================================================
 
-function showHelp() {
-  console.log(`Today - Daily review and planning tool
-
-Usage:
-  bin/today [options] [command] [request]
-
-Commands:
-  (none)      Start interactive daily review session
-  configure   Open configuration UI for system settings
-  now         Quick "what should I do right now?" session
-  dry-run     Show the prompt that would be sent to the AI (no API call)
-
-Options:
-  --date DATE       Target date (YYYY-MM-DD) - queries historical data
-  --no-sync         Skip sync step (faster startup)
-  --non-interactive Run in non-interactive mode (for automation)
-  -h, --help        Show this help message
-
-Examples:
-  bin/today                           # Start daily review
-  bin/today configure                 # Configure system settings
-  bin/today now                       # Quick "what should I do now?" session
-  bin/today dry-run                   # Show prompt without running Claude
-  bin/today dry-run --date 2025-12-15 # Show prompt for a specific date
-  bin/today "fix the bug in login"    # Focused session with specific request
-
-Files:
-  Today's plan:    vault/plans/YYYY_QQ_MM_W##_DD.md
-  Tomorrow's plan: vault/plans/YYYY_QQ_MM_W##_DD.md (next day)
-`);
-}
-
-async function main() {
-  const args = process.argv.slice(2);
-
-  // Handle help early
-  if (args.includes('-h') || args.includes('--help')) {
-    showHelp();
-    return;
-  }
-
-  // Parse arguments
-  let command = null;
-  let request = [];
-  let noSync = false;
-  let nonInteractive = false;
-  let targetDate = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--no-sync') {
-      noSync = true;
-    } else if (args[i] === '--non-interactive') {
-      nonInteractive = true;
-    } else if (args[i] === '--date' && args[i + 1]) {
-      targetDate = args[i + 1];
-      i++; // Skip the next arg (the date value)
-    } else if (!command && ['init', 'update', 'dry-run', 'now', 'configure'].includes(args[i])) {
-      command = args[i];
-    } else {
-      request.push(args[i]);
-    }
-  }
-
-  let directRequest = request.length > 0 ? request.join(' ') : null;
-
-  // Handle configure command - doesn't need database
-  if (command === 'configure') {
-    await runConfigure();
-    return;
-  }
-
+async function ensureConfigAndDatabase(options = {}) {
   // Check if config.toml exists (skip for dry-run which is used for testing)
-  if (!configExists() && command !== 'dry-run') {
+  if (!configExists() && !options.skipConfigCheck) {
     console.log('━'.repeat(60));
     console.log('⚠️  No configuration found');
     console.log('━'.repeat(60));
@@ -483,23 +409,16 @@ async function main() {
     console.log();
   }
 
-  // Always check database health first (except for help which returns early)
+  // Check database health
   await checkAndRecoverDatabase();
+}
 
-  // Handle dry-run command - show what prompt would be sent to AI
-  if (command === 'dry-run') {
-    await runInteractiveSession(directRequest, nonInteractive, true /* dryRun */, targetDate);
-    return;
-  }
-
-  // Handle now command - quick "what should I do right now?" query
-  if (command === 'now') {
-    directRequest = 'What should I do *right now*?';
-  }
+async function runSession(request, options) {
+  const { noSync, nonInteractive, date: targetDate } = options;
 
   // Display appropriate message
-  if (directRequest) {
-    console.log(`📊 Starting focused session: ${directRequest}`);
+  if (request) {
+    console.log(`📊 Starting focused session: ${request}`);
   } else {
     console.log('📊 Starting daily review process...');
   }
@@ -511,18 +430,68 @@ async function main() {
     console.log('🔄 Syncing data sources...');
     try {
       execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
-    } catch (error) {
+    } catch {
       console.error('⚠️  Sync completed with some errors');
     }
   } else {
     console.log('⚠️  Skipping sync (--no-sync flag provided)');
   }
 
-  // Run the appropriate session
-  await runInteractiveSession(directRequest, nonInteractive, false, targetDate);
+  // Run the session
+  await runInteractiveSession(request, nonInteractive, false, targetDate);
 }
 
-main().catch((e) => {
-  console.error(`❌ Fatal error: ${e.message}`);
-  process.exit(1);
-});
+// ============================================================================
+// Commander setup
+// ============================================================================
+
+program
+  .name('today')
+  .description('AI-powered daily review and planning tool')
+  .version('1.0.0');
+
+// Default command - daily review with optional request
+program
+  .argument('[request...]', 'Optional request for focused session')
+  .option('--no-sync', 'Skip sync step (faster startup)')
+  .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+  .action(async (requestParts, options) => {
+    await ensureConfigAndDatabase();
+    const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+    await runSession(request, options);
+  });
+
+// Configure command
+program
+  .command('configure')
+  .description('Open configuration UI for system settings')
+  .action(async () => {
+    await runConfigure();
+  });
+
+// Now command - quick "what should I do right now?"
+program
+  .command('now')
+  .description('Quick "what should I do right now?" session')
+  .option('--no-sync', 'Skip sync step')
+  .option('--non-interactive', 'Run in non-interactive mode')
+  .action(async (options) => {
+    await ensureConfigAndDatabase();
+    await runSession('What should I do *right now*?', options);
+  });
+
+// Dry-run command - show prompt without calling AI
+program
+  .command('dry-run')
+  .description('Show the prompt that would be sent to the AI (no API call)')
+  .argument('[request...]', 'Optional request for focused session')
+  .option('--non-interactive', 'Include non-interactive mode flags in prompt')
+  .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+  .action(async (requestParts, options) => {
+    await ensureConfigAndDatabase({ skipConfigCheck: true });
+    const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+    await runInteractiveSession(request, options.nonInteractive, true, options.date);
+  });
+
+program.parse();
