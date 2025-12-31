@@ -29,7 +29,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.toml');
-const CONFIG_EXAMPLE_PATH = path.join(PROJECT_ROOT, 'config.toml.example');
 
 /**
  * Get the user's preferred editor
@@ -148,52 +147,6 @@ async function ensurePluginConfig() {
     }
 
     fs.writeFileSync(CONFIG_PATH, configContent);
-  }
-
-  // Also update config.toml.example if it exists
-  try {
-    let exampleContent = fs.readFileSync(CONFIG_EXAMPLE_PATH, 'utf8');
-    let exampleModified = false;
-
-    for (const [name, plugin] of plugins) {
-      const sectionHeader = `[plugins.${name}.`;
-      if (exampleContent.includes(sectionHeader) || exampleContent.includes(`# ${sectionHeader}`)) {
-        continue;
-      }
-
-      // Add plugins section header if needed
-      if (!exampleContent.includes('# Plugins')) {
-        exampleContent = exampleContent.trimEnd() + '\n\n' +
-          '# =============================================================================\n' +
-          '# Plugins\n' +
-          '# =============================================================================\n' +
-          '# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]\n' +
-          '# Uncomment and set enabled = true to activate a plugin\n';
-      }
-
-      const lines = [];
-      lines.push(`# [plugins.${name}.default]`);
-      lines.push(`# enabled = true`);
-
-      if (plugin.settings) {
-        for (const [key, schema] of Object.entries(plugin.settings)) {
-          const defaultValue = schema.default;
-          if (defaultValue !== undefined) {
-            const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
-            lines.push(`# ${key} = ${valueStr}`);
-          }
-        }
-      }
-
-      exampleContent = exampleContent.trimEnd() + '\n\n' + lines.join('\n') + '\n';
-      exampleModified = true;
-    }
-
-    if (exampleModified) {
-      fs.writeFileSync(CONFIG_EXAMPLE_PATH, exampleContent);
-    }
-  } catch {
-    // Example file doesn't exist, that's fine
   }
 }
 
@@ -864,7 +817,7 @@ ${pluginsSection}`;
     let tomlOutput = stringifyToml(config);
     tomlOutput = formatMultilineStrings(tomlOutput);
     const content = `# Configuration for Today system
-# See config.toml.example for all available options
+# Run 'bin/today configure' to edit interactively
 
 ${tomlOutput}`;
     fs.writeFileSync(CONFIG_PATH, content);

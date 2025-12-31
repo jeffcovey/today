@@ -1,5 +1,5 @@
 // Configuration helper for JavaScript modules
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { parse } from 'smol-toml';
@@ -10,6 +10,14 @@ const __dirname = dirname(__filename);
 let configCache = null;
 let lastReadTime = 0;
 const CACHE_TTL = 60000; // Cache for 1 minute
+
+/**
+ * Check if config.toml exists
+ */
+export function configExists() {
+  const configPath = join(__dirname, '..', 'config.toml');
+  return existsSync(configPath);
+}
 
 function readConfig() {
   const now = Date.now();
@@ -23,8 +31,7 @@ function readConfig() {
     configCache = parse(configContent);
     lastReadTime = now;
     return configCache;
-  } catch (error) {
-    console.error('Error reading config.toml:', error);
+  } catch {
     // Return defaults if config can't be read
     return {
       timezone: 'America/New_York'

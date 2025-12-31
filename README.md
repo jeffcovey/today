@@ -102,17 +102,11 @@ You can manage your plugins with `bin/today configure` (which just calls out to 
 > cd today
 > npm install
 >
-> # 2. Copy config templates
-> cp config.toml.example config.toml
+> # 2. Copy environment template and add your API keys
 > cp .env.example .env
+> # Edit .env with your credentials (Anthropic API key, etc.)
 >
-> # 3. Configure plugins interactively
-> bin/plugins configure
->
-> # 4. Sync data from your configured sources
-> bin/plugins sync
->
-> # 5. Start a daily review session with Claude
+> # 3. Run Today - it will guide you through initial configuration
 > bin/today
 > ```
 >
@@ -143,14 +137,11 @@ cd today
 # Install dependencies
 npm install
 
-# Copy configuration templates
-cp config.toml.example config.toml
+# Copy environment template and add your API keys
 cp .env.example .env
+# Edit .env with your credentials (Anthropic API key, etc.)
 
-# Edit config.toml with your preferences (timezone, profile, etc.)
-# Edit .env with your API keys and credentials
-
-# Run daily planning (syncs data, initializes vault on first run)
+# Run Today - it will guide you through initial configuration
 bin/today
 ```
 
@@ -188,11 +179,7 @@ When you run `claude` for the first time, it will open a browser to authenticate
 
 ### config.toml
 
-Non-secret configuration lives in `config.toml`. Copy from the example:
-
-```bash
-cp config.toml.example config.toml
-```
+Non-secret configuration lives in `config.toml`. Run `bin/today configure` to create or edit it interactively.
 
 Key settings:
 
