@@ -30,6 +30,89 @@ const diaryDir = path.join(projectRoot, diaryDirectory);
 const lastSyncDate = lastSyncTime ? new Date(lastSyncTime) : null;
 
 /**
+ * Get today's date in YYYY-MM-DD format (respecting configured timezone)
+ */
+function getTodayDateString() {
+  const tz = process.env.TZ || 'America/New_York';
+  const now = new Date();
+  return now.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD format
+}
+
+/**
+ * Create today's diary file if it doesn't exist
+ * Returns true if file was created, false if it already existed
+ */
+function ensureTodaysDiaryFile() {
+  const today = getTodayDateString();
+  const filePath = path.join(diaryDir, `${today}.md`);
+
+  if (fs.existsSync(filePath)) {
+    return false;
+  }
+
+  // Create minimal front matter template
+  const content = `---
+date: ${today}
+---
+
+`;
+
+  fs.writeFileSync(filePath, content, 'utf8');
+  return true;
+}
+
+/**
+ * Check if a diary file only contains the auto-generated template (no real content)
+ */
+function isEmptyDiaryFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const { body } = parseFrontMatter(content);
+
+    // File is "empty" if body is whitespace-only (no sections, no entries)
+    return body.trim() === '';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clean up empty diary files from previous days
+ * Only removes files that contain just the auto-generated template
+ */
+function cleanupEmptyDiaryFiles() {
+  const today = getTodayDateString();
+  const removed = [];
+
+  if (!fs.existsSync(diaryDir)) {
+    return removed;
+  }
+
+  const files = fs.readdirSync(diaryDir)
+    .filter(f => f.endsWith('.md') && /^\d{4}-\d{2}-\d{2}\.md$/.test(f));
+
+  for (const file of files) {
+    const fileDate = file.replace('.md', '');
+
+    // Skip today's file - never remove it
+    if (fileDate === today) continue;
+
+    const filePath = path.join(diaryDir, file);
+
+    if (isEmptyDiaryFile(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+        removed.push(file);
+      } catch {
+        // Ignore removal errors
+      }
+    }
+  }
+
+  return removed;
+}
+
+/**
  * Parse YAML front matter from markdown
  */
 function parseFrontMatter(content) {
@@ -200,11 +283,19 @@ const entries = [];
 const errors = [];
 const processed = [];
 let isIncremental = false;
+let createdTodaysFile = false;
+let removedEmptyFiles = [];
 
 // Create diary directory if it doesn't exist
 if (!fs.existsSync(diaryDir)) {
   fs.mkdirSync(diaryDir, { recursive: true });
 }
+
+// Clean up empty diary files from previous days
+removedEmptyFiles = cleanupEmptyDiaryFiles();
+
+// Ensure today's diary file exists
+createdTodaysFile = ensureTodaysDiaryFile();
 
 // Get list of diary files to process
 let diaryFiles = [];
@@ -268,6 +359,8 @@ console.log(JSON.stringify({
     diary_files: diaryFiles.length,
     entries_count: entries.length,
     processed: processed.length > 0 ? processed : undefined,
+    created_today: createdTodaysFile ? getTodayDateString() + '.md' : undefined,
+    removed_empty: removedEmptyFiles.length > 0 ? removedEmptyFiles : undefined,
     errors: errors.length > 0 ? errors : undefined
   }
 }));
