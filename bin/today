@@ -186,7 +186,16 @@ async function checkForUpdates(execSync, readline) {
         }
 
         console.log('');
-        console.log('✅ Updated! Please restart bin/today to use the new version.');
+        console.log('✅ Updated!');
+        console.log('');
+        console.log('Checking for plugin vault file updates...');
+        try {
+          execSync('bin/plugins vault-files --check', { cwd: projectRoot, stdio: 'inherit' });
+        } catch {
+          // Ignore errors in vault file check
+        }
+        console.log('');
+        console.log('Please restart bin/today to use the new version.');
         process.exit(0);
       } catch (pullError) {
         // Restore stashed changes if pull failed
@@ -219,9 +228,9 @@ async function main() {
   const { execSync, spawnSync } = await import('child_process');
   const readline = await import('readline');
 
-  const { getTimezone, getFullConfig, configExists } = await import('../src/config.js');
+  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath } = await import('../src/config.js');
   const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
-  const { getAIInstructionsByType, getPluginSources } = await import('../src/plugin-loader.js');
+  const { getAIInstructionsByType, getPluginSources, checkPluginVaultFileChanges } = await import('../src/plugin-loader.js');
   const { program } = await import('commander');
   const { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } = await import('../src/plugin-schemas.js');
   const { ensureHealthyDatabase } = await import('../src/db-health.js');
@@ -233,6 +242,50 @@ async function main() {
   // Check for updates (skip in non-interactive mode)
   if (!process.argv.includes('--non-interactive') && !process.argv.includes('--skip-update-check')) {
     await checkForUpdates(execSync, readline);
+  }
+
+  // Check for vault file updates (periodically, after main update check)
+  async function checkVaultFileUpdates() {
+    // Skip if vault path not set or in non-interactive mode
+    if (process.argv.includes('--non-interactive')) return;
+
+    // Check at most once per day
+    const lastCheckFile = join(projectRoot, '.data', '.last-vault-check');
+    if (existsSync(lastCheckFile)) {
+      const lastCheck = statSync(lastCheckFile).mtimeMs;
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (Date.now() - lastCheck < oneDay) {
+        return;
+      }
+    }
+
+    try {
+      const vaultPath = getAbsoluteVaultPath();
+      if (!existsSync(vaultPath)) return;
+
+      const changes = await checkPluginVaultFileChanges(vaultPath);
+
+      // Update check timestamp
+      const dataDir = join(projectRoot, '.data');
+      if (!existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(lastCheckFile, '');
+
+      if (changes.length > 0) {
+        console.log('');
+        console.log(`📋 ${changes.length} plugin vault file(s) have updates available.`);
+        console.log('   Run: bin/plugins vault-files --check');
+        console.log('');
+      }
+    } catch {
+      // Silently ignore vault check failures
+    }
+  }
+
+  // Run vault file check after update check
+  if (!process.argv.includes('--skip-update-check')) {
+    await checkVaultFileUpdates();
   }
 
   async function checkAndRecoverDatabase() {

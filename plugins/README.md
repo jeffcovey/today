@@ -12,6 +12,9 @@ plugins/
     plugin.toml      # Plugin metadata
     read.js          # Read command (reads data, can be any executable)
     write.js         # Write command (creates/updates entries)
+    vault/           # Vault files (templates, scripts, etc.)
+      scripts/
+        time-tracking-widget.js
   apple-health-auto-export/
     plugin.toml      # Plugin metadata
     read.js          # Read-only plugin (no write command)
@@ -335,6 +338,65 @@ Duration-based activity records for time tracking.
 
 See `src/plugin-schemas.js` for complete schema definitions for all types.
 
+## Plugin Vault Files
+
+Plugins can include files that belong in the user's vault—templates, Dataview scripts, dashboards, etc. These are stored in a `vault/` subdirectory within each plugin.
+
+### Structure
+
+```
+plugins/
+  markdown-plans/
+    plugin.toml
+    read.js
+    vault/                # Files to copy to user's vault
+      templates/
+        daily-plan.md
+        weekly-review.md
+      scripts/
+        weekly-header.js
+      plans/              # Creates empty directory
+        .gitkeep
+```
+
+The file paths within `vault/` mirror where they should appear in the user's vault. For example, `plugins/markdown-plans/vault/templates/daily-plan.md` installs to `{vault_path}/templates/daily-plan.md`.
+
+### Managing Vault Files
+
+```bash
+# Check for new/updated vault files from enabled plugins
+bin/plugins vault-files --check
+
+# Install missing vault files (won't overwrite existing)
+bin/plugins vault-files --install
+
+# Force update all vault files (overwrites existing)
+bin/plugins vault-files --install --force
+
+# List all vault files from enabled plugins
+bin/plugins vault-files --list
+```
+
+### Automatic Updates
+
+When you run `bin/today update`, the system automatically checks for vault file updates after applying the git update. If any enabled plugins have new or modified vault files, you'll see a notification.
+
+Additionally, `bin/today` performs a daily check for vault file updates and notifies you if any are available.
+
+### For Plugin Authors
+
+To include vault files in your plugin:
+
+1. Create a `vault/` directory in your plugin folder
+2. Add files with paths matching their destination in the user's vault
+3. Use `.gitkeep` files to create empty directories (these are skipped during install)
+
+Files are only copied if:
+- They don't already exist in the user's vault (default behavior)
+- The user runs `--install --force` to overwrite
+
+This ensures users' customizations are preserved while still allowing them to get updates when desired.
+
 ## CLI Commands
 
 ```bash
@@ -346,26 +408,20 @@ bin/plugins configure <plugin>      # Configure specific plugin
 bin/plugins sync                    # Sync all enabled plugins
 bin/plugins sync <plugin>           # Sync specific plugin
 bin/plugins sync --type <type>      # Sync plugins of a specific type
+bin/plugins vault-files             # Check for vault file updates
+bin/plugins vault-files --install   # Install missing vault files
 ```
 
 ### Interactive Configuration
 
-Run `bin/plugins configure` to interactively manage plugin sources:
+Run `bin/plugins configure` to open a full-screen configuration UI:
 
-```
-? Select a plugin to configure: Time Tracking
-? What would you like to do?
-  1) Add new source
-  2) Edit source
-  3) Remove source
-  4) Back
-```
+- Use arrow keys to navigate the plugin list
+- Press Enter to select a plugin and view/edit its sources
+- Press Escape to go back
+- Press `a` to add a new source, `d` to delete
 
-When editing a source, you can:
-- Enable/disable the source
-- Edit plugin-specific settings (e.g., `days_to_sync`, `directory`)
-- Enable/disable auto-tagging
-- Add or edit AI instructions (opens in `$EDITOR`)
+When editing a source, you can toggle settings, edit values inline, and open multi-line fields (like AI instructions) in your `$EDITOR`.
 
 ## Creating a New Plugin
 

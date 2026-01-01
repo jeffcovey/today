@@ -1309,3 +1309,241 @@ export async function getAIInstructionsByType() {
 
   return byType;
 }
+
+/**
+ * Get list of vault files for a plugin
+ * Returns array of relative file paths within the plugin's vault/ directory
+ * @param {object} plugin - Plugin object with _path
+ * @returns {Array<string>} - List of relative file paths
+ */
+export function getPluginVaultFiles(plugin) {
+  const vaultDir = path.join(plugin._path, 'vault');
+
+  if (!fs.existsSync(vaultDir)) {
+    return [];
+  }
+
+  const files = [];
+
+  function walkDir(dir, relativePath = '') {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = path.join(relativePath, entry.name);
+
+      if (entry.isDirectory()) {
+        walkDir(fullPath, relPath);
+      } else {
+        files.push(relPath);
+      }
+    }
+  }
+
+  walkDir(vaultDir);
+  return files;
+}
+
+/**
+ * Get plugins that have vault files
+ * @param {object} options - { enabledOnly: boolean }
+ * @returns {Promise<Array<{plugin: object, files: string[], enabled: boolean}>>}
+ */
+export async function getPluginsWithVaultFiles(options = {}) {
+  const { enabledOnly = false } = options;
+  const allPlugins = await discoverPlugins();
+  const enabledPlugins = await getEnabledPlugins();
+  const enabledNames = new Set(enabledPlugins.map(({ plugin }) => plugin.name));
+  const result = [];
+
+  for (const [name, plugin] of allPlugins) {
+    if (enabledOnly && !enabledNames.has(name)) {
+      continue;
+    }
+    const files = getPluginVaultFiles(plugin);
+    if (files.length > 0) {
+      result.push({ plugin, files, enabled: enabledNames.has(name) });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Sync vault files from enabled plugins to the user's vault
+ * Creates directories as needed and copies files that don't exist
+ * @param {object} options - { vaultPath, force, verbose }
+ * @returns {Promise<{installed: string[], skipped: string[], errors: string[]}>}
+ */
+export async function syncPluginVaultFiles(options = {}) {
+  const { vaultPath, force = false, verbose = false, enabledOnly = true } = options;
+
+  const result = {
+    installed: [],
+    skipped: [],
+    errors: []
+  };
+
+  const pluginsWithFiles = await getPluginsWithVaultFiles({ enabledOnly });
+  let needsCssSnippet = false;
+
+  for (const { plugin, files } of pluginsWithFiles) {
+    const pluginVaultDir = path.join(plugin._path, 'vault');
+
+    for (const relPath of files) {
+      const srcPath = path.join(pluginVaultDir, relPath);
+      const destPath = path.join(vaultPath, relPath);
+      const destDir = path.dirname(destPath);
+
+      try {
+        // Check if this file uses cssclasses (needs CSS snippet)
+        if (relPath.endsWith('.md')) {
+          const content = fs.readFileSync(srcPath, 'utf8');
+          if (content.includes('cssclasses:')) {
+            needsCssSnippet = true;
+          }
+        }
+
+        // Create destination directory if needed
+        if (!fs.existsSync(destDir)) {
+          fs.mkdirSync(destDir, { recursive: true });
+          if (verbose) {
+            console.log(`  Created directory: ${path.relative(vaultPath, destDir)}`);
+          }
+        }
+
+        // Check if file already exists
+        if (fs.existsSync(destPath) && !force) {
+          result.skipped.push(`${plugin.name}:${relPath}`);
+          continue;
+        }
+
+        // Copy file
+        fs.copyFileSync(srcPath, destPath);
+        result.installed.push(`${plugin.name}:${relPath}`);
+
+        if (verbose) {
+          console.log(`  Installed: ${relPath} (from ${plugin.name})`);
+        }
+      } catch (error) {
+        result.errors.push(`${plugin.name}:${relPath}: ${error.message}`);
+      }
+    }
+  }
+
+  // If any plugin uses cssclasses, install the CSS snippet
+  if (needsCssSnippet) {
+    const cssSnippetSrc = path.join(PROJECT_ROOT, 'skeleton', '.obsidian', 'snippets', 'today.css');
+    const cssSnippetDest = path.join(vaultPath, '.obsidian', 'snippets', 'today.css');
+
+    if (fs.existsSync(cssSnippetSrc)) {
+      try {
+        const cssDir = path.dirname(cssSnippetDest);
+        if (!fs.existsSync(cssDir)) {
+          fs.mkdirSync(cssDir, { recursive: true });
+          if (verbose) {
+            console.log(`  Created directory: .obsidian/snippets`);
+          }
+        }
+
+        if (!fs.existsSync(cssSnippetDest) || force) {
+          fs.copyFileSync(cssSnippetSrc, cssSnippetDest);
+          result.installed.push('skeleton:.obsidian/snippets/today.css');
+          if (verbose) {
+            console.log(`  Installed: .obsidian/snippets/today.css (CSS snippet for cssclasses)`);
+          }
+        } else {
+          result.skipped.push('skeleton:.obsidian/snippets/today.css');
+        }
+      } catch (error) {
+        result.errors.push(`skeleton:.obsidian/snippets/today.css: ${error.message}`);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Check which plugin vault files differ from installed versions
+ * Used for upgrade notifications
+ * @param {string} vaultPath - Path to user's vault
+ * @returns {Promise<Array<{plugin: string, file: string, status: 'missing'|'modified'}>>}
+ */
+export async function checkPluginVaultFileChanges(vaultPath, options = {}) {
+  const { enabledOnly = true } = options;
+  const changes = [];
+  const pluginsWithFiles = await getPluginsWithVaultFiles({ enabledOnly });
+  let needsCssSnippet = false;
+
+  for (const { plugin, files } of pluginsWithFiles) {
+    const pluginVaultDir = path.join(plugin._path, 'vault');
+
+    for (const relPath of files) {
+      // Skip .gitkeep files - they're just for directory structure
+      if (relPath.endsWith('.gitkeep')) {
+        continue;
+      }
+
+      const srcPath = path.join(pluginVaultDir, relPath);
+      const destPath = path.join(vaultPath, relPath);
+
+      // Check if this file uses cssclasses
+      if (relPath.endsWith('.md')) {
+        const content = fs.readFileSync(srcPath, 'utf8');
+        if (content.includes('cssclasses:')) {
+          needsCssSnippet = true;
+        }
+      }
+
+      if (!fs.existsSync(destPath)) {
+        changes.push({
+          plugin: plugin.name,
+          file: relPath,
+          status: 'missing'
+        });
+        continue;
+      }
+
+      // Compare file contents
+      const srcContent = fs.readFileSync(srcPath, 'utf8');
+      const destContent = fs.readFileSync(destPath, 'utf8');
+
+      if (srcContent !== destContent) {
+        changes.push({
+          plugin: plugin.name,
+          file: relPath,
+          status: 'modified'
+        });
+      }
+    }
+  }
+
+  // Check CSS snippet if any plugin uses cssclasses
+  if (needsCssSnippet) {
+    const cssSnippetSrc = path.join(PROJECT_ROOT, 'skeleton', '.obsidian', 'snippets', 'today.css');
+    const cssSnippetDest = path.join(vaultPath, '.obsidian', 'snippets', 'today.css');
+
+    if (fs.existsSync(cssSnippetSrc)) {
+      if (!fs.existsSync(cssSnippetDest)) {
+        changes.push({
+          plugin: 'skeleton',
+          file: '.obsidian/snippets/today.css',
+          status: 'missing'
+        });
+      } else {
+        const srcContent = fs.readFileSync(cssSnippetSrc, 'utf8');
+        const destContent = fs.readFileSync(cssSnippetDest, 'utf8');
+        if (srcContent !== destContent) {
+          changes.push({
+            plugin: 'skeleton',
+            file: '.obsidian/snippets/today.css',
+            status: 'modified'
+          });
+        }
+      }
+    }
+  }
+
+  return changes;
+}
