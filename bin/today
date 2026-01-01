@@ -528,7 +528,7 @@ ${contextSection}`;
       process.exit(1);
     }
 
-    if (directRequest && nonInteractive) {
+    if (nonInteractive) {
       console.log('🤖 Running in non-interactive mode...');
       try {
         spawnSync('timeout', ['600', 'claude', '--model', model, '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
