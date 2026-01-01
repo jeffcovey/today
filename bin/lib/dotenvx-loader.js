@@ -8,11 +8,28 @@ import { existsSync, readFileSync } from 'fs';
 import { spawnSync } from 'child_process';
 
 /**
- * Check if dotenvx encryption is present
+ * Check if dotenvx encryption is present AND we can decrypt it
  */
 export function hasDotenvxEncryption() {
-  return existsSync('.env.vault') || 
-    (existsSync('.env') && readFileSync('.env', 'utf8').includes('DOTENV_PUBLIC_KEY'));
+  // No .env file = nothing to load
+  if (!existsSync('.env')) {
+    return false;
+  }
+
+  const envContent = readFileSync('.env', 'utf8');
+
+  // Check if file has encrypted values
+  const hasEncryptedValues = envContent.includes('DOTENV_PUBLIC_KEY') || existsSync('.env.vault');
+
+  if (!hasEncryptedValues) {
+    // Plain .env file - dotenvx not needed, Node will load it normally
+    return false;
+  }
+
+  // Has encrypted values - check if we have the private key to decrypt
+  const hasPrivateKey = process.env.DOTENV_PRIVATE_KEY || existsSync('.env.keys');
+
+  return hasPrivateKey;
 }
 
 /**

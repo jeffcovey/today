@@ -1,8 +1,8 @@
 # =============================================================================
 # Environment & Secrets
 # =============================================================================
-# .env is encrypted inline with dotenvx, safe to commit
-# .env
+# Environment files (users create from .env.example)
+.env
 .env.keys
 .env.local
 
