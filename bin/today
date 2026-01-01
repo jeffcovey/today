@@ -157,7 +157,24 @@ async function main() {
         }
       }
 
-      if (sections.length === 0) return '';
+      if (sections.length === 0) {
+        return `# Data Sources
+
+**No plugins are currently enabled.**
+
+Today works best when connected to your data sources (calendars, tasks, notes, etc.).
+Run \`bin/today configure\` and select "Plugins" to enable data sources.
+
+Available plugin types include:
+- Calendars (Google Calendar, public calendars)
+- Tasks and projects (GitHub, markdown files)
+- Notes and diary (Day One, markdown files)
+- Time tracking, habits, health metrics
+- Weather and other context
+
+The more data sources you enable, the more helpful Today can be.
+`;
+      }
 
       const intro = `# Data Sources
 
