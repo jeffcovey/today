@@ -530,11 +530,20 @@ ${contextSection}`;
 
     if (nonInteractive) {
       console.log('🤖 Running in non-interactive mode...');
-      try {
-        spawnSync('timeout', ['600', 'claude', '--model', model, '--print', '--dangerously-skip-permissions', prompt], { stdio: 'inherit' });
-      } catch (e) {
-        console.error(`ERROR: Command timed out or failed after 10 minutes: ${e.message}`);
+      const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
+        stdio: 'inherit',
+        timeout: 600000 // 10 minutes in milliseconds
+      });
+      if (result.error) {
+        if (result.error.code === 'ETIMEDOUT') {
+          console.error('ERROR: Command timed out after 10 minutes');
+        } else {
+          console.error(`ERROR: ${result.error.message}`);
+        }
         process.exit(1);
+      }
+      if (result.status !== 0) {
+        process.exit(result.status || 1);
       }
     } else if (directRequest) {
       console.log('🤖 Starting session...');
@@ -545,7 +554,7 @@ ${contextSection}`;
     }
 
     console.log('\n' + '━'.repeat(50));
-    console.log('✅ Session ended\n');
+    console.log('✅ Session ended');
     console.log('━'.repeat(50) + '\n');
   }
 
