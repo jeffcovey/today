@@ -24,6 +24,64 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+const ENV_PATH = path.join(projectRoot, '.env');
+
+// ============================================================================
+// Environment variable helpers (using dotenvx for encryption)
+// ============================================================================
+
+/**
+ * Get an environment variable value (decrypted if encrypted)
+ */
+function getEnvVar(key) {
+  try {
+    const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return result.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if an environment variable exists
+ */
+function hasEnvVar(key) {
+  return getEnvVar(key) !== null;
+}
+
+/**
+ * Set an environment variable (always encrypted)
+ */
+function setEnvVar(key, value) {
+  if (!fs.existsSync(ENV_PATH)) {
+    fs.writeFileSync(ENV_PATH, '# Environment variables for Today\n\n');
+  }
+
+  const escapedValue = value.replace(/"/g, '\\"');
+
+  try {
+    execSync(`npx dotenvx set ${key} "${escapedValue}"`, {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    console.error(`Failed to set ${key}:`, error.message);
+    return false;
+  }
+}
+
+// AI provider to env var mapping
+const AI_PROVIDER_ENV_VARS = {
+  anthropic: { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
+  openai: { key: 'OPENAI_API_KEY', label: 'OpenAI API Key' },
+  gemini: { key: 'GOOGLE_API_KEY', label: 'Google API Key' },
+  ollama: null, // Local, no key needed
+};
 
 /**
  * Editor helper for multi-line fields
@@ -91,6 +149,13 @@ const CONFIG_SECTIONS = [
           { value: 'gemini', label: 'Google Gemini' },
         ],
         description: 'AI for background tasks (summaries, tagging)'
+      },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'encrypted',
+        dynamic: true, // Label and env var change based on provider
+        description: 'API key for the selected provider'
       },
       {
         key: 'model',
@@ -233,7 +298,33 @@ function ConfigApp({ onAction }) {
   const field = section.fields[fieldIndex];
   const currentValue = field.path ? getConfigValue(config, field.path, field.default) : null;
 
-  // Handle keyboard input
+  // Get current provider for dynamic API key field
+  const currentProvider = getConfigValue(config, ['ai', 'provider'], 'anthropic');
+  const providerEnvVar = AI_PROVIDER_ENV_VARS[currentProvider];
+
+  // Get dynamic field info for encrypted API key fields
+  const getFieldInfo = (f) => {
+    if (f.type === 'encrypted' && f.dynamic) {
+      if (!providerEnvVar) {
+        return { label: 'API Key (not needed for Ollama)', envVar: null, hidden: true };
+      }
+      return { label: providerEnvVar.label, envVar: providerEnvVar.key, hidden: false };
+    }
+    return { label: f.label, envVar: null, hidden: false };
+  };
+
+  const fieldInfo = getFieldInfo(field);
+
+  // Handle escape key in non-navigate modes
+  useInput((input, key) => {
+    if (mode === 'navigate') return;
+
+    if (key.escape) {
+      setMode('navigate');
+    }
+  });
+
+  // Handle keyboard input in navigate mode
   useInput((input, key) => {
     if (mode !== 'navigate') return;
 
@@ -265,6 +356,13 @@ function ConfigApp({ onAction }) {
         }
       } else if (field.type === 'select') {
         setMode('select');
+      } else if (field.type === 'encrypted') {
+        // Skip if field is hidden (e.g., Ollama doesn't need API key)
+        if (fieldInfo.hidden) return;
+        // Get current decrypted value for editing
+        const decryptedValue = fieldInfo.envVar ? (getEnvVar(fieldInfo.envVar) || '') : '';
+        setEditValue(decryptedValue);
+        setMode('edit');
       } else {
         setEditValue(String(currentValue || ''));
         setMode('edit');
@@ -274,11 +372,19 @@ function ConfigApp({ onAction }) {
 
   // Save a field value
   const saveField = (value) => {
-    const newConfig = JSON.parse(JSON.stringify(config)); // Deep clone
-    setConfigValue(newConfig, field.path, value);
-    writeConfig(newConfig);
-    setConfig(readConfig());
-    setMode('navigate');
+    if (field.type === 'encrypted') {
+      // Save encrypted value to .env
+      if (fieldInfo.envVar && value) {
+        setEnvVar(fieldInfo.envVar, value);
+      }
+      setMode('navigate');
+    } else {
+      const newConfig = JSON.parse(JSON.stringify(config)); // Deep clone
+      setConfigValue(newConfig, field.path, value);
+      writeConfig(newConfig);
+      setConfig(readConfig());
+      setMode('navigate');
+    }
   };
 
   // Cancel editing
@@ -301,6 +407,7 @@ function ConfigApp({ onAction }) {
   // Render fields list
   const fields = section.fields.map((f, i) => {
     const isSelected = i === fieldIndex;
+    const fInfo = getFieldInfo(f);
 
     if (f.type === 'action') {
       return html`
@@ -309,6 +416,23 @@ function ConfigApp({ onAction }) {
             ${isSelected ? '▸ ' : '  '}${f.label}
           </${Text}>
           <${Text} dimColor> → Press Enter to open</${Text}>
+        </${Box}>
+      `;
+    }
+
+    // Handle encrypted fields
+    if (f.type === 'encrypted') {
+      const hasValue = fInfo.envVar ? hasEnvVar(fInfo.envVar) : false;
+      const displayValue = fInfo.hidden ? '—' : (hasValue ? '••••••••' : '(not set)');
+      const editHint = fInfo.hidden ? '' : ' [encrypted]';
+
+      return html`
+        <${Box} key=${'field-' + section.key + '-' + f.key}>
+          <${Text} color=${isSelected ? 'cyan' : 'white'} dimColor=${fInfo.hidden}>
+            ${isSelected ? '▸ ' : '  '}${fInfo.label}:
+          </${Text}>
+          <${Text} color=${fInfo.hidden ? 'gray' : 'green'}> ${displayValue}</${Text}>
+          ${isSelected && editHint ? html`<${Text} dimColor>${editHint}</${Text}>` : null}
         </${Box}>
       `;
     }
@@ -343,12 +467,12 @@ function ConfigApp({ onAction }) {
   // Edit mode UI
   const editUI = mode === 'edit' ? html`
     <${Box} flexDirection="column" borderStyle="single" borderColor="yellow" paddingX=${1} marginTop=${1}>
-      <${Text} bold color="yellow">${field.label}</${Text}>
+      <${Text} bold color="yellow">${fieldInfo.label}</${Text}>
       <${Box} marginTop=${1}>
         <${TextInput}
           defaultValue=${editValue}
           onSubmit=${saveField}
-          placeholder="Enter value..."
+          placeholder=${field.type === 'encrypted' ? 'Enter API key...' : 'Enter value...'}
         />
       </${Box}>
       <${Box} marginTop=${1}>
