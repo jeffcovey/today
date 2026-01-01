@@ -5,13 +5,28 @@
 
 import express from 'express';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { getVaultPath } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
+
+// Get vault path from config (supports absolute or relative paths)
+function getAbsoluteVaultPath() {
+  const vaultPath = getVaultPath();
+  if (path.isAbsolute(vaultPath)) {
+    return vaultPath;
+  }
+  // Handle ~ for home directory
+  if (vaultPath.startsWith('~/')) {
+    return path.join(process.env.HOME || '', vaultPath.slice(2));
+  }
+  return path.join(projectRoot, vaultPath);
+}
 
 const app = express();
 const PORT = process.env.VAULT_API_PORT || 3334;
@@ -41,9 +56,10 @@ async function getApiKey() {
 }
 
 const API_KEY = await getApiKey();
-const INBOX_DIR = path.join(projectRoot, 'vault/inbox');
+const VAULT_PATH = getAbsoluteVaultPath();
+const INBOX_DIR = path.join(VAULT_PATH, 'inbox');
 
-// Ensure inbox directory exists
+// Ensure inbox directory exists (creates vault dir if needed)
 await fs.mkdir(INBOX_DIR, { recursive: true }).catch(() => {});
 
 // Log the API key on startup (only in development)
@@ -67,16 +83,15 @@ const authenticateApiKey = (req, res, next) => {
 // List all vault markdown files
 app.get('/vault/list', authenticateApiKey, async (req, res) => {
   try {
-    const vaultPath = path.join(projectRoot, 'vault');
     const files = [];
-    
+
     async function scanDir(dir, basePath = '') {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.join(basePath, entry.name);
-        
+
         if (entry.isDirectory() && !entry.name.startsWith('.')) {
           // Recurse into subdirectories
           await scanDir(fullPath, relativePath);
@@ -85,9 +100,9 @@ app.get('/vault/list', authenticateApiKey, async (req, res) => {
           const stats = await fs.stat(fullPath);
           const content = await fs.readFile(fullPath, 'utf8');
           const sha = crypto.createHash('sha256').update(content).digest('hex');
-          
+
           files.push({
-            path: `vault/${relativePath.replace(/\\/g, '/')}`,
+            path: relativePath.replace(/\\/g, '/'),
             modified: stats.mtime.toISOString(),
             size: stats.size,
             sha: sha
@@ -95,8 +110,8 @@ app.get('/vault/list', authenticateApiKey, async (req, res) => {
         }
       }
     }
-    
-    await scanDir(vaultPath);
+
+    await scanDir(VAULT_PATH);
     
     res.json({
       success: true,
@@ -117,7 +132,7 @@ app.get('/vault/file/*', authenticateApiKey, async (req, res) => {
   try {
     // Get the file path from the URL
     const requestedPath = req.params[0];
-    
+
     // Security: ensure the path doesn't escape the vault directory
     if (requestedPath.includes('..') || requestedPath.startsWith('/')) {
       return res.status(400).json({
@@ -125,31 +140,31 @@ app.get('/vault/file/*', authenticateApiKey, async (req, res) => {
         message: 'Path traversal not allowed'
       });
     }
-    
-    const filePath = path.join(projectRoot, 'vault', requestedPath);
-    
+
+    const filePath = path.join(VAULT_PATH, requestedPath);
+
     // Check if file exists and is within vault
     const realPath = await fs.realpath(filePath).catch(() => null);
-    const vaultPath = await fs.realpath(path.join(projectRoot, 'vault'));
-    
-    if (!realPath || !realPath.startsWith(vaultPath)) {
+    const realVaultPath = await fs.realpath(VAULT_PATH);
+
+    if (!realPath || !realPath.startsWith(realVaultPath)) {
       return res.status(404).json({
         error: 'File not found',
-        path: `vault/${requestedPath}`
+        path: requestedPath
       });
     }
-    
+
     // Read the file
     const content = await fs.readFile(filePath, 'utf8');
     const stats = await fs.stat(filePath);
     const sha = crypto.createHash('sha256').update(content).digest('hex');
-    
+
     // Encode content as Base64 to avoid JSON parsing issues with special characters
     const contentBase64 = Buffer.from(content, 'utf8').toString('base64');
-    
+
     res.json({
       success: true,
-      path: `vault/${requestedPath}`,
+      path: requestedPath,
       content: contentBase64,
       contentEncoding: 'base64',
       modified: stats.mtime.toISOString(),
@@ -158,14 +173,14 @@ app.get('/vault/file/*', authenticateApiKey, async (req, res) => {
     });
   } catch (error) {
     console.error('Error reading vault file:', error);
-    
+
     if (error.code === 'ENOENT') {
       return res.status(404).json({
         error: 'File not found',
-        path: `vault/${req.params[0]}`
+        path: req.params[0]
       });
     }
-    
+
     res.status(500).json({
       error: 'Failed to read file',
       message: error.message
@@ -198,10 +213,8 @@ app.post('/vault/batch', authenticateApiKey, async (req, res) => {
           });
           continue;
         }
-        
-        // Remove 'vault/' prefix if present
-        const cleanPath = requestedPath.replace(/^vault\//, '');
-        const filePath = path.join(projectRoot, 'vault', cleanPath);
+
+        const filePath = path.join(VAULT_PATH, requestedPath);
         
         const content = await fs.readFile(filePath, 'utf8');
         const stats = await fs.stat(filePath);
@@ -287,7 +300,7 @@ app.post('/inbox/upload', authenticateApiKey, async (req, res) => {
     res.json({
       success: true,
       filename,
-      path: `vault/inbox/${filename}`,
+      path: `inbox/${filename}`,
       size: Buffer.byteLength(content, 'utf8')
     });
     
@@ -336,6 +349,7 @@ app.get('/health', (req, res) => {
 // Start server
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`Vault API server running on http://127.0.0.1:${PORT}`);
+  console.log(`Vault path: ${VAULT_PATH}`);
   console.log(`API Key: ${API_KEY}`);
   console.log(`Health check: http://127.0.0.1:${PORT}/health`);
   console.log('');

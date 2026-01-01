@@ -13,7 +13,7 @@
 import { getChangedFiles, formatChangesAsContext } from '../../src/vault-changes.js';
 
 // Read settings from environment (set by plugin loader)
-const directory = process.env.PLUGIN_SETTING_DIRECTORY || 'vault';
+const directory = process.env.PLUGIN_SETTING_DIRECTORY || process.env.VAULT_PATH;
 const excludeDirsStr = process.env.PLUGIN_SETTING_EXCLUDEDIRS || '.sync,templates,.git,.git.nosync,.obsidian,.trash';
 const excludeDirs = new Set(excludeDirsStr.split(',').map(d => d.trim()));
 

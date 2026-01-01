@@ -27,8 +27,8 @@ import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
-const plansDirectory = config.plans_directory || 'vault/plans';
-const templatesDirectory = config.templates_directory || 'vault/plans/templates';
+const plansDirectory = config.plans_directory || `${process.env.VAULT_PATH}/plans`;
+const templatesDirectory = config.templates_directory || `${process.env.VAULT_PATH}/plans/templates`;
 const linkDailyNotes = config.link_daily_notes !== false; // opt-out, default true
 const plansDir = path.join(projectRoot, plansDirectory);
 const templatesDir = path.join(projectRoot, templatesDirectory);

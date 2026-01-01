@@ -12,7 +12,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 // Read settings from environment (set by plugin loader)
-const directory = process.env.PLUGIN_SETTING_DIRECTORY || 'vault';
+const directory = process.env.PLUGIN_SETTING_DIRECTORY || process.env.VAULT_PATH;
 
 /**
  * Find all iCloud duplicate files in the directory

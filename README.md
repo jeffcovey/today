@@ -236,7 +236,7 @@ See `.env.example` for the full list.
 
 ## Vault Structure
 
-Your personal data lives in the `vault/` directory. On first run, `bin/today` will offer to initialize it from the `skeleton/` template.
+Your personal data lives in the `vault/` directory (configurable via `vault_path` in config.toml). Plugins automatically create their required directories when first used.
 
 ```
 vault/
@@ -502,7 +502,6 @@ npm run lint:md:fix            # Auto-fix markdown issues
 ## Documentation
 
 - [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
-- [Vault README](skeleton/README.md) - Detailed vault documentation
 
 ## License
 

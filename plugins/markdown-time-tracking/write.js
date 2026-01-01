@@ -13,7 +13,7 @@ import path from 'path';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const entryJson = process.env.ENTRY_JSON || '';
-const directory = config.directory || 'vault/logs/time-tracking';
+const directory = config.directory || `${process.env.VAULT_PATH}/logs/time-tracking`;
 
 const timeDir = path.join(projectRoot, directory);
 const currentTimerFile = path.join(timeDir, 'current-timer.md');

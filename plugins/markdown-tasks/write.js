@@ -18,8 +18,8 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const entryJson = process.env.ENTRY_JSON || '';
 
-const directory = config.directory || 'vault';
-const defaultTaskFile = config.default_task_file || 'vault/tasks/tasks.md';
+const directory = config.directory || process.env.VAULT_PATH;
+const defaultTaskFile = config.default_task_file || `${process.env.VAULT_PATH}/tasks/tasks.md`;
 
 // Priority mappings
 const priorityToEmoji = {

@@ -58,6 +58,7 @@ const CONFIG_SECTIONS = [
     fields: [
       { key: 'timezone', label: 'Current Timezone', path: ['timezone'], default: 'America/New_York' },
       { key: 'location', label: 'Current Location', path: ['location'], default: '' },
+      { key: 'vault_path', label: 'Vault Path', path: ['vault_path'], default: 'vault', description: 'Path to markdown notes directory (e.g., vault, notes, ~/Obsidian)' },
     ]
   },
   {

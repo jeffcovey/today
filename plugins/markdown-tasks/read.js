@@ -18,7 +18,7 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 const fileFilter = process.env.FILE_FILTER || '';  // Sync only specific file(s)
 
-const directory = config.directory || 'vault';
+const directory = config.directory || process.env.VAULT_PATH;
 const excludePaths = (config.exclude_paths || 'templates,.obsidian')
   .split(',')
   .map(p => p.trim())

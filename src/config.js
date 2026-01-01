@@ -97,3 +97,20 @@ export function getApiModel() {
 export function getClaudeModel() {
   return getApiModel();
 }
+
+/**
+ * Get the vault path (directory for markdown notes).
+ * Returns configured path or 'vault' as default.
+ */
+export function getVaultPath() {
+  const config = readConfig();
+  return config.vault_path || 'vault';
+}
+
+/**
+ * Get the absolute vault path.
+ */
+export function getAbsoluteVaultPath() {
+  const projectRoot = join(__dirname, '..');
+  return join(projectRoot, getVaultPath());
+}

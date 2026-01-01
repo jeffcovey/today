@@ -22,9 +22,9 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 // Read settings from environment (set by plugin loader)
-const inboxDirectory = process.env.PLUGIN_SETTING_INBOX_DIRECTORY || 'vault/inbox';
-const diaryDirectory = process.env.PLUGIN_SETTING_DIARY_DIRECTORY || 'vault/diary';
-const tasksFile = process.env.PLUGIN_SETTING_TASKS_FILE || 'vault/tasks/tasks.md';
+const inboxDirectory = process.env.PLUGIN_SETTING_INBOX_DIRECTORY || `${process.env.VAULT_PATH}/inbox`;
+const diaryDirectory = process.env.PLUGIN_SETTING_DIARY_DIRECTORY || `${process.env.VAULT_PATH}/diary`;
+const tasksFile = process.env.PLUGIN_SETTING_TASKS_FILE || `${process.env.VAULT_PATH}/tasks/tasks.md`;
 const trashRetentionDays = parseInt(process.env.PLUGIN_SETTING_TRASH_RETENTION_DAYS || '7', 10);
 
 // Resolve paths relative to project root

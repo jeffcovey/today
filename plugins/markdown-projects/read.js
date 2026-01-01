@@ -11,7 +11,7 @@ import path from 'path';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
-const directory = config.directory || 'vault/projects';
+const directory = config.directory || `${process.env.VAULT_PATH}/projects`;
 const excludePaths = (config.exclude_paths || 'templates,zz-attachments')
   .split(',')
   .map(p => p.trim())

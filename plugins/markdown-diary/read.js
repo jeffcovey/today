@@ -23,7 +23,7 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 
-const diaryDirectory = config.diary_directory || 'vault/diary';
+const diaryDirectory = config.diary_directory || `${process.env.VAULT_PATH}/diary`;
 const diaryDir = path.join(projectRoot, diaryDirectory);
 
 // Parse last sync time for incremental sync

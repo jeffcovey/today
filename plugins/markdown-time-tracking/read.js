@@ -12,7 +12,7 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 const daysToSync = config.days_to_sync || 365;
-const directory = config.directory || 'vault/logs/time-tracking';
+const directory = config.directory || `${process.env.VAULT_PATH}/logs/time-tracking`;
 
 const timeDir = path.join(projectRoot, directory);
 

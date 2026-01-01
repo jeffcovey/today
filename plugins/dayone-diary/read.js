@@ -12,7 +12,7 @@ import path from 'path';
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
-const journalFile = config.journal_file || 'vault/logs/Journal.json';
+const journalFile = config.journal_file || `${process.env.VAULT_PATH}/logs/Journal.json`;
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 
 const journalPath = path.join(projectRoot, journalFile);

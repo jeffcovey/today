@@ -11,7 +11,7 @@ import path from 'path';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
-const logsDirectory = config.logs_directory || 'vault/logs';
+const logsDirectory = config.logs_directory || `${process.env.VAULT_PATH}/logs`;
 const retentionDays = config.retention_days || 30;
 const cleanupOldFiles = config.cleanup_old_files || false;
 

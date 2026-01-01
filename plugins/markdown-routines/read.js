@@ -25,7 +25,7 @@ import { TZDate } from '@date-fns/tz';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
-const routinesDirectory = config.routines_directory || 'vault/routines';
+const routinesDirectory = config.routines_directory || `${process.env.VAULT_PATH}/routines`;
 const historyLimit = config.history_limit || 30;
 
 // Get timezone from global config

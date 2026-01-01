@@ -4,7 +4,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
-import { getFullConfig } from './config.js';
+import { getFullConfig, getVaultPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
@@ -164,6 +164,7 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
   try {
     // Run from project root so relative paths in plugins work correctly
     // Explicitly pipe all stdio to prevent stderr from leaking to terminal
+    const vaultPath = getVaultPath();
     const output = execSync(fullPath, {
       cwd: PROJECT_ROOT,
       encoding: 'utf8',
@@ -171,6 +172,7 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
       env: {
         ...process.env,
         PROJECT_ROOT,
+        VAULT_PATH: vaultPath,
         PLUGIN_CONFIG: JSON.stringify(sourceConfig),
         ...extraEnv
       },
