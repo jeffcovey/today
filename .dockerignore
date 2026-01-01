@@ -7,6 +7,7 @@ Dockerfile
 .dockerignore
 .data/
 .sync-config.json
-.env.local
+.env
+.env.keys
 .DS_Store
 *.log

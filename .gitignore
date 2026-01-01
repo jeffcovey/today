@@ -1,10 +1,9 @@
 # =============================================================================
 # Environment & Secrets
 # =============================================================================
-# Environment files (users create from .env.example)
+# Environment files (created by plugin configuration)
 .env
 .env.keys
-.env.local
 
 # =============================================================================
 # User Configuration (copy from *.example files)

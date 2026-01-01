@@ -49,29 +49,33 @@ function getEnvVar(key) {
 }
 
 /**
- * Set an environment variable (encrypted by default)
+ * Set an environment variable (always encrypted)
  * Creates .env file if it doesn't exist
+ * dotenvx automatically creates .env.keys on first encryption
  * @param {string} key - Environment variable name
  * @param {string} value - Value to set
+ * @returns {boolean} - True if successful
  */
 function setEnvVar(key, value) {
   // Create .env if it doesn't exist
   if (!fs.existsSync(ENV_PATH)) {
-    fs.writeFileSync(ENV_PATH, '# Environment variables\n# Encrypted with dotenvx\n\n');
+    fs.writeFileSync(ENV_PATH, '# Environment variables for Today\n\n');
   }
 
+  // Escape the value for shell
+  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+
   try {
-    // Use dotenvx set to encrypt and save
-    execSync(`npx dotenvx set ${key} "${value.replace(/"/g, '\\"')}"`, {
+    // dotenvx set encrypts by default and creates .env.keys if needed
+    execSync(`npx dotenvx set ${key} "${escapedValue}"`, {
       cwd: projectRoot,
       stdio: ['pipe', 'pipe', 'pipe']
     });
+    return true;
   } catch (error) {
-    // If encryption fails (no keys), set as plain text
-    execSync(`npx dotenvx set ${key} "${value.replace(/"/g, '\\"')}" --plain`, {
-      cwd: projectRoot,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    // Log error for debugging
+    console.error(`Failed to set ${key}:`, error.message);
+    return false;
   }
 }
 
