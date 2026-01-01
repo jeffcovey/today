@@ -246,3 +246,62 @@ export function clearProviderCache() {
   googleProvider = null;
   ollamaProvider = null;
 }
+
+/**
+ * Provider requirements for interactive sessions
+ */
+const INTERACTIVE_PROVIDER_REQUIREMENTS = {
+  anthropic: {
+    binary: 'claude',
+    name: 'Claude Code CLI',
+    installInstructions: [
+      'npm install -g @anthropic-ai/claude-code',
+      '',
+      'Then authenticate by running:',
+      '   claude',
+    ],
+  },
+  ollama: {
+    binary: 'ollama',
+    name: 'Ollama',
+    installInstructions: [
+      'Install from: https://ollama.ai/download',
+      '',
+      'Then start the server:',
+      '   ollama serve',
+    ],
+  },
+  // API-only providers don't need binaries for interactive use
+  // (though they may not support interactive mode yet)
+  openai: null,
+  google: null,
+  gemini: null,
+};
+
+/**
+ * Get the interactive provider requirements
+ * @returns {Object} - The requirements mapping
+ */
+export function getInteractiveProviderRequirements() {
+  return INTERACTIVE_PROVIDER_REQUIREMENTS;
+}
+
+/**
+ * Check if a provider's binary requirements are met (sync version for CLI use)
+ * @param {string} providerName - The provider to check
+ * @param {function} spawnSync - The spawnSync function to use
+ * @returns {{ available: boolean, requirement?: object }}
+ */
+export function checkProviderBinarySync(providerName, spawnSync) {
+  const requirement = INTERACTIVE_PROVIDER_REQUIREMENTS[providerName];
+
+  if (!requirement) {
+    // No binary required
+    return { available: true };
+  }
+
+  const which = spawnSync('which', [requirement.binary], { encoding: 'utf8' });
+  const available = which.status === 0;
+
+  return { available, requirement };
+}

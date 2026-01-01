@@ -79,7 +79,7 @@ async function main() {
   const { execSync, spawnSync } = await import('child_process');
 
   const { getTimezone, getFullConfig, configExists } = await import('../src/config.js');
-  const { getInteractiveModel, getInteractiveProviderName } = await import('../src/ai-provider.js');
+  const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
   const { getAIInstructionsByType, getPluginSources } = await import('../src/plugin-loader.js');
   const { program } = await import('commander');
   const { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } = await import('../src/plugin-schemas.js');
@@ -373,6 +373,21 @@ ${contextSection}`;
     const interactiveProvider = getInteractiveProviderName();
     const model = getInteractiveModel();
 
+    // Check if this provider requires a binary and if it's installed
+    const { available, requirement } = checkProviderBinarySync(interactiveProvider, spawnSync);
+
+    if (!available && requirement) {
+      console.error(`❌ ${requirement.name} not found.`);
+      console.error('');
+      console.error('Install it with:');
+      for (const line of requirement.installInstructions) {
+        console.error(`   ${line}`);
+      }
+      console.error('');
+      process.exit(1);
+    }
+
+    // Currently only anthropic provider supports interactive sessions
     if (interactiveProvider !== 'anthropic') {
       console.error(`Error: Interactive sessions only support 'anthropic' provider currently.`);
       console.error(`Your config has: interactive_provider = "${interactiveProvider}"`);
