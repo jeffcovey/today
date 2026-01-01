@@ -6,8 +6,6 @@ displayName = "Front Conversations"
 description = "Support conversations from Front (frontapp.com)"
 type = "issues"
 
-requiredEnv = ["FRONT_API_TOKEN"]
-
 longDescription = """
 Syncs conversations from Front as issues using the Front Core API.
 
@@ -17,8 +15,7 @@ Syncs conversations from Front as issues using the Front Core API.
 2. Click "Create API token"
 3. Name it descriptively (e.g., "Today System Sync")
 4. Select scope with conversation read access
-5. Copy the token and add to your .env file:
-   FRONT_API_TOKEN=your_token_here
+5. Use "bin/today configure" to add your token securely
 
 ## Schema Mapping
 
@@ -44,6 +41,7 @@ The metadata JSON contains:
 read = "./read.js"
 
 [settings]
+api_token = { type = "string", default = "", description = "Front API token", encrypted = true }
 inbox_ids = { type = "string", required = false, description = "Comma-separated inbox IDs to sync (omit for all inboxes)" }
 assignee = { type = "string", required = false, description = "Filter by assignee email (omit for all assignees)" }
 include_archived = { type = "boolean", default = false, description = "Include archived conversations" }

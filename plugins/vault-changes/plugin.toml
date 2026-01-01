@@ -6,7 +6,6 @@ displayName = "Vault Changes"
 description = "Shows files modified or added today, plus git status"
 type = "context"
 
-requiredEnv = []
 
 longDescription = """
 Reports which vault files have changed today and provides git status information.

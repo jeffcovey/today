@@ -6,7 +6,6 @@ displayName = "GitHub Projects"
 description = "Sync projects from GitHub Projects V2"
 type = "projects"
 
-requiredEnv = []
 
 longDescription = """
 Syncs GitHub Projects V2 from users, repositories, or organizations.

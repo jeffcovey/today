@@ -6,7 +6,6 @@ displayName = "iCloud Conflict Cleanup"
 description = "Clean up duplicate files created by iCloud Drive sync"
 type = "utility"
 
-requiredEnv = []
 
 longDescription = """
 Cleans up duplicate files created by iCloud Drive sync.

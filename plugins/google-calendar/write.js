@@ -37,10 +37,10 @@ async function main() {
     return;
   }
 
-  // Get service account credentials
-  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  // Get service account credentials (injected by plugin-loader from encrypted env var)
+  const serviceAccountKey = config.service_account_key;
   if (!serviceAccountKey) {
-    console.log(JSON.stringify({ success: false, error: 'GOOGLE_SERVICE_ACCOUNT_KEY not set' }));
+    console.log(JSON.stringify({ success: false, error: 'Google service account key not configured. Use "bin/today configure" to set up credentials.' }));
     return;
   }
 
