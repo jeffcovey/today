@@ -89,138 +89,16 @@ You can configure multiple sources for each plugin, for example, for a work Gmai
 
 You can manage your plugins with `bin/today configure` (which just calls out to `bin/plugins configure` if you want to go straight there), or edit ./config.toml directly. You can see what will be passed to the AI with `bin/today dry-run`.
 
----
-
 ## Vault & Obsidian
 
 Many file-based plugins look for a "vault" directory and follow some [Obsidian](https://obsidian.md) conventions. The path to the vault can be configured, and defaults to `vault/` under Today's directory. Plugins automatically create their required directories inside the vault when first used.
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, Obsidian, etc.). Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
 
----
-
-### Inbox Processing
-
-The `vault/inbox/` directory is a drop zone for quick capture. The inbox-processing plugin automatically processes files based on their content:
-
-| File Type | Detection | Action |
-|-----------|-----------|--------|
-| **Progress notes** | First line is `# Progress` | Appended to diary file, moved to `.trash` |
-| **Concern notes** | First line is `# Concerns` or filename contains "concerns" | Appended to diary file, moved to `.trash` |
-| **Task files** | Contains only checkbox lines (`- [ ]` or `- [x]`) | Tasks appended to `tasks/tasks.md`, moved to `.trash` |
-| **Other notes** | Default | Left in inbox for user review |
-
-Processed files are kept in `vault/inbox/.trash/` for 7 days (configurable) before automatic deletion.
-
-#### Quick Capture with Mobile Apps
-
-The inbox works great with quick-capture apps that can save files to a synced folder:
-
-**[Drafts](https://getdrafts.com/)** (iOS/Mac) - Create actions that save notes to your inbox:
-
-```
-# Progress note action
-Title: Progress
-Body: {{date}} {{time}}
-{{draft}}
-Save to: vault/inbox/progress-{{timestamp}}.md
-
-# Quick task action
-Body: - [ ] {{draft}}
-Save to: vault/inbox/task-{{timestamp}}.md
-```
-
-**[TextExpander](https://textexpander.com/)** - Create snippets for note formats:
-
-```
-# Progress snippet (;prog)
-# Progress
-%B %e, %Y %H:%M
-<cursor>
-
-# Concerns snippet (;concern)
-# Concerns
-%B %e, %Y %H:%M
-<cursor>
-```
-
-The date format `December 7, 2025 14:30` is parsed to determine which plan file to append to.
-
-
-## Automation
-
-The scheduler (`src/scheduler.js`) automates daily operations:
-
-- **Every 10 minutes**: Quick sync (vault and tasks)
-- **Every hour**: Full sync + task classification + auto-tagging
-- **Every 2 hours**: Update daily plans with Claude API
-- **Daily at 1 AM**: Archive completed tasks
-- **Daily at 2 AM**: Vault snapshot backup
-
-### Running the Scheduler
-
-**Option 1: Run Locally**
-
-```bash
-# Run scheduler in foreground
-node src/scheduler.js
-
-# Or run in background with pm2
-npm install -g pm2
-pm2 start src/scheduler.js --name today-scheduler
-pm2 save
-```
-
-**Option 2: System cron** (manual setup)
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add entries like:
-*/10 * * * * cd /path/to/today && bin/sync --quick
-0 */2 * * * cd /path/to/today && bin/today update
-```
-
-### Important: Version Control Your Vault
-
-**The scheduler modifies files automatically without asking.** It will update daily plans, archive tasks, and sync data. To track these changes and recover if needed:
-
-```bash
-cd vault
-git init
-git add .
-git commit -m "Initial vault"
-
-# After running the scheduler, review changes:
-git status
-git diff
-```
-
-This lets you see exactly what the scheduler changed and revert if needed.
-
-## Development
-
-### Using the Devcontainer
-
-The easiest way to develop is using VS Code's devcontainer:
-
-1. Install [Docker](https://www.docker.com/) and [VS Code](https://code.visualstudio.com/)
-2. Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension
-3. Open this folder in VS Code
-4. Click "Reopen in Container" when prompted
-
-### Running Tests
-
-```bash
-npm test                       # Run all tests
-npm run test:watch             # Watch mode
-npm run test:coverage          # Coverage report
-```
-
 ## Documentation
 
-- [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
+- [AI Providers Guide](docs/AI_PROVIDERS.md) - Configure AI backends (Claude, OpenAI, Ollama)
+- [Plugin Development](plugins/README.md) - Create custom plugins
 
 ## License
 
