@@ -139,8 +139,7 @@ const host = config.host;
 const port = config.port || 993;
 const secure = config.secure !== false;
 const username = config.username;
-const passwordEnv = config.password_env || 'EMAIL_PASSWORD';
-const password = process.env[passwordEnv];
+const password = config.password;  // Injected by plugin-loader from encrypted env var
 
 const daysToSync = config.days_to_sync || 30;
 const configuredFolders = config.folders ? config.folders.split(',').map(f => f.trim()) : null;
@@ -163,8 +162,8 @@ if (!username) {
 }
 
 if (!password) {
-  console.error(`Error: Password not found in environment variable ${passwordEnv}`);
-  console.log(JSON.stringify({ entries: [], metadata: { error: `${passwordEnv} not set` } }));
+  console.error('Error: Password not configured. Use "bin/today configure" to set up IMAP credentials.');
+  console.log(JSON.stringify({ entries: [], metadata: { error: 'password not configured' } }));
   process.exit(0);
 }
 

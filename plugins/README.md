@@ -142,9 +142,6 @@ displayName = "My Plugin"
 description = "Short description (shown in plugin list)"
 type = "time-logs"           # Data type (see Plugin Types below)
 
-# Environment variables required to run
-requiredEnv = ["API_TOKEN"]
-
 # Long description for users (shown by `bin/plugins info`)
 longDescription = """
 Detailed documentation about this plugin, including:
@@ -172,7 +169,42 @@ days_to_sync = { type = "number", default = 365 }
 directory = { type = "string", default = "vault/logs/time-tracking" }
 auto_add_topics = { type = "boolean", default = false, description = "Automatically add topic tags using AI" }
 taggable_field = { type = "string", default = "description", description = "Database field to add topic tags to" }
+
+# Encrypted settings for secrets (API keys, passwords, tokens)
+# These are stored encrypted in .env and injected at runtime
+api_token = { type = "string", default = "", description = "API token", encrypted = true }
 ```
+
+## Encrypted Settings
+
+For plugins that require secrets (API keys, passwords, tokens), use `encrypted = true` in the setting definition:
+
+```toml
+[settings]
+api_token = { type = "string", default = "", description = "API token", encrypted = true }
+password = { type = "string", default = "", description = "Password", encrypted = true }
+```
+
+**How it works:**
+
+1. Users configure secrets via `bin/today configure` or `bin/plugins configure`
+2. Values are encrypted and stored in `.env` using dotenvx
+3. Environment variable names are auto-generated: `TODAY_<PLUGIN>_<SOURCE>_<SETTING>`
+   - Example: `TODAY_IMAP_EMAIL_WORK_PASSWORD` for `imap-email/work` source's `password` setting
+4. At runtime, the plugin-loader decrypts and injects values into `PLUGIN_CONFIG`
+
+**In your read/write commands**, access encrypted settings just like regular config:
+
+```javascript
+const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const apiToken = config.api_token;  // Decrypted value injected by plugin-loader
+```
+
+**Benefits:**
+- Secrets never stored in plain text
+- Unique env var per source (no conflicts between multiple sources)
+- Users don't need to manually manage environment variables
+- Encryption keys stored separately in `.env.keys`
 
 ## Writing a Read Command
 

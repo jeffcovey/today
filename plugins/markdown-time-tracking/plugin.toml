@@ -6,7 +6,6 @@ displayName = "Markdown Time Tracking"
 description = "Sync local markdown time tracking files to database"
 type = "time-logs"
 
-requiredEnv = []
 
 longDescription = """
 Syncs time entries from markdown files in your vault to the database.

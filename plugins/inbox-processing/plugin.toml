@@ -6,7 +6,6 @@ displayName = "Inbox Processing"
 description = "Process inbox files and route them to diary, tasks, or leave for review"
 type = "utility"
 
-requiredEnv = []
 
 longDescription = """
 Processes files dropped into the inbox directory and routes them based on content:

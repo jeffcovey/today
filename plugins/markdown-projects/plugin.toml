@@ -6,7 +6,6 @@ displayName = "Markdown Projects"
 description = "Sync project files from vault to database"
 type = "projects"
 
-requiredEnv = []
 
 longDescription = """
 Syncs project files from your vault to the database.

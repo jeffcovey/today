@@ -6,8 +6,6 @@ displayName = "Google Calendar"
 description = "Sync events from Google Calendar (read/write)"
 type = "events"
 
-requiredEnv = ["GOOGLE_SERVICE_ACCOUNT_KEY"]
-
 longDescription = """
 Fetches calendar events from Google Calendar using service account authentication.
 Supports multiple calendars and can create/update/delete events.
@@ -17,7 +15,7 @@ Setup:
 2. Enable Google Calendar API
 3. Share your calendar(s) with the service account email
 4. Base64-encode the service account JSON key
-5. Set GOOGLE_SERVICE_ACCOUNT_KEY in .env
+5. Use "bin/today configure" to add your key securely
 
 Each calendar is configured as a separate source in config.toml:
 
@@ -35,6 +33,7 @@ read = "./read.js"
 write = "./write.js"
 
 [settings]
+service_account_key = { type = "string", default = "", description = "Base64-encoded Google service account JSON key", encrypted = true }
 calendar_id = { type = "string", required = true, description = "Google Calendar ID (email or calendar ID)" }
 days_back = { type = "number", default = 7, description = "Days in the past to include" }
 days_forward = { type = "number", default = 30, description = "Days in the future to include" }

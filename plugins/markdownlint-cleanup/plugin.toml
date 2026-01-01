@@ -6,7 +6,6 @@ displayName = "Markdownlint Cleanup"
 description = "Auto-fix markdown formatting issues using markdownlint-cli2"
 type = "utility"
 
-requiredEnv = []
 
 longDescription = """
 Runs markdownlint-cli2 with --fix to automatically correct markdown formatting

@@ -6,7 +6,6 @@ displayName = "GitHub Issues"
 description = "Issue tracking from GitHub repositories"
 type = "issues"
 
-requiredEnv = []
 
 longDescription = """
 Syncs issues from GitHub repositories using the gh CLI.

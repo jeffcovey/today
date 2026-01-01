@@ -13,6 +13,55 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
 
+// ============================================================================
+// Encrypted settings helpers
+// ============================================================================
+
+/**
+ * Generate a unique environment variable name for encrypted settings
+ * Must match the formula in plugins-configure-ui.js
+ */
+function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
+  const sanitize = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
+}
+
+/**
+ * Get a decrypted environment variable value using dotenvx
+ */
+function getDecryptedEnvVar(key) {
+  try {
+    const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return result.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Inject decrypted values for encrypted settings into source config
+ */
+function injectDecryptedSettings(plugin, sourceName, sourceConfig) {
+  const settings = plugin.settings || {};
+  const injected = { ...sourceConfig };
+
+  for (const [key, def] of Object.entries(settings)) {
+    if (def.encrypted) {
+      const envVarName = getEncryptedEnvVarName(plugin.name, sourceName, key);
+      const value = getDecryptedEnvVar(envVarName);
+      if (value) {
+        injected[key] = value;
+      }
+    }
+  }
+
+  return injected;
+}
+
 // Cache of loaded plugins
 const pluginCache = new Map();
 
@@ -148,9 +197,10 @@ export function isPluginConfigured(pluginName) {
  * @param {string} command - Command name (e.g., 'read', 'write')
  * @param {object} sourceConfig - Source configuration from config.toml
  * @param {object} extraEnv - Additional environment variables
+ * @param {string} [sourceName] - Source name for decrypting encrypted settings
  * @returns {{success: boolean, data?: any, error?: string}}
  */
-function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
+function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
     return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
@@ -160,6 +210,11 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
   if (!fs.existsSync(fullPath)) {
     return { success: false, error: `Command not found: ${fullPath}` };
   }
+
+  // Inject decrypted values for encrypted settings
+  const configWithSecrets = sourceName
+    ? injectDecryptedSettings(plugin, sourceName, sourceConfig)
+    : sourceConfig;
 
   try {
     // Run from project root so relative paths in plugins work correctly
@@ -173,7 +228,7 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}) {
         ...process.env,
         PROJECT_ROOT,
         VAULT_PATH: vaultPath,
-        PLUGIN_CONFIG: JSON.stringify(sourceConfig),
+        PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
         ...extraEnv
       },
       maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
@@ -360,7 +415,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
   }
 
   // Run the read command with last sync time and source ID
-  const result = runPluginCommand(plugin, 'read', sourceConfig, envVars);
+  const result = runPluginCommand(plugin, 'read', sourceConfig, envVars, sourceName);
 
   if (!result.success) {
     return {
@@ -478,7 +533,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
         const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '', // Force full re-read of modified files
           SOURCE_ID: sourceId
-        });
+        }, sourceName);
         if (resyncResult.success && resyncResult.data) {
           const resyncEntries = Array.isArray(resyncResult.data)
             ? resyncResult.data
@@ -510,7 +565,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
-        });
+        }, sourceName);
         if (resyncResult.success && resyncResult.data) {
           const resyncEntries = Array.isArray(resyncResult.data)
             ? resyncResult.data
@@ -544,7 +599,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
-        });
+        }, sourceName);
         if (resyncResult.success && resyncResult.data) {
           const resyncEntries = Array.isArray(resyncResult.data)
             ? resyncResult.data
@@ -579,7 +634,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
-        });
+        }, sourceName);
         if (resyncResult.success && resyncResult.data) {
           const resyncEntries = Array.isArray(resyncResult.data)
             ? resyncResult.data
@@ -614,7 +669,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
-        });
+        }, sourceName);
         if (resyncResult.success && resyncResult.data) {
           const resyncEntries = Array.isArray(resyncResult.data)
             ? resyncResult.data
@@ -931,7 +986,7 @@ export async function writePluginEntry(pluginName, sourceName, entry) {
 
   return runPluginCommand(plugin, 'write', source.config, {
     ENTRY_JSON: JSON.stringify(entry)
-  });
+  }, sourceName);
 }
 
 /**

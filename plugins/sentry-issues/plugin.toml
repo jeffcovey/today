@@ -6,8 +6,6 @@ displayName = "Sentry Issues"
 description = "Error tracking issues from Sentry"
 type = "issues"
 
-requiredEnv = ["SENTRY_AUTH_TOKEN"]
-
 longDescription = """
 Syncs error issues from Sentry as issues using the Sentry API.
 
@@ -15,8 +13,7 @@ Syncs error issues from Sentry as issues using the Sentry API.
 
 1. Go to Sentry: Settings > Developer Settings > Auth Tokens
 2. Create a new token with "project:read" and "event:read" scopes
-3. Copy the token and add to your .env file:
-   SENTRY_AUTH_TOKEN=your_token_here
+3. Use "bin/today configure" to add your token securely
 
 ## Schema Mapping
 
@@ -45,6 +42,7 @@ The metadata JSON contains:
 read = "./read.js"
 
 [settings]
+auth_token = { type = "string", default = "", description = "Sentry auth token", encrypted = true }
 organization = { type = "string", required = true, description = "Sentry organization slug" }
 project = { type = "string", required = false, description = "Project slug (omit for all projects)" }
 query = { type = "string", default = "is:unresolved", description = "Sentry search query" }

@@ -3,8 +3,6 @@
 // Read conversations from Front using the Core API
 // Input: Config via environment variables (PLUGIN_CONFIG as JSON)
 // Output: JSON object with entries array
-//
-// Requires: FRONT_API_TOKEN environment variable
 
 const API_BASE = 'https://api2.frontapp.com';
 
@@ -14,12 +12,11 @@ const inboxIds = config.inbox_ids ? config.inbox_ids.split(',').map(s => s.trim(
 const assigneeEmail = config.assignee || '';
 const includeArchived = config.include_archived === true || config.include_archived === 'true';
 const limit = config.limit || 100;
-
-const apiToken = process.env.FRONT_API_TOKEN;
+const apiToken = config.api_token;  // Injected by plugin-loader from encrypted env var
 
 if (!apiToken) {
   console.error(JSON.stringify({
-    error: 'FRONT_API_TOKEN environment variable is required'
+    error: 'Front API token not configured. Use "bin/today configure" to set up credentials.'
   }));
   process.exit(1);
 }

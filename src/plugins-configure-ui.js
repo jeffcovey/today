@@ -293,39 +293,51 @@ function buildSourceList(pluginName, plugin) {
 // Edit source dialog
 // ============================================================================
 
-function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor, onEnvSave }) {
+/**
+ * Generate a unique environment variable name for encrypted settings
+ * @param {string} pluginName - Plugin name (e.g., "imap-email")
+ * @param {string} sourceName - Source name (e.g., "personal")
+ * @param {string} settingKey - Setting key (e.g., "password")
+ * @returns {string} Environment variable name (e.g., "TODAY_IMAP_EMAIL_PERSONAL_PASSWORD")
+ */
+function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
+  const sanitize = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
+}
+
+function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor, onEncryptedSave }) {
   const [fieldIndex, setFieldIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
   const settings = plugin.settings || {};
-  const requiredEnv = plugin.requiredEnv || [];
 
   const fields = [
     { key: 'enabled', label: 'Enabled', type: 'boolean', value: sourceConfig.enabled === true },
   ];
 
-  // Add environment variable fields first (they're important)
-  for (const envKey of requiredEnv) {
-    const hasValue = hasEnvVar(envKey);
-    fields.push({
-      key: `env:${envKey}`,
-      label: envKey,
-      type: 'env',
-      required: true,
-      value: hasValue ? '********' : '',
-      envKey: envKey,
-    });
-  }
-
   for (const [key, def] of Object.entries(settings)) {
-    fields.push({
-      key,
-      label: def.description || key,
-      type: def.type || 'string',
-      required: def.required || false,
-      value: sourceConfig[key] ?? def.default ?? '',
-    });
+    if (def.encrypted) {
+      // Encrypted setting - stored in .env, not config.toml
+      const envVarName = getEncryptedEnvVarName(pluginName, sourceName, key);
+      const hasValue = hasEnvVar(envVarName);
+      fields.push({
+        key,
+        label: def.description || key,
+        type: 'encrypted',
+        required: def.required || false,
+        value: hasValue ? '********' : '',
+        envVarName,
+      });
+    } else {
+      fields.push({
+        key,
+        label: def.description || key,
+        type: def.type || 'string',
+        required: def.required || false,
+        value: sourceConfig[key] ?? def.default ?? '',
+      });
+    }
   }
 
   // Add ai_instructions as the last field (available for all sources)
@@ -354,9 +366,9 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
         if (onOpenEditor) {
           onOpenEditor(currentField.key, currentField.value);
         }
-      } else if (currentField.type === 'env') {
-        // For env vars, decrypt and show the actual value for editing
-        const decryptedValue = getEnvVar(currentField.envKey) || '';
+      } else if (currentField.type === 'encrypted') {
+        // For encrypted settings, decrypt and show the actual value for editing
+        const decryptedValue = getEnvVar(currentField.envVarName) || '';
         setEditValue(decryptedValue);
         setEditing(true);
       } else {
@@ -367,10 +379,10 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
   });
 
   const handleSubmit = (value) => {
-    if (currentField.type === 'env') {
-      // Save env var with encryption
-      if (onEnvSave) {
-        onEnvSave(currentField.envKey, value);
+    if (currentField.type === 'encrypted') {
+      // Save encrypted setting to .env
+      if (onEncryptedSave) {
+        onEncryptedSave(currentField.envVarName, value);
       }
     } else {
       onSave(currentField.key, value);
@@ -389,13 +401,13 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
       displayValue = f.value
         ? (lines.length > 1 ? `${lines[0].slice(0, 30)}... (${lines.length} lines)` : lines[0].slice(0, 50))
         : '(not set)';
-    } else if (f.type === 'env') {
-      // Show masked value for env vars
+    } else if (f.type === 'encrypted') {
+      // Show masked value for encrypted settings
       displayValue = f.value || '(not set)';
     } else {
       displayValue = f.value || '(not set)';
     }
-    const editHint = f.type === 'multiline' ? ' [opens editor]' : (f.type === 'env' ? ' [encrypted]' : '');
+    const editHint = f.type === 'multiline' ? ' [opens editor]' : (f.type === 'encrypted' ? ' [encrypted]' : '');
     return html`
       <${Box} key=${'field-' + f.key}>
         <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${f.label}: </Text>
@@ -574,9 +586,9 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
     }
   };
 
-  const handleEnvSave = (envKey, value) => {
+  const handleEncryptedSave = (envVarName, value) => {
     if (value) {
-      setEnvVar(envKey, value);
+      setEnvVar(envVarName, value);
     }
     refreshSources();
   };
@@ -591,7 +603,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         onSave=${handleEditSave}
         onCancel=${() => setMode('list')}
         onOpenEditor=${handleOpenEditor}
-        onEnvSave=${handleEnvSave}
+        onEncryptedSave=${handleEncryptedSave}
       />
     `;
   }
