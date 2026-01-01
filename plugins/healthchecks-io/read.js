@@ -7,14 +7,13 @@
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 
-const apiKeyEnv = config.api_key_env || 'HEALTHCHECKS_API_KEY';
-const apiKey = process.env[apiKeyEnv];
+const apiKey = config.api_key;  // Injected by plugin-loader from encrypted env var
 const includePassing = config.include_passing || false;
 const includePaused = config.include_paused || false;
 
 if (!apiKey) {
   console.error(JSON.stringify({
-    error: `API key not found in ${apiKeyEnv}`,
+    error: 'Healthchecks.io API key not configured. Use "bin/today configure" to set up credentials.',
     entries: []
   }));
   process.exit(1);

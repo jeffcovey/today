@@ -6,7 +6,6 @@ displayName = "Apple Health Auto Export"
 description = "Health metrics from iOS Health app via Auto Export"
 type = "health"
 
-requiredEnv = []
 
 longDescription = """
 Syncs health data exported from the iOS Health app using the

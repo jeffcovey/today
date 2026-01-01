@@ -6,7 +6,6 @@ displayName = "Markdown Diary"
 description = "Diary entries from markdown files with sections for gratitude, progress, concerns, and journal"
 type = "diary"
 
-requiredEnv = []
 
 longDescription = """
 Reads diary entries from vault/diary/*.md files.

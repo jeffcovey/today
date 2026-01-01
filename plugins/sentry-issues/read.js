@@ -3,8 +3,6 @@
 // Read issues from Sentry using the Sentry API
 // Input: Config via environment variables (PLUGIN_CONFIG as JSON)
 // Output: JSON object with entries array
-//
-// Requires: SENTRY_AUTH_TOKEN environment variable
 
 const API_BASE = 'https://sentry.io/api/0';
 
@@ -14,12 +12,11 @@ const organization = config.organization;
 const project = config.project || '';
 const query = config.query || 'is:unresolved';
 const limit = config.limit || 100;
-
-const authToken = process.env.SENTRY_AUTH_TOKEN;
+const authToken = config.auth_token;  // Injected by plugin-loader from encrypted env var
 
 if (!authToken) {
   console.error(JSON.stringify({
-    error: 'SENTRY_AUTH_TOKEN environment variable is required'
+    error: 'Sentry auth token not configured. Use "bin/today configure" to set up credentials.'
   }));
   process.exit(1);
 }

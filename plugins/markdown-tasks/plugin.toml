@@ -6,7 +6,6 @@ displayName = "Markdown Tasks"
 description = "Sync Obsidian-style markdown tasks to database"
 type = "tasks"
 
-requiredEnv = []
 
 longDescription = """
 Syncs tasks from markdown files in your vault to the database.

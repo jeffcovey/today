@@ -6,7 +6,6 @@ displayName = "Streaks Habits"
 description = "Daily habit tracking from the Streaks iOS app"
 type = "habits"
 
-requiredEnv = []
 
 longDescription = """
 Syncs habits from Streaks app backup files (.streaks) to the database.

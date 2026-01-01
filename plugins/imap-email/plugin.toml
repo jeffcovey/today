@@ -6,7 +6,6 @@ displayName = "IMAP Email"
 description = "Sync emails from any IMAP server (iCloud, Gmail, etc.)"
 type = "email"
 
-requiredEnv = []
 
 longDescription = """
 Syncs recent emails from IMAP servers to the local database for quick access
@@ -45,7 +44,7 @@ secure = { type = "boolean", default = true, description = "Use SSL/TLS connecti
 
 # Authentication
 username = { type = "string", default = "", description = "IMAP username (usually email address)" }
-password_env = { type = "string", default = "EMAIL_PASSWORD", description = "Environment variable containing password" }
+password = { type = "string", default = "", description = "IMAP password", encrypted = true }
 
 # Sync settings
 days_to_sync = { type = "number", default = 30, description = "Number of days of email to sync and keep" }

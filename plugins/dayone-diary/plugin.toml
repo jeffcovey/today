@@ -6,7 +6,6 @@ displayName = "Day One Diary"
 description = "Diary entries from Day One app JSON export"
 type = "diary"
 
-requiredEnv = []
 
 longDescription = """
 Syncs diary entries from a Day One JSON export file (Journal.json).

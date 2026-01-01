@@ -6,7 +6,6 @@ displayName = "Resilio Conflict Cleanup"
 description = "Clean up sync conflict files created by Resilio Sync"
 type = "utility"
 
-requiredEnv = []
 
 longDescription = """
 Cleans up sync conflict files created by Resilio Sync.

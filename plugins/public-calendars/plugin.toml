@@ -6,7 +6,6 @@ displayName = "Public Calendars"
 description = "Sync events from public iCal feeds (TripIt, Airbnb, etc.)"
 type = "events"
 
-requiredEnv = []
 
 longDescription = """
 Fetches calendar events from public iCal/ICS URLs and syncs them to the database.
