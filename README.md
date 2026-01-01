@@ -63,6 +63,10 @@ The hope is:
 3. It stays flexible with changing circumstances, helping you get the most out of right now.
 4. The more information you pour into it, the more it makes connections and thoughtful suggestions. ("Your diary said you're not getting outside enough. And you're up three pounds, and want to lose weight to take the pressure off your bad hip. Bob emailed about pickleball Friday morning. You wrote back that you couldn't, but the meeting you had then was canceled. Should we tell him you'll be there?")
 
+## Installation
+
+Clone https://github.com/jeffcovey/today/ onto a POSIX system with `npm` installed. Running `bin/today` should run `npm install` if you're missing any dependencies, and should run `bin/today configure` if you haven't set up your profile and plugins. The more information you provide through your profile and plugins, the more tailored advice the AI can provide.
+
 ## Inputs
 
 Your information comes into the system through plugins. They are categorized into several types with matching binaries. Common data types are stored for each (email "From:", event "Location"), with metadata fields for source-specific types.
@@ -81,186 +85,19 @@ Plugin types:
 - **Time Logs** (`bin/track`): Toggl, Clockify, Harvest, RescueTime, etc.
 - **Utility**: Inbox processing, file cleanup, linting, etc.
 
-You can configure multiple sources for each plugin, for example, for a work Gmail account and a personal Gmail account. You can add instructions for each source to tell the AI something about it ("This is my birthdays calendar. Remind me of these events one week in advance, and then the day of."). *Only some of the above-listed services already have [plugins](plugins/)!* Please share your own where you see a gap you want to fill! Others users will appreciate it. The [Plugin README](plugins/README.md) explains how to create plugins. Reach out at https://github.com/jeffcovey/today/discussions to share your work or ideas or to ask questions.
+You can configure multiple sources for each plugin, for example, for a work Gmail account and a personal Gmail account. You can add instructions for each source to tell the AI something about it ("This is my birthdays calendar. Remind me of these events one week in advance, and then the day of."). *Only some of the above-listed services already have [plugins](plugins/)!* Please share your own where you see a gap you want to fill. The [Plugin README](plugins/README.md) explains how to create plugins. Reach out at https://github.com/jeffcovey/today/discussions to share your work or ideas or to ask questions.
 
 You can manage your plugins with `bin/today configure` (which just calls out to `bin/plugins configure` if you want to go straight there), or edit ./config.toml directly. You can see what will be passed to the AI with `bin/today dry-run`.
 
 ---
 
+## Vault & Obsidian
 
-## Obsidian
+Many file-based plugins look for a "vault" directory and follow some [Obsidian](https://obsidian.md) conventions. The path to the vault can be configured, and defaults to `vault/` under Today's directory. Plugins automatically create their required directories inside the vault when first used.
 
-# OLD
-
-> **Beta Testing Note (December 2025)**
->
-> This project is transitioning to a plugin-based architecture. The documentation below will be revised to reflect these changes. For beta testers, here's how to get started:
->
-> ```bash
-> # 1. Clone and install
-> git clone https://github.com/jeffcovey/today.git
-> cd today
-> npm install
->
-> # 2. Copy environment template and add your API keys
-> cp .env.example .env
-> # Edit .env with your credentials (Anthropic API key, etc.)
->
-> # 3. Run Today - it will guide you through initial configuration
-> bin/today
-> ```
->
-> Key commands for exploring the system:
-> - `bin/plugins list` - See available plugins
-> - `bin/tasks today` - View today's tasks
-> - `bin/track today` - View time tracking
-> - `bin/habits today` - View habits (requires Streaks app)
-> - `bin/calendar today` - View calendar events
+**Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, Obsidian, etc.). Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
 
 ---
-
-## Features
-
-- **AI-Powered Daily Reviews** - Claude-assisted morning reviews that synthesize calendar events, tasks, emails, and time tracking into actionable daily plans
-- **Vault-Based Task Management** - Markdown files using [Obsidian Tasks](https://publish.obsidian.md/tasks/) syntax for portable, version-controlled tasks
-- **Stage Themes** - Focus different days on different types of work (front-stage, back-stage, off-stage)
-- **Multi-Source Sync** - Pull data from Google Calendar, iCloud, email (IMAP), Toggl time tracking, and more
-- **Local-First** - All data stored in local markdown files; sync to cloud services is optional
-
-## Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/jeffcovey/today.git
-cd today
-
-# Install dependencies
-npm install
-
-# Copy environment template and add your API keys
-cp .env.example .env
-# Edit .env with your credentials (Anthropic API key, etc.)
-
-# Run Today - it will guide you through initial configuration
-bin/today
-```
-
-## Prerequisites
-
-**Required:**
-
-- **Node.js 20+** - JavaScript runtime
-- **Claude Code CLI** - Anthropic's AI assistant for daily reviews
-- **sqlite3** - Database operations
-- **Anthropic API key** - For AI features (set in `.env`)
-
-**Optional integrations:**
-
-- Google Calendar service account
-- iCloud account for calendar sync
-- IMAP email account
-- Toggl account for time tracking
-
-### Installing Claude Code
-
-The easiest way to get all dependencies is to use the devcontainer (see [Development](#development)). For manual installation:
-
-```bash
-# Install Claude Code CLI globally
-npm install -g @anthropic-ai/claude-code
-
-# Authenticate Claude (required before using bin/today)
-claude
-```
-
-When you run `claude` for the first time, it will open a browser to authenticate. Complete the authentication before running `bin/today`.
-
-## Configuration
-
-### config.toml
-
-Non-secret configuration lives in `config.toml`. Run `bin/today configure` to create or edit it interactively.
-
-Key settings:
-
-```toml
-# Your timezone
-timezone = "America/New_York"
-
-[profile]
-name = "Your Name"
-email = "you@example.com"
-wake_time = "06:00"
-bed_time = "21:30"
-
-# Day-of-week themes
-[stages]
-monday = "front"     # Outward-facing: meetings, calls, emails
-tuesday = "back"     # Maintenance: bills, bug fixes, organizing
-wednesday = "front"
-thursday = "back"
-friday = "off"       # Personal: nature, friends, hobbies
-saturday = "off"
-sunday = "back"
-
-# Topic tags for auto-categorization (used by plugins with auto_add_topics)
-[tags]
-topics = ["programming", "meetings", "email", "reading", "exercise"]
-
-[ai]
-claude_model = "claude-sonnet-4-20250514"
-```
-
-### Environment Variables (.env)
-
-Secrets and credentials go in `.env`. The file is encrypted using [dotenvx](https://dotenvx.com/).
-
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-npx dotenvx encrypt  # Encrypt the file
-```
-
-Key variables:
-
-| Variable | Description |
-|----------|-------------|
-| `TODAY_ANTHROPIC_KEY` | Anthropic API key for AI features |
-| `EMAIL_ACCOUNT` / `EMAIL_PASSWORD` | IMAP email credentials |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Base64-encoded Google service account JSON |
-| `GOOGLE_CALENDAR_IDS` | Comma-separated calendar IDs |
-| `ICLOUD_USERNAME` / `ICLOUD_APP_PASSWORD` | iCloud credentials |
-| `TOGGL_API_TOKEN` | Toggl time tracking API token |
-
-See `.env.example` for the full list.
-
-## Vault Structure
-
-Your personal data lives in the `vault/` directory (configurable via `vault_path` in config.toml). Plugins automatically create their required directories when first used.
-
-```
-vault/
-├── Dashboard.md              # Main dashboard with widgets
-├── plans/                    # Daily, weekly, monthly plans
-│   └── 2025_Q1_01_W01_15.md  # Daily plan for Jan 15, 2025
-├── tasks/                    # Task collections
-│   ├── tasks.md              # Main task inbox
-│   ├── repeating.md          # Recurring tasks
-│   └── every_six_weeks.md    # Contact reminders
-├── notes/                    # General notes
-│   ├── inbox/                # New notes landing zone
-│   ├── concerns/             # Issues to address
-│   └── progress/             # Progress updates
-├── projects/                 # Project files
-├── topics/                   # Topic-based notes
-├── templates/                # Note templates
-├── scripts/                  # DataviewJS widgets
-└── logs/                     # Sync status, time tracking
-```
-
-The vault is designed to work standalone or with [Obsidian](https://obsidian.md/).
-
-**Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, etc.).
 
 ### Inbox Processing
 
@@ -309,117 +146,6 @@ Save to: vault/inbox/task-{{timestamp}}.md
 
 The date format `December 7, 2025 14:30` is parsed to determine which plan file to append to.
 
-## Main Commands
-
-### bin/today
-
-The main command for daily planning. Runs an AI-assisted review session.
-
-```bash
-bin/today                      # Interactive daily review
-bin/today update               # Update review file via API
-bin/today --no-sync            # Skip sync step
-bin/today "specific request"   # Focused session with a request
-```
-
-### bin/sync
-
-Synchronizes all data sources.
-
-```bash
-bin/sync                       # Full sync
-bin/sync --calendar            # Sync calendars only
-bin/sync --email               # Sync email only
-bin/sync --toggl               # Sync time tracking only
-```
-
-### bin/tasks
-
-Manage tasks from markdown files.
-
-```bash
-bin/tasks list                 # List all active tasks
-bin/tasks list --today         # Show today's tasks
-bin/tasks sync                 # Sync tasks from vault files
-bin/tasks add "Task" --date 2025-01-20
-```
-
-### bin/email
-
-Email management.
-
-```bash
-bin/email list                 # List recent emails
-bin/email list --unread        # Show unread emails
-bin/email download             # Download emails to local cache
-```
-
-### bin/calendar
-
-Calendar operations.
-
-```bash
-bin/calendar today             # Show today's events
-bin/calendar week              # Show this week's events
-bin/calendar sync              # Sync calendars to database
-```
-
-### bin/track
-
-Time tracking integration.
-
-```bash
-bin/track                      # Show current timer status
-bin/track start "Task"         # Start a timer
-bin/track stop                 # Stop current timer
-```
-
-### bin/plugins
-
-Manage data source plugins.
-
-```bash
-bin/plugins list               # Show available plugins
-bin/plugins status             # Show enabled plugins and sources
-bin/plugins configure          # Interactive plugin configuration
-bin/plugins sync               # Sync all enabled plugins
-```
-
-See [plugins/README.md](plugins/README.md) for details on creating and configuring plugins.
-
-## Task Syntax
-
-Tasks use [Obsidian Tasks](https://publish.obsidian.md/tasks/) syntax:
-
-```markdown
-- [ ] Task description ⏫ 📅 2025-01-15 🔁 every week
-```
-
-### Priority Markers
-
-| Marker | Priority |
-|--------|----------|
-| 🔺 | Urgent/highest |
-| ⏫ | High |
-| 🔼 | Medium |
-| 🔽 | Low |
-
-### Date Markers
-
-| Marker | Meaning |
-|--------|---------|
-| 📅 YYYY-MM-DD | Due date |
-| ⏳ YYYY-MM-DD | Scheduled date |
-| ➕ YYYY-MM-DD | Created date |
-| ✅ YYYY-MM-DD | Completion date |
-
-### Stage Tags
-
-Focus different days on different types of work:
-
-- `#stage/front-stage` - Meetings, calls, support, emails
-- `#stage/back-stage` - Maintenance, bills, bug fixes, organizing
-- `#stage/off-stage` - Personal time, nature, friends, reading
 
 ## Automation
 
@@ -490,13 +216,6 @@ The easiest way to develop is using VS Code's devcontainer:
 npm test                       # Run all tests
 npm run test:watch             # Watch mode
 npm run test:coverage          # Coverage report
-```
-
-### Linting
-
-```bash
-npm run lint                   # Lint markdown files
-npm run lint:md:fix            # Auto-fix markdown issues
 ```
 
 ## Documentation

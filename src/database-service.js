@@ -10,12 +10,19 @@
  */
 
 import Database from 'better-sqlite3';
-import dotenvx from '@dotenvx/dotenvx';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenvx.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.dirname(__dirname);
+
+// Load environment variables only if .env exists (to avoid warnings)
+if (fs.existsSync(path.join(projectRoot, '.env'))) {
+  const dotenvx = await import('@dotenvx/dotenvx');
+  dotenvx.default.config({ quiet: true });
+}
 
 // Singleton instance
 let instance = null;

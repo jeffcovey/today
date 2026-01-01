@@ -198,7 +198,18 @@ export function getConfiguredTimezone() {
  */
 export function getCurrentTime(timezone) {
   const tz = timezone || getConfiguredTimezone();
-  return new TZDate(new Date(), tz);
+  try {
+    const tzDate = new TZDate(new Date(), tz);
+    // Verify the date is valid
+    if (isNaN(tzDate.getTime())) {
+      console.error(`Warning: Invalid timezone "${tz}", falling back to UTC`);
+      return new TZDate(new Date(), 'UTC');
+    }
+    return tzDate;
+  } catch (error) {
+    console.error(`Warning: TZDate error with timezone "${tz}": ${error.message}`);
+    return new TZDate(new Date(), 'UTC');
+  }
 }
 
 /**
@@ -309,9 +320,34 @@ export function getStartOfDayTimestamp(timezone) {
  */
 export function formatFullDateTime(date, timezone) {
   const tz = timezone || getConfiguredTimezone();
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  const tzDate = new TZDate(d, tz);
-  return format(tzDate, "EEEE, MMMM d, yyyy 'at' h:mm a zzz");
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    const tzDate = new TZDate(d, tz);
+    // Check for invalid date
+    if (isNaN(tzDate.getTime())) {
+      return new Date().toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+    }
+    return format(tzDate, "EEEE, MMMM d, yyyy 'at' h:mm a zzz");
+  } catch (error) {
+    // Fallback to native formatting if date-fns fails
+    return new Date().toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
+  }
 }
 
 /**
