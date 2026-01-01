@@ -546,8 +546,6 @@ ${contextSection}`;
 
     console.log('\n' + '━'.repeat(50));
     console.log('✅ Session ended\n');
-    console.log('💡 Track progress with:');
-    console.log('   bin/diary add progress \'note\'');
     console.log('━'.repeat(50) + '\n');
   }
 
