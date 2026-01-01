@@ -23,6 +23,66 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+const ENV_PATH = path.join(projectRoot, '.env');
+
+// ============================================================================
+// Environment variable helpers (using dotenvx for encryption)
+// ============================================================================
+
+/**
+ * Get an environment variable value (decrypted if encrypted)
+ * @param {string} key - Environment variable name
+ * @returns {string|null} - Decrypted value or null if not set
+ */
+function getEnvVar(key) {
+  try {
+    const result = execSync(`npx dotenvx get ${key} --format=json 2>/dev/null`, {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    const parsed = JSON.parse(result);
+    return parsed[key] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set an environment variable (encrypted by default)
+ * Creates .env file if it doesn't exist
+ * @param {string} key - Environment variable name
+ * @param {string} value - Value to set
+ */
+function setEnvVar(key, value) {
+  // Create .env if it doesn't exist
+  if (!fs.existsSync(ENV_PATH)) {
+    fs.writeFileSync(ENV_PATH, '# Environment variables\n# Encrypted with dotenvx\n\n');
+  }
+
+  try {
+    // Use dotenvx set to encrypt and save
+    execSync(`npx dotenvx set ${key} "${value.replace(/"/g, '\\"')}"`, {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  } catch (error) {
+    // If encryption fails (no keys), set as plain text
+    execSync(`npx dotenvx set ${key} "${value.replace(/"/g, '\\"')}" --plain`, {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  }
+}
+
+/**
+ * Check if an environment variable is set
+ * @param {string} key - Environment variable name
+ * @returns {boolean}
+ */
+function hasEnvVar(key) {
+  return getEnvVar(key) !== null;
+}
 
 // ============================================================================
 // Editor helper for multi-line fields
@@ -229,15 +289,30 @@ function buildSourceList(pluginName, plugin) {
 // Edit source dialog
 // ============================================================================
 
-function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor }) {
+function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor, onEnvSave }) {
   const [fieldIndex, setFieldIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
   const settings = plugin.settings || {};
+  const requiredEnv = plugin.requiredEnv || [];
+
   const fields = [
     { key: 'enabled', label: 'Enabled', type: 'boolean', value: sourceConfig.enabled === true },
   ];
+
+  // Add environment variable fields first (they're important)
+  for (const envKey of requiredEnv) {
+    const hasValue = hasEnvVar(envKey);
+    fields.push({
+      key: `env:${envKey}`,
+      label: envKey,
+      type: 'env',
+      required: true,
+      value: hasValue ? '********' : '',
+      envKey: envKey,
+    });
+  }
 
   for (const [key, def] of Object.entries(settings)) {
     fields.push({
@@ -275,6 +350,11 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
         if (onOpenEditor) {
           onOpenEditor(currentField.key, currentField.value);
         }
+      } else if (currentField.type === 'env') {
+        // For env vars, decrypt and show the actual value for editing
+        const decryptedValue = getEnvVar(currentField.envKey) || '';
+        setEditValue(decryptedValue);
+        setEditing(true);
       } else {
         setEditValue(String(currentField.value || ''));
         setEditing(true);
@@ -283,7 +363,14 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
   });
 
   const handleSubmit = (value) => {
-    onSave(currentField.key, value);
+    if (currentField.type === 'env') {
+      // Save env var with encryption
+      if (onEnvSave) {
+        onEnvSave(currentField.envKey, value);
+      }
+    } else {
+      onSave(currentField.key, value);
+    }
     setEditing(false);
   };
 
@@ -298,10 +385,13 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
       displayValue = f.value
         ? (lines.length > 1 ? `${lines[0].slice(0, 30)}... (${lines.length} lines)` : lines[0].slice(0, 50))
         : '(not set)';
+    } else if (f.type === 'env') {
+      // Show masked value for env vars
+      displayValue = f.value || '(not set)';
     } else {
       displayValue = f.value || '(not set)';
     }
-    const editHint = f.type === 'multiline' ? ' [opens editor]' : '';
+    const editHint = f.type === 'multiline' ? ' [opens editor]' : (f.type === 'env' ? ' [encrypted]' : '');
     return html`
       <${Box} key=${'field-' + f.key}>
         <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${f.label}: </Text>
@@ -458,16 +548,15 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
   const handleAddSource = (sourceName) => {
     createSource(pluginName, sourceName);
     refreshSources();
-    setMode('list');
-  };
-
-  const handleDelete = (confirmed) => {
-    if (confirmed) {
-      deleteSource(pluginName, selectedSource.sourceName);
-      refreshSources();
-      setSelectedIndex(Math.max(0, selectedIndex - 1));
+    // Find the index of the newly created source and select it
+    const newSources = buildSourceList(pluginName, plugin);
+    const newIndex = newSources.findIndex(s => s.sourceName === sourceName);
+    if (newIndex >= 0) {
+      setSelectedIndex(newIndex);
+      setSources(newSources);
     }
-    setMode('list');
+    // Go straight to edit mode for the new source
+    setMode('edit');
   };
 
   const handleOpenEditor = (fieldKey, currentValue) => {
@@ -481,6 +570,13 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
     }
   };
 
+  const handleEnvSave = (envKey, value) => {
+    if (value) {
+      setEnvVar(envKey, value);
+    }
+    refreshSources();
+  };
+
   if (mode === 'edit' && selectedSource) {
     return html`
       <${EditSourceDialog}
@@ -491,6 +587,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         onSave=${handleEditSave}
         onCancel=${() => setMode('list')}
         onOpenEditor=${handleOpenEditor}
+        onEnvSave=${handleEnvSave}
       />
     `;
   }
@@ -511,7 +608,15 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
       <${Box} flexDirection="column" borderStyle="single" borderColor="red" paddingX=${1}>
         <${Text} bold color="red">Delete "${selectedSource.sourceName}"?</Text>
         <${Box} marginTop=${1}>
-          <${ConfirmInput} onConfirm=${handleDelete} />
+          <${ConfirmInput}
+            onConfirm=${() => {
+              deleteSource(pluginName, selectedSource.sourceName);
+              refreshSources();
+              setSelectedIndex(Math.max(0, selectedIndex - 1));
+              setMode('list');
+            }}
+            onCancel=${() => setMode('list')}
+          />
         </Box>
       </Box>
     `;
