@@ -16,8 +16,12 @@ import {
   getPluginSources,
   getEnabledPlugins,
   syncPluginSource,
-  getSyncMetadata
+  getSyncMetadata,
+  syncPluginVaultFiles,
+  checkPluginVaultFileChanges,
+  getPluginsWithVaultFiles
 } from '../src/plugin-loader.js';
+import { getAbsoluteVaultPath } from '../src/config.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
 import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
@@ -929,6 +933,115 @@ program
   .option('--if-stale <minutes>', 'Only sync if data is older than N minutes')
   .action(async (pluginName, sourceName, options) => {
     await cmdSync(pluginName, sourceName, options);
+  });
+
+program
+  .command('vault-files')
+  .description('Manage plugin vault files (templates, scripts, etc.)')
+  .option('--install', 'Install missing vault files from enabled plugins')
+  .option('--check', 'Check for new/updated vault files (default)')
+  .option('--force', 'Force overwrite existing files during install')
+  .option('--list', 'List all vault files from enabled plugins')
+  .action(async (options) => {
+    const vaultPath = getAbsoluteVaultPath();
+
+    // Ensure vault directory exists
+    if (!fs.existsSync(vaultPath)) {
+      fs.mkdirSync(vaultPath, { recursive: true });
+    }
+
+    if (options.list) {
+      // List all vault files from all plugins (not just enabled)
+      const pluginsWithFiles = await getPluginsWithVaultFiles({ enabledOnly: false });
+
+      if (pluginsWithFiles.length === 0) {
+        console.log(colors.yellow('No plugins have vault files.'));
+        return;
+      }
+
+      console.log(colors.cyan('Plugin Vault Files:'));
+      console.log('');
+
+      for (const { plugin, files, enabled } of pluginsWithFiles) {
+        const enabledStatus = enabled ? colors.green('[enabled]') : colors.gray('[disabled]');
+        console.log(colors.bold(`  ${plugin.displayName || plugin.name}`) + ` ${enabledStatus}`);
+        for (const file of files) {
+          const destPath = path.join(vaultPath, file);
+          const exists = fs.existsSync(destPath);
+          const status = exists ? colors.green('✓') : colors.gray('○');
+          console.log(`    ${status} ${file}`);
+        }
+        console.log('');
+      }
+      return;
+    }
+
+    if (options.install) {
+      // Install vault files
+      console.log(colors.cyan('Installing vault files from enabled plugins...'));
+      console.log(`  Vault path: ${vaultPath}`);
+      console.log('');
+
+      const result = await syncPluginVaultFiles({
+        vaultPath,
+        force: options.force,
+        verbose: true
+      });
+
+      console.log('');
+      if (result.installed.length > 0) {
+        console.log(colors.green(`✓ Installed ${result.installed.length} file(s)`));
+      }
+      if (result.skipped.length > 0) {
+        console.log(colors.gray(`  Skipped ${result.skipped.length} existing file(s)`));
+        if (!options.force) {
+          console.log(colors.gray('  Use --force to overwrite existing files'));
+        }
+      }
+      if (result.errors.length > 0) {
+        console.log(colors.red(`✗ ${result.errors.length} error(s)`));
+        for (const error of result.errors) {
+          console.log(colors.red(`  - ${error}`));
+        }
+      }
+      return;
+    }
+
+    // Default: check for changes (--check or no flag)
+    console.log(colors.cyan('Checking plugin vault files...'));
+    console.log(`  Vault path: ${vaultPath}`);
+    console.log('');
+
+    const changes = await checkPluginVaultFileChanges(vaultPath);
+
+    if (changes.length === 0) {
+      console.log(colors.green('✓ All vault files are up to date.'));
+      return;
+    }
+
+    // Group by plugin
+    const byPlugin = new Map();
+    for (const change of changes) {
+      if (!byPlugin.has(change.plugin)) {
+        byPlugin.set(change.plugin, []);
+      }
+      byPlugin.get(change.plugin).push(change);
+    }
+
+    console.log(colors.yellow(`${changes.length} file(s) have updates available:`));
+    console.log('');
+
+    for (const [pluginName, pluginChanges] of byPlugin) {
+      console.log(colors.bold(`  ${pluginName}:`));
+      for (const change of pluginChanges) {
+        const icon = change.status === 'missing' ? colors.gray('○ missing:') : colors.yellow('⟳ updated:');
+        console.log(`    ${icon} ${change.file}`);
+      }
+      console.log('');
+    }
+
+    console.log('Run with --install to install missing files.');
+    console.log('Run with --install --force to update all files.');
   });
 
 // Ensure config.toml has entries for all plugins before parsing
