@@ -163,10 +163,40 @@ async function checkForUpdates(execSync, readline) {
     if (answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no') {
       console.log('');
       console.log('Updating...');
-      execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
-      console.log('');
-      console.log('✅ Updated! Please restart bin/today to use the new version.');
-      process.exit(0);
+
+      // Check for local changes that would block the pull
+      const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
+      const hasLocalChanges = status.length > 0;
+
+      if (hasLocalChanges) {
+        console.log('Stashing local changes...');
+        execSync('git stash --include-untracked', { cwd: projectRoot, stdio: 'pipe' });
+      }
+
+      try {
+        execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
+
+        if (hasLocalChanges) {
+          console.log('Restoring local changes...');
+          try {
+            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
+          } catch {
+            console.log('⚠️  Could not auto-restore changes. Run: git stash pop');
+          }
+        }
+
+        console.log('');
+        console.log('✅ Updated! Please restart bin/today to use the new version.');
+        process.exit(0);
+      } catch (pullError) {
+        // Restore stashed changes if pull failed
+        if (hasLocalChanges) {
+          try {
+            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
+          } catch { /* ignore */ }
+        }
+        console.error('❌ Update failed. Please run: git pull origin main');
+      }
     }
 
     console.log('');
