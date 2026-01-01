@@ -66,6 +66,116 @@ if (!process.env.SKIP_DEP_CHECK) {
 }
 
 // =============================================================================
+// Update Check: Compare local version with origin/main
+// =============================================================================
+
+async function checkForUpdates(execSync, readline) {
+  // Skip if not a git repo or explicitly disabled
+  if (!existsSync(join(projectRoot, '.git')) || process.env.SKIP_UPDATE_CHECK) {
+    return;
+  }
+
+  // Skip if we checked recently (within last hour)
+  const lastCheckFile = join(projectRoot, '.data', '.last-update-check');
+  if (existsSync(lastCheckFile)) {
+    const lastCheck = statSync(lastCheckFile).mtimeMs;
+    const oneHour = 60 * 60 * 1000;
+    if (Date.now() - lastCheck < oneHour) {
+      return;
+    }
+  }
+
+  try {
+    // Fetch latest from origin (quick, just updates refs)
+    execSync('git fetch origin main --quiet 2>/dev/null', {
+      cwd: projectRoot,
+      timeout: 5000,
+      stdio: 'pipe'
+    });
+
+    // Compare local HEAD with origin/main
+    const localHead = execSync('git rev-parse HEAD', {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    const remoteHead = execSync('git rev-parse origin/main', {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    // Update the check timestamp
+    const dataDir = join(projectRoot, '.data');
+    if (!existsSync(dataDir)) {
+      execSync(`mkdir -p "${dataDir}"`, { cwd: projectRoot });
+    }
+    execSync(`touch "${lastCheckFile}"`, { cwd: projectRoot });
+
+    if (localHead === remoteHead) {
+      return; // Already up to date
+    }
+
+    // Check if we're behind (not just diverged)
+    const behindCount = execSync(`git rev-list --count HEAD..origin/main 2>/dev/null || echo 0`, {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    if (behindCount === '0') {
+      return; // Local has changes not in remote, don't prompt
+    }
+
+    // Get commit summaries for what's new
+    const newCommits = execSync(
+      'git log HEAD..origin/main --oneline --no-decorate 2>/dev/null | head -10',
+      { cwd: projectRoot, encoding: 'utf8' }
+    ).trim();
+
+    if (!newCommits) {
+      return;
+    }
+
+    console.log('');
+    console.log('📦 A new version of Today is available!');
+    console.log('');
+    console.log("What's new:");
+    for (const line of newCommits.split('\n')) {
+      // Format: "abc1234 Commit message" -> "  • Commit message"
+      const message = line.replace(/^[a-f0-9]+\s+/, '');
+      console.log(`  • ${message}`);
+    }
+    if (parseInt(behindCount, 10) > 10) {
+      console.log(`  ... and ${parseInt(behindCount, 10) - 10} more commits`);
+    }
+    console.log('');
+
+    // Prompt user
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const answer = await new Promise(resolve => {
+      rl.question('Would you like to update now? [Y/n] ', resolve);
+    });
+    rl.close();
+
+    if (answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no') {
+      console.log('');
+      console.log('Updating...');
+      execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
+      console.log('');
+      console.log('✅ Updated! Please restart bin/today to use the new version.');
+      process.exit(0);
+    }
+
+    console.log('');
+  } catch {
+    // Silently ignore update check failures (network issues, etc.)
+  }
+}
+
+// =============================================================================
 // Main: Dynamic imports ensure deps exist before loading npm packages
 // =============================================================================
 
@@ -77,6 +187,7 @@ async function main() {
   const fs = await import('fs');
   const path = await import('path');
   const { execSync, spawnSync } = await import('child_process');
+  const readline = await import('readline');
 
   const { getTimezone, getFullConfig, configExists } = await import('../src/config.js');
   const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
@@ -88,6 +199,11 @@ async function main() {
   const { runConfigure } = await import('../src/configure-ui.js');
 
   process.chdir(projectRoot);
+
+  // Check for updates (skip in non-interactive mode)
+  if (!process.argv.includes('--non-interactive') && !process.argv.includes('--skip-update-check')) {
+    await checkForUpdates(execSync, readline);
+  }
 
   async function checkAndRecoverDatabase() {
     if (process.env.SKIP_DB_HEALTH) {
@@ -495,6 +611,7 @@ ${contextSection}`;
     .passThroughOptions()
     .option('--no-sync', 'Skip sync step (faster startup)')
     .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+    .option('--skip-update-check', 'Skip checking for updates')
     .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data');
 
   program
@@ -535,6 +652,56 @@ ${contextSection}`;
       await ensureConfigAndDatabase({ skipConfigCheck: true });
       const request = requestParts.length > 0 ? requestParts.join(' ') : null;
       await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date);
+    });
+
+  program
+    .command('update')
+    .description('Check for and install updates')
+    .action(async () => {
+      console.log('Checking for updates...');
+      console.log('');
+
+      try {
+        // Fetch latest
+        execSync('git fetch origin main', { cwd: projectRoot, stdio: 'inherit' });
+
+        const localHead = execSync('git rev-parse HEAD', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
+
+        const remoteHead = execSync('git rev-parse origin/main', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
+
+        if (localHead === remoteHead) {
+          console.log('✅ Already up to date!');
+          return;
+        }
+
+        // Show what's new
+        const newCommits = execSync(
+          'git log HEAD..origin/main --oneline --no-decorate',
+          { cwd: projectRoot, encoding: 'utf8' }
+        ).trim();
+
+        console.log("What's new:");
+        for (const line of newCommits.split('\n')) {
+          const message = line.replace(/^[a-f0-9]+\s+/, '');
+          console.log(`  • ${message}`);
+        }
+        console.log('');
+
+        // Pull updates
+        console.log('Updating...');
+        execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
+        console.log('');
+        console.log('✅ Updated successfully!');
+      } catch (error) {
+        console.error('❌ Update failed:', error.message);
+        process.exit(1);
+      }
     });
 
   program.parse();
