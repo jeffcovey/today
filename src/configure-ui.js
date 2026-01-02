@@ -107,6 +107,61 @@ function editInEditor(currentText, filename = 'edit.txt') {
 }
 
 /**
+ * Get available Ollama models by running `ollama list`
+ * @returns {Array<{value: string, label: string}>} - Array of model options
+ */
+function getOllamaModels() {
+  try {
+    const output = execSync('ollama list', { encoding: 'utf8', timeout: 5000 });
+    const lines = output.trim().split('\n').slice(1); // Skip header row
+    const models = lines
+      .map(line => {
+        const name = line.split(/\s+/)[0]; // First column is model name
+        return name ? { value: name, label: name } : null;
+      })
+      .filter(Boolean);
+    return models.length > 0 ? models : [{ value: 'llama3.2', label: 'llama3.2 (default)' }];
+  } catch {
+    // Ollama not installed or not running
+    return [{ value: 'llama3.2', label: 'llama3.2 (default - ollama not found)' }];
+  }
+}
+
+/**
+ * Get model options based on provider
+ * @param {string} provider - The AI provider name
+ * @returns {Array<{value: string, label: string}>|null} - Options array or null for free-form input
+ */
+function getModelOptionsForProvider(provider) {
+  switch (provider) {
+    case 'ollama':
+      return getOllamaModels();
+    case 'anthropic':
+      return [
+        { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
+        { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+        { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Fast)' },
+      ];
+    case 'openai':
+      return [
+        { value: 'gpt-4o', label: 'GPT-4o (Recommended)' },
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
+        { value: 'o1', label: 'o1 (Reasoning)' },
+        { value: 'o3-mini', label: 'o3-mini (Reasoning, Fast)' },
+      ];
+    case 'gemini':
+    case 'google':
+      return [
+        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Recommended)' },
+        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      ];
+    default:
+      return null; // Free-form input for unknown providers
+  }
+}
+
+/**
  * Configuration sections and fields
  */
 const CONFIG_SECTIONS = [
@@ -162,7 +217,9 @@ const CONFIG_SECTIONS = [
         label: 'Background Model',
         path: ['ai', 'model'],
         default: '',
-        description: 'Model name (empty = provider default)'
+        type: 'dynamic-select',
+        getOptions: (config) => getModelOptionsForProvider(config.ai?.provider || 'anthropic'),
+        description: 'Model for background tasks'
       },
       {
         key: 'interactive_provider',
@@ -171,7 +228,10 @@ const CONFIG_SECTIONS = [
         default: 'anthropic',
         type: 'select',
         options: [
-          { value: 'anthropic', label: 'Anthropic Claude' },
+          { value: 'anthropic', label: 'Anthropic Claude (uses Claude CLI)' },
+          { value: 'ollama', label: 'Ollama (Local models)' },
+          { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
+          { value: 'gemini', label: 'Google Gemini' },
         ],
         description: 'AI for interactive sessions (bin/today)'
       },
@@ -179,13 +239,9 @@ const CONFIG_SECTIONS = [
         key: 'interactive_model',
         label: 'Interactive Model',
         path: ['ai', 'interactive_model'],
-        default: 'sonnet',
-        type: 'select',
-        options: [
-          { value: 'opus', label: 'Opus (Most capable)' },
-          { value: 'sonnet', label: 'Sonnet (Recommended)' },
-          { value: 'haiku', label: 'Haiku (Fastest)' },
-        ],
+        default: '',
+        type: 'dynamic-select',
+        getOptions: (config) => getModelOptionsForProvider(config.ai?.interactive_provider || 'anthropic'),
         description: 'Model for interactive sessions'
       },
       {
@@ -354,7 +410,7 @@ function ConfigApp({ onAction }) {
           onAction({ type: 'openEditor', path: field.path, currentValue: currentValue || '' });
           exit();
         }
-      } else if (field.type === 'select') {
+      } else if (field.type === 'select' || field.type === 'dynamic-select') {
         setMode('select');
       } else if (field.type === 'encrypted') {
         // Skip if field is hidden (e.g., Ollama doesn't need API key)
@@ -381,6 +437,14 @@ function ConfigApp({ onAction }) {
     } else {
       const newConfig = JSON.parse(JSON.stringify(config)); // Deep clone
       setConfigValue(newConfig, field.path, value);
+
+      // When provider changes, reset the corresponding model to empty (will use default)
+      if (field.key === 'provider') {
+        setConfigValue(newConfig, ['ai', 'model'], '');
+      } else if (field.key === 'interactive_provider') {
+        setConfigValue(newConfig, ['ai', 'interactive_model'], '');
+      }
+
       writeConfig(newConfig);
       setConfig(readConfig());
       setMode('navigate');
@@ -443,6 +507,9 @@ function ConfigApp({ onAction }) {
 
     if (f.type === 'select') {
       displayValue = f.options?.find(o => o.value === value)?.label || value;
+    } else if (f.type === 'dynamic-select') {
+      const dynamicOptions = f.getOptions ? f.getOptions(config) : [];
+      displayValue = dynamicOptions?.find(o => o.value === value)?.label || value || '(provider default)';
     } else if (f.type === 'multiline') {
       const lines = String(value || '').split('\n');
       displayValue = value
@@ -481,13 +548,17 @@ function ConfigApp({ onAction }) {
     </${Box}>
   ` : null;
 
-  // Select mode UI
+  // Select mode UI - get options (static or dynamic)
+  const selectOptions = field.type === 'dynamic-select' && field.getOptions
+    ? field.getOptions(config)
+    : field.options;
+
   const selectUI = mode === 'select' ? html`
     <${Box} flexDirection="column" borderStyle="single" borderColor="yellow" paddingX=${1} marginTop=${1}>
       <${Text} bold color="yellow">${field.label}</${Text}>
       <${Box} marginTop=${1}>
         <${Select}
-          options=${field.options}
+          options=${selectOptions}
           defaultValue=${currentValue}
           onChange=${saveField}
         />

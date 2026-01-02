@@ -16,7 +16,7 @@
 // Everything else uses dynamic import() after deps are verified.
 // =============================================================================
 
-import { existsSync, statSync } from 'fs';
+import { existsSync, statSync, utimesSync } from 'fs';
 import { dirname, join } from 'path';
 import { execSync as execSyncBuiltin } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -54,6 +54,9 @@ if (!process.env.SKIP_DEP_CHECK) {
     console.log('');
     try {
       execSyncBuiltin('npm install', { stdio: 'inherit', cwd: projectRoot });
+      // Touch node_modules to update mtime so we don't reinstall on next run
+      const now = new Date();
+      utimesSync(nodeModulesPath, now, now);
       console.log('');
       console.log('✅ Dependencies installed!');
       console.log('');
@@ -337,7 +340,8 @@ async function main() {
           console.log(`  ⏳ ${ai.name || pluginType}...`);
           currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
             encoding: 'utf8',
-            timeout: 10000
+            timeout: 10000,
+            env: { ...process.env, CONTEXT_ONLY: 'true' }
           });
           currentData = currentData.split('\n')
             .filter(line => !line.includes('[dotenvx'))
@@ -473,7 +477,8 @@ The following data was retrieved for the specified date.
             ...process.env,
             PROJECT_ROOT: projectRoot,
             PLUGIN_CONFIG: JSON.stringify(sourceConfig),
-            SOURCE_ID: sourceId
+            SOURCE_ID: sourceId,
+            CONTEXT_ONLY: 'true' // Skip expensive operations during context gathering
           }
         });
 
@@ -491,7 +496,7 @@ The following data was retrieved for the specified date.
     return lines.length > 2 ? lines.join('\n') : null;
   }
 
-  async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null) {
+  async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null, compact = false) {
     const timezone = getTimezone();
 
     const now = getCurrentTime(timezone);
@@ -582,7 +587,27 @@ ${contextSection}`;
     }
 
     if (dryRun) {
-      console.log(prompt);
+      if (compact) {
+        const { compactifyPrompt, writeReferenceFile, estimateTokens } = await import('../src/chat-session.js');
+        const originalTokens = estimateTokens(prompt);
+        const refFilePath = writeReferenceFile(prompt);
+        const compactPrompt = compactifyPrompt(prompt, refFilePath);
+        const compactTokens = estimateTokens(compactPrompt);
+
+        console.log('━'.repeat(60));
+        console.log('COMPACT MODE PREVIEW');
+        console.log('━'.repeat(60));
+        console.log(`Original: ~${originalTokens} tokens`);
+        console.log(`Compact:  ~${compactTokens} tokens (${Math.round((1 - compactTokens/originalTokens) * 100)}% reduction)`);
+        if (refFilePath) {
+          console.log(`Reference: ${refFilePath}`);
+        }
+        console.log('━'.repeat(60));
+        console.log('');
+        console.log(compactPrompt);
+      } else {
+        console.log(prompt);
+      }
       return;
     }
 
@@ -603,37 +628,63 @@ ${contextSection}`;
       process.exit(1);
     }
 
-    // Currently only anthropic provider supports interactive sessions
-    if (interactiveProvider !== 'anthropic') {
-      console.error(`Error: Interactive sessions only support 'anthropic' provider currently.`);
-      console.error(`Your config has: interactive_provider = "${interactiveProvider}"`);
-      console.error(`Please set interactive_provider = "anthropic" in config.toml`);
-      process.exit(1);
-    }
+    // Determine whether to use Claude CLI or built-in REPL
+    const useClaudeCLI = interactiveProvider === 'anthropic' && !process.env.USE_BUILTIN_REPL;
 
     if (nonInteractive) {
+      // Non-interactive mode: use AI provider directly or Claude CLI
       console.log('🤖 Running in non-interactive mode...');
-      const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
-        stdio: 'inherit',
-        timeout: 600000 // 10 minutes in milliseconds
-      });
-      if (result.error) {
-        if (result.error.code === 'ETIMEDOUT') {
-          console.error('ERROR: Command timed out after 10 minutes');
-        } else {
-          console.error(`ERROR: ${result.error.message}`);
+      if (useClaudeCLI) {
+        const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
+          stdio: 'inherit',
+          timeout: 600000 // 10 minutes in milliseconds
+        });
+        if (result.error) {
+          if (result.error.code === 'ETIMEDOUT') {
+            console.error('ERROR: Command timed out after 10 minutes');
+          } else {
+            console.error(`ERROR: ${result.error.message}`);
+          }
+          process.exit(1);
         }
-        process.exit(1);
+        if (result.status !== 0) {
+          process.exit(result.status || 1);
+        }
+      } else {
+        // Use AI provider directly for non-interactive
+        const { createCompletion } = await import('../src/ai-provider.js');
+        try {
+          const response = await createCompletion({
+            system: prompt,
+            messages: [{ role: 'user', content: directRequest || 'What should I focus on right now?' }],
+            provider: interactiveProvider,
+            model,
+            maxTokens: 4000,
+            temperature: 0.7
+          });
+          console.log(response);
+        } catch (error) {
+          console.error(`ERROR: ${error.message}`);
+          process.exit(1);
+        }
       }
-      if (result.status !== 0) {
-        process.exit(result.status || 1);
+    } else if (useClaudeCLI) {
+      // Interactive mode with Claude CLI
+      if (directRequest) {
+        console.log('🤖 Starting session...');
+      } else {
+        console.log('🤖 Starting daily review...');
       }
-    } else if (directRequest) {
-      console.log('🤖 Starting session...');
       spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
     } else {
-      console.log('🤖 Starting daily review...');
-      spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+      // Interactive mode with built-in REPL (for Ollama, OpenAI, Gemini, etc.)
+      if (directRequest) {
+        console.log('🤖 Starting session...');
+      } else {
+        console.log('🤖 Starting daily review...');
+      }
+      const { runChatSession } = await import('../src/chat-session.js');
+      await runChatSession(prompt, { provider: interactiveProvider, model });
     }
 
     console.log('\n' + '━'.repeat(50));
@@ -737,11 +788,12 @@ ${contextSection}`;
     .option('--no-sync', 'Skip sync step')
     .option('--non-interactive', 'Include non-interactive mode flags in prompt')
     .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+    .option('--compact', 'Show compact version (for local models with limited context)')
     .action(async (requestParts, options, cmd) => {
       const mergedOpts = mergeOptions(options, cmd);
       await ensureConfigAndDatabase({ skipConfigCheck: true });
       const request = requestParts.length > 0 ? requestParts.join(' ') : null;
-      await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date);
+      await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date, mergedOpts.compact);
     });
 
   program

@@ -312,6 +312,11 @@ export function getLatestSyncTimeForType(db, pluginType) {
 export function ensureSyncForType(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType), force = false } = options;
 
+  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
+  if (process.env.CONTEXT_ONLY === 'true' && !force) {
+    return false;
+  }
+
   if (!force) {
     const lastSync = getLatestSyncTimeForType(db, pluginType);
 

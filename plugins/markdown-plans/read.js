@@ -26,6 +26,7 @@ import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+const contextOnly = process.env.CONTEXT_ONLY === 'true'; // Skip expensive AI operations
 
 const plansDirectory = config.plans_directory || `${process.env.VAULT_PATH}/plans`;
 const templatesDirectory = config.templates_directory || `${process.env.VAULT_PATH}/plans/templates`;
@@ -1278,23 +1279,26 @@ async function main() {
   }
 
   // Generate summaries for past days that are missing them
-  const daysNeedingSummaries = getPastDaysNeedingSummaries(today, 7);
-  for (const dayInfo of daysNeedingSummaries) {
-    const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path);
-    if (summary) {
-      addSummaryToFile(dayInfo.path, summary);
-      metadata.summaries_generated.push({
-        file: dayInfo.filename,
-        date: dayInfo.dateStr,
-      });
+  // Skip when CONTEXT_ONLY=true (during context gathering) to avoid slow AI calls
+  if (!contextOnly) {
+    const daysNeedingSummaries = getPastDaysNeedingSummaries(today, 7);
+    for (const dayInfo of daysNeedingSummaries) {
+      const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path);
+      if (summary) {
+        addSummaryToFile(dayInfo.path, summary);
+        metadata.summaries_generated.push({
+          file: dayInfo.filename,
+          date: dayInfo.dateStr,
+        });
+      }
     }
-  }
 
-  // Generate suggestions for tomorrow's plan if needed
-  if (needsPriorities(tomorrowPaths.day.path)) {
-    const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path);
-    if (suggestions && updateTomorrowPlan(tomorrowPaths.day.path, suggestions)) {
-      metadata.tomorrow_updated = true;
+    // Generate suggestions for tomorrow's plan if needed
+    if (needsPriorities(tomorrowPaths.day.path)) {
+      const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path);
+      if (suggestions && updateTomorrowPlan(tomorrowPaths.day.path, suggestions)) {
+        metadata.tomorrow_updated = true;
+      }
     }
   }
 

@@ -94,16 +94,107 @@ const DEFAULT_MODELS = {
   ollama: 'llama3.2',
 };
 
+// Default maximum context window for Ollama (higher values may cause timeouts on limited hardware)
+const OLLAMA_DEFAULT_MAX_CONTEXT = 8192;
+
+// Cache for Ollama model info
+let ollamaModelInfoCache = new Map();
+
 /**
- * Get the configured model for the current provider
+ * Get Ollama model information including context length
+ * @param {string} modelName - The model name
+ * @param {string} baseURL - Ollama base URL
+ * @returns {Promise<{contextLength: number, parameterSize: string}|null>}
+ */
+async function getOllamaModelInfo(modelName, baseURL = 'http://localhost:11434') {
+  const cacheKey = `${baseURL}:${modelName}`;
+  if (ollamaModelInfoCache.has(cacheKey)) {
+    return ollamaModelInfoCache.get(cacheKey);
+  }
+
+  try {
+    const response = await fetch(`${baseURL}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: modelName }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const info = {
+      contextLength: data.model_info?.['llama.context_length'] ||
+                     data.model_info?.['context_length'] ||
+                     null,
+      parameterSize: data.details?.parameter_size || null,
+    };
+
+    ollamaModelInfoCache.set(cacheKey, info);
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get effective context limit for Ollama
+ * Uses model's context length but caps at hardware limit from config
+ * @param {string} modelName - The model name
+ * @param {object} aiConfig - AI config from config.toml
+ * @returns {Promise<number>}
+ */
+async function getOllamaContextLimit(modelName, aiConfig = {}) {
+  // User can override the max context in config
+  const configMax = aiConfig.ollama?.max_context || OLLAMA_DEFAULT_MAX_CONTEXT;
+
+  // Try to get model's actual context length
+  const baseURL = aiConfig.ollama?.base_url || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const modelInfo = await getOllamaModelInfo(modelName, baseURL);
+
+  if (modelInfo?.contextLength) {
+    // Use the smaller of model's context and configured max
+    return Math.min(modelInfo.contextLength, configMax);
+  }
+
+  return configMax;
+}
+
+// Model name patterns for each provider (to detect mismatched configs)
+const PROVIDER_MODEL_PATTERNS = {
+  anthropic: /^(claude|sonnet|opus|haiku)/i,
+  openai: /^(gpt|o1|o3|davinci|curie|babbage|ada)/i,
+  google: /^(gemini|palm|bard)/i,
+  ollama: /^(llama|mistral|codellama|phi|qwen|deepseek|gemma|vicuna|neural|wizard|orca|stable|dolphin|openchat|zephyr|solar|yi|command)/i,
+};
+
+/**
+ * Check if a model name matches a provider
+ */
+function modelMatchesProvider(modelName, providerName) {
+  const pattern = PROVIDER_MODEL_PATTERNS[providerName];
+  if (!pattern) return true; // Unknown provider, assume it matches
+  return pattern.test(modelName);
+}
+
+/**
+ * Get the configured model for a given provider
+ * @param {object} options - Options to override config
+ * @param {string} [options.provider] - Provider name (overrides config)
+ * @param {string} [options.model] - Model name (overrides config)
  * @returns {Promise<object>} - The AI SDK model object
  */
-async function getConfiguredModel() {
+async function getConfiguredModel(options = {}) {
   const config = getFullConfig();
   const aiConfig = config.ai || {};
 
-  const providerName = aiConfig.provider || 'anthropic';
-  const modelName = aiConfig.model || DEFAULT_MODELS[providerName];
+  const providerName = options.provider || aiConfig.provider || 'anthropic';
+  let modelName = options.model || aiConfig.model || DEFAULT_MODELS[providerName];
+
+  // If the model doesn't match the provider (e.g., "opus" with ollama), use the default
+  if (modelName && !modelMatchesProvider(modelName, providerName)) {
+    modelName = DEFAULT_MODELS[providerName];
+  }
 
   switch (providerName) {
     case 'anthropic':
@@ -130,22 +221,72 @@ async function getConfiguredModel() {
  * @param {Object} options
  * @param {Array} options.messages - Array of {role, content} messages
  * @param {string} [options.system] - System prompt
+ * @param {string} [options.provider] - AI provider (overrides config)
+ * @param {string} [options.model] - Model name (overrides config)
  * @param {number} [options.maxTokens=1000] - Maximum tokens to generate
  * @param {number} [options.temperature=0] - Temperature (0-1)
  * @returns {Promise<string>} - The generated text
  */
 export async function createCompletion(options) {
-  const model = await getConfiguredModel();
+  const config = getFullConfig();
+  const providerName = options.provider || config.ai?.provider || 'anthropic';
 
-  const result = await generateText({
+  const model = await getConfiguredModel({
+    provider: options.provider,
+    model: options.model,
+  });
+
+  const genOptions = {
     model,
     system: options.system,
     messages: options.messages || [],
     maxTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
-  });
+  };
 
+  // For Ollama, dynamically set context window based on prompt size (with cap)
+  if (providerName === 'ollama') {
+    const charCount = getMessagesCharCount(options.messages, options.system);
+    const estimatedTokens = estimateTokens(charCount);
+    const calculatedCtx = estimatedTokens + (options.maxTokens || 1000) + 1000;
+    // Cap at OLLAMA_DEFAULT_MAX_CONTEXT to avoid timeouts on limited hardware
+    const numCtx = Math.min(OLLAMA_DEFAULT_MAX_CONTEXT, Math.max(4096, Number.isFinite(calculatedCtx) ? calculatedCtx : 4096));
+
+    genOptions.providerOptions = {
+      ollama: {
+        options: {
+          num_ctx: Math.round(numCtx),
+        },
+      },
+    };
+  }
+
+  const result = await generateText(genOptions);
   return result.text;
+}
+
+/**
+ * Estimate token count from character count (rough approximation: ~4 chars per token)
+ */
+function estimateTokens(charCount) {
+  if (!Number.isFinite(charCount) || charCount <= 0) return 0;
+  return Math.ceil(charCount / 4);
+}
+
+/**
+ * Calculate total character count for messages
+ */
+function getMessagesCharCount(messages, system) {
+  let total = 0;
+  if (system && typeof system === 'string') {
+    total += system.length;
+  }
+  for (const msg of messages || []) {
+    if (msg.content && typeof msg.content === 'string') {
+      total += msg.content.length;
+    }
+  }
+  return total;
 }
 
 /**
@@ -154,15 +295,41 @@ export async function createCompletion(options) {
  * @returns {Promise<object>} - Stream result with textStream property
  */
 export async function streamCompletion(options) {
-  const model = await getConfiguredModel();
+  const config = getFullConfig();
+  const providerName = options.provider || config.ai?.provider || 'anthropic';
 
-  return streamText({
+  const model = await getConfiguredModel({
+    provider: options.provider,
+    model: options.model,
+  });
+
+  const streamOptions = {
     model,
     system: options.system,
     messages: options.messages || [],
     maxTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
-  });
+  };
+
+  // For Ollama, dynamically set context window based on prompt size (with cap)
+  if (providerName === 'ollama') {
+    const charCount = getMessagesCharCount(options.messages, options.system);
+    const estimatedTokens = estimateTokens(charCount);
+    // Context needs: input tokens + output tokens + buffer
+    const calculatedCtx = estimatedTokens + (options.maxTokens || 4000) + 1000;
+    // Cap at OLLAMA_DEFAULT_MAX_CONTEXT to avoid timeouts on limited hardware
+    const numCtx = Math.min(OLLAMA_DEFAULT_MAX_CONTEXT, Math.max(4096, Number.isFinite(calculatedCtx) ? calculatedCtx : 4096));
+
+    streamOptions.providerOptions = {
+      ollama: {
+        options: {
+          num_ctx: Math.round(numCtx),
+        },
+      },
+    };
+  }
+
+  return streamText(streamOptions);
 }
 
 /**
@@ -245,6 +412,51 @@ export function clearProviderCache() {
   openaiProvider = null;
   googleProvider = null;
   ollamaProvider = null;
+  ollamaModelInfoCache.clear();
+}
+
+/**
+ * Get Ollama model info (exported for use by chat-session)
+ * @param {string} modelName - The model name
+ * @returns {Promise<{contextLength: number, parameterSize: string}|null>}
+ */
+export { getOllamaModelInfo };
+
+/**
+ * Get the effective token limit for compact mode decisions
+ * @param {string} provider - Provider name
+ * @param {string} model - Model name
+ * @returns {Promise<{contextLimit: number, source: string}>}
+ */
+export async function getEffectiveContextLimit(provider, model) {
+  if (provider !== 'ollama') {
+    // Cloud providers have large context windows, no need for compact mode
+    return { contextLimit: 200000, source: 'cloud-provider' };
+  }
+
+  const config = getFullConfig();
+  const aiConfig = config.ai || {};
+
+  // Check for user-configured max
+  const configMax = aiConfig.ollama?.max_context;
+  if (configMax) {
+    return { contextLimit: configMax, source: 'config' };
+  }
+
+  // Try to get model info from Ollama
+  const baseURL = aiConfig.ollama?.base_url || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const modelInfo = await getOllamaModelInfo(model, baseURL);
+
+  if (modelInfo?.contextLength) {
+    // Model advertises context, but cap at default for hardware safety
+    const effectiveLimit = Math.min(modelInfo.contextLength, OLLAMA_DEFAULT_MAX_CONTEXT);
+    return {
+      contextLimit: effectiveLimit,
+      source: `model (${modelInfo.parameterSize || 'unknown size'}, capped at ${OLLAMA_DEFAULT_MAX_CONTEXT})`,
+    };
+  }
+
+  return { contextLimit: OLLAMA_DEFAULT_MAX_CONTEXT, source: 'default' };
 }
 
 /**

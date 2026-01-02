@@ -215,6 +215,7 @@ The read command reads data and outputs JSON. It can be written in any language.
 - `PLUGIN_CONFIG`: JSON string of source configuration from config.toml
 - `LAST_SYNC_TIME`: ISO timestamp of last sync (empty for first sync)
 - `SOURCE_ID`: Full source identifier (e.g., `markdown-time-tracking/local`)
+- `CONTEXT_ONLY`: Set to `"true"` when gathering context for AI prompts (see below)
 
 **Output:**
 - JSON object to stdout with entries and metadata
@@ -298,6 +299,49 @@ The write command creates or updates entries. It's required for `read-write` plu
   "description": "Working on feature #topic/programming"
 }
 ```
+
+## The CONTEXT_ONLY Flag
+
+When `bin/today` gathers context for AI prompts, it sets `CONTEXT_ONLY=true` in the environment. This signals plugins to skip expensive operations that aren't needed for reading context.
+
+**What CONTEXT_ONLY affects:**
+
+1. **Data plugins**: The `ensureSyncForType()` function in the plugin loader skips automatic syncing. This prevents slow sync operations when you just want to read cached data.
+
+2. **Context plugins**: Should skip:
+   - AI API calls (summaries, suggestions, analysis)
+   - Subprocess spawning (e.g., calling `bin/today` recursively)
+   - File modifications (creating/updating files)
+
+**When to check CONTEXT_ONLY in your plugin:**
+
+```javascript
+const contextOnly = process.env.CONTEXT_ONLY === 'true';
+
+// Skip expensive AI operations during context gathering
+if (!contextOnly) {
+  const summary = await generateAISummary(data);
+  await writeToFile(summaryPath, summary);
+}
+
+// Always return the current context data
+console.log(JSON.stringify({ context, metadata }));
+```
+
+**Example - markdown-plans plugin:**
+
+The markdown-plans plugin generates AI summaries for past days and suggestions for tomorrow. These operations are skipped when `CONTEXT_ONLY=true` because:
+- They call AI APIs (slow, costs money)
+- They spawn `bin/today dry-run` subprocesses
+- The summaries aren't needed just to display current plan context
+
+**When NOT to use CONTEXT_ONLY:**
+
+- Read-only HTTP fetches (like weather API) - these are fast and stateless
+- Simple file reads and local calculations
+- Operations that don't modify files or call AI
+
+The goal is fast context gathering (~5-10 seconds) for responsive AI sessions.
 
 ## Plugin Types
 
