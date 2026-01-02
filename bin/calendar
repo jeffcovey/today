@@ -1,0 +1,798 @@
+#!/usr/bin/env node
+
+// Calendar CLI - queries events from plugin system
+// All operations delegate to "events" plugins
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import { execSync } from 'child_process';
+import { getDatabase } from '../src/database-service.js';
+import { discoverPlugins, getPluginSources, getPluginAccess, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getConfiguredTimezone, formatTime } from '../src/date-utils.js';
+import { program } from 'commander';
+
+// Get configured timezone
+const TIMEZONE = getConfiguredTimezone();
+
+// Get all calendar sources from all event plugins
+async function getAllCalendarSources() {
+  const plugins = await discoverPlugins();
+  const sources = [];
+
+  for (const [pluginName, plugin] of plugins) {
+    if (plugin.type !== 'events') continue;
+
+    const pluginSources = getPluginSources(pluginName);
+    for (const { sourceName, config } of pluginSources) {
+      sources.push({
+        name: sourceName,
+        plugin: pluginName,
+        pluginMeta: plugin,
+        config
+      });
+    }
+  }
+
+  return sources;
+}
+
+// Find a calendar source by name
+async function findCalendarSource(sourceName) {
+  const allSources = await getAllCalendarSources();
+
+  // Exact match first
+  let match = allSources.find(s => s.name === sourceName);
+  if (match) return match;
+
+  // Partial match
+  match = allSources.find(s => s.name.includes(sourceName));
+  return match || null;
+}
+
+// Get default writable calendar source (first source from a plugin that supports write)
+async function getDefaultWritableSource() {
+  const allSources = await getAllCalendarSources();
+
+  for (const source of allSources) {
+    // Use pluginMeta to check for write support
+    if (getPluginAccess(source.pluginMeta) === 'read-write') {
+      return source;
+    }
+  }
+
+  return null;
+}
+
+// Quiet sync - ensures database is current before read operations
+function ensureSync(db) {
+  ensureSyncForType(db, 'events');
+}
+
+// Get events from database
+function getEventsForRange(db, startDate, endDate) {
+  return db.prepare(`
+    SELECT
+      id, source, calendar_name, title,
+      start_date as start, end_date as end,
+      start_timezone, end_timezone,
+      location, description, all_day
+    FROM events
+    WHERE start_date <= ? AND end_date >= ?
+    ORDER BY start_date
+  `).all(endDate.toISOString(), startDate.toISOString()).map(event => ({
+    ...event,
+    allDay: event.all_day === 1,
+    calendar: event.calendar_name
+  }));
+}
+
+// Call a plugin's write command
+function callPluginWrite(source, action, eventData) {
+  const pluginDir = `plugins/${source.plugin}`;
+  const pluginConfig = JSON.stringify(source.config);
+  const input = JSON.stringify({ action, event: eventData });
+
+  try {
+    const result = execSync(`echo '${input.replace(/'/g, "'\\''")}' | node ${pluginDir}/write.js`, {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PLUGIN_CONFIG: pluginConfig
+      }
+    });
+    return JSON.parse(result);
+  } catch (error) {
+    // Try to parse error output
+    if (error.stdout) {
+      try {
+        return JSON.parse(error.stdout);
+      } catch { }
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+// Call a plugin's read command with --date
+function callPluginRead(source, date) {
+  const pluginDir = `plugins/${source.plugin}`;
+  const pluginConfig = JSON.stringify(source.config);
+
+  try {
+    const result = execSync(`node ${pluginDir}/read.js --date=${date}`, {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PLUGIN_CONFIG: pluginConfig
+      }
+    });
+    return JSON.parse(result);
+  } catch (error) {
+    return { entries: [], error: error.message };
+  }
+}
+
+// Parse event details from command line arguments
+function parseEventArgs(args) {
+  const event = {
+    title: '',
+    start_date: '',
+    end_date: '',
+    location: '',
+    description: '',
+    timezone: TIMEZONE,
+    sourceArg: null
+  };
+
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
+
+    if (arg === '--title' || arg === '-t') {
+      event.title = args[++i];
+    } else if (arg === '--date' || arg === '-d') {
+      const dateStr = args[++i];
+      const timeStr = args[++i] || '09:00';
+      const endTimeStr = args[++i] || '10:00';
+
+      const [startHour, startMin] = timeStr.split(':');
+      const [endHour, endMin] = endTimeStr.split(':');
+
+      event.start_date = `${dateStr}T${startHour.padStart(2, '0')}:${startMin.padStart(2, '0')}:00`;
+      event.end_date = `${dateStr}T${endHour.padStart(2, '0')}:${endMin.padStart(2, '0')}:00`;
+    } else if (arg === '--start') {
+      event.start_date = args[++i];
+    } else if (arg === '--end') {
+      event.end_date = args[++i];
+    } else if (arg === '--location' || arg === '-l') {
+      event.location = args[++i];
+    } else if (arg === '--description' || arg === '--desc') {
+      event.description = args[++i];
+    } else if (arg === '--timezone' || arg === '--tz') {
+      event.timezone = args[++i];
+    } else if (arg === '--calendar' || arg === '-c') {
+      event.sourceArg = args[++i];
+    } else if (!event.title) {
+      event.title = arg;
+    }
+    i++;
+  }
+
+  return event;
+}
+
+// Date command - show events for a specific date
+async function cmdDate(db, targetDate) {
+  ensureSync(db);
+
+  // Parse target date to get start and end of day
+  const startOfDay = new Date(targetDate + 'T00:00:00');
+  const endOfDay = new Date(targetDate + 'T23:59:59');
+
+  const events = getEventsForRange(db, startOfDay, endOfDay);
+
+  if (events.length === 0) {
+    console.log(`No events for ${targetDate}`);
+    return;
+  }
+
+  for (const event of events) {
+    if (event.allDay) {
+      console.log(`all-day: ${event.title}${event.calendar ? ` [${event.calendar}]` : ''}`);
+    } else {
+      const time = formatTime(event.start, TIMEZONE);
+      console.log(`${time}: ${event.title}${event.location ? ` @ ${event.location}` : ''}${event.calendar ? ` [${event.calendar}]` : ''}`);
+    }
+  }
+}
+
+// Commands
+async function cmdToday(db) {
+  ensureSync(db);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const events = getEventsForRange(db, today, tomorrow);
+
+  if (events.length === 0) {
+    console.log('No events for today.');
+  } else {
+    console.log(`📅 Today's Events (${events.length}):\n`);
+    for (const event of events) {
+      if (event.allDay) {
+        console.log(`  • ${event.title}`);
+      } else {
+        const time = formatTime(event.start, TIMEZONE);
+        console.log(`  • ${time} - ${event.title}`);
+      }
+      if (event.calendar) console.log(`    📆 ${event.calendar}`);
+      if (event.location) console.log(`    📍 ${event.location}`);
+      if (event.description) {
+        const firstLine = event.description.split('\n')[0];
+        console.log(`    ${firstLine}`);
+      }
+      console.log('');
+    }
+  }
+
+  console.log(getSyncStatusMessage(db, 'events'));
+}
+
+async function cmdWeek(db) {
+  ensureSync(db);
+
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const events = getEventsForRange(db, weekStart, weekEnd);
+
+  if (events.length === 0) {
+    console.log('No events for the next 7 days.');
+  } else {
+    console.log(`📅 This Week's Events (${events.length}):\n`);
+
+    const byDate = {};
+    for (const event of events) {
+      const dateKey = event.start.split('T')[0];
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      byDate[dateKey].push(event);
+    }
+
+    for (const dateKey of Object.keys(byDate).sort()) {
+      const date = new Date(dateKey + 'T12:00:00');
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      console.log(`${dayName}:`);
+
+      for (const event of byDate[dateKey]) {
+        if (event.allDay) {
+          console.log(`  • ${event.title}`);
+        } else {
+          const time = formatTime(event.start, TIMEZONE);
+          console.log(`  • ${time} - ${event.title}`);
+        }
+        if (event.calendar) console.log(`    📆 ${event.calendar}`);
+        if (event.location) console.log(`    📍 ${event.location}`);
+      }
+      console.log('');
+    }
+  }
+
+  console.log(getSyncStatusMessage(db, 'events'));
+}
+
+async function cmdSync() {
+  console.log('Syncing calendars via plugin system...');
+  execSync('bin/plugins sync --type events', {
+    encoding: 'utf8',
+    stdio: 'inherit'
+  });
+}
+
+async function cmdAdd(args) {
+  const eventDetails = parseEventArgs(args);
+
+  if (!eventDetails.title) {
+    console.error('❌ Error: Event title is required');
+    process.exit(1);
+  }
+
+  if (!eventDetails.start_date || !eventDetails.end_date) {
+    console.error('❌ Error: Start and end times are required');
+    console.log('Use --date followed by date and times, or --start and --end with full datetime');
+    process.exit(1);
+  }
+
+  // Find calendar source
+  let source = eventDetails.sourceArg
+    ? await findCalendarSource(eventDetails.sourceArg)
+    : await getDefaultWritableSource();
+
+  if (!source) {
+    console.error('❌ Error: No calendar specified and no default configured');
+    console.log('Use --calendar/-c to specify a source. Run "calendar list" to see available calendars.');
+    process.exit(1);
+  }
+
+  // Check if plugin supports write
+  if (getPluginAccess(source.pluginMeta) !== 'read-write') {
+    console.error(`❌ Error: Calendar "${source.name}" (${source.plugin}) does not support write operations`);
+    process.exit(1);
+  }
+
+  console.log('📅 Creating event...');
+  console.log(`  Title: ${eventDetails.title}`);
+  console.log(`  Start: ${new Date(eventDetails.start_date).toLocaleString()}`);
+  console.log(`  End: ${new Date(eventDetails.end_date).toLocaleString()}`);
+  console.log(`  Calendar: ${source.name}`);
+  if (eventDetails.location) console.log(`  Location: ${eventDetails.location}`);
+
+  const result = callPluginWrite(source, 'create', {
+    title: eventDetails.title,
+    start_date: eventDetails.start_date,
+    end_date: eventDetails.end_date,
+    location: eventDetails.location,
+    description: eventDetails.description,
+    timezone: eventDetails.timezone
+  });
+
+  if (result.success) {
+    console.log(`✅ Event created: ${result.html_link || result.event_id}`);
+  } else {
+    console.error(`❌ Error: ${result.error}`);
+    process.exit(1);
+  }
+}
+
+async function cmdUpdate(eventId, args) {
+  const eventDetails = parseEventArgs(args);
+
+  // Find calendar source
+  let source = null;
+
+  if (eventDetails.sourceArg) {
+    source = await findCalendarSource(eventDetails.sourceArg);
+  } else {
+    // Try to look up from database
+    const db = getDatabase();
+    const eventRecord = db.prepare(`SELECT source FROM events WHERE id = ?`).get(eventId);
+    if (eventRecord) {
+      const [, sourceName] = eventRecord.source.split('/');
+      source = await findCalendarSource(sourceName);
+    }
+  }
+
+  if (!source) {
+    source = await getDefaultWritableSource();
+  }
+
+  if (!source) {
+    console.error('❌ Error: No calendar specified');
+    console.log('Use --calendar/-c to specify a source. Run "calendar list" to see available calendars.');
+    process.exit(1);
+  }
+
+  console.log(`📝 Updating event ${eventId} in ${source.name}...`);
+
+  const updateData = { id: eventId };
+  if (eventDetails.title) updateData.title = eventDetails.title;
+  if (eventDetails.start_date) updateData.start_date = eventDetails.start_date;
+  if (eventDetails.end_date) updateData.end_date = eventDetails.end_date;
+  if (eventDetails.location) updateData.location = eventDetails.location;
+  if (eventDetails.description) updateData.description = eventDetails.description;
+  if (eventDetails.timezone) updateData.timezone = eventDetails.timezone;
+
+  const result = callPluginWrite(source, 'update', updateData);
+
+  if (result.success) {
+    console.log(`✅ Event updated: ${result.html_link || result.event_id}`);
+  } else {
+    console.error(`❌ Error: ${result.error}`);
+    process.exit(1);
+  }
+}
+
+async function cmdDelete(eventId, sourceArg) {
+  let source = null;
+
+  if (sourceArg) {
+    source = await findCalendarSource(sourceArg);
+  } else {
+    // Try to look up from database
+    const db = getDatabase();
+    const eventRecord = db.prepare(`SELECT source FROM events WHERE id = ?`).get(eventId);
+    if (eventRecord) {
+      const [, sourceName] = eventRecord.source.split('/');
+      source = await findCalendarSource(sourceName);
+      if (source) {
+        console.log(`   Found event in calendar: ${sourceName}`);
+      }
+    }
+  }
+
+  if (!source) {
+    source = await getDefaultWritableSource();
+  }
+
+  if (!source) {
+    console.error('❌ Error: No calendar specified and could not determine from event');
+    console.log('Use --calendar/-c to specify a source. Run "calendar list" to see available calendars.');
+    process.exit(1);
+  }
+
+  console.log(`🗑️  Deleting event ${eventId} from ${source.name}...`);
+
+  const result = callPluginWrite(source, 'delete', { id: eventId });
+
+  if (result.success) {
+    console.log(`✅ Event deleted`);
+  } else {
+    console.error(`❌ Error: ${result.error}`);
+    process.exit(1);
+  }
+}
+
+async function cmdShow(sourceArg, dateStr) {
+  const showDate = dateStr || new Date().toISOString().split('T')[0];
+  const source = await findCalendarSource(sourceArg);
+
+  if (!source) {
+    console.error(`❌ Calendar source "${sourceArg}" not found`);
+    console.log('Run "calendar list" to see available sources.');
+    process.exit(1);
+  }
+
+  console.log(`📅 Fetching events for ${showDate} from ${source.name}...`);
+
+  const data = callPluginRead(source, showDate);
+  const events = data.entries || [];
+
+  if (events.length === 0) {
+    console.log('No events found for this date');
+  } else {
+    console.log(`\nFound ${events.length} event(s):\n`);
+    for (const event of events) {
+      console.log(`📌 ${event.title}`);
+      console.log(`   ID: ${event.id}`);
+      console.log(`   Start: ${event.start_date}`);
+      console.log(`   End: ${event.end_date}`);
+      if (event.location) console.log(`   📍 ${event.location}`);
+      console.log('');
+    }
+  }
+}
+
+async function cmdCleanup(sourceArg, daysToKeep = 0) {
+  const source = await findCalendarSource(sourceArg);
+
+  if (!source) {
+    console.error(`❌ Calendar source "${sourceArg}" not found`);
+    console.log('Run "calendar list" to see available sources.');
+    process.exit(1);
+  }
+
+  // Check if plugin supports write
+  if (getPluginAccess(source.pluginMeta) !== 'read-write') {
+    console.error(`❌ Error: Calendar "${source.name}" (${source.plugin}) does not support write operations`);
+    process.exit(1);
+  }
+
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+  if (daysToKeep > 0) {
+    console.log(`🗑️  Cleaning up events before ${cutoffStr} from ${source.name}...`);
+  } else {
+    console.log(`🗑️  Cleaning up all past events from ${source.name}...`);
+  }
+
+  // Fetch events from the past 2 years up to cutoff
+  const twoYearsAgo = new Date(cutoffDate.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+  let deletedCount = 0;
+
+  // Iterate day by day (crude but works with our --date interface)
+  let currentDate = new Date(twoYearsAgo);
+  while (currentDate < cutoffDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    const data = callPluginRead(source, dateStr);
+
+    for (const event of data.entries || []) {
+      const result = callPluginWrite(source, 'delete', { id: event.id });
+      if (result.success) {
+        deletedCount++;
+      }
+    }
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  if (deletedCount > 0) {
+    console.log(`✅ Deleted ${deletedCount} past event(s)`);
+  } else {
+    console.log(`✅ No past events to clean up`);
+  }
+}
+
+async function cmdSyncTimeTracking(sourceArg, daysBack = 2) {
+  const source = await findCalendarSource(sourceArg);
+
+  if (!source) {
+    console.error(`❌ Calendar source "${sourceArg}" not found`);
+    console.log('Run "calendar list" to see available sources.');
+    process.exit(1);
+  }
+
+  // Check if plugin supports write
+  if (getPluginAccess(source.pluginMeta) !== 'read-write') {
+    console.error(`❌ Error: Calendar "${source.name}" (${source.plugin}) does not support write operations`);
+    process.exit(1);
+  }
+
+  const TIME_TRACKING_EMOJI = '⏱️';
+  const db = getDatabase();
+
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysBack);
+  startDate.setHours(0, 0, 0, 0);
+
+  console.log(`🔄 Syncing time tracking entries to ${source.name}...`);
+  console.log(`   Date range: ${startDate.toDateString()} to ${endDate.toDateString()}`);
+
+  // Get time entries from database
+  const timeEntries = db.prepare(`
+    SELECT id, start_time, end_time, description
+    FROM time_logs
+    WHERE datetime(start_time) >= datetime('now', '-' || ? || ' days')
+      AND datetime(start_time) <= datetime('now')
+      AND end_time IS NOT NULL
+    ORDER BY start_time
+  `).all(daysBack);
+
+  console.log(`   Found ${timeEntries.length} time tracking entries in database`);
+
+  // Deduplicate
+  const uniqueEntries = new Map();
+  for (const entry of timeEntries) {
+    const key = `${entry.start_time}|${entry.end_time}|${entry.description}`;
+    if (!uniqueEntries.has(key)) {
+      uniqueEntries.set(key, entry);
+    }
+  }
+
+  // Get existing calendar events for the date range
+  const existingEvents = [];
+  let currentDate = new Date(startDate);
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    const data = callPluginRead(source, dateStr);
+    for (const event of data.entries || []) {
+      if (event.title && event.title.startsWith(TIME_TRACKING_EMOJI)) {
+        existingEvents.push(event);
+      }
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  console.log(`   Found ${existingEvents.length} existing time tracking events in calendar`);
+
+  // Map existing events
+  const existingEventsMap = new Map();
+  for (const event of existingEvents) {
+    const title = event.title.replace(TIME_TRACKING_EMOJI + ' ', '');
+    const key = `${event.start_date}|${event.end_date}|${title}`;
+    existingEventsMap.set(key, event);
+  }
+
+  // Find entries to add
+  const entriesToAdd = [];
+  for (const [, entry] of uniqueEntries) {
+    const calendarKey = `${entry.start_time}|${entry.end_time}|${entry.description}`;
+    if (!existingEventsMap.has(calendarKey)) {
+      entriesToAdd.push(entry);
+    }
+  }
+
+  // Find events to remove
+  const eventsToRemove = [];
+  for (const [, event] of existingEventsMap) {
+    const title = event.title.replace(TIME_TRACKING_EMOJI + ' ', '');
+    const dbKey = `${event.start_date}|${event.end_date}|${title}`;
+    if (!uniqueEntries.has(dbKey)) {
+      eventsToRemove.push(event);
+    }
+  }
+
+  console.log(`   ${entriesToAdd.length} entries to add, ${eventsToRemove.length} events to remove`);
+
+  // Add missing entries
+  let addedCount = 0;
+  for (const entry of entriesToAdd) {
+    const result = callPluginWrite(source, 'create', {
+      title: `${TIME_TRACKING_EMOJI} ${entry.description}`,
+      start_date: entry.start_time,
+      end_date: entry.end_time,
+      timezone: TIMEZONE
+    });
+    if (result.success) {
+      addedCount++;
+    } else {
+      console.error(`   ⚠️  Failed to add "${entry.description}": ${result.error}`);
+    }
+  }
+
+  // Remove obsolete events
+  let removedCount = 0;
+  for (const event of eventsToRemove) {
+    const result = callPluginWrite(source, 'delete', { id: event.id });
+    if (result.success) {
+      removedCount++;
+    } else {
+      console.error(`   ⚠️  Failed to remove "${event.title}": ${result.error}`);
+    }
+  }
+
+  if (addedCount > 0 || removedCount > 0) {
+    console.log(`✅ Sync complete: Added ${addedCount}, Removed ${removedCount}`);
+  } else {
+    console.log(`✅ Already in sync (${uniqueEntries.size} entries)`);
+  }
+}
+
+// Commander setup
+const db = getDatabase();
+
+program
+  .name('calendar')
+  .description('Calendar management for Today system');
+
+program
+  .command('sync')
+  .description('Sync all calendars via plugin system')
+  .action(async () => {
+    await cmdSync();
+  });
+
+program
+  .command('today', { isDefault: true })
+  .description('Show today\'s events')
+  .action(async () => {
+    await cmdToday(db);
+  });
+
+program
+  .command('week')
+  .description('Show this week\'s events')
+  .action(async () => {
+    await cmdWeek(db);
+  });
+
+program
+  .command('list')
+  .aliases(['list-calendars', 'calendars'])
+  .description('List configured calendar sources')
+  .action(async () => {
+    const allSources = await getAllCalendarSources();
+
+    if (allSources.length === 0) {
+      console.log('No calendar sources configured.');
+      console.log('');
+      console.log('Add calendars in config.toml. Run "bin/plugins list" to see available plugins.');
+    } else {
+      console.log('📅 Configured Calendar Sources:\n');
+
+      // Group by plugin
+      const byPlugin = {};
+      for (const s of allSources) {
+        if (!byPlugin[s.plugin]) byPlugin[s.plugin] = [];
+        byPlugin[s.plugin].push(s);
+      }
+
+      const defaultSource = await getDefaultWritableSource();
+
+      for (const [plugin, sources] of Object.entries(byPlugin)) {
+        const access = getPluginAccess(sources[0].pluginMeta);
+        const writeSupport = access === 'read-write' ? ' (read/write)' : ' (read-only)';
+
+        console.log(`${plugin}${writeSupport}:`);
+        for (const s of sources) {
+          const isDefault = defaultSource && s.name === defaultSource.name && s.plugin === defaultSource.plugin;
+          const displayName = s.config.name || s.config.calendar_id || s.name;
+          console.log(`  ${s.name}${isDefault ? ' (default)' : ''}`);
+          console.log(`    ${displayName}`);
+        }
+        console.log('');
+      }
+
+      console.log('Use source names with commands:');
+      console.log('  calendar show personal 2023-01-15   # Historical lookup');
+      console.log('  calendar add "Meeting" -c personal  # Create event');
+    }
+  });
+
+program
+  .command('add')
+  .description('Add a new event')
+  .option('-t, --title <title>', 'Event title')
+  .option('-d, --date <date>', 'Date (YYYY-MM-DD)')
+  .option('--start <datetime>', 'Start datetime (ISO format)')
+  .option('--end <datetime>', 'End datetime (ISO format)')
+  .option('-l, --location <location>', 'Event location')
+  .option('--description <desc>', 'Event description')
+  .option('--tz, --timezone <tz>', `Timezone (default: ${TIMEZONE})`)
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .allowUnknownOption() // Allow positional title and time arguments
+  .action(async (options, cmd) => {
+    // Pass all raw args to parseEventArgs for backward compatibility
+    const args = process.argv.slice(3);
+    await cmdAdd(args);
+  });
+
+program
+  .command('update')
+  .description('Update an existing event')
+  .argument('<event-id>', 'Event ID to update')
+  .option('-t, --title <title>', 'New event title')
+  .option('-d, --date <date>', 'New date')
+  .option('--start <datetime>', 'New start datetime')
+  .option('--end <datetime>', 'New end datetime')
+  .option('-l, --location <location>', 'New location')
+  .option('--description <desc>', 'New description')
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .allowUnknownOption()
+  .action(async (eventId, options, cmd) => {
+    const args = process.argv.slice(4);
+    await cmdUpdate(eventId, args);
+  });
+
+program
+  .command('delete')
+  .description('Delete an event')
+  .argument('<event-id>', 'Event ID to delete')
+  .option('-c, --calendar <source>', 'Calendar source name')
+  .action(async (eventId, options) => {
+    await cmdDelete(eventId, options.calendar);
+  });
+
+program
+  .command('show')
+  .alias('get')
+  .description('Fetch events from a source for a specific date')
+  .argument('<source>', 'Calendar source name')
+  .argument('[date]', 'Date (YYYY-MM-DD, default: today)')
+  .action(async (source, date) => {
+    await cmdShow(source, date);
+  });
+
+program
+  .command('cleanup')
+  .description('Delete past events from a calendar')
+  .argument('<source>', 'Calendar source name')
+  .argument('[days-to-keep]', 'Number of recent days to keep', (val) => parseInt(val, 10), 0)
+  .action(async (source, daysToKeep) => {
+    await cmdCleanup(source, daysToKeep);
+  });
+
+program
+  .command('sync-time-tracking')
+  .alias('sync-tracking')
+  .description('Sync time tracking entries with a calendar')
+  .argument('<source>', 'Calendar source name')
+  .argument('[days-back]', 'Number of days to look back', (val) => parseInt(val, 10), 2)
+  .action(async (source, daysBack) => {
+    await cmdSyncTimeTracking(source, daysBack);
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  await cmdDate(db, process.argv[dateArgIdx + 1]);
+  process.exit(0);
+}
+
+program.parse();

@@ -1,0 +1,803 @@
+#!/usr/bin/env node
+
+/**
+ * Today - Daily review and planning tool
+ *
+ * Usage:
+ *   bin/today [options] [command] [request]
+ *   bin/today update                  # Update review file via API
+ *   bin/today --no-sync               # Skip sync step
+ *   bin/today "specific request"      # Focused session with request
+ */
+
+// =============================================================================
+// Bootstrap: Check dependencies using only Node built-ins
+// Static imports resolve at parse time, so we can only use built-ins here.
+// Everything else uses dynamic import() after deps are verified.
+// =============================================================================
+
+import { existsSync, statSync } from 'fs';
+import { dirname, join } from 'path';
+import { execSync as execSyncBuiltin } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = dirname(__dirname);
+
+// Check if node_modules is missing or outdated (skip in tests)
+if (!process.env.SKIP_DEP_CHECK) {
+  const nodeModulesPath = join(projectRoot, 'node_modules');
+  const packageJsonPath = join(projectRoot, 'package.json');
+  const packageLockPath = join(projectRoot, 'package-lock.json');
+
+  let needsInstall = false;
+  let installReason = '';
+
+  if (!existsSync(nodeModulesPath)) {
+    needsInstall = true;
+    installReason = 'Dependencies not installed';
+  } else {
+    // Check if package.json or package-lock.json is newer than node_modules
+    const nodeModulesMtime = statSync(nodeModulesPath).mtimeMs;
+    const packageJsonMtime = existsSync(packageJsonPath) ? statSync(packageJsonPath).mtimeMs : 0;
+    const packageLockMtime = existsSync(packageLockPath) ? statSync(packageLockPath).mtimeMs : 0;
+
+    if (packageJsonMtime > nodeModulesMtime || packageLockMtime > nodeModulesMtime) {
+      needsInstall = true;
+      installReason = 'Dependencies outdated (package files changed)';
+    }
+  }
+
+  if (needsInstall) {
+    console.log(`📦 ${installReason}. Running npm install...`);
+    console.log('');
+    try {
+      execSyncBuiltin('npm install', { stdio: 'inherit', cwd: projectRoot });
+      console.log('');
+      console.log('✅ Dependencies installed!');
+      console.log('');
+    } catch (e) {
+      console.error('❌ Failed to install dependencies:', e.message);
+      console.error('   Please run: npm install');
+      process.exit(1);
+    }
+  }
+}
+
+// =============================================================================
+// Update Check: Compare local version with origin/main
+// =============================================================================
+
+async function checkForUpdates(execSync, readline) {
+  // Skip if not a git repo or explicitly disabled
+  if (!existsSync(join(projectRoot, '.git')) || process.env.SKIP_UPDATE_CHECK) {
+    return;
+  }
+
+  // Skip if we checked recently (within last hour)
+  const lastCheckFile = join(projectRoot, '.data', '.last-update-check');
+  if (existsSync(lastCheckFile)) {
+    const lastCheck = statSync(lastCheckFile).mtimeMs;
+    const oneHour = 60 * 60 * 1000;
+    if (Date.now() - lastCheck < oneHour) {
+      return;
+    }
+  }
+
+  try {
+    // Fetch latest from origin (quick, just updates refs)
+    execSync('git fetch origin main --quiet 2>/dev/null', {
+      cwd: projectRoot,
+      timeout: 5000,
+      stdio: 'pipe'
+    });
+
+    // Compare local HEAD with origin/main
+    const localHead = execSync('git rev-parse HEAD', {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    const remoteHead = execSync('git rev-parse origin/main', {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    // Update the check timestamp
+    const dataDir = join(projectRoot, '.data');
+    if (!existsSync(dataDir)) {
+      execSync(`mkdir -p "${dataDir}"`, { cwd: projectRoot });
+    }
+    execSync(`touch "${lastCheckFile}"`, { cwd: projectRoot });
+
+    if (localHead === remoteHead) {
+      return; // Already up to date
+    }
+
+    // Check if we're behind (not just diverged)
+    const behindCount = execSync(`git rev-list --count HEAD..origin/main 2>/dev/null || echo 0`, {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+
+    if (behindCount === '0') {
+      return; // Local has changes not in remote, don't prompt
+    }
+
+    // Get commit summaries for what's new
+    const newCommits = execSync(
+      'git log HEAD..origin/main --oneline --no-decorate 2>/dev/null | head -10',
+      { cwd: projectRoot, encoding: 'utf8' }
+    ).trim();
+
+    if (!newCommits) {
+      return;
+    }
+
+    console.log('');
+    console.log('📦 A new version of Today is available!');
+    console.log('');
+    console.log("What's new:");
+    for (const line of newCommits.split('\n')) {
+      // Format: "abc1234 Commit message" -> "  • Commit message"
+      const message = line.replace(/^[a-f0-9]+\s+/, '');
+      console.log(`  • ${message}`);
+    }
+    if (parseInt(behindCount, 10) > 10) {
+      console.log(`  ... and ${parseInt(behindCount, 10) - 10} more commits`);
+    }
+    console.log('');
+
+    // Prompt user
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const answer = await new Promise(resolve => {
+      rl.question('Would you like to update now? [Y/n] ', resolve);
+    });
+    rl.close();
+
+    if (answer.toLowerCase() !== 'n' && answer.toLowerCase() !== 'no') {
+      console.log('');
+      console.log('Updating...');
+
+      // Check for local changes that would block the pull
+      const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
+      const hasLocalChanges = status.length > 0;
+
+      if (hasLocalChanges) {
+        console.log('Stashing local changes...');
+        execSync('git stash --include-untracked', { cwd: projectRoot, stdio: 'pipe' });
+      }
+
+      try {
+        execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
+
+        if (hasLocalChanges) {
+          console.log('Restoring local changes...');
+          try {
+            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
+          } catch {
+            console.log('⚠️  Could not auto-restore changes. Run: git stash pop');
+          }
+        }
+
+        console.log('');
+        console.log('✅ Updated!');
+        console.log('');
+        console.log('Checking for plugin vault file updates...');
+        try {
+          execSync('bin/plugins vault-files --check', { cwd: projectRoot, stdio: 'inherit' });
+        } catch {
+          // Ignore errors in vault file check
+        }
+        console.log('');
+        console.log('Please restart bin/today to use the new version.');
+        process.exit(0);
+      } catch (pullError) {
+        // Restore stashed changes if pull failed
+        if (hasLocalChanges) {
+          try {
+            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
+          } catch { /* ignore */ }
+        }
+        console.error('❌ Update failed. Please run: git pull origin main');
+      }
+    }
+
+    console.log('');
+  } catch {
+    // Silently ignore update check failures (network issues, etc.)
+  }
+}
+
+// =============================================================================
+// Main: Dynamic imports ensure deps exist before loading npm packages
+// =============================================================================
+
+async function main() {
+  // Dynamic imports - these resolve at runtime, after deps are installed
+  const { autoDotenvx } = await import('./lib/dotenvx-loader.js');
+  autoDotenvx();
+
+  const fs = await import('fs');
+  const path = await import('path');
+  const { execSync, spawnSync } = await import('child_process');
+  const readline = await import('readline');
+
+  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath } = await import('../src/config.js');
+  const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
+  const { getAIInstructionsByType, getPluginSources, checkPluginVaultFileChanges } = await import('../src/plugin-loader.js');
+  const { program } = await import('commander');
+  const { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } = await import('../src/plugin-schemas.js');
+  const { ensureHealthyDatabase } = await import('../src/db-health.js');
+  const { getCurrentTime, formatFullDateTime } = await import('../src/date-utils.js');
+  const { runConfigure } = await import('../src/configure-ui.js');
+
+  process.chdir(projectRoot);
+
+  // Check for updates (skip in non-interactive mode)
+  if (!process.argv.includes('--non-interactive') && !process.argv.includes('--skip-update-check')) {
+    await checkForUpdates(execSync, readline);
+  }
+
+  // Check for vault file updates (periodically, after main update check)
+  async function checkVaultFileUpdates() {
+    // Skip if vault path not set or in non-interactive mode
+    if (process.argv.includes('--non-interactive')) return;
+
+    // Check at most once per day
+    const lastCheckFile = join(projectRoot, '.data', '.last-vault-check');
+    if (existsSync(lastCheckFile)) {
+      const lastCheck = statSync(lastCheckFile).mtimeMs;
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (Date.now() - lastCheck < oneDay) {
+        return;
+      }
+    }
+
+    try {
+      const vaultPath = getAbsoluteVaultPath();
+      if (!existsSync(vaultPath)) return;
+
+      const changes = await checkPluginVaultFileChanges(vaultPath);
+
+      // Update check timestamp
+      const dataDir = join(projectRoot, '.data');
+      if (!existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(lastCheckFile, '');
+
+      if (changes.length > 0) {
+        console.log('');
+        console.log(`📋 ${changes.length} plugin vault file(s) have updates available.`);
+        console.log('   Run: bin/plugins vault-files --check');
+        console.log('');
+      }
+    } catch {
+      // Silently ignore vault check failures
+    }
+  }
+
+  // Run vault file check after update check
+  if (!process.argv.includes('--skip-update-check')) {
+    await checkVaultFileUpdates();
+  }
+
+  async function checkAndRecoverDatabase() {
+    if (process.env.SKIP_DB_HEALTH) {
+      return;
+    }
+
+    console.log('🔍 Checking database health...');
+    const result = await ensureHealthyDatabase({ verbose: true });
+
+    if (!result.success) {
+      console.error('❌ Database check failed');
+      process.exit(1);
+    }
+
+    if (result.recreated) {
+      console.log('ℹ️  Run bin/sync to populate data from external sources\n');
+    }
+  }
+
+  async function getDataContext() {
+    if (process.env.SKIP_CONTEXT === 'true') {
+      return `# Data Sources
+(Context gathering skipped for testing)`;
+    }
+
+    try {
+      const pluginTypes = getPluginTypes();
+      const instructionsByType = await getAIInstructionsByType();
+      const sections = [];
+
+      for (const pluginType of pluginTypes) {
+        const ai = getAIMetadata(pluginType);
+        if (!ai) continue;
+
+        if (pluginType === 'context') {
+          const contextData = await getContextPluginsData(instructionsByType.get('context'));
+          if (contextData) {
+            sections.push(contextData);
+          }
+          continue;
+        }
+
+        const typeData = instructionsByType.get(pluginType);
+        if (!typeData || typeData.sources.length === 0) continue;
+
+        let currentData = '';
+        try {
+          console.log(`  ⏳ ${ai.name || pluginType}...`);
+          currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
+            encoding: 'utf8',
+            timeout: 10000
+          });
+          currentData = currentData.split('\n')
+            .filter(line => !line.includes('[dotenvx'))
+            .join('\n');
+        } catch {
+          currentData = '(No data available)';
+        }
+
+        const block = generateAIContextBlock(pluginType, {
+          userInstructions: typeData.instructions,
+          currentData
+        });
+
+        if (block) {
+          sections.push(block);
+        }
+      }
+
+      if (sections.length === 0) {
+        return `# Data Sources
+
+**No plugins are currently enabled.**
+
+Today works best when connected to your data sources (calendars, tasks, notes, etc.).
+Run \`bin/today configure\` and select "Plugins" to enable data sources.
+
+Available plugin types include:
+- Calendars (Google Calendar, public calendars)
+- Tasks and projects (GitHub, markdown files)
+- Notes and diary (Day One, markdown files)
+- Time tracking, habits, health metrics
+- Weather and other context
+
+The more data sources you enable, the more helpful Today can be.
+`;
+      }
+
+      const intro = `# Data Sources
+
+The following data is synced from external sources via the plugin system.
+Each section shows current data and instructions for querying more.
+
+- Run \`bin/plugins list\` to see available plugins
+- Run \`bin/plugins sync\` to refresh data from all sources
+- Run \`bin/plugins sync <plugin-name>\` to sync a specific plugin
+
+`;
+
+      return intro + sections.join('\n\n---\n\n');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  async function getDataContextForDate(targetDate) {
+    const sections = [];
+    const pluginTypes = getPluginTypes();
+    const historicalTypes = ['time-logs', 'diary', 'events', 'tasks', 'habits'];
+
+    for (const pluginType of pluginTypes) {
+      if (!historicalTypes.includes(pluginType)) continue;
+
+      const schema = schemas[pluginType];
+      if (!schema || !schema.ai?.dateCommand) continue;
+
+      const command = schema.ai.dateCommand.replace('$DATE', targetDate);
+
+      try {
+        const output = execSync(command, {
+          cwd: projectRoot,
+          encoding: 'utf8',
+          timeout: 30000,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        const cleanOutput = output.split('\n')
+          .filter(line => !line.includes('[dotenvx'))
+          .join('\n')
+          .trim();
+
+        if (!cleanOutput || cleanOutput.includes('No ')) continue;
+
+        const block = generateAIContextBlock(pluginType, {
+          userInstructions: [],
+          currentData: cleanOutput,
+          commandUsed: command
+        });
+
+        if (block) {
+          sections.push(block);
+        }
+      } catch {
+        // Command failed - skip this type
+      }
+    }
+
+    if (sections.length === 0) {
+      return `# Data Sources\n(No data found for ${targetDate})`;
+    }
+
+    const intro = `# Data Sources for ${targetDate}
+
+The following data was retrieved for the specified date.
+
+`;
+
+    return intro + sections.join('\n\n---\n\n');
+  }
+
+  async function getContextPluginsData(typeData) {
+    if (!typeData || typeData.sources.length === 0) return null;
+
+    const lines = ['## Contextual Information', ''];
+
+    for (const sourceId of typeData.sources) {
+      try {
+        const [pluginName, sourceName] = sourceId.split('/');
+        const pluginPath = path.join(projectRoot, 'plugins', pluginName);
+        const readScript = path.join(pluginPath, 'read.js');
+
+        if (!fs.existsSync(readScript)) continue;
+
+        const sources = getPluginSources(pluginName);
+        const sourceConfig = sources.find(s => s.sourceName === sourceName)?.config || {};
+
+        console.log(`  ⏳ ${pluginName}...`);
+
+        const output = execSync(`node "${readScript}"`, {
+          cwd: projectRoot,
+          encoding: 'utf8',
+          timeout: 30000,
+          env: {
+            ...process.env,
+            PROJECT_ROOT: projectRoot,
+            PLUGIN_CONFIG: JSON.stringify(sourceConfig),
+            SOURCE_ID: sourceId
+          }
+        });
+
+        const data = JSON.parse(output);
+
+        if (data.context) {
+          lines.push(data.context);
+          lines.push('');
+        }
+      } catch {
+        // Silently continue if plugin fails
+      }
+    }
+
+    return lines.length > 2 ? lines.join('\n') : null;
+  }
+
+  async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null) {
+    const timezone = getTimezone();
+
+    const now = getCurrentTime(timezone);
+    const currentTime = formatFullDateTime(now, timezone);
+
+    let dataContext;
+    if (targetDate) {
+      console.log(`📊 Gathering context for ${targetDate}...`);
+      dataContext = await getDataContextForDate(targetDate);
+    } else {
+      console.log('📊 Gathering context...');
+      dataContext = await getDataContext();
+    }
+    console.log('✅ Context ready\n');
+    const config = getFullConfig();
+
+    const profile = config.profile || {};
+    const profileLines = [];
+    if (profile.name) profileLines.push(`- **Name**: ${profile.name}`);
+    if (config.location) profileLines.push(`- **Location**: ${config.location}`);
+    if (profile.home_location && profile.home_location !== config.location) {
+      profileLines.push(`- **Home**: ${profile.home_location}`);
+    }
+    profileLines.push(`- **Timezone**: ${timezone}`);
+    if (profile.vocation) profileLines.push(`- **Vocation**: ${profile.vocation}`);
+    if (profile.wake_time) profileLines.push(`- **Wake time**: ${profile.wake_time}`);
+    if (profile.bed_time) profileLines.push(`- **Bed time**: ${profile.bed_time}`);
+    if (profile.birthdate) profileLines.push(`- **Birthdate**: ${profile.birthdate}`);
+
+    const timeInfo = targetDate
+      ? `- **Target Date**: ${targetDate}\n- **Generated At**: ${currentTime} (${timezone})`
+      : `- **Current Time**: ${currentTime} (${timezone})`;
+
+    const aiInstructions = config.ai?.ai_instructions?.trim();
+    const aiInstructionsSection = aiInstructions
+      ? `\n## User Instructions\n${aiInstructions}\n`
+      : '';
+
+    const contextSection = `## Pre-Computed Context
+${timeInfo}
+
+## Database
+- **Path**: .data/today.db (SQLite)
+- **Direct queries**: sqlite3 .data/today.db "SELECT ..."
+
+## User Profile
+${profileLines.join('\n')}
+${aiInstructionsSection}
+${dataContext}`;
+
+    if (dryRun && targetDate) {
+      console.log(contextSection);
+      return;
+    }
+
+    let prompt;
+    const intro = `You are an agent helping a user. Information about the user and the user's context is provided below.`;
+
+    if (directRequest) {
+      const requestSection = `The user's request is:
+
+> ${directRequest}`;
+
+      if (nonInteractive) {
+        prompt = `${intro}
+
+## CRITICAL: You are in NON-INTERACTIVE mode
+- You have FULL PERMISSION to create, update, and modify files
+- Do NOT ask for permission - execute the requested actions immediately
+- Complete the task WITHOUT asking for confirmation
+
+${requestSection}
+
+${contextSection}`;
+      } else {
+        prompt = `${intro}
+
+${requestSection}
+
+${contextSection}`;
+      }
+    } else {
+      prompt = `${intro}
+
+Look at the user's current situation and offer suggestions of what the user should do.
+
+${contextSection}`;
+    }
+
+    if (dryRun) {
+      console.log(prompt);
+      return;
+    }
+
+    const interactiveProvider = getInteractiveProviderName();
+    const model = getInteractiveModel();
+
+    // Check if this provider requires a binary and if it's installed
+    const { available, requirement } = checkProviderBinarySync(interactiveProvider, spawnSync);
+
+    if (!available && requirement) {
+      console.error(`❌ ${requirement.name} not found.`);
+      console.error('');
+      console.error('Install it with:');
+      for (const line of requirement.installInstructions) {
+        console.error(`   ${line}`);
+      }
+      console.error('');
+      process.exit(1);
+    }
+
+    // Currently only anthropic provider supports interactive sessions
+    if (interactiveProvider !== 'anthropic') {
+      console.error(`Error: Interactive sessions only support 'anthropic' provider currently.`);
+      console.error(`Your config has: interactive_provider = "${interactiveProvider}"`);
+      console.error(`Please set interactive_provider = "anthropic" in config.toml`);
+      process.exit(1);
+    }
+
+    if (nonInteractive) {
+      console.log('🤖 Running in non-interactive mode...');
+      const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
+        stdio: 'inherit',
+        timeout: 600000 // 10 minutes in milliseconds
+      });
+      if (result.error) {
+        if (result.error.code === 'ETIMEDOUT') {
+          console.error('ERROR: Command timed out after 10 minutes');
+        } else {
+          console.error(`ERROR: ${result.error.message}`);
+        }
+        process.exit(1);
+      }
+      if (result.status !== 0) {
+        process.exit(result.status || 1);
+      }
+    } else if (directRequest) {
+      console.log('🤖 Starting session...');
+      spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+    } else {
+      console.log('🤖 Starting daily review...');
+      spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+    }
+
+    console.log('\n' + '━'.repeat(50));
+    console.log('✅ Session ended');
+    console.log('━'.repeat(50) + '\n');
+  }
+
+  async function ensureConfigAndDatabase(options = {}) {
+    if (!configExists() && !options.skipConfigCheck) {
+      console.log('━'.repeat(60));
+      console.log('⚠️  No configuration found');
+      console.log('━'.repeat(60));
+      console.log();
+      console.log('Today needs to be configured before first use.');
+      console.log('Opening configuration wizard...');
+      console.log();
+      await runConfigure();
+
+      if (!configExists()) {
+        console.log('Configuration required. Please run: bin/today configure');
+        process.exit(1);
+      }
+      console.log();
+    }
+
+    await checkAndRecoverDatabase();
+  }
+
+  async function runSession(request, options) {
+    const { sync, nonInteractive, date: targetDate } = options;
+
+    if (request) {
+      console.log(`📊 Starting focused session: ${request}`);
+    } else {
+      console.log('📊 Starting daily review process...');
+    }
+
+    if (targetDate) {
+      console.log('⚠️  Skipping sync (using historical date)');
+    } else if (sync !== false) {
+      console.log('🔄 Syncing data sources...');
+      try {
+        execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
+      } catch {
+        console.error('⚠️  Sync completed with some errors');
+      }
+    } else {
+      console.log('⚠️  Skipping sync (--no-sync flag provided)');
+    }
+
+    await runInteractiveSession(request, nonInteractive, false, targetDate);
+  }
+
+  // Helper to merge parent (global) options with command-specific options
+  function mergeOptions(cmdOptions, cmd) {
+    const parentOpts = cmd?.parent?.opts() || {};
+    return { ...parentOpts, ...cmdOptions };
+  }
+
+  program
+    .name('today')
+    .description('AI-powered daily review and planning tool')
+    .version('1.0.0')
+    .enablePositionalOptions()
+    .passThroughOptions()
+    .option('--no-sync', 'Skip sync step (faster startup)')
+    .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+    .option('--skip-update-check', 'Skip checking for updates')
+    .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data');
+
+  program
+    .argument('[request...]', 'Optional request for focused session')
+    .action(async (requestParts, options) => {
+      await ensureConfigAndDatabase();
+      const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+      await runSession(request, options);
+    });
+
+  program
+    .command('configure')
+    .description('Open configuration UI for system settings')
+    .action(async () => {
+      await runConfigure();
+    });
+
+  program
+    .command('now')
+    .description('Quick "what should I do right now?" session')
+    .option('--no-sync', 'Skip sync step')
+    .option('--non-interactive', 'Run in non-interactive mode')
+    .action(async (options, cmd) => {
+      const mergedOpts = mergeOptions(options, cmd);
+      await ensureConfigAndDatabase();
+      await runSession('What should I do *right now*?', mergedOpts);
+    });
+
+  program
+    .command('dry-run')
+    .description('Show the prompt that would be sent to the AI (no API call)')
+    .argument('[request...]', 'Optional request for focused session')
+    .option('--no-sync', 'Skip sync step')
+    .option('--non-interactive', 'Include non-interactive mode flags in prompt')
+    .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+    .action(async (requestParts, options, cmd) => {
+      const mergedOpts = mergeOptions(options, cmd);
+      await ensureConfigAndDatabase({ skipConfigCheck: true });
+      const request = requestParts.length > 0 ? requestParts.join(' ') : null;
+      await runInteractiveSession(request, mergedOpts.nonInteractive, true, mergedOpts.date);
+    });
+
+  program
+    .command('update')
+    .description('Check for and install updates')
+    .action(async () => {
+      console.log('Checking for updates...');
+      console.log('');
+
+      try {
+        // Fetch latest
+        execSync('git fetch origin main', { cwd: projectRoot, stdio: 'inherit' });
+
+        const localHead = execSync('git rev-parse HEAD', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
+
+        const remoteHead = execSync('git rev-parse origin/main', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
+
+        if (localHead === remoteHead) {
+          console.log('✅ Already up to date!');
+          return;
+        }
+
+        // Show what's new
+        const newCommits = execSync(
+          'git log HEAD..origin/main --oneline --no-decorate',
+          { cwd: projectRoot, encoding: 'utf8' }
+        ).trim();
+
+        console.log("What's new:");
+        for (const line of newCommits.split('\n')) {
+          const message = line.replace(/^[a-f0-9]+\s+/, '');
+          console.log(`  • ${message}`);
+        }
+        console.log('');
+
+        // Pull updates
+        console.log('Updating...');
+        execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
+        console.log('');
+        console.log('✅ Updated successfully!');
+      } catch (error) {
+        console.error('❌ Update failed:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program.parse();
+}
+
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

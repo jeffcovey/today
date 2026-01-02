@@ -1,0 +1,49 @@
+# Sentry Issues Plugin
+# Syncs error issues from Sentry
+
+name = "sentry-issues"
+displayName = "Sentry Issues"
+description = "Error tracking issues from Sentry"
+type = "issues"
+
+longDescription = """
+Syncs error issues from Sentry as issues using the Sentry API.
+
+## Setup
+
+1. Go to Sentry: Settings > Developer Settings > Auth Tokens
+2. Create a new token with "project:read" and "event:read" scopes
+3. Use "bin/today configure" to add your token securely
+
+## Schema Mapping
+
+Sentry issues are mapped to the issues schema:
+- title -> title
+- status -> state (unresolved=open, resolved/ignored=closed)
+- firstSeen -> opened_at
+- permalink -> url
+- culprit, level, count, userCount -> metadata
+"""
+
+aiInstructions = """
+Sentry issues are error tracking events grouped by fingerprint.
+Query using the issues table with source LIKE '%sentry%'.
+
+The metadata JSON contains:
+- level: error severity (error, warning, info)
+- culprit: code location causing the error
+- count: total event count
+- userCount: affected users
+- platform: application platform
+- lastSeen: most recent occurrence
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+auth_token = { type = "string", default = "", description = "Sentry auth token", encrypted = true }
+organization = { type = "string", required = true, description = "Sentry organization slug" }
+project = { type = "string", required = false, description = "Project slug (omit for all projects)" }
+query = { type = "string", default = "is:unresolved", description = "Sentry search query" }
+limit = { type = "number", default = 100, description = "Maximum issues to sync" }

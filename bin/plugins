@@ -1,0 +1,1050 @@
+#!/usr/bin/env node
+
+// Plugin management CLI
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import fs from 'fs';
+import os from 'os';
+import { execSync } from 'child_process';
+import * as p from '@clack/prompts';
+import color from 'picocolors';
+import { colors } from '../src/cli-utils.js';
+import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
+import {
+  discoverPlugins,
+  getPluginSources,
+  getEnabledPlugins,
+  syncPluginSource,
+  getSyncMetadata,
+  syncPluginVaultFiles,
+  checkPluginVaultFileChanges,
+  getPluginsWithVaultFiles
+} from '../src/plugin-loader.js';
+import { getAbsoluteVaultPath } from '../src/config.js';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+import { getDatabase } from '../src/database-service.js';
+import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { program } from 'commander';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+const CONFIG_PATH = path.join(PROJECT_ROOT, 'config.toml');
+
+/**
+ * Get the user's preferred editor
+ */
+function getEditor() {
+  return process.env.EDITOR || process.env.VISUAL || 'nano';
+}
+
+/**
+ * Edit text in an external editor
+ * @param {string} currentText - Current text content
+ * @param {string} filename - Suggested filename for the temp file
+ * @returns {string|null} - Edited text, or null if cancelled/unchanged
+ */
+function editInEditor(currentText, filename = 'edit.txt') {
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, filename);
+
+  try {
+    fs.writeFileSync(tmpFile, currentText || '');
+    const editor = getEditor();
+    execSync(`${editor} "${tmpFile}"`, { stdio: 'inherit' });
+    const newText = fs.readFileSync(tmpFile, 'utf8');
+    fs.unlinkSync(tmpFile);
+    return newText;
+  } catch (error) {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+    return null;
+  }
+}
+
+/**
+ * Check if an error is a database corruption error that warrants recreation
+ */
+function isDatabaseCorruptionError(error) {
+  const message = error?.message || String(error);
+  return message.includes('database disk image is malformed') ||
+         message.includes('disk I/O error') ||
+         message.includes('file is not a database') ||
+         message.includes('database is locked') ||
+         message.includes('unable to open database');
+}
+
+/**
+ * Ensure config.toml has entries for all available plugins.
+ * Adds commented-out defaults for new plugins, removes entries for deleted plugins.
+ */
+async function ensurePluginConfig() {
+  const plugins = await discoverPlugins();
+
+  if (plugins.size === 0) return;
+
+  // Read current config
+  let configContent = '';
+  try {
+    configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+  } catch {
+    return; // No config file yet
+  }
+
+  // Build the plugin config section
+  const pluginConfigs = [];
+  for (const [name, plugin] of plugins) {
+    const sectionHeader = `[plugins.${name}.`;
+
+    // Check if this plugin already has any configuration
+    if (configContent.includes(sectionHeader) || configContent.includes(`# ${sectionHeader}`)) {
+      continue; // Already configured (enabled or commented)
+    }
+
+    // Generate commented-out default config
+    const lines = [];
+    lines.push(`# [plugins.${name}.default]`);
+    lines.push(`# enabled = true`);
+
+    if (plugin.settings) {
+      for (const [key, schema] of Object.entries(plugin.settings)) {
+        const defaultValue = schema.default;
+        if (defaultValue !== undefined) {
+          const valueStr = typeof defaultValue === 'string' ? `"${defaultValue}"` : defaultValue;
+          lines.push(`# ${key} = ${valueStr}`);
+        }
+      }
+    }
+
+    pluginConfigs.push(lines.join('\n'));
+  }
+
+  // Update config.toml if there are new plugins
+  if (pluginConfigs.length > 0) {
+    // Find where to insert - after existing plugins section or at the end
+    const pluginsHeaderMatch = configContent.match(/^# =+\n# Plugins\n# =+/m);
+
+    if (pluginsHeaderMatch) {
+      // Find the end of the plugins section (next header or EOF)
+      const afterHeader = configContent.indexOf(pluginsHeaderMatch[0]) + pluginsHeaderMatch[0].length;
+      const nextHeaderMatch = configContent.slice(afterHeader).match(/\n# =+\n#[^=]/);
+      const insertPoint = nextHeaderMatch
+        ? afterHeader + nextHeaderMatch.index
+        : configContent.length;
+
+      // Insert new plugin configs before the next section
+      const before = configContent.slice(0, insertPoint).trimEnd();
+      const after = configContent.slice(insertPoint);
+
+      configContent = before + '\n\n' + pluginConfigs.join('\n\n') + after;
+    } else {
+      // No plugins section yet, append at the end
+      configContent = configContent.trimEnd() + '\n\n' +
+        '# =============================================================================\n' +
+        '# Plugins\n' +
+        '# =============================================================================\n' +
+        '# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]\n' +
+        '# Uncomment and set enabled = true to activate a plugin\n\n' +
+        pluginConfigs.join('\n\n') + '\n';
+    }
+
+    fs.writeFileSync(CONFIG_PATH, configContent);
+  }
+}
+
+async function cmdList() {
+  const plugins = await discoverPlugins();
+
+  console.log(colors.cyan('Available Plugins:'));
+  console.log('');
+
+  for (const [name, plugin] of plugins) {
+    const sources = getPluginSources(name);
+    const status = sources.length > 0
+      ? colors.green(`${sources.length} source(s) enabled`)
+      : colors.gray('not configured');
+
+    console.log(`  ${colors.bold(plugin.displayName || name)} ${colors.gray(`(${name})`)}`);
+    console.log(`    Type: ${plugin.type} | Access: ${plugin.access}`);
+    console.log(`    ${plugin.description}`);
+    console.log(`    Status: ${status}`);
+
+    if (sources.length > 0) {
+      for (const { sourceName } of sources) {
+        console.log(`      - ${sourceName}`);
+      }
+    }
+    console.log('');
+  }
+}
+
+async function cmdStatus() {
+  const enabledPlugins = await getEnabledPlugins();
+
+  if (enabledPlugins.length === 0) {
+    console.log(colors.yellow('No plugins are currently enabled.'));
+    console.log('');
+    console.log('Configure plugins in config.toml:');
+    console.log('');
+    console.log('  [plugins.time-tracking.local]');
+    console.log('  enabled = true');
+    return;
+  }
+
+  console.log(colors.cyan('Enabled Plugins:'));
+  console.log('');
+
+  for (const { plugin, sources } of enabledPlugins) {
+    console.log(`  ${colors.bold(plugin.displayName || plugin.name)}`);
+
+    for (const { sourceName, config } of sources) {
+      const tableName = `${plugin.name.replace(/-/g, '_')}_${sourceName.replace(/-/g, '_')}`;
+      console.log(`    ${colors.green('●')} ${sourceName} → ${tableName}`);
+    }
+    console.log('');
+  }
+}
+
+/**
+ * Execute the actual sync operation
+ * @param {object} context - { db, vaultPath }
+ * @param {string|null} pluginName - Specific plugin to sync (or null for all)
+ * @param {string|null} sourceName - Specific source within plugin (or null for all)
+ * @param {object} options - Sync options
+ * @returns {Promise<void>}
+ */
+async function runSyncOperation(context, pluginName, sourceName, options) {
+  const { db } = context;
+  const typeFilter = options.type || options.t;
+  const staleMinutes = options['if-stale'] ? parseInt(options['if-stale'], 10) : null;
+
+  if (pluginName) {
+    // Sync specific plugin
+    const plugins = await discoverPlugins();
+    const plugin = plugins.get(pluginName);
+
+    if (!plugin) {
+      console.error(colors.red(`Plugin not found: ${pluginName}`));
+      process.exit(1);
+    }
+
+    // Check if plugin has a read command
+    if (!plugin.commands?.read) {
+      console.log(colors.yellow(`Plugin ${pluginName} does not have a read command.`));
+      console.log(colors.gray('This plugin provides read-only access to external data.'));
+      return;
+    }
+
+    const sources = getPluginSources(pluginName);
+
+    if (sources.length === 0) {
+      console.error(colors.red(`Plugin ${pluginName} has no enabled sources.`));
+      process.exit(1);
+    }
+
+    // Filter to specific source if provided
+    const toSync = sourceName
+      ? sources.filter(s => s.sourceName === sourceName)
+      : sources;
+
+    if (sourceName && toSync.length === 0) {
+      console.error(colors.red(`Source not found: ${sourceName}`));
+      process.exit(1);
+    }
+
+    for (const { sourceName: src, config } of toSync) {
+      console.log(`Syncing ${pluginName}/${src}...`);
+      const result = await syncPluginSource(plugin, src, config, context);
+
+      if (result.success) {
+        console.log(colors.green(`  ✓ ${result.message}`));
+      } else {
+        console.log(colors.red(`  ✗ ${result.message}`));
+      }
+    }
+  } else {
+    // Sync all enabled plugins (optionally filtered by type)
+    const enabledPlugins = await getEnabledPlugins();
+
+    // Filter to plugins that have read commands
+    let syncablePlugins = enabledPlugins.filter(({ plugin }) => plugin.commands?.read);
+
+    // Apply type filter if specified
+    if (typeFilter) {
+      syncablePlugins = syncablePlugins.filter(({ plugin }) => plugin.type === typeFilter);
+
+      if (syncablePlugins.length === 0) {
+        console.log(colors.yellow(`No plugins of type '${typeFilter}' to sync.`));
+        return;
+      }
+    }
+
+    if (syncablePlugins.length === 0) {
+      console.log(colors.yellow('No plugins to sync.'));
+      return;
+    }
+
+    const typeMsg = typeFilter ? ` (type: ${typeFilter})` : '';
+    console.log(colors.cyan(`Syncing plugins${typeMsg}...`));
+    console.log('');
+
+    let skippedCount = 0;
+    for (const { plugin, sources } of syncablePlugins) {
+      for (const { sourceName: src, config } of sources) {
+        const sourceId = `${plugin.name}/${src}`;
+
+        // Check staleness if --if-stale is specified
+        if (staleMinutes !== null) {
+          const syncMeta = getSyncMetadata(db, sourceId);
+          if (syncMeta?.last_synced_at) {
+            const lastSync = new Date(syncMeta.last_synced_at + 'Z');
+            const ageMs = Date.now() - lastSync.getTime();
+            const ageMinutes = ageMs / 1000 / 60;
+            if (ageMinutes < staleMinutes) {
+              skippedCount++;
+              continue; // Skip - data is fresh
+            }
+          }
+        }
+
+        console.log(`  ${plugin.name}/${src}...`);
+        const result = await syncPluginSource(plugin, src, config, context);
+
+        if (result.success) {
+          console.log(colors.green(`    ✓ ${result.message}`));
+        } else {
+          console.log(colors.red(`    ✗ ${result.message}`));
+        }
+      }
+    }
+
+    if (skippedCount > 0 && staleMinutes !== null) {
+      console.log(colors.gray(`  (${skippedCount} source(s) skipped - synced within ${staleMinutes} minutes)`));
+    }
+  }
+
+  // Force WAL checkpoint to ensure all writes are visible to other processes
+  // This is critical for rapid start/stop timer cycles where the parent process
+  // needs to immediately see the changes we just wrote
+  // FULL mode waits for readers to finish, ensuring consistency without truncating WAL
+  db.pragma('wal_checkpoint(FULL)');
+}
+
+async function cmdSync(pluginName, sourceName, options = {}) {
+  // Handle help flag
+  if (options.help || options.h) {
+    console.log(`
+Usage: bin/plugins sync [plugin-name] [source-name] [options]
+
+Sync data from plugins to the database.
+
+Arguments:
+  plugin-name    Sync only this plugin (optional)
+  source-name    Sync only this source within the plugin (optional)
+
+Options:
+  --type TYPE    Sync only plugins of this type (e.g., events, issues, time-logs)
+
+Examples:
+  bin/plugins sync                        # Sync all enabled plugins
+  bin/plugins sync --type events          # Sync only calendar/event plugins
+  bin/plugins sync github-issues          # Sync only github-issues plugin
+  bin/plugins sync github-issues today    # Sync only the 'today' source
+
+Note: CLI tools (bin/calendar, bin/issues, etc.) auto-sync stale data before
+displaying results. Use 'bin/plugins sync' to force an immediate refresh.
+`);
+    return;
+  }
+
+  // Ensure database is healthy and migrations are run
+  let healthResult = await ensureHealthyDatabase({ verbose: true });
+  if (!healthResult.success) {
+    console.error(colors.red('Database health check failed'));
+    process.exit(1);
+  }
+
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  // Attempt sync with automatic recovery on database corruption
+  let retryCount = 0;
+  const maxRetries = 1;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const db = getDatabase();
+      const context = { db, vaultPath };
+      await runSyncOperation(context, pluginName, sourceName, options);
+      return; // Success - exit the retry loop
+    } catch (error) {
+      if (isDatabaseCorruptionError(error) && retryCount < maxRetries) {
+        retryCount++;
+        console.log('');
+        console.log(colors.yellow(`⚠️  Database error detected: ${error.message}`));
+        console.log(colors.cyan('🔄 Recreating database and retrying sync...'));
+        console.log('');
+
+        // Close existing connection and clear singleton
+        try {
+          const db = getDatabase();
+          await db.close();
+        } catch {
+          // Ignore close errors
+        }
+
+        // Recreate the database from scratch
+        const recreated = await createFreshDatabase();
+        if (!recreated) {
+          console.error(colors.red('Failed to recreate database'));
+          process.exit(1);
+        }
+
+        console.log(colors.green('✅ Database recreated successfully'));
+        console.log('');
+
+        // Continue to retry
+      } else {
+        // Non-recoverable error or max retries exceeded
+        throw error;
+      }
+    }
+  }
+}
+
+
+async function cmdConfigure(pluginNameArg) {
+  const plugins = await discoverPlugins();
+
+  if (plugins.size === 0) {
+    p.outro(color.yellow('No plugins available.'));
+    return;
+  }
+
+  // If a specific plugin is specified, use the old flow
+  if (pluginNameArg) {
+    p.intro(color.bgCyan(color.black(' Plugin Configuration ')));
+    const plugin = plugins.get(pluginNameArg);
+    if (!plugin) {
+      p.cancel(`Plugin not found: ${pluginNameArg}`);
+      process.exit(1);
+    }
+    await configurePlugin(plugin, pluginNameArg);
+    p.outro('Configuration saved');
+    return;
+  }
+
+  // Interactive unified view (ink-based UI)
+  await runPluginsConfigure(plugins);
+}
+
+async function configurePlugin(plugin, pluginName) {
+  // Inner configuration loop for a single plugin
+  while (true) {
+    // Show plugin info in a nice box
+    p.note(
+      plugin.longDescription?.trim() || plugin.description,
+      plugin.displayName || plugin.name
+    );
+
+    // Refresh configured sources each iteration
+    const allConfiguredSources = getConfiguredSources(pluginName);
+
+    // Show current sources if any exist
+    if (allConfiguredSources.length > 0) {
+      const sourceList = allConfiguredSources
+        .map(s => {
+          const status = s.config.enabled
+            ? color.green('●')
+            : color.dim('○');
+          return `${status} ${s.sourceName}`;
+        })
+        .join('\n');
+
+      p.note(sourceList, 'Current sources');
+    }
+
+    // Build action choices based on current state
+    const actionOptions = [
+      { value: 'add', label: 'Add new source', hint: 'Create a new configuration' }
+    ];
+
+    if (allConfiguredSources.length > 0) {
+      actionOptions.push(
+        { value: 'edit', label: 'Edit source', hint: 'Modify existing configuration' },
+        { value: 'remove', label: 'Remove source', hint: color.red('Delete a source') }
+      );
+    }
+
+    actionOptions.push(
+      { value: '__back__', label: color.dim('← Back to plugin list') }
+    );
+
+    const action = await p.select({
+      message: 'What would you like to do?',
+      options: actionOptions
+    });
+
+    if (p.isCancel(action) || action === '__back__') {
+      return false; // Return to plugin selection
+    }
+
+    // Handle the selected action
+    if (action === 'add') {
+      await addSource(plugin, pluginName, allConfiguredSources);
+    } else if (action === 'edit') {
+      await editSource(plugin, pluginName, allConfiguredSources);
+    } else if (action === 'remove') {
+      await removeSource(pluginName, allConfiguredSources);
+    }
+  }
+}
+
+// Get configured sources for a plugin from config.toml
+function getConfiguredSources(pluginName) {
+  try {
+    const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+    const parsedConfig = parseToml(configContent);
+    if (parsedConfig.plugins?.[pluginName]) {
+      return Object.entries(parsedConfig.plugins[pluginName]).map(([name, cfg]) => ({
+        sourceName: name,
+        config: cfg
+      }));
+    }
+  } catch {
+    // No config yet
+  }
+  return [];
+}
+
+async function addSource(plugin, pluginName, existingSources) {
+  const existingNames = existingSources.map(s => s.sourceName);
+
+  const sourceName = await p.text({
+    message: 'Source name',
+    placeholder: 'e.g., local, work, personal',
+    defaultValue: 'default',
+    validate: (value) => {
+      if (!value) return 'Source name is required';
+      if (!value.match(/^[a-z0-9_-]+$/)) {
+        return 'Must be lowercase alphanumeric with dashes or underscores';
+      }
+      if (existingNames.includes(value)) {
+        return `Source "${value}" already exists`;
+      }
+    }
+  });
+
+  if (p.isCancel(sourceName)) {
+    p.cancel('Cancelled');
+    return;
+  }
+
+  // Collect settings
+  const sourceConfig = { enabled: true };
+
+  if (plugin.settings) {
+    p.log.info(color.cyan('Configure plugin settings:'));
+
+    for (const [key, schema] of Object.entries(plugin.settings)) {
+      const value = await promptForSetting(key, schema, schema.default);
+      if (p.isCancel(value)) {
+        p.cancel('Cancelled');
+        return;
+      }
+      if (value !== undefined) {
+        sourceConfig[key] = value;
+      }
+    }
+  }
+
+  // Save
+  const s = p.spinner();
+  s.start('Saving configuration');
+  saveSourceConfig(pluginName, sourceName, sourceConfig);
+  s.stop(color.green(`✓ Added source "${sourceName}"`));
+}
+
+async function editSource(plugin, pluginName, allSources) {
+  // Select source to edit
+  let sourceToEdit;
+
+  if (allSources.length === 1) {
+    sourceToEdit = allSources[0].sourceName;
+  } else {
+    sourceToEdit = await p.select({
+      message: 'Select source to edit',
+      options: allSources.map(s => ({
+        value: s.sourceName,
+        label: s.sourceName,
+        hint: s.config.enabled ? color.green('enabled') : color.dim('disabled')
+      }))
+    });
+
+    if (p.isCancel(sourceToEdit)) return;
+  }
+
+  const currentConfig = allSources.find(s => s.sourceName === sourceToEdit)?.config || {};
+
+  // Edit enabled status
+  const enabled = await p.confirm({
+    message: 'Enable this source?',
+    initialValue: currentConfig.enabled === true
+  });
+
+  if (p.isCancel(enabled)) return;
+
+  const sourceConfig = { enabled };
+
+  // Edit settings
+  if (plugin.settings) {
+    p.log.info(color.cyan('Configure plugin settings:'));
+
+    for (const [key, schema] of Object.entries(plugin.settings)) {
+      const currentValue = currentConfig[key] ?? schema.default;
+      const value = await promptForSetting(key, schema, currentValue);
+      if (p.isCancel(value)) {
+        p.cancel('Cancelled');
+        return;
+      }
+      if (value !== undefined) {
+        sourceConfig[key] = value;
+      }
+    }
+  }
+
+  // Handle AI instructions
+  const hasInstructions = !!currentConfig.ai_instructions;
+
+  const editInstructions = await p.confirm({
+    message: hasInstructions
+      ? 'Edit AI instructions?'
+      : 'Add AI instructions? (tells AI how to use this data)',
+    initialValue: false
+  });
+
+  if (!p.isCancel(editInstructions) && editInstructions) {
+    const newInstructions = editInEditor(
+      currentConfig.ai_instructions || '',
+      'ai-instructions.txt'
+    );
+    if (newInstructions?.trim()) {
+      sourceConfig.ai_instructions = newInstructions.trim();
+    }
+  } else if (hasInstructions) {
+    sourceConfig.ai_instructions = currentConfig.ai_instructions;
+  }
+
+  // Save
+  const s = p.spinner();
+  s.start('Saving changes');
+  saveSourceConfig(pluginName, sourceToEdit, sourceConfig);
+  s.stop(color.green(`✓ Updated "${sourceToEdit}"`));
+}
+
+async function removeSource(pluginName, allSources) {
+  let sourceToRemove;
+
+  if (allSources.length === 1) {
+    sourceToRemove = allSources[0].sourceName;
+  } else {
+    sourceToRemove = await p.select({
+      message: 'Select source to remove',
+      options: allSources.map(s => ({
+        value: s.sourceName,
+        label: s.sourceName
+      }))
+    });
+
+    if (p.isCancel(sourceToRemove)) return;
+  }
+
+  const confirmed = await p.confirm({
+    message: `Are you sure you want to remove "${sourceToRemove}"?`,
+    initialValue: false
+  });
+
+  if (p.isCancel(confirmed) || !confirmed) {
+    p.log.info('Cancelled');
+    return;
+  }
+
+  const s = p.spinner();
+  s.start('Removing source');
+  deleteSourceConfig(pluginName, sourceToRemove);
+  s.stop(color.green(`✓ Removed "${sourceToRemove}"`));
+}
+
+// Helper to prompt for a single setting based on schema
+async function promptForSetting(key, schema, currentValue) {
+  const message = schema.description || key;
+
+  if (schema.type === 'boolean') {
+    return p.confirm({
+      message,
+      initialValue: currentValue ?? false
+    });
+  } else if (schema.type === 'number') {
+    const result = await p.text({
+      message,
+      defaultValue: currentValue != null ? String(currentValue) : '',
+      validate: (v) => {
+        if (v && isNaN(Number(v))) return 'Must be a number';
+      }
+    });
+    return result ? Number(result) : undefined;
+  } else if (schema.enum) {
+    return p.select({
+      message,
+      options: schema.enum.map(opt => ({ value: opt, label: String(opt) })),
+      initialValue: currentValue
+    });
+  } else {
+    return p.text({
+      message,
+      defaultValue: currentValue ?? '',
+      placeholder: schema.placeholder
+    });
+  }
+}
+
+// Save a source configuration
+function saveSourceConfig(pluginName, sourceName, sourceConfig) {
+  let config = {};
+  try {
+    const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+    config = parseToml(configContent);
+  } catch {
+    // Config doesn't exist yet
+  }
+
+  if (!config.plugins) config.plugins = {};
+  if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
+
+  config.plugins[pluginName][sourceName] = sourceConfig;
+  writeConfig(config);
+}
+
+// Delete a source configuration
+function deleteSourceConfig(pluginName, sourceName) {
+  let config = {};
+  try {
+    const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+    config = parseToml(configContent);
+  } catch {
+    return;
+  }
+
+  if (config.plugins?.[pluginName]) {
+    delete config.plugins[pluginName][sourceName];
+    if (Object.keys(config.plugins[pluginName]).length === 0) {
+      delete config.plugins[pluginName];
+    }
+  }
+
+  writeConfig(config);
+}
+
+/**
+ * Convert smol-toml output to use multi-line strings for ai_instructions
+ * smol-toml uses \n escapes, but triple-quoted strings are more readable
+ */
+function formatMultilineStrings(tomlStr) {
+  // Match ai_instructions = "..." and convert to triple-quoted if it contains \n
+  return tomlStr.replace(
+    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
+    (match, prefix, content) => {
+      // Check if it has escaped newlines
+      if (!content.includes('\\n')) {
+        return match; // Keep as-is if single line
+      }
+      // Unescape the content and use triple quotes
+      const unescaped = content
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+        .trimEnd(); // Remove trailing whitespace to prevent accumulation
+      return `${prefix}"""\n${unescaped}\n"""`;
+    }
+  );
+}
+
+/**
+ * Write config object to config.toml, preserving comments where possible
+ */
+function writeConfig(config) {
+  // Read existing file to preserve structure/comments
+  let existingContent = '';
+  try {
+    existingContent = fs.readFileSync(CONFIG_PATH, 'utf8');
+  } catch {
+    // File doesn't exist
+  }
+
+  if (existingContent) {
+    // Try to update just the plugins section
+    let pluginsSection = stringifyToml({ plugins: config.plugins });
+    pluginsSection = formatMultilineStrings(pluginsSection);
+
+    // Check if plugins section exists
+    const pluginsMatch = existingContent.match(/^# =+\n# Plugins\n# =+.*?(?=\n# =|\n*$)/ms);
+
+    if (pluginsMatch) {
+      // Replace plugins section
+      const before = existingContent.slice(0, pluginsMatch.index);
+      const newPluginsSection = `# =============================================================================
+# Plugins
+# =============================================================================
+# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
+# Uncomment and set enabled = true to activate a plugin
+
+${pluginsSection}`;
+
+      existingContent = before.trimEnd() + '\n\n' + newPluginsSection;
+      fs.writeFileSync(CONFIG_PATH, existingContent);
+    } else {
+      // No plugins section yet, append it
+      const newPluginsSection = `
+# =============================================================================
+# Plugins
+# =============================================================================
+# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
+# Uncomment and set enabled = true to activate a plugin
+
+${pluginsSection}`;
+
+      fs.writeFileSync(CONFIG_PATH, existingContent.trimEnd() + '\n' + newPluginsSection);
+    }
+  } else {
+    // Write new config file
+    let tomlOutput = stringifyToml(config);
+    tomlOutput = formatMultilineStrings(tomlOutput);
+    const content = `# Configuration for Today system
+# Run 'bin/today configure' to edit interactively
+
+${tomlOutput}`;
+    fs.writeFileSync(CONFIG_PATH, content);
+  }
+}
+
+async function cmdInfo(pluginName) {
+  const plugins = await discoverPlugins();
+
+  if (!pluginName) {
+    console.error(colors.red('Usage: plugins info <plugin-name>'));
+    console.log('');
+    console.log('Available plugins:');
+    for (const [name] of plugins) {
+      console.log(`  ${name}`);
+    }
+    process.exit(1);
+  }
+
+  const plugin = plugins.get(pluginName);
+  if (!plugin) {
+    console.error(colors.red(`Plugin not found: ${pluginName}`));
+    process.exit(1);
+  }
+
+  console.log('');
+  console.log(colors.bold(plugin.displayName || plugin.name));
+  console.log(colors.gray('─'.repeat(60)));
+  console.log('');
+  console.log(`Type: ${plugin.type}`);
+  console.log(`Access: ${plugin.access}`);
+
+  if (plugin.commands?.read) {
+    console.log(`Sync: ${colors.green('yes')}`);
+  } else {
+    console.log(`Sync: ${colors.gray('no (read-only, external data)')}`);
+  }
+
+  console.log('');
+
+  if (plugin.longDescription) {
+    console.log(plugin.longDescription.trim());
+  } else {
+    console.log(plugin.description);
+  }
+
+  // Show configured sources
+  const sources = getPluginSources(pluginName);
+  if (sources.length > 0) {
+    console.log('');
+    console.log(colors.cyan('Configured sources:'));
+    for (const { sourceName, config } of sources) {
+      const status = config.enabled === true ? colors.green('enabled') : colors.gray('disabled');
+      console.log(`  ${sourceName} (${status})`);
+      if (config.ai_instructions) {
+        console.log(colors.gray('    AI instructions from config.toml:'));
+        const lines = config.ai_instructions.trim().split('\n');
+        for (const line of lines) {
+          console.log(colors.gray(`      ${line}`));
+        }
+      }
+    }
+  }
+
+  console.log('');
+}
+
+// Commander setup
+program
+  .name('plugins')
+  .description('Plugin management for Today system');
+
+program
+  .command('list', { isDefault: true })
+  .description('Show all available plugins')
+  .action(async () => {
+    await cmdList();
+  });
+
+program
+  .command('info')
+  .description('Show detailed plugin documentation')
+  .argument('<plugin>', 'Plugin name')
+  .action(async (pluginName) => {
+    await cmdInfo(pluginName);
+  });
+
+program
+  .command('status')
+  .description('Show enabled plugins and their sources')
+  .action(async () => {
+    await cmdStatus();
+  });
+
+program
+  .command('configure')
+  .description('Interactive plugin configuration')
+  .argument('[plugin]', 'Plugin name (optional)')
+  .action(async (pluginName) => {
+    await cmdConfigure(pluginName);
+  });
+
+program
+  .command('sync')
+  .description('Sync plugin data to database')
+  .argument('[plugin]', 'Plugin name (optional)')
+  .argument('[source]', 'Source name within plugin (optional)')
+  .option('-t, --type <type>', 'Only sync plugins of this type (e.g., time-logs, events)')
+  .option('--if-stale <minutes>', 'Only sync if data is older than N minutes')
+  .action(async (pluginName, sourceName, options) => {
+    await cmdSync(pluginName, sourceName, options);
+  });
+
+program
+  .command('vault-files')
+  .description('Manage plugin vault files (templates, scripts, etc.)')
+  .option('--install', 'Install missing vault files from enabled plugins')
+  .option('--check', 'Check for new/updated vault files (default)')
+  .option('--force', 'Force overwrite existing files during install')
+  .option('--list', 'List all vault files from enabled plugins')
+  .action(async (options) => {
+    const vaultPath = getAbsoluteVaultPath();
+
+    // Ensure vault directory exists
+    if (!fs.existsSync(vaultPath)) {
+      fs.mkdirSync(vaultPath, { recursive: true });
+    }
+
+    if (options.list) {
+      // List all vault files from all plugins (not just enabled)
+      const pluginsWithFiles = await getPluginsWithVaultFiles({ enabledOnly: false });
+
+      if (pluginsWithFiles.length === 0) {
+        console.log(colors.yellow('No plugins have vault files.'));
+        return;
+      }
+
+      console.log(colors.cyan('Plugin Vault Files:'));
+      console.log('');
+
+      for (const { plugin, files, enabled } of pluginsWithFiles) {
+        const enabledStatus = enabled ? colors.green('[enabled]') : colors.gray('[disabled]');
+        console.log(colors.bold(`  ${plugin.displayName || plugin.name}`) + ` ${enabledStatus}`);
+        for (const file of files) {
+          const destPath = path.join(vaultPath, file);
+          const exists = fs.existsSync(destPath);
+          const status = exists ? colors.green('✓') : colors.gray('○');
+          console.log(`    ${status} ${file}`);
+        }
+        console.log('');
+      }
+      return;
+    }
+
+    if (options.install) {
+      // Install vault files
+      console.log(colors.cyan('Installing vault files from enabled plugins...'));
+      console.log(`  Vault path: ${vaultPath}`);
+      console.log('');
+
+      const result = await syncPluginVaultFiles({
+        vaultPath,
+        force: options.force,
+        verbose: true
+      });
+
+      console.log('');
+      if (result.installed.length > 0) {
+        console.log(colors.green(`✓ Installed ${result.installed.length} file(s)`));
+      }
+      if (result.skipped.length > 0) {
+        console.log(colors.gray(`  Skipped ${result.skipped.length} existing file(s)`));
+        if (!options.force) {
+          console.log(colors.gray('  Use --force to overwrite existing files'));
+        }
+      }
+      if (result.errors.length > 0) {
+        console.log(colors.red(`✗ ${result.errors.length} error(s)`));
+        for (const error of result.errors) {
+          console.log(colors.red(`  - ${error}`));
+        }
+      }
+      return;
+    }
+
+    // Default: check for changes (--check or no flag)
+    console.log(colors.cyan('Checking plugin vault files...'));
+    console.log(`  Vault path: ${vaultPath}`);
+    console.log('');
+
+    const changes = await checkPluginVaultFileChanges(vaultPath);
+
+    if (changes.length === 0) {
+      console.log(colors.green('✓ All vault files are up to date.'));
+      return;
+    }
+
+    // Group by plugin
+    const byPlugin = new Map();
+    for (const change of changes) {
+      if (!byPlugin.has(change.plugin)) {
+        byPlugin.set(change.plugin, []);
+      }
+      byPlugin.get(change.plugin).push(change);
+    }
+
+    console.log(colors.yellow(`${changes.length} file(s) have updates available:`));
+    console.log('');
+
+    for (const [pluginName, pluginChanges] of byPlugin) {
+      console.log(colors.bold(`  ${pluginName}:`));
+      for (const change of pluginChanges) {
+        const icon = change.status === 'missing' ? colors.gray('○ missing:') : colors.yellow('⟳ updated:');
+        console.log(`    ${icon} ${change.file}`);
+      }
+      console.log('');
+    }
+
+    console.log('Run with --install to install missing files.');
+    console.log('Run with --install --force to update all files.');
+  });
+
+// Ensure config.toml has entries for all plugins before parsing
+await ensurePluginConfig();
+
+program.parse();

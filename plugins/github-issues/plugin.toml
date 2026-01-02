@@ -1,0 +1,41 @@
+# GitHub Issues Plugin
+# Syncs issues from GitHub repositories
+
+name = "github-issues"
+displayName = "GitHub Issues"
+description = "Issue tracking from GitHub repositories"
+type = "issues"
+
+
+longDescription = """
+Syncs issues from GitHub repositories using the gh CLI.
+
+Requires the GitHub CLI (gh) to be installed and authenticated.
+Configure one or more repositories to track issues from.
+
+Each configured source tracks a single repository.
+"""
+
+aiInstructions = """
+To query issues, use the `issues` table:
+- `id`: Issue identifier (source:number format)
+- `title`: Issue title
+- `state`: open or closed
+- `opened_at`: When the issue was created
+- `url`: Link to the issue on GitHub
+- `body`: Issue description
+- `metadata`: JSON with labels, assignees, milestone, closed_at, etc.
+
+Example queries:
+- Open issues: SELECT title, url FROM issues WHERE state = 'open' ORDER BY opened_at DESC
+- By label: SELECT title FROM issues WHERE json_extract(metadata, '$.labels') LIKE '%bug%'
+- Recent closed: SELECT title, json_extract(metadata, '$.closed_at') FROM issues WHERE state = 'closed' ORDER BY json_extract(metadata, '$.closed_at') DESC LIMIT 5
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+repository = { type = "string", required = true, description = "GitHub repository (owner/repo format, e.g., jeffcovey/today)" }
+include_closed = { type = "boolean", default = false, description = "Include closed issues (default: only open)" }
+limit = { type = "number", default = 100, description = "Maximum number of issues to sync" }

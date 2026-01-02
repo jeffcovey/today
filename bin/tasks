@@ -1,0 +1,549 @@
+#!/usr/bin/env node
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+import { execSync } from 'child_process';
+
+// Standard terminal width for wrapping
+const TERMINAL_WIDTH = 80;
+const BULLET_INDENT = '   '; // 3 spaces to align with emoji bullet
+
+// Priority emoji map (shared across commands)
+const PRIORITY_EMOJI = {
+  highest: '🔺',
+  high: '⏫',
+  medium: '🔼',
+  low: '🔽',
+  lowest: '⏬'
+};
+
+/**
+ * Wrap text to fit terminal width, with proper indentation for continuation lines.
+ * URLs and long unbreakable strings go on their own line.
+ */
+function wrapTaskLine(bullet, title, dueSuffix = '') {
+  const fullText = title + dueSuffix;
+
+  // Width available after bullet and space
+  const contentWidth = TERMINAL_WIDTH - 3; // "🔺 " = 3 visible chars (emoji + space)
+
+  // If it fits on one line, just return it
+  if (fullText.length <= contentWidth) {
+    return `${bullet} ${fullText}`;
+  }
+
+  // Split into words, keeping URLs intact
+  const words = fullText.split(/(\s+)/).filter(w => w.trim());
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const isUrl = word.match(/^https?:\/\//);
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+    if (isUrl) {
+      // URLs go on their own line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      lines.push(word);
+      currentLine = '';
+    } else if (testLine.length <= contentWidth) {
+      currentLine = testLine;
+    } else {
+      // Word doesn't fit, start new line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  // Format with bullet on first line, indent on continuation
+  return lines.map((line, i) => {
+    if (i === 0) {
+      return `${bullet} ${line}`;
+    }
+    return `${BULLET_INDENT}${line}`;
+  }).join('\n');
+}
+
+/**
+ * Print a list of tasks with wrapping
+ */
+function printTasks(tasks) {
+  console.log('');
+  for (const task of tasks) {
+    const bullet = PRIORITY_EMOJI[task.priority] || '  ';
+    const dateSuffix = task.due_date ? colors.yellow(` 📅 ${task.due_date}`) : '';
+    console.log(wrapTaskLine(bullet, task.title, dateSuffix));
+  }
+}
+
+program
+  .name('tasks')
+  .description('Task management for Today system');
+
+// Sync command - syncs tasks via plugin system
+program
+  .command('sync')
+  .description('Sync tasks from all enabled task plugins')
+  .action(async () => {
+    console.log(colors.blue('ℹ') + ' Syncing tasks plugins to database...');
+
+    try {
+      const result = execSync('bin/plugins sync --type tasks', { encoding: 'utf8' });
+      // Strip dotenvx output and show result
+      const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\n'));
+    } catch (error) {
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(colors.yellow('⚠') + ' No tasks plugins are enabled.');
+        console.log('');
+        console.log('To sync tasks, configure a plugin:');
+        console.log('');
+        console.log('  ' + colors.cyan('bin/plugins configure'));
+      } else {
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
+    }
+  });
+
+// Today command - shorthand for list --today
+program
+  .command('today')
+  .description('Show tasks due/scheduled for today or earlier')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    const today = getTodayDate();
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE status = 'open'
+        AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
+    `;
+    const params = [today, today];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += `
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(colors.blue('ℹ') + ' No tasks due today');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(colors.gray(`${tasks.length} tasks due today or earlier`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// Recent command - show recently-added tasks
+program
+  .command('recent')
+  .description('Show recently-added tasks (by created date)')
+  .option('-d, --days <days>', 'Number of days to look back', parseInt, 7)
+  .option('-a, --all', 'Include completed tasks')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    // Calculate cutoff date and today's date
+    const today = getTodayDate();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - options.days);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+    let conditions = [
+      `json_extract(metadata, '$.created_date') >= ?`,
+      `json_extract(metadata, '$.created_date') <= ?`
+    ];
+    const params = [cutoffStr, today];
+
+    if (!options.all) {
+      conditions.push("status = 'open'");
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    const sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY json_extract(metadata, '$.created_date') DESC,
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END
+    `;
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(colors.blue('ℹ') + ` No tasks created in the last ${options.days} days`);
+      return;
+    }
+
+    // Print with created date instead of due date
+    console.log('');
+    for (const task of tasks) {
+      const bullet = PRIORITY_EMOJI[task.priority] || '  ';
+      const metadata = task.metadata ? JSON.parse(task.metadata) : {};
+      const createdDate = metadata.created_date;
+      const dateSuffix = createdDate ? colors.cyan(` ➕ ${createdDate}`) : '';
+      console.log(wrapTaskLine(bullet, task.title, dateSuffix));
+    }
+
+    console.log('');
+    console.log(colors.gray(`${tasks.length} tasks created in the last ${options.days} days`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// List command - queries tasks table from plugin system
+program
+  .command('list')
+  .description('List tasks from database')
+  .option('-t, --today', 'Show tasks due/scheduled today')
+  .option('--stage <stage>', 'Filter by stage (front-stage, back-stage, off-stage)')
+  .option('--topic <topic>', 'Filter by topic')
+  .option('-a, --all', 'Include completed tasks')
+  .option('-l, --legend', 'Show legend for symbols')
+  .option('-n, --limit <number>', 'Limit number of tasks shown', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    if (options.legend) {
+      console.log(colors.bold('\nTask List Legend:'));
+      console.log(colors.gray('─────────────────'));
+      console.log('Priority symbols:');
+      console.log('  🔺 = highest    ⏫ = high      🔼 = medium');
+      console.log('  🔽 = low        ⏬ = lowest');
+      console.log('\nStage tags:');
+      console.log('  #stage/front-stage - Meetings, calls, support, emails');
+      console.log('  #stage/back-stage  - Maintenance, planning, organizing');
+      console.log('  #stage/off-stage   - Personal time, relaxation');
+      console.log('\nDate markers:');
+      console.log('  📅 = due date   ⏳ = scheduled   ➕ = created');
+      console.log('');
+      return;
+    }
+
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    // Build query based on options
+    let conditions = [];
+    const params = [];
+
+    if (!options.all) {
+      conditions.push("status = 'open'");
+    }
+
+    if (options.stage) {
+      conditions.push("json_extract(metadata, '$.stage') = ?");
+      params.push(options.stage);
+    }
+
+    if (options.topic) {
+      // Topics are stored as JSON array in metadata
+      conditions.push("json_extract(metadata, '$.topics') LIKE ?");
+      params.push(`%${options.topic}%`);
+    }
+
+    if (options.today) {
+      const today = getTodayDate();
+      conditions.push("(due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)");
+      params.push(today, today);
+    }
+
+    if (options.source) {
+      conditions.push("source LIKE ?");
+      params.push(`%${options.source}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Order by priority then due date
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      ${whereClause}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(colors.blue('ℹ') + ' No tasks found');
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(colors.gray(`${tasks.length} tasks`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// Add command - appends task via plugin system
+program
+  .command('add <title>')
+  .description('Add a new task')
+  .option('-d, --date <date>', 'Set due date (YYYY-MM-DD)')
+  .option('-s, --scheduled <date>', 'Set scheduled date (YYYY-MM-DD)')
+  .option('-p, --priority <priority>', 'Set priority (highest, high, medium, low, lowest)', 'medium')
+  .option('--stage <stage>', 'Set stage (front-stage, back-stage, off-stage)')
+  .option('-t, --topic <topic>', 'Add topic tag (can be used multiple times)', (val, acc) => [...acc, val], [])
+  .option('--source <source>', 'Plugin source to use (e.g., markdown-tasks/local)')
+  .action(async (title, options) => {
+    // Dynamically import to avoid circular dependencies
+    const { writeEntryAndSync } = await import('../src/plugin-loader.js');
+    const db = getDatabase();
+
+    try {
+      const entry = {
+        action: 'add',
+        title,
+        priority: options.priority,
+        stage: options.stage,
+        topics: options.topic,
+        due_date: options.date,
+        scheduled_date: options.scheduled
+      };
+
+      const result = await writeEntryAndSync('tasks', entry, {
+        db,
+        sourceFilter: options.source
+      });
+
+      if (!result.success) {
+        console.error(colors.red('✗') + ` ${result.error}`);
+        process.exit(1);
+      }
+
+      console.log(colors.green('✓') + ' Added task');
+      if (result.writeResult?.line) {
+        console.log(colors.gray(`  ${result.writeResult.line}`));
+      }
+    } catch (error) {
+      console.error(colors.red('Error adding task:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Complete command - marks a task as done via plugin system
+program
+  .command('complete <id>')
+  .description('Mark a task as completed (id from database, e.g., markdown-tasks/local:vault/tasks/tasks.md:44)')
+  .option('--title <title>', 'Task title for verification (safer matching)')
+  .action(async (id, options) => {
+    const { writeEntryAndSync } = await import('../src/plugin-loader.js');
+    const db = getDatabase();
+
+    // Parse source from full ID (e.g., "markdown-tasks/local:vault/tasks/tasks.md:44")
+    // Format: "plugin/source:plugin_specific_id"
+    const firstColon = id.indexOf(':');
+    if (firstColon === -1) {
+      console.error(colors.red('✗') + ' Invalid ID format. Expected: plugin/source:id (e.g., markdown-tasks/local:vault/tasks/tasks.md:44)');
+      process.exit(1);
+    }
+
+    const source = id.substring(0, firstColon);
+    const pluginId = id.substring(firstColon + 1);
+
+    try {
+      const entry = {
+        action: 'complete',
+        id: pluginId,
+        title: options.title
+      };
+
+      const result = await writeEntryAndSync('tasks', entry, {
+        db,
+        sourceFilter: source
+      });
+
+      if (!result.success) {
+        console.error(colors.red('✗') + ` ${result.error}`);
+        process.exit(1);
+      }
+
+      console.log(colors.green('✓') + ' Completed task');
+      if (result.writeResult?.new_line) {
+        console.log(colors.gray(`  ${result.writeResult.new_line}`));
+      }
+    } catch (error) {
+      console.error(colors.red('Error completing task:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Auto-enhancement commands removed - these features are now config-driven:
+// - auto_classify_stages: Adds #stage/... tags during sync
+// - auto_add_date_created: Adds ➕ YYYY-MM-DD markers during sync
+// - auto_add_priority: Adds priority emojis during sync
+// Enable these in config.toml under [plugins.markdown-tasks.local]
+
+// TODO: Revisit add-topics when implementing system-wide tagging
+// - Should work across all taggable plugin types (tasks, time-logs, diary)
+// - Add auto_add_topics config option for sync-time tagging
+
+// Search command - searches tasks table
+program
+  .command('search <query>')
+  .description('Search for tasks by title')
+  .option('-a, --all', 'Include completed tasks')
+  .option('-n, --limit <number>', 'Limit number of results', parseInt)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (query, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'tasks');
+
+    const conditions = ['title LIKE ?'];
+    const params = [`%${query}%`];
+
+    if (!options.all) {
+      conditions.push("status = 'open'");
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    let sql = `
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST
+    `;
+
+    if (options.limit) {
+      sql += ` LIMIT ${options.limit}`;
+    }
+
+    const tasks = db.prepare(sql).all(...params);
+
+    if (tasks.length === 0) {
+      console.log(colors.blue('ℹ') + ` No tasks matching "${query}"`);
+      return;
+    }
+
+    printTasks(tasks);
+
+    console.log('');
+    console.log(colors.gray(`${tasks.length} results for "${query}"`));
+    console.log(getSyncStatusMessage(db, 'tasks'));
+  });
+
+// Note: projects command removed - project management now through vault/projects/*.md files
+
+// Note: check-consistency command removed - task-id based consistency checking is deprecated
+// Tasks are now managed directly through markdown files with Obsidian Tasks plugin
+
+// Note: archive-completed command removed - now config-driven via auto_archive_completed
+// Enable in config.toml under [plugins.markdown-tasks.<source>]
+
+// Handle --date option at top level (used by bin/today for historical queries)
+// Shows tasks due, scheduled, or completed on a specific date
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const db = getDatabase();
+  ensureSyncForType(db, 'tasks');
+
+  // Query for tasks relevant to this date:
+  // - Due on this date
+  // - Scheduled for this date
+  // - Completed on this date
+  const sql = `
+    SELECT id, title, status, priority, due_date, completed_at, metadata, source
+    FROM tasks
+    WHERE due_date = ?
+       OR json_extract(metadata, '$.scheduled_date') = ?
+       OR date(completed_at) = ?
+    ORDER BY
+      status DESC,  -- completed first
+      CASE priority
+        WHEN 'highest' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'medium' THEN 3
+        WHEN 'low' THEN 4
+        WHEN 'lowest' THEN 5
+        ELSE 6
+      END
+  `;
+
+  const tasks = db.prepare(sql).all(targetDate, targetDate, targetDate);
+
+  if (tasks.length === 0) {
+    console.log(`No tasks for ${targetDate}`);
+  } else {
+    for (const task of tasks) {
+      const status = task.status === 'completed' ? '[x]' : '[ ]';
+      console.log(`${status} ${task.title}`);
+    }
+  }
+  process.exit(0);
+}
+
+program.parse();

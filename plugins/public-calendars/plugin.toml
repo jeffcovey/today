@@ -1,0 +1,45 @@
+# Public Calendars Plugin
+# Syncs events from public iCal feeds (TripIt, Airbnb, etc.)
+
+name = "public-calendars"
+displayName = "Public Calendars"
+description = "Sync events from public iCal feeds (TripIt, Airbnb, etc.)"
+type = "events"
+
+
+longDescription = """
+Fetches calendar events from public iCal/ICS URLs and syncs them to the database.
+
+Useful for:
+- Travel itineraries (TripIt, Google Flights)
+- Rental bookings (Airbnb, VRBO)
+- Public event calendars
+- Any service that provides an iCal feed URL
+
+Each calendar is configured as a separate source in config.toml:
+
+  [plugins.public-calendars.tripit]
+  enabled = true
+  name = "TripIt"
+  url = "https://www.tripit.com/feed/ical/..."
+
+  [plugins.public-calendars.airbnb-room1]
+  enabled = true
+  name = "Airbnb - Room 1"
+  url = "https://www.airbnb.com/calendar/ical/..."
+"""
+
+aiInstructions = """
+Public calendar events include travel plans, rental bookings, and external events.
+These are read-only - events cannot be created or modified through this plugin.
+Use bin/calendar to view upcoming events or query the events table directly.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+name = { type = "string", required = true, description = "Display name for this calendar" }
+url = { type = "string", required = true, description = "iCal/ICS feed URL" }
+days_back = { type = "number", default = 7, description = "Days in the past to include" }
+days_forward = { type = "number", default = 90, description = "Days in the future to include" }

@@ -1,0 +1,61 @@
+# Apple Health Auto Export Plugin
+# Syncs health data exported from iOS Health app to database
+
+name = "apple-health-auto-export"
+displayName = "Apple Health Auto Export"
+description = "Health metrics from iOS Health app via Auto Export"
+type = "health"
+
+
+longDescription = """
+Syncs health data exported from the iOS Health app using the
+"Health Auto Export" app (https://www.healthyapps.dev/health-auto-export).
+
+Setup:
+1. Install "Health Auto Export" on your iOS device from the App Store
+2. Configure it to export to a synced folder (iCloud, Dropbox, etc.)
+3. Set the export destination to `vault/logs/` in your Today vault
+4. The app will create files like `HealthAutoExport-YYYY-MM-DD-YYYY-MM-DD.json`
+
+The export file contains metrics including:
+- Step counts and distance walked
+- Weight and body measurements
+- Heart rate and HRV
+- Sleep analysis (with sleep stages)
+- Active energy and exercise time
+- Nutrition (water, caffeine, alcohol)
+- And many more depending on your Health app data
+
+Each source in config.toml can have different settings:
+
+  [plugins.apple-health-auto-export.default]
+  enabled = true
+  logs_directory = "vault/logs"
+  retention_days = 30
+"""
+
+aiInstructions = """
+Health data is synced to the health_metrics table. Query with SQL or use bin/health commands.
+
+Common metric names in the database:
+- Activity: step_count, distance_walking_running, active_energy, flights_climbed
+- Heart: heart_rate, heart_rate_variability_sdnn, resting_heart_rate
+- Body: weight_body_mass, body_mass_index
+- Sleep: sleep_analysis (metadata has stages: rem, deep, core, awake)
+- Vitals: respiratory_rate, blood_oxygen_saturation
+- Nutrition: dietary_water, dietary_caffeine, alcohol_consumption
+
+Example queries:
+- Recent weight: SELECT date, value FROM health_metrics WHERE metric_name = 'weight_body_mass' ORDER BY date DESC LIMIT 7
+- Today's steps: SELECT value FROM health_metrics WHERE metric_name = 'step_count' AND date = DATE('now', 'localtime')
+- Sleep this week: SELECT date, value as hours, metadata FROM health_metrics WHERE metric_name = 'sleep_analysis' AND date > DATE('now', '-7 days')
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+logs_directory = { type = "string", default = "vault/logs", description = "Directory containing HealthAutoExport JSON files" }
+retention_days = { type = "number", default = 30, description = "Days of health data to retain in database" }
+metrics_filter = { type = "string", default = "", description = "Comma-separated list of metrics to include (empty = all)" }
+cleanup_old_files = { type = "boolean", default = true, description = "Delete all HealthAutoExport files except the latest one after reading" }

@@ -1,0 +1,39 @@
+# Day One Diary Plugin
+# Syncs diary entries from Day One JSON export
+
+name = "dayone-diary"
+displayName = "Day One Diary"
+description = "Diary entries from Day One app JSON export"
+type = "diary"
+
+
+longDescription = """
+Syncs diary entries from a Day One JSON export file (Journal.json).
+
+To export from Day One:
+1. Open Day One on Mac
+2. File → Export → JSON
+3. Save to vault/logs/Journal.json
+
+The plugin reads the JSON file and syncs entries to the database.
+Rich metadata (location, weather, tags, starred status) is stored
+in the metadata JSON column for querying.
+"""
+
+aiInstructions = """
+To query diary entries, use the `diary` table:
+- `date`: When the entry was written (ISO 8601)
+- `text`: The diary entry content
+- `metadata`: JSON with location, weather, starred, tags, etc.
+
+Example queries:
+- Recent entries: SELECT date, text FROM diary ORDER BY date DESC LIMIT 5
+- Starred entries: SELECT date, text FROM diary WHERE json_extract(metadata, '$.starred') = 1
+- By location: SELECT date, text FROM diary WHERE json_extract(metadata, '$.location.localityName') LIKE '%Fort Lauderdale%'
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+journal_file = { type = "string", default = "vault/logs/Journal.json", description = "Path to Day One JSON export file" }

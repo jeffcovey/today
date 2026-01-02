@@ -1,0 +1,714 @@
+#!/usr/bin/env node
+
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getDatabase } from '../src/database-service.js';
+import { getSourcesForType, getWritableSource, writeEntryAndSync, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import {
+  getConfiguredTimezone,
+  getCurrentTimeISO,
+  getTodayDate,
+  getWeekAgoDate,
+  subtractSecondsISO,
+  formatTime,
+  sqlLocalDate
+} from '../src/date-utils.js';
+import {
+  parseDuration,
+  formatDurationMinutes,
+  calculateDurationMinutes
+} from '../src/duration-utils.js';
+import {
+  colors,
+  showSourceError,
+  showSourceFilterError
+} from '../src/cli-utils.js';
+import { program } from 'commander';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+
+const TIMEZONE = getConfiguredTimezone();
+
+// Start tracking
+async function cmdStart(description, options = {}) {
+  if (!description) {
+    console.error(colors.red('✗') + ' Usage: track start "Description with #topic/tags" [--source SOURCE]');
+    console.log('');
+    console.log('Examples:');
+    console.log('  track start "Deep work session #topic/programming"');
+    console.log('  track start "Duolingo practice #topic/languages"');
+    console.log('  track start "Hip mobility workout #topic/fitness"');
+    process.exit(1);
+  }
+
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  // Get target source
+  const sourceResult = await getWritableSource('time-logs', options.source);
+  if (!sourceResult.success) {
+    showSourceError(sourceResult.error, sourceResult.availableSources);
+    process.exit(1);
+  }
+  const { source } = sourceResult;
+
+  // Check for running timer on this source
+  const runningTimer = db.prepare(`
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL AND source = ?
+    ORDER BY start_time DESC
+    LIMIT 1
+  `).get(source.sourceId);
+
+  if (runningTimer) {
+    const currentTime = getCurrentTimeISO();
+    const duration = calculateDurationMinutes(runningTimer.start_time, currentTime);
+    const durationFormatted = formatDurationMinutes(duration);
+
+    console.log(colors.yellow('⚠') + ` Stopping previous timer: ${runningTimer.description} (${durationFormatted})`);
+
+    // Stop the previous timer
+    const stopEntry = {
+      start_time: runningTimer.start_time,
+      end_time: currentTime,
+      description: runningTimer.description
+    };
+
+    const stopResult = await writeEntryAndSync('time-logs', stopEntry, {
+      sourceFilter: options.source,
+      db,
+      vaultPath
+    });
+
+    if (!stopResult.success) {
+      console.error(colors.red('✗') + ` Failed to stop previous timer: ${stopResult.error}`);
+      process.exit(1);
+    }
+  }
+
+  // Start new timer (entry with NULL end_time)
+  const startTime = getCurrentTimeISO();
+  const entry = {
+    start_time: startTime,
+    end_time: null,
+    description: description
+  };
+
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: options.source,
+    db,
+    vaultPath
+  });
+
+  if (!result.success) {
+    console.error(colors.red('✗') + ` Failed to start timer: ${result.error}`);
+    process.exit(1);
+  }
+
+  console.log(colors.green('✓') + ` Started: ${description}`);
+  console.log(colors.blue('ℹ') + ` Timezone: ${TIMEZONE}`);
+}
+
+// Stop command
+async function cmdStop(options = {}) {
+  process.stdout.write(colors.gray('Syncing... '));
+  ensureSync();
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  // Find running timer(s)
+  let query = `
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `;
+
+  const runningTimers = db.prepare(query).all();
+
+  if (runningTimers.length === 0) {
+    console.error(colors.red('✗') + ' No timer running');
+    process.exit(1);
+  }
+
+  // If --source specified, filter to that source
+  let timerToStop = runningTimers[0];
+  if (options.source) {
+    const matching = runningTimers.filter(t => t.source.includes(options.source));
+    if (matching.length === 0) {
+      console.error(colors.red('✗') + ` No running timer matching source "${options.source}"`);
+      console.log('');
+      console.log('Running timers:');
+      for (const t of runningTimers) {
+        console.log(`  ${t.source}: ${t.description}`);
+      }
+      process.exit(1);
+    }
+    timerToStop = matching[0];
+  } else if (runningTimers.length > 1) {
+    // Multiple timers, require --source
+    console.error(colors.red('✗') + ' Multiple timers running. Use --source to specify which one to stop.');
+    console.log('');
+    console.log('Running timers:');
+    for (const t of runningTimers) {
+      console.log(`  ${t.source}: ${t.description}`);
+    }
+    process.exit(1);
+  }
+
+  const endTime = getCurrentTimeISO();
+  const duration = calculateDurationMinutes(timerToStop.start_time, endTime);
+  const durationFormatted = formatDurationMinutes(duration);
+
+  // Warn if timer ran unusually long (likely forgotten)
+  const LONG_TIMER_THRESHOLD_MINUTES = 240; // 4 hours
+  if (duration > LONG_TIMER_THRESHOLD_MINUTES) {
+    console.log(colors.yellow('⚠') + ` This timer ran for ${durationFormatted} - was it left running by mistake?`);
+  }
+
+  // Complete the entry
+  const entry = {
+    start_time: timerToStop.start_time,
+    end_time: endTime,
+    description: timerToStop.description
+  };
+
+  // Extract plugin name from the source ID for filtering
+  const [pluginName] = timerToStop.source.split('/');
+
+  process.stdout.write(colors.gray('Saving... '));
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: pluginName,
+    db,
+    vaultPath
+  });
+  console.log(colors.gray('Done'));
+
+  if (!result.success) {
+    console.error(colors.red('✗') + ` Failed to stop timer: ${result.error}`);
+    process.exit(1);
+  }
+
+  console.log(colors.green('✓') + ` Stopped: ${timerToStop.description} (${durationFormatted})`);
+}
+
+// Add command - add a completed entry
+async function cmdAdd(durationStr, options = {}) {
+  // Handle case where description parts come after options parsing
+  const descriptionParts = options._positional || [];
+  const description = descriptionParts.join(' ');
+
+  if (!durationStr || !description) {
+    console.error(colors.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE]');
+    console.log('');
+    console.log('Examples:');
+    console.log('  track add 20m "Reviewing pull requests #topic/programming"');
+    console.log('  track add 2h "Deep work session #topic/programming"');
+    console.log('  track add 1.5h "Language practice #topic/languages"');
+    console.log('  track add 2h30m "Project planning #topic/personal_admin"');
+    console.log('');
+    console.log('Supported duration formats:');
+    console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    process.exit(1);
+  }
+
+  const durationMinutes = parseDuration(durationStr);
+
+  if (durationMinutes === 0) {
+    console.error(colors.red('✗') + ` Could not parse duration: ${durationStr}`);
+    console.log('');
+    console.log('Supported formats: 20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    process.exit(1);
+  }
+
+  const endTime = getCurrentTimeISO();
+  const durationSeconds = durationMinutes * 60;
+
+  // Calculate start time
+  const startTime = subtractSecondsISO(new Date(), durationSeconds);
+
+  // Write entry via plugin and sync
+  const entry = {
+    start_time: startTime,
+    end_time: endTime,
+    description: description
+  };
+
+  const db = getDatabase();
+  const vaultPath = path.join(PROJECT_ROOT, 'vault');
+
+  const result = await writeEntryAndSync('time-logs', entry, {
+    sourceFilter: options.source,
+    db,
+    vaultPath,
+    onSync: () => console.log(colors.gray('Syncing...'))
+  });
+
+  if (!result.success) {
+    showSourceError(result.error, result.availableSources);
+    process.exit(1);
+  }
+
+  const durationFormatted = formatDurationMinutes(durationMinutes);
+  console.log(colors.green('✓') + ` Added: ${description} (${durationFormatted})`);
+
+  console.log(colors.blue('ℹ') + ` Time range: ${formatTime(startTime)} - ${formatTime(endTime)}`);
+}
+
+// Status command - queries DB for running timers (end_time IS NULL)
+async function cmdStatus() {
+  ensureSync();
+  const db = getDatabase();
+
+  // Query for all running timers across all sources
+  const runningTimers = db.prepare(`
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `).all();
+
+  if (runningTimers.length === 0) {
+    console.log(colors.blue('ℹ') + ' No timer running');
+    return;
+  }
+
+  console.log(colors.cyan('⏱') + '  Currently tracking:');
+  console.log('');
+
+  const currentTime = getCurrentTimeISO();
+
+  for (const timer of runningTimers) {
+    const { start_time, description, source } = timer;
+    const duration = calculateDurationMinutes(start_time, currentTime);
+    const durationFormatted = formatDurationMinutes(duration);
+
+    console.log('  ' + colors.green(description));
+    console.log(`  Started: ${formatTime(start_time)}`);
+    console.log(`  Duration: ${durationFormatted}`);
+    console.log(`  Source: ${colors.gray(source)}`);
+
+    if (runningTimers.length > 1) {
+      console.log('');
+    }
+  }
+}
+
+// Date command - queries time_logs table for a specific date
+async function cmdDate(targetDate, options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'time-logs', allSources);
+      return;
+    }
+  }
+
+  // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE ${sqlLocalDate('start_time')} = ?
+    ORDER BY start_time
+  `;
+  const params = [targetDate];
+
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE ${sqlLocalDate('start_time')} = ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(colors.blue('ℹ') + ` No time entries for ${targetDate}`);
+    return;
+  }
+
+  let totalMinutes = 0;
+
+  for (const entry of entries) {
+    const { start_time, end_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
+
+    if (!description) continue;
+
+    totalMinutes += duration;
+
+    // Display entry
+    const startDisplay = formatTime(start_time);
+    const endDisplay = end_time ? formatTime(end_time) : 'running';
+    console.log(`${startDisplay} (${formatDurationMinutes(duration)}): ${description}`);
+  }
+
+  console.log('');
+  console.log(`Total: ${formatDurationMinutes(totalMinutes)}`);
+}
+
+// Today command - queries time_logs table
+async function cmdToday(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+  const today = getTodayDate();
+  const currentTime = getCurrentTimeISO();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'time-logs', allSources);
+      return;
+    }
+    // Show which sources we're querying
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Check for running timers first
+  let runningQuery = `
+    SELECT start_time, description, source
+    FROM time_logs
+    WHERE end_time IS NULL
+    ORDER BY start_time DESC
+  `;
+  if (options.source) {
+    runningQuery = `
+      SELECT start_time, description, source
+      FROM time_logs
+      WHERE end_time IS NULL AND source LIKE ?
+      ORDER BY start_time DESC
+    `;
+  }
+  const runningTimers = options.source
+    ? db.prepare(runningQuery).all(`%${options.source}%`)
+    : db.prepare(runningQuery).all();
+
+  if (runningTimers.length > 0) {
+    console.log(colors.cyan('⏱  Currently Tracking'));
+    console.log('');
+    for (const timer of runningTimers) {
+      const duration = calculateDurationMinutes(timer.start_time, currentTime);
+      console.log(`  ${colors.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
+      console.log(`    ${timer.description}`);
+    }
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE ${sqlLocalDate('start_time')} = ?
+    ORDER BY start_time
+  `;
+  const params = [today];
+
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE ${sqlLocalDate('start_time')} = ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  // Filter out running timers from completed entries display
+  const completedEntries = entries.filter(e => e.end_time !== null);
+
+  if (completedEntries.length === 0 && runningTimers.length === 0) {
+    console.log(colors.blue('ℹ') + ' No time entries for today');
+    return;
+  }
+
+  console.log(colors.cyan("Today's Time Tracking") + ` (${today})`);
+  console.log('');
+
+  if (completedEntries.length === 0) {
+    console.log(colors.blue('ℹ') + ' No completed entries yet');
+    return;
+  }
+
+  let totalMinutes = 0;
+  const topicMinutes = {};
+
+  for (const entry of completedEntries) {
+    const { start_time, end_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
+
+    if (!description) continue;
+
+    const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
+
+    totalMinutes += duration;
+    topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
+
+    // Display entry
+    const startDisplay = formatTime(start_time);
+    const endDisplay = formatTime(end_time);
+    console.log(`  ${colors.green('✓')} ${startDisplay} - ${endDisplay} (${formatDurationMinutes(duration)})`);
+    console.log(`    ${description}`);
+  }
+
+  // Summary by topic
+  if (Object.keys(topicMinutes).length > 0) {
+    console.log('');
+    console.log(colors.cyan('By Topic:'));
+    const sorted = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
+    for (const [topic, mins] of sorted) {
+      console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
+    }
+  }
+
+  console.log('');
+  console.log(colors.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log('');
+  console.log(getSyncStatusMessage(db, 'time-logs'));
+}
+
+// Week command - queries time_logs table
+async function cmdWeek(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'time-logs', allSources);
+      return;
+    }
+    // Show which sources we're querying
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Calculate week start (7 days ago)
+  const weekStart = getWeekAgoDate();
+  const today = getTodayDate();
+
+  // Build query with optional source filter
+  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
+  let query = `
+    SELECT start_time, end_time, duration_minutes, description, source
+    FROM time_logs
+    WHERE ${sqlLocalDate('start_time')} >= ? AND ${sqlLocalDate('start_time')} <= ?
+    ORDER BY start_time
+  `;
+  const params = [weekStart, today];
+
+  if (options.source) {
+    query = `
+      SELECT start_time, end_time, duration_minutes, description, source
+      FROM time_logs
+      WHERE ${sqlLocalDate('start_time')} >= ? AND ${sqlLocalDate('start_time')} <= ? AND source LIKE ?
+      ORDER BY start_time
+    `;
+    params.push(`%${options.source}%`);
+  }
+
+  const entries = db.prepare(query).all(...params);
+
+  if (entries.length === 0) {
+    console.log(colors.blue('ℹ') + ' No time entries for this week');
+    return;
+  }
+
+  console.log(colors.cyan("This Week's Time Tracking") + ` (${weekStart} to ${today})`);
+  console.log('');
+
+  let totalMinutes = 0;
+  const topicMinutes = {};
+  const dayMinutes = {};
+
+  for (const entry of entries) {
+    const { start_time, duration_minutes, description } = entry;
+    const duration = duration_minutes || calculateDurationMinutes(start_time, entry.end_time);
+
+    if (!description) continue;
+
+    const entryDate = start_time.substring(0, 10);
+    const topics = (description.match(/#topic\/[a-z_]+/g) || ['(untagged)']).join(' ');
+
+    totalMinutes += duration;
+    topicMinutes[topics] = (topicMinutes[topics] || 0) + duration;
+    dayMinutes[entryDate] = (dayMinutes[entryDate] || 0) + duration;
+  }
+
+  // Summary by day
+  console.log(colors.cyan('By Day:'));
+  const sortedDays = Object.entries(dayMinutes).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [day, mins] of sortedDays) {
+    console.log(`  ${day}: ${formatDurationMinutes(mins)}`);
+  }
+
+  // Summary by topic
+  console.log('');
+  console.log(colors.cyan('By Topic:'));
+  const sortedTopics = Object.entries(topicMinutes).sort((a, b) => b[1] - a[1]);
+  for (const [topic, mins] of sortedTopics) {
+    console.log(`  ${topic}: ${formatDurationMinutes(mins)}`);
+  }
+
+  console.log('');
+  console.log(colors.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
+  console.log('');
+  console.log(getSyncStatusMessage(db, 'time-logs'));
+}
+
+// Quiet sync - ensures database is current before read operations
+function ensureSync() {
+  const db = getDatabase();
+  ensureSyncForType(db, 'time-logs');
+}
+
+// Restart command - start a new timer with the same description as the most recent entry
+async function cmdRestart(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Find the most recent completed entry
+  const lastEntry = db.prepare(`
+    SELECT description, source
+    FROM time_logs
+    WHERE end_time IS NOT NULL
+    ORDER BY end_time DESC
+    LIMIT 1
+  `).get();
+
+  if (!lastEntry) {
+    console.error(colors.red('✗') + ' No previous entries to restart');
+    process.exit(1);
+  }
+
+  console.log(colors.blue('ℹ') + ` Restarting: ${lastEntry.description}`);
+
+  // Extract plugin name from source for filtering
+  const [pluginName] = lastEntry.source.split('/');
+
+  // Use cmdStart with the same description
+  await cmdStart(lastEntry.description, { source: options.source || pluginName });
+}
+
+// Sync command - delegates to plugin system for all time-logs plugins
+async function cmdSync() {
+  console.log(colors.blue('ℹ') + ' Syncing time-logs plugins to database...');
+
+  try {
+    const result = execSync('bin/plugins sync --type time-logs', { encoding: 'utf8' });
+    // Strip dotenvx output and show result
+    const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+    console.log(lines.join('\n'));
+  } catch (error) {
+    // Check if it's just "no plugins" vs actual error
+    if (error.stdout?.includes('No plugins of type')) {
+      console.log(colors.yellow('⚠') + ' No time-logs plugins are enabled.');
+      console.log('');
+      console.log('To sync time tracking data, configure a plugin:');
+      console.log('');
+      console.log('  ' + colors.cyan('bin/plugins configure'));
+    } else {
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
+      process.exit(1);
+    }
+  }
+}
+
+// Commander setup
+program
+  .name('track')
+  .description('Time tracking for Today system');
+
+program
+  .command('start')
+  .description('Start tracking time (include #topic/tags in description)')
+  .argument('<description...>', 'Description with #topic/tags')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (descriptionParts, options) => {
+    await cmdStart(descriptionParts.join(' '), options);
+  });
+
+program
+  .command('stop')
+  .description('Stop current timer')
+  .option('--source <source>', 'Plugin source filter')
+  .action(async (options) => {
+    await cmdStop(options);
+  });
+
+program
+  .command('restart')
+  .description('Start a new timer with the same description as the last entry')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (options) => {
+    await cmdRestart(options);
+  });
+
+program
+  .command('add')
+  .description('Add entry for work you forgot to track')
+  .argument('<duration>', 'Duration (e.g., 20m, 1.5h, 2h30m)')
+  .argument('<description...>', 'Description with #topic/tags')
+  .option('--source <source>', 'Plugin source to use')
+  .action(async (duration, descriptionParts, options) => {
+    await cmdAdd(duration, { ...options, _positional: descriptionParts });
+  });
+
+program
+  .command('status', { isDefault: true })
+  .description('Show current timer status')
+  .action(async () => {
+    await cmdStatus();
+  });
+
+program
+  .command('today')
+  .description('Show today\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdToday(options);
+  });
+
+program
+  .command('week')
+  .description('Show this week\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdWeek(options);
+  });
+
+program
+  .command('sync')
+  .description('Sync all time-logs plugins to database')
+  .action(async () => {
+    await cmdSync();
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  const sourceArgIdx = process.argv.findIndex(a => a === '--source');
+  const source = sourceArgIdx > 0 ? process.argv[sourceArgIdx + 1] : undefined;
+  await cmdDate(targetDate, { source });
+  process.exit(0);
+}
+
+program.parse();

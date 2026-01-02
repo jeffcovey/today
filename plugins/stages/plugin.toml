@@ -1,0 +1,30 @@
+name = "stages"
+displayName = "Day Stages"
+description = "Groups tasks by stage (Front Stage, Back Stage, Off Stage) based on day of week"
+type = "context"
+
+[commands]
+read = "./read.js"
+
+[settings]
+# Stage definitions
+front_stage_name = { type = "string", default = "Front Stage", description = "Name for front stage" }
+front_stage_description = { type = "string", default = "Outward-facing work: meetings, calls, emails, support, communications", description = "Description of front stage activities" }
+front_stage_tag = { type = "string", default = "#stage/front-stage", description = "Tag for front stage tasks" }
+
+back_stage_name = { type = "string", default = "Back Stage", description = "Name for back stage" }
+back_stage_description = { type = "string", default = "Maintenance work: bills, bug fixes, organizing, admin tasks", description = "Description of back stage activities" }
+back_stage_tag = { type = "string", default = "#stage/back-stage", description = "Tag for back stage tasks" }
+
+off_stage_name = { type = "string", default = "Off Stage", description = "Name for off stage" }
+off_stage_description = { type = "string", default = "Personal time: nature, friends, reading, hobbies, rest", description = "Description of off stage activities" }
+off_stage_tag = { type = "string", default = "#stage/off-stage", description = "Tag for off stage tasks" }
+
+# Day assignments (front, back, or off)
+monday = { type = "string", default = "front", description = "Stage for Monday" }
+tuesday = { type = "string", default = "off", description = "Stage for Tuesday" }
+wednesday = { type = "string", default = "front", description = "Stage for Wednesday" }
+thursday = { type = "string", default = "back", description = "Stage for Thursday" }
+friday = { type = "string", default = "off", description = "Stage for Friday" }
+saturday = { type = "string", default = "front", description = "Stage for Saturday" }
+sunday = { type = "string", default = "back", description = "Stage for Sunday" }

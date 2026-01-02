@@ -1,0 +1,512 @@
+#!/usr/bin/env node
+
+// Auto-use dotenvx if available
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+
+program
+  .name('email')
+  .description('Email management CLI - queries emails synced by imap-email plugin');
+
+// Stats command - show email database statistics
+program
+  .command('stats')
+  .description('Show email database statistics')
+  .action(async () => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'email');
+
+    console.log(colors.blue('📊 Email Database Statistics'));
+
+    const stats = db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        MIN(date) as oldest,
+        MAX(date) as newest,
+        SUM(size) as total_size
+      FROM email
+    `).get();
+
+    if (stats.total === 0) {
+      console.log(colors.yellow('No emails synced yet.'));
+      console.log('Run "bin/plugins sync imap-email" to sync emails.');
+      return;
+    }
+
+    console.log(colors.green(`\nTotal emails: ${stats.total}`));
+    console.log(colors.gray(`Oldest email: ${stats.oldest ? new Date(stats.oldest).toLocaleDateString() : 'N/A'}`));
+    console.log(colors.gray(`Newest email: ${stats.newest ? new Date(stats.newest).toLocaleDateString() : 'N/A'}`));
+    if (stats.total_size) {
+      console.log(colors.gray(`Total size: ${(stats.total_size / 1024 / 1024).toFixed(2)} MB`));
+    }
+
+    // Folder breakdown
+    const folders = db.prepare(`
+      SELECT folder, COUNT(*) as count
+      FROM email
+      GROUP BY folder
+      ORDER BY count DESC
+    `).all();
+
+    if (folders.length > 0) {
+      console.log(colors.blue('\n📁 Emails by folder:'));
+      for (const folder of folders) {
+        console.log(colors.gray(`  ${folder.folder}: ${folder.count} emails`));
+      }
+    }
+
+    // Source breakdown
+    const sources = db.prepare(`
+      SELECT source, COUNT(*) as count
+      FROM email
+      GROUP BY source
+      ORDER BY count DESC
+    `).all();
+
+    if (sources.length > 0) {
+      console.log(colors.blue('\n📧 Emails by source:'));
+      for (const src of sources) {
+        console.log(colors.gray(`  ${src.source}: ${src.count} emails`));
+      }
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'email'));
+  });
+
+// List command - list recent emails
+program
+  .command('list')
+  .description('List recent emails')
+  .option('-d, --days <number>', 'Number of days of email to show', '7')
+  .option('-l, --limit <number>', 'Number of emails to show')
+  .option('-f, --from <email>', 'Filter by sender')
+  .option('-s, --subject <text>', 'Filter by subject')
+  .option('--folder <folder>', 'Filter by folder')
+  .option('--source <source>', 'Filter by plugin source')
+  .option('--unread', 'Show only unread emails')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'email');
+
+    const conditions = [];
+    const params = [];
+
+    // Filter by days
+    const days = parseInt(options.days);
+    conditions.push("date >= datetime('now', ?)");
+    params.push(`-${days} days`);
+
+    // Exclude trash folders by default
+    conditions.push("folder NOT LIKE '%Trash%'");
+    conditions.push("folder NOT LIKE '%Deleted%'");
+
+    if (options.from) {
+      conditions.push('(from_address LIKE ? OR from_name LIKE ?)');
+      params.push(`%${options.from}%`, `%${options.from}%`);
+    }
+
+    if (options.subject) {
+      conditions.push('subject LIKE ?');
+      params.push(`%${options.subject}%`);
+    }
+
+    if (options.folder) {
+      conditions.push('folder LIKE ?');
+      params.push(`%${options.folder}%`);
+    }
+
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    if (options.unread) {
+      conditions.push("flags NOT LIKE '%seen%'");
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limitClause = options.limit ? `LIMIT ${parseInt(options.limit)}` : '';
+
+    const sql = `
+      SELECT id, subject, from_address, from_name, date, folder, flags, source
+      FROM email
+      ${whereClause}
+      ORDER BY date DESC
+      ${limitClause}
+    `;
+
+    const emails = db.prepare(sql).all(...params);
+
+    if (emails.length === 0) {
+      console.log(colors.yellow('No emails found.'));
+      return;
+    }
+
+    console.log(colors.blue(`\n📧 Recent Emails (${emails.length}):`));
+    for (const email of emails) {
+      const date = new Date(email.date).toLocaleDateString();
+      const from = email.from_name || email.from_address;
+      const subject = email.subject || '(no subject)';
+      const flags = email.flags ? JSON.parse(email.flags) : [];
+      const unreadMarker = flags.includes('seen') ? '' : colors.cyan('● ');
+
+      console.log(`${unreadMarker}${colors.bold(subject)}`);
+      console.log(`   From: ${from} | Date: ${date}`);
+    }
+
+    console.log('');
+    console.log(getSyncStatusMessage(db, 'email'));
+  });
+
+// Search command - search emails
+program
+  .command('search <query>')
+  .description('Search emails (use --server for historical IMAP search)')
+  .option('-s, --server', 'Search IMAP server directly (for historical emails)')
+  .option('-l, --limit <number>', 'Max results to return', '20')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (query, options) => {
+    if (options.server) {
+      // Server search - connect to IMAP directly
+      console.log(colors.blue(`🔍 Searching IMAP server for: ${query}`));
+
+      // Dynamic imports for IMAP
+      const { ImapFlow } = await import('imapflow');
+      const toml = await import('smol-toml');
+      const fs = await import('fs');
+      const path = await import('path');
+
+      // Load config to get IMAP settings
+      const configPath = path.join(process.cwd(), 'config.toml');
+      let config;
+      try {
+        const configContent = fs.readFileSync(configPath, 'utf-8');
+        config = toml.parse(configContent);
+      } catch (e) {
+        console.error(colors.red('Could not read config.toml'));
+        process.exit(1);
+      }
+
+      // Find imap-email sources
+      const imapSources = [];
+      for (const [sourceName, sourceConfig] of Object.entries(config.plugins?.['imap-email'] || {})) {
+        if (sourceConfig.enabled && sourceConfig.host && sourceConfig.username) {
+          imapSources.push({ sourceName, ...sourceConfig });
+        }
+      }
+
+      if (imapSources.length === 0) {
+        console.log(colors.yellow('No IMAP email sources configured.'));
+        console.log('Configure imap-email plugin in config.toml');
+        process.exit(1);
+      }
+
+      const allResults = [];
+      const limit = parseInt(options.limit);
+
+      for (const source of imapSources) {
+        if (allResults.length >= limit) break;
+
+        const password = process.env[source.password_env || 'EMAIL_PASSWORD'];
+        if (!password) {
+          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in ${source.password_env || 'EMAIL_PASSWORD'}`));
+          continue;
+        }
+
+        console.log(colors.gray(`Searching ${source.sourceName}...`));
+
+        const client = new ImapFlow({
+          host: source.host,
+          port: source.port || 993,
+          secure: source.secure !== false,
+          auth: { user: source.username, pass: password },
+          logger: false
+        });
+
+        try {
+          await client.connect();
+          const allFolders = await client.list();
+          const foldersToSearch = allFolders
+            .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
+            .map(f => f.path)
+            .slice(0, 5); // Limit folders for speed
+
+          for (const folder of foldersToSearch) {
+            if (allResults.length >= limit) break;
+            try {
+              const lock = await client.getMailboxLock(folder);
+              try {
+                for await (const msg of client.fetch(
+                  { or: [{ subject: query }, { from: query }, { body: query }] },
+                  { envelope: true, size: true }
+                )) {
+                  allResults.push({
+                    uid: msg.uid,
+                    folder,
+                    subject: msg.envelope?.subject || '(no subject)',
+                    from: msg.envelope?.from?.[0]?.address || 'unknown',
+                    date: msg.envelope?.date,
+                    source: source.sourceName
+                  });
+                  if (allResults.length >= limit) break;
+                }
+              } finally {
+                lock.release();
+              }
+            } catch (e) {
+              // Skip folders we can't access
+            }
+          }
+          await client.logout();
+        } catch (e) {
+          console.log(colors.yellow(`Could not search ${source.sourceName}: ${e.message}`));
+        }
+      }
+
+      if (allResults.length === 0) {
+        console.log(colors.yellow('No emails found matching your query.'));
+      } else {
+        allResults.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateB - dateA;
+        });
+
+        console.log(colors.green(`\n📧 Found ${allResults.length} emails on server:\n`));
+        for (const email of allResults.slice(0, limit)) {
+          const date = email.date ? new Date(email.date).toLocaleDateString() : 'unknown';
+          console.log(`${colors.bold(email.subject)}`);
+          console.log(`   From: ${email.from} | Date: ${date} | Folder: ${email.folder}`);
+        }
+      }
+    } else {
+      // Local database search
+      console.log(colors.blue(`🔍 Searching local cache for: ${query}`));
+
+      const db = getDatabase();
+      ensureSyncForType(db, 'email');
+
+      const conditions = [
+        "(subject LIKE ? OR from_address LIKE ? OR from_name LIKE ? OR text_content LIKE ?)"
+      ];
+      const params = [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`];
+
+      // Exclude trash
+      conditions.push("folder NOT LIKE '%Trash%'");
+      conditions.push("folder NOT LIKE '%Deleted%'");
+
+      if (options.source) {
+        conditions.push('source LIKE ?');
+        params.push(`%${options.source}%`);
+      }
+
+      const sql = `
+        SELECT id, subject, from_address, from_name, date, folder, source
+        FROM email
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY date DESC
+        LIMIT ?
+      `;
+      params.push(parseInt(options.limit));
+
+      const emails = db.prepare(sql).all(...params);
+
+      if (emails.length === 0) {
+        console.log(colors.yellow('No emails found. Try --server to search IMAP directly.'));
+      } else {
+        console.log(colors.green(`\n📧 Found ${emails.length} emails:\n`));
+        for (const email of emails) {
+          const date = new Date(email.date).toLocaleDateString();
+          const from = email.from_name || email.from_address;
+          console.log(`${colors.bold(email.subject || '(no subject)')}`);
+          console.log(`   From: ${from} | Date: ${date}`);
+        }
+      }
+
+      console.log('');
+      console.log(getSyncStatusMessage(db, 'email'));
+    }
+  });
+
+// Download command - fetch a specific email body by ID
+program
+  .command('download [emailId]')
+  .description('Fetch specific email body by ID (e.g., imap-email/icloud:INBOX:196336)')
+  .action(async (emailId) => {
+    if (!emailId) {
+      console.log(colors.blue('📧 To fetch a specific email body, provide the email ID.'));
+      console.log(colors.gray('Format: source:folder:uid'));
+      console.log(colors.gray('Example: bin/email download "imap-email/icloud:INBOX:196336"'));
+      console.log('');
+      console.log('To sync all emails, run: bin/plugins sync imap-email');
+      return;
+    }
+
+    // Parse the email ID
+    const match = emailId.match(/^([^:]+\/[^:]+):(.+):(\d+)$/);
+    if (!match) {
+      console.error(colors.red('Invalid email ID format. Expected: source:folder:uid'));
+      console.error(colors.gray('Example: imap-email/icloud:INBOX:196336'));
+      process.exit(1);
+    }
+
+    const [, sourceId, folder, uidStr] = match;
+    const uid = parseInt(uidStr);
+    const [pluginName, sourceName] = sourceId.split('/');
+
+    console.log(colors.blue(`📧 Fetching email body: ${emailId}`));
+
+    // Dynamic imports
+    const { ImapFlow } = await import('imapflow');
+    const { simpleParser } = await import('mailparser');
+    const Database = (await import('better-sqlite3')).default;
+    const toml = await import('smol-toml');
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // Load config to get IMAP settings
+    const configPath = path.join(process.cwd(), 'config.toml');
+    let config;
+    try {
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      config = toml.parse(configContent);
+    } catch (e) {
+      console.error(colors.red('Could not read config.toml'));
+      process.exit(1);
+    }
+
+    const sourceConfig = config.plugins?.[pluginName]?.[sourceName];
+    if (!sourceConfig) {
+      console.error(colors.red(`Source not found in config: ${sourceId}`));
+      process.exit(1);
+    }
+
+    const { host, port = 993, secure = true, username, password_env = 'EMAIL_PASSWORD' } = sourceConfig;
+    const password = process.env[password_env];
+
+    if (!password) {
+      console.error(colors.red(`Password not found in ${password_env}`));
+      process.exit(1);
+    }
+
+    // Connect to IMAP
+    const client = new ImapFlow({
+      host,
+      port,
+      secure,
+      auth: { user: username, pass: password },
+      logger: false
+    });
+
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock(folder);
+
+      try {
+        const message = await client.fetchOne(uid, { source: true }, { uid: true });
+
+        if (!message || !message.source) {
+          console.error(colors.red('Email not found or no content'));
+          process.exit(1);
+        }
+
+        const parsed = await simpleParser(message.source);
+        let textContent = parsed.text || '';
+        let htmlContent = parsed.html || '';
+        const attachments = parsed.attachments?.map(a => ({
+          filename: a.filename,
+          contentType: a.contentType,
+          size: a.size
+        })) || [];
+
+        const maxBodySize = 50000;
+        if (textContent.length > maxBodySize) {
+          textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
+        }
+        if (htmlContent.length > maxBodySize) {
+          htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
+        }
+
+        const snippet = textContent
+          ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
+          : '';
+
+        // Update database
+        const dbPath = path.join(process.cwd(), '.data', 'today.db');
+        const db = new Database(dbPath, { timeout: 30000 });
+        db.pragma('journal_mode = WAL');
+        db.pragma('busy_timeout = 30000');
+
+        const result = db.prepare(`
+          UPDATE email
+          SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
+              metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
+          WHERE id = ?
+        `).run(
+          snippet,
+          textContent,
+          htmlContent,
+          attachments.length > 0 ? JSON.stringify(attachments) : null,
+          emailId
+        );
+
+        db.close();
+
+        if (result.changes > 0) {
+          console.log(colors.green('✓ Email body fetched and saved'));
+          console.log(colors.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
+          if (attachments.length > 0) {
+            console.log(colors.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+          }
+        } else {
+          console.log(colors.yellow('Email not found in database'));
+        }
+
+      } finally {
+        lock.release();
+        await client.logout();
+      }
+    } catch (e) {
+      console.error(colors.red(`Error: ${e.message}`));
+      process.exit(1);
+    }
+  });
+
+// Setup command - show setup instructions
+program
+  .command('setup')
+  .description('Setup email account credentials')
+  .action(async () => {
+    console.log(colors.blue('📧 Email Account Setup'));
+    console.log(colors.yellow('\nFor iCloud/Apple Mail:'));
+    console.log('1. Go to https://appleid.apple.com');
+    console.log('2. Sign in and go to "Sign-In and Security"');
+    console.log('3. Select "App-Specific Passwords"');
+    console.log('4. Generate a new password for "today-cli email"');
+    console.log('5. Add the password to your .env file');
+    console.log(colors.green('\nExample .env entry:'));
+    console.log('EMAIL_PASSWORD=xxxx-xxxx-xxxx-xxxx');
+    console.log(colors.gray('\nThen configure imap-email plugin in config.toml'));
+  });
+
+// Sync command - shorthand for bin/plugins sync imap-email
+program
+  .command('sync')
+  .description('Sync emails from IMAP servers')
+  .action(async () => {
+    console.log(colors.blue('📧 Syncing emails...'));
+    const { execSync } = await import('child_process');
+    try {
+      execSync('bin/plugins sync imap-email', { stdio: 'inherit' });
+    } catch (e) {
+      // execSync throws on non-zero exit, but output is already shown
+    }
+  });
+
+program.parse();

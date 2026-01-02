@@ -1,0 +1,41 @@
+# Markdown Diary Plugin
+# Reads diary entries from vault/diary/*.md files
+
+name = "markdown-diary"
+displayName = "Markdown Diary"
+description = "Diary entries from markdown files with sections for gratitude, progress, concerns, and journal"
+type = "diary"
+
+
+longDescription = """
+Reads diary entries from vault/diary/*.md files.
+Each daily file (YYYY-MM-DD.md) contains sections for different entry types:
+
+- Gratitude: Simple bullets (no timestamps)
+- Progress: ### HH:MM timestamped entries for work accomplishments
+- Concerns: ### HH:MM timestamped entries for worries or issues
+- Journal: ### HH:MM timestamped entries for free-form reflection
+
+Also reads from legacy locations for migration:
+- vault/logs/gratitude.md (date-prefixed lines)
+- vault/notes/progress/*.md (individual files)
+- vault/notes/concerns/*.md (individual files)
+"""
+
+aiInstructions = """
+This plugin reads diary entries from markdown files in vault/diary/.
+Each daily file (YYYY-MM-DD.md) contains sections for different entry types.
+
+Query by type: SELECT * FROM diary WHERE json_extract(metadata, '$.type') = 'gratitude'
+Query by date: SELECT * FROM diary WHERE DATE(date) = '2025-12-16'
+On this day: SELECT * FROM diary WHERE strftime('%m-%d', date) = strftime('%m-%d', 'now')
+
+Entry types: gratitude, progress, concern, journal
+Legacy entries have metadata.legacy = true
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+diary_directory = { type = "string", default = "vault/diary", description = "Directory containing diary markdown files" }

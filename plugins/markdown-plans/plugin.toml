@@ -1,0 +1,28 @@
+name = "markdown-plans"
+displayName = "Plan Context"
+description = "Provides plan hierarchy context (year/quarter/month/week/day) for AI alignment"
+type = "context"
+longDescription = """
+Provides the current plan hierarchy (year → quarter → month → week → day)
+as context for AI assistants to align daily work with long-term goals.
+
+When run, this plugin:
+1. Creates today's and tomorrow's daily plan files from templates
+2. Generates daily summaries for past days (yesterday and any missing)
+3. Suggests focus and priorities for tomorrow based on open tasks/events
+
+File naming pattern:
+- Year:    YYYY_00.md           (e.g., 2025_00.md)
+- Quarter: YYYY_Q#_00.md        (e.g., 2025_Q4_00.md)
+- Month:   YYYY_Q#_MM_00.md     (e.g., 2025_Q4_12_00.md)
+- Week:    YYYY_Q#_MM_W##_00.md (e.g., 2025_Q4_12_W51_00.md)
+- Day:     YYYY_Q#_MM_W##_DD.md (e.g., 2025_Q4_12_W51_17.md)
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+plans_directory = { type = "string", default = "vault/plans", description = "Directory containing plan files" }
+templates_directory = { type = "string", default = "vault/plans/templates", description = "Directory containing plan templates" }
+link_daily_notes = { type = "boolean", default = true, description = "Add link to today's plan at top of Obsidian daily note" }

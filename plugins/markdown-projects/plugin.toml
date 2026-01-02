@@ -1,0 +1,49 @@
+# Markdown Projects Plugin
+# Syncs Obsidian-style project files to database
+
+name = "markdown-projects"
+displayName = "Markdown Projects"
+description = "Sync project files from vault to database"
+type = "projects"
+
+
+longDescription = """
+Syncs project files from your vault to the database.
+
+Project files use YAML frontmatter for metadata:
+```yaml
+---
+title: Project Name
+status: active
+priority: high
+category: health
+start_date: 2025-01-01
+target_date: 2025-06-30
+percent_done: 25
+review_frequency: weekly
+last_reviewed: 2025-12-15
+---
+```
+
+Status values:
+- planning: Not yet started
+- active: Currently being worked on
+- in-progress: Same as active (normalized)
+- on_hold: Paused
+- completed: Done (or files in completed/ subfolder)
+- archived: No longer relevant
+
+Priority values: urgent, high, medium, low (mapped to highest/high/medium/low/lowest)
+
+Tasks within project files are linked via file path in their ID.
+"""
+
+aiInstructions = ""
+
+[commands]
+read = "./read.js"
+
+[settings]
+directory = { type = "string", default = "vault/projects", description = "Root directory containing project files" }
+exclude_paths = { type = "string", default = "templates,zz-attachments", description = "Comma-separated paths to exclude" }
+completed_folder = { type = "string", default = "completed", description = "Subfolder containing completed projects" }

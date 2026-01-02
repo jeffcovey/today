@@ -1,0 +1,51 @@
+# Streaks Habits Plugin
+# Syncs habit tracking data from the Streaks iOS app backup files
+
+name = "streaks-habits"
+displayName = "Streaks Habits"
+description = "Daily habit tracking from the Streaks iOS app"
+type = "habits"
+
+
+longDescription = """
+Syncs habits from Streaks app backup files (.streaks) to the database.
+
+Streaks is a habit tracking app for iOS (https://streaksapp.com).
+Export your data by going to Settings > Data > Export in the app.
+Save the .streaks file to your vault/logs directory.
+
+The plugin reads the latest .streaks file and extracts:
+- Habit definitions (name, category, target type)
+- Completion history for the last N days (configurable)
+- Current streak calculations
+
+Each database entry represents one habit on one day.
+"""
+
+aiInstructions = """
+Habit data from Streaks shows daily completion status for recurring habits.
+
+Key fields:
+- title: Habit name
+- date: Which day (YYYY-MM-DD)
+- status: completed, pending, skipped, or partial
+- value: Duration in seconds (for timer-based habits)
+- category: Habit category/group
+- metadata.current_streak: Days in a row completed
+
+Query today's habits:
+  SELECT title, status, json_extract(metadata, '$.current_streak') as streak
+  FROM habits WHERE date = date('now') ORDER BY status, title
+
+Find habits with long streaks:
+  SELECT DISTINCT title, json_extract(metadata, '$.current_streak') as streak
+  FROM habits WHERE date = date('now') ORDER BY streak DESC
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+logs_directory = { type = "string", default = "vault/logs", description = "Directory containing .streaks backup files" }
+retention_days = { type = "number", default = 30, description = "Days of history to keep in database" }
+cleanup_old_files = { type = "boolean", default = false, description = "Delete all .streaks files except the latest one after reading" }

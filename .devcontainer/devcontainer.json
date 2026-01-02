@@ -1,0 +1,45 @@
+{
+	"name": "Node.js Today CLI",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/devcontainers/features/sshd:1": {
+			"version": "latest"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.vscode-json"
+			]
+		}
+	},
+	"postCreateCommand": "npm install && chmod +x bin/* && npx dotenvx run --overload -- .devcontainer/setup-ssh-keys.sh",
+	"postStartCommand": "bash .devcontainer/devcontainer-startup",
+	"containerEnv": {
+		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
+		"DEVCONTAINER_PROJECT": "today"
+	},
+	"remoteEnv": {
+		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
+	},
+	"mounts": [],
+	"forwardPorts": [
+		2222,
+		8081
+	],
+	"portsAttributes": {
+		"2222": {
+			"label": "SSH",
+			"onAutoForward": "notify"
+		},
+		"8081": {
+			"label": "Code Server",
+			"onAutoForward": "notify"
+		}
+	},
+	"workspaceFolder": "/workspaces/today"
+}

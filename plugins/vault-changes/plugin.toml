@@ -1,0 +1,32 @@
+# Vault Changes Plugin
+# Displays files changed in the vault and git status
+
+name = "vault-changes"
+displayName = "Vault Changes"
+description = "Shows files modified or added today, plus git status"
+type = "context"
+
+
+longDescription = """
+Reports which vault files have changed today and provides git status information.
+
+This plugin displays context about:
+- Files added, modified, or deleted today
+- Git branch, uncommitted changes, and unpushed commits
+- Today's commit history
+
+The underlying change tracking is handled by the core vault-changes module
+(src/vault-changes.js) which is always available to other plugins regardless
+of whether this display plugin is enabled.
+
+Disabling this plugin only hides the context display - it does not affect
+change tracking used by other plugins like markdownlint-cleanup.
+"""
+
+[commands]
+read = "./read.js"
+write = "./write.js"
+
+[settings]
+directory = { type = "string", default = "vault", description = "Directory to track" }
+excludeDirs = { type = "string", default = ".sync,templates,.git,.git.nosync,.obsidian,.trash", description = "Comma-separated directories to exclude" }

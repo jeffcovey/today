@@ -1,0 +1,11 @@
+name = "weather-context"
+displayName = "Weather Report"
+description = "Provides current weather and forecast for the user's location"
+type = "context"
+
+[commands]
+read = "./read.js"
+
+[settings]
+location = { type = "string", default = "", description = "Location override (defaults to config.toml location)" }
+units = { type = "string", default = "imperial", description = "Temperature units: imperial or metric" }

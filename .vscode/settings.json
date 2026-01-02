@@ -1,0 +1,19 @@
+{
+  "markdownlint.config": {
+    "extends": ".markdownlint.json"
+  },
+  "editor.formatOnSave": true,
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": false
+    }
+  },
+  "files.associations": {
+    "*.md": "markdown"
+  }
+}

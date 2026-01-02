@@ -1,0 +1,29 @@
+# Inbox Processing Plugin
+# Routes inbox files to appropriate destinations
+
+name = "inbox-processing"
+displayName = "Inbox Processing"
+description = "Process inbox files and route them to diary, tasks, or leave for review"
+type = "utility"
+
+
+longDescription = """
+Processes files dropped into the inbox directory and routes them based on content:
+
+- **Progress notes** (title "Progress") → Added to diary file
+- **Concern notes** (title "Concerns") → Added to diary file
+- **Task-only files** (only checkboxes) → Appended to tasks.md
+- **Unrecognized files** → Left in inbox for user review
+
+Processed files are moved to .trash within the inbox directory and automatically
+cleaned up after the retention period.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+inbox_directory = { type = "string", default = "vault/inbox", description = "Directory to monitor for incoming files" }
+diary_directory = { type = "string", default = "vault/diary", description = "Directory for diary files" }
+tasks_file = { type = "string", default = "vault/tasks/tasks.md", description = "Path to tasks file" }
+trash_retention_days = { type = "number", default = 7, description = "Days to keep processed files in trash before deletion" }

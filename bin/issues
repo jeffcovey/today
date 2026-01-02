@@ -1,0 +1,417 @@
+#!/usr/bin/env node
+
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getDatabase } from '../src/database-service.js';
+import { getSourcesForType, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import {
+  colors,
+  showSourceFilterError
+} from '../src/cli-utils.js';
+import { program } from 'commander';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.dirname(__dirname);
+
+// Open command - show open issues (default)
+async function cmdOpen(options = {}) {
+  const db = getDatabase();
+  ensureSyncForType(db, 'issues');
+  const limitPerSource = options.limit || 10;
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('issues', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'issues', allSources);
+      return;
+    }
+  }
+
+  // Get all sources or filter to specified one
+  let sourceFilter = '';
+  if (options.source) {
+    sourceFilter = `AND source LIKE '%${options.source}%'`;
+  }
+
+  // Get distinct sources
+  const sources = db.prepare(`
+    SELECT DISTINCT source FROM issues
+    WHERE state = 'open' ${sourceFilter}
+    ORDER BY source
+  `).all().map(r => r.source);
+
+  if (sources.length === 0) {
+    console.log(colors.blue('ℹ') + ' No open issues');
+    return;
+  }
+
+  let totalShown = 0;
+
+  for (const source of sources) {
+    // Get issues for this source
+    const issues = db.prepare(`
+      SELECT id, title, state, opened_at, url, metadata, source
+      FROM issues
+      WHERE state = 'open' AND source = ?
+      ORDER BY opened_at DESC
+      LIMIT ?
+    `).all(source, limitPerSource);
+
+    // Get total count for this source
+    const totalCount = db.prepare(`
+      SELECT COUNT(*) as count FROM issues
+      WHERE state = 'open' AND source = ?
+    `).get(source).count;
+
+    // Display source header
+    console.log(colors.cyan(`── ${source} `) + colors.gray(`(${issues.length} of ${totalCount} open)`));
+    console.log('');
+
+    for (const issue of issues) {
+      displayIssue(issue);
+    }
+
+    totalShown += issues.length;
+  }
+
+  console.log(colors.cyan('Total:') + ` ${totalShown} issues shown`);
+  console.log('');
+  console.log(getSyncStatusMessage(db, 'issues'));
+}
+
+// Closed command - show recently closed issues
+async function cmdClosed(options = {}) {
+  const db = getDatabase();
+  ensureSyncForType(db, 'issues');
+  const limit = options.limit || 10;
+
+  // Validate source filter if provided
+  if (options.source) {
+    const { sources, allSources } = await getSourcesForType('issues', options.source);
+    if (sources.length === 0) {
+      showSourceFilterError(options.source, 'issues', allSources);
+      return;
+    }
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Build query with optional source filter
+  let query = `
+    SELECT id, title, state, opened_at, url, metadata, source
+    FROM issues
+    WHERE state = 'closed'
+    ORDER BY json_extract(metadata, '$.closed_at') DESC
+    LIMIT ?
+  `;
+  const params = [limit];
+
+  if (options.source) {
+    query = `
+      SELECT id, title, state, opened_at, url, metadata, source
+      FROM issues
+      WHERE state = 'closed' AND source LIKE ?
+      ORDER BY json_extract(metadata, '$.closed_at') DESC
+      LIMIT ?
+    `;
+    params.unshift(`%${options.source}%`);
+  }
+
+  const issues = db.prepare(query).all(...params);
+
+  if (issues.length === 0) {
+    console.log(colors.blue('ℹ') + ' No closed issues');
+    return;
+  }
+
+  console.log(colors.cyan('Recently Closed Issues'));
+  console.log('');
+
+  for (const issue of issues) {
+    displayIssue(issue);
+  }
+}
+
+// Search command - search issues by title or body
+async function cmdSearch(searchTerm, options = {}) {
+  if (!searchTerm) {
+    console.error(colors.red('✗') + ' Usage: issues search "search term" [--limit N]');
+    process.exit(1);
+  }
+
+  const db = getDatabase();
+  ensureSyncForType(db, 'issues');
+  const limit = options.limit || 10;
+
+  // Build query with optional source filter
+  let query = `
+    SELECT id, title, state, opened_at, url, body, metadata, source
+    FROM issues
+    WHERE title LIKE ? OR body LIKE ?
+    ORDER BY opened_at DESC
+    LIMIT ?
+  `;
+  const params = [`%${searchTerm}%`, `%${searchTerm}%`, limit];
+
+  if (options.source) {
+    query = `
+      SELECT id, title, state, opened_at, url, body, metadata, source
+      FROM issues
+      WHERE (title LIKE ? OR body LIKE ?) AND source LIKE ?
+      ORDER BY opened_at DESC
+      LIMIT ?
+    `;
+    params.splice(2, 0, `%${options.source}%`);
+  }
+
+  const issues = db.prepare(query).all(...params);
+
+  if (issues.length === 0) {
+    console.log(colors.blue('ℹ') + ` No issues matching "${searchTerm}"`);
+    return;
+  }
+
+  console.log(colors.cyan(`Search Results for "${searchTerm}"`));
+  console.log('');
+
+  for (const issue of issues) {
+    displayIssue(issue, searchTerm);
+  }
+
+  console.log('');
+  console.log(colors.cyan('Found:') + ` ${issues.length} issues`);
+}
+
+// Show command - show a specific issue by number
+async function cmdShow(issueId, options = {}) {
+  if (!issueId) {
+    console.error(colors.red('✗') + ' Usage: issues show <issue-number>');
+    process.exit(1);
+  }
+
+  const db = getDatabase();
+  ensureSyncForType(db, 'issues');
+
+  // Search for issue by ID (could be "52" or full ID like "github-issues/today:52")
+  const issue = db.prepare(`
+    SELECT id, title, state, opened_at, url, body, metadata, source
+    FROM issues
+    WHERE id LIKE ?
+    LIMIT 1
+  `).get(`%${issueId}`);
+
+  if (!issue) {
+    console.log(colors.blue('ℹ') + ` Issue ${issueId} not found`);
+    return;
+  }
+
+  displayIssueFull(issue);
+}
+
+// Stats command - show issue statistics
+async function cmdStats() {
+  const db = getDatabase();
+  ensureSyncForType(db, 'issues');
+
+  const stats = db.prepare(`
+    SELECT
+      COUNT(*) as total_issues,
+      COUNT(CASE WHEN state = 'open' THEN 1 END) as open_issues,
+      COUNT(CASE WHEN state = 'closed' THEN 1 END) as closed_issues,
+      MIN(opened_at) as oldest_issue,
+      MAX(opened_at) as newest_issue
+    FROM issues
+  `).get();
+
+  const labelStats = db.prepare(`
+    SELECT
+      json_each.value as label,
+      COUNT(*) as count
+    FROM issues, json_each(json_extract(metadata, '$.labels'))
+    WHERE state = 'open'
+    GROUP BY json_each.value
+    ORDER BY count DESC
+    LIMIT 10
+  `).all();
+
+  console.log(colors.cyan('Issue Statistics'));
+  console.log('');
+  console.log(`  Total issues: ${colors.green(stats.total_issues)}`);
+  console.log(`  Open: ${colors.yellow(stats.open_issues)}`);
+  console.log(`  Closed: ${colors.gray(stats.closed_issues)}`);
+  console.log('');
+  console.log(`  Date range: ${stats.oldest_issue?.substring(0, 10) || 'N/A'} to ${stats.newest_issue?.substring(0, 10) || 'N/A'}`);
+
+  if (labelStats.length > 0) {
+    console.log('');
+    console.log('  Top labels (open issues):');
+    for (const label of labelStats) {
+      console.log(`    ${label.label}: ${label.count}`);
+    }
+  }
+}
+
+// Sync command - delegates to plugin system
+async function cmdSync() {
+  console.log(colors.blue('ℹ') + ' Syncing issues plugins to database...');
+
+  try {
+    const result = execSync('bin/plugins sync --type issues', { encoding: 'utf8' });
+    // Strip dotenvx output and show result
+    const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+    console.log(lines.join('\n'));
+  } catch (error) {
+    if (error.stdout?.includes('No plugins of type')) {
+      console.log(colors.yellow('⚠') + ' No issues plugins are enabled.');
+      console.log('');
+      console.log('To sync issues, configure a plugin:');
+      console.log('');
+      console.log('  ' + colors.cyan('bin/plugins configure'));
+    } else {
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
+      process.exit(1);
+    }
+  }
+}
+
+// Helper to display a single issue (list view)
+function displayIssue(issue, highlightTerm = null) {
+  const { id, title, state, opened_at, url, metadata } = issue;
+
+  // Extract issue number from ID (e.g., "github-issues/today:52" -> "52")
+  const issueNum = id.split(':').pop();
+  const dateStr = opened_at.substring(0, 10);
+
+  // Parse metadata
+  let meta = {};
+  try {
+    meta = metadata ? JSON.parse(metadata) : {};
+  } catch (e) {}
+
+  // State indicator
+  const stateIcon = state === 'open' ? colors.green('●') : colors.gray('●');
+
+  // Labels
+  const labels = meta.labels || [];
+  const labelStr = labels.length > 0
+    ? ' ' + labels.map(l => colors.blue(`[${l}]`)).join(' ')
+    : '';
+
+  // Title with optional highlight
+  let displayTitle = title;
+  if (highlightTerm) {
+    const regex = new RegExp(`(${highlightTerm})`, 'gi');
+    displayTitle = displayTitle.replace(regex, colors.yellow('$1'));
+  }
+
+  console.log(`${stateIcon} ${colors.cyan('#' + issueNum)} ${displayTitle}${labelStr}`);
+  console.log(colors.gray(`  opened ${dateStr}${url ? ' • ' + url : ''}`));
+  console.log('');
+}
+
+// Helper to display a single issue (full view)
+function displayIssueFull(issue) {
+  const { id, title, state, opened_at, url, body, metadata } = issue;
+
+  // Extract issue number from ID
+  const issueNum = id.split(':').pop();
+  const dateStr = opened_at.substring(0, 10);
+
+  // Parse metadata
+  let meta = {};
+  try {
+    meta = metadata ? JSON.parse(metadata) : {};
+  } catch (e) {}
+
+  // State indicator
+  const stateIcon = state === 'open' ? colors.green('● open') : colors.gray('● closed');
+
+  console.log(colors.cyan(`#${issueNum}`) + ` ${title}`);
+  console.log('');
+  console.log(`  State: ${stateIcon}`);
+  console.log(`  Opened: ${dateStr}`);
+  if (meta.closed_at) {
+    console.log(`  Closed: ${meta.closed_at.substring(0, 10)}`);
+  }
+  if (url) {
+    console.log(`  URL: ${url}`);
+  }
+  if (meta.labels && meta.labels.length > 0) {
+    console.log(`  Labels: ${meta.labels.join(', ')}`);
+  }
+  if (meta.assignees && meta.assignees.length > 0) {
+    console.log(`  Assignees: ${meta.assignees.join(', ')}`);
+  }
+  if (meta.milestone) {
+    console.log(`  Milestone: ${meta.milestone}`);
+  }
+
+  if (body) {
+    console.log('');
+    console.log(colors.cyan('Description:'));
+    console.log('');
+    // Indent body text
+    const lines = body.split('\n').map(l => '  ' + l);
+    console.log(lines.join('\n'));
+  }
+}
+
+// Commander setup
+program
+  .name('issues')
+  .description('Issue tracking for Today system');
+
+program
+  .command('open', { isDefault: true })
+  .description('Show open issues')
+  .option('--limit <n>', 'Limit issues per source', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdOpen(options);
+  });
+
+program
+  .command('closed')
+  .description('Show recently closed issues')
+  .option('--limit <n>', 'Limit number of results', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdClosed(options);
+  });
+
+program
+  .command('search')
+  .description('Search issues by title or body')
+  .argument('<term...>', 'Search term')
+  .option('--limit <n>', 'Limit number of results', (val) => parseInt(val, 10), 10)
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (termParts, options) => {
+    await cmdSearch(termParts.join(' '), options);
+  });
+
+program
+  .command('show')
+  .description('Show a specific issue')
+  .argument('<number>', 'Issue number')
+  .action(async (issueId) => {
+    await cmdShow(issueId);
+  });
+
+program
+  .command('stats')
+  .description('Show issue statistics')
+  .action(async () => {
+    await cmdStats();
+  });
+
+program
+  .command('sync')
+  .description('Sync all issues plugins to database')
+  .action(async () => {
+    await cmdSync();
+  });
+
+program.parse();

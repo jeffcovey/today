@@ -1,0 +1,35 @@
+# GitHub Projects Plugin
+# Syncs GitHub Projects V2 to the projects table
+
+name = "github-projects"
+displayName = "GitHub Projects"
+description = "Sync projects from GitHub Projects V2"
+type = "projects"
+
+
+longDescription = """
+Syncs GitHub Projects V2 from users, repositories, or organizations.
+
+Requires the GitHub CLI (gh) with `read:project` scope:
+  gh auth refresh -s read:project
+
+GitHub Issues within projects are synced separately via github-issues plugin.
+This plugin syncs project metadata and tracks which issues belong to each project.
+"""
+
+aiInstructions = """
+GitHub Projects are synced as projects in the database.
+- Issues within projects are synced via github-issues plugin
+- Project items reference issues by their GitHub number
+- Check metadata.items for issue numbers in each project
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+owner = { type = "string", required = true, description = "GitHub username or organization name" }
+type = { type = "string", default = "user", description = "Project owner type: user, org, or repo" }
+repository = { type = "string", description = "Repository name (required if type = repo)" }
+include_closed = { type = "boolean", default = false, description = "Include closed projects" }
+limit = { type = "number", default = 20, description = "Maximum number of projects to sync" }

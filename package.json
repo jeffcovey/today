@@ -1,0 +1,73 @@
+{
+  "name": "today",
+  "version": "1.0.0",
+  "description": "A personal command center for reviewing inputs, managing plans and dreams, and deciding what to do each day",
+  "bin": {
+    "email": "./bin/email"
+  },
+  "scripts": {
+    "prepare": "[ -f node_modules/.bin/lefthook ] && lefthook install || true",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' npx jest --watch",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
+    "lint:md": "markdownlint-cli2 '**/*.md' '!node_modules/**'",
+    "lint:md:fix": "markdownlint-cli2 --fix '**/*.md' '!node_modules/**'",
+    "lint:vault": "markdownlint-cli2 'vault/**/*.md'",
+    "lint:vault:fix": "markdownlint-cli2 --fix 'vault/**/*.md'",
+    "lint": "npm run lint:md"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.1",
+    "@ai-sdk/google": "^3.0.1",
+    "@ai-sdk/openai": "^3.0.1",
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@clack/prompts": "^0.11.0",
+    "@date-fns/tz": "^1.4.1",
+    "@dotenvx/dotenvx": "^1.51.1",
+    "@inkjs/ui": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "ai": "^6.0.3",
+    "better-sqlite3": "^12.5.0",
+    "blessed": "^0.1.81",
+    "chokidar": "^5.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.2",
+    "connect-sqlite3": "^0.9.16",
+    "countries-and-timezones": "^3.8.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "enquirer": "^2.4.1",
+    "express": "^5.2.1",
+    "express-session": "^1.18.2",
+    "googleapis": "^167.0.0",
+    "htm": "^3.1.1",
+    "imapflow": "^1.1.1",
+    "ink": "^6.6.0",
+    "js-yaml": "^4.1.0",
+    "mailparser": "^3.9.0",
+    "marked": "^17.0.1",
+    "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2",
+    "ollama-ai-provider-v2": "^1.5.5",
+    "react": "^19.2.3",
+    "smol-toml": "^1.5.2",
+    "sqlite3": "^5.1.7",
+    "tsdav": "^2.1.5",
+    "zod": "^4.2.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "lefthook": "^2.0.9",
+    "markdownlint-cli2": "^0.19.1"
+  },
+  "overrides": {
+    "nodemailer": "^7.0.11"
+  }
+}

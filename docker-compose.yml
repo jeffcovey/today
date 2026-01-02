@@ -1,0 +1,43 @@
+version: '3.3'
+
+services:
+  today:
+    build: .
+    container_name: today
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
+      - SKIP_DEP_CHECK=${SKIP_DEP_CHECK:-false}
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      # Mount the entire project directory
+      - .:/app
+      # Use named volumes for caches to persist between container rebuilds
+      - calendar-cache:/app/.calendar-cache
+      # Override node_modules to use container's version
+      - /app/node_modules
+      # Mount SSH directory for git operations (read-only)
+      - ~/.ssh:/root/.ssh:ro
+      # Mount Claude CLI config directory for authentication persistence
+      - ~/.config/claude:/root/.config/claude
+    stdin_open: true
+    tty: true
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    # Uncomment to auto-pull a model on startup:
+    # entrypoint: ["/bin/bash", "-c"]
+    # command: ["ollama serve & sleep 5 && ollama pull tinyllama && tail -f /dev/null"]
+
+volumes:
+  calendar-cache:
+    driver: local
+  ollama-data:
+    driver: local

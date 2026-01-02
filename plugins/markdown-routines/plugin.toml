@@ -1,0 +1,58 @@
+# Markdown Routines Plugin
+# Syncs multi-step routines from vault/routines/*.md files
+
+name = "markdown-routines"
+displayName = "Markdown Routines"
+description = "Daily and periodic routines tracked in markdown files"
+type = "habits"
+
+
+longDescription = """
+Syncs routines from markdown files in vault/routines/ to the habits database.
+
+Each routine file contains:
+- YAML front matter with name, recurrence, estimated_minutes, history
+- Markdown tasks with scheduled dates (⏳ YYYY-MM-DD)
+
+On each sync, the plugin:
+1. Checks if the scheduled date is in the past (new period)
+2. Records completion stats (X/Y steps done) to the history
+3. Resets all tasks to unchecked
+4. Updates scheduled dates to the current period start
+
+Recurrence patterns supported:
+- daily
+- on weekdays / on weekends
+- weekly / weekly on Sunday
+- monthly / monthly on the 15th / monthly on the last day
+- monthly on the first Monday / monthly on the third Thursday
+- quarterly
+- yearly / yearly on March 15
+"""
+
+aiInstructions = """
+Routine data shows completion progress for multi-step checklists.
+
+Key fields:
+- title: Routine name (e.g., "Morning Routine")
+- date: Which day (YYYY-MM-DD)
+- status: completed (100%), partial (1-99%), or pending (0%)
+- value: Steps completed
+- metadata.target_type: 'steps'
+- metadata.target_value: Total steps in routine
+- metadata.current_streak: Consecutive days with 100% completion
+- metadata.recurrence: How often (daily, weekly, etc.)
+
+Query today's routines:
+  SELECT title, status, value as done,
+         json_extract(metadata, '$.target_value') as total,
+         json_extract(metadata, '$.current_streak') as streak
+  FROM habits WHERE source LIKE 'markdown-routines%' AND date = date('now')
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+routines_directory = { type = "string", default = "vault/routines", description = "Directory containing routine markdown files" }
+history_limit = { type = "number", default = 30, description = "Number of historical completions to keep in front matter" }

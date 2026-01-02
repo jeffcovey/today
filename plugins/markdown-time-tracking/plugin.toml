@@ -1,0 +1,41 @@
+# Markdown Time Tracking Plugin
+# Syncs local markdown time tracking files to database
+
+name = "markdown-time-tracking"
+displayName = "Markdown Time Tracking"
+description = "Sync local markdown time tracking files to database"
+type = "time-logs"
+
+
+longDescription = """
+Syncs time entries from markdown files in your vault to the database.
+
+Time entries are stored in monthly files (e.g., `2025-12.md`) with one entry per line:
+
+```
+2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on project #topic/programming
+2025-12-09T14:00:00-05:00|2025-12-09T15:00:00-05:00|Meeting with team #topic/meetings
+```
+
+The current timer (if running) is stored in `current-timer.md`.
+
+This plugin reads the markdown files and syncs them to SQLite for querying.
+"""
+
+aiInstructions = """
+To check current ongoing activity, read `{directory}/current-timer.md`.
+To see entries, read `{directory}/YYYY-MM.md` for the relevant month.
+
+Each line in the monthly file is: `START_ISO8601|END_ISO8601|Description #topic/tag`
+Example: `2025-12-09T09:00:00-05:00|2025-12-09T10:30:00-05:00|Working on code #topic/programming`
+"""
+
+[commands]
+read = "./read.js"
+write = "./write.js"
+
+[settings]
+days_to_sync = { type = "number", default = 365 }
+directory = { type = "string", default = "vault/logs/time-tracking" }
+auto_add_topics = { type = "boolean", default = false, description = "Automatically add topic tags using AI after syncing" }
+taggable_field = { type = "string", default = "description", description = "Database field to add topic tags to" }
