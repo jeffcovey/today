@@ -217,7 +217,9 @@ Consolidated styling for all page types: dashboard, plans, projects, packing lis
   box-shadow: 0 2px 6px rgba(102, 126, 234, 0.2);
 }
 
-.project-template strong {
+.project-template > strong,
+.project-template p > strong,
+.project-template h2 + p strong {
   display: inline-block;
   padding: 4px 12px;
   background: var(--background-secondary);
@@ -296,6 +298,13 @@ Consolidated styling for all page types: dashboard, plans, projects, packing lis
   margin: 2px 0;
 }
 
+/* Ensure Tasks plugin checkboxes are visible */
+.project-template .plugin-tasks-query-result,
+.plan .plugin-tasks-query-result,
+.dashboard .plugin-tasks-query-result {
+  padding-left: 1.5em;
+}
+
 .plan a,
 .project-template a,
 .packing-list a {
@@ -348,7 +357,7 @@ Consolidated styling for all page types: dashboard, plans, projects, packing lis
   max-width: 100%;
 }
 
-.dashboard ul {
+.dashboard ul:not(.plugin-tasks-query-result):not(.contains-task-list) {
   list-style: none;
   padding-left: 0;
 }
