@@ -353,6 +353,7 @@ Each plugin type has a defined schema. Data is stored in a shared table for that
 | `diary` | `diary` | Journal entries with date and text |
 | `email` | `email` | Email messages with headers and content |
 | `events` | `events` | Calendar events with start/end times |
+| `finance` | `financial_transactions`, `budget_allocations` | Financial data (transactions, budget planning) |
 | `habits` | `habits` | Daily habit tracking with completion status |
 | `health` | `health_metrics` | Health measurements (steps, weight, sleep) |
 | `issues` | `issues` | Tickets, bugs, alerts from external systems |
