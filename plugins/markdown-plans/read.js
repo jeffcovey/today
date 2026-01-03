@@ -1136,6 +1136,12 @@ function updateTomorrowPlan(filePath, suggestions) {
 function linkPlanToDailyNote(planPath, date) {
   if (!linkDailyNotes) return { linked: false, reason: 'disabled' };
 
+  // Skip if markdown-diary plugin is enabled (it handles richer daily note content)
+  const diaryPluginPath = path.join(projectRoot, 'plugins', 'markdown-diary', 'plugin.toml');
+  if (fs.existsSync(diaryPluginPath)) {
+    return { linked: false, reason: 'markdown-diary plugin handles daily notes' };
+  }
+
   const vaultPath = path.join(projectRoot, 'vault');
   const dailyNotesConfigPath = path.join(vaultPath, '.obsidian', 'daily-notes.json');
 

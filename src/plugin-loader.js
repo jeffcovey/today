@@ -149,6 +149,126 @@ export async function getPlugin(name) {
 }
 
 /**
+ * Determine if we should offer to update a file based on content similarity
+ * @param {string} srcContent - New skeleton/template content
+ * @param {string} destContent - Existing user content
+ * @param {string} filePath - File path for context
+ * @returns {boolean} - Whether to offer the update
+ */
+function shouldOfferUpdate(srcContent, destContent, filePath) {
+  // Always offer updates for certain file types that are meant to be synced
+  if (filePath.endsWith('.css') || filePath.endsWith('.js') || filePath.match(/\.(json|toml|yaml)$/)) {
+    return true;
+  }
+
+  // For markdown files, use smart similarity detection
+  if (filePath.endsWith('.md')) {
+    const srcLines = srcContent.split('\n').map(line => line.trim()).filter(line => line);
+    const destLines = destContent.split('\n').map(line => line.trim()).filter(line => line);
+
+    // If file size has changed dramatically, likely diverged
+    const sizeRatio = Math.min(srcLines.length, destLines.length) / Math.max(srcLines.length, destLines.length);
+    if (sizeRatio < 0.3) {
+      return false; // Files are very different sizes
+    }
+
+    // Check for template vs data file patterns
+    const srcIsTemplate = isTemplateContent(srcContent);
+    const destIsData = isDataContent(destContent);
+
+    // Don't offer to replace data files with templates
+    if (srcIsTemplate && destIsData) {
+      return false;
+    }
+
+    // Calculate line similarity
+    const commonLines = srcLines.filter(srcLine =>
+      destLines.some(destLine =>
+        // Exact match or very similar (allowing for minor edits)
+        destLine === srcLine ||
+        (srcLine.length > 10 && destLine.length > 10 &&
+         levenshteinDistance(srcLine.toLowerCase(), destLine.toLowerCase()) / Math.max(srcLine.length, destLine.length) < 0.3)
+      )
+    );
+
+    const similarity = commonLines.length / Math.max(srcLines.length, destLines.length);
+
+    // Only offer update if files are still reasonably similar (>50% common lines)
+    return similarity > 0.5;
+  }
+
+  // For other file types, default to offering updates
+  return true;
+}
+
+/**
+ * Check if content looks like template/documentation
+ */
+function isTemplateContent(content) {
+  const templateMarkers = [
+    /^#.*Quick.*Add/i,
+    /^#.*Reference/i,
+    /^#.*Syntax/i,
+    /^#.*Example/i,
+    /Example task/i,
+    /This is your/i,
+    /Add tasks here/i,
+    /^>\s*\[!note\]/i
+  ];
+
+  return templateMarkers.some(pattern => pattern.test(content));
+}
+
+/**
+ * Check if content looks like user data
+ */
+function isDataContent(content) {
+  const dataMarkers = [
+    // High density of task items
+    (content.match(/^- \[[ x]\]/gm) || []).length > 20,
+    // Personal/specific task content
+    /\b(buy|get|call|email|check|fix|add|download|reply|ask)\b.*\b(my|the|from|to|with)\b/i.test(content),
+    // Dates in task content (suggests real tasks vs examples)
+    (content.match(/\b\d{4}-\d{2}-\d{2}\b/g) || []).length > 5,
+    // Topic/stage tags (suggests active usage)
+    (content.match(/#topic\/|#stage\//g) || []).length > 10
+  ];
+
+  return dataMarkers.some(condition => condition);
+}
+
+/**
+ * Simple Levenshtein distance for similarity comparison
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[str2.length][str1.length];
+}
+
+/**
  * Derive plugin access level from its commands
  * @param {object} plugin - Plugin object with commands
  * @returns {'read-only'|'read-write'|'none'}
@@ -1150,14 +1270,17 @@ async function runAutoPriority(options) {
   const { db, plugin, sourceName, sourceConfig, tableName } = options;
   const sourceId = `${plugin.name}/${sourceName}`;
 
-  // Query for tasks without priority
+  // Query for tasks without priority (limit per sync to avoid overwhelming)
+  const batchSize = sourceConfig.auto_priority_batch_size || 50;
   const tasks = db.prepare(`
     SELECT id, title, metadata
     FROM ${tableName}
     WHERE source = ?
       AND status = 'open'
       AND json_extract(metadata, '$.priority') IS NULL
-  `).all(sourceId);
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(sourceId, batchSize);
 
   if (tasks.length === 0) {
     return { prioritized: 0, files_modified: [], used_ai: false };
@@ -1381,7 +1504,7 @@ export async function getPluginsWithVaultFiles(options = {}) {
  * @returns {Promise<{installed: string[], skipped: string[], errors: string[]}>}
  */
 export async function syncPluginVaultFiles(options = {}) {
-  const { vaultPath, force = false, verbose = false, enabledOnly = true } = options;
+  const { vaultPath, force = false, verbose = false, enabledOnly = true, filesToUpdate = null } = options;
 
   const result = {
     installed: [],
@@ -1396,6 +1519,14 @@ export async function syncPluginVaultFiles(options = {}) {
     const pluginVaultDir = path.join(plugin._path, 'vault');
 
     for (const relPath of files) {
+      // If filesToUpdate is specified, only process files in that list
+      if (filesToUpdate) {
+        const shouldUpdate = filesToUpdate.some(f => f.plugin === plugin.name && f.file === relPath);
+        if (!shouldUpdate) {
+          continue;
+        }
+      }
+
       const srcPath = path.join(pluginVaultDir, relPath);
       const destPath = path.join(vaultPath, relPath);
       const destDir = path.dirname(destPath);
@@ -1466,6 +1597,50 @@ export async function syncPluginVaultFiles(options = {}) {
     }
   }
 
+  // Install shared scripts from skeleton
+  const scriptsSrc = path.join(PROJECT_ROOT, 'skeleton', 'scripts');
+  const scriptsDest = path.join(vaultPath, 'scripts');
+
+  if (fs.existsSync(scriptsSrc)) {
+    try {
+      if (!fs.existsSync(scriptsDest)) {
+        fs.mkdirSync(scriptsDest, { recursive: true });
+        if (verbose) {
+          console.log(`  Created directory: scripts`);
+        }
+      }
+
+      // Install all scripts from skeleton/scripts
+      const scriptFiles = fs.readdirSync(scriptsSrc);
+      for (const scriptFile of scriptFiles) {
+        const srcPath = path.join(scriptsSrc, scriptFile);
+        const destPath = path.join(scriptsDest, scriptFile);
+
+        if (fs.statSync(srcPath).isFile()) {
+          // If filesToUpdate is specified, only process skeleton files in that list
+          if (filesToUpdate) {
+            const shouldUpdate = filesToUpdate.some(f => f.plugin === 'skeleton' && f.file === `scripts/${scriptFile}`);
+            if (!shouldUpdate) {
+              continue;
+            }
+          }
+
+          if (!fs.existsSync(destPath) || force) {
+            fs.copyFileSync(srcPath, destPath);
+            result.installed.push(`skeleton:scripts/${scriptFile}`);
+            if (verbose) {
+              console.log(`  Installed: scripts/${scriptFile}`);
+            }
+          } else {
+            result.skipped.push(`skeleton:scripts/${scriptFile}`);
+          }
+        }
+      }
+    } catch (error) {
+      result.errors.push(`skeleton:scripts: ${error.message}`);
+    }
+  }
+
   return result;
 }
 
@@ -1510,16 +1685,19 @@ export async function checkPluginVaultFileChanges(vaultPath, options = {}) {
         continue;
       }
 
-      // Compare file contents
+      // Compare file contents with smart similarity detection
       const srcContent = fs.readFileSync(srcPath, 'utf8');
       const destContent = fs.readFileSync(destPath, 'utf8');
 
       if (srcContent !== destContent) {
-        changes.push({
-          plugin: plugin.name,
-          file: relPath,
-          status: 'modified'
-        });
+        // Check if files are similar enough to warrant an update offer
+        if (shouldOfferUpdate(srcContent, destContent, relPath)) {
+          changes.push({
+            plugin: plugin.name,
+            file: relPath,
+            status: 'modified'
+          });
+        }
       }
     }
   }
@@ -1545,6 +1723,41 @@ export async function checkPluginVaultFileChanges(vaultPath, options = {}) {
             file: '.obsidian/snippets/today.css',
             status: 'modified'
           });
+        }
+      }
+    }
+  }
+
+  // Check shared scripts from skeleton
+  const scriptsSrc = path.join(PROJECT_ROOT, 'skeleton', 'scripts');
+  const scriptsDest = path.join(vaultPath, 'scripts');
+
+  if (fs.existsSync(scriptsSrc)) {
+    const scriptFiles = fs.readdirSync(scriptsSrc);
+    for (const scriptFile of scriptFiles) {
+      const srcPath = path.join(scriptsSrc, scriptFile);
+      const destPath = path.join(scriptsDest, scriptFile);
+
+      if (fs.statSync(srcPath).isFile()) {
+        if (!fs.existsSync(destPath)) {
+          changes.push({
+            plugin: 'skeleton',
+            file: `scripts/${scriptFile}`,
+            status: 'missing'
+          });
+        } else {
+          const srcContent = fs.readFileSync(srcPath, 'utf8');
+          const destContent = fs.readFileSync(destPath, 'utf8');
+          if (srcContent !== destContent) {
+            // Use smart similarity detection for skeleton scripts too
+            if (shouldOfferUpdate(srcContent, destContent, `scripts/${scriptFile}`)) {
+              changes.push({
+                plugin: 'skeleton',
+                file: `scripts/${scriptFile}`,
+                status: 'modified'
+              });
+            }
+          }
         }
       }
     }

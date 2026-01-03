@@ -39,26 +39,267 @@ function getTodayDateString() {
 }
 
 /**
- * Create today's diary file if it doesn't exist
+ * Check if a plugin is enabled by reading config.toml
+ */
+function isPluginEnabled(pluginName) {
+  try {
+    const configPath = path.join(projectRoot, 'config.toml');
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf8');
+
+    // Look for any [plugins.{pluginName}.*] section with enabled = true
+    // Plugins can have multiple instances (e.g., google-calendar.personal, google-calendar.zazen)
+    const pluginSectionRegex = new RegExp(`^\\[plugins\\.${pluginName}\\.\\w+\\]`, 'gm');
+    const sections = configContent.match(pluginSectionRegex);
+
+    if (!sections) {
+      return false;
+    }
+
+    // Check each section to see if any has enabled = true
+    for (const section of sections) {
+      const sectionStart = configContent.indexOf(section);
+      const nextSectionStart = configContent.indexOf('\n[', sectionStart + 1);
+      const sectionContent = nextSectionStart === -1
+        ? configContent.substring(sectionStart)
+        : configContent.substring(sectionStart, nextSectionStart);
+
+      if (sectionContent.includes('enabled = true')) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    // If we can't read the config, assume disabled
+    return false;
+  }
+}
+
+/**
+ * Generate time tracking widget section
+ */
+function generateTimeTrackingSection(date) {
+  return `## ⏱️ Time Tracking - Today
+
+\`\`\`dataviewjs
+await dv.view("scripts/time-tracking-widget", {
+    startDate: "${date}",
+    endDate: "${date}"
+});
+\`\`\``;
+}
+
+/**
+ * Generate upcoming events section
+ */
+function generateUpcomingEventsSection(date) {
+  return `## 📅 Upcoming Events
+
+\`\`\`dataviewjs
+await dv.view("scripts/calendar-events-widget");
+\`\`\``;
+}
+
+/**
+ * Generate plan navigation section (replacing simple link)
+ */
+function generatePlanNavigationSection(date) {
+  const dateObj = new Date(date + 'T00:00:00');
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const quarter = `Q${Math.ceil((dateObj.getMonth() + 1) / 3)}`;
+
+  // Calculate ISO week number
+  function getISOWeek(date) {
+    const target = new Date(date.valueOf());
+    const dayNr = (date.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const firstThursday = target.valueOf();
+    target.setMonth(0, 1);
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+    }
+    return Math.ceil((firstThursday - target) / 604800000) + 1;
+  }
+  const weekNum = String(getISOWeek(dateObj)).padStart(2, '0');
+
+  const dailyFile = `${year}_${quarter}_${month}_W${weekNum}_${day}`;
+  const weeklyFile = `${year}_${quarter}_${month}_W${weekNum}_00`;
+  const monthlyFile = `${year}_${quarter}_${month}_00`;
+  const quarterlyFile = `${year}_${quarter}_00`;
+  const yearlyFile = `${year}_00`;
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[dateObj.getDay()];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthName = monthNames[dateObj.getMonth()];
+
+  return `## 📅 ${dayName}, ${monthName} ${day}, ${year}
+
+📅 [[plans/${dailyFile}|Today's Plan]] | 📊 [[plans/${weeklyFile}|This Week]] | 📆 [[plans/${monthlyFile}|This Month]] | 🎯 [[plans/${quarterlyFile}|This Quarter]] | 📈 [[plans/${yearlyFile}|This Year]]`;
+}
+
+/**
+ * Generate stage notice section using actual stages plugin configuration
+ */
+function generateStageNoticeSection(date) {
+  try {
+    const dateObj = new Date(date + 'T00:00:00');
+
+    // Read stages plugin configuration from config.toml
+    const configPath = path.join(projectRoot, 'config.toml');
+    if (!fs.existsSync(configPath)) {
+      return null;
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf8');
+
+    // Extract stages plugin config section
+    const stagesSectionMatch = configContent.match(/\[plugins\.stages\.default\]([\s\S]*?)(?=\n\[|$)/);
+    if (!stagesSectionMatch) {
+      return null;
+    }
+
+    const stagesSection = stagesSectionMatch[1];
+
+    // Parse configuration values
+    function getConfigValue(key, defaultValue) {
+      const match = stagesSection.match(new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, 'm'));
+      return match ? match[1] : defaultValue;
+    }
+
+    // Stage definitions from config
+    const stages = {
+      front: {
+        name: getConfigValue('front_stage_name', 'Front Stage'),
+        description: getConfigValue('front_stage_description', 'Outward-facing work: meetings, calls, emails, support, communications'),
+        emoji: '🎬'
+      },
+      back: {
+        name: getConfigValue('back_stage_name', 'Back Stage'),
+        description: getConfigValue('back_stage_description', 'Maintenance work: bills, bug fixes, organizing, admin tasks'),
+        emoji: '🔧'
+      },
+      off: {
+        name: getConfigValue('off_stage_name', 'Off Stage'),
+        description: getConfigValue('off_stage_description', 'Personal time: nature, friends, reading, hobbies, rest'),
+        emoji: '🎨'
+      }
+    };
+
+    // Day-to-stage mapping from config
+    const dayMapping = {
+      monday: getConfigValue('monday', 'front'),
+      tuesday: getConfigValue('tuesday', 'off'),
+      wednesday: getConfigValue('wednesday', 'front'),
+      thursday: getConfigValue('thursday', 'back'),
+      friday: getConfigValue('friday', 'off'),
+      saturday: getConfigValue('saturday', 'front'),
+      sunday: getConfigValue('sunday', 'back')
+    };
+
+    // Get the day name and map to stage
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = days[dateObj.getDay()];
+    const stageKey = dayMapping[dayName] || 'front';
+    const stage = stages[stageKey] || stages.front;
+
+    return `${stage.emoji} **${stage.name}** - ${stage.description}`;
+  } catch (error) {
+    // Fallback to default if config parsing fails
+    return '🎬 **Front Stage** - Outward-facing work: meetings, calls, emails, support, communications';
+  }
+}
+
+/**
+ * Update or add a section in diary file using markers
+ */
+function updateDiarySection(filePath, sectionName, content) {
+  if (!fs.existsSync(filePath)) return false;
+
+  const startMarker = `<!-- TODAY:${sectionName}:START -->`;
+  const endMarker = `<!-- TODAY:${sectionName}:END -->`;
+
+  let fileContent = fs.readFileSync(filePath, 'utf8');
+
+  const newSection = content ? `${startMarker}\n${content}\n${endMarker}` : '';
+
+  // Check if markers already exist
+  const startIndex = fileContent.indexOf(startMarker);
+  const endIndex = fileContent.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = fileContent.substring(0, startIndex);
+    const after = fileContent.substring(endIndex + endMarker.length);
+    fileContent = before + newSection + after;
+  } else if (content) {
+    // Add new section after front matter
+    const frontMatterMatch = fileContent.match(/^---\n[\s\S]*?\n---\n/);
+    if (frontMatterMatch) {
+      const frontMatter = frontMatterMatch[0];
+      const rest = fileContent.substring(frontMatter.length);
+      fileContent = frontMatter + '\n' + newSection + '\n' + rest;
+    } else {
+      // No front matter, add at beginning
+      fileContent = newSection + '\n\n' + fileContent;
+    }
+  }
+
+  fs.writeFileSync(filePath, fileContent, 'utf8');
+  return true;
+}
+
+/**
+ * Create today's diary file if it doesn't exist, with dynamic sections
  * Returns true if file was created, false if it already existed
  */
 function ensureTodaysDiaryFile() {
   const today = getTodayDateString();
   const filePath = path.join(diaryDir, `${today}.md`);
 
-  if (fs.existsSync(filePath)) {
-    return false;
-  }
+  const fileExists = fs.existsSync(filePath);
 
-  // Create minimal front matter template
-  const content = `---
+  if (!fileExists) {
+    // Create minimal front matter template
+    const content = `---
 date: ${today}
+cssclasses: dashboard
 ---
 
 `;
+    fs.writeFileSync(filePath, content, 'utf8');
+  }
 
-  fs.writeFileSync(filePath, content, 'utf8');
-  return true;
+  // Add or update dynamic sections based on enabled plugins
+  // Note: Add in reverse order since new sections are inserted after front matter
+  const timeTrackingEnabled = isPluginEnabled('markdown-time-tracking');
+  const plansEnabled = isPluginEnabled('markdown-plans');
+  const stagesEnabled = isPluginEnabled('stages');
+  const calendarEnabled = isPluginEnabled('google-calendar') || isPluginEnabled('public-calendars');
+
+  if (plansEnabled) {
+    updateDiarySection(filePath, 'PLAN_NAVIGATION', generatePlanNavigationSection(today));
+  }
+
+  if (stagesEnabled) {
+    updateDiarySection(filePath, 'STAGE_NOTICE', generateStageNoticeSection(today));
+  }
+
+  if (timeTrackingEnabled) {
+    updateDiarySection(filePath, 'TIME_TRACKING', generateTimeTrackingSection(today));
+  }
+
+  if (calendarEnabled) {
+    updateDiarySection(filePath, 'UPCOMING_EVENTS', generateUpcomingEventsSection(today));
+  }
+
+  return !fileExists;
 }
 
 /**
@@ -69,23 +310,123 @@ function isEmptyDiaryFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const { body } = parseFrontMatter(content);
 
-    // File is "empty" if body is whitespace-only (no sections, no entries)
-    return body.trim() === '';
+    // Remove all marker comments (<!-- TODAY:*:START --> and <!-- TODAY:*:END -->)
+    const contentWithoutMarkers = body.replace(/<!--\s*TODAY:[^:]+:(START|END)\s*-->/g, '');
+
+    // Remove all auto-generated sections (time tracking widgets, plan navigation, stage notices)
+    let contentWithoutAutoSections = contentWithoutMarkers;
+
+    // Remove time tracking sections
+    contentWithoutAutoSections = contentWithoutAutoSections.replace(/## ⏱️ Time Tracking - Today[\s\S]*?```dataviewjs[\s\S]*?```/g, '');
+
+    // Remove plan navigation sections (with emoji headers and links)
+    contentWithoutAutoSections = contentWithoutAutoSections.replace(/## 📅 [^,]+, [^,]+ \d+, \d+[\s\S]*?📅 \[\[plans\/[^\]]+\]\][\s\S]*?\[\[plans\/[^\]]+\]\]/g, '');
+
+    // Remove stage notice lines (emoji + stage name + focus)
+    contentWithoutAutoSections = contentWithoutAutoSections.replace(/[🎬🔧🎨] \*\*[^*]+\*\* - [^\n]+/g, '');
+
+    // Remove any remaining dataviewjs blocks
+    contentWithoutAutoSections = contentWithoutAutoSections.replace(/```dataviewjs[\s\S]*?```/g, '');
+
+    // Check if what's left is only whitespace, empty sections, or common empty patterns
+    const trimmed = contentWithoutAutoSections.trim();
+
+    // File is empty if:
+    // 1. No content after removing auto-generated sections
+    // 2. Only empty markdown sections (## Title with no content)
+    // 3. Only whitespace and newlines
+    if (trimmed === '') {
+      return true;
+    }
+
+    // Check for files with only empty section headers
+    const linesAfterTrim = trimmed.split('\n').filter(line => line.trim() !== '');
+    const onlyEmptyHeaders = linesAfterTrim.every(line =>
+      line.match(/^#+\s+/) || // Section headers
+      line.match(/^-\s*$/) ||  // Empty bullet points
+      line.trim() === ''       // Whitespace
+    );
+
+    return onlyEmptyHeaders;
   } catch {
     return false;
   }
 }
 
 /**
+ * Remove TODAY sections from old diary files (sections only relevant for current day)
+ */
+function removeTodaySectionsFromOldFiles() {
+  const today = getTodayDateString();
+  const cleaned = [];
+  const skipped = [];
+
+  if (!fs.existsSync(diaryDir)) {
+    return { cleaned, skipped };
+  }
+
+  const files = fs.readdirSync(diaryDir)
+    .filter(f => f.endsWith('.md') && /^\d{4}-\d{2}-\d{2}\.md$/.test(f));
+
+  for (const file of files) {
+    const fileDate = file.replace('.md', '');
+
+    // Skip today's file - keep TODAY sections active
+    if (fileDate === today) {
+      continue;
+    }
+
+    const filePath = path.join(diaryDir, file);
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+
+      // Check if file has any TODAY sections
+      if (!content.includes('<!-- TODAY:')) {
+        continue;
+      }
+
+      const originalSize = Buffer.byteLength(content, 'utf8');
+
+      // Remove all TODAY sections (between START and END markers, including markers)
+      let cleanedContent = content.replace(/<!-- TODAY:[^:]+:START -->[\s\S]*?<!-- TODAY:[^:]+:END -->\n?/g, '');
+
+      // Clean up any extra blank lines that might result from section removal
+      cleanedContent = cleanedContent.replace(/\n\n\n+/g, '\n\n');
+
+      // Only write if content actually changed
+      if (cleanedContent !== content) {
+        fs.writeFileSync(filePath, cleanedContent, 'utf8');
+        const newSize = Buffer.byteLength(cleanedContent, 'utf8');
+
+        cleaned.push({
+          file,
+          date: fileDate,
+          originalSize,
+          newSize,
+          bytesRemoved: originalSize - newSize
+        });
+      }
+    } catch (error) {
+      skipped.push({ file, reason: `processing failed: ${error.message}` });
+    }
+  }
+
+  return { cleaned, skipped };
+}
+
+/**
  * Clean up empty diary files from previous days
- * Only removes files that contain just the auto-generated template
+ * Removes files that contain only auto-generated content (markers, widgets, navigation)
+ * or are completely empty/whitespace-only
  */
 function cleanupEmptyDiaryFiles() {
   const today = getTodayDateString();
   const removed = [];
+  const skipped = [];
 
   if (!fs.existsSync(diaryDir)) {
-    return removed;
+    return { removed, skipped };
   }
 
   const files = fs.readdirSync(diaryDir)
@@ -95,21 +436,30 @@ function cleanupEmptyDiaryFiles() {
     const fileDate = file.replace('.md', '');
 
     // Skip today's file - never remove it
-    if (fileDate === today) continue;
+    if (fileDate === today) {
+      skipped.push({ file, reason: 'current day' });
+      continue;
+    }
 
     const filePath = path.join(diaryDir, file);
 
     if (isEmptyDiaryFile(filePath)) {
       try {
+        const stats = fs.statSync(filePath);
         fs.unlinkSync(filePath);
-        removed.push(file);
-      } catch {
-        // Ignore removal errors
+        removed.push({
+          file,
+          date: fileDate,
+          size: stats.size,
+          lastModified: stats.mtime.toISOString().split('T')[0]
+        });
+      } catch (error) {
+        skipped.push({ file, reason: `deletion failed: ${error.message}` });
       }
     }
   }
 
-  return removed;
+  return { removed, skipped };
 }
 
 /**
@@ -291,8 +641,12 @@ if (!fs.existsSync(diaryDir)) {
   fs.mkdirSync(diaryDir, { recursive: true });
 }
 
+// Remove TODAY sections from old diary files (not relevant after the day passes)
+const sectionCleanupResult = removeTodaySectionsFromOldFiles();
+
 // Clean up empty diary files from previous days
-removedEmptyFiles = cleanupEmptyDiaryFiles();
+const cleanupResult = cleanupEmptyDiaryFiles();
+removedEmptyFiles = cleanupResult.removed;
 
 // Ensure today's diary file exists
 createdTodaysFile = ensureTodaysDiaryFile();
@@ -360,7 +714,15 @@ console.log(JSON.stringify({
     entries_count: entries.length,
     processed: processed.length > 0 ? processed : undefined,
     created_today: createdTodaysFile ? getTodayDateString() + '.md' : undefined,
-    removed_empty: removedEmptyFiles.length > 0 ? removedEmptyFiles : undefined,
+    cleanup: {
+      sections_cleaned: sectionCleanupResult.cleaned.length > 0 ? sectionCleanupResult.cleaned : undefined,
+      removed_empty: removedEmptyFiles.length > 0 ? removedEmptyFiles : undefined,
+      skipped_files: cleanupResult.skipped.length > 0 ? cleanupResult.skipped : undefined,
+      section_cleanup_failed: sectionCleanupResult.skipped.length > 0 ? sectionCleanupResult.skipped : undefined,
+      total_sections_cleaned: sectionCleanupResult.cleaned.length,
+      total_removed: removedEmptyFiles.length,
+      total_skipped: cleanupResult.skipped.length
+    },
     errors: errors.length > 0 ? errors : undefined
   }
 }));

@@ -21,6 +21,7 @@ import {
   checkPluginVaultFileChanges,
   getPluginsWithVaultFiles
 } from '../src/plugin-loader.js';
+import { exportUpcomingEvents } from '../src/export-calendar-events.js';
 import { getAbsoluteVaultPath } from '../src/config.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
@@ -355,6 +356,116 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
     console.log('');
     console.log(colors.cyan('Installing missing vault files...'));
     console.log(colors.red(`✗ Failed to install vault files: ${error.message}`));
+  }
+
+  // Check for updated vault files and offer to install them
+  try {
+    const changes = await checkPluginVaultFileChanges(context.vaultPath);
+    const updates = changes.filter(change => change.status === 'modified');
+
+    if (updates.length > 0) {
+      console.log('');
+      console.log(colors.yellow(`📦 ${updates.length} vault file(s) have updates available:`));
+
+      // Group by plugin for cleaner display
+      const byPlugin = new Map();
+      for (const change of updates) {
+        if (!byPlugin.has(change.plugin)) {
+          byPlugin.set(change.plugin, []);
+        }
+        byPlugin.get(change.plugin).push(change.file);
+      }
+
+      for (const [pluginName, files] of byPlugin) {
+        console.log(colors.bold(`  ${pluginName}:`));
+        for (const file of files) {
+          console.log(colors.gray(`    • ${file}`));
+        }
+      }
+
+      console.log('');
+
+      // Prompt with working timeout mechanism
+      let shouldInstall = false;
+      const isInteractive = process.stdin.isTTY && process.stdout.isTTY && !process.env.CI;
+
+      if (!isInteractive) {
+        console.log(colors.gray('⏱️  Non-interactive environment - skipping updates (run with --force to install automatically)'));
+      } else {
+        try {
+          // Create a promise that rejects after timeout
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('TIMEOUT')), 10000);
+          });
+
+          // Create the user prompt promise
+          const promptPromise = p.confirm({
+            message: 'Install updated files?',
+            initialValue: true
+          });
+
+          // Race the promises - first one to resolve wins
+          const result = await Promise.race([promptPromise, timeoutPromise]);
+          shouldInstall = !p.isCancel(result) && result;
+
+        } catch (error) {
+          if (error.message === 'TIMEOUT') {
+            console.log(colors.gray('\n⏱️  Timeout - skipping updates (run with --force to install automatically)'));
+          } else {
+            console.log(colors.gray('Skipping updates'));
+          }
+          shouldInstall = false;
+        }
+      }
+
+      if (shouldInstall) {
+        console.log('');
+        console.log(colors.cyan('Installing updated vault files...'));
+
+        // Convert detected changes to the format expected by syncPluginVaultFiles
+        const filesToUpdate = updates.map(change => ({
+          plugin: change.plugin,
+          file: change.file
+        }));
+
+        const updateResult = await syncPluginVaultFiles({
+          vaultPath: context.vaultPath,
+          force: true,
+          verbose: false,
+          filesToUpdate: filesToUpdate
+        });
+
+        if (updateResult.installed.length > 0) {
+          console.log(colors.green(`✓ Updated ${updateResult.installed.length} file(s)`));
+          for (const file of updateResult.installed) {
+            console.log(colors.gray(`  ${file}`));
+          }
+        }
+
+        if (updateResult.errors.length > 0) {
+          console.log(colors.red(`✗ ${updateResult.errors.length} error(s) during update:`));
+          for (const error of updateResult.errors) {
+            console.log(colors.red(`  ${error}`));
+          }
+        }
+      } else {
+        console.log(colors.gray('Run `bin/plugins vault-files --install` to update these files manually'));
+      }
+      console.log('');
+    }
+  } catch (error) {
+    console.log('');
+    console.log(colors.cyan('Checking for vault file updates...'));
+    console.log(colors.red(`✗ Failed to check for updates: ${error.message}`));
+  }
+
+  // Export upcoming calendar events to JSON file for Obsidian widget
+  try {
+    await exportUpcomingEvents(context.vaultPath);
+  } catch (error) {
+    console.log('');
+    console.log(colors.cyan('Exporting calendar events...'));
+    console.log(colors.red(`✗ Failed to export calendar events: ${error.message}`));
   }
 
   // Force WAL checkpoint to ensure all writes are visible to other processes
