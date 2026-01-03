@@ -78,6 +78,7 @@ function setEnvVar(key, value) {
 // AI provider to env var mapping
 const AI_PROVIDER_ENV_VARS = {
   anthropic: { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
+  'anthropic-api': { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
   openai: { key: 'OPENAI_API_KEY', label: 'OpenAI API Key' },
   gemini: { key: 'GOOGLE_API_KEY', label: 'Google API Key' },
   ollama: null, // Local, no key needed
@@ -137,6 +138,7 @@ function getModelOptionsForProvider(provider) {
     case 'ollama':
       return getOllamaModels();
     case 'anthropic':
+    case 'anthropic-api':
       return [
         { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
         { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
@@ -229,6 +231,7 @@ const CONFIG_SECTIONS = [
         type: 'select',
         options: [
           { value: 'anthropic', label: 'Anthropic Claude (uses Claude CLI)' },
+          { value: 'anthropic-api', label: 'Anthropic Claude (uses API key)' },
           { value: 'ollama', label: 'Ollama (Local models)' },
           { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
           { value: 'gemini', label: 'Google Gemini' },

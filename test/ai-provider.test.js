@@ -78,18 +78,34 @@ describe('AI Provider (Vercel AI SDK)', () => {
   });
 
   describe('getInteractiveModel', () => {
-    test('returns default interactive model (sonnet)', () => {
+    test('returns default interactive model based on provider', () => {
       getFullConfig.mockReturnValue({});
 
-      expect(getInteractiveModel()).toBe('sonnet');
+      expect(getInteractiveModel()).toBe('claude-sonnet-4-20250514');
+    });
+
+    test('returns default model for anthropic-api provider', () => {
+      getFullConfig.mockReturnValue({
+        ai: { interactive_provider: 'anthropic-api' }
+      });
+
+      expect(getInteractiveModel()).toBe('claude-sonnet-4-20250514');
+    });
+
+    test('returns default model for ollama provider', () => {
+      getFullConfig.mockReturnValue({
+        ai: { interactive_provider: 'ollama' }
+      });
+
+      expect(getInteractiveModel()).toBe('llama3.2');
     });
 
     test('returns configured interactive model', () => {
       getFullConfig.mockReturnValue({
-        ai: { interactive_model: 'opus' }
+        ai: { interactive_model: 'claude-opus-4-20250514' }
       });
 
-      expect(getInteractiveModel()).toBe('opus');
+      expect(getInteractiveModel()).toBe('claude-opus-4-20250514');
     });
   });
 

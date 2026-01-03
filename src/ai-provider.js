@@ -89,6 +89,7 @@ async function getOllamaModel(modelName, options = {}) {
 // Default models for each provider
 const DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-20250514',
+  'anthropic-api': 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
   google: 'gemini-1.5-flash',
   ollama: 'llama3.2',
@@ -163,6 +164,7 @@ async function getOllamaContextLimit(modelName, aiConfig = {}) {
 // Model name patterns for each provider (to detect mismatched configs)
 const PROVIDER_MODEL_PATTERNS = {
   anthropic: /^(claude|sonnet|opus|haiku)/i,
+  'anthropic-api': /^(claude|sonnet|opus|haiku)/i,
   openai: /^(gpt|o1|o3|davinci|curie|babbage|ada)/i,
   google: /^(gemini|palm|bard)/i,
   ollama: /^(llama|mistral|codellama|phi|qwen|deepseek|gemma|vicuna|neural|wizard|orca|stable|dolphin|openchat|zephyr|solar|yi|command)/i,
@@ -198,6 +200,7 @@ async function getConfiguredModel(options = {}) {
 
   switch (providerName) {
     case 'anthropic':
+    case 'anthropic-api':
       return getAnthropicModel(modelName);
     case 'openai':
       return getOpenAIModel(modelName, {
@@ -212,7 +215,7 @@ async function getConfiguredModel(options = {}) {
         baseURL: aiConfig.ollama?.base_url || aiConfig.ollama?.baseURL,
       });
     default:
-      throw new Error(`Unknown AI provider: ${providerName}. Available: anthropic, openai, google, ollama`);
+      throw new Error(`Unknown AI provider: ${providerName}. Available: anthropic, anthropic-api, openai, google, ollama`);
   }
 }
 
@@ -344,6 +347,7 @@ export async function isAIAvailable() {
   try {
     switch (providerName) {
       case 'anthropic':
+      case 'anthropic-api':
         return !!(process.env.ANTHROPIC_API_KEY || process.env.TODAY_ANTHROPIC_KEY);
       case 'openai':
         return !!(process.env.OPENAI_API_KEY || aiConfig.openai?.api_key);
@@ -390,7 +394,10 @@ export function getInteractiveProviderName() {
  */
 export function getInteractiveModel() {
   const config = getFullConfig();
-  return config.ai?.interactive_model || 'sonnet';
+  const interactiveProvider = config.ai?.interactive_provider || 'anthropic';
+  // Map anthropic-api to anthropic for DEFAULT_MODELS lookup
+  const providerKey = interactiveProvider === 'anthropic-api' ? 'anthropic' : interactiveProvider;
+  return config.ai?.interactive_model || DEFAULT_MODELS[providerKey] || DEFAULT_MODELS.anthropic;
 }
 
 /**
@@ -484,7 +491,7 @@ const INTERACTIVE_PROVIDER_REQUIREMENTS = {
     ],
   },
   // API-only providers don't need binaries for interactive use
-  // (though they may not support interactive mode yet)
+  'anthropic-api': null, // Uses API key directly with built-in chat
   openai: null,
   google: null,
   gemini: null,
