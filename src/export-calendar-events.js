@@ -5,8 +5,31 @@
 
 import { getDatabase } from './database-service.js';
 import { getFullConfig } from './config.js';
+import { parseISO, format } from 'date-fns';
+import { TZDate } from '@date-fns/tz';
 import fs from 'fs';
 import path from 'path';
+
+/**
+ * Convert database time to proper timezone-aware ISO string
+ * @param {string} dateTime - Database datetime string
+ * @param {string} timezone - Event timezone (e.g., "America/New_York")
+ * @param {string} defaultTimezone - Default timezone from config
+ * @returns {string} Properly formatted ISO string
+ */
+function convertDatabaseTime(dateTime, timezone, defaultTimezone) {
+  if (!dateTime) return null;
+
+  // Use the event's timezone if available, otherwise fall back to default
+  const tz = timezone || defaultTimezone;
+
+  // Parse the database time and interpret it in the event's timezone
+  const parsed = parseISO(dateTime);
+  const tzDate = new TZDate(parsed, tz);
+
+  // Return as ISO string that maintains timezone context
+  return format(tzDate, "yyyy-MM-dd'T'HH:mm:ss");
+}
 
 /**
  * Export upcoming events to JSON file for Obsidian widget
@@ -36,6 +59,8 @@ export async function exportUpcomingEvents(vaultPath, daysAhead = 30) {
         title,
         start_date,
         end_date,
+        start_timezone,
+        end_timezone,
         location,
         description,
         all_day
@@ -48,8 +73,8 @@ export async function exportUpcomingEvents(vaultPath, daysAhead = 30) {
     const transformedEvents = events.map(event => ({
       id: event.id,
       title: event.title || 'Untitled Event',
-      start: event.start_date,
-      end: event.end_date,
+      start: convertDatabaseTime(event.start_date, event.start_timezone, timezone),
+      end: convertDatabaseTime(event.end_date, event.end_timezone, timezone),
       location: event.location || '',
       description: event.description || '',
       calendar: event.calendar_name || event.source,
