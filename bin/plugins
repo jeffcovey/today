@@ -326,32 +326,34 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
   }
 
   // Install any missing vault files from enabled plugins
-  console.log('');
-  console.log(colors.cyan('Installing missing vault files...'));
   try {
     const vaultResult = await syncPluginVaultFiles({
       vaultPath: context.vaultPath,
       verbose: false
     });
 
-    if (vaultResult.installed.length > 0) {
-      console.log(colors.green(`✓ Installed ${vaultResult.installed.length} vault files`));
-      for (const file of vaultResult.installed) {
-        console.log(colors.gray(`  ${file}`));
-      }
-    } else if (vaultResult.skipped.length > 0) {
-      console.log(colors.gray(`✓ All vault files already exist (${vaultResult.skipped.length} checked)`));
-    } else {
-      console.log(colors.gray('✓ No vault files to install'));
-    }
+    // Only show output if there's something to report
+    if (vaultResult.installed.length > 0 || vaultResult.errors.length > 0) {
+      console.log('');
+      console.log(colors.cyan('Installing missing vault files...'));
 
-    if (vaultResult.errors.length > 0) {
-      console.log(colors.yellow(`⚠ ${vaultResult.errors.length} errors during vault file installation:`));
-      for (const error of vaultResult.errors) {
-        console.log(colors.red(`  ${error}`));
+      if (vaultResult.installed.length > 0) {
+        console.log(colors.green(`✓ Installed ${vaultResult.installed.length} vault files`));
+        for (const file of vaultResult.installed) {
+          console.log(colors.gray(`  ${file}`));
+        }
+      }
+
+      if (vaultResult.errors.length > 0) {
+        console.log(colors.yellow(`⚠ ${vaultResult.errors.length} errors during vault file installation:`));
+        for (const error of vaultResult.errors) {
+          console.log(colors.red(`  ${error}`));
+        }
       }
     }
   } catch (error) {
+    console.log('');
+    console.log(colors.cyan('Installing missing vault files...'));
     console.log(colors.red(`✗ Failed to install vault files: ${error.message}`));
   }
 

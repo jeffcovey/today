@@ -1,0 +1,566 @@
+#!/usr/bin/env node
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate, formatDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+import { execSync } from 'child_process';
+
+program
+  .name('finance')
+  .description('Financial data for Today system');
+
+// Helper to format currency
+function formatCurrency(amount) {
+  const isNegative = amount < 0;
+  const abs = Math.abs(amount);
+  const formatted = `$${abs.toFixed(2)}`;
+  return isNegative ? `-${formatted}` : formatted;
+}
+
+// Helper to format amounts with color
+function formatAmount(amount) {
+  if (amount === 0) return colors.gray(formatCurrency(amount));
+  if (amount > 0) return colors.green(formatCurrency(amount));
+  return colors.red(formatCurrency(amount));
+}
+
+// Sync command
+program
+  .command('sync')
+  .description('Sync financial data from all enabled finance plugins')
+  .action(async () => {
+    console.log(colors.blue('ℹ') + ' Syncing finance plugins to database...');
+
+    try {
+      const result = execSync('bin/plugins sync --type finance', { encoding: 'utf8' });
+      const lines = result.split('\\n').filter(l => !l.includes('[dotenvx'));
+      console.log(lines.join('\\n'));
+    } catch (error) {
+      if (error.stdout?.includes('No plugins of type')) {
+        console.log(colors.yellow('⚠') + ' No finance plugins are enabled.');
+        console.log('');
+        console.log('To sync financial data, configure a plugin:');
+        console.log('');
+        console.log('  ' + colors.cyan('bin/plugins configure'));
+      } else {
+        console.error(colors.red('✗') + ' Sync failed:', error.message);
+        process.exit(1);
+      }
+    }
+  });
+
+// Recent command - show recent transactions
+program
+  .command('recent')
+  .description('Show recent financial transactions')
+  .option('-d, --days <days>', 'Number of days to show', '30')
+  .option('--limit <limit>', 'Maximum number of transactions', '20')
+  .option('--source <source>', 'Filter by plugin source')
+  .option('--account <account>', 'Filter by account name')
+  .option('--category <category>', 'Filter by category')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'finance');
+
+    const days = parseInt(options.days);
+    const limit = parseInt(options.limit);
+
+    let sql = `
+      SELECT date, account, payee, category, amount, memo, cleared
+      FROM financial_transactions
+      WHERE date >= DATE('now', '-${days} days')
+    `;
+    const params = [];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    if (options.account) {
+      sql += ` AND account LIKE ?`;
+      params.push(`%${options.account}%`);
+    }
+
+    if (options.category) {
+      sql += ` AND category LIKE ?`;
+      params.push(`%${options.category}%`);
+    }
+
+    sql += ` ORDER BY date DESC, amount DESC LIMIT ${limit}`;
+
+    const transactions = db.prepare(sql).all(...params);
+
+    if (transactions.length === 0) {
+      console.log(colors.blue('ℹ') + ` No transactions found in the last ${days} days`);
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan(`Recent Transactions (last ${days} days)`));
+    console.log('');
+
+    for (const tx of transactions) {
+      const date = colors.gray(tx.date);
+      const amount = formatAmount(tx.amount);
+      const account = colors.blue(tx.account);
+      const payee = tx.payee || '';
+      const category = tx.category ? colors.yellow(tx.category) : '';
+      const cleared = tx.cleared === 'Cleared' ? colors.green('✓') : colors.gray('○');
+
+      console.log(`${cleared} ${date} ${amount.padEnd(12)} ${account}`);
+      if (payee) console.log(`    ${payee} ${category}`);
+      if (tx.memo) console.log(`    ${colors.gray(tx.memo)}`);
+      console.log('');
+    }
+
+    console.log(colors.gray(`${transactions.length} transactions shown`));
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Summary command - show financial summary
+program
+  .command('summary')
+  .description('Show financial summary by category and account')
+  .option('-d, --days <days>', 'Number of days to analyze', '30')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'finance');
+
+    const days = parseInt(options.days);
+    const today = getTodayDate();
+
+    let whereClause = `WHERE date >= DATE('now', '-${days} days')`;
+    const params = [];
+
+    if (options.source) {
+      whereClause += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    // Total income/expenses
+    const totals = db.prepare(`
+      SELECT
+        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as total_income,
+        SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) as total_expenses,
+        SUM(amount) as net_total,
+        COUNT(*) as transaction_count
+      FROM financial_transactions ${whereClause}
+    `).get(...params);
+
+    // By category
+    const byCategory = db.prepare(`
+      SELECT category, category_group, SUM(amount) as total, COUNT(*) as count
+      FROM financial_transactions ${whereClause}
+      GROUP BY category, category_group
+      HAVING total != 0
+      ORDER BY ABS(total) DESC
+      LIMIT 10
+    `).all(...params);
+
+    // By account
+    const byAccount = db.prepare(`
+      SELECT account, SUM(amount) as total, COUNT(*) as count
+      FROM financial_transactions ${whereClause}
+      GROUP BY account
+      HAVING total != 0
+      ORDER BY ABS(total) DESC
+    `).all(...params);
+
+    console.log('');
+    console.log(colors.cyan(`Financial Summary (last ${days} days)`));
+    console.log(colors.gray('─'.repeat(50)));
+    console.log('');
+
+    // Overall totals
+    console.log(colors.bold('Overall'));
+    console.log(`  Income:     ${formatAmount(totals.total_income || 0)}`);
+    console.log(`  Expenses:   ${formatAmount(totals.total_expenses || 0)}`);
+    console.log(`  Net Total:  ${formatAmount(totals.net_total || 0)}`);
+    console.log(`  Transactions: ${totals.transaction_count || 0}`);
+    console.log('');
+
+    // By category
+    if (byCategory.length > 0) {
+      console.log(colors.bold('By Category (top 10)'));
+      for (const cat of byCategory) {
+        const category = cat.category || 'Uncategorized';
+        const group = cat.category_group ? ` (${cat.category_group})` : '';
+        console.log(`  ${formatAmount(cat.total).padEnd(12)} ${category}${group} (${cat.count} txns)`);
+      }
+      console.log('');
+    }
+
+    // By account
+    if (byAccount.length > 0) {
+      console.log(colors.bold('By Account'));
+      for (const acc of byAccount) {
+        console.log(`  ${formatAmount(acc.total).padEnd(12)} ${acc.account} (${acc.count} txns)`);
+      }
+      console.log('');
+    }
+
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Categories command - list all categories
+program
+  .command('categories')
+  .description('List all transaction categories')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'finance');
+
+    let sql = `
+      SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
+      FROM financial_transactions
+    `;
+    const params = [];
+
+    if (options.source) {
+      sql += ` WHERE source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += `
+      GROUP BY category, category_group
+      ORDER BY category_group, category
+    `;
+
+    const categories = db.prepare(sql).all(...params);
+
+    if (categories.length === 0) {
+      console.log(colors.blue('ℹ') + ' No categories found');
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan('Transaction Categories'));
+    console.log('');
+
+    let currentGroup = null;
+    for (const cat of categories) {
+      const group = cat.category_group || 'Uncategorized';
+
+      if (group !== currentGroup) {
+        console.log(colors.bold(group));
+        currentGroup = group;
+      }
+
+      const category = cat.category || 'Uncategorized';
+      const total = formatAmount(cat.total);
+      console.log(`  ${category.padEnd(30)} ${total.padEnd(12)} (${cat.count} txns)`);
+    }
+
+    console.log('');
+    console.log(colors.gray(`${categories.length} categories`));
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Accounts command - list all accounts
+program
+  .command('accounts')
+  .description('List all accounts')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'finance');
+
+    let sql = `
+      SELECT account, COUNT(*) as count, SUM(amount) as balance,
+             MIN(date) as first_transaction, MAX(date) as last_transaction
+      FROM financial_transactions
+    `;
+    const params = [];
+
+    if (options.source) {
+      sql += ` WHERE source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += `
+      GROUP BY account
+      ORDER BY account
+    `;
+
+    const accounts = db.prepare(sql).all(...params);
+
+    if (accounts.length === 0) {
+      console.log(colors.blue('ℹ') + ' No accounts found');
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan('Accounts'));
+    console.log('');
+
+    for (const acc of accounts) {
+      const balance = formatAmount(acc.balance);
+      console.log(`${colors.bold(acc.account)}`);
+      console.log(`  Balance: ${balance} (${acc.count} transactions)`);
+      console.log(`  Period:  ${acc.first_transaction} to ${acc.last_transaction}`);
+      console.log('');
+    }
+
+    console.log(colors.gray(`${accounts.length} accounts`));
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Budget command - show budget data with various views
+program
+  .command('budget')
+  .description('Show budget data (default: overview for current month)')
+  .option('-m, --month <month>', 'Month to show (YYYY-MM format)', '')
+  .option('--source <source>', 'Filter by plugin source')
+  .option('--summary', 'Show performance summary with over/under budget analysis')
+  .option('--categories', 'List all budget categories for the month')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'finance');
+
+    let month;
+    if (options.month) {
+      // Convert YYYY-MM to YYYY-MM-01 format
+      month = options.month.length === 7 ? options.month + '-01' : options.month;
+    } else {
+      month = new Date().toISOString().split('T')[0].substring(0, 7) + '-01';
+    }
+
+    let whereClause = 'WHERE month = ?';
+    const params = [month];
+
+    if (options.source) {
+      whereClause += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    // Categories view
+    if (options.categories) {
+      const categories = db.prepare(`
+        SELECT category, category_group, assigned, activity, available
+        FROM budget_allocations ${whereClause}
+        ORDER BY category_group, category
+      `).all(...params);
+
+      if (categories.length === 0) {
+        console.log(colors.blue('ℹ') + ` No budget categories found for ${month.substring(0, 7)}`);
+        return;
+      }
+
+      console.log('');
+      console.log(colors.cyan(`Budget Categories - ${month.substring(0, 7)}`));
+      console.log('');
+
+      // Filter out categories where all amounts are zero
+      const nonZeroCategories = categories.filter(cat =>
+        cat.assigned !== 0 || cat.activity !== 0 || cat.available !== 0
+      );
+
+      // Group the non-zero categories by category group
+      const groupedCategories = {};
+      for (const cat of nonZeroCategories) {
+        const group = cat.category_group || 'Uncategorized';
+        if (!groupedCategories[group]) {
+          groupedCategories[group] = [];
+        }
+        groupedCategories[group].push(cat);
+      }
+
+      // Display each group that has non-zero categories
+      for (const [groupName, groupCategories] of Object.entries(groupedCategories)) {
+        console.log(colors.bold(groupName));
+
+        for (const cat of groupCategories) {
+          const category = cat.category || 'Uncategorized';
+          const assigned = formatAmount(cat.assigned);
+          const activity = formatAmount(cat.activity);
+          const available = formatAmount(cat.available);
+
+          console.log(`  ${category.padEnd(30)} ${assigned.padEnd(12)} ${activity.padEnd(12)} ${available}`);
+        }
+      }
+
+      console.log('');
+      console.log(colors.gray(`${nonZeroCategories.length} non-zero categories for ${month.substring(0, 7)} (${categories.length} total)`));
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    // Summary view
+    if (options.summary) {
+      // Overall totals
+      const totals = db.prepare(`
+        SELECT
+          SUM(assigned) as total_assigned,
+          SUM(activity) as total_activity,
+          SUM(available) as total_available,
+          COUNT(*) as category_count
+        FROM budget_allocations ${whereClause}
+      `).get(...params);
+
+      // Over budget categories
+      const overBudget = db.prepare(`
+        SELECT category, category_group, assigned, activity, available,
+               ROUND((ABS(activity) / NULLIF(assigned, 0)) * 100, 1) as percent_used
+        FROM budget_allocations ${whereClause}
+        AND assigned > 0 AND available < 0
+        ORDER BY percent_used DESC
+        LIMIT 10
+      `).all(...params);
+
+      // Under budget categories
+      const underBudget = db.prepare(`
+        SELECT category, category_group, assigned, activity, available,
+               ROUND((ABS(activity) / NULLIF(assigned, 0)) * 100, 1) as percent_used
+        FROM budget_allocations ${whereClause}
+        AND assigned > 0 AND available > 0 AND activity != 0
+        ORDER BY available DESC
+        LIMIT 10
+      `).all(...params);
+
+      // By category group
+      const byGroup = db.prepare(`
+        SELECT category_group, SUM(assigned) as total_assigned,
+               SUM(activity) as total_activity, SUM(available) as total_available
+        FROM budget_allocations ${whereClause}
+        GROUP BY category_group
+        ORDER BY total_assigned DESC
+      `).all(...params);
+
+      console.log('');
+      console.log(colors.cyan(`Budget Performance Summary - ${month.substring(0, 7)}`));
+      console.log(colors.gray('─'.repeat(60)));
+      console.log('');
+
+      // Overall performance
+      console.log(colors.bold('Overall Performance'));
+      console.log(`  Total Assigned: ${formatAmount(totals.total_assigned || 0)}`);
+      console.log(`  Total Activity: ${formatAmount(totals.total_activity || 0)}`);
+      console.log(`  Total Available: ${formatAmount(totals.total_available || 0)}`);
+      console.log(`  Categories: ${totals.category_count || 0}`);
+      console.log('');
+
+      // Over budget
+      if (overBudget.length > 0) {
+        console.log(colors.bold('Over Budget Categories'));
+        for (const cat of overBudget) {
+          const category = cat.category || 'Uncategorized';
+          const group = cat.category_group ? ` (${cat.category_group})` : '';
+          console.log(`  ${colors.red(formatAmount(cat.available).padEnd(12))} ${category}${group} ${colors.red(`(${cat.percent_used}%)`)}`);
+        }
+        console.log('');
+      }
+
+      // Under budget
+      if (underBudget.length > 0) {
+        console.log(colors.bold('Under Budget Categories (top remaining)'));
+        for (const cat of underBudget) {
+          const category = cat.category || 'Uncategorized';
+          const group = cat.category_group ? ` (${cat.category_group})` : '';
+          console.log(`  ${colors.green(formatAmount(cat.available).padEnd(12))} ${category}${group} ${colors.gray(`(${cat.percent_used}% used)`)}`);
+        }
+        console.log('');
+      }
+
+      // By group - filter out groups with all zero amounts
+      const nonZeroGroups = byGroup.filter(group =>
+        group.total_assigned !== 0 || group.total_activity !== 0 || group.total_available !== 0
+      );
+
+      if (nonZeroGroups.length > 0) {
+        console.log(colors.bold('By Category Group'));
+        for (const group of nonZeroGroups) {
+          const groupName = group.category_group || 'Uncategorized';
+          const assigned = formatAmount(group.total_assigned);
+          const activity = formatAmount(group.total_activity);
+          const available = formatAmount(group.total_available);
+          console.log(`  ${groupName.padEnd(20)} ${assigned.padEnd(10)} ${activity.padEnd(10)} ${available}`);
+        }
+        console.log('');
+      }
+
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    // Default overview
+    const allocations = db.prepare(`
+      SELECT category_group, category, assigned, activity, available
+      FROM budget_allocations ${whereClause}
+      ORDER BY category_group, category
+    `).all(...params);
+
+    if (allocations.length === 0) {
+      console.log(colors.blue('ℹ') + ` No budget data found for ${month.substring(0, 7)}`);
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    // Calculate totals
+    const totals = allocations.reduce((acc, alloc) => {
+      acc.assigned += alloc.assigned;
+      acc.activity += alloc.activity;
+      acc.available += alloc.available;
+      return acc;
+    }, { assigned: 0, activity: 0, available: 0 });
+
+    console.log('');
+    console.log(colors.cyan(`Budget Overview - ${month.substring(0, 7)}`));
+    console.log(colors.gray('─'.repeat(60)));
+    console.log('');
+
+    // Overall totals
+    console.log(colors.bold('Summary'));
+    console.log(`  Assigned:   ${formatAmount(totals.assigned)}`);
+    console.log(`  Activity:   ${formatAmount(totals.activity)}`);
+    console.log(`  Available:  ${formatAmount(totals.available)}`);
+    console.log('');
+
+    // By category group - filter out zero-amount categories
+    const nonZeroAllocations = allocations.filter(alloc =>
+      alloc.assigned !== 0 || alloc.activity !== 0 || alloc.available !== 0
+    );
+
+    // Group the non-zero allocations by category group
+    const groupedAllocations = {};
+    for (const alloc of nonZeroAllocations) {
+      const group = alloc.category_group || 'Uncategorized';
+      if (!groupedAllocations[group]) {
+        groupedAllocations[group] = [];
+      }
+      groupedAllocations[group].push(alloc);
+    }
+
+    // Display each group that has non-zero categories
+    for (const [groupName, groupAllocations] of Object.entries(groupedAllocations)) {
+      console.log(colors.bold(groupName));
+
+      for (const alloc of groupAllocations) {
+        const category = alloc.category || 'Uncategorized';
+        const assigned = formatAmount(alloc.assigned);
+        const activity = formatAmount(alloc.activity);
+        const available = formatAmount(alloc.available);
+
+        // Show percentage used if assigned amount > 0
+        let usage = '';
+        if (alloc.assigned > 0) {
+          const percent = Math.round((Math.abs(alloc.activity) / alloc.assigned) * 100);
+          const color = percent > 100 ? colors.red : percent > 80 ? colors.yellow : colors.green;
+          usage = ` ${color(`(${percent}%)`)}`;
+        }
+
+        console.log(`  ${category.padEnd(25)} ${assigned.padEnd(10)} ${activity.padEnd(10)} ${available}${usage}`);
+      }
+    }
+
+    console.log('');
+    console.log(colors.gray(`${nonZeroAllocations.length} non-zero categories (${allocations.length} total)`));
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+program.parse();

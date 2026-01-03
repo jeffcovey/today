@@ -860,6 +860,107 @@ Common metric names:
 
   // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
 
+  'finance': {
+    table: 'financial_transactions',
+    staleMinutes: 60, // Financial data doesn't change frequently
+    ai: {
+      name: 'Financial Data',
+      description: `Financial data from budgeting and banking systems (YNAB, bank exports, etc.).
+Each entry represents a financial transaction with account, category, and amount information.
+Use this data to understand spending patterns, budget adherence, and financial health.
+Transaction amounts use positive values for inflows (income) and negative for outflows (expenses).`,
+      defaultCommand: 'bin/finance recent ; bin/finance summary',
+      dateCommand: 'bin/finance --date $DATE',
+      queryInstructions: `Commands: bin/finance recent, bin/finance summary, bin/finance categories, bin/finance accounts
+SQL: SELECT date, payee, category, amount, account FROM financial_transactions WHERE date >= DATE('now', '-30 days') ORDER BY date DESC`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (generated from transaction details if not provided)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., ynab-finance/default)'
+      },
+      date: {
+        sqlType: 'DATE NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Transaction date (YYYY-MM-DD)'
+      },
+      account: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Account name (e.g., "Chase Checking", "Apple Card")'
+      },
+      payee: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Who the transaction was with'
+      },
+      category: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Category or subcategory for the transaction'
+      },
+      category_group: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Higher-level category group'
+      },
+      amount: {
+        sqlType: 'REAL NOT NULL',
+        jsType: 'number',
+        required: true,
+        description: 'Transaction amount (positive for income, negative for expenses)'
+      },
+      memo: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Additional notes or memo for the transaction'
+      },
+      cleared: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Cleared status (Cleared, Uncleared, Reconciled)'
+      },
+      flag: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Flag color or status for the transaction'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (import_id, transfer_info, etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'date', 'account', 'category']
+  },
+
+
   'utility': {
     // Utility plugins perform maintenance tasks and don't store data
     // They have no AI context (ai: null) because there's nothing to query

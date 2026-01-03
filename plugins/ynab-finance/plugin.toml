@@ -1,0 +1,68 @@
+# YNAB Finance Plugin
+# Syncs transaction data from YNAB CSV exports
+
+name = "ynab-finance"
+displayName = "YNAB Finance"
+description = "Financial transaction data from YNAB budget exports"
+type = "finance"
+
+longDescription = """
+Syncs financial transaction data and budget allocations from YNAB (You Need A Budget) CSV exports.
+
+Setup:
+1. Export your YNAB data by going to Budget Settings > Export Budget Data
+2. Save both "Register.csv" and "Plan.csv" files to your vault/logs directory
+3. The plugin will automatically detect and process both YNAB export files
+
+YNAB exports two types of files:
+- Register.csv: All transactions (processed into financial_transactions table)
+- Plan.csv: Budget allocation data (processed into budget_allocations table)
+
+Export files are named: "Budget Name as of YYYY-MM-DD HH-MM - Register.csv" and "Budget Name as of YYYY-MM-DD HH-MM - Plan.csv"
+
+Features:
+- Processes transactions from the latest Register.csv export
+- Processes budget allocations from the latest Plan.csv export
+- Converts YNAB format to standardized financial data format
+- Optionally cleans up old export files after processing
+- Handles cleared/uncleared status and transaction flags
+- Supports budget performance analysis with bin/finance budget commands
+"""
+
+aiInstructions = """
+YNAB data includes both transaction data and budget allocation data.
+
+Transaction data (financial_transactions table):
+- Amounts: Negative for expenses (outflows), positive for income (inflows)
+- Categories: Organized into category groups (e.g., "Food: Groceries")
+- Accounts: Credit cards, checking, savings, etc.
+- Cleared status: Shows if transactions have been reconciled
+
+Budget allocation data (budget_allocations table):
+- Monthly budget planning and performance tracking
+- Assigned: Amount budgeted for each category per month
+- Activity: Actual spending in each category
+- Available: Remaining budget (assigned + activity)
+
+Query recent spending:
+  SELECT payee, category, amount, date FROM financial_transactions
+  WHERE amount < 0 AND date > DATE('now', '-30 days')
+  ORDER BY amount ASC LIMIT 20
+
+Budget vs actual analysis:
+  SELECT category, assigned, activity, available,
+         ROUND((ABS(activity) / NULLIF(assigned, 0)) * 100, 1) as percent_used
+  FROM budget_allocations
+  WHERE month = DATE('now', 'start of month') AND assigned > 0
+  ORDER BY percent_used DESC
+
+Commands: bin/finance recent, bin/finance summary, bin/finance budget
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+logs_directory = { type = "string", default = "vault/logs", description = "Directory containing YNAB CSV export files" }
+cleanup_old_files = { type = "boolean", default = true, description = "Delete all YNAB export files except the latest Register.csv after reading" }
+retention_days = { type = "number", default = 365, description = "Days of transaction data to retain in database" }
