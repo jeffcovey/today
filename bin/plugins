@@ -6,6 +6,7 @@ autoDotenvx();
 
 import fs from 'fs';
 import os from 'os';
+import readline from 'readline';
 import { execSync } from 'child_process';
 import * as p from '@clack/prompts';
 import color from 'picocolors';
@@ -393,27 +394,41 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
         console.log(colors.gray('⏱️  Non-interactive environment - skipping updates (run with --force to install automatically)'));
       } else {
         try {
-          // Create a promise that rejects after timeout
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('TIMEOUT')), 10000);
-          });
+          // Use native readline with proper timeout control
+          shouldInstall = await new Promise((resolve) => {
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout
+            });
 
-          // Create the user prompt promise
-          const promptPromise = p.confirm({
-            message: 'Install updated files?',
-            initialValue: true
-          });
+            let resolved = false;
 
-          // Race the promises - first one to resolve wins
-          const result = await Promise.race([promptPromise, timeoutPromise]);
-          shouldInstall = !p.isCancel(result) && result;
+            // Auto-timeout after 10 seconds
+            const timeoutId = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                console.log(colors.gray('\n⏱️  Timeout - skipping updates (run with --force to install automatically)'));
+                rl.close();
+                resolve(false);
+              }
+            }, 10000);
+
+            // Ask the question
+            rl.question(colors.cyan('Install updated files? ') + colors.gray('(Y/n): '), (answer) => {
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeoutId);
+                rl.close();
+
+                const response = answer.toLowerCase().trim();
+                const shouldInstallFiles = response === '' || response === 'y' || response === 'yes';
+                resolve(shouldInstallFiles);
+              }
+            });
+          });
 
         } catch (error) {
-          if (error.message === 'TIMEOUT') {
-            console.log(colors.gray('\n⏱️  Timeout - skipping updates (run with --force to install automatically)'));
-          } else {
-            console.log(colors.gray('Skipping updates'));
-          }
+          console.log(colors.gray('Skipping updates'));
           shouldInstall = false;
         }
       }
