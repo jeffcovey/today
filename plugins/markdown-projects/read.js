@@ -164,11 +164,9 @@ function extractDescription(content) {
 // Process project files
 const projectFiles = findProjectFiles(rootDir);
 const entries = [];
-const filesProcessed = [];
 
 for (const filePath of projectFiles) {
   const relativePath = path.relative(projectRoot, filePath);
-  filesProcessed.push(relativePath);
 
   let content;
   try {
@@ -271,7 +269,8 @@ for (const filePath of projectFiles) {
 }
 
 // Output JSON
+// Note: We intentionally don't include files_processed to force full sync.
+// This ensures stale entries are cleaned up when project files are renamed/deleted.
 console.log(JSON.stringify({
-  entries,
-  files_processed: filesProcessed
+  entries
 }));
