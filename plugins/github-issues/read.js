@@ -18,7 +18,8 @@ delete process.env.GH_ENTERPRISE_TOKEN;
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const repository = config.repository;
 const includeClosedConfig = config.include_closed;
-const limit = config.limit || 100;
+const limit = config.limit || 1000; // Increased default limit to handle large repos
+const sourceId = process.env.SOURCE_ID || '';
 
 if (!repository) {
   console.error(JSON.stringify({
@@ -52,19 +53,75 @@ try {
 const includeClosed = includeClosedConfig === true || includeClosedConfig === 'true';
 const stateFilter = includeClosed ? 'all' : 'open';
 
+// Function to get total count from GitHub
+function getGitHubTotalCount() {
+  try {
+    const countCmd = `gh issue list --repo ${repository} --state ${stateFilter} --limit 1000 | wc -l`;
+    const result = execSync(countCmd, { encoding: 'utf8' });
+    return parseInt(result.trim());
+  } catch (error) {
+    console.error(`Warning: Could not get total count from GitHub: ${error.message}`, { stderr: true });
+    return null;
+  }
+}
+
+// Function to get local count from database (if available)
+function getLocalCount() {
+  try {
+    const projectRoot = process.env.PROJECT_ROOT || '';
+    if (!projectRoot) return 0;
+
+    const state_condition = includeClosed ? "state IN ('open', 'closed')" : "state = 'open'";
+    const countCmd = `sqlite3 "${projectRoot}/.data/today.db" "SELECT COUNT(*) FROM issues WHERE source = '${sourceId}' AND ${state_condition}"`;
+    const result = execSync(countCmd, { encoding: 'utf8' });
+    return parseInt(result.trim()) || 0;
+  } catch (error) {
+    // Don't fail if we can't get local count - just assume 0
+    return 0;
+  }
+}
+
 // Check for incremental sync - use LAST_SYNC_TIME from plugin loader
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 let searchFilter = '';
 let isIncremental = false;
+let forceFullSync = false;
 
 if (lastSyncTime) {
-  // Use yesterday's date to ensure we don't miss anything due to day boundary timing
-  // GitHub search only supports date granularity, not datetime
-  const lastSync = new Date(lastSyncTime);
-  lastSync.setDate(lastSync.getDate() - 1); // Go back one day to be safe
-  const searchDate = lastSync.toISOString().split('T')[0]; // YYYY-MM-DD
-  searchFilter = `--search "updated:>${searchDate}"`;
-  isIncremental = true;
+  // VALIDATION: Check if incremental sync is safe
+  const githubTotal = getGitHubTotalCount();
+  const localCount = getLocalCount();
+
+  if (githubTotal !== null) {
+    // If local count is significantly less than GitHub total, force full sync
+    const threshold = Math.max(githubTotal * 0.8, githubTotal - 10); // 80% or within 10 issues
+
+    if (localCount < threshold) {
+      console.error(`Auto-correcting sync: Local ${localCount}, GitHub ${githubTotal} - forcing full sync`, { stderr: true });
+      forceFullSync = true;
+    } else {
+      // Incremental sync is safe - proceed normally
+      const lastSync = new Date(lastSyncTime);
+      lastSync.setDate(lastSync.getDate() - 1); // Go back one day to be safe
+      const searchDate = lastSync.toISOString().split('T')[0]; // YYYY-MM-DD
+      searchFilter = `--search "updated:>${searchDate}"`;
+      isIncremental = true;
+    }
+  } else {
+    // Couldn't get total count - fall back to incremental to be safe
+    console.error('Warning: Could not validate sync - proceeding with incremental sync', { stderr: true });
+    const lastSync = new Date(lastSyncTime);
+    lastSync.setDate(lastSync.getDate() - 1);
+    const searchDate = lastSync.toISOString().split('T')[0];
+    searchFilter = `--search "updated:>${searchDate}"`;
+    isIncremental = true;
+  }
+}
+
+// If forcing full sync, clear any search filters
+if (forceFullSync) {
+  searchFilter = '';
+  isIncremental = false;
 }
 
 // Fetch issues using gh CLI
@@ -121,11 +178,16 @@ const entries = issues.map(issue => {
   };
 });
 
-// Output JSON
+// Output JSON with sync validation info
 console.log(JSON.stringify({
   entries,
   total: issues.length,
   repository,
   state_filter: stateFilter,
-  incremental: isIncremental
+  incremental: isIncremental,
+  forced_full_sync: forceFullSync,
+  validation: {
+    github_total: getGitHubTotalCount(),
+    local_count: getLocalCount()
+  }
 }));

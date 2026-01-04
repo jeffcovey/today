@@ -13,6 +13,7 @@ const project = config.project || '';
 const query = config.query || 'is:unresolved';
 const limit = config.limit || 100;
 const authToken = config.auth_token;  // Injected by plugin-loader from encrypted env var
+const sourceId = process.env.SOURCE_ID || '';
 
 if (!authToken) {
   console.error(JSON.stringify({
@@ -49,6 +50,51 @@ async function fetchFromSentry(endpoint) {
   return response.json();
 }
 
+// Function to get total count from Sentry API
+async function getSentryTotalCount() {
+  try {
+    let searchQuery = query;
+    if (project) {
+      searchQuery = `project:${project} ${query}`;
+    }
+
+    // Get total count without time filters
+    const params = new URLSearchParams();
+    params.set('query', searchQuery);
+    params.set('limit', '1'); // We only need the total count
+    params.set('sort', 'date');
+
+    const endpoint = `/organizations/${organization}/issues/?${params.toString()}`;
+
+    // Sentry doesn't return total count in headers like GitHub, so this is an estimate
+    // We'll need to actually fetch to get a realistic count
+    const data = await fetchFromSentry(endpoint);
+
+    // Since Sentry doesn't provide total count easily, we'll use the actual fetched count
+    // For better validation, we could fetch multiple pages, but this is a reasonable approximation
+    return Array.isArray(data) ? Math.min(data.length * 10, 200) : 0; // Rough estimate
+  } catch (error) {
+    console.error(`Warning: Could not get total count from Sentry: ${error.message}`, { stderr: true });
+    return null;
+  }
+}
+
+// Function to get local count from database (if available)
+function getLocalCount() {
+  try {
+    const projectRoot = process.env.PROJECT_ROOT || '';
+    if (!projectRoot) return 0;
+
+    const { execSync } = require('child_process');
+    const countCmd = `sqlite3 "${projectRoot}/.data/today.db" "SELECT COUNT(*) FROM issues WHERE source = '${sourceId}'"`;
+    const result = execSync(countCmd, { encoding: 'utf8' });
+    return parseInt(result.trim()) || 0;
+  } catch (error) {
+    // Don't fail if we can't get local count - just assume 0
+    return 0;
+  }
+}
+
 async function fetchIssues() {
   const issues = [];
 
@@ -58,15 +104,39 @@ async function fetchIssues() {
     searchQuery = `project:${project} ${query}`;
   }
 
+  // VALIDATION: Check if incremental sync is safe
+  let forceFullSync = false;
+  let useIncremental = false;
+
+  if (lastSyncTime) {
+    const sentryTotal = await getSentryTotalCount();
+    const localCount = getLocalCount();
+
+    if (sentryTotal !== null && localCount > 0) {
+      // If local count is significantly less than estimated total, force full sync
+      const threshold = Math.max(sentryTotal * 0.8, sentryTotal - 10);
+
+      if (localCount < threshold) {
+        console.error(`Auto-correcting sync: Local ${localCount}, Sentry ~${sentryTotal} - forcing full sync`, { stderr: true });
+        forceFullSync = true;
+      } else {
+        // Incremental sync is safe
+        useIncremental = true;
+      }
+    } else {
+      // If we can't validate, default to incremental to be safe
+      useIncremental = true;
+    }
+  }
+
   // Build query parameters
   const params = new URLSearchParams();
   params.set('query', searchQuery);
   params.set('limit', String(Math.min(limit, 100))); // Sentry max is 100
   params.set('sort', 'date');
 
-  // Incremental sync - filter by date range
-  // Sentry requires both start and end when using date filters
-  if (lastSyncTime) {
+  // Incremental sync - filter by date range (only if not forcing full sync)
+  if (useIncremental && !forceFullSync) {
     const lastSync = new Date(lastSyncTime);
     lastSync.setDate(lastSync.getDate() - 1); // Go back one day to be safe
     params.set('start', lastSync.toISOString());
@@ -90,7 +160,11 @@ async function fetchIssues() {
     pageCount++;
   }
 
-  return issues.slice(0, limit);
+  return {
+    issues: issues.slice(0, limit),
+    isIncremental: useIncremental && !forceFullSync,
+    forcedFullSync: forceFullSync
+  };
 }
 
 function transformIssue(issue) {
@@ -152,15 +226,18 @@ function transformIssue(issue) {
 
 // Main execution
 try {
-  const issues = await fetchIssues();
+  const { issues, isIncremental, forcedFullSync } = await fetchIssues();
   const entries = issues.map(transformIssue);
-
-  const isIncremental = !!lastSyncTime;
 
   console.log(JSON.stringify({
     entries,
     total: entries.length,
-    incremental: isIncremental
+    incremental: isIncremental,
+    forced_full_sync: forcedFullSync,
+    validation: {
+      sentry_total_estimate: await getSentryTotalCount(),
+      local_count: getLocalCount()
+    }
   }));
 } catch (error) {
   console.error(JSON.stringify({
