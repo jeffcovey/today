@@ -1,6 +1,7 @@
 ---
 cssclasses: plan
 daily_summary:
+obsidianUIMode: preview
 ---
 
 > [!note] Requires [Obsidian Tasks](https://obsidian-tasks-group.github.io/obsidian-tasks/) plugin

@@ -1,3 +1,7 @@
+---
+obsidianUIMode: preview
+---
+
 # Tasks in projects
 
 > [!note] Requires [Obsidian Tasks](https://obsidian-tasks-group.github.io/obsidian-tasks/) plugin

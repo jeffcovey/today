@@ -9,6 +9,7 @@ target_date:
 review_frequency: weekly
 last_reviewed:
 cssclasses: project-template
+obsidianUIMode: preview
 ---
 
 > [!note] Requires [Obsidian Tasks](https://obsidian-tasks-group.github.io/obsidian-tasks/) plugin

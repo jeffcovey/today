@@ -270,6 +270,7 @@ function ensureTodaysDiaryFile() {
     const content = `---
 date: ${today}
 cssclasses: dashboard
+obsidianUIMode: preview
 ---
 
 `;
@@ -283,20 +284,23 @@ cssclasses: dashboard
   const stagesEnabled = isPluginEnabled('stages');
   const calendarEnabled = isPluginEnabled('google-calendar') || isPluginEnabled('public-calendars');
 
-  if (plansEnabled) {
-    updateDiarySection(filePath, 'PLAN_NAVIGATION', generatePlanNavigationSection(today));
-  }
-
-  if (stagesEnabled) {
-    updateDiarySection(filePath, 'STAGE_NOTICE', generateStageNoticeSection(today));
+  // Insert sections in REVERSE order of desired final order
+  // Desired: PLAN_NAVIGATION, STAGE_NOTICE, TIME_TRACKING, UPCOMING_EVENTS
+  // So insert: UPCOMING_EVENTS, TIME_TRACKING, STAGE_NOTICE, PLAN_NAVIGATION
+  if (calendarEnabled) {
+    updateDiarySection(filePath, 'UPCOMING_EVENTS', generateUpcomingEventsSection(today));
   }
 
   if (timeTrackingEnabled) {
     updateDiarySection(filePath, 'TIME_TRACKING', generateTimeTrackingSection(today));
   }
 
-  if (calendarEnabled) {
-    updateDiarySection(filePath, 'UPCOMING_EVENTS', generateUpcomingEventsSection(today));
+  if (stagesEnabled) {
+    updateDiarySection(filePath, 'STAGE_NOTICE', generateStageNoticeSection(today));
+  }
+
+  if (plansEnabled) {
+    updateDiarySection(filePath, 'PLAN_NAVIGATION', generatePlanNavigationSection(today));
   }
 
   return !fileExists;
