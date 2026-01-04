@@ -16,6 +16,8 @@ cssclasses: project-template
 
 # {{title}}
 
+<img src="" width="400">
+
 **Open Tasks:** `$= dv.current().file.tasks.where(t => !t.completed).length`
 
 > [!todo]- Task List
