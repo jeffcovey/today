@@ -1,0 +1,27 @@
+[Unit]
+Description=Today Inbox Upload API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{deploy_path}}
+ExecStart=/usr/bin/node {{deploy_path}}/src/inbox-api.js
+Restart=on-failure
+RestartSec=10
+Environment="NODE_ENV=production"
+Environment="HOME={{deploy_path}}"
+Environment="INBOX_API_PORT=3333"
+# Generate a random API key on first install, or use existing
+EnvironmentFile=-{{deploy_path}}/.inbox-api-key
+
+# Logging
+StandardOutput=append:{{deploy_path}}/.data/inbox-api.log
+StandardError=append:{{deploy_path}}/.data/inbox-api.log
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { discoverPlugins } from './plugin-loader.js';
 import { runPluginsConfigure } from './plugins-configure-ui.js';
+import { runDeploymentsConfigure } from './deployments-configure-ui.js';
 
 // Bind htm to React.createElement
 const html = htm.bind(React.createElement);
@@ -267,6 +268,19 @@ const CONFIG_SECTIONS = [
         type: 'action',
         action: 'openPluginConfig',
         description: 'Open plugin configuration'
+      },
+    ]
+  },
+  {
+    key: 'deployments',
+    title: 'Deployments',
+    fields: [
+      {
+        key: 'configure_deployments',
+        label: 'Configure server deployments',
+        type: 'action',
+        action: 'openDeploymentsConfig',
+        description: 'Manage remote server deployments'
       },
     ]
   },
@@ -639,6 +653,10 @@ export async function runConfigure() {
       pendingAction = null;
       const plugins = await discoverPlugins();
       await runPluginsConfigure(plugins);
+      // Loop continues - will re-render ConfigApp
+    } else if (pendingAction?.type === 'openDeploymentsConfig') {
+      pendingAction = null;
+      await runDeploymentsConfigure();
       // Loop continues - will re-render ConfigApp
     } else if (pendingAction?.type === 'openEditor') {
       const { path: fieldPath, currentValue } = pendingAction;

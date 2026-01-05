@@ -1,0 +1,206 @@
+#!/usr/bin/env node
+
+/**
+ * Deploy CLI
+ *
+ * Unified deployment tool supporting multiple servers and providers.
+ *
+ * Usage:
+ *   bin/deploy <deployment> [command] [args...]
+ *   bin/deploy production              # Deploy to 'production'
+ *   bin/deploy production ssh          # SSH into production
+ *   bin/deploy production logs -f      # Follow logs
+ *   bin/deploy --list                  # List all deployments
+ *   bin/deploy --all deploy            # Deploy to all servers
+ */
+
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = dirname(__dirname);
+
+process.chdir(PROJECT_ROOT);
+
+// Load environment
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import {
+  getDeployments,
+  getEnabledDeployments,
+  getDeployment,
+  listDeployments,
+  hasDeployments,
+  getDefaultDeployment,
+  createServer,
+  getCommandHelp
+} from '../src/deploy/index.js';
+import { commands } from '../src/deploy/commands/index.js';
+
+// ANSI colors
+const GREEN = '\x1b[0;32m';
+const YELLOW = '\x1b[1;33m';
+const BLUE = '\x1b[0;34m';
+const RED = '\x1b[0;31m';
+const NC = '\x1b[0m';
+
+function printError(msg) {
+  console.log(`${RED}✗${NC} ${msg}`);
+}
+
+function showHelp() {
+  console.log(`
+Usage: bin/deploy <deployment> [command] [args...]
+
+Examples:
+  bin/deploy production              Deploy to 'production' server
+  bin/deploy production ssh          SSH into production
+  bin/deploy production logs -f      Follow scheduler logs
+  bin/deploy production exec "df -h" Run command on server
+  bin/deploy staging setup           Initial setup of staging server
+
+Options:
+  --list, -l    List all configured deployments
+  --all, -a     Run command on all enabled deployments
+  --help, -h    Show this help message
+${getCommandHelp()}
+Configuration:
+  Add deployments in config.toml:
+
+  [deployments.digitalocean.production]
+  enabled = true
+  domain = "today.example.com"
+  deploy_path = "/opt/today"
+
+  Then set the server IP:
+  npx dotenvx set DEPLOY_DIGITALOCEAN_PRODUCTION_IP "xxx.xxx.xxx.xxx"
+
+  Or run: bin/today configure
+`);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+
+  // Handle global flags
+  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+    showHelp();
+
+    if (hasDeployments()) {
+      console.log('Configured deployments:');
+      listDeployments();
+    }
+    process.exit(0);
+  }
+
+  if (args.includes('--list') || args.includes('-l')) {
+    listDeployments();
+    process.exit(0);
+  }
+
+  // Handle --all flag
+  if (args.includes('--all') || args.includes('-a')) {
+    const allIndex = args.findIndex(a => a === '--all' || a === '-a');
+    args.splice(allIndex, 1);
+
+    const commandName = args[0] || 'deploy';
+    const commandArgs = args.slice(1);
+
+    const deployments = getEnabledDeployments();
+    if (deployments.length === 0) {
+      printError('No enabled deployments found');
+      process.exit(1);
+    }
+
+    console.log(`Running '${commandName}' on ${deployments.length} deployment(s)...`);
+    console.log('');
+
+    for (const deployment of deployments) {
+      if (!deployment.ip) {
+        console.log(`${YELLOW}⚠${NC} Skipping ${deployment.name}: no IP configured`);
+        continue;
+      }
+
+      console.log(`${'═'.repeat(60)}`);
+      console.log(`${BLUE}▸${NC} ${deployment.provider}/${deployment.name}`);
+      console.log(`${'═'.repeat(60)}`);
+
+      const server = createServer(deployment);
+      const command = commands[commandName];
+
+      if (!command) {
+        printError(`Unknown command: ${commandName}`);
+        continue;
+      }
+
+      try {
+        await command(server, commandArgs);
+      } catch (error) {
+        printError(`Failed: ${error.message}`);
+      }
+
+      console.log('');
+    }
+
+    process.exit(0);
+  }
+
+  // Parse deployment name and command
+  const deploymentName = args[0];
+  const commandName = args[1] || 'deploy';
+  const commandArgs = args.slice(2);
+
+  // Get deployment configuration
+  const deployment = getDeployment(deploymentName);
+
+  if (!deployment) {
+    // Maybe the first arg is a command for the default deployment?
+    if (commands[deploymentName]) {
+      const defaultDeployment = getDefaultDeployment();
+      if (defaultDeployment) {
+        const server = createServer(defaultDeployment);
+        const command = commands[deploymentName];
+        await command(server, args.slice(1));
+        process.exit(0);
+      }
+    }
+
+    printError(`Deployment not found: ${deploymentName}`);
+    console.log('');
+    console.log('Available deployments:');
+    listDeployments();
+    console.log('');
+    console.log('Add a deployment in config.toml or run: bin/today configure');
+    process.exit(1);
+  }
+
+  // Get command
+  const command = commands[commandName];
+  if (!command) {
+    printError(`Unknown command: ${commandName}`);
+    console.log('');
+    console.log(getCommandHelp());
+    process.exit(1);
+  }
+
+  // Create server instance
+  const server = createServer(deployment);
+
+  // Execute command
+  try {
+    await command(server, commandArgs);
+  } catch (error) {
+    printError(`Command failed: ${error.message}`);
+    if (process.env.DEBUG) {
+      console.error(error);
+    }
+    process.exit(1);
+  }
+}
+
+main().catch(error => {
+  printError(error.message);
+  process.exit(1);
+});
