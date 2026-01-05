@@ -100,6 +100,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Handle maintenance --local (no deployment needed)
+  if (args[0] === 'maintenance' && (args.includes('--local') || args.includes('-l'))) {
+    const { maintenanceCommand } = await import('../src/deploy/commands/maintenance.js');
+    await maintenanceCommand(null, args.slice(1));
+    process.exit(0);
+  }
+
   // Handle --all flag
   if (args.includes('--all') || args.includes('-a')) {
     const allIndex = args.findIndex(a => a === '--all' || a === '-a');

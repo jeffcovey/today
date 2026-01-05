@@ -86,11 +86,31 @@ export async function deployCommand(server, args = []) {
   // Install systemd services
   await installServices(server);
 
-  // Restart services
-  printInfo('Restarting services...');
-  server.systemctl('restart', 'today-scheduler', { check: false });
-  server.systemctl('restart', 'vault-watcher', { check: false });
-  server.systemctl('restart', 'vault-web', { check: false });
+  // Write scheduler jobs config
+  if (server.jobs && Object.keys(server.jobs).length > 0) {
+    printInfo('Writing scheduler jobs config...');
+    const jobsJson = JSON.stringify(server.jobs, null, 2);
+    server.sshCmd(`cat > ${deployPath}/.data/scheduler-config.json << 'JOBS_EOF'
+${jobsJson}
+JOBS_EOF`);
+    printStatus(`Configured ${Object.keys(server.jobs).length} scheduled job(s)`);
+  }
+
+  // Enable and start configured services
+  const enabledServices = Object.entries(server.services || {})
+    .filter(([_, enabled]) => enabled)
+    .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
+
+  if (enabledServices.length > 0) {
+    printInfo(`Enabling configured services: ${enabledServices.join(', ')}`);
+    for (const service of enabledServices) {
+      server.systemctl('enable', service, { check: false });
+      server.systemctl('restart', service, { check: false });
+    }
+    printStatus(`Started ${enabledServices.length} service(s)`);
+  } else {
+    printInfo('No services configured. Enable in config.toml under [deployments.*.services]');
+  }
 
   printStatus('Deployment complete!');
   console.log('');

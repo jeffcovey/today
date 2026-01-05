@@ -114,9 +114,12 @@ Processed files are kept in `vault/inbox/.trash/` for 7 days (configurable) befo
 
 #### Quick Capture with Mobile Apps
 
-The inbox works great with quick-capture apps that can save files to a synced folder:
+The inbox works great with quick-capture apps. If you have a server with the inbox-api service running, you can upload directly via HTTPS. Otherwise, use file sync.
 
-**[Drafts](https://getdrafts.com/)** (iOS/Mac) - Create actions that save notes to your inbox:
+**[Drafts](https://getdrafts.com/)** (iOS/Mac):
+
+- **With inbox-api**: Copy `scripts/drafts-send-to-inbox.js` into a Drafts Action to upload directly to your server
+- **With file sync**: Create actions that save to your synced vault folder:
 
 ```
 # Progress note action
@@ -151,11 +154,9 @@ The date format `December 7, 2025 14:30` is parsed to determine which plan file 
 
 The scheduler (`src/scheduler.js`) automates daily operations:
 
-- **Every 10 minutes**: Quick sync (vault and tasks)
-- **Every hour**: Full sync + task classification + auto-tagging
-- **Every 2 hours**: Update daily plans with Claude API
-- **Daily at 1 AM**: Archive completed tasks
-- **Daily at 2 AM**: Vault snapshot backup
+- **Every 10 minutes**: Plugin sync (external sources, task classification, plan updates)
+- **Every 6 hours**: Database maintenance (WAL checkpoint)
+- **Weekly**: Database vacuum
 
 ### Running the Scheduler
 
@@ -198,6 +199,62 @@ git diff
 ```
 
 This lets you see exactly what the scheduler changed and revert if needed.
+
+## Server Deployment
+
+Today can be deployed to remote servers for scheduled automation and always-on operation. The deployment system supports multiple servers and providers.
+
+### Why Deploy?
+
+- **Always-on scheduling**: Run the scheduler 24/7 without keeping your laptop open
+- **Inbox API**: Receive files from mobile apps like Drafts directly via HTTPS
+- **Vault syncing**: Keep your vault synchronized between local and remote
+- **Multiple environments**: Deploy to production, staging, or backup servers
+
+### Configuration
+
+Run `bin/today configure` and select "Deployments" to add servers. The interactive UI handles all configuration including secure storage of server IPs.
+
+### Commands
+
+```bash
+bin/deploy --list                    # Show all deployments
+bin/deploy production status         # Check server status
+bin/deploy production setup          # Initial server setup (nginx, SSL, systemd)
+bin/deploy production deploy         # Deploy code and restart services
+bin/deploy production logs           # View recent logs
+bin/deploy production ssh            # Open SSH session
+bin/deploy production maintenance    # Run cleanup tasks
+```
+
+### How It Works
+
+Deployment copies your **local configuration** to the remote server, making the remote a mirror of your local setup. This means:
+
+- Your `config.toml` plugins run on the server with the same settings
+- Scheduled jobs execute remotely instead of locally
+- Vault changes sync between local and remote
+
+### Supported Providers
+
+| Provider | Description |
+|----------|-------------|
+| `digitalocean` | DigitalOcean Droplets with automated setup |
+| `hetzner` | Hetzner Cloud servers |
+| `generic` | Any VPS with SSH access |
+
+### Services & Jobs
+
+Configure which services run and what scheduled jobs execute in `bin/today configure` under Deployments. Available services:
+
+- **scheduler**: Runs scheduled jobs (plugin sync, maintenance, custom commands)
+- **vault-watcher**: Watches for vault changes and triggers actions
+- **vault-web**: Serves your vault as a web site
+- **inbox-api**: Receives files uploaded from mobile apps
+
+Services and jobs are configured per-deployment, so different servers can run different workloads.
+
+---
 
 ## Development
 

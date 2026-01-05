@@ -10,7 +10,6 @@ const KNOWN_SERVICES = [
   'today-scheduler',
   'vault-watcher',
   'vault-web',
-  'vault-api',
   'inbox-api',
   'resilio-sync',
   'nginx',

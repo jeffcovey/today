@@ -79,6 +79,17 @@ function getDeploymentIp(provider, name) {
 }
 
 /**
+ * Default jobs for new deployments
+ */
+const DEFAULT_JOBS = {
+  'plugin-sync': {
+    schedule: '*/10 * * * *',
+    command: 'bin/plugins sync',
+    description: 'Sync all plugins'
+  }
+};
+
+/**
  * Parse deployment configuration from config.toml
  *
  * Config format:
@@ -89,6 +100,14 @@ function getDeploymentIp(provider, name) {
  * remote_vault_path = "vault"
  * ssh_user = "root"
  * ssh_port = 22
+ *
+ * [deployments.{provider}.{name}.services]
+ * scheduler = true
+ * vault-watcher = true
+ * inbox-api = false
+ *
+ * [deployments.{provider}.{name}.jobs]
+ * plugin-sync = { schedule = "...", command = "bin/plugins sync" }
  */
 export function getDeployments() {
   const config = getFullConfig();
@@ -104,6 +123,29 @@ export function getDeployments() {
 
       const ip = getDeploymentIp(provider, name);
 
+      // Parse services config (default all to false for safety)
+      const servicesConfig = deploymentConfig.services || {};
+      const services = {
+        scheduler: servicesConfig.scheduler === true,
+        'vault-watcher': servicesConfig['vault-watcher'] === true,
+        'vault-web': servicesConfig['vault-web'] === true,
+        'inbox-api': servicesConfig['inbox-api'] === true,
+        'resilio-sync': servicesConfig['resilio-sync'] === true
+      };
+
+      // Parse jobs config (use defaults if not specified)
+      const jobsConfig = deploymentConfig.jobs || DEFAULT_JOBS;
+      const jobs = {};
+      for (const [jobName, jobConfig] of Object.entries(jobsConfig)) {
+        if (typeof jobConfig === 'object' && jobConfig.schedule && jobConfig.command) {
+          jobs[jobName] = {
+            schedule: jobConfig.schedule,
+            command: jobConfig.command,
+            description: jobConfig.description || jobName
+          };
+        }
+      }
+
       deployments.push({
         name,
         provider,
@@ -116,8 +158,12 @@ export function getDeployments() {
         sshPort: deploymentConfig.ssh_port || 22,
         sshKeyPath: deploymentConfig.ssh_key_path || null,
         adminEmail: deploymentConfig.admin_email || config.profile?.email || 'admin@example.com',
-        // Provider-specific settings
-        ...deploymentConfig
+        services,
+        jobs,
+        // Provider-specific settings (exclude parsed sections)
+        ...Object.fromEntries(
+          Object.entries(deploymentConfig).filter(([k]) => !['services', 'jobs'].includes(k))
+        )
       });
     }
   }

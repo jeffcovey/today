@@ -274,15 +274,43 @@ const CONFIG_SECTIONS = [
   {
     key: 'deployments',
     title: 'Deployments',
-    fields: [
-      {
-        key: 'configure_deployments',
-        label: 'Configure server deployments',
+    type: 'dynamic',
+    getFields: (config) => {
+      const deployments = config.deployments || {};
+      const fields = [];
+
+      for (const [provider, providerDeployments] of Object.entries(deployments)) {
+        for (const [name, settings] of Object.entries(providerDeployments)) {
+          const services = settings.services || {};
+          const enabledServices = Object.entries(services)
+            .filter(([_, v]) => v === true)
+            .map(([k]) => k);
+          const statusIcon = settings.enabled !== false ? '✓' : '○';
+
+          fields.push({
+            key: `${provider}/${name}`,
+            label: `${statusIcon} ${provider}/${name}`,
+            type: 'deployment',
+            provider,
+            name,
+            settings,
+            description: enabledServices.length > 0
+              ? `Services: ${enabledServices.join(', ')}`
+              : 'No services enabled'
+          });
+        }
+      }
+
+      fields.push({
+        key: '__add_deployment__',
+        label: '+ Add deployment',
         type: 'action',
-        action: 'openDeploymentsConfig',
-        description: 'Manage remote server deployments'
-      },
-    ]
+        action: 'addDeployment'
+      });
+
+      return fields;
+    },
+    fields: [] // Will be populated dynamically
   },
 ];
 
@@ -359,16 +387,22 @@ function setConfigValue(config, pathArr, value) {
 /**
  * Main configuration app component
  */
-function ConfigApp({ onAction }) {
+function ConfigApp({ onAction, initialSection = 0 }) {
   const { exit } = useApp();
   const [config, setConfig] = useState(() => readConfig());
-  const [sectionIndex, setSectionIndex] = useState(0);
+  const [sectionIndex, setSectionIndex] = useState(initialSection);
   const [fieldIndex, setFieldIndex] = useState(0);
   const [mode, setMode] = useState('navigate'); // 'navigate', 'edit', 'select'
   const [editValue, setEditValue] = useState('');
 
   const section = CONFIG_SECTIONS[sectionIndex];
-  const field = section.fields[fieldIndex];
+
+  // For dynamic sections, compute fields from config; otherwise use static fields
+  const sectionFields = section.type === 'dynamic' && section.getFields
+    ? section.getFields(config)
+    : section.fields;
+
+  const field = sectionFields[fieldIndex];
   const currentValue = field.path ? getConfigValue(config, field.path, field.default) : null;
 
   // Get current provider for dynamic API key field
@@ -411,14 +445,25 @@ function ConfigApp({ onAction }) {
       setSectionIndex((i) => (i + 1) % CONFIG_SECTIONS.length);
       setFieldIndex(0);
     } else if (key.downArrow || input === 'j') {
-      setFieldIndex((i) => Math.min(i + 1, section.fields.length - 1));
+      setFieldIndex((i) => Math.min(i + 1, sectionFields.length - 1));
     } else if (key.upArrow || input === 'k') {
       setFieldIndex((i) => Math.max(i - 1, 0));
     } else if (key.return) {
       if (field.type === 'action') {
         // Trigger action callback and exit to allow action to run
         if (onAction) {
-          onAction({ type: field.action });
+          onAction({ type: field.action, returnToSection: sectionIndex });
+          exit();
+        }
+      } else if (field.type === 'deployment') {
+        // Open deployment editor
+        if (onAction) {
+          onAction({
+            type: 'editDeployment',
+            provider: field.provider,
+            name: field.name,
+            returnToSection: sectionIndex
+          });
           exit();
         }
       } else if (field.type === 'multiline') {
@@ -486,7 +531,7 @@ function ConfigApp({ onAction }) {
   });
 
   // Render fields list
-  const fields = section.fields.map((f, i) => {
+  const fields = sectionFields.map((f, i) => {
     const isSelected = i === fieldIndex;
     const fInfo = getFieldInfo(f);
 
@@ -496,7 +541,18 @@ function ConfigApp({ onAction }) {
           <${Text} color=${isSelected ? 'cyan' : 'white'}>
             ${isSelected ? '▸ ' : '  '}${f.label}
           </${Text}>
-          <${Text} dimColor> → Press Enter to open</${Text}>
+          <${Text} dimColor> → Press Enter</${Text}>
+        </${Box}>
+      `;
+    }
+
+    if (f.type === 'deployment') {
+      return html`
+        <${Box} key=${'field-' + section.key + '-' + f.key}>
+          <${Text} color=${isSelected ? 'cyan' : 'white'}>
+            ${isSelected ? '▸ ' : '  '}${f.label}
+          </${Text}>
+          <${Text} dimColor> ${f.description}</${Text}>
         </${Box}>
       `;
     }
@@ -638,6 +694,7 @@ function setConfigValueAndSave(pathArr, value) {
 
 export async function runConfigure() {
   let pendingAction = null;
+  let currentSection = 0;
 
   while (true) {
     // Create action handler that stores action and exits
@@ -645,19 +702,27 @@ export async function runConfigure() {
       pendingAction = action;
     };
 
-    const { waitUntilExit } = render(html`<${ConfigApp} onAction=${handleAction} />`);
+    const { waitUntilExit } = render(html`<${ConfigApp} onAction=${handleAction} initialSection=${currentSection} />`);
     await waitUntilExit();
 
     // Handle any pending action
     if (pendingAction?.type === 'openPluginConfig') {
+      currentSection = pendingAction.returnToSection ?? currentSection;
       pendingAction = null;
       const plugins = await discoverPlugins();
       await runPluginsConfigure(plugins);
-      // Loop continues - will re-render ConfigApp
-    } else if (pendingAction?.type === 'openDeploymentsConfig') {
+      // Loop continues - will re-render ConfigApp at same section
+    } else if (pendingAction?.type === 'editDeployment') {
+      currentSection = pendingAction.returnToSection ?? currentSection;
+      const { provider, name } = pendingAction;
       pendingAction = null;
-      await runDeploymentsConfigure();
-      // Loop continues - will re-render ConfigApp
+      await runDeploymentsConfigure({ editDeployment: { provider, name } });
+      // Loop continues - will re-render ConfigApp at same section
+    } else if (pendingAction?.type === 'addDeployment') {
+      currentSection = pendingAction.returnToSection ?? currentSection;
+      pendingAction = null;
+      await runDeploymentsConfigure({ addNew: true });
+      // Loop continues - will re-render ConfigApp at same section
     } else if (pendingAction?.type === 'openEditor') {
       const { path: fieldPath, currentValue } = pendingAction;
       pendingAction = null;

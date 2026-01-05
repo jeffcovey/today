@@ -2,21 +2,22 @@
  * Maintenance command
  *
  * Run maintenance tasks on the server (cleanup logs, check disk, etc.)
+ *
+ * Usage:
+ *   bin/deploy <deployment> maintenance           Run on remote server via SSH
+ *   bin/deploy <deployment> maintenance --local   Run locally (for scheduler)
  */
 
-import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-export async function maintenanceCommand(server, args = []) {
-  console.log(`🧹 Running maintenance on ${server.name}...`);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..', '..', '..');
 
-  if (!server.validate()) {
-    process.exit(1);
-  }
-
-  const deployPath = server.deployPath;
-
-  // The maintenance script with templated paths
-  const maintenanceScript = `
+function getMaintenanceScript(deployPath) {
+  return `
 set -e
 
 # Colors
@@ -49,23 +50,25 @@ fi
 # 2. Clean up large log files
 print_status "Checking log files..."
 
-# System logs
-if [ -f /var/log/syslog ]; then
-    SYSLOG_SIZE=$(du -m /var/log/syslog | cut -f1)
-    if [ "$SYSLOG_SIZE" -gt 500 ]; then
-        print_warning "Syslog is \${SYSLOG_SIZE}MB, truncating..."
-        sudo truncate -s 0 /var/log/syslog
-        print_status "Truncated syslog"
+# System logs (only if sudo available without password)
+if sudo -n true 2>/dev/null; then
+    if [ -f /var/log/syslog ]; then
+        SYSLOG_SIZE=$(du -m /var/log/syslog 2>/dev/null | cut -f1 || echo 0)
+        if [ "$SYSLOG_SIZE" -gt 500 ]; then
+            print_warning "Syslog is \${SYSLOG_SIZE}MB, truncating..."
+            sudo truncate -s 0 /var/log/syslog
+            print_status "Truncated syslog"
+        fi
     fi
-fi
 
-# Remove old rotated logs
-sudo rm -f /var/log/syslog.*.gz /var/log/syslog.1 2>/dev/null || true
+    # Remove old rotated logs
+    sudo rm -f /var/log/syslog.*.gz /var/log/syslog.1 2>/dev/null || true
+fi
 
 # Application logs
 for LOG_FILE in ${deployPath}/.data/*.log; do
     if [ -f "$LOG_FILE" ]; then
-        LOG_SIZE=$(du -m "$LOG_FILE" | cut -f1)
+        LOG_SIZE=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1 || echo 0)
         if [ "$LOG_SIZE" -gt "$MAX_LOG_SIZE_MB" ]; then
             LOG_NAME=$(basename "$LOG_FILE")
             print_warning "$LOG_NAME is \${LOG_SIZE}MB, truncating..."
@@ -93,12 +96,14 @@ if [ -f ${deployPath}/.data/today.db ]; then
     fi
 fi
 
-# 4. Clean up journal logs
-print_status "Cleaning journal logs..."
-sudo journalctl --vacuum-time=7d --vacuum-size=500M 2>/dev/null || true
+# 4. Clean up journal logs (only if sudo available)
+if sudo -n true 2>/dev/null; then
+    print_status "Cleaning journal logs..."
+    sudo journalctl --vacuum-time=7d --vacuum-size=500M 2>/dev/null || true
+fi
 
 # 5. Clean npm cache if disk is tight
-DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+DISK_USAGE=$(df / 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || echo 0)
 if [ "$DISK_USAGE" -gt 90 ]; then
     print_warning "Disk usage high (\${DISK_USAGE}%), cleaning npm cache..."
     npm cache clean --force 2>/dev/null || true
@@ -112,7 +117,7 @@ else
 fi
 
 # 7. Check system load
-LOAD_1MIN=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
+LOAD_1MIN=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//' || echo "N/A")
 print_status "System load is $LOAD_1MIN"
 
 # 8. Report status
@@ -120,12 +125,40 @@ echo ""
 echo "📊 System Status:"
 echo "  Disk: \${DISK_USAGE}% used"
 echo "  Load: $LOAD_1MIN"
-echo "  Memory: $(free -m | awk '/^Mem:/{printf "%.0f%% used", $3/$2 * 100}')"
+if command -v free &> /dev/null; then
+    echo "  Memory: $(free -m | awk '/^Mem:/{printf "%.0f%% used", $3/$2 * 100}')"
+fi
 echo ""
 print_status "Maintenance complete!"
 `;
+}
 
-  server.sshScript(maintenanceScript);
+export async function maintenanceCommand(server, args = []) {
+  const runLocal = args.includes('--local') || args.includes('-l');
+
+  if (runLocal) {
+    console.log(`🧹 Running local maintenance...`);
+    const script = getMaintenanceScript(PROJECT_ROOT);
+    try {
+      execSync(script, {
+        cwd: PROJECT_ROOT,
+        stdio: 'inherit',
+        shell: '/bin/bash'
+      });
+    } catch (error) {
+      // Script may exit non-zero for warnings, that's OK
+    }
+    return;
+  }
+
+  console.log(`🧹 Running maintenance on ${server.name}...`);
+
+  if (!server.validate()) {
+    process.exit(1);
+  }
+
+  const script = getMaintenanceScript(server.deployPath);
+  server.sshScript(script);
 }
 
 export default maintenanceCommand;
