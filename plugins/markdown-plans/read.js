@@ -255,6 +255,84 @@ function getTemplateVariables(date) {
 }
 
 /**
+ * Get template variables for a weekly plan
+ */
+function getWeeklyTemplateVariables(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const week = getISOWeek(date);
+  const quarter = getQuarter(month);
+  const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+
+  // Get start of week (Monday)
+  const startOfWeek = new Date(date);
+  const dayOfWeek = date.getDay();
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday (0) to 6
+  startOfWeek.setDate(date.getDate() - daysToSubtract);
+
+  // Generate all days of the week
+  const days = [];
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const stagePattern = ['Front', 'Off', 'Front', 'Back', 'Off', 'Front', 'Back']; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(startOfWeek);
+    day.setDate(startOfWeek.getDate() + i);
+    days.push({
+      name: dayNames[i],
+      date: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      stage: stagePattern[i] + ' Stage',
+    });
+  }
+
+  // Calculate previous and next week filenames
+  const prevWeek = new Date(startOfWeek);
+  prevWeek.setDate(startOfWeek.getDate() - 7);
+  const nextWeek = new Date(startOfWeek);
+  nextWeek.setDate(startOfWeek.getDate() + 7);
+
+  const prevWeekPaths = getPlanFilePaths(prevWeek);
+  const nextWeekPaths = getPlanFilePaths(nextWeek);
+  const prevWeekFile = path.basename(prevWeekPaths.week.path, '.md');
+  const nextWeekFile = path.basename(nextWeekPaths.week.path, '.md');
+
+  // End date (Sunday)
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+  return {
+    '{{WEEK_NUMBER}}': String(week),
+    '{{START_DATE}}': startOfWeek.toISOString().split('T')[0],
+    '{{END_DATE}}': endOfWeek.toISOString().split('T')[0],
+    '{{YEAR}}': String(year),
+    '{{MONTH}}': String(month),
+    '{{MONTH_NAME}}': monthName,
+    '{{QUARTER}}': `Q${quarter}`,
+    '{{PREV_WEEK}}': prevWeekFile,
+    '{{NEXT_WEEK}}': nextWeekFile,
+    '{{DATE}}': new Date().toISOString().split('T')[0],
+
+    // Individual day template variables
+    '{{MON_DATE}}': days[0].date,
+    '{{TUE_DATE}}': days[1].date,
+    '{{WED_DATE}}': days[2].date,
+    '{{THU_DATE}}': days[3].date,
+    '{{FRI_DATE}}': days[4].date,
+    '{{SAT_DATE}}': days[5].date,
+    '{{SUN_DATE}}': days[6].date,
+
+    // Stage assignments for each day
+    '{{MON_STAGE}}': days[0].stage,
+    '{{TUE_STAGE}}': days[1].stage,
+    '{{WED_STAGE}}': days[2].stage,
+    '{{THU_STAGE}}': days[3].stage,
+    '{{FRI_STAGE}}': days[4].stage,
+    '{{SAT_STAGE}}': days[5].stage,
+    '{{SUN_STAGE}}': days[6].stage,
+  };
+}
+
+/**
  * Create a daily plan from template if it doesn't exist
  */
 function ensureDailyPlan(planInfo, date) {
@@ -269,6 +347,33 @@ function ensureDailyPlan(planInfo, date) {
 
   const template = fs.readFileSync(templatePath, 'utf-8');
   const variables = getTemplateVariables(date);
+
+  let content = template;
+  for (const [key, value] of Object.entries(variables)) {
+    content = content.split(key).join(value);
+  }
+
+  fs.mkdirSync(plansDir, { recursive: true });
+  fs.writeFileSync(planInfo.path, content, 'utf-8');
+
+  return { created: true, file: path.basename(planInfo.path) };
+}
+
+/**
+ * Create a weekly plan from template if it doesn't exist
+ */
+function ensureWeeklyPlan(planInfo, date) {
+  if (fs.existsSync(planInfo.path)) {
+    return { existed: true };
+  }
+
+  const templatePath = path.join(templatesDir, 'weekly-plan.md');
+  if (!fs.existsSync(templatePath)) {
+    return { error: `Template not found: ${templatePath}` };
+  }
+
+  const template = fs.readFileSync(templatePath, 'utf-8');
+  const variables = getWeeklyTemplateVariables(date);
 
   let content = template;
   for (const [key, value] of Object.entries(variables)) {
@@ -1231,6 +1336,12 @@ async function main() {
   const dailyResult = ensureDailyPlan(planPaths.day, today);
   if (dailyResult.created) {
     metadata.plans_created.push({ type: 'day', file: dailyResult.file });
+  }
+
+  // Ensure this week's weekly plan exists
+  const weeklyResult = ensureWeeklyPlan(planPaths.week, today);
+  if (weeklyResult.created) {
+    metadata.plans_created.push({ type: 'week', file: weeklyResult.file });
   }
 
   // Link today's plan to Obsidian daily note
