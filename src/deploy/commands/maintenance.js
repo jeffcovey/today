@@ -53,7 +53,8 @@ print_status "Checking log files..."
 # System logs (only if sudo available without password)
 if sudo -n true 2>/dev/null; then
     if [ -f /var/log/syslog ]; then
-        SYSLOG_SIZE=$(du -m /var/log/syslog 2>/dev/null | cut -f1 || echo 0)
+        SYSLOG_SIZE=$(du -m /var/log/syslog 2>/dev/null | cut -f1)
+        SYSLOG_SIZE=\${SYSLOG_SIZE:-0}
         if [ "$SYSLOG_SIZE" -gt 500 ]; then
             print_warning "Syslog is \${SYSLOG_SIZE}MB, truncating..."
             sudo truncate -s 0 /var/log/syslog
@@ -68,7 +69,8 @@ fi
 # Application logs
 for LOG_FILE in ${deployPath}/.data/*.log; do
     if [ -f "$LOG_FILE" ]; then
-        LOG_SIZE=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1 || echo 0)
+        LOG_SIZE=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+        LOG_SIZE=\${LOG_SIZE:-0}
         if [ "$LOG_SIZE" -gt "$MAX_LOG_SIZE_MB" ]; then
             LOG_NAME=$(basename "$LOG_FILE")
             print_warning "$LOG_NAME is \${LOG_SIZE}MB, truncating..."
@@ -81,7 +83,8 @@ done
 # 3. Database maintenance
 print_status "Checking database..."
 if [ -f ${deployPath}/.data/today.db ]; then
-    WAL_SIZE=$(du -m ${deployPath}/.data/today.db-wal 2>/dev/null | cut -f1 || echo 0)
+    WAL_SIZE=$(du -m ${deployPath}/.data/today.db-wal 2>/dev/null | cut -f1)
+    WAL_SIZE=\${WAL_SIZE:-0}
     if [ "$WAL_SIZE" -gt 100 ]; then
         print_warning "WAL file is \${WAL_SIZE}MB, checkpointing..."
         sqlite3 ${deployPath}/.data/today.db 'PRAGMA wal_checkpoint(TRUNCATE);' 2>/dev/null || true
@@ -103,7 +106,8 @@ if sudo -n true 2>/dev/null; then
 fi
 
 # 5. Clean npm cache if disk is tight
-DISK_USAGE=$(df / 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || echo 0)
+DISK_USAGE=$(df / 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
+DISK_USAGE=\${DISK_USAGE:-0}
 if [ "$DISK_USAGE" -gt 90 ]; then
     print_warning "Disk usage high (\${DISK_USAGE}%), cleaning npm cache..."
     npm cache clean --force 2>/dev/null || true
