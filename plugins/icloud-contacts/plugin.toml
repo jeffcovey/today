@@ -1,0 +1,24 @@
+# iCloud Contacts Plugin
+# Syncs contacts from iCloud CardDAV
+
+name = "icloud-contacts"
+displayName = "iCloud Contacts"
+description = "Sync contacts from iCloud CardDAV"
+type = "contacts"
+
+longDescription = """
+Syncs contact information from iCloud using CardDAV protocol.
+"""
+
+aiInstructions = """
+Use contact information to:
+- Remind about upcoming birthdays (next 7-14 days)
+- Provide context when people are mentioned
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+apple_id = { type = "string", default = "", description = "Apple ID email address" }
+app_password = { type = "string", default = "", description = "App-specific password for iCloud", encrypted = true }

@@ -1,858 +1,404 @@
 #!/usr/bin/env node
 
-// Contacts integration script for iCloud contacts
+// Contacts CLI - queries contacts from plugin system
 import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createDAVClient } from 'tsdav';
-import fs from 'fs';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getTodayDate } from '../src/date-utils.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+import { execSync } from 'child_process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Quiet sync - ensures database is current before read operations
+function ensureSync(db) {
+  ensureSyncForType(db, 'contacts');
+}
 
-const DB_PATH = path.join(__dirname, '..', '.data', 'today.db');
-const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
-
-class ContactsSync {
-  constructor() {
-    this.contacts = [];
-    this.client = null;
-    this.db = getDatabase();
-    this.initDatabase();
-  }
-
-  initDatabase() {
-    // Tables are already created from migration, but ensure they exist
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS contacts (
-        id TEXT PRIMARY KEY,
-        first_name TEXT,
-        last_name TEXT,
-        full_name TEXT,
-        organization TEXT,
-        birthday TEXT,
-        url TEXT,
-        etag TEXT,
-        notes TEXT,
-        last_contacted TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS contact_emails (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        contact_id TEXT NOT NULL,
-        email TEXT NOT NULL,
-        is_primary BOOLEAN DEFAULT 0,
-        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS contact_phones (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        contact_id TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        is_primary BOOLEAN DEFAULT 0,
-        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS contact_addresses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        contact_id TEXT NOT NULL,
-        po_box TEXT,
-        extended TEXT,
-        street TEXT,
-        city TEXT,
-        region TEXT,
-        postal_code TEXT,
-        country TEXT,
-        FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON contacts(full_name);
-      CREATE INDEX IF NOT EXISTS idx_contact_emails_email ON contact_emails(email);
-    `);
-  }
-
-  // Check if cache is valid
-  async isCacheValid() {
-    try {
-      // Check when contacts were last updated
-      const result = this.db.prepare(
-        'SELECT MAX(updated_at) as last_update FROM contacts'
-      ).get();
-      
-      if (!result.last_update) return false;
-      
-      const lastUpdate = new Date(result.last_update).getTime();
-      const now = Date.now();
-      const cacheAge = now - lastUpdate;
-      
-      return cacheAge < CACHE_DURATION;
-    } catch {
+// Check if contacts table exists
+function contactsTableExists(db) {
+  try {
+    db.prepare("SELECT 1 FROM contacts LIMIT 1").get();
+    return true;
+  } catch (error) {
+    if (error.code === 'SQLITE_ERROR' && error.message.includes('no such table')) {
       return false;
     }
+    throw error;
+  }
+}
+
+// Get contacts from database
+function getAllContacts(db) {
+  if (!contactsTableExists(db)) {
+    return [];
+  }
+  return db.prepare(`
+    SELECT id, source, full_name, first_name, last_name,
+           organization, primary_email, primary_phone,
+           birthday, notes, created_at
+    FROM contacts
+    ORDER BY full_name
+  `).all();
+}
+
+// Get birthdays for next N days
+function getUpcomingBirthdays(db, days = 7) {
+  if (!contactsTableExists(db)) {
+    return [];
   }
 
-  // Load contacts from database
-  async loadCache() {
-    try {
-      const contacts = this.db.prepare(`
-        SELECT 
-          c.*,
-          GROUP_CONCAT(DISTINCT e.email) as emails,
-          GROUP_CONCAT(DISTINCT p.phone) as phones
-        FROM contacts c
-        LEFT JOIN contact_emails e ON c.id = e.contact_id
-        LEFT JOIN contact_phones p ON c.id = p.contact_id
-        GROUP BY c.id
-      `).all();
+  const events = [];
+  const today = new Date();
 
-      this.contacts = contacts.map(contact => ({
-        id: contact.id,
-        name: contact.full_name,
-        firstName: contact.first_name,
-        lastName: contact.last_name,
-        organization: contact.organization,
-        birthday: contact.birthday,
-        url: contact.url,
-        etag: contact.etag,
-        notes: contact.notes,
-        lastContacted: contact.last_contacted,
-        emails: contact.emails ? contact.emails.split(',') : [],
-        phones: contact.phones ? contact.phones.split(',') : []
-      }));
+  for (let i = 0; i < days; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(today.getDate() + i);
+    const monthDay = `${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
 
-      // Also load addresses
-      for (const contact of this.contacts) {
-        const addresses = this.db.prepare(`
-          SELECT po_box, extended, street, city, region, postal_code, country
-          FROM contact_addresses
-          WHERE contact_id = ?
-        `).all(contact.id);
-        
-        if (addresses.length > 0) {
-          contact.addresses = addresses.map(addr => ({
-            poBox: addr.po_box,
-            extended: addr.extended,
-            street: addr.street,
-            city: addr.city,
-            region: addr.region,
-            postalCode: addr.postal_code,
-            country: addr.country
-          }));
-        }
-      }
+    const dayEvents = db.prepare(`
+      SELECT full_name, birthday, organization, primary_email, primary_phone
+      FROM contacts
+      WHERE birthday LIKE '%${monthDay}'
+    `).all();
 
-      return this.contacts.length > 0;
-    } catch (error) {
-      console.error('Error loading from database:', error.message);
-      return false;
+    if (dayEvents.length > 0) {
+      events.push({
+        date: checkDate.toISOString().split('T')[0],
+        dayLabel: checkDate.toDateString(),
+        contacts: dayEvents
+      });
     }
   }
 
-  // Save contacts to database
-  async saveToDatabase() {
-    const insertContact = this.db.prepare(`
-      INSERT OR REPLACE INTO contacts (
-        id, first_name, last_name, full_name, organization, birthday, url, etag, notes, last_contacted, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `);
+  return events;
+}
 
-    const deleteEmails = this.db.prepare('DELETE FROM contact_emails WHERE contact_id = ?');
-    const deletePhones = this.db.prepare('DELETE FROM contact_phones WHERE contact_id = ?');
-    const deleteAddresses = this.db.prepare('DELETE FROM contact_addresses WHERE contact_id = ?');
-
-    const insertEmail = this.db.prepare(`
-      INSERT INTO contact_emails (contact_id, email, is_primary) VALUES (?, ?, ?)
-    `);
-
-    const insertPhone = this.db.prepare(`
-      INSERT INTO contact_phones (contact_id, phone, is_primary) VALUES (?, ?, ?)
-    `);
-
-    const insertAddress = this.db.prepare(`
-      INSERT INTO contact_addresses (
-        contact_id, po_box, extended, street, city, region, postal_code, country
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const saveAll = this.db.transaction(() => {
-      for (const contact of this.contacts) {
-        // Update main contact
-        insertContact.run(
-          contact.id,
-          contact.firstName || null,
-          contact.lastName || null,
-          contact.name || null,
-          contact.organization || null,
-          contact.birthday || null,
-          contact.url || null,
-          contact.etag || null,
-          contact.notes || null,
-          contact.lastContacted || null
-        );
-
-        // Clear and re-insert related data
-        deleteEmails.run(contact.id);
-        deletePhones.run(contact.id);
-        deleteAddresses.run(contact.id);
-
-        // Insert emails
-        if (contact.emails?.length > 0) {
-          contact.emails.forEach((email, index) => {
-            insertEmail.run(contact.id, email, index === 0 ? 1 : 0);
-          });
-        }
-
-        // Insert phones
-        if (contact.phones?.length > 0) {
-          contact.phones.forEach((phone, index) => {
-            insertPhone.run(contact.id, phone, index === 0 ? 1 : 0);
-          });
-        }
-
-        // Insert addresses
-        if (contact.addresses?.length > 0) {
-          contact.addresses.forEach(addr => {
-            insertAddress.run(
-              contact.id,
-              addr.poBox || null,
-              addr.extended || null,
-              addr.street || null,
-              addr.city || null,
-              addr.region || null,
-              addr.postalCode || null,
-              addr.country || null
-            );
-          });
-        }
-      }
-    });
-
-    saveAll();
+// Get birthdays for specific date
+function getBirthdaysForDate(db, targetDate) {
+  if (!contactsTableExists(db)) {
+    return [];
   }
 
-  // Parse vCard format
-  parseVCard(vCardText) {
-    const contact = {};
-    const lines = vCardText.split(/\r?\n/);
-    
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
-      
-      // Handle line continuations
-      while (i + 1 < lines.length && (lines[i + 1].startsWith(' ') || lines[i + 1].startsWith('\t'))) {
-        line += lines[i + 1].substring(1);
-        i++;
-      }
-      
-      const colonIndex = line.indexOf(':');
-      if (colonIndex > 0) {
-        const key = line.substring(0, colonIndex);
-        const value = line.substring(colonIndex + 1);
-        
-        // Parse common vCard fields
-        if (key.startsWith('FN')) {
-          contact.name = value.trim();
-        } else if (key.startsWith('N')) {
-          // N format: LastName;FirstName;MiddleName;Prefix;Suffix
-          const parts = value.split(';');
-          contact.lastName = parts[0]?.trim() || '';
-          contact.firstName = parts[1]?.trim() || '';
-        } else if (key.startsWith('EMAIL')) {
-          if (!contact.emails) contact.emails = [];
-          contact.emails.push(value.trim());
-        } else if (key.startsWith('TEL')) {
-          if (!contact.phones) contact.phones = [];
-          contact.phones.push(value.trim());
-        } else if (key.startsWith('ORG')) {
-          contact.organization = value.trim();
-        } else if (key.startsWith('NOTE')) {
-          contact.notes = value.trim().replace(/\\n/g, '\n');
-          // Extract last contacted date from notes if present
-          const lastContactedMatch = contact.notes.match(/Last\s+contacted?:\s*(\d{4}-\d{2}-\d{2})/i);
-          if (lastContactedMatch) {
-            contact.lastContacted = lastContactedMatch[1];
-          }
-        } else if (key.startsWith('BDAY')) {
-          contact.birthday = value.trim();
-        } else if (key.startsWith('ADR')) {
-          // Parse address
-          const parts = value.split(';');
-          if (!contact.addresses) contact.addresses = [];
-          contact.addresses.push({
-            poBox: parts[0]?.trim() || '',
-            extended: parts[1]?.trim() || '',
-            street: parts[2]?.trim() || '',
-            city: parts[3]?.trim() || '',
-            region: parts[4]?.trim() || '',
-            postalCode: parts[5]?.trim() || '',
-            country: parts[6]?.trim() || ''
-          });
-        } else if (key === 'UID') {
-          contact.id = value.trim();
-        }
-      }
-    }
-    
-    return contact;
+  const date = new Date(targetDate);
+  const monthDay = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+  return db.prepare(`
+    SELECT full_name, birthday, organization, primary_email, primary_phone
+    FROM contacts
+    WHERE birthday LIKE '%${monthDay}'
+    ORDER BY full_name
+  `).all();
+}
+
+// Search contacts
+function searchContacts(db, query) {
+  if (!contactsTableExists(db)) {
+    return [];
   }
 
-  // iCloud Contacts via CardDAV using tsdav
-  async synciCloudContacts() {
-    try {
-      if (!process.env.ICLOUD_USERNAME || !process.env.ICLOUD_APP_PASSWORD) {
-        console.log('⚠️  iCloud not configured');
-        console.log('   Need ICLOUD_USERNAME and ICLOUD_APP_PASSWORD in .env');
-        console.log('   Get app-specific password at: https://appleid.apple.com/account/manage');
-        return [];
-      }
+  const searchTerm = `%${query.toLowerCase()}%`;
 
-      console.log('📇 Fetching iCloud Contacts...');
-      
-      const username = process.env.ICLOUD_USERNAME;
-      const password = process.env.ICLOUD_APP_PASSWORD;
-      
-      try {
-        // Create DAV client
-        console.log('   Connecting to iCloud...');
-        this.client = await createDAVClient({
-          serverUrl: 'https://contacts.icloud.com',
-          credentials: {
-            username: username,
-            password: password,
-          },
-          authMethod: 'Basic',
-          defaultAccountType: 'carddav',
-        });
+  return db.prepare(`
+    SELECT full_name, organization, primary_email, primary_phone, birthday, notes
+    FROM contacts
+    WHERE LOWER(full_name) LIKE ?
+       OR LOWER(organization) LIKE ?
+       OR LOWER(notes) LIKE ?
+    ORDER BY full_name
+    LIMIT 20
+  `).all(searchTerm, searchTerm, searchTerm);
+}
 
-        // Fetch address books
-        console.log('   Fetching address books...');
-        const addressBooks = await this.client.fetchAddressBooks();
-        
-        if (!addressBooks || addressBooks.length === 0) {
-          console.log('   ⚠️  No address books found');
-          return [];
-        }
+// Display contact with details
+function displayContact(contact) {
+  console.log(`${colors.bold(contact.full_name || 'Unknown')}`);
+  if (contact.organization) {
+    console.log(`  ${colors.gray('Organization:')} ${contact.organization}`);
+  }
+  if (contact.primary_email) {
+    console.log(`  ${colors.gray('Email:')} ${contact.primary_email}`);
+  }
+  if (contact.primary_phone) {
+    console.log(`  ${colors.gray('Phone:')} ${contact.primary_phone}`);
+  }
+  if (contact.birthday) {
+    console.log(`  ${colors.gray('Birthday:')} ${contact.birthday}`);
+  }
+  if (contact.notes && contact.notes.length > 0) {
+    const shortNotes = contact.notes.length > 100
+      ? contact.notes.substring(0, 100) + '...'
+      : contact.notes;
+    console.log(`  ${colors.gray('Notes:')} ${shortNotes}`);
+  }
+}
 
-        console.log(`   Found ${addressBooks.length} address book(s)`);
-        
-        // Store the first address book for later use (for adding contacts)
-        this.addressBook = addressBooks[0];
-        
-        // Fetch vCards from the first (default) address book
-        console.log('   Fetching contacts...');
-        const vcards = await this.client.fetchVCards({
-          addressBook: addressBooks[0],
-        });
+// Commands
+async function cmdSync() {
+  console.log(colors.blue('ℹ') + ' Syncing contacts plugins to database...');
 
-        if (!vcards || vcards.length === 0) {
-          console.log('   ⚠️  No contacts found in address book');
-          return [];
-        }
-
-        // Parse vCards
-        const contacts = [];
-        for (const vcard of vcards) {
-          if (vcard.data) {
-            const contact = this.parseVCard(vcard.data);
-            if (contact && contact.name) {
-              // Add the URL for potential updates
-              contact.url = vcard.url;
-              contact.etag = vcard.etag;
-              // Also check for custom X- fields for last contacted
-              if (vcard.data.includes('X-LAST-CONTACTED:')) {
-                const match = vcard.data.match(/X-LAST-CONTACTED:(\d{4}-\d{2}-\d{2})/i);
-                if (match) {
-                  contact.lastContacted = match[1];
-                }
-              }
-              contacts.push(contact);
-            }
-          }
-        }
-
-        console.log(`   ✓ Found ${contacts.length} contacts`);
-        return contacts;
-
-      } catch (error) {
-        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-          console.error('   ❌ Authentication failed. Check your iCloud credentials.');
-          console.log('   Make sure you\'re using an app-specific password, not your regular password.');
-        } else if (error.message?.includes('ENOTFOUND') || error.message?.includes('network')) {
-          console.error('   ❌ Network error. Check your internet connection.');
-        } else {
-          console.error('   ❌ Error fetching contacts:', error.message);
-          if (process.env.DEBUG) {
-            console.error('Full error:', error);
-          }
-        }
-        return [];
-      }
-    } catch (error) {
-      console.error('Error syncing iCloud contacts:', error.message);
-      return [];
+  try {
+    const result = execSync('bin/plugins sync --type contacts', { encoding: 'utf8' });
+    const lines = result.split('\n').filter(l => !l.includes('[dotenvx'));
+    console.log(lines.join('\n'));
+  } catch (error) {
+    if (error.stdout?.includes('No plugins of type')) {
+      console.log(colors.yellow('⚠') + ' No contacts plugins are enabled.');
+      console.log('');
+      console.log('To sync contacts, configure a plugin:');
+      console.log('');
+      console.log('  ' + colors.cyan('bin/plugins configure'));
+    } else {
+      console.error(colors.red('✗') + ' Sync failed:', error.message);
+      process.exit(1);
     }
   }
+}
 
-  // Search contacts
-  search(query) {
-    const searchTerm = query.toLowerCase();
-    
-    // Use SQL for searching
-    const results = this.db.prepare(`
-      SELECT DISTINCT c.*
-      FROM contacts c
-      LEFT JOIN contact_emails e ON c.id = e.contact_id
-      LEFT JOIN contact_phones p ON c.id = p.contact_id
-      WHERE 
-        LOWER(c.full_name) LIKE ? OR
-        LOWER(c.first_name) LIKE ? OR
-        LOWER(c.last_name) LIKE ? OR
-        LOWER(c.organization) LIKE ? OR
-        LOWER(e.email) LIKE ? OR
-        p.phone LIKE ?
-    `).all(
-      `%${searchTerm}%`,
-      `%${searchTerm}%`,
-      `%${searchTerm}%`,
-      `%${searchTerm}%`,
-      `%${searchTerm}%`,
-      `%${searchTerm}%`
-    );
+async function cmdBirthdays(db, options) {
+  ensureSync(db);
 
-    // Convert to contact format
-    return results.map(row => ({
-      id: row.id,
-      name: row.full_name,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      organization: row.organization,
-      birthday: row.birthday,
-      notes: row.notes,
-      lastContacted: row.last_contacted,
-      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(row.id).map(e => e.email),
-      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(row.id).map(p => p.phone)
-    }));
-  }
-
-  // Get contact by email
-  findByEmail(email) {
-    const result = this.db.prepare(`
-      SELECT c.*
-      FROM contacts c
-      JOIN contact_emails e ON c.id = e.contact_id
-      WHERE LOWER(e.email) = LOWER(?)
-      LIMIT 1
-    `).get(email);
-
-    if (!result) return null;
-
-    return {
-      id: result.id,
-      name: result.full_name,
-      firstName: result.first_name,
-      lastName: result.last_name,
-      organization: result.organization,
-      birthday: result.birthday,
-      notes: result.notes,
-      lastContacted: result.last_contacted,
-      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
-      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
-    };
-  }
-
-  // Get contact by phone
-  findByPhone(phone) {
-    // Normalize phone number (remove common formatting)
-    const normalizedPhone = phone.replace(/[\s\-\(\)\.]/g, '');
-    
-    const result = this.db.prepare(`
-      SELECT c.*
-      FROM contacts c
-      JOIN contact_phones p ON c.id = p.contact_id
-      WHERE REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '-', ''), '(', ''), ')', '') LIKE ?
-      LIMIT 1
-    `).get(`%${normalizedPhone}%`);
-
-    if (!result) return null;
-
-    return {
-      id: result.id,
-      name: result.full_name,
-      firstName: result.first_name,
-      lastName: result.last_name,
-      organization: result.organization,
-      birthday: result.birthday,
-      notes: result.notes,
-      lastContacted: result.last_contacted,
-      emails: this.db.prepare('SELECT email FROM contact_emails WHERE contact_id = ?').all(result.id).map(e => e.email),
-      phones: this.db.prepare('SELECT phone FROM contact_phones WHERE contact_id = ?').all(result.id).map(p => p.phone)
-    };
-  }
-
-  // Main sync method
-  async sync(forceRefresh = false) {
-    // Check cache first unless forced refresh
-    if (!forceRefresh && await this.isCacheValid()) {
-      await this.loadCache();
-      console.log(`✅ Loaded ${this.contacts.length} contacts from database cache`);
-      return this.contacts;
-    }
-
-    // Fetch from iCloud
-    const iCloudContacts = await this.synciCloudContacts();
-    this.contacts = iCloudContacts;
-
-    // Save to database
-    if (this.contacts.length > 0) {
-      await this.saveToDatabase();
-      console.log(`✅ Synced ${this.contacts.length} contacts to database`);
-    }
-
-    return this.contacts;
-  }
-
-  // Display contacts in a formatted way
-  displayContacts(contacts = this.contacts) {
+  if (options.date) {
+    const contacts = getBirthdaysForDate(db, options.date);
     if (contacts.length === 0) {
-      console.log('No contacts found');
+      const dateStr = new Date(options.date).toDateString();
+      console.log(colors.blue('ℹ') + ` No birthdays on ${dateStr}.`);
       return;
     }
 
-    console.log(`\nFound ${contacts.length} contact(s):\n`);
-    
-    contacts.forEach((contact, index) => {
-      console.log(`${index + 1}. ${contact.name || 'Unknown'}`);
-      if (contact.organization) {
-        console.log(`   Organization: ${contact.organization}`);
-      }
-      if (contact.emails?.length > 0) {
-        console.log(`   Email: ${contact.emails.join(', ')}`);
-      }
-      if (contact.phones?.length > 0) {
-        console.log(`   Phone: ${contact.phones.join(', ')}`);
-      }
-      if (contact.birthday) {
-        console.log(`   Birthday: ${contact.birthday}`);
-      }
-      if (contact.lastContacted) {
-        // Calculate days since last contact
-        const lastDate = new Date(contact.lastContacted);
-        const today = new Date();
-        const daysSince = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-        const weeksSince = Math.floor(daysSince / 7);
-        
-        let timeString = `${contact.lastContacted}`;
-        if (daysSince === 0) {
-          timeString += ' (today)';
-        } else if (daysSince === 1) {
-          timeString += ' (yesterday)';
-        } else if (daysSince < 7) {
-          timeString += ` (${daysSince} days ago)`;
-        } else if (weeksSince < 8) {
-          timeString += ` (${weeksSince} week${weeksSince === 1 ? '' : 's'} ago)`;
-        } else {
-          const monthsSince = Math.floor(daysSince / 30);
-          timeString += ` (${monthsSince} month${monthsSince === 1 ? '' : 's'} ago)`;
-        }
-        
-        console.log(`   Last contacted: ${timeString}`);
-        
-        // Highlight if it's been more than 6 weeks
-        if (weeksSince >= 6) {
-          console.log(`   ⚠️  Time to reach out! (${weeksSince} weeks)`);
-        }
-      }
+    const dateStr = new Date(options.date).toDateString();
+    console.log(colors.bold(`🎂 Birthdays on ${dateStr}:\n`));
+    contacts.forEach(contact => {
+      displayContact(contact);
+      console.log('');
+    });
+  } else {
+    const days = options.days || 7;
+    const events = getUpcomingBirthdays(db, days);
+
+    if (events.length === 0) {
+      console.log(colors.blue('ℹ') + ` No birthdays in the next ${days} days.`);
+      return;
+    }
+
+    console.log(colors.bold(`🎂 Upcoming Birthdays (Next ${days} Days):\n`));
+    events.forEach(dayEvent => {
+      console.log(colors.bold(dayEvent.dayLabel + ':'));
+      dayEvent.contacts.forEach(contact => {
+        console.log(`  🎂 ${colors.bold(contact.full_name)}`);
+        if (contact.organization) console.log(`     ${colors.gray(contact.organization)}`);
+      });
       console.log('');
     });
   }
 
-  // Export contacts as JSON
-  async exportJSON(filename = 'contacts-export.json') {
-    const fs = await import('fs/promises');
-    const exportPath = path.join(process.cwd(), filename);
-    await this.loadCache();
-    await fs.writeFile(exportPath, JSON.stringify(this.contacts, null, 2));
-    console.log(`✅ Exported ${this.contacts.length} contacts to ${filename}`);
-  }
-
-  // Get statistics
-  getStats() {
-    const stats = this.db.prepare(`
-      SELECT 
-        COUNT(DISTINCT c.id) as total,
-        COUNT(DISTINCT CASE WHEN e.email IS NOT NULL THEN c.id END) as with_email,
-        COUNT(DISTINCT CASE WHEN p.phone IS NOT NULL THEN c.id END) as with_phone,
-        COUNT(DISTINCT CASE WHEN c.organization IS NOT NULL THEN c.id END) as with_organization,
-        COUNT(DISTINCT CASE WHEN c.birthday IS NOT NULL THEN c.id END) as with_birthday,
-        COUNT(DISTINCT CASE WHEN a.contact_id IS NOT NULL THEN c.id END) as with_address
-      FROM contacts c
-      LEFT JOIN contact_emails e ON c.id = e.contact_id
-      LEFT JOIN contact_phones p ON c.id = p.contact_id
-      LEFT JOIN contact_addresses a ON c.id = a.contact_id
-    `).get();
-
-    return {
-      total: stats.total,
-      withEmail: stats.with_email,
-      withPhone: stats.with_phone,
-      withOrganization: stats.with_organization,
-      withBirthday: stats.with_birthday,
-      withAddress: stats.with_address
-    };
-  }
-
-  close() {
-    this.db.close();
-  }
+  console.log(getSyncStatusMessage(db, 'contacts'));
 }
 
-// CLI interface
-async function main() {
-  const args = process.argv.slice(2);
-  const command = args[0] || 'sync';
-  
-  const contactsSync = new ContactsSync();
+async function cmdList(db, options = {}) {
+  ensureSync(db);
 
-  try {
-    switch (command) {
-      case 'sync':
-        await contactsSync.sync(args.includes('--force'));
-        break;
+  const contacts = getAllContacts(db);
 
-      case 'search':
-        const query = args.slice(1).join(' ');
-        if (!query) {
-          console.log('Usage: contacts search <query>');
-          process.exit(1);
-        }
-        const results = contactsSync.search(query);
-        contactsSync.displayContacts(results);
-        break;
-
-      case 'list':
-        await contactsSync.loadCache();
-        contactsSync.displayContacts();
-        break;
-
-      case 'stats':
-        const stats = contactsSync.getStats();
-        console.log('\n📊 Contact Statistics:');
-        console.log(`   Total contacts: ${stats.total}`);
-        console.log(`   With email: ${stats.withEmail}`);
-        console.log(`   With phone: ${stats.withPhone}`);
-        console.log(`   With organization: ${stats.withOrganization}`);
-        console.log(`   With birthday: ${stats.withBirthday}`);
-        console.log(`   With address: ${stats.withAddress}`);
-        break;
-
-      case 'due':
-      case 'overdue':
-        // Show contacts who haven't been contacted in 6+ weeks
-        await contactsSync.loadCache();
-        const overdueContacts = contactsSync.contacts.filter(contact => {
-          if (!contact.lastContacted) return false;
-          const lastDate = new Date(contact.lastContacted);
-          const today = new Date();
-          const daysSince = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-          return daysSince >= 42; // 6 weeks = 42 days
-        }).sort((a, b) => {
-          // Sort by last contacted date (oldest first)
-          return new Date(a.lastContacted) - new Date(b.lastContacted);
-        });
-        
-        if (overdueContacts.length === 0) {
-          console.log('\n✅ No contacts are overdue for reaching out!');
-        } else {
-          console.log(`\n⚠️  ${overdueContacts.length} contact(s) haven't been contacted in 6+ weeks:\n`);
-          contactsSync.displayContacts(overdueContacts);
-        }
-        break;
-
-      case 'export':
-        const filename = args[1] || 'contacts-export.json';
-        await contactsSync.exportJSON(filename);
-        break;
-
-      case 'cache':
-        const cacheValid = await contactsSync.isCacheValid();
-        if (cacheValid) {
-          const result = contactsSync.db.prepare(
-            'SELECT MAX(updated_at) as last_update FROM contacts'
-          ).get();
-          const lastUpdate = new Date(result.last_update);
-          const age = Date.now() - lastUpdate.getTime();
-          const hours = Math.floor(age / (60 * 60 * 1000));
-          const minutes = Math.floor((age % (60 * 60 * 1000)) / (60 * 1000));
-          console.log(`✅ Cache is valid (${hours}h ${minutes}m old)`);
-        } else {
-          console.log('❌ Cache is expired or needs refresh');
-        }
-        break;
-
-      case 'clear-cache':
-        // Just mark all contacts as old to force refresh on next sync
-        contactsSync.db.prepare("UPDATE contacts SET updated_at = datetime('now', '-1 day')").run();
-        console.log('✅ Cache marked for refresh');
-        break;
-
-      case '--help':
-
-      case 'update-note':
-        // Update a contact's note field
-        const searchName = process.argv[3];
-        const newNote = process.argv[4];
-        
-        if (!searchName || !newNote) {
-          console.log('Usage: contacts update-note <name> <note>');
-          process.exit(1);
-        }
-        
-        await contactsSync.sync();
-        const contacts = contactsSync.searchContacts(searchName);
-        
-        if (contacts.length === 0) {
-          console.log(`No contact found for: ${searchName}`);
-          process.exit(1);
-        }
-        
-        if (contacts.length > 1) {
-          console.log(`Multiple contacts found for: ${searchName}`);
-          contacts.forEach((c, i) => console.log(`  ${i+1}. ${c.name}`));
-          console.log('Please be more specific');
-          process.exit(1);
-        }
-        
-        const contact = contacts[0];
-        await contactsSync.synciCloudContacts();
-        
-        // Fetch the existing vCard
-        const vcards = await contactsSync.client.fetchVCards({
-          addressBook: contactsSync.addressBook
-        });
-        
-        const existingVcard = vcards.find(v => v.data && v.data.includes(contact.name));
-        if (!existingVcard) {
-          console.log(`Could not find vCard for ${contact.name}`);
-          process.exit(1);
-        }
-        
-        // Update the NOTE field in the vCard
-        let updatedData = existingVcard.data;
-        if (updatedData.includes('NOTE:')) {
-          // Replace existing note
-          updatedData = updatedData.replace(/NOTE:.*?(\r\n|\n|$)/, `NOTE:${newNote}\r\n`);
-        } else {
-          // Add note before END:VCARD
-          updatedData = updatedData.replace(/END:VCARD/, `NOTE:${newNote}\r\nEND:VCARD`);
-        }
-        
-        try {
-          await contactsSync.client.updateVCard({
-            vCard: {
-              url: existingVcard.url,
-              data: updatedData,
-              etag: existingVcard.etag
-            }
-          });
-          console.log(`✅ Updated note for ${contact.name}: ${newNote}`);
-        } catch (error) {
-          console.error(`Failed to update contact: ${error.message}`);
-          process.exit(1);
-        }
-        break;
-
-      case 'add':
-        // Simple add contact for Ken Felts
-        const firstName = process.argv[3];
-        const lastName = process.argv[4];
-        const url = process.argv[5];
-        const note = process.argv[6];
-        
-        if (!firstName || !lastName) {
-          console.log('Usage: contacts add <firstName> <lastName> [url] [note]');
-          process.exit(1);
-        }
-        
-        await contactsSync.synciCloudContacts();
-        
-        // Create a simple vCard
-        const vcard = [
-          'BEGIN:VCARD',
-          'VERSION:3.0',
-          `FN:${firstName} ${lastName}`,
-          `N:${lastName};${firstName};;;`,
-          url ? `URL:${url}` : '',
-          note ? `NOTE:${note}` : '',
-          'END:VCARD'
-        ].filter(line => line).join('\r\n');
-        
-        try {
-          // Use the address book from the synced data
-          console.log('Creating vCard with data:', vcard);
-          console.log('Using addressBook:', contactsSync.addressBook);
-          
-          const response = await contactsSync.client.createVCard({
-            addressBook: contactsSync.addressBook,
-            vCard: vcard,
-            filename: `${firstName}_${lastName}_${Date.now()}.vcf`
-          });
-          
-          console.log('Response from createVCard:', response);
-          console.log(`✅ Added contact: ${firstName} ${lastName}`);
-          if (url) console.log(`   URL: ${url}`);
-          if (note) console.log(`   Note: ${note}`);
-        } catch (error) {
-          console.error('Failed to add contact:', error);
-          console.error('Full error:', error);
-          process.exit(1);
-        }
-        break;
-
-      case 'help':
-        console.log('Usage: contacts [command] [options]');
-        console.log('');
-        console.log('Commands:');
-        console.log('  sync [--force]     Sync contacts from iCloud (default)');
-        console.log('  search <query>     Search contacts by name, email, or phone');
-        console.log('  list               List all contacts');
-        console.log('  due/overdue        Show contacts not contacted in 6+ weeks');
-        console.log('  stats              Show contact statistics');
-        console.log('  export [filename]  Export contacts to JSON file');
-        console.log('  cache              Check cache status');
-        console.log('  clear-cache        Mark cache for refresh');
-        console.log('  add <first> <last> [url] [note]  Add a new contact');
-        console.log('  help               Show this help message');
-        console.log('');
-        console.log('Configuration:');
-        console.log('  Set these in your .env file:');
-        console.log('  ICLOUD_USERNAME    Your iCloud email address');
-        console.log('  ICLOUD_APP_PASSWORD App-specific password from appleid.apple.com');
-        break;
-
-      default:
-        console.log(`Unknown command: ${command}`);
-        console.log('Run "contacts help" for usage information');
-        process.exit(1);
-    }
-  } finally {
-    contactsSync.close();
+  if (contacts.length === 0) {
+    console.log(colors.blue('ℹ') + ' No contacts found.');
+    console.log('');
+    console.log('Sync contacts first: ' + colors.cyan('bin/contacts sync'));
+    return;
   }
+
+  console.log(colors.bold(`📇 All Contacts (${contacts.length}):\n`));
+
+  const limit = options.limit || 20;
+  const displayed = contacts.slice(0, limit);
+
+  displayed.forEach(contact => {
+    console.log(`${colors.bold(contact.full_name)}`);
+    if (contact.organization) console.log(`  ${colors.gray(contact.organization)}`);
+    if (contact.primary_email) console.log(`  ${colors.gray(contact.primary_email)}`);
+    console.log('');
+  });
+
+  if (contacts.length > limit) {
+    console.log(colors.gray(`... and ${contacts.length - limit} more contacts`));
+    console.log(colors.gray(`Use --limit option to show more`));
+    console.log('');
+  }
+
+  console.log(getSyncStatusMessage(db, 'contacts'));
 }
 
-// Run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .then(() => process.exit(0))
-    .catch(error => {
-      console.error('Error:', error.message);
-      process.exit(1);
+async function cmdSearch(db, query) {
+  ensureSync(db);
+
+  const contacts = searchContacts(db, query);
+
+  if (contacts.length === 0) {
+    console.log(colors.blue('ℹ') + ` No contacts matching "${query}".`);
+    return;
+  }
+
+  console.log(colors.bold(`🔍 Search Results for "${query}" (${contacts.length}):\n`));
+
+  contacts.forEach(contact => {
+    displayContact(contact);
+    console.log('');
+  });
+
+  console.log(getSyncStatusMessage(db, 'contacts'));
+}
+
+async function cmdStats(db) {
+  ensureSync(db);
+
+  if (!contactsTableExists(db)) {
+    console.log(colors.blue('ℹ') + ' No contacts plugins enabled.');
+    console.log('');
+    console.log('To view contact statistics, configure a plugin:');
+    console.log('');
+    console.log('  ' + colors.cyan('bin/plugins configure'));
+    return;
+  }
+
+  const stats = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      COUNT(CASE WHEN birthday IS NOT NULL THEN 1 END) as with_birthday,
+      COUNT(CASE WHEN primary_email IS NOT NULL THEN 1 END) as with_email,
+      COUNT(CASE WHEN primary_phone IS NOT NULL THEN 1 END) as with_phone,
+      COUNT(CASE WHEN organization IS NOT NULL THEN 1 END) as with_organization,
+      COUNT(CASE WHEN notes IS NOT NULL AND notes != '' THEN 1 END) as with_notes
+    FROM contacts
+  `).get();
+
+  console.log(colors.bold('\n📊 Contact Statistics:'));
+  console.log(`   Total contacts: ${stats.total}`);
+  console.log(`   With birthday: ${stats.with_birthday}`);
+  console.log(`   With email: ${stats.with_email}`);
+  console.log(`   With phone: ${stats.with_phone}`);
+  console.log(`   With organization: ${stats.with_organization}`);
+  console.log(`   With notes: ${stats.with_notes}`);
+  console.log('');
+
+  console.log(getSyncStatusMessage(db, 'contacts'));
+}
+
+// Default command - show summary
+async function cmdSummary(db) {
+  ensureSync(db);
+
+  if (!contactsTableExists(db)) {
+    console.log(colors.blue('ℹ') + ' No contacts plugins enabled. Run ' + colors.cyan('bin/plugins configure') + ' to set up contacts.');
+    return;
+  }
+
+  const total = db.prepare('SELECT COUNT(*) as count FROM contacts').get().count;
+  if (total === 0) {
+    console.log(colors.blue('ℹ') + ' No contacts found. Run ' + colors.cyan('bin/contacts sync') + ' to import contacts.');
+    return;
+  }
+
+  console.log(colors.bold('📇 Contact Summary\n'));
+
+  // Show upcoming birthdays (next 7 days)
+  const upcomingBirthdays = getUpcomingBirthdays(db, 7);
+  if (upcomingBirthdays.length > 0) {
+    console.log(colors.bold('🎂 Upcoming Birthdays (Next 7 Days):'));
+    upcomingBirthdays.slice(0, 3).forEach(dayEvent => {
+      console.log(`  ${colors.bold(dayEvent.dayLabel)}:`);
+      dayEvent.contacts.forEach(contact => {
+        console.log(`    🎂 ${contact.full_name}`);
+      });
     });
+
+    if (upcomingBirthdays.length > 3) {
+      const moreCount = upcomingBirthdays.slice(3).reduce((sum, day) => sum + day.contacts.length, 0);
+      console.log(`    ... and ${moreCount} more birthdays`);
+    }
+    console.log('');
+  }
+
+  console.log(colors.gray(`📊 ${total} total contacts`));
+
+  if (upcomingBirthdays.length === 0) {
+    console.log(colors.green('✅ No upcoming birthdays in the next 7 days'));
+  }
+
+  console.log('');
+  console.log(colors.gray('Commands: birthday, list, search, sync, stats'));
+  console.log(getSyncStatusMessage(db, 'contacts'));
 }
 
-// Export for use in other scripts
-export { ContactsSync };
+// Commander setup
+const db = getDatabase();
+
+program
+  .name('contacts')
+  .description('Contact management for Today system');
+
+program
+  .command('summary', { isDefault: true })
+  .description('Show contact summary (default)')
+  .action(async () => {
+    await cmdSummary(db);
+  });
+
+program
+  .command('sync')
+  .description('Sync contacts via plugin system')
+  .action(async () => {
+    await cmdSync();
+  });
+
+program
+  .command('birthday')
+  .aliases(['birthdays'])
+  .description('Show upcoming birthdays')
+  .option('--days <days>', 'Number of days to look ahead', parseInt, 7)
+  .option('--date <date>', 'Show birthdays for specific date (YYYY-MM-DD)')
+  .action(async (options) => {
+    await cmdBirthdays(db, options);
+  });
+
+program
+  .command('list')
+  .description('List all contacts')
+  .option('--limit <limit>', 'Maximum number of contacts to show', parseInt, 20)
+  .action(async (options) => {
+    await cmdList(db, options);
+  });
+
+program
+  .command('search <query>')
+  .description('Search contacts by name, organization, or notes')
+  .action(async (query) => {
+    await cmdSearch(db, query);
+  });
+
+program
+  .command('stats')
+  .description('Show contact statistics')
+  .action(async () => {
+    await cmdStats(db);
+  });
+
+// Handle --date option at top level (used by bin/today for historical queries)
+const dateArgIdx = process.argv.findIndex(a => a === '--date');
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+  const targetDate = process.argv[dateArgIdx + 1];
+  ensureSync(db);
+
+  const birthdays = getBirthdaysForDate(db, targetDate);
+  if (birthdays.length === 0) {
+    console.log(`No birthdays for ${targetDate}`);
+  } else {
+    console.log('Birthdays:');
+    birthdays.forEach(contact => {
+      console.log(`  🎂 ${contact.full_name}`);
+    });
+  }
+  process.exit(0);
+}
+
+program.parse();
