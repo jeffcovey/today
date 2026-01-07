@@ -134,6 +134,32 @@ function displayContact(contact) {
   }
 }
 
+// Import writeEntryAndSync dynamically to avoid circular dependencies
+let writeEntryAndSyncFn = null;
+async function getWriteEntryAndSync() {
+  if (!writeEntryAndSyncFn) {
+    const module = await import('../src/plugin-loader.js');
+    writeEntryAndSyncFn = module.writeEntryAndSync;
+  }
+  return writeEntryAndSyncFn;
+}
+
+// Display disambiguation options for same-name contacts
+function displayDisambiguation(matches) {
+  console.log(colors.yellow('⚠') + ' Multiple contacts match. Please be more specific:\n');
+  matches.forEach((m, i) => {
+    console.log(`  ${colors.bold(`[${i + 1}]`)} ${m.name}`);
+    if (m.email && m.email !== '(no email)') {
+      console.log(`      ${colors.gray('Email:')} ${m.email}`);
+    }
+    if (m.id) {
+      console.log(`      ${colors.gray('ID:')} ${m.id}`);
+    }
+  });
+  console.log('');
+  console.log(colors.gray('Use --email or --id to specify which contact.'));
+}
+
 // Commands
 async function cmdSync() {
   console.log(colors.blue('ℹ') + ' Syncing contacts plugins to database...');
@@ -284,6 +310,187 @@ async function cmdStats(db) {
   console.log(getSyncStatusMessage(db, 'contacts'));
 }
 
+// Add a new contact
+async function cmdAdd(options) {
+  const writeEntryAndSync = await getWriteEntryAndSync();
+
+  // Build contact data from options
+  const entry = { action: 'create' };
+
+  if (options.name) {
+    entry.full_name = options.name;
+    const nameParts = options.name.split(' ');
+    if (nameParts.length >= 2) {
+      entry.first_name = nameParts[0];
+      entry.last_name = nameParts.slice(1).join(' ');
+    } else {
+      entry.first_name = options.name;
+    }
+  }
+
+  if (options.firstName) entry.first_name = options.firstName;
+  if (options.lastName) entry.last_name = options.lastName;
+  if (options.email) entry.primary_email = options.email;
+  if (options.phone) entry.primary_phone = options.phone;
+  if (options.organization) entry.organization = options.organization;
+  if (options.birthday) entry.birthday = options.birthday;
+  if (options.notes) entry.notes = options.notes;
+
+  // Require at least a name
+  if (!entry.full_name && !entry.first_name) {
+    console.error(colors.red('✗') + ' Contact name is required.');
+    console.log('');
+    console.log('Usage: ' + colors.cyan('bin/contacts add --name "John Doe" --email john@example.com'));
+    process.exit(1);
+  }
+
+  // Build full name if not provided
+  if (!entry.full_name) {
+    entry.full_name = [entry.first_name, entry.last_name].filter(Boolean).join(' ');
+  }
+
+  console.log(colors.gray('Creating contact...'));
+
+  const result = await writeEntryAndSync('contacts', entry, { db });
+
+  if (result.success) {
+    const writeResult = result.writeResult;
+    if (writeResult?.success) {
+      console.log(colors.green('✓') + ` ${writeResult.message}`);
+    } else if (writeResult?.error) {
+      console.error(colors.red('✗') + ` ${writeResult.error}`);
+      process.exit(1);
+    } else {
+      console.log(colors.green('✓') + ` Created contact: ${entry.full_name}`);
+    }
+  } else {
+    console.error(colors.red('✗') + ` ${result.error || 'Failed to create contact'}`);
+    if (result.availableSources) {
+      console.log('');
+      console.log('Available sources:');
+      result.availableSources.forEach(s => {
+        console.log(`  ${s.enabled ? colors.green('●') : colors.gray('○')} ${s.sourceId}`);
+      });
+    }
+    process.exit(1);
+  }
+}
+
+// Edit an existing contact
+async function cmdEdit(nameOrSearch, options) {
+  const writeEntryAndSync = await getWriteEntryAndSync();
+
+  // Build search criteria
+  const search = {};
+  if (options.id) {
+    search.id = options.id;
+  } else if (options.email) {
+    search.email = options.email;
+  } else if (nameOrSearch) {
+    search.name = nameOrSearch;
+  } else {
+    console.error(colors.red('✗') + ' Specify a contact name, --email, or --id to edit.');
+    process.exit(1);
+  }
+
+  // Build updates from options
+  const updates = {};
+  if (options.name) {
+    updates.full_name = options.name;
+    const nameParts = options.name.split(' ');
+    if (nameParts.length >= 2) {
+      updates.first_name = nameParts[0];
+      updates.last_name = nameParts.slice(1).join(' ');
+    }
+  }
+  if (options.firstName) updates.first_name = options.firstName;
+  if (options.lastName) updates.last_name = options.lastName;
+  if (options.newEmail) updates.primary_email = options.newEmail;
+  if (options.phone) updates.primary_phone = options.phone;
+  if (options.organization) updates.organization = options.organization;
+  if (options.birthday) updates.birthday = options.birthday;
+  if (options.notes) updates.notes = options.notes;
+
+  if (Object.keys(updates).length === 0) {
+    console.error(colors.red('✗') + ' No updates specified.');
+    console.log('');
+    console.log('Usage: ' + colors.cyan('bin/contacts edit "John Doe" --phone 555-1234'));
+    process.exit(1);
+  }
+
+  console.log(colors.gray('Updating contact...'));
+
+  const entry = { action: 'update', search, updates };
+  const result = await writeEntryAndSync('contacts', entry, { db });
+
+  if (result.success) {
+    const writeResult = result.writeResult;
+    if (writeResult?.success) {
+      console.log(colors.green('✓') + ` ${writeResult.message}`);
+    } else if (writeResult?.error === 'multiple_matches') {
+      displayDisambiguation(writeResult.matches);
+      process.exit(1);
+    } else if (writeResult?.error) {
+      console.error(colors.red('✗') + ` ${writeResult.error}`);
+      process.exit(1);
+    } else {
+      console.log(colors.green('✓') + ' Contact updated.');
+    }
+  } else {
+    console.error(colors.red('✗') + ` ${result.error || 'Failed to update contact'}`);
+    process.exit(1);
+  }
+}
+
+// Delete a contact
+async function cmdDelete(nameOrSearch, options) {
+  const writeEntryAndSync = await getWriteEntryAndSync();
+
+  // Build search criteria
+  const search = {};
+  if (options.id) {
+    search.id = options.id;
+  } else if (options.email) {
+    search.email = options.email;
+  } else if (nameOrSearch) {
+    search.name = nameOrSearch;
+  } else {
+    console.error(colors.red('✗') + ' Specify a contact name, --email, or --id to delete.');
+    process.exit(1);
+  }
+
+  // Confirm unless --force
+  if (!options.force) {
+    console.log(colors.yellow('⚠') + ` This will delete the contact matching: ${nameOrSearch || options.email || options.id}`);
+    console.log('');
+    console.log('Use ' + colors.cyan('--force') + ' to skip this confirmation.');
+    process.exit(0);
+  }
+
+  console.log(colors.gray('Deleting contact...'));
+
+  const entry = { action: 'delete', search };
+  const result = await writeEntryAndSync('contacts', entry, { db });
+
+  if (result.success) {
+    const writeResult = result.writeResult;
+    if (writeResult?.success) {
+      console.log(colors.green('✓') + ` ${writeResult.message}`);
+    } else if (writeResult?.error === 'multiple_matches') {
+      displayDisambiguation(writeResult.matches);
+      process.exit(1);
+    } else if (writeResult?.error) {
+      console.error(colors.red('✗') + ` ${writeResult.error}`);
+      process.exit(1);
+    } else {
+      console.log(colors.green('✓') + ' Contact deleted.');
+    }
+  } else {
+    console.error(colors.red('✗') + ` ${result.error || 'Failed to delete contact'}`);
+    process.exit(1);
+  }
+}
+
 // Default command - show summary
 async function cmdSummary(db) {
   ensureSync(db);
@@ -326,7 +533,7 @@ async function cmdSummary(db) {
   }
 
   console.log('');
-  console.log(colors.gray('Commands: birthday, list, search, sync, stats'));
+  console.log(colors.gray('Commands: birthday, list, search, add, edit, delete, sync, stats'));
   console.log(getSyncStatusMessage(db, 'contacts'));
 }
 
@@ -381,6 +588,49 @@ program
   .description('Show contact statistics')
   .action(async () => {
     await cmdStats(db);
+  });
+
+program
+  .command('add')
+  .description('Add a new contact')
+  .option('--name <name>', 'Full name')
+  .option('--first-name <firstName>', 'First name')
+  .option('--last-name <lastName>', 'Last name')
+  .option('--email <email>', 'Email address')
+  .option('--phone <phone>', 'Phone number')
+  .option('--organization <org>', 'Organization/company')
+  .option('--birthday <date>', 'Birthday (YYYY-MM-DD)')
+  .option('--notes <notes>', 'Notes about the contact')
+  .action(async (options) => {
+    await cmdAdd(options);
+  });
+
+program
+  .command('edit [name]')
+  .description('Edit an existing contact')
+  .option('--id <id>', 'Contact ID (for disambiguation)')
+  .option('--email <email>', 'Find by email (for disambiguation)')
+  .option('--name <name>', 'Update full name')
+  .option('--first-name <firstName>', 'Update first name')
+  .option('--last-name <lastName>', 'Update last name')
+  .option('--new-email <newEmail>', 'Update email address')
+  .option('--phone <phone>', 'Update phone number')
+  .option('--organization <org>', 'Update organization')
+  .option('--birthday <date>', 'Update birthday (YYYY-MM-DD)')
+  .option('--notes <notes>', 'Update notes')
+  .action(async (name, options) => {
+    await cmdEdit(name, options);
+  });
+
+program
+  .command('delete [name]')
+  .aliases(['rm', 'remove'])
+  .description('Delete a contact')
+  .option('--id <id>', 'Contact ID (for disambiguation)')
+  .option('--email <email>', 'Find by email (for disambiguation)')
+  .option('--force', 'Skip confirmation')
+  .action(async (name, options) => {
+    await cmdDelete(name, options);
   });
 
 // Handle --date option at top level (used by bin/today for historical queries)

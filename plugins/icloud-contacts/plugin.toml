@@ -18,6 +18,7 @@ Use contact information to:
 
 [commands]
 read = "./read.js"
+write = "./write.js"
 
 [settings]
 apple_id = { type = "string", default = "", description = "Apple ID email address" }
