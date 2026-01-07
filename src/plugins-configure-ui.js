@@ -16,6 +16,7 @@ import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+import { schemas } from './plugin-schemas.js';
 
 const html = htm.bind(React.createElement);
 
@@ -36,13 +37,12 @@ const ENV_PATH = path.join(projectRoot, '.env');
  */
 function getEnvVar(key) {
   try {
-    const result = execSync(`npx dotenvx get ${key} --format=json 2>/dev/null`, {
+    const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
       cwd: projectRoot,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
-    });
-    const parsed = JSON.parse(result);
-    return parsed[key] || null;
+    }).trim();
+    return result || null;
   } catch {
     return null;
   }
@@ -196,22 +196,29 @@ function createSource(pluginName, sourceName) {
 // Build plugin list for main menu
 // ============================================================================
 
-const TYPE_LABELS = {
-  'events': 'Calendars & Events',
-  'tasks': 'Tasks',
-  'projects': 'Projects',
-  'issues': 'Issues',
-  'diary': 'Diary & Notes',
-  'time-logs': 'Time Tracking',
-  'habits': 'Habits',
-  'health-metrics': 'Health',
-  'email': 'Email',
-  'context': 'Context',
-  'utility': 'Utilities',
-  'other': 'Other',
-};
+/**
+ * Get display label for a plugin type
+ * Uses the AI name from schema, or falls back to capitalized type name
+ */
+function getTypeDisplayLabel(type) {
+  const schema = schemas[type];
+  if (schema?.ai?.name) {
+    return schema.ai.name;
+  }
+  // Fallback: capitalize and replace hyphens
+  return type.split('-').map(word =>
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+}
 
-const TYPE_ORDER = ['events', 'tasks', 'projects', 'issues', 'diary', 'time-logs', 'habits', 'health-metrics', 'email', 'context', 'utility', 'other'];
+/**
+ * Get all plugin types from schemas, sorted alphabetically
+ * Excludes utility type (no AI context)
+ */
+function getOrderedPluginTypes() {
+  const allTypes = Object.keys(schemas);
+  return allTypes.filter(type => type !== 'utility').sort();
+}
 
 function buildPluginList(plugins) {
   const config = readConfig();
@@ -246,11 +253,11 @@ function buildPluginList(plugins) {
   const displayList = [];
   const pluginIndexMap = []; // Maps display index to plugin (null for headers)
 
-  for (const type of TYPE_ORDER) {
+  for (const type of getOrderedPluginTypes()) {
     if (!byType[type] || byType[type].length === 0) continue;
 
     // Add type header
-    displayList.push({ type: 'header', label: TYPE_LABELS[type] || type });
+    displayList.push({ type: 'header', label: getTypeDisplayLabel(type) });
     pluginIndexMap.push(null);
 
     // Add plugins

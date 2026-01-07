@@ -1,7 +1,7 @@
 // Calendar Events Widget for Obsidian DataviewJS
 // Shows upcoming events from Today's calendar sync system
 // Reads from logs/upcoming-events.json (exported during plugin sync)
-// Fixed: Proper timezone handling and 3-day range (Jan 3-5)
+// Filters to 3-day range and excludes past timed events
 // Usage: await dv.view("scripts/calendar-events-widget");
 
 // Import timezone-aware formatting function (same as bin/calendar uses)
@@ -48,10 +48,21 @@ try {
                 const dayAfterStr = dayAfter.toLocaleDateString('sv-SE', {timeZone: timezone});
 
                 // Filter events to exactly 3 days: today, tomorrow, day after
+                // Also filter out events that have already passed
+                const now = new Date();
                 allEvents = data.entries.filter(entry => {
                     if (!entry.start) return false;
                     const eventDate = entry.start.split('T')[0];
-                    return eventDate === todayStr || eventDate === tomorrowStr || eventDate === dayAfterStr;
+                    const isInDateRange = eventDate === todayStr || eventDate === tomorrowStr || eventDate === dayAfterStr;
+                    if (!isInDateRange) return false;
+
+                    // For timed events, filter out those that have already started
+                    if (!entry.isAllDay) {
+                        const eventStart = new Date(entry.start);
+                        if (eventStart < now) return false;
+                    }
+                    // All-day events for today are always shown (they span the whole day)
+                    return true;
                 });
             }
         }

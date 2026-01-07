@@ -858,8 +858,6 @@ Common metric names:
     indexes: ['source', 'date', 'metric_name']
   },
 
-  // NOTE: Add new plugin types HERE (at the end) to get correct migration version numbers
-
   'finance': {
     table: 'financial_transactions',
     staleMinutes: 60, // Financial data doesn't change frequently
@@ -960,6 +958,133 @@ SQL: SELECT date, payee, category, amount, account FROM financial_transactions W
     indexes: ['source', 'date', 'account', 'category']
   },
 
+  'contacts': {
+    table: 'contacts',
+    staleMinutes: 240, // Contacts change infrequently, sync every 4 hours
+    ai: {
+      name: 'Contacts',
+      description: `Contact information synced from address books (iCloud, Google, etc.).
+Includes names, emails, phones, birthdays, organizations, and notes.
+Use this to remind the user of upcoming birthdays and to provide
+context when people are mentioned.`,
+      defaultCommand: 'bin/contacts birthday --days 7',
+      dateCommand: 'bin/contacts --date $DATE',
+      queryInstructions: `Commands: bin/contacts birthday --days 7, bin/contacts search "name", bin/contacts list
+SQL: SELECT full_name, birthday, organization, notes FROM contacts ORDER BY full_name
+
+Common queries:
+- Today's birthdays: SELECT * FROM contacts WHERE birthday LIKE '%' || strftime('%m-%d', 'now') || '%'
+- Search by name: SELECT * FROM contacts WHERE full_name LIKE '%name%'`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique contact identifier (generated from CardDAV UID or name if not provided)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., icloud-contacts/default)'
+      },
+      first_name: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'First name'
+      },
+      last_name: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Last name'
+      },
+      full_name: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Full display name'
+      },
+      nickname: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Preferred name or nickname'
+      },
+      organization: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Company or organization'
+      },
+      job_title: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Professional title'
+      },
+      primary_email: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Primary email address'
+      },
+      primary_phone: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Primary phone number'
+      },
+      birthday: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Birthday in YYYY-MM-DD or --MM-DD format'
+      },
+      location_city: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'City where this person lives'
+      },
+      location_state: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'State/region where this person lives'
+      },
+      location_country: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Country where this person lives'
+      },
+      notes: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Personal notes about this contact'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific data (emails[], phones[], addresses[], social_profiles[], etc.)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'full_name', 'birthday']
+  },
 
   'utility': {
     // Utility plugins perform maintenance tasks and don't store data
@@ -969,6 +1094,10 @@ SQL: SELECT date, payee, category, amount, account FROM financial_transactions W
     ai: null, // No AI context - utility plugins are silent background tasks
     fields: {}
   }
+
+  // ⚠️  CRITICAL: Add new plugin types above HERE to get correct migration version numbers
+  // ⚠️  DO NOT insert plugin types in the middle - it breaks database migrations!
+
 };
 
 /**
