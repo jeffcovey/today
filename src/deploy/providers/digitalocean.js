@@ -70,6 +70,29 @@ export class DigitalOceanProvider extends RemoteServer {
       ufw allow 'Nginx Full'
       ufw --force enable
 
+      echo "Configuring log rotation..."
+      cat > /etc/logrotate.d/rsyslog << 'LOGROTATE'
+/var/log/syslog
+/var/log/mail.log
+/var/log/kern.log
+/var/log/auth.log
+/var/log/user.log
+/var/log/cron.log
+{
+    rotate 4
+    daily
+    size 100M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+        /usr/lib/rsyslog/rsyslog-rotate
+    endscript
+}
+LOGROTATE
+
       echo "✓ Base setup complete"
     `);
 
@@ -183,10 +206,15 @@ SERVICE
       systemctl enable resilio-sync
       systemctl start resilio-sync
 
+      # Filter rslsync from syslog (it's very chatty and fills up disk)
+      echo ':programname, isequal, "rslsync" stop' > /etc/rsyslog.d/10-rslsync.conf
+      systemctl restart rsyslog
+
       echo ""
       echo "✓ Resilio Sync installed"
       echo "  Password: $RESILIO_PASSWORD"
       echo "  Config: /etc/resilio-sync/config.json"
+      echo "  Note: rslsync logs filtered from syslog (too verbose)"
     `);
 
     printStatus('Resilio Sync setup complete');
