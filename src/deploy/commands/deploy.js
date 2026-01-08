@@ -76,6 +76,13 @@ export async function deployCommand(server, args = []) {
     printWarning('Migrations may have already run');
   }
 
+  // Fix vault ownership for Resilio Sync (if vault is owned by rslsync)
+  const vaultOwner = server.sshCmd(`stat -c %U ${deployPath}/vault 2>/dev/null || echo ''`, { check: false, capture: true });
+  if (vaultOwner.stdout.trim() === 'rslsync') {
+    printInfo('Fixing vault ownership for Resilio Sync...');
+    server.sshCmd(`chown -R rslsync:rslsync ${deployPath}/vault`, { check: false });
+  }
+
   // Install logrotate config if it exists
   const logrotateConfig = path.join(PROJECT_ROOT, 'config', 'logrotate-today');
   if (fs.existsSync(logrotateConfig)) {
