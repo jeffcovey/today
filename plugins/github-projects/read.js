@@ -21,6 +21,9 @@ const ownerType = config.type || 'user';
 const repository = config.repository;
 const includeClosed = config.include_closed === true || config.include_closed === 'true';
 const limit = config.limit || 20;
+const defaultReviewFrequency = config.default_review_frequency || 'weekly';
+const closedReviewFrequency = config.closed_review_frequency || 'never';
+const staleness_days = config.staleness_days || 7;
 
 if (!owner) {
   console.error(JSON.stringify({
@@ -171,6 +174,62 @@ if (!includeClosed) {
   projects = projects.filter(p => !p.closed);
 }
 
+/**
+ * Calculate GitHub-native attention score and reasons
+ * @param {Object} project - GitHub project data
+ * @param {Object} metadata - Project metadata with items
+ * @param {number} stalenessDays - Days before considering project stale
+ * @returns {Object} { score: number, reasons: string[] }
+ */
+function calculateAttentionScore(project, metadata, stalenessDays) {
+  const reasons = [];
+  let score = 0;
+
+  // Check for staleness (no recent updates)
+  if (project.updatedAt) {
+    const updatedDate = new Date(project.updatedAt);
+    const daysSinceUpdate = Math.floor((Date.now() - updatedDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceUpdate >= stalenessDays) {
+      const staleDays = daysSinceUpdate;
+      reasons.push(`no activity for ${staleDays} days`);
+
+      // Scoring: stale projects get increasing scores
+      if (staleDays >= 30) score += 75;      // Very stale
+      else if (staleDays >= 14) score += 50; // Quite stale
+      else if (staleDays >= stalenessDays) score += 25; // Mildly stale
+    }
+  }
+
+  // Check for incomplete items (open issues/PRs)
+  if (metadata.items && metadata.items.length > 0) {
+    const openItems = metadata.items.filter(i => i.state === 'open').length;
+    const totalItems = metadata.items.length;
+
+    if (openItems > 0) {
+      const openPercentage = Math.round((openItems / totalItems) * 100);
+
+      if (openPercentage > 80) {
+        reasons.push(`${openItems}/${totalItems} items incomplete (${openPercentage}%)`);
+        score += 30; // Many incomplete items
+      } else if (openPercentage > 50) {
+        reasons.push(`${openItems}/${totalItems} items incomplete (${openPercentage}%)`);
+        score += 15; // Some incomplete items
+      }
+    }
+  }
+
+  // Closed projects get low attention unless there are other issues
+  if (project.closed && score === 0) {
+    score = 0; // Completed projects need no attention
+  }
+
+  // Ensure score doesn't exceed 100
+  score = Math.min(score, 100);
+
+  return { score, reasons };
+}
+
 // Transform to our schema
 const entries = projects.map(project => {
   // Build metadata object
@@ -214,6 +273,17 @@ const entries = projects.map(project => {
     progress = Math.round((closed / metadata.items.length) * 100);
   }
 
+  // Calculate GitHub-native attention score and reasons
+  const attentionData = calculateAttentionScore(project, metadata, staleness_days);
+  const attentionScore = attentionData.score;
+  const attentionReasons = attentionData.reasons;
+
+  // Set review frequency based on project status
+  const reviewFrequency = project.closed ? closedReviewFrequency : defaultReviewFrequency;
+
+  // Set last_reviewed to null for new projects (they'll appear as needing review)
+  const lastReviewed = null;
+
   // Build unique ID
   const idPrefix = ownerType === 'repo' ? `${owner}/${repository}` : owner;
 
@@ -228,8 +298,11 @@ const entries = projects.map(project => {
     due_date: null,
     completed_at: null,
     progress: progress,
-    review_frequency: null,
-    last_reviewed: null,
+    review_frequency: reviewFrequency,
+    last_reviewed: lastReviewed,
+    attention_score: attentionScore,
+    attention_reasons: attentionReasons.length > 0 ? JSON.stringify(attentionReasons) : null,
+    last_activity: project.updatedAt ? project.updatedAt.split('T')[0] : null,
     url: project.url,
     parent_id: null,
     metadata: JSON.stringify(metadata)

@@ -758,6 +758,24 @@ SELECT * FROM tasks WHERE id LIKE 'markdown-tasks/local:vault/projects/PROJECT_F
         required: false,
         description: 'Parent project ID for sub-projects/hierarchies'
       },
+      attention_score: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Urgency score 0-100 (higher = needs more attention)'
+      },
+      attention_reasons: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of reasons why this project needs attention'
+      },
+      last_activity: {
+        sqlType: 'DATE',
+        jsType: 'string',
+        required: false,
+        description: 'Date of last meaningful activity (YYYY-MM-DD)'
+      },
       metadata: {
         sqlType: 'TEXT',
         jsType: 'string',
