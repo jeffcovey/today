@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from 'fs';
 
-// Read local mount targets to exclude from Jest
-const localMountsPath = '.local-mounts.json';
-const localMounts = existsSync(localMountsPath)
-  ? JSON.parse(readFileSync(localMountsPath, 'utf8')).targets || []
+// Read local mount targets from mounts.local to exclude from Jest
+const mountsLocalPath = '.devcontainer/mounts.local';
+const localMounts = existsSync(mountsLocalPath)
+  ? readFileSync(mountsLocalPath, 'utf8')
+      .split('\n')
+      .filter(line => line.trim() && !line.startsWith('#') && line.includes('='))
+      .map(line => line.split('=')[0].trim())
   : [];
 
 export default {

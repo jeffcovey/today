@@ -26,13 +26,6 @@ Resilio Sync.btskey
 # =============================================================================
 .data/
 .last-dep-check
-.local-mounts.json
-
-# =============================================================================
-# Local Mounts (added dynamically via .devcontainer/setup-mounts.sh)
-# =============================================================================
-# Entries from mounts.local are added to .git/info/exclude automatically
-
 # =============================================================================
 # Build & Dependencies
 # =============================================================================
@@ -58,6 +51,7 @@ __pycache__/
 # DevContainer Local Config
 # =============================================================================
 .devcontainer/mounts.local
+.devcontainer/docker-compose.override.yml
 
 # =============================================================================
 # OS Files

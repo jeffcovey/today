@@ -1,9 +1,12 @@
 {
 	"name": "Node.js Today CLI",
-	"build": {
-		"dockerfile": "Dockerfile",
-		"context": ".."
-	},
+	"dockerComposeFile": [
+		"docker-compose.yml",
+		"docker-compose.override.yml"
+	],
+	"service": "devcontainer",
+	"workspaceFolder": "/workspaces/today",
+	"initializeCommand": "bash .devcontainer/generate-compose-override.sh || true",
 	"features": {
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/sshd:1": {
@@ -26,7 +29,6 @@
 	"remoteEnv": {
 		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
 	},
-	"mounts": [],
 	"forwardPorts": [
 		2222,
 		8081
@@ -40,6 +42,5 @@
 			"label": "Code Server",
 			"onAutoForward": "notify"
 		}
-	},
-	"workspaceFolder": "/workspaces/today"
+	}
 }

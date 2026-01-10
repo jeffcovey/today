@@ -1,27 +1,13 @@
 # Local mount configuration for devcontainer
 # Copy this file to mounts.local and customize for your system
 #
-# IMPORTANT: For bind mounts to work, you must ALSO add corresponding
-# entries to devcontainer.json's "mounts" array. This file documents
-# your desired mounts and creates symlinks after container start.
-#
-# Step 1: Add to devcontainer.json (before rebuilding container):
-#
-#   "mounts": [
-#     {
-#       "source": "/path/on/host",
-#       "target": "/workspaces/today/foldername",
-#       "type": "bind"
-#     }
-#   ]
-#
-# Step 2: Add to this file (for documentation/symlink fallback):
-#
-#   foldername=/path/on/host
-#
 # Format: target=source
 #   target: folder name in /workspaces/today/
 #   source: absolute path on your host machine
+#
+# The generate-compose-override.sh script reads this file and creates
+# docker-compose.override.yml with the appropriate volume mounts.
+# This runs automatically when you rebuild the container.
 #
 # Examples:
 
@@ -29,4 +15,4 @@
 # vault=/Users/username/Library/Mobile Documents/iCloud~md~obsidian/Documents/vault
 
 # Additional project repositories
-# my-rails-app=/Users/username/src/rails/my-rails-app
+# OlderGay.Men=/Users/username/src/rails/OlderGay.Men

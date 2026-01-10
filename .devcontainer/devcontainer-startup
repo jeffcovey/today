@@ -6,22 +6,17 @@ echo "=== DevContainer Startup ==="
 echo "Project: $(basename "$(pwd)")"
 echo "Time: $(date)"
 
-# Setup local mounts from mounts.local (if configured)
-if [ -f ".devcontainer/setup-mounts.sh" ]; then
-    bash .devcontainer/setup-mounts.sh
-fi
-
 # Check vault mount status
 if [ -d "/workspaces/today/vault" ]; then
     if [ -n "$(ls -A /workspaces/today/vault 2>/dev/null)" ]; then
         echo "✅ Vault mounted from host ($(ls /workspaces/today/vault | wc -l) items)"
     else
         echo "⚠️  Vault directory exists but appears empty"
-        echo "   Configure mounts in .devcontainer/mounts.local"
+        echo "   Configure mounts in .devcontainer/mounts.local and rebuild"
     fi
 else
-    echo "ℹ️  No vault mounted - creating empty vault directory"
-    mkdir -p /workspaces/today/vault
+    echo "ℹ️  No vault mounted"
+    echo "   Configure mounts in .devcontainer/mounts.local and rebuild"
 fi
 
 echo ""
