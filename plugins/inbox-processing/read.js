@@ -522,7 +522,48 @@ function processTimeTrackingMarkers(files) {
     addSessionsToTimeLog(sessions);
   }
 
-  // Only delete marker files that were used in complete sessions
+  // Check for Start markers that match existing sessions in the log
+  const currentDate = new Date();
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const logFile = path.join(PROJECT_ROOT, `vault/logs/time-tracking/${year}-${month}.md`);
+
+  let existingSessions = [];
+  if (fs.existsSync(logFile)) {
+    const logContent = fs.readFileSync(logFile, 'utf-8');
+    existingSessions = logContent.trim().split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const [startTime, endTime, description] = line.split('|');
+        return { startTime: new Date(startTime), endTime: new Date(endTime) };
+      });
+  }
+
+  // Mark duplicate Start markers (Start markers that match existing logged sessions)
+  for (const marker of collapsedMarkers) {
+    if (marker.action === 'Start' && !usedMarkers.has(marker.filePath)) {
+      // Check if this Start marker matches an existing session (within 30 seconds)
+      const matchesExisting = existingSessions.some(session => {
+        const timeDiff = Math.abs(marker.parsedTime - session.startTime);
+        return timeDiff < 30000; // Within 30 seconds
+      });
+
+      if (matchesExisting) {
+        usedMarkers.add(marker.filePath); // Mark for deletion as duplicate
+      }
+    }
+  }
+
+  // Mark orphaned Stop markers for cleanup (Stop markers that couldn't be paired)
+  for (const marker of collapsedMarkers) {
+    if (marker.action === 'Stop' && !usedMarkers.has(marker.filePath)) {
+      // This Stop marker couldn't be paired with a Start marker
+      // It's likely from a session that was already processed in a previous run
+      usedMarkers.add(marker.filePath); // Track as processed for deletion
+    }
+  }
+
+  // Only delete marker files that were used in complete sessions or cleaned up as orphaned
   // Keep unpaired Start markers in inbox for future Stop markers
   for (const marker of markers) {
     if (usedMarkers.has(marker.filePath)) {
