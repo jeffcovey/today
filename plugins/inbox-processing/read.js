@@ -499,6 +499,7 @@ function processTimeTrackingMarkers(files) {
   // Pair starts and stops chronologically
   const sessions = [];
   const startStack = [];
+  const usedMarkers = new Set(); // Track which markers were used in sessions
 
   for (const marker of collapsedMarkers) {
     if (marker.action === 'Start') {
@@ -515,6 +516,10 @@ function processTimeTrackingMarkers(files) {
         description: startMarker.description,
         topicTag: topicTag
       });
+
+      // Mark both markers as used
+      usedMarkers.add(startMarker.filePath);
+      usedMarkers.add(marker.filePath);
     }
   }
 
@@ -523,13 +528,16 @@ function processTimeTrackingMarkers(files) {
     addSessionsToTimeLog(sessions);
   }
 
-  // Archive all processed marker files
+  // Only delete marker files that were used in complete sessions
+  // Keep unpaired Start markers in inbox for future Stop markers
   for (const marker of markers) {
-    moveToTrash(marker.filePath);
+    if (usedMarkers.has(marker.filePath)) {
+      moveToTrash(marker.filePath);
+    }
   }
 
   return {
-    processed: markers.length,
+    processed: usedMarkers.size, // Only count markers that were used in complete sessions
     sessions: sessions.length
   };
 }
