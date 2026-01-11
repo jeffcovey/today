@@ -45,14 +45,14 @@ process.chdir(projectRoot);
 async function processInbox() {
   printInfo('Processing inbox files...');
 
-  const inboxDir = path.join(projectRoot, 'vault/notes/inbox');
+  const inboxDir = path.join(projectRoot, 'vault/inbox');
 
   if (!fs.existsSync(inboxDir)) {
     fs.mkdirSync(inboxDir, { recursive: true });
   }
 
   try {
-    const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md'));
+    const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
 
     if (files.length === 0) {
       printInfo('No files in inbox to process');
@@ -73,7 +73,14 @@ async function processInbox() {
     }
 
     // Second pass: batch process all time tracking markers
-    processTimeTrackingMarkers();
+    try {
+      processTimeTrackingMarkers();
+    } catch (error) {
+      printError(`Time tracking processing failed: ${error.message}`);
+      if (process.env.DEBUG) {
+        console.error(error);
+      }
+    }
 
     return true;
   } catch (error) {
@@ -86,7 +93,9 @@ async function processInbox() {
  * Route a single inbox file based on content
  */
 async function processInboxFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = safeReadFile(filePath);
+  if (!content) return 'skipped'; // File was locked, skip it
+
   const lines = content.split('\n');
   const firstLine = lines[0] || '';
   const title = firstLine.replace(/^#\s*/, '').replace(/^-\s*\[\s*\]\s*/, '');
@@ -136,6 +145,7 @@ async function processInboxFile(filePath) {
  * Process a progress note - add to plan file and archive
  */
 function processProgressNote(filePath, content, basename) {
+  // Content is already safely read by caller
   const dateMatch = content.match(/^[A-Za-z]+ \d+, \d+ \d+:\d+/m);
 
   if (!dateMatch) {
@@ -192,6 +202,7 @@ function processProgressNote(filePath, content, basename) {
  * Process a concern note - add to plan file and archive
  */
 function processConcernNote(filePath, content, basename) {
+  // Content is already safely read by caller
   const dateMatch = content.match(/^[A-Za-z]+ \d+, \d+ \d+:\d+/m);
 
   if (!dateMatch) {
@@ -280,15 +291,22 @@ function processTimeTrackingMarker(filePath, content, basename) {
  * Process all time tracking markers in batch
  */
 function processTimeTrackingMarkers() {
-  const inboxDir = path.join(projectRoot, 'vault/notes/inbox');
-  const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md'));
+  const inboxDir = path.join(projectRoot, 'vault/inbox');
+  const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
   const markers = [];
+
 
   // Collect all time tracking markers
   for (const filename of files) {
     if (filename.startsWith('time-tracking-')) {
       const filePath = path.join(inboxDir, filename);
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const content = safeReadFile(filePath);
+
+      if (!content) {
+        printWarning(`  • Skipping locked time tracking file: ${filename}`);
+        continue;
+      }
+
       const lines = content.trim().split('\n');
 
       const action = lines[0];
@@ -426,6 +444,35 @@ function addSessionsToTimeLog(sessions) {
     // Write sorted content back
     fs.writeFileSync(logFile, entries.join('\n') + '\n', 'utf-8');
   }
+}
+
+/**
+ * Safely read a file with retry logic for locked files
+ */
+function safeReadFile(filePath, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch (error) {
+      if (error.code === 'EDEADLK' || error.message.includes('Resource deadlock')) {
+        printInfo(`  • File locked (attempt ${attempt}/${maxRetries}): ${path.basename(filePath)}`);
+        if (attempt < maxRetries) {
+          // Wait a bit before retrying
+          const delay = attempt * 1000; // 1s, 2s, 3s
+          const start = Date.now();
+          while (Date.now() - start < delay) {
+            // Simple busy wait
+          }
+          continue;
+        } else {
+          printWarning(`  • Skipping locked file: ${path.basename(filePath)}`);
+          return null;
+        }
+      }
+      throw error; // Re-throw other errors
+    }
+  }
+  return null;
 }
 
 /**
