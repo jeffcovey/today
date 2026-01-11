@@ -366,19 +366,6 @@ function processTaskOnlyFile(filePath, content, basename) {
   };
 }
 
-/**
- * Map focus mode description to topic tag
- */
-function mapDescriptionToTopic(description) {
-  const mapping = {
-    'Mindfulness': '#topic/meditation_mindfulness',
-    'Exercise': '#topic/fitness',
-    'Work': '#topic/programming',
-    'Reading': '#topic/reading'
-  };
-
-  return mapping[description] || '#topic/other';
-}
 
 /**
  * Add sessions to time tracking log and sort
@@ -396,7 +383,7 @@ function addSessionsToTimeLog(sessions) {
     fs.mkdirSync(logDir, { recursive: true });
 
     // Format new entry
-    const entry = `${session.startTime}|${session.endTime}|${session.description} ${session.topicTag}`;
+    const entry = `${session.startTime}|${session.endTime}|${session.description}`;
 
     // Read existing content or create new
     let content = '';
@@ -404,19 +391,30 @@ function addSessionsToTimeLog(sessions) {
       content = fs.readFileSync(logFile, 'utf-8');
     }
 
-    // Add new entry
-    content += content ? `\n${entry}` : entry;
+    const entries = content ? content.trim().split('\n').filter(line => line.trim()) : [];
 
-    // Sort entries by start time
-    const entries = content.trim().split('\n').filter(line => line.trim());
-    entries.sort((a, b) => {
-      const timeA = a.split('|')[0];
-      const timeB = b.split('|')[0];
-      return new Date(timeA) - new Date(timeB);
+    // Check if this session already exists (same start and end times within 1 minute)
+    const sessionExists = entries.some(existingEntry => {
+      const [existingStart, existingEnd] = existingEntry.split('|');
+      const startDiff = Math.abs(new Date(session.startTime) - new Date(existingStart));
+      const endDiff = Math.abs(new Date(session.endTime) - new Date(existingEnd));
+      return startDiff < 60000 && endDiff < 60000; // Within 1 minute
     });
 
-    // Write sorted content back
-    fs.writeFileSync(logFile, entries.join('\n') + '\n', 'utf-8');
+    if (!sessionExists) {
+      // Add new entry
+      entries.push(entry);
+
+      // Sort entries by start time
+      entries.sort((a, b) => {
+        const timeA = a.split('|')[0];
+        const timeB = b.split('|')[0];
+        return new Date(timeA) - new Date(timeB);
+      });
+
+      // Write sorted content back
+      fs.writeFileSync(logFile, entries.join('\n') + '\n', 'utf-8');
+    }
   }
 }
 
@@ -507,14 +505,10 @@ function processTimeTrackingMarkers(files) {
     } else if (marker.action === 'Stop' && startStack.length > 0) {
       const startMarker = startStack.pop();
 
-      // Map description to topic tag
-      const topicTag = mapDescriptionToTopic(startMarker.description);
-
       sessions.push({
         startTime: startMarker.timestamp,
         endTime: marker.timestamp,
-        description: startMarker.description,
-        topicTag: topicTag
+        description: startMarker.description
       });
 
       // Mark both markers as used
