@@ -61,10 +61,19 @@ async function processInbox() {
 
     printInfo(`Processing ${files.length} file(s) from inbox...`);
 
+    // First pass: process non-time-tracking files
     for (const filename of files) {
       const filePath = path.join(inboxDir, filename);
-      await processInboxFile(filePath);
+      const result = await processInboxFile(filePath);
+
+      // Skip time tracking markers in individual processing
+      if (result === 'time-tracking') {
+        continue;
+      }
     }
+
+    // Second pass: batch process all time tracking markers
+    processTimeTrackingMarkers();
 
     return true;
   } catch (error) {
@@ -82,6 +91,11 @@ async function processInboxFile(filePath) {
   const firstLine = lines[0] || '';
   const title = firstLine.replace(/^#\s*/, '').replace(/^-\s*\[\s*\]\s*/, '');
   const basename = path.basename(filePath);
+
+  // Time tracking markers
+  if (basename.startsWith('time-tracking-')) {
+    return processTimeTrackingMarker(filePath, content, basename);
+  }
 
   // Progress notes
   if (title === 'Progress') {
@@ -255,6 +269,166 @@ function processTaskOnlyFile(filePath, content) {
 }
 
 /**
+ * Process time tracking markers
+ */
+function processTimeTrackingMarker(filePath, content, basename) {
+  // Mark this file for batch processing - we'll handle all markers together
+  return 'time-tracking';
+}
+
+/**
+ * Process all time tracking markers in batch
+ */
+function processTimeTrackingMarkers() {
+  const inboxDir = path.join(projectRoot, 'vault/notes/inbox');
+  const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md'));
+  const markers = [];
+
+  // Collect all time tracking markers
+  for (const filename of files) {
+    if (filename.startsWith('time-tracking-')) {
+      const filePath = path.join(inboxDir, filename);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      const action = lines[0];
+      const timestamp = lines[1];
+      const description = lines[2] || '';
+
+      markers.push({
+        filePath,
+        action,
+        timestamp,
+        description,
+        parsedTime: new Date(timestamp)
+      });
+    }
+  }
+
+  if (markers.length === 0) return;
+
+  printInfo(`Processing ${markers.length} time tracking marker(s)...`);
+
+  // Sort by timestamp
+  markers.sort((a, b) => a.parsedTime - b.parsedTime);
+
+  // First, collapse duplicate markers (same action within 30 seconds)
+  const collapsedMarkers = [];
+
+  for (const marker of markers) {
+    const existingSameAction = collapsedMarkers.filter(m =>
+      m.action === marker.action &&
+      Math.abs(m.parsedTime - marker.parsedTime) / 1000 <= 30
+    );
+
+    if (existingSameAction.length > 0) {
+      // Update existing marker with earliest start or latest stop
+      const existing = existingSameAction[0];
+      if (marker.action === 'Start' && marker.parsedTime < existing.parsedTime) {
+        existing.timestamp = marker.timestamp;
+        existing.parsedTime = marker.parsedTime;
+      } else if (marker.action === 'Stop' && marker.parsedTime > existing.parsedTime) {
+        existing.timestamp = marker.timestamp;
+        existing.parsedTime = marker.parsedTime;
+      }
+    } else {
+      collapsedMarkers.push({ ...marker });
+    }
+  }
+
+  // Sort collapsed markers by timestamp
+  collapsedMarkers.sort((a, b) => a.parsedTime - b.parsedTime);
+
+  // Now pair starts and stops chronologically
+  const sessions = [];
+  const startStack = [];
+
+  for (const marker of collapsedMarkers) {
+    if (marker.action === 'Start') {
+      startStack.push(marker);
+    } else if (marker.action === 'Stop' && startStack.length > 0) {
+      const startMarker = startStack.pop();
+
+      // Map description to topic tag
+      const topicTag = mapDescriptionToTopic(startMarker.description);
+
+      sessions.push({
+        startTime: startMarker.timestamp,
+        endTime: marker.timestamp,
+        description: startMarker.description,
+        topicTag: topicTag
+      });
+    }
+  }
+
+  // Add sessions to time tracking log
+  if (sessions.length > 0) {
+    addSessionsToTimeLog(sessions);
+  }
+
+  // Archive all processed marker files
+  for (const marker of markers) {
+    moveToTrash(marker.filePath);
+  }
+
+  printInfo(`  • Created ${sessions.length} time tracking session(s)`);
+}
+
+/**
+ * Map focus mode description to topic tag
+ */
+function mapDescriptionToTopic(description) {
+  const mapping = {
+    'Mindfulness': '#topic/meditation_mindfulness',
+    'Exercise': '#topic/fitness',
+    'Work': '#topic/programming',
+    'Reading': '#topic/reading'
+  };
+
+  return mapping[description] || '#topic/other';
+}
+
+/**
+ * Add sessions to time tracking log and sort
+ */
+function addSessionsToTimeLog(sessions) {
+  for (const session of sessions) {
+    const date = new Date(session.startTime);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+
+    const logFile = path.join(projectRoot, `vault/logs/time-tracking/${year}-${month}.md`);
+
+    // Ensure directory exists
+    const logDir = path.dirname(logFile);
+    fs.mkdirSync(logDir, { recursive: true });
+
+    // Format new entry
+    const entry = `${session.startTime}|${session.endTime}|${session.description} ${session.topicTag}`;
+
+    // Read existing content or create new
+    let content = '';
+    if (fs.existsSync(logFile)) {
+      content = fs.readFileSync(logFile, 'utf-8');
+    }
+
+    // Add new entry
+    content += content ? `\n${entry}` : entry;
+
+    // Sort entries by start time
+    const entries = content.trim().split('\n').filter(line => line.trim());
+    entries.sort((a, b) => {
+      const timeA = a.split('|')[0];
+      const timeB = b.split('|')[0];
+      return new Date(timeA) - new Date(timeB);
+    });
+
+    // Write sorted content back
+    fs.writeFileSync(logFile, entries.join('\n') + '\n', 'utf-8');
+  }
+}
+
+/**
  * Move file to dated trash folder
  */
 function moveToTrash(filePath) {
@@ -296,6 +470,7 @@ Usage:
   inbox-processing help         Show this help
 
 Processes files in vault/notes/inbox:
+  - Time tracking markers → Group, create sessions, add to time logs
   - Progress notes → Add to plan file, archive to progress/
   - Concern notes → Add to plan file, archive to concerns/
   - Task-only files → Append to tasks.md
