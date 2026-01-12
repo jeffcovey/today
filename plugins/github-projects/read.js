@@ -281,8 +281,8 @@ const entries = projects.map(project => {
   // Set review frequency based on project status
   const reviewFrequency = project.closed ? closedReviewFrequency : defaultReviewFrequency;
 
-  // Set last_reviewed to null for new projects (they'll appear as needing review)
-  const lastReviewed = null;
+  // Use GitHub project activity as last reviewed date
+  const lastReviewed = project.updatedAt ? project.updatedAt.split('T')[0] : null;
 
   // Build unique ID
   const idPrefix = ownerType === 'repo' ? `${owner}/${repository}` : owner;
