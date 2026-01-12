@@ -377,7 +377,7 @@ program
 
     // Get projects with review tracking that are overdue
     const sql = `
-      SELECT id, title, status, priority, review_frequency, last_reviewed,
+      SELECT id, title, status, priority, review_frequency, last_reviewed, url,
              julianday(?) - julianday(last_reviewed) as days_since
       FROM projects
       WHERE status IN ('active', 'planning')
@@ -416,8 +416,9 @@ program
         ? colors.yellow(` (${daysSince}d since last review)`)
         : colors.red(' (never reviewed)');
 
+      const urlInfo = project.url ? ` ${colors.cyan(project.url)}` : '';
       console.log(`${priorityEmoji} ${project.title}${reviewInfo}`);
-      console.log(colors.gray(`   ${project.review_frequency} review`));
+      console.log(colors.gray(`   ${project.review_frequency} review${urlInfo}`));
     }
 
     console.log('');
