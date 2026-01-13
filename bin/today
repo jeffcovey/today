@@ -296,15 +296,16 @@ async function main() {
       return;
     }
 
-    console.log('🔍 Checking database health...');
-    const result = await ensureHealthyDatabase({ verbose: true });
+    const quiet = process.env.TODAY_QUIET === '1';
+    if (!quiet) console.log('🔍 Checking database health...');
+    const result = await ensureHealthyDatabase({ verbose: !quiet });
 
     if (!result.success) {
       console.error('❌ Database check failed');
       process.exit(1);
     }
 
-    if (result.recreated) {
+    if (result.recreated && !quiet) {
       console.log('ℹ️  Run bin/sync to populate data from external sources\n');
     }
   }
@@ -337,7 +338,7 @@ async function main() {
 
         let currentData = '';
         try {
-          console.log(`  ⏳ ${ai.name || pluginType}...`);
+          if (process.env.TODAY_QUIET !== '1') console.log(`  ⏳ ${ai.name || pluginType}...`);
           currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
             encoding: 'utf8',
             timeout: 10000,
@@ -467,7 +468,7 @@ The following data was retrieved for the specified date.
         const sources = getPluginSources(pluginName);
         const sourceConfig = sources.find(s => s.sourceName === sourceName)?.config || {};
 
-        console.log(`  ⏳ ${pluginName}...`);
+        if (process.env.TODAY_QUIET !== '1') console.log(`  ⏳ ${pluginName}...`);
 
         const output = execSync(`node "${readScript}"`, {
           cwd: projectRoot,
@@ -496,7 +497,8 @@ The following data was retrieved for the specified date.
     return lines.length > 2 ? lines.join('\n') : null;
   }
 
-  async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null, compact = false) {
+  async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null, compact = false, quiet = false) {
+    const log = quiet ? () => {} : console.log.bind(console);
     const timezone = getTimezone();
 
     const now = getCurrentTime(timezone);
@@ -504,13 +506,13 @@ The following data was retrieved for the specified date.
 
     let dataContext;
     if (targetDate) {
-      console.log(`📊 Gathering context for ${targetDate}...`);
+      log(`📊 Gathering context for ${targetDate}...`);
       dataContext = await getDataContextForDate(targetDate);
     } else {
-      console.log('📊 Gathering context...');
+      log('📊 Gathering context...');
       dataContext = await getDataContext();
     }
-    console.log('✅ Context ready\n');
+    log('✅ Context ready\n');
     const config = getFullConfig();
 
     const profile = config.profile || {};
@@ -633,10 +635,10 @@ ${contextSection}`;
 
     if (nonInteractive) {
       // Non-interactive mode: use AI provider directly or Claude CLI
-      console.log('🤖 Running in non-interactive mode...');
+      log('🤖 Running in non-interactive mode...');
       if (useClaudeCLI) {
         const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
-          stdio: 'inherit',
+          stdio: quiet ? ['pipe', 'pipe', 'pipe'] : 'inherit',
           timeout: 600000 // 10 minutes in milliseconds
         });
         if (result.error) {
@@ -646,6 +648,9 @@ ${contextSection}`;
             console.error(`ERROR: ${result.error.message}`);
           }
           process.exit(1);
+        }
+        if (quiet && result.stdout) {
+          console.log(result.stdout.toString());
         }
         if (result.status !== 0) {
           process.exit(result.status || 1);
@@ -671,25 +676,25 @@ ${contextSection}`;
     } else if (useClaudeCLI) {
       // Interactive mode with Claude CLI
       if (directRequest) {
-        console.log('🤖 Starting session...');
+        log('🤖 Starting session...');
       } else {
-        console.log('🤖 Starting daily review...');
+        log('🤖 Starting daily review...');
       }
       spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
     } else {
       // Interactive mode with built-in REPL (for Ollama, OpenAI, Gemini, etc.)
       if (directRequest) {
-        console.log('🤖 Starting session...');
+        log('🤖 Starting session...');
       } else {
-        console.log('🤖 Starting daily review...');
+        log('🤖 Starting daily review...');
       }
       const { runChatSession } = await import('../src/chat-session.js');
       await runChatSession(prompt, { provider: interactiveProvider, model });
     }
 
-    console.log('\n' + '━'.repeat(50));
-    console.log('✅ Session ended');
-    console.log('━'.repeat(50) + '\n');
+    log('\n' + '━'.repeat(50));
+    log('✅ Session ended');
+    log('━'.repeat(50) + '\n');
   }
 
   async function ensureConfigAndDatabase(options = {}) {
@@ -714,28 +719,29 @@ ${contextSection}`;
   }
 
   async function runSession(request, options) {
-    const { sync, nonInteractive, date: targetDate } = options;
+    const { sync, nonInteractive, quiet, date: targetDate } = options;
+    const log = quiet ? () => {} : console.log.bind(console);
 
     if (request) {
-      console.log(`📊 Starting focused session: ${request}`);
+      log(`📊 Starting focused session: ${request}`);
     } else {
-      console.log('📊 Starting daily review process...');
+      log('📊 Starting daily review process...');
     }
 
     if (targetDate) {
-      console.log('⚠️  Skipping sync (using historical date)');
+      log('⚠️  Skipping sync (using historical date)');
     } else if (sync !== false) {
-      console.log('🔄 Syncing data sources...');
+      log('🔄 Syncing data sources...');
       try {
-        execSync('bin/plugins sync', { stdio: 'inherit', cwd: projectRoot });
+        execSync('bin/plugins sync', { stdio: quiet ? 'pipe' : 'inherit', cwd: projectRoot });
       } catch {
-        console.error('⚠️  Sync completed with some errors');
+        if (!quiet) console.error('⚠️  Sync completed with some errors');
       }
     } else {
-      console.log('⚠️  Skipping sync (--no-sync flag provided)');
+      log('⚠️  Skipping sync (--no-sync flag provided)');
     }
 
-    await runInteractiveSession(request, nonInteractive, false, targetDate);
+    await runInteractiveSession(request, nonInteractive, false, targetDate, false, quiet);
   }
 
   // Helper to merge parent (global) options with command-specific options
@@ -752,6 +758,7 @@ ${contextSection}`;
     .passThroughOptions()
     .option('--no-sync', 'Skip sync step (faster startup)')
     .option('--non-interactive', 'Run in non-interactive mode (for automation)')
+    .option('--quiet', 'Suppress status output (for scripts)')
     .option('--skip-update-check', 'Skip checking for updates')
     .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
     .option('--focus [name]', 'Use a focus preset from config (or list available)');
@@ -792,6 +799,7 @@ ${contextSection}`;
   program
     .argument('[request...]', 'Optional request for focused session')
     .action(async (requestParts, options) => {
+      if (options.quiet) process.env.TODAY_QUIET = '1';
       await ensureConfigAndDatabase();
 
       // Handle --focus option
@@ -835,7 +843,7 @@ ${contextSection}`;
           process.exit(1);
         }
 
-        console.log(`📌 Focus: ${presetName}${preset.description ? ` - ${preset.description}` : ''}`);
+        if (!options.quiet) console.log(`📌 Focus: ${presetName}${preset.description ? ` - ${preset.description}` : ''}`);
         await runSession(preset.instructions, options);
         return;
       }
