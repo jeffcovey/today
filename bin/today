@@ -763,8 +763,8 @@ ${contextSection}`;
     console.log('Available focus presets:');
     console.log('');
     presetNames.forEach((name, i) => {
-      const desc = presets[name].description || '(no description)';
-      console.log(`  ${i + 1}. ${name} - ${desc}`);
+      const desc = presets[name].description || name;
+      console.log(`  ${i + 1}. ${desc}`);
     });
     console.log('');
 
@@ -829,8 +829,8 @@ ${contextSection}`;
           console.log('');
           console.log('Available presets:');
           for (const name of presetNames) {
-            const desc = presets[name].description || '';
-            console.log(`  ${name}${desc ? ` - ${desc}` : ''}`);
+            const desc = presets[name].description || name;
+            console.log(`  ${desc}`);
           }
           process.exit(1);
         }
