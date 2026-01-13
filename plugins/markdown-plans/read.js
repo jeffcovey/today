@@ -484,15 +484,10 @@ async function generateDailySummary(dateStr, planFilePath) {
   // Get data context using bin/today dry-run --date
   let dataContext = '';
   try {
-    dataContext = execSync(`bin/today dry-run --date ${dateStr} --no-sync 2>/dev/null`, {
+    dataContext = execSync(`bin/today dry-run --date ${dateStr} --no-sync --quiet 2>/dev/null`, {
       encoding: 'utf8',
       timeout: 30000
-    });
-    // Filter out dotenvx noise and status messages
-    dataContext = dataContext.split('\n')
-      .filter(line => !line.includes('[dotenvx') && !line.startsWith('🔍') && !line.startsWith('📊') && !line.startsWith('✅'))
-      .join('\n')
-      .trim();
+    }).trim();
   } catch {
     dataContext = '';
   }
