@@ -537,6 +537,10 @@ The following data was retrieved for the specified date.
       ? `\n## User Instructions\n${aiInstructions}\n`
       : '';
 
+    const timeReminder = `
+## Reminder
+The current time is ${currentTime} (${timezone}). Double-check all times and dates in your response.`;
+
     const contextSection = `## Pre-Computed Context
 ${timeInfo}
 
@@ -547,7 +551,8 @@ ${timeInfo}
 ## User Profile
 ${profileLines.join('\n')}
 ${aiInstructionsSection}
-${dataContext}`;
+${dataContext}
+${timeReminder}`;
 
     if (dryRun && targetDate) {
       console.log(contextSection);
