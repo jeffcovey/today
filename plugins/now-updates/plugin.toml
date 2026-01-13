@@ -1,0 +1,33 @@
+name = "now-updates"
+displayName = "Now Updates"
+description = "Maintains vault/now.md with periodic AI-generated status updates"
+type = "context"
+longDescription = """
+Periodically generates AI status updates and maintains them in vault/now.md.
+
+Features:
+- Updates every 2 hours (configurable) during waking hours
+- One pre-wake update so it's ready when you get up
+- No updates after bedtime
+- Keeps 24 hours of updates with nice dividers
+- Auto-prunes old entries
+
+Each update includes:
+- What's happened recently
+- Suggestions for what to do now
+- Preview of what's coming up
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+file_path = { type = "string", default = "now.md", description = "Filename within the vault directory" }
+update_interval_hours = { type = "number", default = 2, description = "Hours between updates" }
+retention_hours = { type = "number", default = 24, description = "How long to keep updates" }
+instructions = { type = "string", default = """
+Report on what's happened today, suggest what should be done now,
+and give a summary of the plan for the rest of the day.
+If it's less than seven hours before my bedtime in the currently-configured
+time zone, add a preview of tomorrow.
+""", description = "Instructions for generating each update" }
