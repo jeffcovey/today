@@ -331,10 +331,21 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceNa
     return { success: false, error: `Command not found: ${fullPath}` };
   }
 
+  // Apply plugin.toml settings defaults, then user config overrides
+  const settingsDefaults = {};
+  if (plugin.settings) {
+    for (const [key, def] of Object.entries(plugin.settings)) {
+      if (def.default !== undefined) {
+        settingsDefaults[key] = def.default;
+      }
+    }
+  }
+  const mergedConfig = { ...settingsDefaults, ...sourceConfig };
+
   // Inject decrypted values for encrypted settings
   const configWithSecrets = sourceName
-    ? injectDecryptedSettings(plugin, sourceName, sourceConfig)
-    : sourceConfig;
+    ? injectDecryptedSettings(plugin, sourceName, mergedConfig)
+    : mergedConfig;
 
   try {
     // Run from project root so relative paths in plugins work correctly
