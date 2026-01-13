@@ -114,3 +114,21 @@ export function getAbsoluteVaultPath() {
   const projectRoot = join(__dirname, '..');
   return join(projectRoot, getVaultPath());
 }
+
+/**
+ * Get all focus presets from config.
+ * Returns an object mapping preset names to their config.
+ */
+export function getFocusPresets() {
+  const config = readConfig();
+  return config.focus || {};
+}
+
+/**
+ * Get a specific focus preset by name.
+ * Returns { description, instructions } or undefined if not found.
+ */
+export function getFocusPreset(name) {
+  const presets = getFocusPresets();
+  return presets[name];
+}

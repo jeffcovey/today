@@ -91,6 +91,38 @@ You can manage your plugins with `bin/today configure` (which just calls out to 
 
 ---
 
+## Focus Presets
+
+Define reusable focus sessions in `config.toml` for common workflows:
+
+```toml
+[focus.inbox]
+description = "Process inbox and messages"
+instructions = """
+Help me process my inbox. Start with highest priority items.
+Check Front conversations, then emails, then vault inbox.
+"""
+
+[focus.weekly-review]
+description = "Weekly planning and review"
+instructions = """
+Let's do a weekly review. Look at:
+1. What I accomplished this week
+2. What's carrying over to next week
+3. Any projects that need attention
+"""
+```
+
+Then run with:
+
+```bash
+bin/today --focus inbox          # Run specific preset
+bin/today --focus                # Show menu to choose preset
+bin/today --focus --non-interactive  # Automated preset run
+```
+
+---
+
 ## Vault & Obsidian
 
 Many file-based plugins look for a "vault" directory and follow some [Obsidian](https://obsidian.md) conventions. The path to the vault can be configured, and defaults to `vault/` under Today's directory. Plugins automatically create their required directories inside the vault when first used.

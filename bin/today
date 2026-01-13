@@ -231,7 +231,7 @@ async function main() {
   const { execSync, spawnSync } = await import('child_process');
   const readline = await import('readline');
 
-  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath } = await import('../src/config.js');
+  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath, getFocusPresets, getFocusPreset } = await import('../src/config.js');
   const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
   const { getAIInstructionsByType, getPluginSources, checkPluginVaultFileChanges } = await import('../src/plugin-loader.js');
   const { program } = await import('commander');
@@ -753,12 +753,93 @@ ${contextSection}`;
     .option('--no-sync', 'Skip sync step (faster startup)')
     .option('--non-interactive', 'Run in non-interactive mode (for automation)')
     .option('--skip-update-check', 'Skip checking for updates')
-    .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data');
+    .option('--date <date>', 'Target date (YYYY-MM-DD) for historical data')
+    .option('--focus [name]', 'Use a focus preset from config (or list available)');
+
+  // Helper to show focus preset selection menu
+  async function selectFocusPreset(presets) {
+    const presetNames = Object.keys(presets);
+    console.log('');
+    console.log('Available focus presets:');
+    console.log('');
+    presetNames.forEach((name, i) => {
+      const desc = presets[name].description || '(no description)';
+      console.log(`  ${i + 1}. ${name} - ${desc}`);
+    });
+    console.log('');
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const answer = await new Promise(resolve => {
+      rl.question('Select a preset (number or name): ', resolve);
+    });
+    rl.close();
+
+    const trimmed = answer.trim();
+    const num = parseInt(trimmed, 10);
+    if (num >= 1 && num <= presetNames.length) {
+      return presetNames[num - 1];
+    }
+    if (presetNames.includes(trimmed)) {
+      return trimmed;
+    }
+    return null;
+  }
 
   program
     .argument('[request...]', 'Optional request for focused session')
     .action(async (requestParts, options) => {
       await ensureConfigAndDatabase();
+
+      // Handle --focus option
+      if (options.focus !== undefined) {
+        const presets = getFocusPresets();
+        const presetNames = Object.keys(presets);
+
+        if (presetNames.length === 0) {
+          console.error('No focus presets configured.');
+          console.log('');
+          console.log('Add presets to config.toml:');
+          console.log('');
+          console.log('  [focus.inbox]');
+          console.log('  description = "Process inbox and messages"');
+          console.log('  instructions = """');
+          console.log('  Help me process my inbox...');
+          console.log('  """');
+          process.exit(1);
+        }
+
+        let presetName = options.focus;
+
+        // If --focus with no argument, show selection menu
+        if (presetName === true) {
+          presetName = await selectFocusPreset(presets);
+          if (!presetName) {
+            console.error('Invalid selection.');
+            process.exit(1);
+          }
+        }
+
+        const preset = getFocusPreset(presetName);
+        if (!preset) {
+          console.error(`Focus preset "${presetName}" not found.`);
+          console.log('');
+          console.log('Available presets:');
+          for (const name of presetNames) {
+            const desc = presets[name].description || '';
+            console.log(`  ${name}${desc ? ` - ${desc}` : ''}`);
+          }
+          process.exit(1);
+        }
+
+        console.log(`📌 Focus: ${presetName}${preset.description ? ` - ${preset.description}` : ''}`);
+        await runSession(preset.instructions, options);
+        return;
+      }
+
       const request = requestParts.length > 0 ? requestParts.join(' ') : null;
       await runSession(request, options);
     });
