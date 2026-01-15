@@ -283,6 +283,15 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
       }
     }
 
+    // Sort plugins so context plugins run last (they depend on fresh data from other plugins)
+    syncablePlugins.sort((a, b) => {
+      const aIsContext = a.plugin.type === 'context';
+      const bIsContext = b.plugin.type === 'context';
+      if (aIsContext && !bIsContext) return 1;
+      if (!aIsContext && bIsContext) return -1;
+      return 0;
+    });
+
     if (syncablePlugins.length === 0) {
       console.log(colors.yellow('No plugins to sync.'));
       return;

@@ -21,6 +21,7 @@ import { execSync } from 'child_process';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const contextOnly = process.env.CONTEXT_ONLY === 'true';
+const isGenerating = process.env.NOW_UPDATES_GENERATING === '1';
 
 const fileName = config.file_path || 'now.md';
 const updateIntervalHours = config.update_interval_hours || 2;
@@ -175,7 +176,7 @@ function generateUpdate(now) {
         cwd: projectRoot,
         encoding: 'utf8',
         timeout: 180000,
-        env: { ...process.env, SKIP_UPDATE_CHECK: '1', SKIP_DEP_CHECK: '1' }
+        env: { ...process.env, SKIP_UPDATE_CHECK: '1', SKIP_DEP_CHECK: '1', NOW_UPDATES_GENERATING: '1' }
       }
     );
 
@@ -226,8 +227,15 @@ async function main() {
   let context = existingContent.trim() || 'No updates yet.';
 
   // Skip update generation during context gathering (like markdown-plans does)
+  // Also return empty context if we're in the middle of generating a new update
+  // to avoid circular reference where AI reads old updates and propagates stale info
   if (contextOnly) {
-    console.log(JSON.stringify({ context, metadata }));
+    if (isGenerating) {
+      // Don't include old updates when generating new ones - AI should use fresh data
+      console.log(JSON.stringify({ context: '', metadata: { ...metadata, skipped: 'generating' } }));
+    } else {
+      console.log(JSON.stringify({ context, metadata }));
+    }
     return;
   }
 
