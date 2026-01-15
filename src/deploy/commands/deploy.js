@@ -97,7 +97,7 @@ export async function deployCommand(server, args = []) {
   if (server.jobs && Object.keys(server.jobs).length > 0) {
     printInfo('Writing scheduler jobs config...');
     const jobsJson = JSON.stringify(server.jobs, null, 2);
-    server.sshCmd(`cat > ${deployPath}/.data/scheduler-config.json << 'JOBS_EOF'
+    server.sshScript(`cat > ${deployPath}/.data/scheduler-config.json << 'JOBS_EOF'
 ${jobsJson}
 JOBS_EOF`);
     printStatus(`Configured ${Object.keys(server.jobs).length} scheduled job(s)`);
