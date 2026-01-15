@@ -213,9 +213,9 @@ program
       for (const source of imapSources) {
         if (allResults.length >= limit) break;
 
-        const password = process.env[source.password_env || 'EMAIL_PASSWORD'];
+        const password = process.env[`TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`];
         if (!password) {
-          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in ${source.password_env || 'EMAIL_PASSWORD'}`));
+          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`));
           continue;
         }
 
@@ -387,11 +387,11 @@ program
       process.exit(1);
     }
 
-    const { host, port = 993, secure = true, username, password_env = 'EMAIL_PASSWORD' } = sourceConfig;
-    const password = process.env[password_env];
+    const { host, port = 993, secure = true, username } = sourceConfig;
+    const password = process.env[`TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`];
 
     if (!password) {
-      console.error(colors.red(`Password not found in ${password_env}`));
+      console.error(colors.red(`Password not found in TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`));
       process.exit(1);
     }
 
