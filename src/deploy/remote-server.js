@@ -63,6 +63,9 @@ export class RemoteServer {
     this.sshPort = config.sshPort || 22;
     this.sshKeyPath = config.sshKeyPath || this.getDefaultSshKeyPath();
     this.adminEmail = config.adminEmail || 'admin@example.com';
+    this.services = config.services || {};
+    this.jobs = config.jobs || {};
+    this.ai = config.ai || null;
   }
 
   /**

@@ -17,6 +17,13 @@ import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { discoverPlugins } from './plugin-loader.js';
 import { runPluginsConfigure } from './plugins-configure-ui.js';
 import { runDeploymentsConfigure } from './deployments-configure-ui.js';
+import {
+  AI_PROVIDER_ENV_VARS,
+  BACKGROUND_PROVIDER_OPTIONS,
+  INTERACTIVE_PROVIDER_OPTIONS,
+  getOllamaModels,
+  getModelOptionsForProvider,
+} from './ai-settings-shared.js';
 
 // Bind htm to React.createElement
 const html = htm.bind(React.createElement);
@@ -76,14 +83,6 @@ function setEnvVar(key, value) {
   }
 }
 
-// AI provider to env var mapping
-const AI_PROVIDER_ENV_VARS = {
-  anthropic: { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
-  'anthropic-api': { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
-  openai: { key: 'OPENAI_API_KEY', label: 'OpenAI API Key' },
-  gemini: { key: 'GOOGLE_API_KEY', label: 'Google API Key' },
-  ollama: null, // Local, no key needed
-};
 
 /**
  * Editor helper for multi-line fields
@@ -108,61 +107,6 @@ function editInEditor(currentText, filename = 'edit.txt') {
   }
 }
 
-/**
- * Get available Ollama models by running `ollama list`
- * @returns {Array<{value: string, label: string}>} - Array of model options
- */
-function getOllamaModels() {
-  try {
-    const output = execSync('ollama list', { encoding: 'utf8', timeout: 5000 });
-    const lines = output.trim().split('\n').slice(1); // Skip header row
-    const models = lines
-      .map(line => {
-        const name = line.split(/\s+/)[0]; // First column is model name
-        return name ? { value: name, label: name } : null;
-      })
-      .filter(Boolean);
-    return models.length > 0 ? models : [{ value: 'llama3.2', label: 'llama3.2 (default)' }];
-  } catch {
-    // Ollama not installed or not running
-    return [{ value: 'llama3.2', label: 'llama3.2 (default - ollama not found)' }];
-  }
-}
-
-/**
- * Get model options based on provider
- * @param {string} provider - The AI provider name
- * @returns {Array<{value: string, label: string}>|null} - Options array or null for free-form input
- */
-function getModelOptionsForProvider(provider) {
-  switch (provider) {
-    case 'ollama':
-      return getOllamaModels();
-    case 'anthropic':
-    case 'anthropic-api':
-      return [
-        { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
-        { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
-        { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Fast)' },
-      ];
-    case 'openai':
-      return [
-        { value: 'gpt-4o', label: 'GPT-4o (Recommended)' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Fast)' },
-        { value: 'o1', label: 'o1 (Reasoning)' },
-        { value: 'o3-mini', label: 'o3-mini (Reasoning, Fast)' },
-      ];
-    case 'gemini':
-    case 'google':
-      return [
-        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Recommended)' },
-        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      ];
-    default:
-      return null; // Free-form input for unknown providers
-  }
-}
 
 /**
  * Configuration sections and fields
@@ -200,12 +144,7 @@ const CONFIG_SECTIONS = [
         path: ['ai', 'provider'],
         default: 'anthropic',
         type: 'select',
-        options: [
-          { value: 'anthropic', label: 'Anthropic Claude' },
-          { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
-          { value: 'ollama', label: 'Ollama (Local models)' },
-          { value: 'gemini', label: 'Google Gemini' },
-        ],
+        options: BACKGROUND_PROVIDER_OPTIONS,
         description: 'AI for background tasks (summaries, tagging)'
       },
       {
@@ -230,13 +169,7 @@ const CONFIG_SECTIONS = [
         path: ['ai', 'interactive_provider'],
         default: 'anthropic',
         type: 'select',
-        options: [
-          { value: 'anthropic', label: 'Anthropic Claude (uses Claude CLI)' },
-          { value: 'anthropic-api', label: 'Anthropic Claude (uses API key)' },
-          { value: 'ollama', label: 'Ollama (Local models)' },
-          { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
-          { value: 'gemini', label: 'Google Gemini' },
-        ],
+        options: INTERACTIVE_PROVIDER_OPTIONS,
         description: 'AI for interactive sessions (bin/today)'
       },
       {

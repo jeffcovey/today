@@ -1,8 +1,8 @@
 // Configuration helper for JavaScript modules
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { parse } from 'smol-toml';
+import { parse, stringify } from 'smol-toml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -131,4 +131,25 @@ export function getFocusPresets() {
 export function getFocusPreset(name) {
   const presets = getFocusPresets();
   return presets[name];
+}
+
+/**
+ * Apply deployment-specific AI overrides and write to a new config file.
+ * Used during deployment to customize AI settings per server.
+ * @param {Object} aiOverrides - AI settings to override (provider, model, etc.)
+ * @param {string} outputPath - Path to write the modified config
+ */
+export function applyDeploymentOverrides(aiOverrides, outputPath) {
+  const configPath = join(__dirname, '..', 'config.toml');
+  const config = parse(readFileSync(configPath, 'utf8'));
+
+  // Apply AI overrides
+  if (!config.ai) config.ai = {};
+  for (const [key, value] of Object.entries(aiOverrides)) {
+    if (value !== undefined && value !== null) {
+      config.ai[key] = value;
+    }
+  }
+
+  writeFileSync(outputPath, stringify(config));
 }

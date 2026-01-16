@@ -57,6 +57,17 @@ export async function deployCommand(server, args = []) {
     server.scpToRemote(path.join(PROJECT_ROOT, file), `${deployPath}/${file}`);
   }
 
+  // Apply deployment-specific AI overrides to config.toml
+  if (server.ai) {
+    printInfo('Applying deployment AI configuration...');
+    const { applyDeploymentOverrides } = await import('../../config.js');
+    const tempConfigPath = path.join(PROJECT_ROOT, '.deploy-config.toml');
+    applyDeploymentOverrides(server.ai, tempConfigPath);
+    server.scpToRemote(tempConfigPath, `${deployPath}/config.toml`);
+    fs.unlinkSync(tempConfigPath);
+    printStatus('AI configuration applied');
+  }
+
   // Configure git
   server.sshCmd(`git config --global --add safe.directory ${deployPath}`, { check: false });
   server.sshCmd("git config --global user.email 'today-bot@system.local' && git config --global user.name 'Today Bot'", { check: false });
