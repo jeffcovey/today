@@ -192,6 +192,26 @@ function createSource(pluginName, sourceName) {
   writeConfig(config);
 }
 
+// Function to get available calendar sources for dropdowns
+function getAvailableCalendarSources() {
+  const config = readConfig();
+  const sources = [];
+
+  if (config.plugins && config.plugins['public-calendars']) {
+    for (const sourceName of Object.keys(config.plugins['public-calendars'])) {
+      sources.push({
+        value: `public-calendars/${sourceName}`,
+        label: `public-calendars/${sourceName}`
+      });
+    }
+  }
+
+  // Add empty option for "none"
+  sources.unshift({ value: '', label: '(none)' });
+
+  return sources;
+}
+
 // ============================================================================
 // Build plugin list for main menu
 // ============================================================================
@@ -316,6 +336,7 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
   const [fieldIndex, setFieldIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [selecting, setSelecting] = useState(false);
 
   const settings = plugin.settings || {};
 
@@ -335,6 +356,21 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
         required: def.required || false,
         value: hasValue ? '********' : '',
         envVarName,
+      });
+    } else if (def.type === 'select') {
+      // Select field - get options dynamically if needed
+      let options = def.options || [];
+      if (key === 'calendar_source') {
+        // Special case: get available calendar sources
+        options = getAvailableCalendarSources();
+      }
+      fields.push({
+        key,
+        label: def.description || key,
+        type: 'select',
+        required: def.required || false,
+        value: sourceConfig[key] ?? def.default ?? '',
+        options: options,
       });
     } else {
       fields.push({
@@ -358,7 +394,13 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
   const currentField = fields[fieldIndex];
 
   useInput((input, key) => {
-    if (editing) return;
+    if (editing || selecting) {
+      if (key.escape) {
+        setEditing(false);
+        setSelecting(false);
+      }
+      return;
+    }
     if (key.escape || input === 'q') {
       onCancel();
     } else if (key.downArrow || input === 'j') {
@@ -368,6 +410,8 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     } else if (key.return) {
       if (currentField.type === 'boolean') {
         onSave(currentField.key, !currentField.value);
+      } else if (currentField.type === 'select') {
+        setSelecting(true);
       } else if (currentField.type === 'multiline') {
         // Open external editor for multiline fields
         if (onOpenEditor) {
@@ -402,6 +446,10 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     let displayValue;
     if (f.type === 'boolean') {
       displayValue = f.value ? 'Yes' : 'No';
+    } else if (f.type === 'select') {
+      // Show option label for select fields
+      const option = f.options?.find(opt => opt.value === f.value);
+      displayValue = option ? option.label : (f.value || '(not set)');
     } else if (f.type === 'multiline') {
       // Show truncated preview for multiline
       const lines = String(f.value || '').split('\n');
@@ -414,7 +462,7 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     } else {
       displayValue = f.value || '(not set)';
     }
-    const editHint = f.type === 'multiline' ? ' [opens editor]' : (f.type === 'encrypted' ? ' [encrypted]' : '');
+    const editHint = f.type === 'multiline' ? ' [opens editor]' : (f.type === 'encrypted' ? ' [encrypted]' : (f.type === 'select' ? ' [select]' : ''));
     return html`
       <${Box} key=${'field-' + f.key}>
         <${Text} color=${isSelected ? 'cyan' : 'white'}>${isSelected ? '▸ ' : '  '}${f.label}: </Text>
@@ -433,6 +481,18 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
         <${Box} marginTop=${1} borderStyle="single" borderColor="yellow" paddingX=${1} flexDirection="column">
           <${Text} color="yellow">${currentField.label}</Text>
           <${TextInput} defaultValue=${editValue} onSubmit=${handleSubmit} placeholder="Enter value..." />
+        </Box>
+      ` : selecting && currentField.type === 'select' ? html`
+        <${Box} marginTop=${1} borderStyle="single" borderColor="green" paddingX=${1} flexDirection="column">
+          <${Text} color="green">${currentField.label}</Text>
+          <${Select}
+            options=${currentField.options}
+            defaultValue=${currentField.value}
+            onChange=${(value) => {
+              onSave(currentField.key, value);
+              setSelecting(false);
+            }}
+          />
         </Box>
       ` : html`
         <${Box} marginTop=${1}>

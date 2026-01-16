@@ -1,0 +1,38 @@
+# Hosting Plugin
+# Displays rental property information and status
+
+name = "hosting"
+displayName = "Hosting Properties"
+description = "Shows rental property status and recent email activity"
+type = "context"
+
+longDescription = """
+Displays information about rental properties configured in config.toml.
+
+This plugin shows:
+- Property names and current status (Dirty, Prepared, Occupied)
+- Check-in and check-out times
+- Recent email activity related to each property
+- Instructions for AI to edit status in config.toml when requested
+
+Configure properties in config.toml under [plugins.hosting.*] sections.
+"""
+
+aiInstructions = """
+When the user asks to change a property status (e.g., "mark Florida Oasis as occupied", "set downtown loft to dirty", "Florida Oasis is now prepared"), edit the status field in config.toml under the appropriate [plugins.hosting.*] section. The status should be one of: "Dirty", "Prepared", or "Occupied".
+
+For calendar_source settings, use references to existing public-calendars sources (e.g., "public-calendars/side-room-cal"). Available calendar sources can be found by looking at [plugins.public-calendars.*] sections in config.toml.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+name = { type = "string", description = "Property name (required if auto_name_from_url is false)" }
+auto_name_from_url = { type = "boolean", default = false, description = "Extract name from primary_url and check daily for changes" }
+primary_url = { type = "string", description = "Main listing URL" }
+additional_urls = { type = "array", description = "Additional listing URLs" }
+calendar_source = { type = "select", description = "Calendar source for occupancy tracking" }
+checkin_time = { type = "string", default = "15:00", description = "Check-in time (HH:MM)" }
+checkout_time = { type = "string", default = "11:00", description = "Check-out time (HH:MM)" }
+status = { type = "string", default = "Prepared", description = "Current status: Dirty, Prepared, or Occupied" }
