@@ -143,8 +143,9 @@ const password = config.password;  // Injected by plugin-loader from encrypted e
 
 const daysToSync = config.days_to_sync || 30;
 const configuredFolders = config.folders ? config.folders.split(',').map(f => f.trim()) : null;
-const excludeFolders = (config.exclude_folders || 'Junk,Trash,Deleted Messages,Deleted Items,Spam,[Gmail]/Spam,[Gmail]/Trash,Drafts')
-  .split(',').map(f => f.trim().toLowerCase());
+const excludeFolders = config.exclude_folders
+  ? config.exclude_folders.split(',').map(f => f.trim().toLowerCase()).filter(f => f)
+  : [];
 const includeBody = config.include_body !== false;
 const maxBodySize = config.max_body_size || 50000;
 

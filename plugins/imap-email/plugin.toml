@@ -49,7 +49,7 @@ password = { type = "string", default = "", description = "IMAP password", encry
 # Sync settings
 days_to_sync = { type = "number", default = 30, description = "Number of days of email to sync and keep" }
 folders = { type = "string", default = "", description = "Comma-separated folders to sync (empty = auto-discover all)" }
-exclude_folders = { type = "string", default = "Junk,Trash,Deleted Messages,Deleted Items,Spam,[Gmail]/Spam,[Gmail]/Trash", description = "Folders to exclude from auto-discovery" }
+exclude_folders = { type = "string", default = "Junk,[Gmail]/Spam,[Gmail]/Trash,[Gmail]/All Mail,[Gmail]/Important,Drafts", description = "Folders to exclude from auto-discovery" }
 batch_size = { type = "number", default = 100, description = "Number of emails to fetch per batch" }
 
 # Content settings
