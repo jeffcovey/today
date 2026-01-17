@@ -302,6 +302,7 @@ async function cmdStatus() {
 async function cmdDate(targetDate, options = {}) {
   ensureSync();
   const db = getDatabase();
+  const currentTime = getCurrentTimeISO();
 
   // Validate source filter if provided
   if (options.source) {
@@ -309,6 +310,42 @@ async function cmdDate(targetDate, options = {}) {
     if (sources.length === 0) {
       showSourceFilterError(options.source, 'time-logs', allSources);
       return;
+    }
+    // Show which sources we're querying
+    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
+    console.log('');
+  }
+
+  // Check for running timers first (only for today)
+  const today = getTodayDate();
+  if (targetDate === today) {
+    let runningQuery = `
+      SELECT start_time, description, source
+      FROM time_logs
+      WHERE end_time IS NULL
+      ORDER BY start_time DESC
+    `;
+    if (options.source) {
+      runningQuery = `
+        SELECT start_time, description, source
+        FROM time_logs
+        WHERE end_time IS NULL AND source LIKE ?
+        ORDER BY start_time DESC
+      `;
+    }
+    const runningTimers = options.source
+      ? db.prepare(runningQuery).all(`%${options.source}%`)
+      : db.prepare(runningQuery).all();
+
+    if (runningTimers.length > 0) {
+      console.log(colors.cyan('⏱  Currently Tracking'));
+      console.log('');
+      for (const timer of runningTimers) {
+        const duration = calculateDurationMinutes(timer.start_time, currentTime);
+        console.log(`  ${colors.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
+        console.log(`    ${timer.description}`);
+      }
+      console.log('');
     }
   }
 
@@ -334,115 +371,32 @@ async function cmdDate(targetDate, options = {}) {
 
   const entries = db.prepare(query).all(...params);
 
-  if (entries.length === 0) {
+  // Filter out running timers from completed entries display
+  const completedEntries = entries.filter(e => e.end_time !== null);
+
+  // Check if we have any running timers (only relevant for today)
+  const hasRunningTimers = targetDate === today && entries.some(e => e.end_time === null);
+
+  if (completedEntries.length === 0 && !hasRunningTimers) {
     console.log(colors.blue('ℹ') + ` No time entries for ${targetDate}`);
     return;
   }
 
-  let totalMinutes = 0;
+  // Use special header for today
+  const isToday = targetDate === today;
+  const header = isToday
+    ? colors.cyan("Today's Time Tracking") + ` (${targetDate})`
+    : colors.cyan("Time Tracking") + ` (${targetDate})`;
 
-  for (const entry of entries) {
-    const { start_time, end_time, duration_minutes, description } = entry;
-    const duration = duration_minutes || calculateDurationMinutes(start_time, end_time);
-
-    if (!description) continue;
-
-    totalMinutes += duration;
-
-    // Display entry
-    const startDisplay = formatTime(start_time);
-    const endDisplay = end_time ? formatTime(end_time) : 'running';
-    console.log(`${startDisplay} (${formatDurationMinutes(duration)}): ${description}`);
-  }
-
-  console.log('');
-  console.log(`Total: ${formatDurationMinutes(totalMinutes)}`);
-}
-
-// Today command - queries time_logs table
-async function cmdToday(options = {}) {
-  ensureSync();
-  const db = getDatabase();
-  const today = getTodayDate();
-  const currentTime = getCurrentTimeISO();
-
-  // Validate source filter if provided
-  if (options.source) {
-    const { sources, allSources } = await getSourcesForType('time-logs', options.source);
-    if (sources.length === 0) {
-      showSourceFilterError(options.source, 'time-logs', allSources);
-      return;
-    }
-    // Show which sources we're querying
-    console.log(colors.gray(`Sources: ${sources.map(s => s.sourceId).join(', ')}`));
-    console.log('');
-  }
-
-  // Check for running timers first
-  let runningQuery = `
-    SELECT start_time, description, source
-    FROM time_logs
-    WHERE end_time IS NULL
-    ORDER BY start_time DESC
-  `;
-  if (options.source) {
-    runningQuery = `
-      SELECT start_time, description, source
-      FROM time_logs
-      WHERE end_time IS NULL AND source LIKE ?
-      ORDER BY start_time DESC
-    `;
-  }
-  const runningTimers = options.source
-    ? db.prepare(runningQuery).all(`%${options.source}%`)
-    : db.prepare(runningQuery).all();
-
-  if (runningTimers.length > 0) {
-    console.log(colors.cyan('⏱  Currently Tracking'));
-    console.log('');
-    for (const timer of runningTimers) {
-      const duration = calculateDurationMinutes(timer.start_time, currentTime);
-      console.log(`  ${colors.yellow('⏱')} ${formatTime(timer.start_time)} - now (${formatDurationMinutes(duration)})`);
-      console.log(`    ${timer.description}`);
-    }
-    console.log('');
-  }
-
-  // Build query with optional source filter
-  // Use sqlLocalDate() to extract date from timezone-aware timestamps correctly
-  let query = `
-    SELECT start_time, end_time, duration_minutes, description, source
-    FROM time_logs
-    WHERE ${sqlLocalDate('start_time')} = ?
-    ORDER BY start_time
-  `;
-  const params = [today];
-
-  if (options.source) {
-    query = `
-      SELECT start_time, end_time, duration_minutes, description, source
-      FROM time_logs
-      WHERE ${sqlLocalDate('start_time')} = ? AND source LIKE ?
-      ORDER BY start_time
-    `;
-    params.push(`%${options.source}%`);
-  }
-
-  const entries = db.prepare(query).all(...params);
-
-  // Filter out running timers from completed entries display
-  const completedEntries = entries.filter(e => e.end_time !== null);
-
-  if (completedEntries.length === 0 && runningTimers.length === 0) {
-    console.log(colors.blue('ℹ') + ' No time entries for today');
-    return;
-  }
-
-  console.log(colors.cyan("Today's Time Tracking") + ` (${today})`);
+  console.log(header);
   console.log('');
 
   if (completedEntries.length === 0) {
-    console.log(colors.blue('ℹ') + ' No completed entries yet');
+    if (isToday && hasRunningTimers) {
+      console.log(colors.blue('ℹ') + ' No completed entries yet');
+    } else {
+      console.log(colors.blue('ℹ') + ` No time entries for ${targetDate}`);
+    }
     return;
   }
 
@@ -481,6 +435,12 @@ async function cmdToday(options = {}) {
   console.log(colors.cyan('Total:') + ` ${formatDurationMinutes(totalMinutes)}`);
   console.log('');
   console.log(getSyncStatusMessage(db, 'time-logs'));
+}
+
+// Today command - wrapper around cmdDate for today's date
+async function cmdToday(options = {}) {
+  const today = getTodayDate();
+  await cmdDate(today, options);
 }
 
 // Week command - queries time_logs table
@@ -692,6 +652,15 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     await cmdWeek(options);
+  });
+
+program
+  .command('day')
+  .description('Show time entries for a specific date')
+  .argument('<date>', 'Date in YYYY-MM-DD format')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (date, options) => {
+    await cmdDate(date, options);
   });
 
 program
