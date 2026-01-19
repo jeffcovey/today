@@ -10,6 +10,8 @@ import {
   getCurrentTimeISO,
   getTodayDate,
   getWeekAgoDate,
+  addDaysToDate,
+  formatDate,
   subtractSecondsISO,
   formatTime,
   sqlLocalDate
@@ -443,6 +445,20 @@ async function cmdToday(options = {}) {
   await cmdDate(today, options);
 }
 
+// Get yesterday's date in YYYY-MM-DD format
+function getYesterdayDate(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const today = new Date();
+  const yesterday = addDaysToDate(today, -1);
+  return formatDate(yesterday);
+}
+
+// Yesterday command - wrapper around cmdDate for yesterday's date
+async function cmdYesterday(options = {}) {
+  const yesterday = getYesterdayDate();
+  await cmdDate(yesterday, options);
+}
+
 // Week command - queries time_logs table
 async function cmdWeek(options = {}) {
   ensureSync();
@@ -644,6 +660,14 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     await cmdToday(options);
+  });
+
+program
+  .command('yesterday')
+  .description('Show yesterday\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdYesterday(options);
   });
 
 program
