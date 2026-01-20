@@ -869,7 +869,20 @@ async function cmdFix(options = {}) {
   const suggestions = await generateSuggestions(db, problems);
 
   if (suggestions.length === 0) {
-    console.log(colors.yellow('⚠') + ' No automatic fixes available for these problems.');
+    console.log(colors.yellow('⚠') + ' No automatic fixes available for these problems:');
+    console.log('');
+
+    // Show the problems so user knows what to fix manually
+    for (const problem of problems) {
+      displayProblem(problem);
+
+      // Show additional details to help locate the entry
+      if (problem.entry) {
+        console.log(colors.gray(`     File: ${problem.entry.id || 'unknown'}`));
+        console.log(colors.gray(`     Time: ${formatTime(problem.entry.start_time)} - ${formatTime(problem.entry.end_time)}`));
+      }
+    }
+
     console.log('');
     console.log('Consider manually editing the source files or using bin/track add/start/stop to correct entries.');
     return;
@@ -980,24 +993,22 @@ async function generateSuggestions(db, problems) {
         break;
 
       case 'long_entry':
-        if (problem.hours > 24) {
-          // For extremely long entries, suggest splitting or capping
-          const reasonableEndTime = await suggestReasonableEndTime(db, problem.entry);
-          if (reasonableEndTime) {
-            suggestions.push({
-              type: 'cap_entry',
-              problem: problem,
-              description: `Cap ${problem.hours}h entry to reasonable duration`,
-              action: {
-                type: 'update_end_time',
-                entryId: problem.entry.id,
-                entryStartTime: problem.entry.start_time,
-                currentEndTime: problem.entry.end_time,
-                suggestedEndTime: reasonableEndTime,
-                reason: 'Likely forgotten timer - capped to reasonable work session length'
-              }
-            });
-          }
+        // For long entries (>12 hours), suggest capping to reasonable duration
+        const reasonableEndTimeLong = await suggestReasonableEndTime(db, problem.entry);
+        if (reasonableEndTimeLong) {
+          suggestions.push({
+            type: 'cap_entry',
+            problem: problem,
+            description: `Cap ${problem.hours}h entry to reasonable duration`,
+            action: {
+              type: 'update_end_time',
+              entryId: problem.entry.id,
+              entryStartTime: problem.entry.start_time,
+              currentEndTime: problem.entry.end_time,
+              suggestedEndTime: reasonableEndTimeLong,
+              reason: 'Likely forgotten timer - capped to reasonable work session length'
+            }
+          });
         }
         break;
 
@@ -1089,6 +1100,14 @@ function displaySuggestion(suggestion, dryRun = false) {
 
     const currentDuration = calculateDurationMinutes(entryStartTime, action.currentEndTime);
     const suggestedDuration = calculateDurationMinutes(entryStartTime, action.suggestedEndTime);
+
+    // Show entry description and location
+    if (problem.entry?.description) {
+      console.log(colors.cyan('  Entry:') + ` "${problem.entry.description.substring(0, 60)}${problem.entry.description.length > 60 ? '...' : ''}"`);
+    }
+    if (problem.entry?.id) {
+      console.log(colors.gray('  File:') + ` ${problem.entry.id}`);
+    }
 
     console.log(colors.yellow('  Current:') + ` ${formatTime(entryStartTime)} - ${formatTime(action.currentEndTime)} (${formatDurationMinutes(currentDuration)})`);
     console.log(colors.green('  Suggested:') + ` ${formatTime(entryStartTime)} - ${formatTime(action.suggestedEndTime)} (${formatDurationMinutes(suggestedDuration)})`);
