@@ -8,166 +8,54 @@ week_priorities:
   -
   -
 week_summary:
-review_date:
 cssclasses: plan
 ---
 
+# Week {{WEEK_NUMBER}} – {{MONTH_NAME}} {{START_DAY}}-{{END_DAY}}, {{YEAR}}
+
 ```dataviewjs
-await dv.view("scripts/weekly-header", { startDate: dv.current().start_date, weekNum: dv.current().week_number });
+await dv.view("scripts/weekly-widget", { type: "navigation" });
 ```
 
-[[plans/{{PREV_WEEK}}|← Previous]] <span style="float: right;">[[plans/{{NEXT_WEEK}}|Next →]]</span>
+## 💡 Plan
 
-## Week Theme: `=this.week_theme`
+### Theme and Priorities
 
-<!-- WEEK_META -->
-**Week Priorities:**
+`=this.week_theme`
 
 ```dataview
-LIST this.week_priorities
+LIST WITHOUT ID item
+FLATTEN this.week_priorities AS item
 WHERE file = this.file
 ```
 
-**Review Date:** `=this.review_date`
-<!-- /WEEK_META -->
+### Notes
+
+...
 
 ---
 
-## 📋 Week Overview
 
-> [!summary] Week Summary
-> `=this.week_summary`
+## 🔍 Review (End of Week)
+
+
+### Week Summary
+
+`=this.week_summary`
+
+### Daily Summaries
 
 ```dataviewjs
-await dv.view("scripts/weekly-daily-links", { startDate: dv.current().start_date, weekNum: dv.current().week_number });
+await dv.view("scripts/weekly-widget", { type: "daily-links", startDate: dv.current().start_date, weekNum: dv.current().week_number });
 ```
 
----
+### Projects Progress
 
-## 🎯 Key Objectives for This Week
+```dataviewjs
+await dv.view("scripts/weekly-widget", { type: "projects", startDate: dv.current().start_date });
+```
 
-### High Priority (Must Complete)
-
-- [ ]
-- [ ]
-- [ ]
-
-### Medium Priority (Should Complete)
-
-- [ ]
-- [ ]
-- [ ]
-
-### Low Priority (Could Complete)
-
-- [ ]
-- [ ]
-
-### Health & Wellness Goals
-
-- [ ] Hip mobility routine: __/7 days target
-- [ ] Zazen practice: __/14 sessions target (2x daily)
-- [ ] Sleep schedule: __/7 nights on target
-- [ ]
-
-### Learning & Growth
-
-- [ ]
-- [ ]
-
----
-
-## 📊 Daily Focus Areas
-
-### Monday - {{MON_DATE}}
-
-**Stage:** {{MON_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Tuesday - {{TUE_DATE}}
-
-**Stage:** {{TUE_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Wednesday - {{WED_DATE}}
-
-**Stage:** {{WED_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Thursday - {{THU_DATE}}
-
-**Stage:** {{THU_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Friday - {{FRI_DATE}}
-
-**Stage:** {{FRI_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Saturday - {{SAT_DATE}}
-
-**Stage:** {{SAT_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
-### Sunday - {{SUN_DATE}}
-
-**Stage:** {{SUN_STAGE}}
-- **Key Focus:**
-- **Major Tasks:**
-
----
-
-## 🚀 Projects Focus
-
-### Primary Projects (Deep Work)
-
-1. **Project Name**
-   - Objective:
-   - Key milestones this week:
-   - Time allocation:
-
-2. **Project Name**
-   - Objective:
-   - Key milestones this week:
-   - Time allocation:
-
-### Secondary Projects (Maintenance)
-
--
--
--
-
----
-
-## 📈 Success Metrics
-
-### Technical Achievements Target
-
-- [ ]
-- [ ]
-- [ ]
-
-### Health & Routine Achievements Target
-
-- [ ]
-- [ ]
-- [ ]
-
-### Personal/Professional Achievements Target
-
-- [ ]
-- [ ]
-- [ ]
-
----
-
-## ⏱️ Time Tracking
+### ⏱️ Time Tracking
 
 ```dataviewjs
 const page = dv.current();
@@ -184,110 +72,9 @@ await dv.view("scripts/time-tracking-widget", {
 
 ---
 
-## 💡 Week Planning Notes
+### 💭 Reflection & Insights
 
-### Potential Challenges
-
--
--
--
-
-### Mitigation Strategies
-
--
--
--
-
-### Week Mantra
-
-*""*
-
-### Notes for Future Self
-
--
--
-
----
-
-## 🔍 Week Review (End of Week)
-
-> [!note]- Week Review (Expand after week completion)
->
-> ### ✅ What Went Well
->
-> **Accomplishments:**
-> -
->
-> -
-> -
->
-> **Positive Patterns:**
-> -
->
-> -
->
-> ```dataviewjs
-> await dv.view("scripts/weekly-progress", { startDate: dv.current().start_date });
-> ```
->
-> ### ⚠️ Challenges & Lessons
->
-> **What Could Improve:**
-> -
->
-> -
-> -
->
-> **Obstacles Encountered:**
-> -
->
-> -
->
-> ```dataviewjs
-> await dv.view("scripts/weekly-concerns", { startDate: dv.current().start_date });
-> ```
->
-> ### 📊 Metrics Review
->
-> #### Priority Completion
->
-> - **High Priority:** **/** completed (___%)
-> - **Medium Priority:** **/** completed (___%)
-> - **Low Priority:** **/** completed (___%)
->
-> #### Health & Wellness
->
-> - **Hip mobility:** **/7 days (**_%)
-> - **Zazen practice:** **/14 sessions (**_%)
-> - **Sleep schedule:** **/7 nights (**_%)
->
-> #### Projects Progress
->
-> ```dataviewjs
-> await dv.view("scripts/weekly-projects", { startDate: dv.current().start_date });
-> ```
->
-> ### 💭 Reflection & Insights
->
-> **Surprises & Unexpected Events:**
-> -
->
-> -
->
-> **Energy & Health This Week:**
-> - Physical:
-> - Mental:
-> - Emotional:
->
-> **Key Lesson/Insight:**
->
->
-> **Action Items for Next Week:**
-> - [ ]
-> - [ ]
-> - [ ]
->
-> **Review Completed:** {{DATE}}
+...
 
 ---
 

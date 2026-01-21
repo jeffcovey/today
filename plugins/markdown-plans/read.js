@@ -31,8 +31,8 @@ const contextOnly = process.env.CONTEXT_ONLY === 'true'; // Skip expensive AI op
 const plansDirectory = config.plans_directory || `${process.env.VAULT_PATH}/plans`;
 const templatesDirectory = config.templates_directory || `${process.env.VAULT_PATH}/plans/templates`;
 const linkDailyNotes = config.link_daily_notes !== false; // opt-out, default true
-const plansDir = path.join(projectRoot, plansDirectory);
-const templatesDir = path.join(projectRoot, templatesDirectory);
+const plansDir = path.isAbsolute(plansDirectory) ? plansDirectory : path.join(projectRoot, plansDirectory);
+const templatesDir = path.isAbsolute(templatesDirectory) ? templatesDirectory : path.join(projectRoot, templatesDirectory);
 
 /**
  * Calculate ISO week number
@@ -304,6 +304,8 @@ function getWeeklyTemplateVariables(date) {
     '{{WEEK_NUMBER}}': String(week),
     '{{START_DATE}}': startOfWeek.toISOString().split('T')[0],
     '{{END_DATE}}': endOfWeek.toISOString().split('T')[0],
+    '{{START_DAY}}': String(startOfWeek.getDate()),
+    '{{END_DAY}}': String(endOfWeek.getDate()),
     '{{YEAR}}': String(year),
     '{{MONTH}}': String(month),
     '{{MONTH_NAME}}': monthName,
@@ -388,17 +390,18 @@ function ensureWeeklyPlan(planInfo, date) {
 
 /**
  * Extract date components from plan filename for sorting
- * Pattern: YYYY_Q#_MM_W##_DD.md → { year, month, day }
+ * Pattern: YYYY_Q#_MM_W##_DD.md → { year, month, week, day }
  * Week plans end in _00.md
  */
 function parsePlanFilename(filename) {
   // Daily plan: 2025_Q4_12_W01_29.md
-  const dailyMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W\d+_(\d{2})\.md$/);
+  const dailyMatch = filename.match(/^(\d{4})_Q\d+_(\d{2})_W(\d+)_(\d{2})\.md$/);
   if (dailyMatch) {
     return {
       year: parseInt(dailyMatch[1], 10),
       month: parseInt(dailyMatch[2], 10),
-      day: parseInt(dailyMatch[3], 10),
+      week: parseInt(dailyMatch[3], 10),
+      day: parseInt(dailyMatch[4], 10),
       isDaily: true,
     };
   }
@@ -454,7 +457,7 @@ function parsePlanFilename(filename) {
 
 /**
  * Get all plan files sorted chronologically by actual date
- * Sorts by year, month, day to handle ISO week boundary issues
+ * Sorts by year, month, week, day to handle ISO week boundary issues
  */
 function getSortedPlanFiles() {
   if (!fs.existsSync(plansDir)) return [];
@@ -476,7 +479,12 @@ function getSortedPlanFiles() {
     // Then by month (0 for yearly/quarterly plans goes first)
     if (parsedA.month !== parsedB.month) return parsedA.month - parsedB.month;
 
-    // Then by day (0 for monthly/weekly plans goes first)
+    // Then by week (0 for monthly plans, then by week number)
+    const weekA = parsedA.week || 0;
+    const weekB = parsedB.week || 0;
+    if (weekA !== weekB) return weekA - weekB;
+
+    // Then by day (0 for weekly plans goes first)
     if (parsedA.day !== parsedB.day) return parsedA.day - parsedB.day;
 
     // Fall back to alphabetical for same date
@@ -487,93 +495,72 @@ function getSortedPlanFiles() {
 }
 
 /**
- * Get previous and next plan files for a given plan file
+ * Migrate a plan file from hardcoded navigation to widget-based navigation
+ * - Removes old [[plans/...|← Previous]] style navigation
+ * - Adds dataviewjs navigation widget if not present
  */
-function getPrevNextPlans(currentFile) {
-  const files = getSortedPlanFiles();
-  const currentIndex = files.indexOf(currentFile);
-
-  if (currentIndex === -1) return { prev: null, next: null };
-
-  const prev = currentIndex > 0 ? files[currentIndex - 1] : null;
-  const next = currentIndex < files.length - 1 ? files[currentIndex + 1] : null;
-
-  return { prev, next };
-}
-
-/**
- * Build Obsidian navigation links for prev/next plans
- * Uses float:right for the Next link to right-justify it
- */
-function buildNavLinks(currentFile) {
-  const { prev, next } = getPrevNextPlans(currentFile);
-
-  if (!prev && !next) return null;
-
-  const parts = [];
-
-  if (prev) {
-    const prevName = prev.replace('.md', '');
-    parts.push(`[[plans/${prevName}|← Previous]]`);
-  }
-
-  if (next) {
-    const nextName = next.replace('.md', '');
-    parts.push(`<span style="float: right;">[[plans/${nextName}|Next →]]</span>`);
-  }
-
-  return parts.join(' ');
-}
-
-/**
- * Add navigation links to a plan file if not already present
- */
-function addNavigationLinks(filePath) {
-  const filename = path.basename(filePath);
-  const navLinks = buildNavLinks(filename);
-
-  if (!navLinks) return false;
+function migrateNavigationToWidget(filePath) {
+  if (!fs.existsSync(filePath)) return false;
 
   let content = fs.readFileSync(filePath, 'utf-8');
+  const originalContent = content;
 
-  // Check if navigation already exists
-  if (content.includes('← Previous') || content.includes('Next →')) {
+  // Check if already has navigation widget
+  const hasWidget = content.includes('type: "navigation"');
+  if (hasWidget) {
+    // Just remove old hardcoded navigation if present
+    const navLinePattern = /^.*\[\[plans\/[^\]]+\|(← Previous|Next →|↑ Up)\]\].*\n?/gm;
+    content = content.replace(navLinePattern, '');
+    content = content.replace(/\n{3,}/g, '\n\n');
+
+    if (content !== originalContent) {
+      fs.writeFileSync(filePath, content, 'utf-8');
+      return true;
+    }
     return false;
   }
 
-  // Add navigation after the header line (# Daily Plan - ... or # Weekly Plan - ... etc)
+  // Remove old hardcoded navigation lines
+  const navLinePattern = /^.*\[\[plans\/[^\]]+\|(← Previous|Next →|↑ Up)\]\].*\n?/gm;
+  content = content.replace(navLinePattern, '');
+
+  // Add navigation widget after the main header
   const headerMatch = content.match(/^(# .+)$/m);
   if (headerMatch) {
-    const newContent = content.replace(
-      headerMatch[0],
-      `${headerMatch[0]}\n${navLinks}`
+    const headerLine = headerMatch[1];
+    const navWidget = '```dataviewjs\nawait dv.view("scripts/weekly-widget", { type: "navigation" });\n```\n';
+    content = content.replace(
+      headerLine,
+      `${headerLine}\n\n${navWidget}`
     );
+  }
 
-    if (newContent !== content) {
-      fs.writeFileSync(filePath, newContent, 'utf-8');
-      return true;
-    }
+  // Clean up multiple blank lines
+  content = content.replace(/\n{3,}/g, '\n\n');
+
+  if (content !== originalContent) {
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return true;
   }
 
   return false;
 }
 
 /**
- * Add navigation links to all plan files that are missing them
+ * Migrate all plan files to use widget-based navigation
  */
-function addNavigationToAllFiles() {
-  const added = [];
+function migrateAllNavigationToWidget() {
+  const migrated = [];
   const files = getSortedPlanFiles();
 
   for (const file of files) {
     const filePath = path.join(plansDir, file);
-
-    if (addNavigationLinks(filePath)) {
-      added.push({ file });
+    if (migrateNavigationToWidget(filePath)) {
+      migrated.push({ file });
     }
   }
 
-  return added;
+  return migrated;
 }
 
 /**
@@ -1312,6 +1299,432 @@ function linkPlanToDailyNote(planPath, date) {
 }
 
 /**
+ * Query diary entries from database for a date range
+ * Returns entries grouped by type: { gratitude: [], progress: [], concern: [] }
+ */
+function getDiaryEntriesForWeek(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return { gratitude: [], progress: [], concern: [] };
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query diary entries within the date range
+  const query = `SELECT id, date, text, metadata FROM diary WHERE date >= '${startStr}' AND date < '${endStr}T23:59:59' ORDER BY date ASC`;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    const rows = JSON.parse(result || '[]');
+
+    // Group by type
+    const grouped = { gratitude: [], progress: [], concern: [] };
+    for (const row of rows) {
+      let type = 'journal';
+      if (row.metadata) {
+        try {
+          const meta = JSON.parse(row.metadata);
+          type = meta.type || 'journal';
+        } catch { /* ignore */ }
+      }
+      if (grouped[type]) {
+        grouped[type].push({
+          id: row.id,
+          date: row.date,
+          text: row.text,
+        });
+      }
+    }
+    return grouped;
+  } catch {
+    return { gratitude: [], progress: [], concern: [] };
+  }
+}
+
+/**
+ * Format diary entries for display in weekly plan
+ */
+function formatDiaryEntries(entries, type) {
+  if (entries.length === 0) return null;
+
+  const lines = [];
+  for (const entry of entries) {
+    // Extract just the date part for display
+    const dateStr = entry.date.substring(0, 10);
+    const timeStr = entry.date.substring(11, 16);
+    const dateLabel = timeStr && timeStr !== '00:00' ? `${dateStr} ${timeStr}` : dateStr;
+
+    // Clean up the text (remove "I'm grateful for " prefix if present for gratitude)
+    let text = entry.text.trim();
+    if (type === 'gratitude' && text.toLowerCase().startsWith("i'm grateful for ")) {
+      text = text.substring(17);
+    }
+
+    // Format as bullet with date
+    lines.push(`- **${dateLabel}**: ${text}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Update weekly plan file with diary notes from database
+ * Uses markers to identify the section: <!-- DIARY_NOTES:START --> ... <!-- DIARY_NOTES:END -->
+ */
+function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(weeklyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const entries = getDiaryEntriesForWeek(startDate, endDate);
+  const totalEntries = entries.gratitude.length + entries.progress.length + entries.concern.length;
+
+  if (totalEntries === 0) {
+    return { updated: false, reason: 'no diary entries', counts: { gratitude: 0, progress: 0, concern: 0 } };
+  }
+
+  let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+
+  // Build the diary notes section
+  const sections = [];
+
+  if (entries.gratitude.length > 0) {
+    sections.push(`### Gratitude\n\n${formatDiaryEntries(entries.gratitude, 'gratitude')}`);
+  }
+
+  if (entries.progress.length > 0) {
+    sections.push(`### Progress\n\n${formatDiaryEntries(entries.progress, 'progress')}`);
+  }
+
+  if (entries.concern.length > 0) {
+    sections.push(`### Concerns\n\n${formatDiaryEntries(entries.concern, 'concern')}`);
+  }
+
+  const diarySection = sections.join('\n\n');
+  const startMarker = '<!-- DIARY_NOTES:START -->';
+  const endMarker = '<!-- DIARY_NOTES:END -->';
+  const newSection = `${startMarker}\n## 📝 Week Notes\n\n${diarySection}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section before the Review section or at the end
+    const reviewMatch = content.match(/## 🔍 Review/);
+    if (reviewMatch && reviewMatch.index !== undefined) {
+      content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
+    } else {
+      // Add before the footer line if present
+      const footerMatch = content.match(/\n\*Week \d+ of \d+/);
+      if (footerMatch && footerMatch.index !== undefined) {
+        content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+      } else {
+        content += '\n\n' + newSection;
+      }
+    }
+  }
+
+  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    counts: {
+      gratitude: entries.gratitude.length,
+      progress: entries.progress.length,
+      concern: entries.concern.length,
+    },
+  };
+}
+
+/**
+ * Get the Monday of the week for a given date
+ */
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Find the earliest daily plan file date
+ */
+function getEarliestPlanDate() {
+  if (!fs.existsSync(plansDir)) return null;
+
+  const files = fs.readdirSync(plansDir).filter(f => f.endsWith('.md'));
+  const dailyFiles = files.filter(f => /^\d{4}_Q\d+_\d{2}_W\d+_\d{2}\.md$/.test(f) && !f.endsWith('_00.md'));
+
+  let earliest = null;
+  for (const f of dailyFiles) {
+    const match = f.match(/^(\d{4})_Q\d+_(\d{2})_W\d+_(\d{2})\.md$/);
+    if (match) {
+      const d = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+      if (!earliest || d < earliest) earliest = d;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Create all missing weekly plan files from earliest plan date to today
+ */
+function createMissingWeeklyPlans(today) {
+  const earliest = getEarliestPlanDate();
+  if (!earliest) return { created: [], skipped: 0 };
+
+  const created = [];
+  let skipped = 0;
+
+  // Start from the Monday of the earliest date
+  let currentMonday = getMonday(earliest);
+  const todayMonday = getMonday(today);
+
+  while (currentMonday <= todayMonday) {
+    const planPaths = getPlanFilePaths(currentMonday);
+
+    if (!fs.existsSync(planPaths.week.path)) {
+      const result = ensureWeeklyPlan(planPaths.week, currentMonday);
+      if (result.created) {
+        created.push(result.file);
+      } else if (result.error) {
+        skipped++;
+      }
+    }
+
+    // Move to next week
+    currentMonday.setDate(currentMonday.getDate() + 7);
+  }
+
+  return { created, skipped };
+}
+
+/**
+ * Get week start and end dates from a weekly plan file's frontmatter
+ */
+function getWeekDatesFromPlan(weeklyPlanPath) {
+  if (!fs.existsSync(weeklyPlanPath)) return null;
+
+  const content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  if (!frontmatter.start_date) return null;
+
+  const startDate = new Date(frontmatter.start_date + 'T00:00:00');
+  let endDate;
+
+  if (frontmatter.end_date) {
+    endDate = new Date(frontmatter.end_date + 'T23:59:59');
+  } else {
+    // Default to 6 days after start (Monday to Sunday)
+    endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 6);
+    endDate.setHours(23, 59, 59);
+  }
+
+  return { startDate, endDate };
+}
+
+/**
+ * Query habit stats from database for a date range
+ * Returns { total, completed, byCategory, byHabit }
+ */
+function getHabitStatsForWeek(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return null;
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query habit stats grouped by category
+  const categoryQuery = `
+    SELECT
+      category,
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+      SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) as skipped,
+      SUM(CASE WHEN status = 'partial' THEN 1 ELSE 0 END) as partial
+    FROM habits
+    WHERE date >= '${startStr}' AND date <= '${endStr}'
+    GROUP BY category
+    ORDER BY category
+  `;
+
+  // Query individual habit stats
+  const habitQuery = `
+    SELECT
+      title,
+      category,
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+    FROM habits
+    WHERE date >= '${startStr}' AND date <= '${endStr}'
+    GROUP BY title, category
+    ORDER BY category, title
+  `;
+
+  try {
+    const categoryResult = execSync(`sqlite3 -json "${dbPath}" "${categoryQuery}"`, { encoding: 'utf8' });
+    const categoryRows = JSON.parse(categoryResult || '[]');
+
+    if (categoryRows.length === 0) return null;
+
+    const habitResult = execSync(`sqlite3 -json "${dbPath}" "${habitQuery}"`, { encoding: 'utf8' });
+    const habitRows = JSON.parse(habitResult || '[]');
+
+    // Aggregate totals
+    let total = 0;
+    let completed = 0;
+    let skipped = 0;
+    let partial = 0;
+    const byCategory = {};
+
+    for (const row of categoryRows) {
+      total += row.total;
+      completed += row.completed;
+      skipped += row.skipped;
+      partial += row.partial;
+
+      const cat = row.category || 'Uncategorized';
+      byCategory[cat] = {
+        total: row.total,
+        completed: row.completed,
+        skipped: row.skipped,
+        partial: row.partial,
+        rate: row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0,
+      };
+    }
+
+    // Process individual habits grouped by category
+    const byHabit = {};
+    for (const row of habitRows) {
+      const cat = row.category || 'Uncategorized';
+      if (!byHabit[cat]) byHabit[cat] = [];
+      byHabit[cat].push({
+        title: row.title,
+        total: row.total,
+        completed: row.completed,
+        rate: row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0,
+      });
+    }
+
+    return {
+      total,
+      completed,
+      skipped,
+      partial,
+      rate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      byCategory,
+      byHabit,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Format habit stats for display in weekly plan
+ */
+function formatHabitStats(stats) {
+  if (!stats || stats.total === 0) return null;
+
+  const lines = [];
+  lines.push(`**Overall:** ${stats.completed}/${stats.total} completed (${stats.rate}%)`);
+
+  // Show individual habits grouped by category
+  if (stats.byHabit && Object.keys(stats.byHabit).length > 0) {
+    for (const [category, habits] of Object.entries(stats.byHabit)) {
+      const catStats = stats.byCategory[category];
+      lines.push('');
+      lines.push(`**${category}** (${catStats.rate}%):`);
+      for (const habit of habits) {
+        const emoji = habit.rate === 100 ? '✅' : habit.rate >= 50 ? '🔶' : '❌';
+        lines.push(`- ${emoji} ${habit.title}: ${habit.completed}/${habit.total} (${habit.rate}%)`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Update weekly plan file with habit stats from database
+ * Uses markers: <!-- HABIT_STATS:START --> ... <!-- HABIT_STATS:END -->
+ */
+function updateWeeklyPlanWithHabitStats(weeklyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(weeklyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const stats = getHabitStatsForWeek(startDate, endDate);
+
+  if (!stats || stats.total === 0) {
+    return { updated: false, reason: 'no habit data', stats: null };
+  }
+
+  let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+
+  const formattedStats = formatHabitStats(stats);
+  const startMarker = '<!-- HABIT_STATS:START -->';
+  const endMarker = '<!-- HABIT_STATS:END -->';
+  const newSection = `${startMarker}\n### Habit Completion\n\n${formattedStats}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add after DIARY_NOTES section if present, otherwise before Review section
+    const diaryEndMarker = '<!-- DIARY_NOTES:END -->';
+    const diaryEndIndex = content.indexOf(diaryEndMarker);
+
+    if (diaryEndIndex !== -1) {
+      // Insert after diary notes
+      const insertPoint = diaryEndIndex + diaryEndMarker.length;
+      content = content.substring(0, insertPoint) + '\n\n' + newSection + content.substring(insertPoint);
+    } else {
+      // Add before the Review section
+      const reviewMatch = content.match(/## 🔍 Review/);
+      if (reviewMatch && reviewMatch.index !== undefined) {
+        content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
+      } else {
+        // Add before footer
+        const footerMatch = content.match(/\n\*Week \d+ of \d+/);
+        if (footerMatch && footerMatch.index !== undefined) {
+          content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+        } else {
+          content += '\n\n' + newSection;
+        }
+      }
+    }
+  }
+
+  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    stats: {
+      total: stats.total,
+      completed: stats.completed,
+      rate: stats.rate,
+    },
+  };
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -1327,9 +1740,12 @@ async function main() {
     due_today_removed: [],
     empty_reflection_removed: [],
     summary_callouts_added: [],
-    navigation_added: [],
+    navigation_migrated: [],
     tomorrow_updated: false,
     daily_note_linked: null,
+    diary_notes_updated: null,
+    habit_stats_updated: null,
+    missing_weekly_plans_created: [],
   };
 
   // Ensure today's daily plan exists
@@ -1342,6 +1758,63 @@ async function main() {
   const weeklyResult = ensureWeeklyPlan(planPaths.week, today);
   if (weeklyResult.created) {
     metadata.plans_created.push({ type: 'week', file: weeklyResult.file });
+  }
+
+  // Create any missing weekly plans from earliest daily plan to today
+  const missingWeeklyResult = createMissingWeeklyPlans(today);
+  if (missingWeeklyResult.created.length > 0) {
+    metadata.missing_weekly_plans_created = missingWeeklyResult.created;
+  }
+
+  // Update weekly plan with diary notes from database (current week)
+  const weekDates = getWeekDatesFromPlan(planPaths.week.path);
+  if (weekDates) {
+    const diaryResult = updateWeeklyPlanWithDiaryNotes(
+      planPaths.week.path,
+      weekDates.startDate,
+      weekDates.endDate
+    );
+    if (diaryResult.updated) {
+      metadata.diary_notes_updated = diaryResult.counts;
+    }
+
+    // Update habit stats for current week
+    const habitResult = updateWeeklyPlanWithHabitStats(
+      planPaths.week.path,
+      weekDates.startDate,
+      weekDates.endDate
+    );
+    if (habitResult.updated) {
+      metadata.habit_stats_updated = habitResult.stats;
+    }
+  }
+
+  // Also update the previous week's plan (entries may still be coming in)
+  const lastWeek = new Date(today);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  const lastWeekPaths = getPlanFilePaths(lastWeek);
+  if (fs.existsSync(lastWeekPaths.week.path)) {
+    const lastWeekDates = getWeekDatesFromPlan(lastWeekPaths.week.path);
+    if (lastWeekDates) {
+      const lastWeekResult = updateWeeklyPlanWithDiaryNotes(
+        lastWeekPaths.week.path,
+        lastWeekDates.startDate,
+        lastWeekDates.endDate
+      );
+      if (lastWeekResult.updated) {
+        metadata.prev_week_diary_notes_updated = lastWeekResult.counts;
+      }
+
+      // Update habit stats for previous week
+      const lastWeekHabitResult = updateWeeklyPlanWithHabitStats(
+        lastWeekPaths.week.path,
+        lastWeekDates.startDate,
+        lastWeekDates.endDate
+      );
+      if (lastWeekHabitResult.updated) {
+        metadata.prev_week_habit_stats_updated = lastWeekHabitResult.stats;
+      }
+    }
   }
 
   // Link today's plan to Obsidian daily note
@@ -1384,10 +1857,10 @@ async function main() {
     metadata.summary_callouts_added = addedCallouts;
   }
 
-  // Add navigation links to all plan files that are missing them
-  const addedNavigation = addNavigationToAllFiles();
-  if (addedNavigation.length > 0) {
-    metadata.navigation_added = addedNavigation;
+  // Migrate plan files from hardcoded navigation to widget-based navigation
+  const migratedNav = migrateAllNavigationToWidget();
+  if (migratedNav.length > 0) {
+    metadata.navigation_migrated = migratedNav;
   }
 
   // Generate summaries for past days that are missing them
