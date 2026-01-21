@@ -11,7 +11,7 @@ week_summary:
 cssclasses: plan
 ---
 
-# Week {{WEEK_NUMBER}} – {{MONTH_NAME}} {{START_DAY}}-{{END_DAY}}, {{YEAR}}
+# Week {{WEEK_NUMBER}} – {{DATE_RANGE}}{{YEAR_SUFFIX}}
 
 ```dataviewjs
 await dv.view("scripts/weekly-widget", { type: "navigation" });
