@@ -24,6 +24,7 @@ const limit = config.limit || 20;
 const defaultReviewFrequency = config.default_review_frequency || 'weekly';
 const closedReviewFrequency = config.closed_review_frequency || 'never';
 const staleness_days = config.staleness_days || 7;
+const createDateFields = config.create_date_fields === true || config.create_date_fields === 'true';
 
 if (!owner) {
   console.error(JSON.stringify({
@@ -59,6 +60,69 @@ try {
   process.exit(1);
 }
 
+/**
+ * Create a date field on a project if it doesn't exist
+ * @param {string} projectId - GitHub project node ID
+ * @param {string} fieldName - Name of the field to create
+ * @returns {boolean} - Whether the field was created
+ */
+function createDateField(projectId, fieldName) {
+  const mutation = `
+    mutation {
+      createProjectV2Field(input: {
+        projectId: "${projectId}"
+        dataType: DATE
+        name: "${fieldName}"
+      }) {
+        projectV2Field {
+          ... on ProjectV2Field {
+            id
+            name
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    execSync(`gh api graphql -f query='${mutation.replace(/'/g, "\\'")}'`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    // Silently fail - likely missing write scope
+    return false;
+  }
+}
+
+/**
+ * Ensure a project has Start Date and Due Date fields
+ * @param {Object} project - Project object with id and fields
+ * @returns {Object} - { startDateCreated, dueDateCreated }
+ */
+function ensureDateFields(project) {
+  const result = { startDateCreated: false, dueDateCreated: false };
+
+  if (!project.fields?.nodes) return result;
+
+  const fieldNames = project.fields.nodes
+    .filter(f => f.name)
+    .map(f => f.name.toLowerCase());
+
+  const hasStartDate = fieldNames.some(n => n === 'start date');
+  const hasDueDate = fieldNames.some(n => n === 'due date');
+
+  if (!hasStartDate) {
+    result.startDateCreated = createDateField(project.id, 'Start Date');
+  }
+  if (!hasDueDate) {
+    result.dueDateCreated = createDateField(project.id, 'Due Date');
+  }
+
+  return result;
+}
+
 // Build GraphQL query based on owner type
 function buildQuery() {
   const projectFields = `
@@ -70,11 +134,42 @@ function buildQuery() {
     closed
     public
     updatedAt
+    fields(first: 20) {
+      nodes {
+        ... on ProjectV2Field {
+          id
+          name
+          dataType
+        }
+        ... on ProjectV2SingleSelectField {
+          id
+          name
+          dataType
+        }
+        ... on ProjectV2IterationField {
+          id
+          name
+          dataType
+        }
+      }
+    }
     items(first: 100) {
       totalCount
       nodes {
         id
         type
+        fieldValues(first: 10) {
+          nodes {
+            ... on ProjectV2ItemFieldDateValue {
+              date
+              field {
+                ... on ProjectV2Field {
+                  name
+                }
+              }
+            }
+          }
+        }
         content {
           ... on Issue {
             number
@@ -174,6 +269,13 @@ if (!includeClosed) {
   projects = projects.filter(p => !p.closed);
 }
 
+// Create date fields on projects that don't have them (if enabled)
+if (createDateFields) {
+  for (const project of projects) {
+    ensureDateFields(project);
+  }
+}
+
 /**
  * Calculate GitHub-native attention score and reasons
  * @param {Object} project - GitHub project data
@@ -245,7 +347,10 @@ const entries = projects.map(project => {
     metadata.repository = repository;
   }
 
-  // Extract item information
+  // Extract item information and date field values
+  let projectStartDate = null;
+  let projectDueDate = null;
+
   if (project.items) {
     metadata.item_count = project.items.totalCount;
 
@@ -263,6 +368,36 @@ const entries = projects.map(project => {
 
     if (items.length > 0) {
       metadata.items = items;
+    }
+
+    // Extract dates from item field values
+    // Look for "Start Date" and "Due Date" fields, compute min/max across items
+    const startDates = [];
+    const dueDates = [];
+
+    for (const item of project.items.nodes) {
+      if (!item.fieldValues?.nodes) continue;
+
+      for (const fieldValue of item.fieldValues.nodes) {
+        if (!fieldValue.date || !fieldValue.field?.name) continue;
+
+        const fieldName = fieldValue.field.name.toLowerCase();
+        if (fieldName.includes('start')) {
+          startDates.push(fieldValue.date);
+        } else if (fieldName.includes('due') || fieldName.includes('end') || fieldName.includes('target')) {
+          dueDates.push(fieldValue.date);
+        }
+      }
+    }
+
+    // Use earliest start date and latest due date
+    if (startDates.length > 0) {
+      startDates.sort();
+      projectStartDate = startDates[0];
+    }
+    if (dueDates.length > 0) {
+      dueDates.sort();
+      projectDueDate = dueDates[dueDates.length - 1];
     }
   }
 
@@ -294,8 +429,8 @@ const entries = projects.map(project => {
     status: project.closed ? 'completed' : 'active',
     priority: null, // GitHub Projects don't have priority
     topic: null,
-    start_date: null,
-    due_date: null,
+    start_date: projectStartDate,
+    due_date: projectDueDate,
     completed_at: null,
     progress: progress,
     review_frequency: reviewFrequency,

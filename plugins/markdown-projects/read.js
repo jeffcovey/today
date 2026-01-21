@@ -219,6 +219,13 @@ for (const filePath of projectFiles) {
   // Extract description
   const description = extractDescription(content);
 
+  // Build URL as vault-relative path for Obsidian linking
+  // relativePath is relative to projectRoot, we need it relative to vault
+  const vaultPath = process.env.VAULT_PATH || 'vault';
+  const vaultRelativePath = relativePath.startsWith(vaultPath + '/')
+    ? relativePath.slice(vaultPath.length + 1)
+    : relativePath.replace(/^vault\//, '');
+
   // Build metadata for extra fields
   const metadata = {};
   if (frontmatter.cover_image) metadata.cover_image = frontmatter.cover_image;
@@ -262,7 +269,7 @@ for (const filePath of projectFiles) {
     progress,
     review_frequency: reviewFrequency,
     last_reviewed: lastReviewed,
-    url: null,
+    url: vaultRelativePath,
     parent_id: null,
     metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
   });

@@ -42,6 +42,7 @@ aiInstructions = ""
 
 [commands]
 read = "./read.js"
+write = "./write.js"
 
 [settings]
 directory = { type = "string", default = "vault/projects", description = "Root directory containing project files" }

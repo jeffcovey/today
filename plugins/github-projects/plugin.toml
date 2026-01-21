@@ -13,6 +13,9 @@ Syncs GitHub Projects V2 from users, repositories, or organizations.
 Requires the GitHub CLI (gh) with `read:project` scope:
   gh auth refresh -s read:project
 
+To enable automatic creation of date fields, also add write scope:
+  gh auth refresh -s project
+
 GitHub Issues within projects are synced separately via github-issues plugin.
 This plugin syncs project metadata and tracks which issues belong to each project.
 """
@@ -26,6 +29,7 @@ GitHub Projects are synced as projects in the database.
 
 [commands]
 read = "./read.js"
+write = "./write.js"
 
 [settings]
 owner = { type = "string", required = true, description = "GitHub username or organization name" }
@@ -36,3 +40,4 @@ limit = { type = "number", default = 20, description = "Maximum number of projec
 default_review_frequency = { type = "string", default = "weekly", description = "Default review frequency for active projects (daily, weekly, monthly, quarterly, yearly, never)" }
 closed_review_frequency = { type = "string", default = "never", description = "Review frequency for closed/completed projects" }
 staleness_days = { type = "number", default = 7, description = "Days of no activity before project is considered stale" }
+create_date_fields = { type = "boolean", default = false, description = "Automatically create 'Start Date' and 'Due Date' fields on projects that don't have them (requires 'project' scope)" }

@@ -526,4 +526,148 @@ program
     console.log(getSyncStatusMessage(db, 'projects'));
   });
 
+// No-dates command - show projects without dates
+program
+  .command('no-dates')
+  .description('Show projects that have no start or due date set')
+  .option('-s, --status <status>', 'Filter by status (default: active)')
+  .action(async (options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    const status = options.status || 'active';
+
+    const projects = db.prepare(`
+      SELECT id, title, status, priority, source
+      FROM projects
+      WHERE status = ?
+        AND (start_date IS NULL OR due_date IS NULL)
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        title
+    `).all(status);
+
+    if (projects.length === 0) {
+      console.log(colors.green('✓') + ` All ${status} projects have dates set!`);
+      return;
+    }
+
+    console.log('');
+    console.log(colors.bold(`Projects Without Dates (${status})`));
+    console.log(colors.gray('─'.repeat(40)));
+    console.log('');
+
+    for (const project of projects) {
+      const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+      const sourceType = project.source.split('/')[0];
+      const sourceLabel = sourceType === 'github-projects' ? '(GitHub)' : '(Markdown)';
+
+      console.log(`${priorityEmoji} ${project.title} ${colors.gray(sourceLabel)}`);
+    }
+
+    console.log('');
+    console.log(colors.gray(`${projects.length} projects without dates`));
+    console.log('');
+    console.log('Set dates with: ' + colors.cyan('bin/projects set-dates "<name>" --start YYYY-MM-DD --due YYYY-MM-DD'));
+  });
+
+// Set dates command - update start and/or due dates for a project
+program
+  .command('set-dates <id>')
+  .description('Set start and/or due date for a project')
+  .option('-s, --start <date>', 'Start date (YYYY-MM-DD)')
+  .option('-d, --due <date>', 'Due/target date (YYYY-MM-DD)')
+  .option('--clear-start', 'Clear the start date')
+  .option('--clear-due', 'Clear the due date')
+  .action(async (id, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    // Validate dates if provided
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (options.start && !dateRegex.test(options.start)) {
+      console.log(colors.red('✗') + ' Invalid start date format. Use YYYY-MM-DD');
+      process.exit(1);
+    }
+    if (options.due && !dateRegex.test(options.due)) {
+      console.log(colors.red('✗') + ' Invalid due date format. Use YYYY-MM-DD');
+      process.exit(1);
+    }
+
+    if (!options.start && !options.due && !options.clearStart && !options.clearDue) {
+      console.log(colors.yellow('⚠') + ' No date changes specified. Use --start, --due, --clear-start, or --clear-due');
+      process.exit(1);
+    }
+
+    // Determine plugin from source (e.g., "github-projects/today" -> "github-projects")
+    const pluginName = project.source.split('/')[0];
+
+    // Build the write command arguments
+    const writeArgs = {
+      action: 'set-dates',
+      projectId: project.id,
+      startDate: options.clearStart ? null : (options.start || undefined),
+      dueDate: options.clearDue ? null : (options.due || undefined),
+    };
+
+    // Call the plugin's write command
+    const pluginDir = `plugins/${pluginName}`;
+    const writeScript = `${pluginDir}/write.js`;
+
+    try {
+      const result = execSync(`node ${writeScript}`, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PROJECT_ROOT: process.cwd(),
+        }
+      });
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        console.log(colors.green('✓') + ` Updated dates for "${project.title}"`);
+        if (options.start || options.clearStart) {
+          console.log(`  Start date: ${options.start || '(cleared)'}`);
+        }
+        if (options.due || options.clearDue) {
+          console.log(`  Due date: ${options.due || '(cleared)'}`);
+        }
+
+        // Sync to update the database
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Syncing to update database...');
+        execSync(`bin/plugins sync ${pluginName}`, { stdio: 'inherit' });
+      } else {
+        console.log(colors.red('✗') + ` Failed to update dates: ${response.error}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
+        console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting dates`);
+      } else {
+        console.log(colors.red('✗') + ` Error: ${error.message}`);
+      }
+      process.exit(1);
+    }
+  });
+
 program.parse();

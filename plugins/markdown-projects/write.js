@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+
+// Write handler for markdown-projects plugin
+// Supports updating project frontmatter fields like start_date, target_date
+
+import fs from 'fs';
+import path from 'path';
+
+const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+const args = JSON.parse(process.env.PLUGIN_WRITE_ARGS || '{}');
+
+function output(result) {
+  console.log(JSON.stringify(result));
+}
+
+// Parse YAML frontmatter from markdown content
+function parseFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return { frontmatter: {}, body: content, raw: '' };
+
+  const raw = match[1];
+  const body = content.slice(match[0].length);
+  const frontmatter = {};
+
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const key = line.substring(0, colonIndex).trim();
+    let value = line.substring(colonIndex + 1).trim();
+
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    frontmatter[key] = value || null;
+  }
+
+  return { frontmatter, body, raw };
+}
+
+// Update a frontmatter field in the raw YAML
+function updateFrontmatterField(raw, key, value) {
+  const lines = raw.split('\n');
+  let found = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(`${key}:`)) {
+      if (value === null) {
+        // Remove the line
+        lines.splice(i, 1);
+      } else {
+        lines[i] = `${key}: ${value}`;
+      }
+      found = true;
+      break;
+    }
+  }
+
+  // Add the field if not found and value is not null
+  if (!found && value !== null) {
+    // Find a good place to insert (after similar fields or at end)
+    let insertIndex = lines.length;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('start_date:') || lines[i].startsWith('target_date:') ||
+          lines[i].startsWith('due_date:') || lines[i].startsWith('end_date:')) {
+        insertIndex = i + 1;
+      }
+    }
+    lines.splice(insertIndex, 0, `${key}: ${value}`);
+  }
+
+  return lines.join('\n');
+}
+
+// Handle set-dates action
+function handleSetDates() {
+  const { projectId, startDate, dueDate } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  // Project ID for markdown-projects is the file path (e.g., "vault/projects/my-project.md")
+  // Extract it from the full ID which might have source prefix
+  let filePath = projectId;
+  if (filePath.includes(':')) {
+    filePath = filePath.split(':').pop();
+  }
+
+  const fullPath = path.join(projectRoot, filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return output({ success: false, error: `Project file not found: ${filePath}` });
+  }
+
+  // Read and parse the file
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const { frontmatter, body, raw } = parseFrontmatter(content);
+
+  if (!raw) {
+    return output({ success: false, error: 'Project file has no frontmatter' });
+  }
+
+  // Update the frontmatter
+  let updatedRaw = raw;
+
+  if (startDate !== undefined) {
+    updatedRaw = updateFrontmatterField(updatedRaw, 'start_date', startDate);
+  }
+
+  if (dueDate !== undefined) {
+    // markdown-projects uses target_date for due date
+    updatedRaw = updateFrontmatterField(updatedRaw, 'target_date', dueDate);
+  }
+
+  // Write back the file
+  const newContent = `---\n${updatedRaw}\n---${body}`;
+  fs.writeFileSync(fullPath, newContent, 'utf8');
+
+  return output({
+    success: true,
+    updated: {
+      file: filePath,
+      startDate: startDate !== undefined ? startDate : frontmatter.start_date,
+      dueDate: dueDate !== undefined ? dueDate : frontmatter.target_date,
+    }
+  });
+}
+
+// Main
+if (args.action === 'set-dates') {
+  handleSetDates();
+} else {
+  output({ success: false, error: `Unknown action: ${args.action}` });
+}
