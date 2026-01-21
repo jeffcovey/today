@@ -1764,6 +1764,16 @@ async function main() {
   const missingWeeklyResult = createMissingWeeklyPlans(today);
   if (missingWeeklyResult.created.length > 0) {
     metadata.missing_weekly_plans_created = missingWeeklyResult.created;
+
+    // Update newly created weekly plans with diary notes and habit stats
+    for (const weekFile of missingWeeklyResult.created) {
+      const weekPath = path.join(plansDir, weekFile);
+      const weekDates = getWeekDatesFromPlan(weekPath);
+      if (weekDates) {
+        updateWeeklyPlanWithDiaryNotes(weekPath, weekDates.startDate, weekDates.endDate);
+        updateWeeklyPlanWithHabitStats(weekPath, weekDates.startDate, weekDates.endDate);
+      }
+    }
   }
 
   // Update weekly plan with diary notes from database (current week)
