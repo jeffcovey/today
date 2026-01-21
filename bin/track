@@ -3,6 +3,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createInterface } from 'readline';
 import { getDatabase } from '../src/database-service.js';
 import { getSourcesForType, getWritableSource, writeEntryAndSync, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import {
@@ -10,6 +11,8 @@ import {
   getCurrentTimeISO,
   getTodayDate,
   getWeekAgoDate,
+  addDaysToDate,
+  formatDate,
   subtractSecondsISO,
   formatTime,
   sqlLocalDate
@@ -261,8 +264,10 @@ async function cmdAdd(durationStr, options = {}) {
 
 // Status command - queries DB for running timers (end_time IS NULL)
 async function cmdStatus() {
+  // Perform daily sanity check (silent if no problems)
   ensureSync();
   const db = getDatabase();
+  await performDailyCheck(db, { verbose: false });
 
   // Query for all running timers across all sources
   const runningTimers = db.prepare(`
@@ -439,8 +444,26 @@ async function cmdDate(targetDate, options = {}) {
 
 // Today command - wrapper around cmdDate for today's date
 async function cmdToday(options = {}) {
+  // Perform daily sanity check (silent if no problems)
+  const db = getDatabase();
+  await performDailyCheck(db, { verbose: false });
+
   const today = getTodayDate();
   await cmdDate(today, options);
+}
+
+// Get yesterday's date in YYYY-MM-DD format
+function getYesterdayDate(timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const today = new Date();
+  const yesterday = addDaysToDate(today, -1);
+  return formatDate(yesterday);
+}
+
+// Yesterday command - wrapper around cmdDate for yesterday's date
+async function cmdYesterday(options = {}) {
+  const yesterday = getYesterdayDate();
+  await cmdDate(yesterday, options);
 }
 
 // Week command - queries time_logs table
@@ -591,6 +614,703 @@ async function cmdSync() {
   }
 }
 
+// Audit command - check for problematic time entries
+async function cmdAudit(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Handle daily check mode
+  if (options.daily) {
+    return await performDailyCheck(db, options);
+  }
+
+  // Determine date range to check
+  const endDate = getTodayDate();
+  let startDate;
+
+  if (options.all) {
+    // Check all entries
+    const oldestEntry = db.prepare(`
+      SELECT MIN(DATE(start_time, 'localtime')) as oldest_date
+      FROM time_logs
+    `).get();
+    startDate = oldestEntry?.oldest_date || endDate;
+  } else {
+    // Check last N days (default 30)
+    const daysToCheck = options.days || 30;
+    const startDateObj = new Date();
+    startDateObj.setDate(startDateObj.getDate() - daysToCheck);
+    startDate = formatDate(startDateObj);
+  }
+
+  console.log(colors.cyan('🔍 Time Tracking Audit') + ` (${startDate} to ${endDate})`);
+  console.log('');
+
+  // Find problematic entries
+  const problems = findProblems(db, startDate, endDate);
+
+  if (problems.length === 0) {
+    console.log(colors.green('✓') + ' No problems found!');
+    return;
+  }
+
+  console.log(colors.yellow(`⚠ Found ${problems.length} potential problem${problems.length > 1 ? 's' : ''}:`));
+  console.log('');
+
+  for (const problem of problems) {
+    displayProblem(problem);
+  }
+
+  console.log('');
+  console.log(colors.blue('ℹ') + ' Run ' + colors.cyan('bin/track fix') + ' to see suggested corrections');
+}
+
+// Perform daily sanity check (used internally and via --daily flag)
+async function performDailyCheck(db, options = {}) {
+  // Check if we've already done today's check
+  if (!options.force && hasCheckedToday(db)) {
+    if (options.verbose) {
+      console.log(colors.blue('ℹ') + ' Daily sanity check already completed today');
+    }
+    return;
+  }
+
+  // Check last 7 days for any day with >24 hours
+  const endDate = getTodayDate();
+  const startDateObj = new Date();
+  startDateObj.setDate(startDateObj.getDate() - 7);
+  const startDate = formatDate(startDateObj);
+
+  const problems = findProblems(db, startDate, endDate, { onlyMajor: true });
+
+  if (problems.length > 0) {
+    console.log(colors.yellow('⚠') + ` Found ${problems.length} time tracking issue${problems.length > 1 ? 's' : ''} in the last 7 days:`);
+    console.log('');
+
+    for (const problem of problems) {
+      displayProblem(problem);
+    }
+
+    console.log('');
+    console.log(colors.blue('ℹ') + ' Run ' + colors.cyan('bin/track fix') + ' to see suggested corrections');
+  } else if (options.verbose) {
+    console.log(colors.green('✓') + ' No time tracking problems found in last 7 days');
+  }
+
+  // Mark that we've checked today
+  markCheckedToday(db);
+}
+
+
+// Find problems in time entries
+function findProblems(db, startDate, endDate, options = {}) {
+  const problems = [];
+
+  // Get all entries in date range grouped by date
+  const dailyTotals = db.prepare(`
+    SELECT
+      DATE(start_time, 'localtime') as date,
+      SUM(CASE WHEN duration_minutes IS NULL THEN 0 ELSE duration_minutes END) as total_minutes,
+      COUNT(*) as entry_count
+    FROM time_logs
+    WHERE DATE(start_time, 'localtime') >= ? AND DATE(start_time, 'localtime') <= ?
+    GROUP BY DATE(start_time, 'localtime')
+    ORDER BY date
+  `).all(startDate, endDate);
+
+  // Check for impossible daily totals (>24 hours)
+  for (const day of dailyTotals) {
+    const totalHours = day.total_minutes / 60;
+    if (totalHours > 24) {
+      problems.push({
+        type: 'impossible_day_total',
+        severity: 'major',
+        date: day.date,
+        totalHours: Math.round(totalHours * 10) / 10,
+        totalMinutes: day.total_minutes,
+        entryCount: day.entry_count,
+        message: `${day.date} has ${Math.round(totalHours * 10) / 10}h of tracked time (${day.entry_count} entries)`
+      });
+    }
+  }
+
+  // Check for extremely long individual entries (>12 hours)
+  const longEntries = db.prepare(`
+    SELECT
+      DATE(start_time, 'localtime') as date,
+      start_time,
+      end_time,
+      duration_minutes,
+      description,
+      id
+    FROM time_logs
+    WHERE DATE(start_time, 'localtime') >= ? AND DATE(start_time, 'localtime') <= ?
+      AND duration_minutes > 720
+    ORDER BY duration_minutes DESC
+  `).all(startDate, endDate);
+
+  for (const entry of longEntries) {
+    const hours = Math.round((entry.duration_minutes / 60) * 10) / 10;
+    problems.push({
+      type: 'long_entry',
+      severity: entry.duration_minutes > 1440 ? 'major' : 'minor', // >24h = major
+      date: entry.date,
+      hours: hours,
+      entry: entry,
+      message: `${entry.date}: ${hours}h entry - "${entry.description.substring(0, 50)}${entry.description.length > 50 ? '...' : ''}"`
+    });
+  }
+
+  // Check for running timers older than 1 day
+  const now = getCurrentTimeISO();
+  const oldRunningTimers = db.prepare(`
+    SELECT
+      start_time,
+      description,
+      source,
+      id
+    FROM time_logs
+    WHERE end_time IS NULL
+      AND datetime(start_time) < datetime(?, '-1 day')
+    ORDER BY start_time
+  `).all(now);
+
+  for (const timer of oldRunningTimers) {
+    const duration = calculateDurationMinutes(timer.start_time, now);
+    const hours = Math.round((duration / 60) * 10) / 10;
+    problems.push({
+      type: 'old_running_timer',
+      severity: 'major',
+      hours: hours,
+      entry: timer,
+      message: `Running timer for ${hours}h: "${timer.description.substring(0, 50)}${timer.description.length > 50 ? '...' : ''}"`
+    });
+  }
+
+  // If onlyMajor flag is set, filter to major problems only
+  if (options.onlyMajor) {
+    return problems.filter(p => p.severity === 'major');
+  }
+
+  return problems;
+}
+
+// Display a problem
+function displayProblem(problem) {
+  const icon = problem.severity === 'major' ? '🚨' : '⚠️';
+  console.log(`  ${icon} ${problem.message}`);
+}
+
+// Check if we've already run daily check today
+function hasCheckedToday(db) {
+  const today = getTodayDate();
+
+  try {
+    const lastCheck = db.prepare(`
+      SELECT value FROM metadata WHERE key = 'last_sanity_check'
+    `).get();
+
+    return lastCheck?.value === today;
+  } catch (error) {
+    // metadata table might not exist yet
+    return false;
+  }
+}
+
+// Mark that we've checked today
+function markCheckedToday(db) {
+  const today = getTodayDate();
+
+  // Create metadata table if it doesn't exist
+  try {
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run();
+
+    db.prepare(`
+      INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_sanity_check', ?)
+    `).run(today);
+  } catch (error) {
+    // If we can't create metadata table, just continue silently
+    // The check will run again next time
+  }
+}
+
+// Fix command - suggest and apply corrections to problematic entries
+async function cmdFix(options = {}) {
+  ensureSync();
+  const db = getDatabase();
+
+  // Find problems in last 30 days by default
+  const endDate = getTodayDate();
+  const daysToCheck = options.days || 30;
+  const startDateObj = new Date();
+  startDateObj.setDate(startDateObj.getDate() - daysToCheck);
+  const startDate = formatDate(startDateObj);
+
+  const problems = findProblems(db, startDate, endDate);
+
+  if (problems.length === 0) {
+    console.log(colors.green('✓') + ' No problems found to fix!');
+    return;
+  }
+
+  console.log(colors.cyan('🔧 Time Tracking Fixes') + ` (${startDate} to ${endDate})`);
+  console.log('');
+  console.log(`Found ${problems.length} problem${problems.length > 1 ? 's' : ''} - analyzing for fixes...`);
+  console.log('');
+
+  // Group problems by type and suggest fixes
+  const suggestions = await generateSuggestions(db, problems);
+
+  if (suggestions.length === 0) {
+    console.log(colors.yellow('⚠') + ' No automatic fixes available for these problems:');
+    console.log('');
+
+    // Show the problems so user knows what to fix manually
+    for (const problem of problems) {
+      displayProblem(problem);
+
+      // Show additional details to help locate the entry
+      if (problem.entry) {
+        console.log(colors.gray(`     File: ${problem.entry.id || 'unknown'}`));
+        console.log(colors.gray(`     Time: ${formatTime(problem.entry.start_time)} - ${formatTime(problem.entry.end_time)}`));
+      }
+    }
+
+    console.log('');
+    console.log('Consider manually editing the source files or using bin/track add/start/stop to correct entries.');
+    return;
+  }
+
+  console.log(`Generated ${suggestions.length} suggested fix${suggestions.length > 1 ? 'es' : ''}:`);
+  console.log('');
+
+  // Show suggestions and ask for approval
+  if (options.dryRun) {
+    // Just show what would be done
+    for (const suggestion of suggestions) {
+      displaySuggestion(suggestion, true);
+    }
+    console.log('');
+    console.log(colors.blue('ℹ') + ' Dry run completed. Use --apply to actually make changes.');
+    return;
+  }
+
+  // Interactive mode - ask for each suggestion
+  const appliedFixes = [];
+
+  for (let i = 0; i < suggestions.length; i++) {
+    const suggestion = suggestions[i];
+    console.log(`${colors.cyan(`Fix ${i + 1}/${suggestions.length}:`)} ${suggestion.description}`);
+    console.log('');
+    displaySuggestion(suggestion);
+
+    const answer = await askUserApproval(
+      'Apply this fix?',
+      ['yes', 'no', 'quit'],
+      'yes'
+    );
+
+    console.log('');
+
+    if (answer === 'quit') {
+      console.log(colors.yellow('⚠') + ' Stopped by user request');
+
+      // Sync any fixes that were already applied before quitting
+      if (appliedFixes.length > 0) {
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Re-syncing applied fixes...');
+        await cmdSync();
+        console.log(colors.green(`✓ ${appliedFixes.length} fix${appliedFixes.length > 1 ? 'es' : ''} applied and synced`));
+      }
+
+      return; // Exit the function immediately
+    }
+
+    if (answer === 'yes' || answer === 'y') {
+      try {
+        const result = await applyFix(db, suggestion);
+        if (result.success) {
+          appliedFixes.push(suggestion);
+          console.log(colors.green('✓') + ` Fix applied successfully`);
+
+          // Immediate sync after each fix for better safety
+          console.log(colors.gray('    Syncing...'));
+          await cmdSync();
+          console.log(colors.gray('    ✓ Synced'));
+        } else {
+          console.log(colors.red('✗') + ` Failed to apply fix: ${result.error}`);
+        }
+      } catch (error) {
+        console.log(colors.red('✗') + ` Error applying fix: ${error.message}`);
+      }
+    } else if (answer === 'no' || answer === 'n') {
+      console.log(colors.gray('  Skipped'));
+    } else {
+      // Handle any unexpected input
+      console.log(colors.gray('  Skipped'));
+    }
+
+    if (i < suggestions.length - 1) {
+      console.log('');
+    }
+  }
+
+  // Final summary (sync already happened after each fix)
+  if (appliedFixes.length > 0) {
+    console.log('');
+    console.log(colors.green(`✓ All ${appliedFixes.length} fix${appliedFixes.length > 1 ? 'es' : ''} applied and synced successfully`));
+  } else {
+    console.log('');
+    console.log(colors.blue('ℹ') + ' No fixes were applied');
+  }
+}
+
+// Generate intelligent suggestions for fixing problems
+async function generateSuggestions(db, problems) {
+  const suggestions = [];
+
+  for (const problem of problems) {
+    switch (problem.type) {
+      case 'old_running_timer':
+        // Suggest stopping old running timers
+        suggestions.push({
+          type: 'stop_timer',
+          problem: problem,
+          description: `Stop running timer: "${problem.entry.description.substring(0, 50)}..."`,
+          action: {
+            type: 'stop_timer',
+            entryId: problem.entry.id,
+            suggestedEndTime: problem.entry.start_time // Stop at same time as start
+          }
+        });
+        break;
+
+      case 'long_entry':
+        // For long entries (>12 hours), suggest capping to reasonable duration
+        const reasonableEndTimeLong = await suggestReasonableEndTime(db, problem.entry);
+        if (reasonableEndTimeLong) {
+          suggestions.push({
+            type: 'cap_entry',
+            problem: problem,
+            description: `Cap ${problem.hours}h entry to reasonable duration`,
+            action: {
+              type: 'update_end_time',
+              entryId: problem.entry.id,
+              entryStartTime: problem.entry.start_time,
+              currentEndTime: problem.entry.end_time,
+              suggestedEndTime: reasonableEndTimeLong,
+              reason: 'Likely forgotten timer - capped to reasonable work session length'
+            }
+          });
+        }
+        break;
+
+      case 'impossible_day_total':
+        // For days with >24 hours, look for the longest entries to fix
+        const dayEntries = db.prepare(`
+          SELECT * FROM time_logs
+          WHERE DATE(start_time, 'localtime') = ?
+            AND duration_minutes > 480
+          ORDER BY duration_minutes DESC
+          LIMIT 3
+        `).all(problem.date);
+
+        for (const entry of dayEntries) {
+          const reasonableEndTime = await suggestReasonableEndTime(db, entry);
+          if (reasonableEndTime) {
+            suggestions.push({
+              type: 'cap_day_entry',
+              problem: problem,
+              description: `Cap long entry on ${problem.date}: "${entry.description.substring(0, 40)}..."`,
+              action: {
+                type: 'update_end_time',
+                entryId: entry.id,
+                entryStartTime: entry.start_time,
+                currentEndTime: entry.end_time,
+                suggestedEndTime: reasonableEndTime,
+                reason: `Part of ${problem.totalHours}h day - likely forgotten timer`
+              }
+            });
+          }
+        }
+        break;
+    }
+  }
+
+  return suggestions;
+}
+
+// Suggest a reasonable end time based on typical work patterns
+async function suggestReasonableEndTime(db, entry) {
+  try {
+    const startTime = new Date(entry.start_time);
+
+    // Look at user's typical session lengths for similar activities
+    const description = entry.description;
+    const topic = description.match(/#topic\/[a-z_]+/)?.[0] || null;
+
+    let typicalDuration = 120; // Default 2 hours
+
+    if (topic) {
+      // Find average duration for this topic type
+      const avgDuration = db.prepare(`
+        SELECT AVG(duration_minutes) as avg_minutes
+        FROM time_logs
+        WHERE description LIKE ?
+          AND duration_minutes BETWEEN 15 AND 480
+          AND DATE(start_time, 'localtime') >= DATE('now', 'localtime', '-90 days')
+      `).get(`%${topic}%`);
+
+      if (avgDuration?.avg_minutes && avgDuration.avg_minutes > 0) {
+        typicalDuration = Math.min(Math.max(avgDuration.avg_minutes, 30), 240); // 30min to 4h
+      }
+    }
+
+    // Suggest end time based on typical duration
+    const suggestedEndTime = new Date(startTime.getTime() + (typicalDuration * 60 * 1000));
+    return suggestedEndTime.toISOString();
+
+  } catch (error) {
+    return null;
+  }
+}
+
+// Display a suggestion for user review
+function displaySuggestion(suggestion, dryRun = false) {
+  const { problem, action } = suggestion;
+
+  if (action.type === 'stop_timer') {
+    console.log(colors.yellow('  Current:') + ` Timer running since ${formatTime(problem.entry.start_time)} (${problem.hours}h)`);
+    console.log(colors.green('  Fix:') + ' Stop the timer now');
+  }
+  else if (action.type === 'update_end_time') {
+    const entryStartTime = action.entryStartTime;
+
+    if (!entryStartTime) {
+      console.log(colors.red('Error: Could not determine entry start time for suggestion'));
+      return;
+    }
+
+    const currentDuration = calculateDurationMinutes(entryStartTime, action.currentEndTime);
+    const suggestedDuration = calculateDurationMinutes(entryStartTime, action.suggestedEndTime);
+
+    // Show entry description and location
+    if (problem.entry?.description) {
+      console.log(colors.cyan('  Entry:') + ` "${problem.entry.description.substring(0, 60)}${problem.entry.description.length > 60 ? '...' : ''}"`);
+    }
+    if (problem.entry?.id) {
+      console.log(colors.gray('  File:') + ` ${problem.entry.id}`);
+    }
+
+    console.log(colors.yellow('  Current:') + ` ${formatTime(entryStartTime)} - ${formatTime(action.currentEndTime)} (${formatDurationMinutes(currentDuration)})`);
+    console.log(colors.green('  Suggested:') + ` ${formatTime(entryStartTime)} - ${formatTime(action.suggestedEndTime)} (${formatDurationMinutes(suggestedDuration)})`);
+    console.log(colors.gray('  Reason:') + ` ${action.reason}`);
+  }
+
+  if (!dryRun) {
+    console.log('');
+  }
+}
+
+// Ask user for approval with interactive prompt
+async function askUserApproval(question, options = ['yes', 'no'], defaultOption = 'yes') {
+  return new Promise((resolve) => {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const optionsStr = options.map(opt =>
+      opt === defaultOption ? opt.toUpperCase() : opt
+    ).join('/');
+
+    rl.question(`${question} [${optionsStr}]: `, (answer) => {
+      rl.close();
+
+      const input = answer.trim().toLowerCase();
+
+      if (input === '' && defaultOption) {
+        resolve(defaultOption);
+        return;
+      }
+
+      // Allow single character responses
+      const singleCharMatch = options.find(opt => opt.startsWith(input));
+      if (singleCharMatch) {
+        resolve(singleCharMatch);
+        return;
+      }
+
+      if (options.includes(input)) {
+        resolve(input);
+      } else {
+        console.log(colors.red('Invalid option. Please try again.'));
+        resolve(askUserApproval(question, options, defaultOption));
+      }
+    });
+  });
+}
+
+// Apply a fix to the database and source files
+async function applyFix(db, suggestion) {
+  const { action } = suggestion;
+
+  try {
+    if (action.type === 'stop_timer') {
+      // Stop a running timer
+      return await stopOldTimer(db, suggestion);
+    } else if (action.type === 'update_end_time') {
+      // Update an entry's end time
+      return await updateEntryEndTime(db, suggestion);
+    } else {
+      return { success: false, error: `Unknown action type: ${action.type}` };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Stop an old running timer
+async function stopOldTimer(db, suggestion) {
+  const { problem, action } = suggestion;
+  const entry = problem.entry;
+
+  // Update the database entry
+  const endTime = getCurrentTimeISO();
+  const duration = calculateDurationMinutes(entry.start_time, endTime);
+
+  db.prepare(`
+    UPDATE time_logs
+    SET end_time = ?, duration_minutes = ?
+    WHERE id = ?
+  `).run(endTime, duration, entry.id);
+
+  // Try to update source file if it's the markdown plugin
+  if (entry.source?.includes('markdown-time-tracking')) {
+    try {
+      const result = await updateMarkdownSourceFile(entry, endTime);
+      if (result.success) {
+        console.log(colors.gray('    Source file updated'));
+      }
+    } catch (error) {
+      console.log(colors.yellow('⚠') + ` Database updated but couldn't update source file: ${error.message}`);
+    }
+  }
+
+  return { success: true };
+}
+
+// Update an entry's end time
+async function updateEntryEndTime(db, suggestion) {
+  const { action } = suggestion;
+
+  // Update the database entry
+  const duration = calculateDurationMinutes(action.entryStartTime, action.suggestedEndTime);
+
+  db.prepare(`
+    UPDATE time_logs
+    SET end_time = ?, duration_minutes = ?
+    WHERE id = ?
+  `).run(action.suggestedEndTime, duration, action.entryId);
+
+  // Try to update source file if it's the markdown plugin
+  if (action.entryId?.includes('markdown-time-tracking')) {
+    try {
+      // Find the entry in database to get current details
+      const entry = db.prepare(`
+        SELECT * FROM time_logs WHERE id = ?
+      `).get(action.entryId);
+
+      if (entry) {
+        const result = await updateMarkdownSourceFile(entry, action.suggestedEndTime);
+        if (result.success) {
+          console.log(colors.gray('    Source file updated'));
+        }
+      }
+    } catch (error) {
+      console.log(colors.yellow('⚠') + ` Database updated but couldn't update source file: ${error.message}`);
+    }
+  }
+
+  return { success: true };
+}
+
+// Update markdown source file for an entry
+async function updateMarkdownSourceFile(entry, newEndTime) {
+  try {
+    // Parse entry ID to get file path and line number
+    // Format: "markdown-time-tracking/local:vault/logs/time-tracking/2026-01.md:150"
+    const entryId = entry.id;
+    if (!entryId || !entryId.includes(':')) {
+      throw new Error('Invalid entry ID format');
+    }
+
+    // Split to separate the source prefix from the file path and line number
+    const parts = entryId.split(':');
+    if (parts.length < 3) {
+      throw new Error('Invalid entry ID format - expected source:path:line');
+    }
+
+    // Reconstruct the file path and get line number
+    const filePath = parts.slice(1, -1).join(':'); // Handle paths that might have colons
+    const lineNumStr = parts[parts.length - 1];
+    const lineNum = parseInt(lineNumStr);
+
+    if (isNaN(lineNum)) {
+      throw new Error('Invalid line number in entry ID');
+    }
+
+    // Get full file path
+    const fullFilePath = path.join(PROJECT_ROOT, filePath);
+
+    // Check if file exists
+    const fs = await import('fs');
+    if (!fs.existsSync(fullFilePath)) {
+      throw new Error(`Source file not found: ${filePath}`);
+    }
+
+    // Read current file content
+    const content = fs.readFileSync(fullFilePath, 'utf8');
+    const lines = content.split('\n');
+
+    // Check if line number is valid
+    if (lineNum >= lines.length) {
+      throw new Error(`Line ${lineNum} does not exist in file`);
+    }
+
+    // Parse and update the line
+    const currentLine = lines[lineNum];
+    const lineParts = currentLine.split('|');
+
+    if (lineParts.length < 3) {
+      throw new Error('Invalid time entry format in source file');
+    }
+
+    // Update the end time while preserving start time and description
+    const [startTime, oldEndTime, description] = lineParts;
+    const newLine = `${startTime.trim()}|${newEndTime}|${description.trim()}`;
+
+    // Update the line in memory
+    lines[lineNum] = newLine;
+
+    // Write the updated content back to file
+    const updatedContent = lines.join('\n');
+    fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
+
+    return { success: true, filePath, lineNum, oldEndTime: oldEndTime?.trim(), newEndTime };
+
+  } catch (error) {
+    throw new Error(`Failed to update source file: ${error.message}`);
+  }
+}
+
 // Commander setup
 program
   .name('track')
@@ -647,6 +1367,14 @@ program
   });
 
 program
+  .command('yesterday')
+  .description('Show yesterday\'s time entries')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    await cmdYesterday(options);
+  });
+
+program
   .command('week')
   .description('Show this week\'s time entries')
   .option('--source <source>', 'Filter by plugin source')
@@ -668,6 +1396,27 @@ program
   .description('Sync all time-logs plugins to database')
   .action(async () => {
     await cmdSync();
+  });
+
+program
+  .command('audit')
+  .description('Check for problematic time entries')
+  .option('--all', 'Check all entries (not just recent)')
+  .option('--days <days>', 'Check last N days (default: 30)', parseInt)
+  .option('--daily', 'Perform daily sanity check (last 7 days, major issues only)')
+  .option('--force', 'Force daily check even if already done today (requires --daily)')
+  .option('--verbose', 'Show output even when no problems found (with --daily)')
+  .action(async (options) => {
+    await cmdAudit(options);
+  });
+
+program
+  .command('fix')
+  .description('Suggest and apply fixes for problematic time entries')
+  .option('--days <days>', 'Check last N days (default: 30)', parseInt)
+  .option('--dry-run', 'Show what would be fixed without making changes')
+  .action(async (options) => {
+    await cmdFix(options);
   });
 
 // Handle --date option at top level (used by bin/today for historical queries)

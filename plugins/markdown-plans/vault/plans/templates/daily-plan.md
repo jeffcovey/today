@@ -9,6 +9,10 @@ obsidianUIMode: preview
 
 # Daily Plan - {{DAY_OF_WEEK}}, {{MONTH_NAME}} {{DAY}}, {{YEAR}}
 
+```dataviewjs
+await dv.view("scripts/weekly-widget", { type: "navigation" });
+```
+
 <!-- TODAY_FOCUS: Day theme and focus area -->
 ## 🎯 Today's Focus
 

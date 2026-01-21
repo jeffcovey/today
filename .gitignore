@@ -28,10 +28,10 @@ Resilio Sync.btskey
 .last-dep-check
 
 # =============================================================================
-# Vault (synced separately)
+# Vault (synced separately, top-level only)
 # =============================================================================
-vault
-vault/
+/vault
+/vault/
 
 # =============================================================================
 # Build & Dependencies
