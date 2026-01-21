@@ -3,6 +3,7 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
+    init: true
     volumes:
       - ..:/workspaces/today:cached
     command: sleep infinity
