@@ -48,3 +48,40 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$MOUNTS_FILE"
 
 echo "Override file generated: $OVERRIDE_FILE"
+
+# Also generate .git/info/exclude to ignore mounted directories
+# Use leading slashes so only top-level directories are ignored (not plugin subdirs)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+EXCLUDE_FILE="$PROJECT_ROOT/.git/info/exclude"
+
+if [ -d "$PROJECT_ROOT/.git/info" ]; then
+    echo "Generating .git/info/exclude..."
+
+    # Preserve the standard header
+    cat > "$EXCLUDE_FILE" << 'HEADER'
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+# For a project mostly in C, the following would be a good set of
+# exclude patterns (uncomment them if you want to use them):
+# *.[oa]
+# *~
+# Auto-generated from mounts.local
+HEADER
+
+    # Add mounted directories with leading slash (root-only matching)
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ "$line" =~ ^#.*$ ]] && continue
+        [[ -z "$line" ]] && continue
+
+        target="${line%%=*}"
+        target="$(echo "$target" | xargs)"
+        [ -z "$target" ] && continue
+
+        # Add with leading slash so it only matches at project root
+        echo "/$target/" >> "$EXCLUDE_FILE"
+        echo "/$target" >> "$EXCLUDE_FILE"
+    done < "$MOUNTS_FILE"
+
+    echo "# End mounts.local" >> "$EXCLUDE_FILE"
+    echo "  ✅ Git exclude file updated"
+fi
