@@ -300,12 +300,33 @@ function getWeeklyTemplateVariables(date) {
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
 
+  // Build smart date range that handles month/year transitions
+  const endMonthName = endOfWeek.toLocaleDateString('en-US', { month: 'long' });
+  const endYear = endOfWeek.getFullYear();
+  let dateRange;
+  let yearSuffix;
+  if (startOfWeek.getMonth() === endOfWeek.getMonth()) {
+    // Same month: "December 15-21, 2025"
+    dateRange = `${monthName} ${startOfWeek.getDate()}-${endOfWeek.getDate()}`;
+    yearSuffix = `, ${year}`;
+  } else if (year === endYear) {
+    // Different months, same year: "December 29 - January 4, 2025"
+    dateRange = `${monthName} ${startOfWeek.getDate()} - ${endMonthName} ${endOfWeek.getDate()}`;
+    yearSuffix = `, ${year}`;
+  } else {
+    // Different years: "December 29, 2025 - January 4, 2026" (no suffix needed)
+    dateRange = `${monthName} ${startOfWeek.getDate()}, ${year} - ${endMonthName} ${endOfWeek.getDate()}, ${endYear}`;
+    yearSuffix = '';
+  }
+
   return {
     '{{WEEK_NUMBER}}': String(week),
     '{{START_DATE}}': startOfWeek.toISOString().split('T')[0],
     '{{END_DATE}}': endOfWeek.toISOString().split('T')[0],
     '{{START_DAY}}': String(startOfWeek.getDate()),
     '{{END_DAY}}': String(endOfWeek.getDate()),
+    '{{DATE_RANGE}}': dateRange,
+    '{{YEAR_SUFFIX}}': yearSuffix,
     '{{YEAR}}': String(year),
     '{{MONTH}}': String(month),
     '{{MONTH_NAME}}': monthName,
