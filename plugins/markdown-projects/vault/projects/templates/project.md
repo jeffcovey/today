@@ -1,7 +1,7 @@
 ---
 title:
 cover_image:
-status: planning
+status: active
 priority: medium
 category:
 start_date:

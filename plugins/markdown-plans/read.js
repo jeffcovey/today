@@ -2708,6 +2708,74 @@ function getYearDatesFromPlan(yearlyPlanPath) {
 }
 
 /**
+ * Update all FUTURE plan files (weekly and above) with projects from database
+ * This ensures projects scheduled for future quarters/months appear in those plan files
+ */
+function updateFuturePlanFilesWithProjects(today) {
+  const results = { quarterly: 0, monthly: 0, weekly: 0 };
+
+  // Get all plan files in the plans directory
+  if (!fs.existsSync(plansDir)) {
+    return results;
+  }
+
+  const files = fs.readdirSync(plansDir).filter(f => f.endsWith('.md'));
+  const todayStr = formatDateStr(today);
+
+  for (const file of files) {
+    const filePath = path.join(plansDir, file);
+
+    // Skip if not a plan file (must have _00.md suffix for non-daily plans)
+    if (!file.includes('_00.md')) continue;
+
+    // Determine plan type from filename pattern
+    // Quarter: YYYY_Q#_00.md
+    // Month: YYYY_Q#_MM_00.md
+    // Week: YYYY_Q#_MM_W##_00.md
+    const quarterMatch = file.match(/^(\d{4})_Q(\d)_00\.md$/);
+    const monthMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_00\.md$/);
+    const weekMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_W(\d{2})_00\.md$/);
+
+    if (quarterMatch) {
+      // Quarterly plan
+      const quarterDates = getQuarterDatesFromPlan(filePath);
+      if (quarterDates && formatDateStr(quarterDates.startDate) > todayStr) {
+        const result = updateQuarterlyPlanWithProjects(
+          filePath,
+          quarterDates.startDate,
+          quarterDates.endDate
+        );
+        if (result.updated) results.quarterly++;
+      }
+    } else if (monthMatch) {
+      // Monthly plan
+      const monthDates = getMonthDatesFromPlan(filePath);
+      if (monthDates && formatDateStr(monthDates.startDate) > todayStr) {
+        const result = updateMonthlyPlanWithProjects(
+          filePath,
+          monthDates.startDate,
+          monthDates.endDate
+        );
+        if (result.updated) results.monthly++;
+      }
+    } else if (weekMatch) {
+      // Weekly plan
+      const weekDates = getWeekDatesFromPlan(filePath);
+      if (weekDates && formatDateStr(weekDates.startDate) > todayStr) {
+        const result = updateWeeklyPlanWithProjects(
+          filePath,
+          weekDates.startDate,
+          weekDates.endDate
+        );
+        if (result.updated) results.weekly++;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
  * Get month start and end dates from a monthly plan file's frontmatter
  */
 function getMonthDatesFromPlan(monthlyPlanPath) {
@@ -2911,6 +2979,13 @@ async function main() {
     if (yearProjectsResult.updated) {
       metadata.yearly_projects_updated = yearProjectsResult.count;
     }
+  }
+
+  // Update FUTURE plan files (weekly and above) that already exist
+  // This ensures projects with future start dates appear in those plans
+  const futurePlansUpdated = updateFuturePlanFilesWithProjects(today);
+  if (futurePlansUpdated.quarterly > 0 || futurePlansUpdated.monthly > 0 || futurePlansUpdated.weekly > 0) {
+    metadata.future_plans_updated = futurePlansUpdated;
   }
 
   // Link today's plan to Obsidian daily note
