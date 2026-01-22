@@ -619,12 +619,22 @@ program
     // Determine plugin from source (e.g., "github-projects/today" -> "github-projects")
     const pluginName = project.source.split('/')[0];
 
+    // Extract owner_type from metadata if available (for github-projects)
+    let ownerType = null;
+    if (project.metadata) {
+      try {
+        const metadata = JSON.parse(project.metadata);
+        ownerType = metadata.owner_type;
+      } catch (e) { /* ignore parse errors */ }
+    }
+
     // Build the write command arguments
     const writeArgs = {
       action: 'set-dates',
       projectId: project.id,
       startDate: options.clearStart ? null : (options.start || undefined),
       dueDate: options.clearDue ? null : (options.due || undefined),
+      ownerType: ownerType,
     };
 
     // Call the plugin's write command
