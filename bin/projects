@@ -702,11 +702,21 @@ program
     // Determine plugin from source
     const pluginName = project.source.split('/')[0];
 
+    // Extract owner_type from metadata if available (for github-projects)
+    let ownerType = null;
+    if (project.metadata) {
+      try {
+        const metadata = JSON.parse(project.metadata);
+        ownerType = metadata.owner_type;
+      } catch (e) { /* ignore parse errors */ }
+    }
+
     // Build the write command arguments
     const writeArgs = {
       action: 'set-priority',
       projectId: project.id,
       priority: normalizedPriority,
+      ownerType: ownerType,
     };
 
     // Call the plugin's write command
@@ -780,11 +790,21 @@ program
     // Determine plugin from source
     const pluginName = project.source.split('/')[0];
 
+    // Extract owner_type from metadata if available (for github-projects)
+    let ownerType = null;
+    if (project.metadata) {
+      try {
+        const metadata = JSON.parse(project.metadata);
+        ownerType = metadata.owner_type;
+      } catch (e) { /* ignore parse errors */ }
+    }
+
     // Build the write command arguments
     const writeArgs = {
       action: 'set-status',
       projectId: project.id,
       status: normalizedStatus,
+      ownerType: ownerType,
     };
 
     // Call the plugin's write command

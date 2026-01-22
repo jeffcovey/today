@@ -31,7 +31,8 @@ function graphql(query) {
 
 // Parse project ID to extract owner type, owner, and project number
 // Format: "github-projects/source:owner#number" or just "owner#number"
-function parseProjectId(projectId) {
+// ownerTypeHint can be passed from the caller if known (from metadata)
+function parseProjectId(projectId, ownerTypeHint = null) {
   let id = projectId;
 
   // Remove source prefix if present
@@ -54,7 +55,9 @@ function parseProjectId(projectId) {
     return { owner, repo, number, type: 'org' };
   }
 
-  return { owner: ownerPart, number, type: 'user' };
+  // Use hint if provided, otherwise default to 'user'
+  const type = ownerTypeHint || 'user';
+  return { owner: ownerPart, number, type };
 }
 
 // Get project details including field IDs and first item
@@ -207,7 +210,7 @@ async function handleSetDates() {
 
   try {
     // Parse the project ID
-    const { owner, number, type } = parseProjectId(projectId);
+    const { owner, number, type } = parseProjectId(projectId, args.ownerType);
 
     // Get project details
     const details = await getProjectDetails(owner, number, type);
@@ -270,7 +273,7 @@ async function handleSetPriority() {
 
   try {
     // Parse the project ID
-    const { owner, number, type } = parseProjectId(projectId);
+    const { owner, number, type } = parseProjectId(projectId, args.ownerType);
 
     // Get project details
     const details = await getProjectDetails(owner, number, type);
@@ -340,7 +343,7 @@ async function handleSetStatus() {
 
   try {
     // Parse the project ID
-    const { owner, number, type } = parseProjectId(projectId);
+    const { owner, number, type } = parseProjectId(projectId, args.ownerType);
 
     // Get project details
     const details = await getProjectDetails(owner, number, type);
