@@ -75,6 +75,9 @@ function updateFrontmatterField(raw, key, value) {
   return lines.join('\n');
 }
 
+// Valid priority values (normalized to lowercase)
+const VALID_PRIORITIES = ['highest', 'high', 'medium', 'low', 'lowest'];
+
 // Handle set-dates action
 function handleSetDates() {
   const { projectId, startDate, dueDate } = args;
@@ -130,9 +133,68 @@ function handleSetDates() {
   });
 }
 
+// Handle set-priority action
+function handleSetPriority() {
+  const { projectId, priority } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (priority === undefined) {
+    return output({ success: false, error: 'priority is required' });
+  }
+
+  // Project ID for markdown-projects is the file path
+  let filePath = projectId;
+  if (filePath.includes(':')) {
+    filePath = filePath.split(':').pop();
+  }
+
+  const fullPath = path.join(projectRoot, filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return output({ success: false, error: `Project file not found: ${filePath}` });
+  }
+
+  // Validate priority value
+  const normalizedPriority = priority === null ? null : priority.toLowerCase();
+  if (normalizedPriority !== null && !VALID_PRIORITIES.includes(normalizedPriority)) {
+    return output({
+      success: false,
+      error: `Invalid priority "${priority}". Valid options: ${VALID_PRIORITIES.join(', ')}`
+    });
+  }
+
+  // Read and parse the file
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const { frontmatter, body, raw } = parseFrontmatter(content);
+
+  if (!raw) {
+    return output({ success: false, error: 'Project file has no frontmatter' });
+  }
+
+  // Update the frontmatter
+  const updatedRaw = updateFrontmatterField(raw, 'priority', normalizedPriority);
+
+  // Write back the file
+  const newContent = `---\n${updatedRaw}\n---${body}`;
+  fs.writeFileSync(fullPath, newContent, 'utf8');
+
+  return output({
+    success: true,
+    updated: {
+      file: filePath,
+      priority: normalizedPriority,
+    }
+  });
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
+} else if (args.action === 'set-priority') {
+  handleSetPriority();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }

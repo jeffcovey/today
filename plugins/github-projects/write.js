@@ -74,6 +74,15 @@ async function getProjectDetails(owner, number, ownerType) {
                 name
                 dataType
               }
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+                dataType
+                options {
+                  id
+                  name
+                }
+              }
             }
           }
           items(first: 1) {
@@ -93,10 +102,11 @@ async function getProjectDetails(owner, number, ownerType) {
     throw new Error(`Project not found: ${owner}#${number}`);
   }
 
-  // Find date field IDs
+  // Find field IDs
   const fields = project.fields.nodes.filter(f => f.name);
   const startDateField = fields.find(f => f.name.toLowerCase() === 'start date');
   const dueDateField = fields.find(f => f.name.toLowerCase() === 'due date');
+  const priorityField = fields.find(f => f.name.toLowerCase() === 'priority');
 
   // Get first item
   const firstItem = project.items.nodes[0];
@@ -106,6 +116,8 @@ async function getProjectDetails(owner, number, ownerType) {
     title: project.title,
     startDateFieldId: startDateField?.id,
     dueDateFieldId: dueDateField?.id,
+    priorityFieldId: priorityField?.id,
+    priorityOptions: priorityField?.options || [],
     firstItemId: firstItem?.id,
   };
 }
@@ -132,6 +144,41 @@ function updateItemDateField(projectId, itemId, fieldId, date) {
 
 // Clear a date field on an item
 function clearItemDateField(projectId, itemId, fieldId) {
+  const mutation = `
+    mutation {
+      clearProjectV2ItemFieldValue(input: {
+        projectId: "${projectId}"
+        itemId: "${itemId}"
+        fieldId: "${fieldId}"
+      }) {
+        projectV2Item { id }
+      }
+    }
+  `;
+
+  graphql(mutation);
+}
+
+// Update a single-select field on an item (e.g., Priority)
+function updateItemSingleSelectField(projectId, itemId, fieldId, optionId) {
+  const mutation = `
+    mutation {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: "${projectId}"
+        itemId: "${itemId}"
+        fieldId: "${fieldId}"
+        value: { singleSelectOptionId: "${optionId}" }
+      }) {
+        projectV2Item { id }
+      }
+    }
+  `;
+
+  graphql(mutation);
+}
+
+// Clear a single-select field on an item
+function clearItemSingleSelectField(projectId, itemId, fieldId) {
   const mutation = `
     mutation {
       clearProjectV2ItemFieldValue(input: {
@@ -206,9 +253,81 @@ async function handleSetDates() {
   }
 }
 
+// Handle set-priority action
+async function handleSetPriority() {
+  const { projectId, priority } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (priority === undefined) {
+    return output({ success: false, error: 'priority is required' });
+  }
+
+  try {
+    // Parse the project ID
+    const { owner, number, type } = parseProjectId(projectId);
+
+    // Get project details
+    const details = await getProjectDetails(owner, number, type);
+
+    if (!details.firstItemId) {
+      return output({ success: false, error: 'Project has no items. Add an item first to set priority.' });
+    }
+
+    if (!details.priorityFieldId) {
+      return output({ success: false, error: 'Project has no "Priority" field. Enable create_priority_field in config.' });
+    }
+
+    // Clear priority if null
+    if (priority === null) {
+      clearItemSingleSelectField(details.projectId, details.firstItemId, details.priorityFieldId);
+      return output({
+        success: true,
+        updated: {
+          project: details.title,
+          itemId: details.firstItemId,
+          priority: null,
+        }
+      });
+    }
+
+    // Find the option ID for the requested priority
+    const normalizedPriority = priority.toLowerCase();
+    const option = details.priorityOptions.find(
+      opt => opt.name.toLowerCase() === normalizedPriority
+    );
+
+    if (!option) {
+      const validOptions = details.priorityOptions.map(o => o.name.toLowerCase()).join(', ');
+      return output({
+        success: false,
+        error: `Invalid priority "${priority}". Valid options: ${validOptions}`
+      });
+    }
+
+    // Update the priority
+    updateItemSingleSelectField(details.projectId, details.firstItemId, details.priorityFieldId, option.id);
+
+    return output({
+      success: true,
+      updated: {
+        project: details.title,
+        itemId: details.firstItemId,
+        priority: option.name,
+      }
+    });
+  } catch (error) {
+    return output({ success: false, error: error.message });
+  }
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
+} else if (args.action === 'set-priority') {
+  handleSetPriority();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }

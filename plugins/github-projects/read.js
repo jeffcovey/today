@@ -25,6 +25,16 @@ const defaultReviewFrequency = config.default_review_frequency || 'weekly';
 const closedReviewFrequency = config.closed_review_frequency || 'never';
 const staleness_days = config.staleness_days || 7;
 const createDateFields = config.create_date_fields === true || config.create_date_fields === 'true';
+const createPriorityField = config.create_priority_field === true || config.create_priority_field === 'true';
+
+// Priority options for the single-select field
+const PRIORITY_OPTIONS = [
+  { name: 'Highest', color: 'RED' },
+  { name: 'High', color: 'ORANGE' },
+  { name: 'Medium', color: 'YELLOW' },
+  { name: 'Low', color: 'GREEN' },
+  { name: 'Lowest', color: 'GRAY' }
+];
 
 if (!owner) {
   console.error(JSON.stringify({
@@ -97,6 +107,67 @@ function createDateField(projectId, fieldName) {
 }
 
 /**
+ * Create a priority single-select field on a project if it doesn't exist
+ * @param {string} projectId - GitHub project node ID
+ * @returns {boolean} - Whether the field was created
+ */
+function createPriorityFieldOnProject(projectId) {
+  // Build options in GraphQL input syntax (not JSON)
+  const optionsList = PRIORITY_OPTIONS.map(opt =>
+    `{ name: "${opt.name}", color: ${opt.color}, description: "${opt.name} priority" }`
+  ).join(', ');
+
+  const mutation = `
+    mutation {
+      createProjectV2Field(input: {
+        projectId: "${projectId}"
+        dataType: SINGLE_SELECT
+        name: "Priority"
+        singleSelectOptions: [${optionsList}]
+      }) {
+        projectV2Field {
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    execSync(`gh api graphql -f query='${mutation.replace(/'/g, "\\'")}'`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    // Silently fail - likely missing write scope
+    return false;
+  }
+}
+
+/**
+ * Ensure a project has a Priority field
+ * @param {Object} project - Project object with id and fields
+ * @returns {boolean} - Whether the field was created
+ */
+function ensurePriorityField(project) {
+  if (!project.fields?.nodes) return false;
+
+  const fieldNames = project.fields.nodes
+    .filter(f => f.name)
+    .map(f => f.name.toLowerCase());
+
+  const hasPriority = fieldNames.some(n => n === 'priority');
+
+  if (!hasPriority) {
+    return createPriorityFieldOnProject(project.id);
+  }
+  return false;
+}
+
+/**
  * Ensure a project has Start Date and Due Date fields
  * @param {Object} project - Project object with id and fields
  * @returns {Object} - { startDateCreated, dueDateCreated }
@@ -164,6 +235,14 @@ function buildQuery() {
               date
               field {
                 ... on ProjectV2Field {
+                  name
+                }
+              }
+            }
+            ... on ProjectV2ItemFieldSingleSelectValue {
+              name
+              field {
+                ... on ProjectV2SingleSelectField {
                   name
                 }
               }
@@ -276,6 +355,13 @@ if (createDateFields) {
   }
 }
 
+// Create priority field on projects that don't have it (if enabled)
+if (createPriorityField) {
+  for (const project of projects) {
+    ensurePriorityField(project);
+  }
+}
+
 /**
  * Calculate GitHub-native attention score and reasons
  * @param {Object} project - GitHub project data
@@ -347,9 +433,10 @@ const entries = projects.map(project => {
     metadata.repository = repository;
   }
 
-  // Extract item information and date field values
+  // Extract item information, date field values, and priority
   let projectStartDate = null;
   let projectDueDate = null;
+  let projectPriority = null;
 
   if (project.items) {
     metadata.item_count = project.items.totalCount;
@@ -370,22 +457,32 @@ const entries = projects.map(project => {
       metadata.items = items;
     }
 
-    // Extract dates from item field values
-    // Look for "Start Date" and "Due Date" fields, compute min/max across items
+    // Extract dates and priority from item field values
+    // Look for "Start Date", "Due Date", and "Priority" fields
     const startDates = [];
     const dueDates = [];
+    const priorities = [];
 
     for (const item of project.items.nodes) {
       if (!item.fieldValues?.nodes) continue;
 
       for (const fieldValue of item.fieldValues.nodes) {
-        if (!fieldValue.date || !fieldValue.field?.name) continue;
+        // Handle date fields
+        if (fieldValue.date && fieldValue.field?.name) {
+          const fieldName = fieldValue.field.name.toLowerCase();
+          if (fieldName.includes('start')) {
+            startDates.push(fieldValue.date);
+          } else if (fieldName.includes('due') || fieldName.includes('end') || fieldName.includes('target')) {
+            dueDates.push(fieldValue.date);
+          }
+        }
 
-        const fieldName = fieldValue.field.name.toLowerCase();
-        if (fieldName.includes('start')) {
-          startDates.push(fieldValue.date);
-        } else if (fieldName.includes('due') || fieldName.includes('end') || fieldName.includes('target')) {
-          dueDates.push(fieldValue.date);
+        // Handle single-select fields (Priority)
+        if (fieldValue.name && fieldValue.field?.name) {
+          const fieldName = fieldValue.field.name.toLowerCase();
+          if (fieldName === 'priority') {
+            priorities.push(fieldValue.name.toLowerCase());
+          }
         }
       }
     }
@@ -398,6 +495,21 @@ const entries = projects.map(project => {
     if (dueDates.length > 0) {
       dueDates.sort();
       projectDueDate = dueDates[dueDates.length - 1];
+    }
+
+    // Use highest priority found (first in priority order)
+    if (priorities.length > 0) {
+      const priorityOrder = ['highest', 'high', 'medium', 'low', 'lowest'];
+      for (const p of priorityOrder) {
+        if (priorities.includes(p)) {
+          projectPriority = p;
+          break;
+        }
+      }
+      // If no match, use the first one found
+      if (!projectPriority) {
+        projectPriority = priorities[0];
+      }
     }
   }
 
@@ -427,7 +539,7 @@ const entries = projects.map(project => {
     title: project.title,
     description: project.shortDescription || null,
     status: project.closed ? 'completed' : 'active',
-    priority: null, // GitHub Projects don't have priority
+    priority: projectPriority, // From Priority single-select field on items
     topic: null,
     start_date: projectStartDate,
     due_date: projectDueDate,

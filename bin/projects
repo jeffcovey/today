@@ -670,4 +670,82 @@ program
     }
   });
 
+// Set priority command - update priority for a project
+program
+  .command('set-priority <id> <priority>')
+  .description('Set priority for a project (highest, high, medium, low, lowest)')
+  .option('--clear', 'Clear the priority')
+  .action(async (id, priority, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    // Validate priority
+    const validPriorities = ['highest', 'high', 'medium', 'low', 'lowest'];
+    const normalizedPriority = options.clear ? null : priority.toLowerCase();
+
+    if (!options.clear && !validPriorities.includes(normalizedPriority)) {
+      console.log(colors.red('✗') + ` Invalid priority: ${priority}`);
+      console.log('Valid priorities: ' + validPriorities.join(', '));
+      process.exit(1);
+    }
+
+    // Determine plugin from source
+    const pluginName = project.source.split('/')[0];
+
+    // Build the write command arguments
+    const writeArgs = {
+      action: 'set-priority',
+      projectId: project.id,
+      priority: normalizedPriority,
+    };
+
+    // Call the plugin's write command
+    const pluginDir = `plugins/${pluginName}`;
+    const writeScript = `${pluginDir}/write.js`;
+
+    try {
+      const result = execSync(`node ${writeScript}`, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PROJECT_ROOT: process.cwd(),
+        }
+      });
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        const emoji = PRIORITY_EMOJI[normalizedPriority] || '  ';
+        console.log(colors.green('✓') + ` Updated priority for "${project.title}"`);
+        console.log(`  Priority: ${emoji} ${normalizedPriority || '(cleared)'}`);
+
+        // Sync to update the database
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Syncing to update database...');
+        execSync(`bin/plugins sync ${pluginName}`, { stdio: 'inherit' });
+      } else {
+        console.log(colors.red('✗') + ` Failed to update priority: ${response.error}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
+        console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting priority`);
+      } else {
+        console.log(colors.red('✗') + ` Error: ${error.message}`);
+      }
+      process.exit(1);
+    }
+  });
+
 program.parse();
