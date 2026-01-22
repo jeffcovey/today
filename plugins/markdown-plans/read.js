@@ -107,13 +107,52 @@ function parseFrontmatter(content) {
   const yaml = match[1];
   const body = content.slice(match[0].length).trim();
 
-  // Simple YAML parser for key: value pairs
+  // YAML parser that handles key: value pairs and arrays
   const frontmatter = {};
+  let pendingArrayKey = null;
+  let currentArray = null;
+
   for (const line of yaml.split('\n')) {
-    const keyMatch = line.match(/^(\w+):\s*"?([^"]*)"?$/);
-    if (keyMatch) {
-      frontmatter[keyMatch[1]] = keyMatch[2].trim();
+    // Check for array item (indented with -)
+    const arrayItemMatch = line.match(/^\s+-\s*(.*)$/);
+    // Check for key with no inline value (potential array start)
+    const emptyKeyMatch = line.match(/^(\w+):\s*$/);
+    // Check for simple key: value
+    const keyMatch = line.match(/^(\w+):\s*(.+)$/);
+
+    if (arrayItemMatch) {
+      // This is an array item
+      if (pendingArrayKey && !currentArray) {
+        // First array item - now we know it's actually an array
+        currentArray = [];
+        frontmatter[pendingArrayKey] = currentArray;
+      }
+      if (currentArray) {
+        currentArray.push(arrayItemMatch[1]);
+      }
+    } else if (emptyKeyMatch) {
+      // Key with no value - could be array start or empty value
+      // Finalize any pending array key that had no items (it's empty string)
+      if (pendingArrayKey && !currentArray) {
+        frontmatter[pendingArrayKey] = '';
+      }
+      pendingArrayKey = emptyKeyMatch[1];
+      currentArray = null;
+    } else if (keyMatch) {
+      // Simple key: value
+      // Finalize any pending array key that had no items
+      if (pendingArrayKey && !currentArray) {
+        frontmatter[pendingArrayKey] = '';
+      }
+      frontmatter[keyMatch[1]] = keyMatch[2].trim().replace(/^"(.*)"$/, '$1');
+      pendingArrayKey = null;
+      currentArray = null;
     }
+  }
+
+  // Handle trailing pending key with no items
+  if (pendingArrayKey && !currentArray) {
+    frontmatter[pendingArrayKey] = '';
   }
 
   return { frontmatter, body };
@@ -187,17 +226,43 @@ function formatPlanContext(planInfo, content) {
   const lines = [];
   lines.push(`### ${planInfo.label}`);
 
-  // Add summary if available
-  const summaryKey = `${planInfo.type === 'day' ? 'daily' : planInfo.type === 'week' ? 'weekly' : planInfo.type}ly_summary`;
-  if (frontmatter[summaryKey] || frontmatter.daily_summary || frontmatter.weekly_summary) {
-    const summary = frontmatter[summaryKey] || frontmatter.daily_summary || frontmatter.weekly_summary;
-    if (summary) {
-      lines.push('');
-      lines.push(`**Summary:** ${summary}`);
+  // Map plan types to their frontmatter field prefixes
+  const typeToPrefix = {
+    year: 'year',
+    quarter: 'quarter',
+    month: 'month',
+    week: 'week',
+    day: 'daily',
+  };
+  const prefix = typeToPrefix[planInfo.type] || planInfo.type;
+
+  // Add theme from frontmatter if available
+  const themeKey = `${prefix}_theme`;
+  if (frontmatter[themeKey]) {
+    lines.push('');
+    lines.push(`**Theme:** ${frontmatter[themeKey]}`);
+  }
+
+  // Add goals/priorities from frontmatter if available
+  const goalsKey = planInfo.type === 'week' ? 'week_priorities' : `${prefix}_goals`;
+  const goals = frontmatter[goalsKey];
+  if (goals && Array.isArray(goals) && goals.length > 0) {
+    lines.push('');
+    lines.push(`**${planInfo.type === 'week' ? 'Priorities' : 'Goals'}:**`);
+    for (const goal of goals) {
+      lines.push(`- ${goal}`);
     }
   }
 
-  // Add key sections based on plan type
+  // Add summary if available
+  const summaryKey = `${prefix === 'daily' ? 'daily' : prefix + 'ly'}_summary`;
+  const summary = frontmatter[summaryKey];
+  if (summary && typeof summary === 'string' && summary.trim()) {
+    lines.push('');
+    lines.push(`**Summary:** ${summary}`);
+  }
+
+  // Add key sections from body based on plan type
   const prioritySections = [
     'Goals',
     'Objectives',
@@ -2776,6 +2841,790 @@ function updateFuturePlanFilesWithProjects(today) {
 }
 
 /**
+ * Get data relevant to a time period for generating theme/goal suggestions
+ * Queries projects, tasks, and calendar events from the database
+ */
+function getDataForPeriod(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return {};
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+  const data = {};
+
+  // Date field patterns to look for in schemas
+  const dateFieldPatterns = ['date', 'start_date', 'due_date', 'start_time', 'end_time', 'opened_at', 'completed_at'];
+
+  // Iterate through all schemas dynamically
+  for (const [pluginType, schema] of Object.entries(schemas)) {
+    if (!schema.table) continue; // Skip types without tables (context, utility)
+
+    const tableName = schema.table;
+    const fields = schema.fields;
+
+    // Find date fields in this schema
+    const dateFields = [];
+    for (const [fieldName, fieldDef] of Object.entries(fields)) {
+      if (dateFieldPatterns.includes(fieldName) ||
+          (fieldDef.sqlType && (fieldDef.sqlType.includes('DATE') || fieldDef.sqlType.includes('DATETIME')))) {
+        dateFields.push(fieldName);
+      }
+    }
+
+    if (dateFields.length === 0) continue; // No date fields to filter on
+
+    // Build WHERE clause for date range
+    const dateConditions = dateFields.map(f => {
+      // Use DATE() function to normalize datetime fields
+      return `(${f} IS NOT NULL AND DATE(${f}) >= '${startStr}' AND DATE(${f}) <= '${endStr}')`;
+    });
+
+    // Special handling for projects (range-based: start_date to due_date)
+    let whereClause;
+    if (tableName === 'projects' && fields.start_date && fields.due_date) {
+      whereClause = `
+        (status = 'active' OR status = 'completed') AND (
+          (start_date IS NOT NULL AND start_date <= '${endStr}' AND (due_date IS NULL OR due_date >= '${startStr}'))
+          OR (due_date IS NOT NULL AND due_date >= '${startStr}' AND due_date <= '${endStr}')
+        )`;
+    } else {
+      whereClause = dateConditions.join(' OR ');
+    }
+
+    // Get display fields (exclude large text fields and metadata for summary)
+    const displayFields = [];
+    for (const [fieldName, fieldDef] of Object.entries(fields)) {
+      // Skip very large fields
+      if (['html_content', 'text_content', 'metadata', 'body', 'attachments'].includes(fieldName)) continue;
+      // Include the field
+      displayFields.push(fieldName);
+    }
+
+    // Limit fields to keep query reasonable
+    const selectFields = displayFields.slice(0, 10).join(', ');
+
+    // Build and execute query
+    const query = `SELECT ${selectFields} FROM ${tableName} WHERE ${whereClause} LIMIT 30`;
+
+    try {
+      const result = execSync(`sqlite3 -json "${dbPath}" "${query.replace(/"/g, '\\"')}"`, {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      const rows = JSON.parse(result || '[]');
+      if (rows.length > 0) {
+        data[tableName] = rows;
+      }
+    } catch (e) {
+      // Table might not exist or query failed - that's ok
+    }
+  }
+
+  return data;
+}
+
+/**
+ * Check if a plan file has empty theme/goals
+ * Returns the field names and whether they're empty
+ */
+function getPlanThemeGoalsStatus(planPath, planType) {
+  if (!fs.existsSync(planPath)) return null;
+
+  const content = fs.readFileSync(planPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  // Field names vary by plan type
+  const fieldMap = {
+    year: { theme: 'year_theme', goals: 'year_goals' },
+    quarter: { theme: 'quarter_theme', goals: 'quarter_goals' },
+    month: { theme: 'month_theme', goals: 'month_goals' },
+    week: { theme: 'week_theme', goals: 'week_priorities' },
+  };
+
+  const fields = fieldMap[planType];
+  if (!fields) return null;
+
+  const theme = frontmatter[fields.theme];
+  const goals = frontmatter[fields.goals];
+
+  // Check if theme is empty
+  const themeEmpty = !theme || theme.trim() === '';
+
+  // Check if goals are empty (array with empty/placeholder items)
+  const goalsEmpty = !goals || !Array.isArray(goals) ||
+    goals.length === 0 ||
+    goals.every(g => !g || g.trim() === '' || g.trim() === '-');
+
+  return {
+    themeField: fields.theme,
+    goalsField: fields.goals,
+    themeEmpty,
+    goalsEmpty,
+    currentTheme: theme,
+    currentGoals: goals,
+  };
+}
+
+/**
+ * Generate suggested theme and goals for a plan using AI
+ */
+async function suggestThemeAndGoals(planPath, planType, startDate, endDate) {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
+    return null;
+  }
+
+  // Get relevant data for this period from all database tables
+  const data = getDataForPeriod(startDate, endDate);
+
+  // Format period description
+  const periodDesc = {
+    year: `the year ${startDate.getFullYear()}`,
+    quarter: `Q${getQuarter(startDate.getMonth() + 1)} ${startDate.getFullYear()} (${startDate.toLocaleDateString('en-US', { month: 'long' })} - ${endDate.toLocaleDateString('en-US', { month: 'long' })})`,
+    month: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    week: `the week of ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
+  }[planType];
+
+  // Build context dynamically from all available data
+  let context = '';
+
+  // Map table names to human-readable names and format functions
+  const tableFormatters = {
+    projects: {
+      name: 'PROJECTS',
+      format: (rows) => rows.map(p => {
+        let line = `- ${p.title}`;
+        if (p.priority) line += ` (${p.priority})`;
+        if (p.due_date) line += ` due ${p.due_date}`;
+        if (p.progress) line += ` [${p.progress}%]`;
+        return line;
+      }).join('\n')
+    },
+    tasks: {
+      name: 'TASKS',
+      format: (rows) => rows.slice(0, 15).map(t => {
+        let line = `- ${t.title || t.content}`;
+        if (t.priority) line += ` (${t.priority})`;
+        if (t.due_date) line += ` due ${t.due_date}`;
+        return line;
+      }).join('\n')
+    },
+    events: {
+      name: 'CALENDAR EVENTS',
+      format: (rows) => rows.slice(0, 15).map(e => {
+        const date = e.start_date ? new Date(e.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        let line = `- ${date ? date + ': ' : ''}${e.title}`;
+        if (e.location) line += ` @ ${e.location}`;
+        return line;
+      }).join('\n')
+    },
+    diary: {
+      name: 'DIARY ENTRIES',
+      format: (rows) => rows.slice(0, 5).map(d => {
+        const date = d.date ? new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const preview = (d.text || '').slice(0, 150).replace(/\n/g, ' ');
+        return `- ${date}: ${preview}...`;
+      }).join('\n')
+    },
+    time_logs: {
+      name: 'TIME TRACKED',
+      format: (rows) => {
+        // Group by description and sum time
+        const byDesc = {};
+        for (const t of rows) {
+          const desc = t.description || 'Untracked';
+          byDesc[desc] = (byDesc[desc] || 0) + (t.duration_minutes || 0);
+        }
+        return Object.entries(byDesc)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([desc, mins]) => `- ${desc}: ${Math.round(mins / 60 * 10) / 10}h`)
+          .join('\n');
+      }
+    },
+    habits: {
+      name: 'HABITS',
+      format: (rows) => {
+        // Group by habit title and count completions
+        const byHabit = {};
+        for (const h of rows) {
+          if (!byHabit[h.title]) byHabit[h.title] = { completed: 0, total: 0 };
+          byHabit[h.title].total++;
+          if (h.status === 'completed') byHabit[h.title].completed++;
+        }
+        return Object.entries(byHabit)
+          .map(([title, stats]) => `- ${title}: ${stats.completed}/${stats.total} days`)
+          .join('\n');
+      }
+    },
+    issues: {
+      name: 'ISSUES/TICKETS',
+      format: (rows) => rows.slice(0, 10).map(i => {
+        return `- [${i.state}] ${i.title}`;
+      }).join('\n')
+    },
+    health_metrics: {
+      name: 'HEALTH METRICS',
+      format: (rows) => {
+        // Group by metric and show average
+        const byMetric = {};
+        for (const h of rows) {
+          if (!byMetric[h.metric_name]) byMetric[h.metric_name] = { sum: 0, count: 0, units: h.units };
+          byMetric[h.metric_name].sum += h.value || 0;
+          byMetric[h.metric_name].count++;
+        }
+        return Object.entries(byMetric)
+          .slice(0, 8)
+          .map(([name, stats]) => {
+            const avg = Math.round(stats.sum / stats.count);
+            return `- ${name}: avg ${avg} ${stats.units || ''}`;
+          })
+          .join('\n');
+      }
+    },
+    contacts: {
+      name: 'BIRTHDAYS',
+      format: (rows) => rows.filter(c => c.birthday).slice(0, 5).map(c => {
+        return `- ${c.full_name}'s birthday`;
+      }).join('\n')
+    },
+    financial_transactions: {
+      name: 'SPENDING SUMMARY',
+      format: (rows) => {
+        // Group by category
+        const byCategory = {};
+        for (const t of rows) {
+          const cat = t.category || 'Uncategorized';
+          byCategory[cat] = (byCategory[cat] || 0) + (t.amount || 0);
+        }
+        return Object.entries(byCategory)
+          .sort((a, b) => a[1] - b[1]) // Most negative (spent) first
+          .slice(0, 8)
+          .map(([cat, amt]) => `- ${cat}: $${Math.abs(amt).toFixed(0)}`)
+          .join('\n');
+      }
+    }
+  };
+
+  // Format each table's data
+  for (const [tableName, rows] of Object.entries(data)) {
+    if (!rows || rows.length === 0) continue;
+
+    const formatter = tableFormatters[tableName];
+    if (formatter) {
+      const formatted = formatter.format(rows);
+      if (formatted && formatted.trim()) {
+        context += `\n\n${formatter.name}:\n${formatted}`;
+      }
+    } else {
+      // Generic fallback for unknown tables
+      context += `\n\n${tableName.toUpperCase().replace(/_/g, ' ')}:\n`;
+      context += rows.slice(0, 10).map(r => {
+        // Try common field names
+        const title = r.title || r.name || r.content || r.description || r.subject || JSON.stringify(r).slice(0, 100);
+        return `- ${title}`;
+      }).join('\n');
+    }
+  }
+
+  if (!context.trim()) {
+    return null; // No data to base suggestions on
+  }
+
+  const goalsFieldName = planType === 'week' ? 'priorities' : 'goals';
+  const numGoals = planType === 'week' ? 3 : (planType === 'month' ? 3 : (planType === 'quarter' ? 3 : 5));
+
+  const prompt = `Based on the following data for ${periodDesc}, suggest:
+1. A concise theme (3-6 words) that captures the main focus or character of this period
+2. ${numGoals} specific, actionable ${goalsFieldName}
+
+Consider ALL the data types below - projects, events, diary entries, habits, time tracking, health, etc.
+The theme should reflect what makes this specific period unique, not just generic goals.
+
+${context}
+
+Respond in this exact format:
+THEME: [your theme here]
+${goalsFieldName.toUpperCase()}:
+- [${goalsFieldName.slice(0, -1)} 1]
+- [${goalsFieldName.slice(0, -1)} 2]
+- [${goalsFieldName.slice(0, -1)} 3]${numGoals > 3 ? '\n- [' + goalsFieldName.slice(0, -1) + ' 4]' : ''}${numGoals > 4 ? '\n- [' + goalsFieldName.slice(0, -1) + ' 5]' : ''}
+
+Make the theme distinctive to THIS period. Make ${goalsFieldName} specific and achievable.`;
+
+  try {
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 400,
+      temperature: 0.7,
+    });
+
+    if (!response) return null;
+
+    // Parse response (createCompletion returns a string directly)
+    const text = response.trim();
+    const themeMatch = text.match(/THEME:\s*(.+)/i);
+    const goalsMatch = text.match(new RegExp(`${goalsFieldName.toUpperCase()}:\\s*\\n([\\s\\S]+)`, 'i'));
+
+    if (!themeMatch) return null;
+
+    const theme = themeMatch[1].trim();
+    const goals = [];
+
+    if (goalsMatch) {
+      const goalsText = goalsMatch[1];
+      const goalLines = goalsText.split('\n').filter(line => line.trim().startsWith('-'));
+      for (const line of goalLines) {
+        const goal = line.replace(/^-\s*/, '').trim();
+        if (goal) goals.push(goal);
+      }
+    }
+
+    return { theme, goals };
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Update a plan file with suggested theme and goals
+ */
+function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
+  if (!fs.existsSync(planPath)) return false;
+
+  let content = fs.readFileSync(planPath, 'utf-8');
+  const { frontmatter, body } = parseFrontmatter(content);
+
+  const fieldMap = {
+    year: { theme: 'year_theme', goals: 'year_goals' },
+    quarter: { theme: 'quarter_theme', goals: 'quarter_goals' },
+    month: { theme: 'month_theme', goals: 'month_goals' },
+    week: { theme: 'week_theme', goals: 'week_priorities' },
+  };
+
+  const fields = fieldMap[planType];
+  if (!fields) return false;
+
+  // Update frontmatter
+  frontmatter[fields.theme] = theme;
+  frontmatter[fields.goals] = goals;
+
+  // Rebuild the file
+  const yamlContent = Object.entries(frontmatter)
+    .map(([key, value]) => {
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          return `${key}:\n  -`;
+        }
+        return `${key}:\n${value.map(v => `  - ${v || ''}`).join('\n')}`;
+      }
+      if (value === null || value === undefined) {
+        return `${key}:`;
+      }
+      return `${key}: ${value}`;
+    })
+    .join('\n');
+
+  content = `---\n${yamlContent}\n---\n${body}`;
+  fs.writeFileSync(planPath, content, 'utf-8');
+
+  return true;
+}
+
+/**
+ * Find and update plan files that are missing themes/goals
+ * Only processes current and future plans (weekly and above)
+ */
+async function suggestMissingThemesAndGoals(today) {
+  const results = { suggested: [], skipped: [] };
+
+  if (!fs.existsSync(plansDir)) {
+    return results;
+  }
+
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
+    return results;
+  }
+
+  const files = fs.readdirSync(plansDir).filter(f => f.endsWith('.md'));
+  const todayStr = formatDateStr(today);
+
+  for (const file of files) {
+    const filePath = path.join(plansDir, file);
+
+    // Skip daily plans (no _00.md suffix)
+    if (!file.includes('_00.md')) continue;
+
+    // Determine plan type and dates
+    let planType = null;
+    let dates = null;
+
+    const yearMatch = file.match(/^(\d{4})_00\.md$/);
+    const quarterMatch = file.match(/^(\d{4})_Q(\d)_00\.md$/);
+    const monthMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_00\.md$/);
+    const weekMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_W(\d{2})_00\.md$/);
+
+    if (yearMatch) {
+      planType = 'year';
+      dates = getYearDatesFromPlan(filePath);
+    } else if (quarterMatch) {
+      planType = 'quarter';
+      dates = getQuarterDatesFromPlan(filePath);
+    } else if (monthMatch) {
+      planType = 'month';
+      dates = getMonthDatesFromPlan(filePath);
+    } else if (weekMatch) {
+      planType = 'week';
+      dates = getWeekDatesFromPlan(filePath);
+    }
+
+    if (!planType || !dates) continue;
+
+    // Check if theme/goals are empty
+    const status = getPlanThemeGoalsStatus(filePath, planType);
+    if (!status) continue;
+
+    // Skip if both are already filled
+    if (!status.themeEmpty && !status.goalsEmpty) continue;
+
+    // Generate suggestions
+    const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate);
+
+    if (suggestion && suggestion.theme && suggestion.goals && suggestion.goals.length > 0) {
+      // Only update if we have good suggestions
+      const updated = updatePlanWithThemeGoals(filePath, planType, suggestion.theme, suggestion.goals);
+      if (updated) {
+        results.suggested.push({
+          file,
+          type: planType,
+          theme: suggestion.theme,
+          goals: suggestion.goals,
+        });
+      }
+    } else {
+      results.skipped.push({ file, type: planType, reason: 'no data or AI unavailable' });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Check if a plan file has an empty summary
+ */
+function getPlanSummaryStatus(planPath, planType) {
+  if (!fs.existsSync(planPath)) return null;
+
+  const content = fs.readFileSync(planPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  // Field names vary by plan type
+  const fieldMap = {
+    year: 'year_summary',
+    quarter: 'quarter_summary',
+    month: 'month_summary',
+    week: 'week_summary',
+  };
+
+  const summaryField = fieldMap[planType];
+  if (!summaryField) return null;
+
+  const summary = frontmatter[summaryField];
+  const isEmpty = !summary || summary.trim() === '' || summary.trim() === 'No daily summaries available for this week';
+
+  return {
+    summaryField,
+    isEmpty,
+    currentSummary: summary,
+  };
+}
+
+/**
+ * Generate a summary for a past plan period using AI
+ */
+async function generatePlanSummary(planPath, planType, startDate, endDate) {
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
+    return null;
+  }
+
+  // Get relevant data for this period from all database tables
+  const data = getDataForPeriod(startDate, endDate);
+
+  // Format period description
+  const periodDesc = {
+    year: `the year ${startDate.getFullYear()}`,
+    quarter: `Q${getQuarter(startDate.getMonth() + 1)} ${startDate.getFullYear()} (${startDate.toLocaleDateString('en-US', { month: 'long' })} - ${endDate.toLocaleDateString('en-US', { month: 'long' })})`,
+    month: startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    week: `the week of ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
+  }[planType];
+
+  // Build context dynamically from all available data (same as theme generation)
+  let context = '';
+
+  const tableFormatters = {
+    projects: {
+      name: 'PROJECTS',
+      format: (rows) => rows.map(p => {
+        let line = `- ${p.title}`;
+        if (p.status === 'completed') line += ' [COMPLETED]';
+        if (p.progress) line += ` [${p.progress}%]`;
+        return line;
+      }).join('\n')
+    },
+    tasks: {
+      name: 'TASKS',
+      format: (rows) => {
+        const completed = rows.filter(t => t.status === 'completed').length;
+        const total = rows.length;
+        let result = `Completed ${completed}/${total} tasks`;
+        const highPriority = rows.filter(t => t.priority === 'high' || t.priority === 'highest');
+        if (highPriority.length > 0) {
+          result += '\nKey tasks: ' + highPriority.slice(0, 5).map(t => t.title || t.content).join(', ');
+        }
+        return result;
+      }
+    },
+    events: {
+      name: 'CALENDAR EVENTS',
+      format: (rows) => rows.slice(0, 10).map(e => {
+        const date = e.start_date ? new Date(e.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        return `- ${date ? date + ': ' : ''}${e.title}`;
+      }).join('\n')
+    },
+    diary: {
+      name: 'DIARY ENTRIES',
+      format: (rows) => rows.slice(0, 8).map(d => {
+        const date = d.date ? new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const preview = (d.text || '').slice(0, 200).replace(/\n/g, ' ');
+        return `- ${date}: ${preview}...`;
+      }).join('\n')
+    },
+    time_logs: {
+      name: 'TIME TRACKED',
+      format: (rows) => {
+        const byDesc = {};
+        for (const t of rows) {
+          const desc = t.description || 'Untracked';
+          byDesc[desc] = (byDesc[desc] || 0) + (t.duration_minutes || 0);
+        }
+        const total = Object.values(byDesc).reduce((a, b) => a + b, 0);
+        return `Total: ${Math.round(total / 60)}h tracked\nTop activities:\n` +
+          Object.entries(byDesc)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([desc, mins]) => `- ${desc}: ${Math.round(mins / 60 * 10) / 10}h`)
+            .join('\n');
+      }
+    },
+    habits: {
+      name: 'HABITS',
+      format: (rows) => {
+        const byHabit = {};
+        for (const h of rows) {
+          if (!byHabit[h.title]) byHabit[h.title] = { completed: 0, total: 0 };
+          byHabit[h.title].total++;
+          if (h.status === 'completed') byHabit[h.title].completed++;
+        }
+        return Object.entries(byHabit)
+          .map(([title, stats]) => {
+            const pct = Math.round(stats.completed / stats.total * 100);
+            return `- ${title}: ${pct}% (${stats.completed}/${stats.total})`;
+          })
+          .join('\n');
+      }
+    },
+    health_metrics: {
+      name: 'HEALTH',
+      format: (rows) => {
+        const byMetric = {};
+        for (const h of rows) {
+          if (!byMetric[h.metric_name]) byMetric[h.metric_name] = { sum: 0, count: 0, units: h.units };
+          byMetric[h.metric_name].sum += h.value || 0;
+          byMetric[h.metric_name].count++;
+        }
+        return Object.entries(byMetric)
+          .slice(0, 6)
+          .map(([name, stats]) => {
+            const avg = Math.round(stats.sum / stats.count);
+            return `- ${name}: avg ${avg} ${stats.units || ''}`;
+          })
+          .join('\n');
+      }
+    }
+  };
+
+  // Format each table's data
+  for (const [tableName, rows] of Object.entries(data)) {
+    if (!rows || rows.length === 0) continue;
+
+    const formatter = tableFormatters[tableName];
+    if (formatter) {
+      const formatted = formatter.format(rows);
+      if (formatted && formatted.trim()) {
+        context += `\n\n${formatter.name}:\n${formatted}`;
+      }
+    }
+  }
+
+  if (!context.trim()) {
+    return null;
+  }
+
+  const sentenceCount = planType === 'week' ? '2-3' : (planType === 'month' ? '3-4' : '4-5');
+
+  const prompt = `Write a ${sentenceCount} sentence narrative summary of what happened during ${periodDesc}.
+
+This is a RETROSPECTIVE summary - describe what was accomplished, experienced, and notable about this period.
+Focus on:
+- Major accomplishments and completed work
+- Key events and experiences
+- Overall character/mood of the period
+- Any significant challenges or breakthroughs
+
+DATA FOR THIS PERIOD:
+${context}
+
+Write ONLY the summary, ${sentenceCount} sentences, nothing else. Be specific and personal, not generic.`;
+
+  try {
+    const response = await createCompletion({
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 400,
+      temperature: 0.7,
+    });
+    return response ? response.trim() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Update a plan file with a generated summary
+ */
+function updatePlanWithSummary(planPath, planType, summary) {
+  if (!fs.existsSync(planPath)) return false;
+
+  let content = fs.readFileSync(planPath, 'utf-8');
+  const { frontmatter, body } = parseFrontmatter(content);
+
+  const fieldMap = {
+    year: 'year_summary',
+    quarter: 'quarter_summary',
+    month: 'month_summary',
+    week: 'week_summary',
+  };
+
+  const summaryField = fieldMap[planType];
+  if (!summaryField) return false;
+
+  // Escape quotes in summary for YAML
+  const escapedSummary = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
+  frontmatter[summaryField] = escapedSummary;
+
+  // Rebuild the file
+  const yamlContent = Object.entries(frontmatter)
+    .map(([key, value]) => {
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          return `${key}:\n  -`;
+        }
+        return `${key}:\n${value.map(v => `  - ${v || ''}`).join('\n')}`;
+      }
+      if (value === null || value === undefined) {
+        return `${key}:`;
+      }
+      return `${key}: ${value}`;
+    })
+    .join('\n');
+
+  content = `---\n${yamlContent}\n---\n${body}`;
+  fs.writeFileSync(planPath, content, 'utf-8');
+
+  return true;
+}
+
+/**
+ * Find and update PAST plan files that are missing summaries
+ * Only processes past plans (weekly and above)
+ */
+async function suggestMissingSummaries(today) {
+  const results = { suggested: [], skipped: [] };
+
+  if (!fs.existsSync(plansDir)) {
+    return results;
+  }
+
+  // Check if AI is available
+  if (!(await isAIAvailable())) {
+    return results;
+  }
+
+  const files = fs.readdirSync(plansDir).filter(f => f.endsWith('.md'));
+  const todayStr = formatDateStr(today);
+
+  for (const file of files) {
+    const filePath = path.join(plansDir, file);
+
+    // Skip daily plans (no _00.md suffix) - they have their own summary generation
+    if (!file.includes('_00.md')) continue;
+
+    // Determine plan type and dates
+    let planType = null;
+    let dates = null;
+
+    const yearMatch = file.match(/^(\d{4})_00\.md$/);
+    const quarterMatch = file.match(/^(\d{4})_Q(\d)_00\.md$/);
+    const monthMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_00\.md$/);
+    const weekMatch = file.match(/^(\d{4})_Q(\d)_(\d{2})_W(\d{2})_00\.md$/);
+
+    if (yearMatch) {
+      planType = 'year';
+      dates = getYearDatesFromPlan(filePath);
+    } else if (quarterMatch) {
+      planType = 'quarter';
+      dates = getQuarterDatesFromPlan(filePath);
+    } else if (monthMatch) {
+      planType = 'month';
+      dates = getMonthDatesFromPlan(filePath);
+    } else if (weekMatch) {
+      planType = 'week';
+      dates = getWeekDatesFromPlan(filePath);
+    }
+
+    if (!planType || !dates) continue;
+
+    // Only process PAST plans (end date before today)
+    if (formatDateStr(dates.endDate) >= todayStr) continue;
+
+    // Check if summary is empty
+    const status = getPlanSummaryStatus(filePath, planType);
+    if (!status || !status.isEmpty) continue;
+
+    // Generate summary
+    const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate);
+
+    if (summary) {
+      const updated = updatePlanWithSummary(filePath, planType, summary);
+      if (updated) {
+        results.suggested.push({
+          file,
+          type: planType,
+          summary: summary.slice(0, 100) + '...',
+        });
+      }
+    } else {
+      results.skipped.push({ file, type: planType, reason: 'no data or AI unavailable' });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Get month start and end dates from a monthly plan file's frontmatter
  */
 function getMonthDatesFromPlan(monthlyPlanPath) {
@@ -2988,6 +3837,28 @@ async function main() {
     metadata.future_plans_updated = futurePlansUpdated;
   }
 
+  // Suggest themes and goals for plans that don't have them
+  // Only runs if AI is available and not in context-only mode
+  if (!contextOnly) {
+    const themeSuggestions = await suggestMissingThemesAndGoals(today);
+    if (themeSuggestions.suggested.length > 0) {
+      metadata.themes_suggested = themeSuggestions.suggested.map(s => ({
+        file: s.file,
+        type: s.type,
+        theme: s.theme,
+      }));
+    }
+
+    // Generate summaries for past plans that don't have them
+    const summarySuggestions = await suggestMissingSummaries(today);
+    if (summarySuggestions.suggested.length > 0) {
+      metadata.summaries_suggested = summarySuggestions.suggested.map(s => ({
+        file: s.file,
+        type: s.type,
+      }));
+    }
+  }
+
   // Link today's plan to Obsidian daily note
   const linkResult = linkPlanToDailyNote(planPaths.day.path, today);
   if (linkResult.linked) {
@@ -3086,10 +3957,20 @@ async function main() {
     }
   }
 
-  // Build context output
+  // Build context output with guidance for the AI
   let context = '';
   if (contextParts.length > 0) {
-    context = `## Current Plan Hierarchy\n\n${contextParts.join('\n\n---\n\n')}`;
+    const guidance = `## Planning Context
+
+This shows the user's plan hierarchy from yearly goals down to today's priorities. Use this to:
+- **Align daily work with long-term goals**: When suggesting tasks or priorities, reference how they connect to weekly, monthly, quarterly, or yearly objectives
+- **Help with quotidian tasks**: Acknowledge routine tasks while connecting them to bigger purposes
+- **Move larger plans forward**: Look for opportunities to advance projects and goals from higher-level plans
+- **Maintain context**: The themes and priorities reflect what the user has decided is important for each time period
+
+When the user asks what to work on, consider both their immediate daily priorities AND how to make progress on longer-term goals.`;
+
+    context = `${guidance}\n\n${contextParts.join('\n\n---\n\n')}`;
   } else {
     context = 'No plan files found for the current period.';
   }

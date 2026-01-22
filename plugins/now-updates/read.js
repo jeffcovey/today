@@ -226,16 +226,11 @@ async function main() {
   let updates = parseExistingUpdates(existingContent);
   let context = existingContent.trim() || 'No updates yet.';
 
-  // Skip update generation during context gathering (like markdown-plans does)
-  // Also return empty context if we're in the middle of generating a new update
-  // to avoid circular reference where AI reads old updates and propagates stale info
+  // Skip update generation during context gathering
+  // now-updates is a log of what's happened - it should NOT be included in AI context
+  // when asking for advice, to avoid circular reference and stale information
   if (contextOnly) {
-    if (isGenerating) {
-      // Don't include old updates when generating new ones - AI should use fresh data
-      console.log(JSON.stringify({ context: '', metadata: { ...metadata, skipped: 'generating' } }));
-    } else {
-      console.log(JSON.stringify({ context, metadata }));
-    }
+    console.log(JSON.stringify({ context: '', metadata: { ...metadata, skipped: 'context-only' } }));
     return;
   }
 

@@ -8,8 +8,15 @@ as context for AI assistants to align daily work with long-term goals.
 
 When run, this plugin:
 1. Creates today's and tomorrow's daily plan files from templates
-2. Generates daily summaries for past days (yesterday and any missing)
+2. Generates daily summaries for past days using AI
 3. Suggests focus and priorities for tomorrow based on open tasks/events
+4. Generates AI themes and goals for current/future plans missing them
+5. Generates AI summaries for past weekly/monthly/quarterly plans missing them
+6. Updates future plan files with scheduled projects
+
+AI-generated content pulls from all database tables (diary, time_logs, habits,
+events, tasks, projects, health_metrics, etc.) to create specific, contextual
+themes and summaries unique to each time period.
 
 File naming pattern:
 - Year:    YYYY_00.md           (e.g., 2025_00.md)
