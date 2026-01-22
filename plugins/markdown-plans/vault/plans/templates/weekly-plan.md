@@ -14,7 +14,7 @@ cssclasses: plan
 # Week {{WEEK_NUMBER}} – {{DATE_RANGE}}{{YEAR_SUFFIX}}
 
 ```dataviewjs
-await dv.view("scripts/weekly-widget", { type: "navigation" });
+await dv.view("scripts/plans-widget", { type: "navigation" });
 ```
 
 ## 💡 Plan
@@ -46,13 +46,13 @@ WHERE file = this.file
 ### Daily Summaries
 
 ```dataviewjs
-await dv.view("scripts/weekly-widget", { type: "daily-links", startDate: dv.current().start_date, weekNum: dv.current().week_number });
+await dv.view("scripts/plans-widget", { type: "daily-links", startDate: dv.current().start_date, weekNum: dv.current().week_number });
 ```
 
 ### Projects Progress
 
 ```dataviewjs
-await dv.view("scripts/weekly-widget", { type: "projects", startDate: dv.current().start_date });
+await dv.view("scripts/plans-widget", { type: "projects", startDate: dv.current().start_date });
 ```
 
 ### ⏱️ Time Tracking

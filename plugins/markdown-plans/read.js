@@ -356,6 +356,77 @@ function getWeeklyTemplateVariables(date) {
 }
 
 /**
+ * Get template variables for a monthly plan
+ */
+function getMonthlyTemplateVariables(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const quarter = getQuarter(month);
+  const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+
+  // First day of the month
+  const startOfMonth = new Date(year, month - 1, 1);
+  // Last day of the month
+  const endOfMonth = new Date(year, month, 0);
+
+  return {
+    '{{YEAR}}': String(year),
+    '{{MONTH}}': String(month).padStart(2, '0'),
+    '{{MONTH_NAME}}': monthName,
+    '{{QUARTER}}': `Q${quarter}`,
+    '{{START_DATE}}': formatDateStr(startOfMonth),
+    '{{END_DATE}}': formatDateStr(endOfMonth),
+  };
+}
+
+/**
+ * Get template variables for a quarterly plan
+ */
+function getQuarterlyTemplateVariables(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const quarter = getQuarter(month);
+
+  // First month of the quarter
+  const firstMonth = (quarter - 1) * 3 + 1;
+  const startOfQuarter = new Date(year, firstMonth - 1, 1);
+  // Last day of the quarter
+  const endOfQuarter = new Date(year, firstMonth + 2, 0);
+
+  // Get month names for the quarter
+  const monthNames = [];
+  for (let m = firstMonth; m < firstMonth + 3; m++) {
+    const d = new Date(year, m - 1, 1);
+    monthNames.push(d.toLocaleDateString('en-US', { month: 'long' }));
+  }
+
+  return {
+    '{{YEAR}}': String(year),
+    '{{QUARTER}}': `Q${quarter}`,
+    '{{QUARTER_NUM}}': String(quarter),
+    '{{START_DATE}}': formatDateStr(startOfQuarter),
+    '{{END_DATE}}': formatDateStr(endOfQuarter),
+    '{{QUARTER_MONTHS}}': monthNames.join(', '),
+  };
+}
+
+/**
+ * Get template variables for a yearly plan
+ */
+function getYearlyTemplateVariables(date) {
+  const year = date.getFullYear();
+
+  const startOfYear = new Date(year, 0, 1);
+  const endOfYear = new Date(year, 11, 31);
+
+  return {
+    '{{YEAR}}': String(year),
+    '{{START_DATE}}': formatDateStr(startOfYear),
+    '{{END_DATE}}': formatDateStr(endOfYear),
+  };
+}
+
+/**
  * Create a daily plan from template if it doesn't exist
  */
 function ensureDailyPlan(planInfo, date) {
@@ -397,6 +468,87 @@ function ensureWeeklyPlan(planInfo, date) {
 
   const template = fs.readFileSync(templatePath, 'utf-8');
   const variables = getWeeklyTemplateVariables(date);
+
+  let content = template;
+  for (const [key, value] of Object.entries(variables)) {
+    content = content.split(key).join(value);
+  }
+
+  fs.mkdirSync(plansDir, { recursive: true });
+  fs.writeFileSync(planInfo.path, content, 'utf-8');
+
+  return { created: true, file: path.basename(planInfo.path) };
+}
+
+/**
+ * Create a monthly plan from template if it doesn't exist
+ */
+function ensureMonthlyPlan(planInfo, date) {
+  if (fs.existsSync(planInfo.path)) {
+    return { existed: true };
+  }
+
+  const templatePath = path.join(templatesDir, 'monthly-plan.md');
+  if (!fs.existsSync(templatePath)) {
+    return { error: `Template not found: ${templatePath}` };
+  }
+
+  const template = fs.readFileSync(templatePath, 'utf-8');
+  const variables = getMonthlyTemplateVariables(date);
+
+  let content = template;
+  for (const [key, value] of Object.entries(variables)) {
+    content = content.split(key).join(value);
+  }
+
+  fs.mkdirSync(plansDir, { recursive: true });
+  fs.writeFileSync(planInfo.path, content, 'utf-8');
+
+  return { created: true, file: path.basename(planInfo.path) };
+}
+
+/**
+ * Create a quarterly plan from template if it doesn't exist
+ */
+function ensureQuarterlyPlan(planInfo, date) {
+  if (fs.existsSync(planInfo.path)) {
+    return { existed: true };
+  }
+
+  const templatePath = path.join(templatesDir, 'quarterly-plan.md');
+  if (!fs.existsSync(templatePath)) {
+    return { error: `Template not found: ${templatePath}` };
+  }
+
+  const template = fs.readFileSync(templatePath, 'utf-8');
+  const variables = getQuarterlyTemplateVariables(date);
+
+  let content = template;
+  for (const [key, value] of Object.entries(variables)) {
+    content = content.split(key).join(value);
+  }
+
+  fs.mkdirSync(plansDir, { recursive: true });
+  fs.writeFileSync(planInfo.path, content, 'utf-8');
+
+  return { created: true, file: path.basename(planInfo.path) };
+}
+
+/**
+ * Create a yearly plan from template if it doesn't exist
+ */
+function ensureYearlyPlan(planInfo, date) {
+  if (fs.existsSync(planInfo.path)) {
+    return { existed: true };
+  }
+
+  const templatePath = path.join(templatesDir, 'yearly-plan.md');
+  if (!fs.existsSync(templatePath)) {
+    return { error: `Template not found: ${templatePath}` };
+  }
+
+  const template = fs.readFileSync(templatePath, 'utf-8');
+  const variables = getYearlyTemplateVariables(date);
 
   let content = template;
   for (const [key, value] of Object.entries(variables)) {
@@ -1746,6 +1898,841 @@ function updateWeeklyPlanWithHabitStats(weeklyPlanPath, startDate, endDate) {
 }
 
 /**
+ * Query projects from database for a week
+ * Returns projects active during the week (start before/during AND end during/after)
+ */
+function getProjectsForWeek(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return [];
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query projects that overlap with this week:
+  // - Has due_date: project timeline overlaps the period
+  // - No due_date + completed: start_date is within the period (was an event)
+  // - No due_date + active: start_date is on or before period end (ongoing)
+  const query = `
+    SELECT id, title, status, priority, topic, start_date, due_date, progress, description, url
+    FROM projects
+    WHERE
+      start_date IS NOT NULL
+      AND start_date <= '${endStr}'
+      AND (
+        (due_date IS NOT NULL AND due_date <> 'TBD' AND due_date >= '${startStr}')
+        OR (due_date IS NULL AND status IN ('completed', 'archived') AND start_date >= '${startStr}')
+        OR (due_date IS NULL AND status NOT IN ('completed', 'archived'))
+        OR (due_date = 'TBD' AND status NOT IN ('completed', 'archived'))
+      )
+    ORDER BY
+      COALESCE(start_date, due_date) ASC,
+      CASE priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 6 END
+  `;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    return JSON.parse(result || '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Format projects for display in weekly plan
+ */
+function formatProjectsForWeek(projects, startDate, endDate) {
+  if (projects.length === 0) return null;
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  const lines = [];
+
+  for (const proj of projects) {
+    // Determine badges for this project
+    const badges = [];
+    if (proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr) {
+      badges.push(`Starts ${proj.start_date}`);
+    }
+    if (proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr) {
+      badges.push(`Due ${proj.due_date}`);
+    }
+
+    // Status emoji
+    const statusEmoji = {
+      'active': '🟢',
+      'planning': '📋',
+      'on_hold': '⏸️',
+      'completed': '✅',
+      'archived': '📦',
+    }[proj.status] || '•';
+
+    // Create link if project has a URL
+    let titleDisplay = proj.title;
+    if (proj.url) {
+      titleDisplay = `[${proj.title}](${proj.url})`;
+    }
+
+    // Build the line
+    let line = `- ${statusEmoji} **${titleDisplay}**`;
+
+    if (proj.status && proj.status !== 'active') {
+      line += ` [${proj.status}]`;
+    }
+
+    if (proj.priority && proj.priority !== 'medium') {
+      line += ` (${proj.priority})`;
+    }
+
+    if (badges.length > 0) {
+      line += ` — ${badges.join(', ')}`;
+    }
+
+    if (proj.progress && proj.progress > 0) {
+      line += ` (${proj.progress}%)`;
+    }
+
+    lines.push(line);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Update weekly plan file with projects from database
+ * Uses markers: <!-- PROJECTS:START --> ... <!-- PROJECTS:END -->
+ */
+function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(weeklyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const projects = getProjectsForWeek(startDate, endDate);
+
+  if (projects.length === 0) {
+    return { updated: false, reason: 'no projects', count: 0 };
+  }
+
+  let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+
+  const formattedProjects = formatProjectsForWeek(projects, startDate, endDate);
+  const startMarker = '<!-- PROJECTS:START -->';
+  const endMarker = '<!-- PROJECTS:END -->';
+  const newSection = `${startMarker}\n### Projects This Week\n\n${formattedProjects}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section after "Theme and Priorities" / before "Notes"
+    const notesMatch = content.match(/### Notes\n/);
+    const diaryNotesMatch = content.match(/<!-- DIARY_NOTES:START -->/);
+    const projectsProgressMatch = content.match(/### Projects Progress/);
+
+    if (notesMatch && notesMatch.index !== undefined) {
+      content = content.substring(0, notesMatch.index) + newSection + '\n\n' + content.substring(notesMatch.index);
+    } else if (diaryNotesMatch && diaryNotesMatch.index !== undefined) {
+      content = content.substring(0, diaryNotesMatch.index) + newSection + '\n\n' + content.substring(diaryNotesMatch.index);
+    } else if (projectsProgressMatch && projectsProgressMatch.index !== undefined) {
+      content = content.substring(0, projectsProgressMatch.index) + newSection + '\n\n' + content.substring(projectsProgressMatch.index);
+    } else {
+      // Add before footer
+      const footerMatch = content.match(/\n\*Week \d+ of \d+/);
+      if (footerMatch && footerMatch.index !== undefined) {
+        content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+      } else {
+        content += '\n\n' + newSection;
+      }
+    }
+  }
+
+  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    count: projects.length,
+  };
+}
+
+/**
+ * Query projects from database for a month
+ * Returns projects active during the month (start before/during AND end during/after)
+ */
+function getProjectsForMonth(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return [];
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query projects that overlap with this month:
+  // - Has due_date: project timeline overlaps the period
+  // - No due_date + completed: start_date is within the period (was an event)
+  // - No due_date + active: start_date is on or before period end (ongoing)
+  const query = `
+    SELECT id, title, status, priority, topic, start_date, due_date, progress, description, url
+    FROM projects
+    WHERE
+      start_date IS NOT NULL
+      AND start_date <= '${endStr}'
+      AND (
+        (due_date IS NOT NULL AND due_date <> 'TBD' AND due_date >= '${startStr}')
+        OR (due_date IS NULL AND status IN ('completed', 'archived') AND start_date >= '${startStr}')
+        OR (due_date IS NULL AND status NOT IN ('completed', 'archived'))
+        OR (due_date = 'TBD' AND status NOT IN ('completed', 'archived'))
+      )
+    ORDER BY
+      COALESCE(start_date, due_date) ASC,
+      CASE priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 6 END
+  `;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    return JSON.parse(result || '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Format projects for display in monthly plan
+ */
+function formatProjectsForMonth(projects, startDate, endDate) {
+  if (projects.length === 0) return null;
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  const lines = [];
+
+  for (const proj of projects) {
+    // Determine badges for this project
+    const badges = [];
+    if (proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr) {
+      badges.push(`Starts ${proj.start_date}`);
+    }
+    if (proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr) {
+      badges.push(`Due ${proj.due_date}`);
+    }
+
+    // Status emoji
+    const statusEmoji = {
+      'active': '🟢',
+      'planning': '📋',
+      'on_hold': '⏸️',
+      'completed': '✅',
+      'archived': '📦',
+    }[proj.status] || '•';
+
+    // Create link if project has a URL
+    let titleDisplay = proj.title;
+    if (proj.url) {
+      titleDisplay = `[${proj.title}](${proj.url})`;
+    }
+
+    // Build the line
+    let line = `- ${statusEmoji} **${titleDisplay}**`;
+
+    if (proj.status && proj.status !== 'active') {
+      line += ` [${proj.status}]`;
+    }
+
+    if (proj.priority && proj.priority !== 'medium') {
+      line += ` (${proj.priority})`;
+    }
+
+    if (badges.length > 0) {
+      line += ` — ${badges.join(', ')}`;
+    }
+
+    if (proj.progress && proj.progress > 0) {
+      line += ` (${proj.progress}%)`;
+    }
+
+    lines.push(line);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Update monthly plan file with projects from database
+ * Uses markers: <!-- PROJECTS:START --> ... <!-- PROJECTS:END -->
+ */
+function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(monthlyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const projects = getProjectsForMonth(startDate, endDate);
+
+  if (projects.length === 0) {
+    return { updated: false, reason: 'no projects', count: 0 };
+  }
+
+  let content = fs.readFileSync(monthlyPlanPath, 'utf-8');
+
+  const formattedProjects = formatProjectsForMonth(projects, startDate, endDate);
+  const startMarker = '<!-- PROJECTS:START -->';
+  const endMarker = '<!-- PROJECTS:END -->';
+  const newSection = `${startMarker}\n### Projects\n\n${formattedProjects}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section before Time Tracking or Review section
+    const timeTrackingMatch = content.match(/### ⏱️ Time Tracking/);
+    const reviewMatch = content.match(/## 🔍 Review/);
+
+    if (timeTrackingMatch && timeTrackingMatch.index !== undefined) {
+      content = content.substring(0, timeTrackingMatch.index) + newSection + '\n\n' + content.substring(timeTrackingMatch.index);
+    } else if (reviewMatch && reviewMatch.index !== undefined) {
+      content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
+    } else {
+      // Add before footer
+      const footerMatch = content.match(/\n\*\w+ \d{4} \| Q\d\*/);
+      if (footerMatch && footerMatch.index !== undefined) {
+        content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+      } else {
+        content += '\n\n' + newSection;
+      }
+    }
+  }
+
+  fs.writeFileSync(monthlyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    count: projects.length,
+  };
+}
+
+/**
+ * Query projects from database for a quarter
+ * Returns projects active during the quarter (start before/during AND end during/after)
+ */
+function getProjectsForQuarter(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return [];
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query projects that overlap with this quarter:
+  // - Has due_date: project timeline overlaps the period
+  // - No due_date + completed: start_date is within the period (was an event)
+  // - No due_date + active: start_date is on or before period end (ongoing)
+  const query = `
+    SELECT id, title, status, priority, topic, start_date, due_date, progress, description, url
+    FROM projects
+    WHERE
+      start_date IS NOT NULL
+      AND start_date <= '${endStr}'
+      AND (
+        (due_date IS NOT NULL AND due_date <> 'TBD' AND due_date >= '${startStr}')
+        OR (due_date IS NULL AND status IN ('completed', 'archived') AND start_date >= '${startStr}')
+        OR (due_date IS NULL AND status NOT IN ('completed', 'archived'))
+        OR (due_date = 'TBD' AND status NOT IN ('completed', 'archived'))
+      )
+    ORDER BY
+      COALESCE(start_date, due_date) ASC,
+      CASE priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 6 END
+  `;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    return JSON.parse(result || '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Format projects for display in quarterly plan, grouped by month
+ */
+function formatProjectsForQuarter(projects, startDate, endDate) {
+  if (projects.length === 0) return null;
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Group projects by the month they're active in
+  // A project is active in a month if it starts, ends, or spans that month
+  const monthGroups = {};
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+
+  // Initialize month groups for the quarter
+  let currentMonth = new Date(startDate);
+  while (currentMonth <= endDate) {
+    const key = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+    monthGroups[key] = {
+      name: monthNames[currentMonth.getMonth()],
+      year: currentMonth.getFullYear(),
+      projects: [],
+    };
+    currentMonth.setMonth(currentMonth.getMonth() + 1);
+  }
+
+  // Assign projects to months
+  for (const proj of projects) {
+    const projStart = proj.start_date ? new Date(proj.start_date + 'T00:00:00') : null;
+    const projEnd = proj.due_date ? new Date(proj.due_date + 'T00:00:00') : null;
+
+    // Determine which month(s) this project belongs to
+    for (const [key, group] of Object.entries(monthGroups)) {
+      const [year, month] = key.split('-').map(Number);
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 0); // Last day of month
+
+      // Project belongs to this month if:
+      // - It starts in this month, or
+      // - It ends in this month
+      const startsThisMonth = projStart && projStart >= monthStart && projStart <= monthEnd;
+      const endsThisMonth = projEnd && projEnd >= monthStart && projEnd <= monthEnd;
+
+      if (startsThisMonth || endsThisMonth) {
+        group.projects.push({
+          ...proj,
+          startsThisMonth,
+          endsThisMonth,
+        });
+      }
+    }
+  }
+
+  // Format output
+  const lines = [];
+  for (const [key, group] of Object.entries(monthGroups)) {
+    if (group.projects.length === 0) continue;
+
+    lines.push(`#### ${group.name}`);
+    lines.push('');
+
+    for (const proj of group.projects) {
+      // Status emoji
+      const statusEmoji = {
+        'active': '🟢',
+        'planning': '📋',
+        'on_hold': '⏸️',
+        'completed': '✅',
+        'archived': '📦',
+      }[proj.status] || '•';
+
+      // Create link if project has a URL
+      let titleDisplay = proj.title;
+      if (proj.url) {
+        titleDisplay = `[${proj.title}](${proj.url})`;
+      }
+
+      // Determine badges
+      const badges = [];
+      if (proj.startsThisMonth && proj.start_date) {
+        badges.push(`Starts ${proj.start_date}`);
+      }
+      if (proj.endsThisMonth && proj.due_date) {
+        badges.push(`Due ${proj.due_date}`);
+      }
+
+      // Build the line
+      let line = `- ${statusEmoji} **${titleDisplay}**`;
+
+      if (proj.status && proj.status !== 'active') {
+        line += ` [${proj.status}]`;
+      }
+
+      if (proj.priority && proj.priority !== 'medium') {
+        line += ` (${proj.priority})`;
+      }
+
+      if (badges.length > 0) {
+        line += ` — ${badges.join(', ')}`;
+      }
+
+      if (proj.progress && proj.progress > 0) {
+        line += ` (${proj.progress}%)`;
+      }
+
+      lines.push(line);
+    }
+
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
+}
+
+/**
+ * Update quarterly plan file with projects from database, grouped by month
+ * Uses markers: <!-- PROJECTS:START --> ... <!-- PROJECTS:END -->
+ */
+function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(quarterlyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const projects = getProjectsForQuarter(startDate, endDate);
+
+  if (projects.length === 0) {
+    return { updated: false, reason: 'no projects', count: 0 };
+  }
+
+  let content = fs.readFileSync(quarterlyPlanPath, 'utf-8');
+
+  const formattedProjects = formatProjectsForQuarter(projects, startDate, endDate);
+  if (!formattedProjects) {
+    return { updated: false, reason: 'no projects in date range', count: 0 };
+  }
+
+  const startMarker = '<!-- PROJECTS:START -->';
+  const endMarker = '<!-- PROJECTS:END -->';
+  const newSection = `${startMarker}\n### Projects\n\n${formattedProjects}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section before Time Tracking or Review section
+    const timeTrackingMatch = content.match(/### ⏱️ Time Tracking/);
+    const reviewMatch = content.match(/## 🔍 Review/);
+
+    if (timeTrackingMatch && timeTrackingMatch.index !== undefined) {
+      content = content.substring(0, timeTrackingMatch.index) + newSection + '\n\n' + content.substring(timeTrackingMatch.index);
+    } else if (reviewMatch && reviewMatch.index !== undefined) {
+      content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
+    } else {
+      // Add before footer
+      const footerMatch = content.match(/\n\*Q\d \d{4}/);
+      if (footerMatch && footerMatch.index !== undefined) {
+        content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+      } else {
+        content += '\n\n' + newSection;
+      }
+    }
+  }
+
+  fs.writeFileSync(quarterlyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    count: projects.length,
+  };
+}
+
+/**
+ * Get quarter start and end dates from a quarterly plan file's frontmatter
+ */
+function getQuarterDatesFromPlan(quarterlyPlanPath) {
+  if (!fs.existsSync(quarterlyPlanPath)) return null;
+
+  const content = fs.readFileSync(quarterlyPlanPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  if (!frontmatter.start_date) return null;
+
+  const startDate = new Date(frontmatter.start_date + 'T00:00:00');
+  let endDate;
+
+  if (frontmatter.end_date) {
+    endDate = new Date(frontmatter.end_date + 'T23:59:59');
+  } else {
+    // Default to end of quarter (3 months from start)
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0);
+    endDate.setHours(23, 59, 59);
+  }
+
+  return { startDate, endDate };
+}
+
+/**
+ * Query projects from database for a year
+ * Returns projects active during the year (start before/during AND end during/after)
+ */
+function getProjectsForYear(startDate, endDate) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return [];
+  }
+
+  const startStr = formatDateStr(startDate);
+  const endStr = formatDateStr(endDate);
+
+  // Query projects that overlap with this year:
+  // - Has due_date: project timeline overlaps the period
+  // - No due_date + completed: start_date is within the period (was an event)
+  // - No due_date + active: start_date is on or before period end (ongoing)
+  const query = `
+    SELECT id, title, status, priority, topic, start_date, due_date, progress, description, url
+    FROM projects
+    WHERE
+      start_date IS NOT NULL
+      AND start_date <= '${endStr}'
+      AND (
+        (due_date IS NOT NULL AND due_date <> 'TBD' AND due_date >= '${startStr}')
+        OR (due_date IS NULL AND status IN ('completed', 'archived') AND start_date >= '${startStr}')
+        OR (due_date IS NULL AND status NOT IN ('completed', 'archived'))
+        OR (due_date = 'TBD' AND status NOT IN ('completed', 'archived'))
+      )
+    ORDER BY
+      COALESCE(start_date, due_date) ASC,
+      CASE priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 6 END
+  `;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    return JSON.parse(result || '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Format projects for display in yearly plan, grouped by quarter
+ */
+function formatProjectsForYear(projects, startDate, endDate) {
+  if (projects.length === 0) return null;
+
+  const year = startDate.getFullYear();
+
+  // Group projects by quarter
+  const quarterGroups = {
+    'Q1': { name: 'Q1 (Jan-Mar)', projects: [] },
+    'Q2': { name: 'Q2 (Apr-Jun)', projects: [] },
+    'Q3': { name: 'Q3 (Jul-Sep)', projects: [] },
+    'Q4': { name: 'Q4 (Oct-Dec)', projects: [] },
+  };
+
+  // Quarter date ranges
+  const quarterRanges = {
+    'Q1': { start: new Date(year, 0, 1), end: new Date(year, 2, 31) },
+    'Q2': { start: new Date(year, 3, 1), end: new Date(year, 5, 30) },
+    'Q3': { start: new Date(year, 6, 1), end: new Date(year, 8, 30) },
+    'Q4': { start: new Date(year, 9, 1), end: new Date(year, 11, 31) },
+  };
+
+  // Assign projects to quarters
+  for (const proj of projects) {
+    const projStart = proj.start_date ? new Date(proj.start_date + 'T00:00:00') : null;
+    const projEnd = proj.due_date ? new Date(proj.due_date + 'T00:00:00') : null;
+
+    for (const [quarter, range] of Object.entries(quarterRanges)) {
+      // Project belongs to this quarter if it starts or ends in it
+      const startsThisQuarter = projStart && projStart >= range.start && projStart <= range.end;
+      const endsThisQuarter = projEnd && projEnd >= range.start && projEnd <= range.end;
+
+      if (startsThisQuarter || endsThisQuarter) {
+        quarterGroups[quarter].projects.push({
+          ...proj,
+          startsThisQuarter,
+          endsThisQuarter,
+        });
+      }
+    }
+  }
+
+  // Format output
+  const lines = [];
+  for (const [quarter, group] of Object.entries(quarterGroups)) {
+    if (group.projects.length === 0) continue;
+
+    lines.push(`#### ${group.name}`);
+    lines.push('');
+
+    for (const proj of group.projects) {
+      // Status emoji
+      const statusEmoji = {
+        'active': '🟢',
+        'planning': '📋',
+        'on_hold': '⏸️',
+        'completed': '✅',
+        'archived': '📦',
+      }[proj.status] || '•';
+
+      // Create link if project has a URL
+      let titleDisplay = proj.title;
+      if (proj.url) {
+        titleDisplay = `[${proj.title}](${proj.url})`;
+      }
+
+      // Determine badges
+      const badges = [];
+      if (proj.startsThisQuarter && proj.start_date) {
+        badges.push(`Starts ${proj.start_date}`);
+      }
+      if (proj.endsThisQuarter && proj.due_date) {
+        badges.push(`Due ${proj.due_date}`);
+      }
+
+      // Build the line
+      let line = `- ${statusEmoji} **${titleDisplay}**`;
+
+      if (proj.status && proj.status !== 'active') {
+        line += ` [${proj.status}]`;
+      }
+
+      if (proj.priority && proj.priority !== 'medium') {
+        line += ` (${proj.priority})`;
+      }
+
+      if (badges.length > 0) {
+        line += ` — ${badges.join(', ')}`;
+      }
+
+      if (proj.progress && proj.progress > 0) {
+        line += ` (${proj.progress}%)`;
+      }
+
+      lines.push(line);
+    }
+
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
+}
+
+/**
+ * Update yearly plan file with projects from database, grouped by quarter
+ * Uses markers: <!-- PROJECTS:START --> ... <!-- PROJECTS:END -->
+ */
+function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
+  if (!fs.existsSync(yearlyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const projects = getProjectsForYear(startDate, endDate);
+
+  if (projects.length === 0) {
+    return { updated: false, reason: 'no projects', count: 0 };
+  }
+
+  let content = fs.readFileSync(yearlyPlanPath, 'utf-8');
+
+  const formattedProjects = formatProjectsForYear(projects, startDate, endDate);
+  if (!formattedProjects) {
+    return { updated: false, reason: 'no projects in date range', count: 0 };
+  }
+
+  const startMarker = '<!-- PROJECTS:START -->';
+  const endMarker = '<!-- PROJECTS:END -->';
+  const newSection = `${startMarker}\n### Projects\n\n${formattedProjects}\n${endMarker}`;
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section after "Annual Goals" section (after its dataview block)
+    // Look for the pattern: ### Annual Goals followed by dataview block, then ---
+    const annualGoalsMatch = content.match(/### Annual Goals[\s\S]*?```\n\n---/);
+    const reviewMatch = content.match(/## 🔍 Review/);
+
+    if (annualGoalsMatch && annualGoalsMatch.index !== undefined) {
+      // Insert before the --- that follows Annual Goals
+      const insertPoint = annualGoalsMatch.index + annualGoalsMatch[0].length - 3; // before ---
+      content = content.substring(0, insertPoint) + newSection + '\n\n' + content.substring(insertPoint);
+    } else if (reviewMatch && reviewMatch.index !== undefined) {
+      content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
+    } else {
+      // Add before footer
+      const footerMatch = content.match(/\n\*\d{4} Annual Plan\*/);
+      if (footerMatch && footerMatch.index !== undefined) {
+        content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
+      } else {
+        content += '\n\n' + newSection;
+      }
+    }
+  }
+
+  fs.writeFileSync(yearlyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    count: projects.length,
+  };
+}
+
+/**
+ * Get year start and end dates from a yearly plan file's frontmatter
+ */
+function getYearDatesFromPlan(yearlyPlanPath) {
+  if (!fs.existsSync(yearlyPlanPath)) return null;
+
+  const content = fs.readFileSync(yearlyPlanPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  if (!frontmatter.start_date) return null;
+
+  const startDate = new Date(frontmatter.start_date + 'T00:00:00');
+  let endDate;
+
+  if (frontmatter.end_date) {
+    endDate = new Date(frontmatter.end_date + 'T23:59:59');
+  } else {
+    // Default to end of year
+    endDate = new Date(startDate.getFullYear(), 11, 31);
+    endDate.setHours(23, 59, 59);
+  }
+
+  return { startDate, endDate };
+}
+
+/**
+ * Get month start and end dates from a monthly plan file's frontmatter
+ */
+function getMonthDatesFromPlan(monthlyPlanPath) {
+  if (!fs.existsSync(monthlyPlanPath)) return null;
+
+  const content = fs.readFileSync(monthlyPlanPath, 'utf-8');
+  const { frontmatter } = parseFrontmatter(content);
+
+  if (!frontmatter.start_date) return null;
+
+  const startDate = new Date(frontmatter.start_date + 'T00:00:00');
+  let endDate;
+
+  if (frontmatter.end_date) {
+    endDate = new Date(frontmatter.end_date + 'T23:59:59');
+  } else {
+    // Default to end of month
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59);
+  }
+
+  return { startDate, endDate };
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -1781,18 +2768,37 @@ async function main() {
     metadata.plans_created.push({ type: 'week', file: weeklyResult.file });
   }
 
+  // Ensure this month's monthly plan exists
+  const monthlyResult = ensureMonthlyPlan(planPaths.month, today);
+  if (monthlyResult.created) {
+    metadata.plans_created.push({ type: 'month', file: monthlyResult.file });
+  }
+
+  // Ensure this quarter's quarterly plan exists
+  const quarterlyResult = ensureQuarterlyPlan(planPaths.quarter, today);
+  if (quarterlyResult.created) {
+    metadata.plans_created.push({ type: 'quarter', file: quarterlyResult.file });
+  }
+
+  // Ensure this year's yearly plan exists
+  const yearlyResult = ensureYearlyPlan(planPaths.year, today);
+  if (yearlyResult.created) {
+    metadata.plans_created.push({ type: 'year', file: yearlyResult.file });
+  }
+
   // Create any missing weekly plans from earliest daily plan to today
   const missingWeeklyResult = createMissingWeeklyPlans(today);
   if (missingWeeklyResult.created.length > 0) {
     metadata.missing_weekly_plans_created = missingWeeklyResult.created;
 
-    // Update newly created weekly plans with diary notes and habit stats
+    // Update newly created weekly plans with diary notes, habit stats, and projects
     for (const weekFile of missingWeeklyResult.created) {
       const weekPath = path.join(plansDir, weekFile);
       const weekDates = getWeekDatesFromPlan(weekPath);
       if (weekDates) {
         updateWeeklyPlanWithDiaryNotes(weekPath, weekDates.startDate, weekDates.endDate);
         updateWeeklyPlanWithHabitStats(weekPath, weekDates.startDate, weekDates.endDate);
+        updateWeeklyPlanWithProjects(weekPath, weekDates.startDate, weekDates.endDate);
       }
     }
   }
@@ -1817,6 +2823,16 @@ async function main() {
     );
     if (habitResult.updated) {
       metadata.habit_stats_updated = habitResult.stats;
+    }
+
+    // Update projects for current week
+    const weekProjectsResult = updateWeeklyPlanWithProjects(
+      planPaths.week.path,
+      weekDates.startDate,
+      weekDates.endDate
+    );
+    if (weekProjectsResult.updated) {
+      metadata.weekly_projects_updated = weekProjectsResult.count;
     }
   }
 
@@ -1845,6 +2861,55 @@ async function main() {
       if (lastWeekHabitResult.updated) {
         metadata.prev_week_habit_stats_updated = lastWeekHabitResult.stats;
       }
+
+      // Update projects for previous week
+      const lastWeekProjectsResult = updateWeeklyPlanWithProjects(
+        lastWeekPaths.week.path,
+        lastWeekDates.startDate,
+        lastWeekDates.endDate
+      );
+      if (lastWeekProjectsResult.updated) {
+        metadata.prev_week_projects_updated = lastWeekProjectsResult.count;
+      }
+    }
+  }
+
+  // Update monthly plan with projects from database (current month)
+  const monthDates = getMonthDatesFromPlan(planPaths.month.path);
+  if (monthDates) {
+    const projectsResult = updateMonthlyPlanWithProjects(
+      planPaths.month.path,
+      monthDates.startDate,
+      monthDates.endDate
+    );
+    if (projectsResult.updated) {
+      metadata.monthly_projects_updated = projectsResult.count;
+    }
+  }
+
+  // Update quarterly plan with projects from database (current quarter)
+  const quarterDates = getQuarterDatesFromPlan(planPaths.quarter.path);
+  if (quarterDates) {
+    const quarterProjectsResult = updateQuarterlyPlanWithProjects(
+      planPaths.quarter.path,
+      quarterDates.startDate,
+      quarterDates.endDate
+    );
+    if (quarterProjectsResult.updated) {
+      metadata.quarterly_projects_updated = quarterProjectsResult.count;
+    }
+  }
+
+  // Update yearly plan with projects from database (current year)
+  const yearDates = getYearDatesFromPlan(planPaths.year.path);
+  if (yearDates) {
+    const yearProjectsResult = updateYearlyPlanWithProjects(
+      planPaths.year.path,
+      yearDates.startDate,
+      yearDates.endDate
+    );
+    if (yearProjectsResult.updated) {
+      metadata.yearly_projects_updated = yearProjectsResult.count;
     }
   }
 
