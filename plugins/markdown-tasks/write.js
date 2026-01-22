@@ -880,80 +880,118 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       filesModified.add(path.relative(projectRoot, archiveFile));
     }
 
-    // Now rebalance main task file if it exceeds max tasks
+    // Now rebalance ALL task files (main + numbered) if any exceed max tasks
     let rebalanced = false;
     let rebalanceInfo = null;
 
-    if (fs.existsSync(taskFile)) {
-      const tasksContent = fs.readFileSync(taskFile, 'utf8');
-      const tasksLines = tasksContent.split('\n').filter(line => line.trim());
+    // Collect all tasks from main file and existing numbered files
+    const allTasks = [];
+    const filesToRebalance = [taskFile]; // Start with main file
 
-      if (tasksLines.length > maxTasksPerFile) {
-        // Keep first maxTasksPerFile, move the rest
-        const toKeep = tasksLines.slice(0, maxTasksPerFile);
-        const toMove = tasksLines.slice(maxTasksPerFile);
+    // Find all existing numbered files
+    const numberedFilePattern = new RegExp(`^${taskBaseName}-(\\d+)\\.md$`);
+    const numberedFiles = allFiles
+      .filter(f => numberedFilePattern.test(f))
+      .map(f => path.join(taskDir, f))
+      .sort();
 
-        // Find existing numbered files and their task counts
-        const numberedFilePattern = new RegExp(`^${taskBaseName}-(\\d+)\\.md$`);
-        const numberedFiles = allFiles
-          .filter(f => numberedFilePattern.test(f))
-          .map(f => {
-            const num = parseInt(f.match(numberedFilePattern)[1]);
-            return { num, file: f };
-          })
-          .sort((a, b) => a.num - b.num);
+    filesToRebalance.push(...numberedFiles);
 
-        // Find a file with room (< maxTasksPerFile tasks) or create a new one
-        let targetFile = null;
-        let targetNum = null;
+    // Collect all tasks and check if any file exceeds limit
+    let needsRebalancing = false;
+    for (const filePath of filesToRebalance) {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const lines = content.split('\n').filter(line => line.trim());
 
-        for (const { num, file } of numberedFiles) {
-          const filePath = path.join(taskDir, file);
-          try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            const lines = content.split('\n').filter(line => line.trim());
+        if (lines.length > maxTasksPerFile) {
+          needsRebalancing = true;
+        }
 
-            if (lines.length < maxTasksPerFile) {
-              targetFile = filePath;
-              targetNum = num;
-              break;
-            }
-          } catch {
-            // Skip files that can't be read
+        allTasks.push(...lines);
+      }
+    }
+
+    if (needsRebalancing && allTasks.length > 0) {
+
+        // Calculate number of files needed
+        const numFilesNeeded = Math.ceil(allTasks.length / maxTasksPerFile);
+
+        // Get existing numbered file numbers
+        const existingNums = numberedFiles
+          .map(f => parseInt(path.basename(f).match(numberedFilePattern)[1]))
+          .sort((a, b) => a - b);
+
+        // Generate file numbers we need (starting from 1 if we need extra files)
+        const targetFileNums = [];
+        if (numFilesNeeded > 1) {
+          // We need numbered files for overflow
+          for (let i = 1; i < numFilesNeeded; i++) {
+            targetFileNums.push(i);
           }
         }
 
-        // If no file has room, create a new one
-        if (!targetFile) {
-          targetNum = numberedFiles.length > 0 ? numberedFiles[numberedFiles.length - 1].num + 1 : 1;
-          targetFile = path.join(taskDir, `${taskBaseName}-${targetNum}.md`);
+        // Ensure we have enough file numbers
+        let nextNum = Math.max(0, ...existingNums, ...targetFileNums) + 1;
+        while (targetFileNums.length < numFilesNeeded - 1) {
+          targetFileNums.push(nextNum++);
         }
 
-        // Read target file and append tasks
-        let targetContent = '';
-        try {
-          targetContent = fs.readFileSync(targetFile, 'utf8');
-        } catch {
-          // File doesn't exist yet
+        // Distribute tasks across files
+        const filesToWrite = [];
+
+        // Main file gets first chunk
+        const mainChunk = allTasks.slice(0, maxTasksPerFile);
+        filesToWrite.push({
+          path: taskFile,
+          tasks: mainChunk,
+          name: path.basename(taskFile)
+        });
+
+        // Remaining tasks go to numbered files
+        let taskIndex = maxTasksPerFile;
+        for (const fileNum of targetFileNums) {
+          const filePath = path.join(taskDir, `${taskBaseName}-${fileNum}.md`);
+          const chunk = allTasks.slice(taskIndex, taskIndex + maxTasksPerFile);
+
+          if (chunk.length > 0) {
+            filesToWrite.push({
+              path: filePath,
+              tasks: chunk,
+              name: path.basename(filePath)
+            });
+            taskIndex += maxTasksPerFile;
+          }
         }
 
-        const targetLines = targetContent.split('\n').filter(line => line.trim());
-        const combinedLines = targetLines.concat(toMove);
+        // Clean up old numbered files first (we'll recreate what we need)
+        for (const filePath of numberedFiles) {
+          try {
+            fs.unlinkSync(filePath);
+            filesModified.add(path.relative(projectRoot, filePath));
+          } catch {
+            // File might not exist, continue
+          }
+        }
 
-        // Write files
-        fs.writeFileSync(taskFile, toKeep.join('\n') + '\n');
-        fs.writeFileSync(targetFile, combinedLines.join('\n') + '\n');
+        // Write all files with new distribution
+        const distributionInfo = [];
+        for (const fileInfo of filesToWrite) {
+          fs.writeFileSync(fileInfo.path, fileInfo.tasks.join('\n') + '\n');
+          filesModified.add(path.relative(projectRoot, fileInfo.path));
 
-        filesModified.add(path.relative(projectRoot, taskFile));
-        filesModified.add(path.relative(projectRoot, targetFile));
+          distributionInfo.push({
+            file: fileInfo.name,
+            task_count: fileInfo.tasks.length
+          });
+        }
 
         rebalanced = true;
         rebalanceInfo = {
-          moved: toMove.length,
-          from: path.basename(taskFile),
-          to: path.basename(targetFile),
-          main_count: toKeep.length,
-          target_count: combinedLines.length
+          total_tasks: allTasks.length,
+          files_created: filesToWrite.length,
+          max_per_file: maxTasksPerFile,
+          distribution: distributionInfo
         };
       }
     }
@@ -967,7 +1005,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       files_modified: Array.from(filesModified),
       needs_sync: filesModified.size > 0
     }));
-  }
 
 } catch (error) {
   console.log(JSON.stringify({ success: false, error: `Failed to write: ${error.message}` }));
