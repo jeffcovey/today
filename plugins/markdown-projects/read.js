@@ -41,20 +41,27 @@ const priorityMap = {
   'lowest': 'lowest'
 };
 
-// Status normalization
+// Status normalization - standardized to: active, paused, completed, cancelled
 const statusMap = {
-  'planning': 'planning',
+  // Active - currently being worked on
   'active': 'active',
-  'in-progress': 'active',  // Normalize to active
+  'planning': 'active',      // Merge planning into active
+  'in-progress': 'active',
   'in_progress': 'active',
-  'on-hold': 'on_hold',
-  'on_hold': 'on_hold',
-  'paused': 'on_hold',
-  'inactive': 'on_hold',
-  'postponed': 'on_hold',
+  // Paused - temporarily on hold
+  'paused': 'paused',
+  'on-hold': 'paused',
+  'on_hold': 'paused',
+  'inactive': 'paused',
+  'postponed': 'paused',
+  // Completed - successfully finished
   'completed': 'completed',
   'done': 'completed',
-  'archived': 'archived'
+  // Cancelled - abandoned, no longer relevant
+  'cancelled': 'cancelled',
+  'canceled': 'cancelled',   // US spelling
+  'archived': 'cancelled',
+  'abandoned': 'cancelled'
 };
 
 // Find all markdown files in project directory

@@ -26,6 +26,7 @@ const closedReviewFrequency = config.closed_review_frequency || 'never';
 const staleness_days = config.staleness_days || 7;
 const createDateFields = config.create_date_fields === true || config.create_date_fields === 'true';
 const createPriorityField = config.create_priority_field === true || config.create_priority_field === 'true';
+const createStatusField = config.create_status_field === true || config.create_status_field === 'true';
 
 // Priority options for the single-select field
 const PRIORITY_OPTIONS = [
@@ -35,6 +36,15 @@ const PRIORITY_OPTIONS = [
   { name: 'Low', color: 'GREEN' },
   { name: 'Lowest', color: 'GRAY' }
 ];
+
+// Status options for the single-select field (named "Project Status" to avoid conflict with built-in Status)
+const STATUS_OPTIONS = [
+  { name: 'Active', color: 'GREEN' },
+  { name: 'Paused', color: 'YELLOW' },
+  { name: 'Completed', color: 'PURPLE' },
+  { name: 'Cancelled', color: 'GRAY' }
+];
+const STATUS_FIELD_NAME = 'Project Status';
 
 if (!owner) {
   console.error(JSON.stringify({
@@ -163,6 +173,67 @@ function ensurePriorityField(project) {
 
   if (!hasPriority) {
     return createPriorityFieldOnProject(project.id);
+  }
+  return false;
+}
+
+/**
+ * Create a status single-select field on a project if it doesn't exist
+ * @param {string} projectId - GitHub project node ID
+ * @returns {boolean} - Whether the field was created
+ */
+function createStatusFieldOnProject(projectId) {
+  // Build options in GraphQL input syntax (not JSON)
+  const optionsList = STATUS_OPTIONS.map(opt =>
+    `{ name: "${opt.name}", color: ${opt.color}, description: "${opt.name} status" }`
+  ).join(', ');
+
+  const mutation = `
+    mutation {
+      createProjectV2Field(input: {
+        projectId: "${projectId}"
+        dataType: SINGLE_SELECT
+        name: "${STATUS_FIELD_NAME}"
+        singleSelectOptions: [${optionsList}]
+      }) {
+        projectV2Field {
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    execSync(`gh api graphql -f query='${mutation.replace(/'/g, "\\'")}'`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    // Silently fail - likely missing write scope
+    return false;
+  }
+}
+
+/**
+ * Ensure a project has a Status field
+ * @param {Object} project - Project object with id and fields
+ * @returns {boolean} - Whether the field was created
+ */
+function ensureStatusField(project) {
+  if (!project.fields?.nodes) return false;
+
+  const fieldNames = project.fields.nodes
+    .filter(f => f.name)
+    .map(f => f.name.toLowerCase());
+
+  const hasStatus = fieldNames.some(n => n === STATUS_FIELD_NAME.toLowerCase());
+
+  if (!hasStatus) {
+    return createStatusFieldOnProject(project.id);
   }
   return false;
 }
@@ -362,6 +433,13 @@ if (createPriorityField) {
   }
 }
 
+// Create status field on projects that don't have it (if enabled)
+if (createStatusField) {
+  for (const project of projects) {
+    ensureStatusField(project);
+  }
+}
+
 /**
  * Calculate GitHub-native attention score and reasons
  * @param {Object} project - GitHub project data
@@ -433,10 +511,11 @@ const entries = projects.map(project => {
     metadata.repository = repository;
   }
 
-  // Extract item information, date field values, and priority
+  // Extract item information, date field values, priority, and status
   let projectStartDate = null;
   let projectDueDate = null;
   let projectPriority = null;
+  let projectStatus = null;
 
   if (project.items) {
     metadata.item_count = project.items.totalCount;
@@ -457,11 +536,12 @@ const entries = projects.map(project => {
       metadata.items = items;
     }
 
-    // Extract dates and priority from item field values
-    // Look for "Start Date", "Due Date", and "Priority" fields
+    // Extract dates, priority, and status from item field values
+    // Look for "Start Date", "Due Date", "Priority", and "Project Status" fields
     const startDates = [];
     const dueDates = [];
     const priorities = [];
+    const statuses = [];
 
     for (const item of project.items.nodes) {
       if (!item.fieldValues?.nodes) continue;
@@ -477,11 +557,13 @@ const entries = projects.map(project => {
           }
         }
 
-        // Handle single-select fields (Priority)
+        // Handle single-select fields (Priority, Status)
         if (fieldValue.name && fieldValue.field?.name) {
           const fieldName = fieldValue.field.name.toLowerCase();
           if (fieldName === 'priority') {
             priorities.push(fieldValue.name.toLowerCase());
+          } else if (fieldName === STATUS_FIELD_NAME.toLowerCase()) {
+            statuses.push(fieldValue.name.toLowerCase());
           }
         }
       }
@@ -511,6 +593,21 @@ const entries = projects.map(project => {
         projectPriority = priorities[0];
       }
     }
+
+    // Use most significant status found (first in status order)
+    if (statuses.length > 0) {
+      const statusOrder = ['paused', 'active', 'completed', 'cancelled'];
+      for (const s of statusOrder) {
+        if (statuses.includes(s)) {
+          projectStatus = s;
+          break;
+        }
+      }
+      // If no match, use the first one found
+      if (!projectStatus) {
+        projectStatus = statuses[0];
+      }
+    }
   }
 
   // Calculate progress from items if available
@@ -534,11 +631,14 @@ const entries = projects.map(project => {
   // Build unique ID
   const idPrefix = ownerType === 'repo' ? `${owner}/${repository}` : owner;
 
+  // Determine status: use Status field if set, otherwise fall back to closed/open
+  const finalStatus = projectStatus || (project.closed ? 'completed' : 'active');
+
   return {
     id: `${idPrefix}#${project.number}`,
     title: project.title,
     description: project.shortDescription || null,
-    status: project.closed ? 'completed' : 'active',
+    status: finalStatus,
     priority: projectPriority, // From Priority single-select field on items
     topic: null,
     start_date: projectStartDate,

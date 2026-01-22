@@ -16,13 +16,12 @@ const PRIORITY_EMOJI = {
   lowest: '⏬'
 };
 
-// Status emoji map
+// Status emoji map (standardized: active, paused, completed, cancelled)
 const STATUS_EMOJI = {
-  planning: '📝',
   active: '🟢',
-  on_hold: '⏸️',
+  paused: '⏸️',
   completed: '✅',
-  archived: '📦'
+  cancelled: '❌'
 };
 
 // Generic helper to get item counts from project metadata
@@ -741,6 +740,84 @@ program
     } catch (error) {
       if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
         console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting priority`);
+      } else {
+        console.log(colors.red('✗') + ` Error: ${error.message}`);
+      }
+      process.exit(1);
+    }
+  });
+
+// Set status command - update status for a project
+program
+  .command('set-status <id> <status>')
+  .description('Set status for a project (active, paused, completed, cancelled)')
+  .option('--clear', 'Clear the status')
+  .action(async (id, status, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    // Validate status
+    const validStatuses = ['active', 'paused', 'completed', 'cancelled'];
+    const normalizedStatus = options.clear ? null : status.toLowerCase();
+
+    if (!options.clear && !validStatuses.includes(normalizedStatus)) {
+      console.log(colors.red('✗') + ` Invalid status: ${status}`);
+      console.log('Valid statuses: ' + validStatuses.join(', '));
+      process.exit(1);
+    }
+
+    // Determine plugin from source
+    const pluginName = project.source.split('/')[0];
+
+    // Build the write command arguments
+    const writeArgs = {
+      action: 'set-status',
+      projectId: project.id,
+      status: normalizedStatus,
+    };
+
+    // Call the plugin's write command
+    const pluginDir = `plugins/${pluginName}`;
+    const writeScript = `${pluginDir}/write.js`;
+
+    try {
+      const result = execSync(`node ${writeScript}`, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PROJECT_ROOT: process.cwd(),
+        }
+      });
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        const emoji = STATUS_EMOJI[normalizedStatus] || '●';
+        console.log(colors.green('✓') + ` Updated status for "${project.title}"`);
+        console.log(`  Status: ${emoji} ${normalizedStatus || '(cleared)'}`);
+
+        // Sync to update the database
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Syncing to update database...');
+        execSync(`bin/plugins sync ${pluginName}`, { stdio: 'inherit' });
+      } else {
+        console.log(colors.red('✗') + ` Failed to update status: ${response.error}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
+        console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting status`);
       } else {
         console.log(colors.red('✗') + ` Error: ${error.message}`);
       }

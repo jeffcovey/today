@@ -107,6 +107,7 @@ async function getProjectDetails(owner, number, ownerType) {
   const startDateField = fields.find(f => f.name.toLowerCase() === 'start date');
   const dueDateField = fields.find(f => f.name.toLowerCase() === 'due date');
   const priorityField = fields.find(f => f.name.toLowerCase() === 'priority');
+  const statusField = fields.find(f => f.name.toLowerCase() === 'project status');
 
   // Get first item
   const firstItem = project.items.nodes[0];
@@ -118,6 +119,8 @@ async function getProjectDetails(owner, number, ownerType) {
     dueDateFieldId: dueDateField?.id,
     priorityFieldId: priorityField?.id,
     priorityOptions: priorityField?.options || [],
+    statusFieldId: statusField?.id,
+    statusOptions: statusField?.options || [],
     firstItemId: firstItem?.id,
   };
 }
@@ -323,11 +326,83 @@ async function handleSetPriority() {
   }
 }
 
+// Handle set-status action
+async function handleSetStatus() {
+  const { projectId, status } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (status === undefined) {
+    return output({ success: false, error: 'status is required' });
+  }
+
+  try {
+    // Parse the project ID
+    const { owner, number, type } = parseProjectId(projectId);
+
+    // Get project details
+    const details = await getProjectDetails(owner, number, type);
+
+    if (!details.firstItemId) {
+      return output({ success: false, error: 'Project has no items. Add an item first to set status.' });
+    }
+
+    if (!details.statusFieldId) {
+      return output({ success: false, error: 'Project has no "Project Status" field. Enable create_status_field in config.' });
+    }
+
+    // Clear status if null
+    if (status === null) {
+      clearItemSingleSelectField(details.projectId, details.firstItemId, details.statusFieldId);
+      return output({
+        success: true,
+        updated: {
+          project: details.title,
+          itemId: details.firstItemId,
+          status: null,
+        }
+      });
+    }
+
+    // Find the option ID for the requested status
+    const normalizedStatus = status.toLowerCase();
+    const option = details.statusOptions.find(
+      opt => opt.name.toLowerCase() === normalizedStatus
+    );
+
+    if (!option) {
+      const validOptions = details.statusOptions.map(o => o.name.toLowerCase()).join(', ');
+      return output({
+        success: false,
+        error: `Invalid status "${status}". Valid options: ${validOptions}`
+      });
+    }
+
+    // Update the status
+    updateItemSingleSelectField(details.projectId, details.firstItemId, details.statusFieldId, option.id);
+
+    return output({
+      success: true,
+      updated: {
+        project: details.title,
+        itemId: details.firstItemId,
+        status: option.name,
+      }
+    });
+  } catch (error) {
+    return output({ success: false, error: error.message });
+  }
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
 } else if (args.action === 'set-priority') {
   handleSetPriority();
+} else if (args.action === 'set-status') {
+  handleSetStatus();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }

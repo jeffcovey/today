@@ -25,13 +25,11 @@ last_reviewed: 2025-12-15
 ---
 ```
 
-Status values:
-- planning: Not yet started
-- active: Currently being worked on
-- in-progress: Same as active (normalized)
-- on_hold: Paused
-- completed: Done (or files in completed/ subfolder)
-- archived: No longer relevant
+Status values (standardized):
+- active: Currently being worked on (aliases: planning, in-progress)
+- paused: Temporarily on hold (aliases: on_hold, postponed, inactive)
+- completed: Successfully finished (alias: done)
+- cancelled: Abandoned, no longer relevant (aliases: archived, abandoned)
 
 Priority values: urgent, high, medium, low (mapped to highest/high/medium/low/lowest)
 

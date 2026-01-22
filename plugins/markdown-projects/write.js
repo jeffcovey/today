@@ -78,6 +78,9 @@ function updateFrontmatterField(raw, key, value) {
 // Valid priority values (normalized to lowercase)
 const VALID_PRIORITIES = ['highest', 'high', 'medium', 'low', 'lowest'];
 
+// Valid status values (normalized to lowercase)
+const VALID_STATUSES = ['active', 'paused', 'completed', 'cancelled'];
+
 // Handle set-dates action
 function handleSetDates() {
   const { projectId, startDate, dueDate } = args;
@@ -190,11 +193,70 @@ function handleSetPriority() {
   });
 }
 
+// Handle set-status action
+function handleSetStatus() {
+  const { projectId, status } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (status === undefined) {
+    return output({ success: false, error: 'status is required' });
+  }
+
+  // Project ID for markdown-projects is the file path
+  let filePath = projectId;
+  if (filePath.includes(':')) {
+    filePath = filePath.split(':').pop();
+  }
+
+  const fullPath = path.join(projectRoot, filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return output({ success: false, error: `Project file not found: ${filePath}` });
+  }
+
+  // Validate status value
+  const normalizedStatus = status === null ? null : status.toLowerCase();
+  if (normalizedStatus !== null && !VALID_STATUSES.includes(normalizedStatus)) {
+    return output({
+      success: false,
+      error: `Invalid status "${status}". Valid options: ${VALID_STATUSES.join(', ')}`
+    });
+  }
+
+  // Read and parse the file
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const { frontmatter, body, raw } = parseFrontmatter(content);
+
+  if (!raw) {
+    return output({ success: false, error: 'Project file has no frontmatter' });
+  }
+
+  // Update the frontmatter
+  const updatedRaw = updateFrontmatterField(raw, 'status', normalizedStatus);
+
+  // Write back the file
+  const newContent = `---\n${updatedRaw}\n---${body}`;
+  fs.writeFileSync(fullPath, newContent, 'utf8');
+
+  return output({
+    success: true,
+    updated: {
+      file: filePath,
+      status: normalizedStatus,
+    }
+  });
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
 } else if (args.action === 'set-priority') {
   handleSetPriority();
+} else if (args.action === 'set-status') {
+  handleSetStatus();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }
