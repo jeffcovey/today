@@ -23,7 +23,7 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
 
-const diaryDirectory = config.diary_directory || `${process.env.VAULT_PATH}/diary`;
+const diaryDirectory = config.diary_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/diary` : 'vault/diary');
 const diaryDir = path.join(projectRoot, diaryDirectory);
 
 // Parse last sync time for incremental sync
@@ -710,9 +710,12 @@ for (const file of diaryFiles) {
 }
 
 // Output
+// files_processed at top level tells plugin-loader which files were processed for incremental sync
+const filesProcessed = diaryFiles.map(f => path.basename(f));
 console.log(JSON.stringify({
   entries: entries,
   incremental: isIncremental,
+  files_processed: filesProcessed.length > 0 ? filesProcessed : undefined,
   metadata: {
     diary_files: diaryFiles.length,
     entries_count: entries.length,

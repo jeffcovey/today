@@ -28,8 +28,8 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const contextOnly = process.env.CONTEXT_ONLY === 'true'; // Skip expensive AI operations
 
-const plansDirectory = config.plans_directory || `${process.env.VAULT_PATH}/plans`;
-const templatesDirectory = config.templates_directory || `${process.env.VAULT_PATH}/plans/templates`;
+const plansDirectory = config.plans_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans` : 'vault/plans');
+const templatesDirectory = config.templates_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans/templates` : 'vault/plans/templates');
 const linkDailyNotes = config.link_daily_notes !== false; // opt-out, default true
 const plansDir = path.isAbsolute(plansDirectory) ? plansDirectory : path.join(projectRoot, plansDirectory);
 const templatesDir = path.isAbsolute(templatesDirectory) ? templatesDirectory : path.join(projectRoot, templatesDirectory);
@@ -1606,8 +1606,43 @@ function formatDiaryEntries(entries, type) {
 }
 
 /**
+ * Parse existing diary entries from the markdown section
+ * Returns entries grouped by type (gratitude, progress, concern)
+ */
+function parseExistingDiaryEntries(sectionContent) {
+  const existing = { gratitude: new Set(), progress: new Set(), concern: new Set() };
+
+  // Find each subsection and extract entries
+  const sections = sectionContent.split(/###\s+/);
+  for (const section of sections) {
+    const lines = section.trim().split('\n');
+    if (lines.length === 0) continue;
+
+    const header = lines[0].toLowerCase().trim();
+    let type = null;
+    if (header.includes('gratitude')) type = 'gratitude';
+    else if (header.includes('progress')) type = 'progress';
+    else if (header.includes('concern')) type = 'concern';
+
+    if (type) {
+      // Extract bullet entries - match "- **date**: text"
+      for (const line of lines.slice(1)) {
+        const match = line.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
+        if (match) {
+          // Store as "date|text" for comparison
+          existing[type].add(`${match[1].trim()}|${match[2].trim()}`);
+        }
+      }
+    }
+  }
+
+  return existing;
+}
+
+/**
  * Update weekly plan file with diary notes from database
  * Uses markers to identify the section: <!-- DIARY_NOTES:START --> ... <!-- DIARY_NOTES:END -->
+ * Merges new entries with existing ones instead of replacing
  */
 function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
   if (!fs.existsSync(weeklyPlanPath)) {
@@ -1622,43 +1657,134 @@ function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
-
-  // Build the diary notes section
-  const sections = [];
-
-  if (entries.gratitude.length > 0) {
-    sections.push(`### Gratitude\n\n${formatDiaryEntries(entries.gratitude, 'gratitude')}`);
-  }
-
-  if (entries.progress.length > 0) {
-    sections.push(`### Progress\n\n${formatDiaryEntries(entries.progress, 'progress')}`);
-  }
-
-  if (entries.concern.length > 0) {
-    sections.push(`### Concerns\n\n${formatDiaryEntries(entries.concern, 'concern')}`);
-  }
-
-  const diarySection = sections.join('\n\n');
   const startMarker = '<!-- DIARY_NOTES:START -->';
   const endMarker = '<!-- DIARY_NOTES:END -->';
-  const newSection = `${startMarker}\n## 📝 Week Notes\n\n${diarySection}\n${endMarker}`;
 
-  // Check if markers already exist
+  // Check if markers already exist and parse existing entries
   const startIndex = content.indexOf(startMarker);
   const endIndex = content.indexOf(endMarker);
+  let existingEntries = { gratitude: new Set(), progress: new Set(), concern: new Set() };
 
   if (startIndex !== -1 && endIndex !== -1) {
-    // Replace existing section
+    const existingSection = content.substring(startIndex + startMarker.length, endIndex);
+    existingEntries = parseExistingDiaryEntries(existingSection);
+  }
+
+  // Helper to check if entry already exists
+  const entryExists = (type, dateLabel, text) => {
+    return existingEntries[type].has(`${dateLabel}|${text}`);
+  };
+
+  // Helper to format entry and check if new
+  const formatEntryWithCheck = (entry, type) => {
+    const dateStr = entry.date.substring(0, 10);
+    const timeStr = entry.date.substring(11, 16);
+    const dateLabel = timeStr && timeStr !== '00:00' ? `${dateStr} ${timeStr}` : dateStr;
+
+    let text = entry.text.trim();
+    if (type === 'gratitude' && text.toLowerCase().startsWith("i'm grateful for ")) {
+      text = text.substring(17);
+    }
+
+    // Check if this exact entry already exists
+    if (entryExists(type, dateLabel, text)) {
+      return null; // Skip existing entries
+    }
+
+    return `- **${dateLabel}**: ${text}`;
+  };
+
+  // Build new entries lists (only entries not already present)
+  const newGratitude = entries.gratitude.map(e => formatEntryWithCheck(e, 'gratitude')).filter(Boolean);
+  const newProgress = entries.progress.map(e => formatEntryWithCheck(e, 'progress')).filter(Boolean);
+  const newConcern = entries.concern.map(e => formatEntryWithCheck(e, 'concern')).filter(Boolean);
+
+  const totalNew = newGratitude.length + newProgress.length + newConcern.length;
+
+  if (totalNew === 0) {
+    return { updated: false, reason: 'no new entries', counts: { gratitude: 0, progress: 0, concern: 0 } };
+  }
+
+  // If section exists, append new entries to each subsection
+  if (startIndex !== -1 && endIndex !== -1) {
+    let existingSection = content.substring(startIndex, endIndex + endMarker.length);
+
+    // Append to each subsection if there are new entries
+    if (newGratitude.length > 0) {
+      if (existingSection.includes('### Gratitude')) {
+        // Find end of Gratitude section (next ### or end marker)
+        existingSection = existingSection.replace(
+          /(### Gratitude\n\n[\s\S]*?)(\n\n###|\n<!-- DIARY)/,
+          `$1\n${newGratitude.join('\n')}$2`
+        );
+      } else {
+        // Add new Gratitude section after the header
+        existingSection = existingSection.replace(
+          '## 📝 Week Notes\n\n',
+          `## 📝 Week Notes\n\n### Gratitude\n\n${newGratitude.join('\n')}\n\n`
+        );
+      }
+    }
+
+    if (newProgress.length > 0) {
+      if (existingSection.includes('### Progress')) {
+        existingSection = existingSection.replace(
+          /(### Progress\n\n[\s\S]*?)(\n\n###|\n<!-- DIARY)/,
+          `$1\n${newProgress.join('\n')}$2`
+        );
+      } else {
+        // Add before Concerns or end marker
+        if (existingSection.includes('### Concerns')) {
+          existingSection = existingSection.replace(
+            '### Concerns',
+            `### Progress\n\n${newProgress.join('\n')}\n\n### Concerns`
+          );
+        } else {
+          existingSection = existingSection.replace(
+            endMarker,
+            `### Progress\n\n${newProgress.join('\n')}\n${endMarker}`
+          );
+        }
+      }
+    }
+
+    if (newConcern.length > 0) {
+      if (existingSection.includes('### Concerns')) {
+        existingSection = existingSection.replace(
+          /(### Concerns\n\n[\s\S]*?)(\n<!-- DIARY)/,
+          `$1\n${newConcern.join('\n')}$2`
+        );
+      } else {
+        existingSection = existingSection.replace(
+          endMarker,
+          `### Concerns\n\n${newConcern.join('\n')}\n${endMarker}`
+        );
+      }
+    }
+
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
-    content = before + newSection + after;
+    content = before + existingSection + after;
   } else {
+    // No existing section - create new one with all entries
+    const sections = [];
+
+    const allGratitude = entries.gratitude.map(e => formatEntryWithCheck(e, 'gratitude') || formatDiaryEntries([e], 'gratitude').split('\n')[0]).filter(Boolean);
+    const allProgress = entries.progress.map(e => formatEntryWithCheck(e, 'progress') || formatDiaryEntries([e], 'progress').split('\n')[0]).filter(Boolean);
+    const allConcern = entries.concern.map(e => formatEntryWithCheck(e, 'concern') || formatDiaryEntries([e], 'concern').split('\n')[0]).filter(Boolean);
+
+    if (allGratitude.length > 0) sections.push(`### Gratitude\n\n${allGratitude.join('\n')}`);
+    if (allProgress.length > 0) sections.push(`### Progress\n\n${allProgress.join('\n')}`);
+    if (allConcern.length > 0) sections.push(`### Concerns\n\n${allConcern.join('\n')}`);
+
+    const diarySection = sections.join('\n\n');
+    const newSection = `${startMarker}\n## 📝 Week Notes\n\n${diarySection}\n${endMarker}`;
+
     // Add new section before the Review section or at the end
     const reviewMatch = content.match(/## 🔍 Review/);
     if (reviewMatch && reviewMatch.index !== undefined) {
       content = content.substring(0, reviewMatch.index) + newSection + '\n\n---\n\n' + content.substring(reviewMatch.index);
     } else {
-      // Add before the footer line if present
       const footerMatch = content.match(/\n\*Week \d+ of \d+/);
       if (footerMatch && footerMatch.index !== undefined) {
         content = content.substring(0, footerMatch.index) + '\n' + newSection + '\n' + content.substring(footerMatch.index);
@@ -1673,9 +1799,9 @@ function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
   return {
     updated: true,
     counts: {
-      gratitude: entries.gratitude.length,
-      progress: entries.progress.length,
-      concern: entries.concern.length,
+      gratitude: newGratitude.length,
+      progress: newProgress.length,
+      concern: newConcern.length,
     },
   };
 }
