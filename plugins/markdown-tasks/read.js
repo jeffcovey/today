@@ -59,10 +59,10 @@ if (filterFiles) {
   // Use vault-changes for efficient incremental sync
   const baselineStatus = getBaselineStatus();
   if (baselineStatus.exists) {
-    // Get files changed today from vault-changes
+    // Get files changed since last baseline from vault-changes
     const changedFiles = getChangedFilePaths({
       directory: rootDir,
-      todayOnly: true,
+      todayOnly: false,
       includeGit: false
     });
     // Filter to only include files that might have tasks
