@@ -216,6 +216,42 @@ const pageScripts = `
 <script src="/static/js/common.js"></script>
 `;
 
+// Navbar HTML (loaded from template)
+let navbarHtml = '';
+(async () => {
+  const template = await loadTemplate('navbar');
+  if (template) navbarHtml = template;
+})();
+
+// Helper to get navbar (with fallback)
+function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
+  const { showSearch = true, searchValue = '' } = options;
+
+  // Use template for default navbar
+  if (title === 'Today' && icon === 'fa-folder-open' && showSearch && !searchValue && navbarHtml) {
+    return navbarHtml;
+  }
+
+  const searchForm = showSearch ? `
+          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+            <div class="input-group">
+              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${searchValue.replace(/"/g, '&quot;')}"` : ''} style="max-width: 250px;">
+              <button class="btn btn-light btn-sm" type="submit">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </form>` : '';
+
+  return `<!-- Navbar -->
+      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="/">
+            <i class="fas ${icon} me-2"></i>${title}
+          </a>${searchForm}
+        </div>
+      </nav>`;
+}
+
 // Helper to get breadcrumb navigation
 function getBreadcrumb(filePath) {
   const parts = filePath.split('/').filter(Boolean);
@@ -485,22 +521,7 @@ async function renderDirectory(dirPath, urlPath) {
       ${pageStyle}
     </head>
     <body>
-      <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/">
-            <i class="fas fa-folder-open me-2"></i>Today
-          </a>
-          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-            <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </nav>
+      ${getNavbar()}
 
       <!-- Main content with chat -->
       <div class="container-fluid mt-3">
@@ -1251,22 +1272,7 @@ async function renderEditor(filePath, urlPath) {
       </style>
     </head>
     <body>
-      <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/">
-            <i class="fas fa-edit me-2"></i>Editing: ${fileName}
-          </a>
-          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-            <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </nav>
+      ${getNavbar(`Editing: ${fileName}`, 'fa-edit')}
 
       <!-- Main content -->
       <div class="container mt-4">
@@ -3327,22 +3333,7 @@ ${cleanContent}
       ${pageStyle}
     </head>
     <body>
-      <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/">
-            <i class="fas fa-file-alt me-2"></i>${fileName}
-          </a>
-          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-            <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </nav>
+      ${getNavbar(fileName, 'fa-file-alt')}
 
       <!-- Main content with chat -->
       <div class="container-fluid mt-3">
@@ -4663,22 +4654,7 @@ app.get('/search', authMiddleware, async (req, res) => {
           ${pageStyle}
         </head>
         <body>
-          <!-- Navbar -->
-          <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-              <a class="navbar-brand" href="/">
-                <i class="fas fa-search me-2"></i>Search Results
-              </a>
-              <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-                <div class="input-group">
-                  <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" value="${searchQuery.replace(/"/g, '&quot;')}" style="max-width: 250px;">
-                  <button class="btn btn-light btn-sm" type="submit">
-                    <i class="fas fa-search"></i>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </nav>
+          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
           
           <div class="container-fluid mt-3">
             <div class="row">
@@ -4736,22 +4712,7 @@ app.get('/search', authMiddleware, async (req, res) => {
           ${pageStyle}
         </head>
         <body>
-          <!-- Navbar -->
-          <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-              <a class="navbar-brand" href="/">
-                <i class="fas fa-search me-2"></i>Search Results
-              </a>
-              <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-                <div class="input-group">
-                  <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" value="${searchQuery.replace(/"/g, '&quot;')}" style="max-width: 250px;">
-                  <button class="btn btn-light btn-sm" type="submit">
-                    <i class="fas fa-search"></i>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </nav>
+          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
           
           <div class="container-fluid mt-3">
             <div class="row">
@@ -5156,14 +5117,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
         ${pageStyle}
       </head>
       <body>
-        <!-- Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-          <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-              <i class="fas fa-tasks me-2"></i>Task Details
-            </a>
-          </div>
-        </nav>
+        ${getNavbar('Task Details', 'fa-tasks', { showSearch: false })}
 
         <div class="container mt-4">
           <div class="row justify-content-center">
@@ -5301,14 +5255,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
         </style>
       </head>
       <body>
-        <!-- Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-          <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-              <i class="fas fa-tasks me-2"></i>Task Editor
-            </a>
-          </div>
-        </nav>
+        ${getNavbar('Task Editor', 'fa-tasks', { showSearch: false })}
 
         <div class="container mt-4">
           <div class="task-form">
