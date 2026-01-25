@@ -5,6 +5,7 @@ import session from 'express-session';
 import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
 import crypto from "crypto";
+import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import { marked } from 'marked';
 import { fileURLToPath } from 'url';
@@ -102,12 +103,39 @@ app.use(session({
 
 // Authentication credentials
 const validUser = process.env.WEB_USER || "admin";
-const validPassword = process.env.WEB_PASSWORD || "changeme";
+
+// Password: use env var, or generate and store encrypted
+function getOrCreatePassword() {
+  if (process.env.WEB_PASSWORD) {
+    return process.env.WEB_PASSWORD;
+  }
+
+  // Generate a secure random password
+  const newPassword = crypto.randomBytes(24).toString('base64');
+
+  // Store encrypted using dotenvx
+  try {
+    execSync(`npx dotenvx set WEB_PASSWORD "${newPassword}"`, {
+      cwd: path.join(__dirname, '..'),
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    console.log('Generated new web password (encrypted in .env)');
+  } catch (error) {
+    console.error('Warning: Could not save password to .env:', error.message);
+  }
+
+  return newPassword;
+}
+
+const validPassword = getOrCreatePassword();
 
 function sessionAuth(req, res, next) {
   if (req.path === "/auth/login" || req.path === "/auth/logout") return next();
   if (req.session && req.session.authenticated) return next();
-  req.session.returnTo = req.originalUrl;
+  // Don't save static asset requests as return URL
+  if (!req.path.match(/\.(ico|png|jpg|jpeg|gif|css|js|woff|woff2|ttf|svg)$/)) {
+    req.session.returnTo = req.originalUrl;
+  }
   res.redirect("/auth/login");
 }
 
@@ -151,9 +179,9 @@ app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
 app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/auth/login")));
 
 const authMiddleware = sessionAuth;
-app.use('/static', express.static(path.join(__dirname, '..', 'public')));
+app.use('/static', express.static(path.join(__dirname, 'web', 'public')));
 
-// MDBootstrap and custom styles
+// MDBootstrap and custom styles (CSS moved to web/public/css/style.css)
 const pageStyle = `
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -163,804 +191,8 @@ const pageStyle = `
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet"/>
 <!-- MDB -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet"/>
-<style>
-  /* Custom styles to complement MDBootstrap - v${Date.now()} */
-  
-  /* Sticky card header with TOC */
-  .card-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: white;
-  }
-  
-  /* Add scroll padding to account for sticky header and navbar */
-  html {
-    scroll-padding-top: 200px; /* Increased to account for navbar + sticky header */
-  }
-  
-  /* Ensure anchor targets are visible */
-  [id]:target {
-    scroll-margin-top: 200px;
-  }
-  
-  /* Table of Contents styles in header */
-  .card-header .toc-header {
-    margin-bottom: 0;
-  }
-  
-  .toc-header summary {
-    color: #6c757d;
-    font-weight: 500;
-    transition: color 0.3s;
-  }
-  
-  .toc-header summary:hover {
-    color: #495057;
-  }
-  
-  .toc-header .toc-links {
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid #dee2e6;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    background: #f8f9fa;
-    margin-top: 0.25rem;
-  }
-  
-  .toc-links a {
-    color: #495057;
-    text-decoration: none;
-    transition: all 0.3s;
-    display: inline-block;
-    padding: 0.1rem 0.3rem;
-    border-radius: 0.25rem;
-    font-size: 0.85rem;
-    line-height: 1.2;
-  }
-  
-  .toc-links a:hover {
-    color: #007bff;
-    background: white;
-  }
-  
-  /* Table of Contents styles */
-  details summary.h5 {
-    color: #007bff;
-    font-weight: 500;
-  }
-  
-  details summary.h5:hover {
-    color: #0056b3;
-  }
-  
-  .toc-links a {
-    color: #495057;
-    transition: color 0.2s;
-    text-decoration: none;
-  }
-  
-  .toc-links a:hover {
-    color: #007bff;
-    text-decoration: underline;
-  }
-  
-  /* Smooth scrolling for anchor links */
-  html {
-    scroll-behavior: smooth;
-  }
-  
-  /* Styles for collapse components that replace details elements */
-  .collapse-header {
-    transition: all 0.3s ease;
-  }
-
-  /* Styles for collapsible task sections */
-  details.task-section {
-    margin: 1rem 0;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    background: white;
-    padding: 0.75rem;
-  }
-
-  details.task-section summary {
-    cursor: pointer;
-    padding: 0.5rem;
-    margin: -0.75rem;
-    padding: 0.75rem;
-    border-radius: 0.5rem;
-    transition: background-color 0.2s;
-    user-select: none;
-  }
-
-  details.task-section summary:hover {
-    background-color: #f8f9fa;
-  }
-
-  details.task-section[open] summary {
-    border-bottom: 1px solid #dee2e6;
-    margin-bottom: 0.75rem;
-    border-radius: 0.5rem 0.5rem 0 0;
-  }
-
-  details.task-section .section-content {
-    padding-top: 0.75rem;
-  }
-
-  /* Style the summary arrow */
-  details.task-section summary::-webkit-details-marker {
-    margin-right: 0.5rem;
-  }
-
-  /* Obsidian-style callout variations */
-  details.callout-note {
-    border-left: 4px solid #007bff;
-  }
-
-  details.callout-tip {
-    border-left: 4px solid #28a745;
-  }
-
-  details.callout-warning {
-    border-left: 4px solid #ffc107;
-  }
-
-  details.callout-danger {
-    border-left: 4px solid #dc3545;
-  }
-
-  details.callout-info {
-    border-left: 4px solid #17a2b8;
-  }
-
-  details.callout-success,
-  details.callout-check,
-  details.callout-done {
-    border-left: 4px solid #28a745;
-  }
-
-  details.callout-abstract,
-  details.callout-summary,
-  details.callout-tldr {
-    border-left: 4px solid #00b0ff;
-  }
-
-  details.callout-hint,
-  details.callout-important {
-    border-left: 4px solid #00bcd4;
-  }
-
-  details.callout-question,
-  details.callout-help,
-  details.callout-faq {
-    border-left: 4px solid #ffc107;
-  }
-
-  details.callout-caution,
-  details.callout-attention {
-    border-left: 4px solid #ff9800;
-  }
-
-  details.callout-failure,
-  details.callout-fail,
-  details.callout-missing,
-  details.callout-error,
-  details.callout-bug {
-    border-left: 4px solid #f44336;
-  }
-
-  details.callout-cite {
-    border-left: 4px solid #9e9e9e;
-  }
-
-  body {
-    background-color: #f5f5f5;
-    min-height: 100vh;
-  }
-  
-  /* Only apply background to markdown content that's NOT in a chat bubble */
-  .markdown-content:not(.chat-bubble .markdown-content) {
-    background: white;
-    padding: 2rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
-  }
-  
-  .markdown-content h1 {
-    color: #1266f1;
-    font-weight: 300;
-    border-bottom: 2px solid #e0e0e0;
-    padding-bottom: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .markdown-content h2 {
-    color: #424242;
-    font-weight: 400;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-  }
-  
-  .markdown-content h3 {
-    color: #616161;
-    font-weight: 500;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
-  
-  .markdown-content pre {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 1rem;
-    border-radius: 0.375rem;
-    overflow-x: auto;
-    margin: 1rem 0;
-  }
-  
-  .markdown-content code {
-    background: rgba(18, 102, 241, 0.1);
-    color: #1266f1;
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    font-size: 0.875em;
-  }
-  
-  .markdown-content pre code {
-    background: transparent;
-    color: #d4d4d4;
-    padding: 0;
-  }
-  
-  .markdown-content blockquote {
-    border-left: 4px solid #1266f1;
-    padding-left: 1rem;
-    margin: 1rem 0;
-    color: #757575;
-    font-style: italic;
-  }
-  
-  .markdown-content table {
-    width: 100%;
-    margin: 1rem 0;
-  }
-  
-  .markdown-content ul, .markdown-content ol {
-    margin: 1rem 0;
-    padding-left: 2rem;
-  }
-  
-  .markdown-content li {
-    margin: 0.5rem 0;
-    line-height: 1.7;
-  }
-  
-  /* Mobile responsiveness */
-  @media (max-width: 768px) {
-    .markdown-content {
-      padding: 1rem;
-    }
-    
-    .container-fluid {
-      padding: 0.5rem;
-    }
-  }
-  
-  /* Task styles */
-  .task-cancelled {
-    text-decoration: line-through;
-    opacity: 0.6;
-    color: #6c757d;
-  }
-
-  .task-cancelled input[type="checkbox"] {
-    opacity: 1;
-  }
-
-  /* Add "(cancelled)" text indicator to cancelled tasks */
-  .task-cancelled::after {
-    content: " (cancelled)";
-    font-style: italic;
-    color: #6c757d;
-  }
-
-  /* Properties card styles */
-  .properties-card {
-    border-left: 4px solid #1266f1;
-  }
-
-  .properties-card .card-header {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  }
-
-  .properties-card .badge {
-    font-weight: normal;
-  }
-
-  .properties-card details summary {
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.2s;
-  }
-
-  .properties-card details summary:hover {
-    opacity: 0.8;
-  }
-
-  .properties-card .progress {
-    background-color: #e9ecef;
-  }
-
-  .properties-card .progress-bar {
-    background-color: #1266f1;
-    transition: width 0.6s ease;
-  }
-
-  .properties-card time {
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    font-size: 0.9em;
-    color: #495057;
-  }
-
-  /* Dataview styles */
-  .dataview-table {
-    width: 100%;
-    margin: 1.5rem 0;
-    border-collapse: collapse;
-  }
-
-  .dataview-table thead {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-bottom: 2px solid #1266f1;
-  }
-
-  .dataview-table th {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: #212529;
-    border-bottom: 2px solid #dee2e6;
-  }
-
-  .dataview-table td {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #dee2e6;
-  }
-
-  .dataview-table tbody tr:hover {
-    background-color: #f8f9fa;
-  }
-
-  .dataview-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  .dataview-list {
-    margin: 1rem 0;
-    padding-left: 1.5rem;
-  }
-
-  .dataview-list li {
-    margin: 0.5rem 0;
-  }
-
-  .dataview-inline {
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    font-size: 0.9em;
-    background-color: #f8f9fa;
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-  }
-
-  /* Chat interface styles */
-  .chat-container {
-    height: calc(100vh - 250px);
-    max-height: 600px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  /* AI Assistant Card Container */
-  .ai-assistant-wrapper {
-    transition: all 0.3s ease;
-  }
-  
-  /* When AI assistant is collapsed, expand main content */
-  @media (min-width: 992px) {
-    .ai-assistant-wrapper.collapsed ~ .col-lg-7,
-    .col-lg-7:has(~ .ai-assistant-wrapper.collapsed) {
-      flex: 0 0 100% !important;
-      max-width: 100% !important;
-      transition: all 0.3s ease;
-    }
-
-    /* Hide the collapsed column */
-    .ai-assistant-wrapper.collapsed {
-      flex: 0 0 0 !important;
-      max-width: 0 !important;
-      overflow: hidden;
-      padding: 0 !important;
-    }
-  }
-  
-  /* Make chat card sticky on desktop */
-  @media (min-width: 992px) {
-    .col-lg-5 > .card {
-      position: sticky;
-      top: 1rem;
-      max-height: calc(100vh - 2rem);
-    }
-    
-    /* When collapsed, show floating toggle button */
-    .ai-assistant-wrapper.collapsed .card {
-      position: fixed;
-      right: -450px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 450px;
-      z-index: 1050;
-      transition: right 0.3s ease;
-      box-shadow: -2px 0 10px rgba(0,0,0,0.15);
-    }
-
-    .ai-assistant-wrapper.collapsed .toggle-btn {
-      position: fixed;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 40px;
-      height: 80px;
-      border-radius: 8px;
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-      z-index: 1051;
-    }
-
-    /* Show card on hover */
-    .ai-assistant-wrapper.collapsed:hover .card {
-      right: 0;
-    }
-  }
-  
-  /* Mobile styles */
-  @media (max-width: 991px) {
-    /* Collapsed state - slides to the bottom */
-    .ai-assistant-wrapper.collapsed .card {
-      position: fixed;
-      bottom: -100%;
-      left: 0;
-      right: 0;
-      width: 100%;
-      z-index: 1050;
-      transform: translateY(calc(100% - 50px));
-      transition: transform 0.3s ease;
-      max-height: 70vh;
-    }
-    
-    .ai-assistant-wrapper.collapsed .card-header {
-      cursor: pointer;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
-    }
-    
-    .ai-assistant-wrapper.collapsed .chat-container {
-      display: none;
-    }
-  }
-  
-  /* Toggle button styles */
-  .toggle-btn {
-    background: transparent;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 0.25rem;
-    margin-left: auto;
-    transition: transform 0.3s ease;
-  }
-  
-  .toggle-btn:hover {
-    transform: scale(1.1);
-  }
-  
-  /* Hide button on mobile in favor of header click */
-  @media (max-width: 991px) {
-    .toggle-btn.desktop-only {
-      display: none;
-    }
-  }
-  
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    background: #f8f9fa;
-  }
-  
-  .chat-bubble {
-    max-width: 70%;
-    margin-bottom: 0.5rem;
-    word-wrap: break-word;
-    padding: 0.35rem 0.5rem !important;
-    border-radius: 1rem !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    border: none !important;
-  }
-  
-  .chat-bubble.user {
-    margin-left: auto;
-    background: #007bff !important;
-    color: white !important;
-  }
-  
-  /* Override any nested card styles */
-  /* Override ANY nested elements that might have backgrounds */
-  .chat-bubble .card,
-  .chat-bubble .card-body,
-  .chat-bubble .markdown-content {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-  }
-  
-  /* Ensure bubble content inherits color */
-  .chat-bubble.user .bubble-content,
-  .chat-bubble.user .markdown-content,
-  .chat-bubble.user .markdown-content * {
-    color: inherit !important;
-  }
-  
-  .chat-bubble.ai .bubble-content,
-  .chat-bubble.ai .markdown-content,
-  .chat-bubble.ai .markdown-content * {
-    color: inherit !important;
-  }
-  
-  /* Special handling for code blocks to maintain readability */
-  .chat-bubble pre {
-    background: #282c34 !important;
-    border: 1px solid #3e4451 !important;
-    margin: 0.5rem 0 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-  }
-  
-  .chat-bubble pre code {
-    background: #282c34 !important;
-    color: #abb2bf !important;
-    padding: 0.75rem !important;
-    border-radius: 0.25rem !important;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-    display: block !important;
-    overflow-x: auto !important;
-  }
-  
-  .chat-bubble.user pre {
-    background: #f5f5f5 !important;
-    border: 1px solid #ccc !important;
-  }
-  
-  .chat-bubble.user pre code {
-    background: #f5f5f5 !important;
-    color: #333 !important;
-  }
-  
-  .chat-bubble.assistant pre,
-  .chat-bubble.ai pre {
-    background: #1e1e1e !important;
-  }
-  
-  .chat-bubble.assistant pre code,
-  .chat-bubble.ai pre code {
-    background: #282c34 !important;
-    color: #abb2bf !important;
-  }
-  
-  /* Inline code styling */
-  .chat-bubble code:not(pre code) {
-    background: rgba(0,0,0,0.75) !important;
-    color: #e6e6e6 !important;
-    padding: 0.125rem 0.25rem !important;
-    border-radius: 3px !important;
-    font-size: 0.9em !important;
-  }
-  
-  .chat-bubble.user code:not(pre code) {
-    background: rgba(0,0,0,0.1) !important;
-    color: #333 !important;
-  }
-  
-  /* AI assistant bubble styling */
-  .chat-bubble.assistant,
-  .chat-bubble.ai {
-    background: #e9ecef !important;
-    color: #212529 !important;
-  }
-  
-  /* Typing indicator styling */
-  .chat-bubble.typing-indicator {
-    background: #e9ecef !important;
-  }
-  
-  .chat-bubble.typing-indicator .spinner-border {
-    width: 1rem;
-    height: 1rem;
-    border-width: 0.15em;
-  }
-  
-  .bubble-content {
-    /* Content styling for the bubble */
-  }
-  
-  /* Remove default margins from markdown elements inside bubbles */
-  .chat-bubble .markdown-content p:first-child,
-  .chat-bubble .markdown-content ul:first-child,
-  .chat-bubble .markdown-content ol:first-child,
-  .chat-bubble .markdown-content blockquote:first-child,
-  .chat-bubble .markdown-content pre:first-child {
-    margin-top: 0 !important;
-  }
-  
-  .chat-bubble .markdown-content p:last-child,
-  .chat-bubble .markdown-content ul:last-child,
-  .chat-bubble .markdown-content ol:last-child,
-  .chat-bubble .markdown-content blockquote:last-child,
-  .chat-bubble .markdown-content pre:last-child {
-    margin-bottom: 0 !important;
-  }
-  
-  /* Compact spacing for all content inside chat bubbles */
-  .chat-bubble .markdown-content p {
-    margin: 0.2rem 0 !important;
-    line-height: 1.3 !important;
-  }
-  
-  .chat-bubble .markdown-content {
-    line-height: 1.3 !important;
-  }
-  
-  .chat-bubble .bubble-content {
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  
-  /* Markdown content styling in chat */
-  .markdown-content {
-    font-size: 0.95rem;
-    line-height: 1.5;
-  }
-  
-  .markdown-content p {
-    margin-bottom: 0.5rem;
-  }
-  
-  .markdown-content p:last-child {
-    margin-bottom: 0;
-  }
-  
-  .markdown-content code {
-    background: rgba(0, 0, 0, 0.1);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    font-size: 0.875em;
-  }
-  
-  .chat-bubble.user .markdown-content code {
-    background: rgba(255, 255, 255, 0.2);
-  }
-  
-  .markdown-content pre {
-    background: #f8f9fa;
-    padding: 0.75rem;
-    border-radius: 0.375rem;
-    overflow-x: auto;
-    margin: 0.5rem 0;
-  }
-  
-  .chat-bubble.user .markdown-content pre {
-    background: rgba(255, 255, 255, 0.1);
-  }
-  
-  .markdown-content ul, .markdown-content ol {
-    margin: 0.5rem 0;
-    padding-left: 1.5rem;
-  }
-  
-  .markdown-content li {
-    margin: 0.25rem 0;
-  }
-  
-  .markdown-content blockquote {
-    border-left: 3px solid #007bff;
-    padding-left: 0.75rem;
-    margin: 0.5rem 0;
-    color: #6c757d;
-  }
-  
-  .chat-bubble.user .markdown-content blockquote {
-    border-left-color: rgba(255, 255, 255, 0.5);
-    color: rgba(255, 255, 255, 0.9);
-  }
-  
-  .markdown-content h1, .markdown-content h2, .markdown-content h3, 
-  .markdown-content h4, .markdown-content h5, .markdown-content h6 {
-    margin-top: 0.75rem;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-  }
-  
-  .markdown-content a {
-    color: #007bff;
-    text-decoration: underline;
-  }
-  
-  .chat-bubble.user .markdown-content a {
-    color: #bbdefb;
-  }
-  
-  .chat-input-area {
-    border-top: 1px solid #dee2e6;
-    padding: 1rem;
-    background: white;
-  }
-  
-  .chat-input-area .input-group {
-    align-items: stretch;
-  }
-  
-  .chat-input-area textarea {
-    resize: none;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    min-height: 100px !important;
-    height: auto !important;
-  }
-  
-  .chat-input-area .btn {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    align-self: stretch;
-  }
-  
-  /* Card body with markdown content - natural flow */
-  .card-body.markdown-content {
-    /* Remove fixed height to allow natural flow */
-    padding: 1.5rem;
-  }
-  
-  /* Sticky navbar and breadcrumb */
-  .navbar {
-    position: sticky;
-    top: 0;
-    z-index: 1020;
-  }
-  
-  nav[aria-label="breadcrumb"] {
-    position: sticky;
-    top: 56px;
-    background: transparent;
-    z-index: 1010;
-    padding: 0.5rem 0;
-    margin-bottom: 1rem;
-  }
-  
-  @media (max-width: 768px) {
-    .chat-container {
-      height: 40vh;
-    }
-    
-    .card-body.markdown-content {
-      /* Natural flow on mobile too */
-    }
-  }
-</style>
+<!-- Custom styles -->
+<link href="/static/css/style.css" rel="stylesheet"/>
 `;
 
 // Helper to get breadcrumb navigation
@@ -968,12 +200,12 @@ function getBreadcrumb(filePath) {
   const parts = filePath.split('/').filter(Boolean);
   let currentPath = '';
   const links = ['<a href="/">Home</a>'];
-  
+
   for (const part of parts) {
     currentPath += '/' + part;
     links.push(`<a href="${currentPath}">${part}</a>`);
   }
-  
+
   return links.join(' / ');
 }
 
@@ -1236,7 +468,7 @@ async function renderDirectory(dirPath, urlPath) {
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
           <a class="navbar-brand" href="/">
-            <i class="fas fa-folder-open me-2"></i>Vault Browser
+            <i class="fas fa-folder-open me-2"></i>Today
           </a>
           <form class="d-flex ms-auto" onsubmit="performSearch(event)">
             <div class="input-group">
@@ -1340,7 +572,7 @@ async function renderDirectory(dirPath, urlPath) {
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3">
+          <div class="col-12 col-md-7 mb-3">
   `;
 
   // Special homepage content
@@ -1365,14 +597,13 @@ async function renderDirectory(dirPath, urlPath) {
       const db = getReadOnlyDatabase();
       const todayISO = today.toISOString().split('T')[0];
 
-      // Query database for tasks with scheduled or due dates for today
-      // Looking for tasks with ⏳ YYYY-MM-DD or 📅 YYYY-MM-DD that are not done
+      // Query database for open tasks with due/scheduled dates for today or earlier
       const taskRows = db.prepare(`
         SELECT COUNT(*) as count
-        FROM markdown_tasks
-        WHERE line_text LIKE '- [ ] %'
-          AND (line_text LIKE '%⏳ ${todayISO}%' OR line_text LIKE '%📅 ${todayISO}%')
-      `).get();
+        FROM tasks
+        WHERE status = 'open'
+          AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
+      `).get(todayISO, todayISO);
 
       taskCount = taskRows.count;
     } catch (error) {
@@ -1411,7 +642,7 @@ async function renderDirectory(dirPath, urlPath) {
     // Add Today's Tasks button (always show it)
     html += `
             <div class="card shadow-sm mb-3">
-              <a href="/tasks-today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
+              <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
                 <div class="d-flex align-items-center justify-content-between ps-2">
                   <div class="d-flex align-items-center">
                     <i class="fas fa-tasks me-2"></i>
@@ -1605,7 +836,7 @@ async function renderDirectory(dirPath, urlPath) {
       </div>
 
     <!-- Chat column -->
-    <div class="col-12 col-lg-5 mb-3">
+    <div class="col-12 col-md-5 mb-3">
       <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
@@ -1640,12 +871,17 @@ async function renderDirectory(dirPath, urlPath) {
     </div>
   </div>
 
+      <!-- Floating toggle button to restore AI assistant -->
+      <button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
+        <i class="fas fa-robot"></i>
+      </button>
+
       <!-- Marked.js for markdown rendering -->
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-      
+
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      
+
       <script>
         // Search functionality
         function performSearch(event) {
@@ -1661,7 +897,7 @@ async function renderDirectory(dirPath, urlPath) {
         
         // Check if mobile and set default collapsed state
         function initializeAIAssistant() {
-          const isMobile = window.innerWidth <= 991;
+          const isMobile = window.innerWidth <= 767;
           const savedState = localStorage.getItem('aiAssistantCollapsed');
           
           // Default to collapsed on mobile, expanded on desktop
@@ -1673,6 +909,8 @@ async function renderDirectory(dirPath, urlPath) {
           
           if (isCollapsed) {
             document.body.classList.add('ai-collapsed');
+            const wrapper = document.getElementById('aiAssistantWrapper');
+            if (wrapper) wrapper.classList.add('collapsed');
             updateToggleIcon();
           }
 
@@ -1686,11 +924,14 @@ async function renderDirectory(dirPath, urlPath) {
         
         function toggleAIAssistant() {
           isCollapsed = !isCollapsed;
+          const wrapper = document.getElementById('aiAssistantWrapper');
 
           if (isCollapsed) {
             document.body.classList.add('ai-collapsed');
+            if (wrapper) wrapper.classList.add('collapsed');
           } else {
             document.body.classList.remove('ai-collapsed');
+            if (wrapper) wrapper.classList.remove('collapsed');
           }
 
           updateToggleIcon();
@@ -1700,7 +941,7 @@ async function renderDirectory(dirPath, urlPath) {
         function updateToggleIcon() {
           const icon = document.getElementById('toggleIcon');
           if (icon) {
-            const isMobile = window.innerWidth <= 991;
+            const isMobile = window.innerWidth <= 767;
             if (isMobile) {
               icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
             } else {
@@ -2769,6 +2010,7 @@ class DataviewAPI {
     this.vaultPath = vaultPath;
     this.currentFilePath = currentFilePath;
     this.allFiles = allFiles; // Pre-loaded files
+    this._outputBuffer = []; // Accumulates rendered HTML
   }
 
   // Get all files in the vault with their frontmatter (static method for initialization)
@@ -2910,7 +2152,148 @@ class DataviewAPI {
 
   // Render a paragraph
   paragraph(text) {
+    this._outputBuffer.push(`<p>${text}</p>`);
     return `<p>${text}</p>`;
+  }
+
+  // Get current page metadata
+  current() {
+    const relPath = this.currentFilePath.replace(this.vaultPath + '/', '').replace(/^\//, '');
+    const page = this.allFiles.find(f => f.path === relPath);
+    if (page) {
+      return { ...page, ...page.frontmatter, file: page.file };
+    }
+    // Return basic info if page not found
+    return {
+      file: {
+        path: relPath,
+        name: path.basename(relPath, '.md'),
+        folder: path.dirname(relPath)
+      }
+    };
+  }
+
+  // Get a single page by path
+  page(pagePath) {
+    // Normalize the path - remove quotes, add .md if needed
+    let normalizedPath = pagePath.replace(/^["']|["']$/g, '');
+    if (!normalizedPath.endsWith('.md')) {
+      normalizedPath += '.md';
+    }
+
+    const page = this.allFiles.find(f =>
+      f.path === normalizedPath ||
+      f.path === normalizedPath.replace('.md', '') + '.md'
+    );
+
+    if (page) {
+      return { ...page, ...page.frontmatter, file: page.file };
+    }
+    return null;
+  }
+
+  // Create an HTML element (accumulates in output buffer)
+  el(tag, content, options = {}) {
+    const { container, attr = {}, cls } = options;
+
+    // Build attributes string
+    let attrStr = '';
+    if (cls) {
+      attrStr += ` class="${cls}"`;
+    }
+    for (const [key, value] of Object.entries(attr)) {
+      // Make internal links absolute (they're relative to vault root in Obsidian)
+      if (key === 'href' && (cls === 'internal-link' || (attr.class && attr.class.includes('internal-link')))) {
+        const absoluteHref = value.startsWith('/') ? value : '/' + value;
+        attrStr += ` ${key}="${absoluteHref}"`;
+      } else {
+        attrStr += ` ${key}="${value}"`;
+      }
+    }
+
+    // Create a pseudo-element that tracks its children
+    const element = {
+      _tag: tag,
+      _attrStr: attrStr,
+      _content: content,
+      _children: [],
+      innerHTML: '',
+      // Render this element and all its children
+      render() {
+        let childContent = this._children.map(c => c.render ? c.render() : c).join('');
+        let innerContent = this._content + childContent + this.innerHTML;
+        return `<${this._tag}${this._attrStr}>${innerContent}</${this._tag}>`;
+      }
+    };
+
+    // If there's a container, add this element as a child
+    if (container && container._children) {
+      container._children.push(element);
+    } else {
+      // Root element - add to the root elements list
+      if (!this._rootElements) {
+        this._rootElements = [];
+      }
+      this._rootElements.push(element);
+    }
+
+    return element;
+  }
+
+  // IO utilities
+  get io() {
+    const self = this;
+    return {
+      async load(filePath) {
+        const fullPath = path.join(self.vaultPath, filePath);
+        try {
+          return await fs.readFile(fullPath, 'utf-8');
+        } catch (error) {
+          console.error('Error loading file:', filePath, error);
+          return '';
+        }
+      }
+    };
+  }
+
+  // View - load and execute an external script
+  async view(scriptPath, input = {}) {
+    // Resolve the script path
+    let fullScriptPath = path.join(this.vaultPath, scriptPath);
+    if (!fullScriptPath.endsWith('.js')) {
+      fullScriptPath += '.js';
+    }
+
+    try {
+      const scriptContent = await fs.readFile(fullScriptPath, 'utf-8');
+
+      // Create a child DataviewAPI for the view with its own output buffer
+      const viewDv = new DataviewAPI(this.vaultPath, this.currentFilePath, this.allFiles);
+
+      // Execute the script in a sandbox with dv and input available
+      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      const scriptFn = new AsyncFunction('dv', 'input', scriptContent);
+      await scriptFn(viewDv, input);
+
+      // Get the output from the view
+      const output = viewDv.getOutput();
+      this._outputBuffer.push(output);
+
+      return output;
+    } catch (error) {
+      console.error('Error executing view:', scriptPath, error);
+      const errorHtml = `<div class="alert alert-warning">DataviewJS Error: ${error.message}</div>`;
+      this._outputBuffer.push(errorHtml);
+      return errorHtml;
+    }
+  }
+
+  // Get all accumulated output
+  getOutput() {
+    // Render all root elements created with dv.el()
+    const elementsHtml = (this._rootElements || []).map(el => el.render()).join('\n');
+    // Combine with any direct output (from dv.paragraph, dv.table, etc.)
+    return this._outputBuffer.join('\n') + elementsHtml;
   }
 }
 
@@ -2968,7 +2351,26 @@ class DataviewArray extends Array {
       const enrichedItem = { ...item, ...item.frontmatter };
       return fn(enrichedItem, index, this);
     });
-    return mapped;
+    // Return DataviewArray to maintain chainability
+    return new DataviewArray(...mapped);
+  }
+
+  // Convert to regular array
+  array() {
+    return Array.from(this).map(item => {
+      // If item has frontmatter, enrich it; otherwise return as-is
+      return item.frontmatter ? { ...item, ...item.frontmatter } : item;
+    });
+  }
+
+  // Filter with predicate (returns DataviewArray)
+  filter(predicate) {
+    const filtered = Array.from(this).filter((item, index) => {
+      // If item has frontmatter, enrich it; otherwise use as-is (for already-mapped items)
+      const enrichedItem = item.frontmatter ? { ...item, ...item.frontmatter } : item;
+      return predicate(enrichedItem, index, this);
+    });
+    return new DataviewArray(...filtered);
   }
 
   get length() {
@@ -3017,7 +2419,9 @@ async function executeDataviewJS(code, vaultPath, currentFilePath) {
     const fn = new AsyncFunction('dv', 'console', code);
     await fn(dv, context.console);
 
-    return output;
+    // Return both manual capture and buffer output
+    const bufferOutput = dv.getOutput();
+    return output + bufferOutput;
   } catch (error) {
     debug('DataviewJS execution error:', error);
     return `<div class="alert alert-danger"><strong>DataviewJS Error:</strong> ${error.message}</div>`;
@@ -3159,160 +2563,80 @@ async function executeTasksQuery(query) {
     return cached.result;
   }
 
-  // Build optimized SQL query with WHERE clauses
-  let sqlWhere = [`file_path NOT LIKE '%/.%'`,
-                  `file_path NOT LIKE '%/@inbox/%'`,
-                  `file_path NOT LIKE '%/node_modules/%'`];
-  let needsJsFiltering = false;
-  const todayDate = new Date();
-  todayDate.setHours(0, 0, 0, 0);
-  const todayStr = todayDate.toISOString().split('T')[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  // Build SQL query for the tasks table
+  let sqlWhere = [];
 
   // Analyze filters to build SQL WHERE clauses
   for (const filter of filters) {
     if (filter === 'done') {
-      sqlWhere.push(`line_text LIKE '- [x]%' OR line_text LIKE '- [X]%'`);
+      sqlWhere.push(`status = 'completed'`);
     } else if (filter === 'not done') {
-      sqlWhere.push(`line_text LIKE '- [ ]%'`);
+      sqlWhere.push(`status = 'open'`);
     } else if (filter === 'done today') {
-      // Optimize for "done today" - the most common query
-      sqlWhere.push(`(line_text LIKE '- [x]%' OR line_text LIKE '- [X]%')`);
-      sqlWhere.push(`line_text LIKE '%✅ ${todayStr}%'`);
-    } else if (filter.startsWith('path includes ')) {
-      const pathPattern = filter.replace('path includes ', '').trim();
-      sqlWhere.push(`file_path LIKE '%${pathPattern}%'`);
-    } else if (filter.startsWith('path does not include ')) {
-      const pathPattern = filter.replace('path does not include ', '').trim();
-      sqlWhere.push(`file_path NOT LIKE '%${pathPattern}%'`);
-    } else {
-      // Complex filters need JavaScript processing
-      needsJsFiltering = true;
+      sqlWhere.push(`status = 'completed'`);
+      sqlWhere.push(`DATE(completed_at) = '${todayStr}'`);
+    } else if (filter.includes('OR') && filter.includes('before tomorrow')) {
+      // Handle "(scheduled before tomorrow) OR (due before tomorrow)"
+      sqlWhere.push(`(due_date <= '${todayStr}' OR json_extract(metadata, '$.scheduled_date') <= '${todayStr}')`);
     }
   }
 
-  // Get filtered tasks from database
-  let taskRows;
+  // Get tasks from database
+  let taskRows = [];
   try {
+    const whereClause = sqlWhere.length > 0 ? `WHERE ${sqlWhere.join(' AND ')}` : '';
     const sql = `
-      SELECT file_path, line_number, line_text
-      FROM markdown_tasks
-      WHERE ${sqlWhere.join(' AND ')}
+      SELECT id, title, status, priority, due_date, completed_at, metadata, source
+      FROM tasks
+      ${whereClause}
     `;
     taskRows = db.prepare(sql).all();
-    debug(`SQL filtered: ${taskRows.length} tasks (from ~6600 total)`);
+    debug(`SQL filtered: ${taskRows.length} tasks from tasks table`);
   } catch (error) {
-    debug('Error querying database:', error.message);
+    debug('Error querying tasks table:', error.message);
     taskRows = [];
   }
 
-  // Parse each task line
-  const tasks = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Priority mapping (text to numeric for sorting)
+  const priorityMap = { highest: 4, high: 3, medium: 2, low: 1, lowest: 0 };
 
-  for (const row of taskRows) {
-    const filePath = row.file_path;
-    const lineNumber = row.line_number;
-    const content = row.line_text;
+  // Convert to standard task format
+  const tasks = taskRows.map(row => {
+    const metadata = row.metadata ? JSON.parse(row.metadata) : {};
+    const scheduledDate = metadata.scheduled_date ? new Date(metadata.scheduled_date + 'T00:00:00') : null;
+    const dueDate = row.due_date ? new Date(row.due_date + 'T00:00:00') : null;
+    const doneDate = row.completed_at ? new Date(row.completed_at) : null;
 
-    // Parse task checkbox state (accounting for indentation and blockquote markers)
-    const isDone = /^(?:>\s*)?-?\s*- \[[xX]\]/.test(content);
-    const isCancelled = /^(?:>\s*)?-?\s*- \[-\]/.test(content);
-    const taskText = content.replace(/^(?:>\s*)?-?\s*- \[[ xX-]\] /, '');
-
-    // Parse dates
-    let scheduledDate = null;
-    let dueDate = null;
-    let doneDate = null;
-
-    const scheduledMatch = taskText.match(/⏳ (\d{4}-\d{2}-\d{2})/);
-    if (scheduledMatch) scheduledDate = new Date(scheduledMatch[1] + 'T00:00:00');
-
-    const dueMatch = taskText.match(/📅 (\d{4}-\d{2}-\d{2})/);
-    if (dueMatch) dueDate = new Date(dueMatch[1] + 'T00:00:00');
-
-    const doneMatch = taskText.match(/✅ (\d{4}-\d{2}-\d{2})/);
-    if (doneMatch) doneDate = new Date(doneMatch[1] + 'T00:00:00');
-
-    // Parse priority
-    let priority = 0;
-    if (taskText.includes('🔺')) priority = 3;
-    else if (taskText.includes('🔼')) priority = 2;
-    else if (taskText.includes('⏫')) priority = 1;
-
-    // Clean task text for display
-    let cleanText = taskText
-      .replace(/[⏳📅✅➕] \d{4}-\d{2}-\d{2}/g, '')
-      .replace(/🔺|🔼|⏫/g, '')
-      .replace(/🔁 .+/g, '')
-      .replace(/<!--.*?-->/g, '')
-      .trim();
-
-    tasks.push({
-      filePath: filePath.replace('/opt/today/vault/', '').replace('vault/', ''),
-      lineNumber: lineNumber,
-      text: cleanText,
-      originalText: taskText,
-      isDone,
-      isCancelled,
+    return {
+      id: row.id,
+      text: row.title,
+      originalText: row.title,
+      isDone: row.status === 'completed',
+      isCancelled: row.status === 'cancelled',
       scheduledDate,
       dueDate,
       doneDate,
-      priority,
-      happens: scheduledDate || dueDate
-    });
-  }
+      priority: priorityMap[row.priority] || 0,
+      priorityText: row.priority,
+      happens: scheduledDate || dueDate,
+      source: row.source
+    };
+  });
 
-  // Apply filters
+  // Apply any remaining JavaScript filters
   let filtered = tasks;
   for (const filter of filters) {
-    const beforeCount = filtered.length;
-    if (filter === 'not done') {
-      filtered = filtered.filter(t => !t.isDone);
-    } else if (filter === 'done') {
-      filtered = filtered.filter(t => t.isDone);
-    } else if (filter === 'done today') {
-      // Only include tasks that have a done date AND it's today
-      // Tasks without done dates should NOT be included
-      const todayStr = today.toDateString();
-      filtered = filtered.filter(t => {
-        if (!t.doneDate) {
-          return false; // No done date = not done today
-        }
-        const taskDateStr = t.doneDate.toDateString();
-        const matches = taskDateStr === todayStr;
-        return t.isDone && matches;
-      });
-      debug(`"done today" filter: ${beforeCount} -> ${filtered.length} tasks (today: ${todayStr})`);
-    } else if (filter.startsWith('path includes ')) {
-      const pathPattern = filter.replace('path includes ', '').trim();
-      filtered = filtered.filter(t => t.filePath.includes(pathPattern));
-    } else if (filter.startsWith('path does not include ')) {
-      const pathPattern = filter.replace('path does not include ', '').trim();
-      filtered = filtered.filter(t => !t.filePath.includes(pathPattern));
-    } else if (filter === 'no scheduled date') {
+    if (filter === 'no scheduled date') {
       filtered = filtered.filter(t => !t.scheduledDate);
     } else if (filter === 'no due date') {
       filtered = filtered.filter(t => !t.dueDate);
-    } else if (filter.includes('OR')) {
-      // Handle OR conditions
-      const conditions = filter.split('OR').map(c => c.replace(/[()]/g, '').trim());
-      filtered = filtered.filter(task => {
-        return conditions.some(cond => {
-          if (cond === 'scheduled before tomorrow') {
-            return task.scheduledDate && task.scheduledDate < tomorrow;
-          } else if (cond === 'due before tomorrow') {
-            return task.dueDate && task.dueDate < tomorrow;
-          } else if (cond === 'scheduled after today') {
-            return task.scheduledDate && task.scheduledDate > today;
-          } else if (cond === 'due after tomorrow') {
-            return task.dueDate && task.dueDate > tomorrow;
-          }
-          return false;
-        });
-      });
     }
   }
 
@@ -3345,29 +2669,6 @@ async function executeTasksQuery(query) {
     });
 
     const result = { grouped: sortedGroups };
-    taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
-    return result;
-  } else if (groupBy && groupBy.includes('function')) {
-    // Simple implementation for grouping by file path
-    // This handles "group by function task.file.path.toUpperCase().replace(query.file.folder, ': ')"
-    const grouped = new Map();
-    for (const task of filtered) {
-      // Group by file path, removing common prefixes
-      let key = task.filePath.toUpperCase();
-      // Remove common folder prefixes like "plans/" if present
-      if (key.includes('PLANS/')) {
-        key = key.replace('PLANS/', '');
-      }
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key).push(task);
-    }
-
-    // Sort groups alphabetically
-    const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
-      return a[0].localeCompare(b[0]);
-    });
-
-    const result = { grouped: sortedGroups, groupType: 'custom' };
     taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
     return result;
   }
@@ -3456,27 +2757,12 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           if (task.isCancelled) {
             displayText += ` <span class="text-muted">(cancelled)</span>`;
           }
-          // Add data attributes with file path and line number for future actions
-          // Store full path in data-file and line number in data-line
-          const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
 
-          // Look up task ID from database to create clickable link
-          let taskLink = '';
-          try {
-            const db = getReadOnlyDatabase();
-            // Database stores paths with 'vault/' prefix
-            const dbFilePath = 'vault/' + relativeFilePath;
-            const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-              .get(dbFilePath, task.lineNumber);
-            if (dbTask) {
-              taskLink = `/task/${dbTask.id}`;
-            }
-          } catch (error) {
-            console.error('Error looking up task ID:', error);
-          }
+          // Use task.id directly for the link (tasks come from tasks table)
+          const taskLink = task.id ? `/task/${task.id}` : '';
 
-          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+          replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -3493,9 +2779,8 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
         for (const task of result.tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-          const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-          // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-          let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+          const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+          let displayText = replaceTagsWithEmojis(task.text);
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -3505,27 +2790,12 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           if (task.isCancelled) {
             displayText += ` <span class="text-muted">(cancelled)</span>`;
           }
-          // Add data attributes with file path and line number for future actions
-          // Store full path in data-file and line number in data-line
-          const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
 
-          // Look up task ID from database to create clickable link
-          let taskLink = '';
-          try {
-            const db = getReadOnlyDatabase();
-            // Database stores paths with 'vault/' prefix
-            const dbFilePath = 'vault/' + relativeFilePath;
-            const dbTask = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-              .get(dbFilePath, task.lineNumber);
-            if (dbTask) {
-              taskLink = `/task/${dbTask.id}`;
-            }
-          } catch (error) {
-            console.error('Error looking up task ID:', error);
-          }
+          // Use task.id directly for the link
+          const taskLink = task.id ? `/task/${task.id}` : '';
 
-          replacement += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
+          replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -3590,8 +2860,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
   }
   content = originalLines.join('\n');
 
-  // Process tasks code blocks before rendering (but skip ones in blockquotes)
-  content = await processTasksCodeBlocks(content, true);
+  // NOTE: Tasks code blocks are processed AFTER markdown rendering to avoid
+  // breaking HTML when tasks blocks are inside list items. See post-rendering
+  // processing below for <pre><code class="language-tasks"> blocks.
 
   // Process dataviewjs code blocks before rendering
   const vaultPath = path.join(process.cwd(), 'vault');
@@ -3738,10 +3009,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
             if (task.isCancelled) {
               displayText += ` <span class="text-muted">(cancelled)</span>`;
             }
-            const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
-            tasksHtml += `${priorityIcon}${displayText}`;
+            const taskLink = task.id ? `/task/${task.id}` : '';
+            tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            if (taskLink) {
+              tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+            } else {
+              tasksHtml += `${priorityIcon}${displayText}`;
+            }
             tasksHtml += `</li>\n`;
           }
           tasksHtml += '</ul>\n';
@@ -3752,9 +3027,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
           for (const task of queryResult.tasks) {
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+            const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+            let displayText = replaceTagsWithEmojis(task.text);
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
@@ -3763,10 +3037,14 @@ async function renderMarkdownUncached(filePath, urlPath) {
             if (task.isCancelled) {
               displayText += ` <span class="text-muted">(cancelled)</span>`;
             }
-            const relativeFilePath = task.filePath.replace('/opt/today/vault/', '').replace(/^\/workspaces\/today\/vault\//, '');
-            tasksHtml += `<li data-file="${relativeFilePath}" data-line="${task.lineNumber}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-file="${relativeFilePath}" data-line="${task.lineNumber}"> `;
-            tasksHtml += `${priorityIcon}${displayText}`;
+            const taskLink = task.id ? `/task/${task.id}` : '';
+            tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            if (taskLink) {
+              tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+            } else {
+              tasksHtml += `${priorityIcon}${displayText}`;
+            }
             tasksHtml += `</li>\n`;
           }
           tasksHtml += '</ul>\n';
@@ -3815,6 +3093,114 @@ ${cleanContent}
 </div>
 </details>`;
     });
+
+  // Process tasks code blocks after markdown rendering
+  // Marked.js converts ```tasks to <pre><code class="language-tasks">
+  htmlContent = await (async () => {
+    const tasksCodeBlockRegex = /<pre[^>]*><code[^>]*class="language-tasks"[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
+    let result = htmlContent;
+    const matches = [];
+    let match;
+
+    while ((match = tasksCodeBlockRegex.exec(htmlContent)) !== null) {
+      matches.push({
+        fullMatch: match[0],
+        query: match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'")
+      });
+    }
+
+    for (const { fullMatch, query } of matches) {
+      const queryResult = await executeTasksQuery(query);
+
+      let replacement = '<div class="tasks-query-result">\n';
+
+      if (queryResult.grouped) {
+        for (const [groupKey, tasks] of queryResult.grouped) {
+          if (tasks.length === 0) continue;
+
+          let dateHeader = groupKey;
+          if (queryResult.groupType !== 'custom' && groupKey !== 'No date') {
+            const d = new Date(groupKey + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            if (!isNaN(d.getTime())) {
+              if (d.toDateString() === today.toDateString()) {
+                dateHeader = 'Today';
+              } else if (d.toDateString() === tomorrow.toDateString()) {
+                dateHeader = 'Tomorrow';
+              } else {
+                dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+              }
+            }
+          }
+
+          replacement += `<h4>${dateHeader}</h4>\n<ul>\n`;
+          for (const task of tasks) {
+            const checkbox = task.isDone ? 'checked' : '';
+            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
+            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+            if (task.isDone && task.doneDate) {
+              const dateStr = task.doneDate.toISOString().split('T')[0];
+              displayText += ` ✅ ${dateStr}`;
+            }
+            if (task.isCancelled) {
+              displayText += ` <span class="text-muted">(cancelled)</span>`;
+            }
+
+            const taskLink = task.id ? `/task/${task.id}` : '';
+            replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            if (taskLink) {
+              replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+            } else {
+              replacement += `${priorityIcon}${displayText}`;
+            }
+            replacement += `</li>\n`;
+          }
+          replacement += '</ul>\n';
+        }
+      } else {
+        if (queryResult.tasks.length > 0) {
+          replacement += '<ul>\n';
+          for (const task of queryResult.tasks) {
+            const checkbox = task.isDone ? 'checked' : '';
+            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
+            const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+            let displayText = replaceTagsWithEmojis(task.text);
+            if (task.isDone && task.doneDate) {
+              const dateStr = task.doneDate.toISOString().split('T')[0];
+              displayText += ` ✅ ${dateStr}`;
+            }
+            if (task.isCancelled) {
+              displayText += ` <span class="text-muted">(cancelled)</span>`;
+            }
+
+            const taskLink = task.id ? `/task/${task.id}` : '';
+            replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            if (taskLink) {
+              replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+            } else {
+              replacement += `${priorityIcon}${displayText}`;
+            }
+            replacement += `</li>\n`;
+          }
+          replacement += '</ul>\n';
+        } else {
+          replacement += '<p class="text-muted">No matching tasks</p>\n';
+        }
+      }
+
+      replacement += '</div>';
+      result = result.replace(fullMatch, replacement);
+    }
+
+    return result;
+  })();
 
   // Enhance remaining blockquotes with MDBootstrap styling
   htmlContent = htmlContent.replace(/<blockquote>/g, '<blockquote class="blockquote border-start border-4 border-primary ps-3 my-3">');
@@ -3979,75 +3365,8 @@ ${cleanContent}
   );
 
   // Make regular markdown tasks with task-id comments clickable
-  // This handles tasks from generated files like tasks-today.md that have task-id comments
-  // but don't have data-task-id or data-file attributes
-  htmlContent = htmlContent.replace(
-    /<li>(<input[^>]*type="checkbox"[^>]*>)\s*(.*?)<!--\s*task-id:\s*([a-f0-9]{32})\s*--><\/li>/gi,
-    (match, checkbox, taskContent, taskId) => {
-      // Look up the task in the markdown_tasks cache to create a link
-      try {
-        const db = getReadOnlyDatabase();
-        const task = db.prepare('SELECT id FROM markdown_tasks WHERE id = ?').get(taskId);
-
-        if (task) {
-          // Wrap task text in link
-          return `<li>${checkbox} <a href="/task/${taskId}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${taskContent.trim()}</a><!-- task-id: ${taskId} --></li>`;
-        }
-      } catch (error) {
-        console.error('Error looking up task by ID:', error);
-      }
-
-      // If lookup fails, return original
-      return match;
-    }
-  );
-
-  // Make markdown tasks clickable - wrap task text in link to task detail page
-  // Look up task IDs from database and create links
-  const taskLinkMatches = [];
-  const taskLinkRegex = /<li[^>]*data-file="([^"]+)"[^>]*data-line="(\d+)"[^>]*>(.*?)<\/li>/gi;
-  let taskMatch;
-
-  while ((taskMatch = taskLinkRegex.exec(htmlContent)) !== null) {
-    const [fullMatch, dataFile, dataLine, liContent] = taskMatch;
-
-    // Look up task ID from database
-    try {
-      const db = getReadOnlyDatabase();
-      // Database stores paths with 'vault/' prefix
-      const dbFilePath = 'vault/' + dataFile;
-      const task = db.prepare('SELECT id FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-        .get(dbFilePath, parseInt(dataLine));
-
-      if (task) {
-        taskLinkMatches.push({
-          fullMatch,
-          dataFile,
-          dataLine,
-          liContent,
-          taskId: task.id
-        });
-      }
-    } catch (error) {
-      // Database lookup failed, skip this task
-      console.error('Error looking up task:', error);
-    }
-  }
-
-  // Replace task list items with clickable versions
-  for (const match of taskLinkMatches) {
-    // Extract checkbox and task content
-    const checkboxMatch = match.liContent.match(/(<input[^>]*>)(.*)/i);
-    if (checkboxMatch) {
-      const checkbox = checkboxMatch[1];
-      let taskContent = checkboxMatch[2].trim();
-
-      // Wrap task text in link (but not the checkbox)
-      const clickableTask = `<li data-file="${match.dataFile}" data-line="${match.dataLine}">${checkbox} <a href="/task/${match.taskId}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${taskContent}</a></li>`;
-
-      htmlContent = htmlContent.replace(match.fullMatch, clickableTask);
-    }
-  }
+  // Tasks are now rendered with links directly from the tasks table
+  // No post-processing needed for task links
 
   const fileName = pageTitle || path.basename(urlPath);
   
@@ -4180,8 +3499,8 @@ ${cleanContent}
 
         <div class="row">
           <!-- Content column -->
-          <div class="col-12 col-lg-7 mb-3">
-            <div class="card shadow-sm h-100">
+          <div class="col-12 col-md-7 mb-3">
+            <div class="card shadow-sm">
               <div class="card-header bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
                   <h5 class="mb-0">${pageTitle || fileName}</h5>
@@ -4199,7 +3518,7 @@ ${cleanContent}
           </div>
           
           <!-- Chat column -->
-          <div class="col-12 col-lg-5 mb-3">
+          <div class="col-12 col-md-5 mb-3">
             <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
             <div class="card shadow-sm">
               <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
@@ -4237,12 +3556,12 @@ ${cleanContent}
 
       <!-- Floating toggle button to restore AI assistant -->
       <button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
-        <i class="fas fa-chevron-left"></i>
+        <i class="fas fa-robot"></i>
       </button>
 
       <!-- Marked.js for markdown rendering -->
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-      
+
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
       
@@ -4261,7 +3580,7 @@ ${cleanContent}
         
         // Check if mobile and set default collapsed state
         function initializeAIAssistant() {
-          const isMobile = window.innerWidth <= 991;
+          const isMobile = window.innerWidth <= 767;
           const savedState = localStorage.getItem('aiAssistantCollapsed');
           
           // Default to collapsed on mobile, expanded on desktop
@@ -4273,6 +3592,8 @@ ${cleanContent}
           
           if (isCollapsed) {
             document.body.classList.add('ai-collapsed');
+            const wrapper = document.getElementById('aiAssistantWrapper');
+            if (wrapper) wrapper.classList.add('collapsed');
             updateToggleIcon();
           }
 
@@ -4286,11 +3607,14 @@ ${cleanContent}
         
         function toggleAIAssistant() {
           isCollapsed = !isCollapsed;
+          const wrapper = document.getElementById('aiAssistantWrapper');
 
           if (isCollapsed) {
             document.body.classList.add('ai-collapsed');
+            if (wrapper) wrapper.classList.add('collapsed');
           } else {
             document.body.classList.remove('ai-collapsed');
+            if (wrapper) wrapper.classList.remove('collapsed');
           }
 
           updateToggleIcon();
@@ -4300,7 +3624,7 @@ ${cleanContent}
         function updateToggleIcon() {
           const icon = document.getElementById('toggleIcon');
           if (icon) {
-            const isMobile = window.innerWidth <= 991;
+            const isMobile = window.innerWidth <= 767;
             if (isMobile) {
               icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
             } else {
@@ -5816,30 +5140,8 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Not a task line' });
     }
 
-    // Check database cache but don't fail if not found
-    const db = getReadOnlyDatabase();
-    const cachedTask = db.prepare('SELECT line_text FROM markdown_tasks WHERE file_path = ? AND line_number = ?')
-      .get(dbFilePath, line);
-
-    // If we have a cached task, verify it matches (ignoring completion status and date)
-    if (cachedTask) {
-      // Strip completion markers for comparison
-      const normalizeTask = (text) => text
-        .replace(/^(?:\s*>)*\s*- \[[xX]\]/, '- [ ]')  // Normalize checkbox to unchecked (including blockquote prefix)
-        .replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '');  // Remove completion date
-
-      const normalizedCache = normalizeTask(cachedTask.line_text);
-      const normalizedFile = normalizeTask(taskLine);
-
-      if (normalizedCache !== normalizedFile) {
-        debug(`[TASK] Cache mismatch at line ${line}, using file version`);
-        debug(`  Cache: "${cachedTask.line_text}"`);
-        debug(`  File:  "${taskLine}"`);
-        // Don't fail - just proceed with the file version
-      }
-    } else {
-      debug(`[TASK] Task not in cache, proceeding with file version: "${taskLine}"`);
-    }
+    // Note: markdown_tasks cache was removed - proceeding with file version directly
+    debug(`[TASK] Processing task from file: "${taskLine}"`);
 
     // Check if this is a recurring task (has 🔁 pattern)
     const recurringMatch = taskLine.match(/🔁\s+(.+?)(?:\s+(?:⏳|📅|➕)|$)/);
@@ -5913,50 +5215,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 
-    // Update the database cache to reflect the change
-    try {
-      if (cachedTask) {
-        // Update existing cache entry
-        const updateStmt = db.prepare(`
-          UPDATE markdown_tasks
-          SET line_text = ?
-          WHERE file_path = ? AND line_number = ?
-        `);
-        updateStmt.run(updatedLine, dbFilePath, line);
-        debug(`[TASK] Updated database cache for ${dbFilePath}:${line}`);
-      } else {
-        // Insert new cache entry if task wasn't cached
-        const insertStmt = db.prepare(`
-          INSERT OR REPLACE INTO markdown_tasks (file_path, line_number, line_text)
-          VALUES (?, ?, ?)
-        `);
-        insertStmt.run(dbFilePath, line, updatedLine);
-        debug(`[TASK] Added to database cache: ${dbFilePath}:${line}`);
-      }
-
-      // If we added a new recurring task, also add it to the cache
-      if (newTaskLine) {
-        const insertStmt = db.prepare(`
-          INSERT OR REPLACE INTO markdown_tasks (file_path, line_number, line_text)
-          VALUES (?, ?, ?)
-        `);
-        insertStmt.run(dbFilePath, line + 1, newTaskLine);
-        debug(`[TASK] Added new recurring task to cache: ${dbFilePath}:${line + 1}`);
-
-        // We should also update line numbers for all tasks after this insertion
-        const updateStmt = db.prepare(`
-          UPDATE markdown_tasks
-          SET line_number = line_number + 1
-          WHERE file_path = ? AND line_number > ?
-        `);
-        updateStmt.run(dbFilePath, line);
-        debug(`[TASK] Updated line numbers for subsequent tasks in cache`);
-      }
-    } catch (dbError) {
-      debug('[TASK] Failed to update database cache:', dbError);
-      // Don't fail the request since the file was updated successfully
-    }
-
+    // Note: markdown_tasks cache was removed - file is the source of truth
     debug(`[TASK] Successfully updated task at line ${line}`);
     res.json({ success: true, updatedLine });
   } catch (error) {
@@ -6031,42 +5290,27 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
   }
 });
 
-// Task detail page for markdown tasks
+// Task detail page - uses tasks table (from plugins)
 app.get('/task/:taskId', authMiddleware, async (req, res) => {
   try {
-    const taskId = parseInt(req.params.taskId);
+    const taskId = req.params.taskId;
     const db = getReadOnlyDatabase();
 
-    // Get task from markdown_tasks cache
-    const task = db.prepare('SELECT * FROM markdown_tasks WHERE id = ?').get(taskId);
+    // Get task from tasks table
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
 
     if (!task) {
       return res.status(404).send('Task not found');
     }
 
-    // Parse the task line to extract details
-    const taskText = task.line_text.replace(/^(\s*>)*\s*- \[[x\s-]\]\s*/i, '').trim();
-
-    // Create clean version for timer (remove status tags and dates)
-    const cleanTaskText = taskText
-      .replace(/#stage\/[^\s]*/g, '')         // Remove #stage/... tags
-      .replace(/[⏫🔼🔽⏬]/g, '')              // Remove priority emojis
-      .replace(/➕\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ➕ created dates
-      .replace(/⏳\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ⏳ due dates
-      .replace(/📅\s*\d{4}-\d{2}-\d{2}/g, '') // Remove 📅 scheduled dates
-      .replace(/✅\s*\d{4}-\d{2}-\d{2}/g, '') // Remove ✅ done dates
-      .replace(/🔁\s*[^\n]*/g, '')            // Remove 🔁 recurrence
-      .replace(/\s+/g, ' ')                   // Collapse multiple spaces
-      .trim();
-
-    // Strip vault/ prefix from file path for links
-    const displayPath = task.file_path.replace(/^vault\//, '');
+    const metadata = task.metadata ? JSON.parse(task.metadata) : {};
+    const priorityEmoji = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' }[task.priority] || '';
 
     const html = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
-        <title>Task: ${taskText.substring(0, 50)}...</title>
+        <title>Task: ${task.title.substring(0, 50)}...</title>
         ${pageStyle}
       </head>
       <body>
@@ -6092,27 +5336,38 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
                   <!-- Task Text -->
                   <div class="mb-4">
                     <h5 class="text-muted mb-2">Task</h5>
-                    <p class="fs-5">${taskText}</p>
+                    <p class="fs-5">${priorityEmoji} ${task.title}</p>
                   </div>
 
-                  <!-- File Location -->
+                  <!-- Status -->
                   <div class="mb-4">
-                    <h6 class="text-muted mb-2">Location</h6>
-                    <div>
-                      <i class="fas fa-file me-2"></i>
-                      <a href="/${displayPath}">${task.file_path}</a>
-                      <span class="text-muted ms-2">(line ${task.line_number})</span>
-                    </div>
+                    <h6 class="text-muted mb-2">Status</h6>
+                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-primary'}">${task.status}</span>
+                    ${task.priority ? `<span class="badge bg-secondary ms-2">${task.priority}</span>` : ''}
+                  </div>
+
+                  ${task.due_date ? `
+                  <div class="mb-4">
+                    <h6 class="text-muted mb-2">Due Date</h6>
+                    <div><i class="fas fa-calendar me-2"></i>${task.due_date}</div>
+                  </div>
+                  ` : ''}
+
+                  ${task.description ? `
+                  <div class="mb-4">
+                    <h6 class="text-muted mb-2">Description</h6>
+                    <p>${task.description}</p>
+                  </div>
+                  ` : ''}
+
+                  <!-- Source -->
+                  <div class="mb-4">
+                    <h6 class="text-muted mb-2">Source</h6>
+                    <div><i class="fas fa-plug me-2"></i>${task.source}</div>
                   </div>
 
                   <!-- Actions -->
                   <div class="d-flex gap-2 flex-wrap">
-                    <a href="/${displayPath}" class="btn btn-primary">
-                      <i class="fas fa-file-alt me-2"></i>View File
-                    </a>
-                    <a href="/edit/${displayPath}" class="btn btn-secondary">
-                      <i class="fas fa-edit me-2"></i>Edit File
-                    </a>
                     <button class="btn btn-success" onclick="startTimer()">
                       <i class="fas fa-play me-2"></i>Start Timer
                     </button>
@@ -6123,15 +5378,14 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
                 </div>
               </div>
 
-              <!-- Raw Task Line -->
+              <!-- Task Metadata -->
               <div class="card mt-3 shadow-sm">
                 <div class="card-body">
                   <small class="text-muted">
                     <div class="mb-2"><strong>Task ID:</strong> ${task.id}</div>
-                    <div class="mb-2"><strong>Created:</strong> ${new Date(task.created_at).toLocaleString()}</div>
-                    <div class="mb-2"><strong>Updated:</strong> ${new Date(task.updated_at).toLocaleString()}</div>
-                    <div class="mb-2"><strong>Raw Line:</strong></div>
-                    <code class="d-block p-2 bg-light">${task.line_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+                    <div class="mb-2"><strong>Created:</strong> ${task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</div>
+                    <div class="mb-2"><strong>Updated:</strong> ${task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A'}</div>
+                    ${task.completed_at ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>` : ''}
                   </small>
                 </div>
               </div>
@@ -6141,7 +5395,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
 
         <script>
           function startTimer() {
-            const taskText = ${JSON.stringify(cleanTaskText)};
+            const taskText = ${JSON.stringify(task.title)};
             fetch('/api/track/start', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
