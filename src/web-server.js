@@ -210,6 +210,12 @@ const pageStyle = `
 <link href="/static/css/style.css" rel="stylesheet"/>
 `;
 
+// Common scripts for all pages
+const pageScripts = `
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+<script src="/static/js/common.js"></script>
+`;
+
 // Helper to get breadcrumb navigation
 function getBreadcrumb(filePath) {
   const parts = filePath.split('/').filter(Boolean);
@@ -896,88 +902,10 @@ async function renderDirectory(dirPath, urlPath) {
 
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      <script src="/static/js/common.js"></script>
 
       <script>
-        // Search functionality
-        function performSearch(event) {
-          event.preventDefault();
-          const searchQuery = document.getElementById('searchInput').value.trim();
-          if (searchQuery) {
-            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
-          }
-        }
-        
-        // AI Assistant Toggle Functionality for Directory View
-        let isCollapsed = false;
-        
-        // Check if mobile and set default collapsed state
-        function initializeAIAssistant() {
-          const isMobile = window.innerWidth <= 767;
-          const savedState = localStorage.getItem('aiAssistantCollapsed');
-          
-          // Default to collapsed on mobile, expanded on desktop
-          if (savedState !== null) {
-            isCollapsed = savedState === 'true';
-          } else {
-            isCollapsed = isMobile;
-          }
-          
-          if (isCollapsed) {
-            document.body.classList.add('ai-collapsed');
-            const wrapper = document.getElementById('aiAssistantWrapper');
-            if (wrapper) wrapper.classList.add('collapsed');
-            updateToggleIcon();
-          }
-
-          // Add click handler for mobile header
-          if (isMobile) {
-            const header = document.getElementById('aiAssistantHeader');
-            header.style.cursor = 'pointer';
-            header.onclick = toggleAIAssistant;
-          }
-        }
-        
-        function toggleAIAssistant() {
-          isCollapsed = !isCollapsed;
-          const wrapper = document.getElementById('aiAssistantWrapper');
-
-          if (isCollapsed) {
-            document.body.classList.add('ai-collapsed');
-            if (wrapper) wrapper.classList.add('collapsed');
-          } else {
-            document.body.classList.remove('ai-collapsed');
-            if (wrapper) wrapper.classList.remove('collapsed');
-          }
-
-          updateToggleIcon();
-          localStorage.setItem('aiAssistantCollapsed', isCollapsed);
-        }
-        
-        function updateToggleIcon() {
-          const icon = document.getElementById('toggleIcon');
-          if (icon) {
-            const isMobile = window.innerWidth <= 767;
-            if (isMobile) {
-              icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
-            } else {
-              icon.className = isCollapsed ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
-            }
-          }
-        }
-        
-        // Handle resize events
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-          clearTimeout(resizeTimeout);
-          resizeTimeout = setTimeout(() => {
-            updateToggleIcon();
-          }, 250);
-        });
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initializeAIAssistant);
-        
-        // Store directory information for AI context
+        // Page-specific data for AI context
         const directoryPath = '${urlPath || '/'}';
         const directoryContents = ${JSON.stringify(items.map(item => ({
           name: item.name,
@@ -1380,17 +1308,10 @@ async function renderEditor(filePath, urlPath) {
 
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      <script src="/static/js/common.js"></script>
       
       <script>
-        // Search functionality
-        function performSearch(event) {
-          event.preventDefault();
-          const searchQuery = document.getElementById('searchInput').value.trim();
-          if (searchQuery) {
-            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
-          }
-        }
-        
+        // Page-specific functions (performSearch is in common.js)
         function saveFile() {
           const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
@@ -3579,88 +3500,10 @@ ${cleanContent}
 
       <!-- MDB -->
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      <script src="/static/js/common.js"></script>
       
       <script>
-        // Search functionality
-        function performSearch(event) {
-          event.preventDefault();
-          const searchQuery = document.getElementById('searchInput').value.trim();
-          if (searchQuery) {
-            window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
-          }
-        }
-        
-        // AI Assistant Toggle Functionality
-        let isCollapsed = false;
-        
-        // Check if mobile and set default collapsed state
-        function initializeAIAssistant() {
-          const isMobile = window.innerWidth <= 767;
-          const savedState = localStorage.getItem('aiAssistantCollapsed');
-          
-          // Default to collapsed on mobile, expanded on desktop
-          if (savedState !== null) {
-            isCollapsed = savedState === 'true';
-          } else {
-            isCollapsed = isMobile;
-          }
-          
-          if (isCollapsed) {
-            document.body.classList.add('ai-collapsed');
-            const wrapper = document.getElementById('aiAssistantWrapper');
-            if (wrapper) wrapper.classList.add('collapsed');
-            updateToggleIcon();
-          }
-
-          // Add click handler for mobile header
-          if (isMobile) {
-            const header = document.getElementById('aiAssistantHeader');
-            header.style.cursor = 'pointer';
-            header.onclick = toggleAIAssistant;
-          }
-        }
-        
-        function toggleAIAssistant() {
-          isCollapsed = !isCollapsed;
-          const wrapper = document.getElementById('aiAssistantWrapper');
-
-          if (isCollapsed) {
-            document.body.classList.add('ai-collapsed');
-            if (wrapper) wrapper.classList.add('collapsed');
-          } else {
-            document.body.classList.remove('ai-collapsed');
-            if (wrapper) wrapper.classList.remove('collapsed');
-          }
-
-          updateToggleIcon();
-          localStorage.setItem('aiAssistantCollapsed', isCollapsed);
-        }
-        
-        function updateToggleIcon() {
-          const icon = document.getElementById('toggleIcon');
-          if (icon) {
-            const isMobile = window.innerWidth <= 767;
-            if (isMobile) {
-              icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
-            } else {
-              icon.className = isCollapsed ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
-            }
-          }
-        }
-        
-        // Handle resize events
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-          clearTimeout(resizeTimeout);
-          resizeTimeout = setTimeout(() => {
-            updateToggleIcon();
-          }, 250);
-        });
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initializeAIAssistant);
-        
-        // Chat functionality
+        // Page-specific: Chat functionality (common functions are in common.js)
         // Version 4: Force clear all old chat to fix structure
         const CHAT_VERSION = 4;
         const storedVersion = localStorage.getItem('chatVersion');
@@ -4874,19 +4717,11 @@ app.get('/search', authMiddleware, async (req, res) => {
             </div>
           </div>
           
-          <script>
-            function performSearch(event) {
-              event.preventDefault();
-              const searchQuery = document.getElementById('searchInput').value.trim();
-              if (searchQuery) {
-                window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
-              }
-            }
-          </script>
+          ${pageScripts}
         </body>
         </html>
       `;
-      
+
       res.send(html);
       
     } catch (error) {
@@ -4938,19 +4773,11 @@ app.get('/search', authMiddleware, async (req, res) => {
             </div>
           </div>
           
-          <script>
-            function performSearch(event) {
-              event.preventDefault();
-              const searchQuery = document.getElementById('searchInput').value.trim();
-              if (searchQuery) {
-                window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
-              }
-            }
-          </script>
+          ${pageScripts}
         </body>
         </html>
       `;
-      
+
       res.send(html);
     }
     
@@ -5432,6 +5259,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
         </script>
 
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      <script src="/static/js/common.js"></script>
       </body>
       </html>
     `;
@@ -5603,6 +5431,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
         <!-- Scripts -->
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
+      <script src="/static/js/common.js"></script>
         <script>
           // Initialize date picker
           flatpickr("#do_date", {
