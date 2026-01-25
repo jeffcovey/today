@@ -237,21 +237,9 @@ const pageScriptsWithMarked = `
 ${pageScripts}
 `;
 
-// Navbar HTML (loaded from template)
-let navbarHtml = '';
-(async () => {
-  const template = await loadTemplate('navbar');
-  if (template) navbarHtml = template;
-})();
-
-// Helper to get navbar (with fallback)
+// Helper to get navbar
 function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
   const { showSearch = true, searchValue = '' } = options;
-
-  // Use template for default navbar
-  if (title === 'Today' && icon === 'fa-folder-open' && showSearch && !searchValue && navbarHtml) {
-    return navbarHtml;
-  }
 
   const searchForm = showSearch ? `
           <form class="d-flex ms-auto" onsubmit="performSearch(event)">
@@ -263,7 +251,11 @@ function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
             </div>
           </form>` : '';
 
-  return `<!-- Navbar -->
+  return `<!-- Loading Spinner Overlay -->
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+      </div>
+      <!-- Navbar -->
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
           <a class="navbar-brand" href="/">
