@@ -139,6 +139,11 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,.1);
 }
 
+.bubble-content .markdown-content {
+  margin: 0;
+  padding: 0;
+}
+
 .markdown-content h1 {
   color: #1266f1;
   font-weight: 300;
@@ -632,5 +637,79 @@ nav[aria-label="breadcrumb"] {
   background: transparent;
   z-index: 1010;
   padding: 0.5rem 0;
+  margin-bottom: 1rem;
+}
+
+/* Editor page styles */
+.editor-container {
+  height: calc(100vh - 250px);
+  min-height: 400px;
+}
+#editor {
+  width: 100%;
+  height: 100%;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 1rem;
+  resize: none;
+}
+#editor:focus {
+  outline: none;
+  box-shadow: none;
+}
+.editor-toolbar {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 0.375rem 0.375rem 0 0;
+  border: 1px solid #dee2e6;
+  border-bottom: none;
+}
+
+/* Task form styles */
+/* Chat timestamp styles */
+.chat-timestamp {
+  opacity: 0.6;
+  margin: 0 0 0.05rem 0;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.chat-timestamp-lg {
+  opacity: 0.6;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.chat-timestamp-subtle {
+  opacity: 0.4;
+  font-size: 0.55rem;
+  font-style: italic;
+}
+
+.thinking-content-display {
+  max-height: 100px;
+  overflow-y: auto;
+  font-family: monospace;
+}
+
+.thinking-result {
+  font-family: monospace;
+  font-size: 0.85rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.task-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.task-form .form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.task-form .form-control,
+.task-form .form-select {
   margin-bottom: 1rem;
 }

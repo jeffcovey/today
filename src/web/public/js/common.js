@@ -171,3 +171,69 @@ document.addEventListener('DOMContentLoaded', () => {
     checkbox.addEventListener('change', () => toggleTaskCheckbox(checkbox));
   });
 });
+
+// Utility: Escape HTML for safe display
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Chat: Check version and clear old data if needed (reloads page if cleared)
+function checkChatVersion() {
+  const CHAT_VERSION = 4;
+  const storedVersion = localStorage.getItem('chatVersion');
+  if (storedVersion !== String(CHAT_VERSION)) {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('chatHistory_') || key === 'inputHistory') {
+        localStorage.removeItem(key);
+      }
+    });
+    localStorage.setItem('chatVersion', String(CHAT_VERSION));
+    window.location.reload();
+    return true; // Page will reload
+  }
+  return false;
+}
+
+// Utility: Create a marked renderer that opens external links in new tabs
+function createExternalLinkRenderer() {
+  const renderer = new marked.Renderer();
+  const originalLink = renderer.link.bind(renderer);
+  renderer.link = function(href, title, text) {
+    const isExternal = /^https?:\/\//.test(href);
+    let link = originalLink(href, title, text);
+    if (isExternal) {
+      link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+    }
+    return link;
+  };
+  return renderer;
+}
+
+// Utility: Get human-readable time ago string
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+
+  let interval = Math.floor(seconds / 31536000);
+  if (interval > 1) return interval + ' years ago';
+  if (interval === 1) return '1 year ago';
+
+  interval = Math.floor(seconds / 2592000);
+  if (interval > 1) return interval + ' months ago';
+  if (interval === 1) return '1 month ago';
+
+  interval = Math.floor(seconds / 86400);
+  if (interval > 1) return interval + ' days ago';
+  if (interval === 1) return '1 day ago';
+
+  interval = Math.floor(seconds / 3600);
+  if (interval > 1) return interval + ' hours ago';
+  if (interval === 1) return '1 hour ago';
+
+  interval = Math.floor(seconds / 60);
+  if (interval > 1) return interval + ' minutes ago';
+  if (interval === 1) return '1 minute ago';
+
+  return 'just now';
+}

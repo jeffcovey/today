@@ -216,6 +216,12 @@ const pageScripts = `
 <script src="/static/js/common.js"></script>
 `;
 
+// Scripts for pages with chat (includes marked.js for markdown)
+const pageScriptsWithMarked = `
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+${pageScripts}
+`;
+
 // Navbar HTML (loaded from template)
 let navbarHtml = '';
 (async () => {
@@ -264,6 +270,105 @@ function getBreadcrumb(filePath) {
   }
 
   return links.join(' / ');
+}
+
+// Helper to get AI assistant chat panel
+function getAIAssistantPanel(placeholderText = 'Ask me anything...') {
+  return `
+    <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
+        <i class="fas fa-robot me-2"></i>
+        <span>AI Assistant</span>
+        <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
+          <i class="fas fa-chevron-right" id="toggleIcon"></i>
+        </button>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <div class="text-center text-muted p-3">
+            <small>${placeholderText}</small>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="input-group">
+            <textarea
+              class="form-control"
+              id="chatInput"
+              placeholder="Type your message or /clear to reset..."
+              rows="4"
+              onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <button class="btn btn-primary" onclick="sendMessage()">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>`;
+}
+
+// Helper to get floating toggle button
+function getFloatingToggleBtn() {
+  return `<button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
+        <i class="fas fa-robot"></i>
+      </button>`;
+}
+
+// Helper to get timer widget (active or idle state)
+function getTimerWidget(timer) {
+  if (timer) {
+    return `
+        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${timer.startTimeISO}">
+          <i class="fas fa-clock me-2"></i>
+          <div class="flex-grow-1">
+            <strong>${timer.description}</strong>
+            <br>
+            <small>Started at ${timer.startTime} • Duration: <span class="timer-duration">${timer.duration}</span></small>
+          </div>
+          <a href="#" id="stopTimerBtn" onclick="
+            const btn = this;
+            const icon = btn.querySelector('i');
+            const text = btn.querySelector('.btn-text');
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+            icon.className = 'fas fa-spinner fa-spin';
+            text.textContent = ' Stopping...';
+            fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()).catch(() => {
+              btn.disabled = false;
+              btn.style.pointerEvents = 'auto';
+              icon.className = 'fas fa-stop';
+              text.textContent = ' Stop';
+            });
+            return false;" class="btn btn-sm btn-outline-dark ms-2">
+            <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
+          </a>
+        </div>`;
+  } else {
+    return `
+        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+          <i class="fas fa-clock me-2"></i>
+          <div class="input-group flex-grow-1">
+            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
+            <button class="btn btn-primary" id="startTimerBtn" onclick="
+              const btn = this;
+              const icon = btn.querySelector('i');
+              const text = btn.querySelector('.btn-text');
+              const desc = document.getElementById('timerDescription').value;
+              if (!desc.trim()) return;
+              btn.disabled = true;
+              icon.className = 'fas fa-spinner fa-spin';
+              text.textContent = ' Starting...';
+              fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
+                btn.disabled = false;
+                icon.className = 'fas fa-play';
+                text.textContent = ' Start';
+              })">
+              <i class="fas fa-play"></i><span class="btn-text"> Start</span>
+            </button>
+          </div>
+        </div>`;
+  }
 }
 
 // Get configured timezone
@@ -533,84 +638,7 @@ async function renderDirectory(dirPath, urlPath) {
         </nav>
 
         <!-- Time Tracking -->
-        ${currentTimer ? `
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${currentTimer.startTimeISO}">
-          <i class="fas fa-clock me-2"></i>
-          <div class="flex-grow-1">
-            <strong>${currentTimer.description}</strong>
-            <br>
-            <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
-          </div>
-          <a href="#" id="stopTimerBtn" onclick="
-            const btn = this;
-            const icon = btn.querySelector('i');
-            const text = btn.querySelector('.btn-text');
-            btn.disabled = true;
-            btn.style.pointerEvents = 'none';
-            icon.className = 'fas fa-spinner fa-spin';
-            text.textContent = ' Stopping...';
-            fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()).catch(() => {
-              btn.disabled = false;
-              btn.style.pointerEvents = 'auto';
-              icon.className = 'fas fa-stop';
-              text.textContent = ' Stop';
-            });
-            return false;" class="btn btn-sm btn-outline-dark ms-2">
-            <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
-          </a>
-        </div>
-        <script>
-          (function() {
-            // Update timer duration every second
-            function updateTimerDuration() {
-              const timerEl = document.querySelector('[data-timer-start]');
-              if (!timerEl) return;
-
-              const startTime = new Date(timerEl.dataset.timerStart);
-              const now = new Date();
-              const durationMs = now - startTime;
-              const hours = Math.floor(durationMs / (1000 * 60 * 60));
-              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-
-              const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
-              const durationSpan = timerEl.querySelector('.timer-duration');
-              if (durationSpan) {
-                durationSpan.textContent = durationText;
-              }
-            }
-
-            // Only start interval if not already running
-            if (!window.timerIntervalStarted) {
-              window.timerIntervalStarted = true;
-              updateTimerDuration();
-              setInterval(updateTimerDuration, 1000);
-            }
-          })();
-        </script>
-        ` : `
-        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-          <i class="fas fa-clock me-2"></i>
-          <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
-            <button class="btn btn-primary" id="startTimerBtn" onclick="
-              const btn = this;
-              const icon = btn.querySelector('i');
-              const text = btn.querySelector('.btn-text');
-              const desc = document.getElementById('timerDescription').value;
-              if (!desc.trim()) return;
-              btn.disabled = true;
-              icon.className = 'fas fa-spinner fa-spin';
-              text.textContent = ' Starting...';
-              fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
-                btn.disabled = false;
-                icon.className = 'fas fa-play';
-                text.textContent = ' Start';
-              })">
-              <i class="fas fa-play"></i><span class="btn-text"> Start</span>
-            </button>
-          </div>
-        </div>
-        `}
+        ${getTimerWidget(currentTimer)}
 
         <div class="row">
           <!-- Content column -->
@@ -879,51 +907,13 @@ async function renderDirectory(dirPath, urlPath) {
 
     <!-- Chat column -->
     <div class="col-12 col-md-5 mb-3">
-      <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
-      <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
-          <i class="fas fa-robot me-2"></i>
-          <span>AI Assistant</span>
-          <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
-            <i class="fas fa-chevron-right" id="toggleIcon"></i>
-          </button>
-        </div>
-        <div class="chat-container">
-          <div class="chat-messages" id="chatMessages">
-            <div class="text-center text-muted p-3">
-              <small>Ask questions about this directory and its contents</small>
-            </div>
-          </div>
-          <div class="chat-input-area">
-            <div class="input-group">
-              <textarea 
-                class="form-control" 
-                id="chatInput" 
-                placeholder="Type your message or /clear to reset..."
-                rows="4"
-                onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-              <button class="btn btn-primary" onclick="sendMessage()">
-                <i class="fas fa-paper-plane"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>
+      ${getAIAssistantPanel('Ask questions about this directory and its contents')}
     </div>
   </div>
 
-      <!-- Floating toggle button to restore AI assistant -->
-      <button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
-        <i class="fas fa-robot"></i>
-      </button>
+      ${getFloatingToggleBtn()}
 
-      <!-- Marked.js for markdown rendering -->
-      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-      <!-- MDB -->
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      <script src="/static/js/common.js"></script>
+      ${pageScriptsWithMarked}
 
       <script>
         // Page-specific data for AI context
@@ -934,18 +924,8 @@ async function renderDirectory(dirPath, urlPath) {
         })))};
         
         // Chat functionality
-        const CHAT_VERSION = 4;
-        const storedVersion = localStorage.getItem('chatVersion');
-        if (storedVersion !== String(CHAT_VERSION)) {
-          Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('chatHistory_') || key === 'inputHistory') {
-              localStorage.removeItem(key);
-            }
-          });
-          localStorage.setItem('chatVersion', String(CHAT_VERSION));
-          window.location.reload();
-        }
-        
+        if (checkChatVersion()) return; // Page will reload if version changed
+
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory_dir_${urlPath || 'root'}') || '[]');
         let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
         let historyIndex = -1;
@@ -973,27 +953,15 @@ async function renderDirectory(dirPath, urlPath) {
             hour12: true 
           });
           
-          // Create renderer for external links
-          const renderer = new marked.Renderer();
-          const originalLink = renderer.link.bind(renderer);
-          renderer.link = function(href, title, text) {
-            const isExternal = /^https?:\/\//.test(href);
-            let link = originalLink(href, title, text);
-            if (isExternal) {
-              link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
-            }
-            return link;
-          };
-          
-          // Render markdown using marked with custom renderer
-          const renderedContent = marked.parse(message, { renderer });
+          // Render markdown using marked with external link renderer
+          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer() });
           
           let bubbleHtml = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">
+              <small class="d-block chat-timestamp">
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
-              <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
+              <div class="markdown-content">\${renderedContent}</div>
             </div>
           \`;
           
@@ -1046,7 +1014,7 @@ async function renderDirectory(dirPath, urlPath) {
           typingIndicator.className = 'chat-bubble assistant typing-indicator';
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking...</small>
+              <small class="d-block chat-timestamp">AI · Thinking...</small>
               <div class="spinner-border spinner-border-sm text-secondary" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
@@ -1185,33 +1153,6 @@ Contents:
             recentsList.innerHTML = recentsHtml;
           }
         }
-        
-        // Helper function for time ago
-        function getTimeAgo(date) {
-          const seconds = Math.floor((new Date() - date) / 1000);
-          
-          let interval = Math.floor(seconds / 31536000);
-          if (interval > 1) return interval + ' years ago';
-          if (interval === 1) return '1 year ago';
-          
-          interval = Math.floor(seconds / 2592000);
-          if (interval > 1) return interval + ' months ago';
-          if (interval === 1) return '1 month ago';
-          
-          interval = Math.floor(seconds / 86400);
-          if (interval > 1) return interval + ' days ago';
-          if (interval === 1) return '1 day ago';
-          
-          interval = Math.floor(seconds / 3600);
-          if (interval > 1) return interval + ' hours ago';
-          if (interval === 1) return '1 hour ago';
-          
-          interval = Math.floor(seconds / 60);
-          if (interval > 1) return interval + ' minutes ago';
-          if (interval === 1) return '1 minute ago';
-          
-          return 'just now';
-        }
       </script>
     </body>
     </html>
@@ -1244,32 +1185,6 @@ async function renderEditor(filePath, urlPath) {
     <head>
       <title>Edit: ${fileName}</title>
       ${pageStyle}
-      <style>
-        .editor-container {
-          height: calc(100vh - 250px);
-          min-height: 400px;
-        }
-        #editor {
-          width: 100%;
-          height: 100%;
-          font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-          font-size: 14px;
-          line-height: 1.6;
-          padding: 1rem;
-          resize: none;
-        }
-        #editor:focus {
-          outline: none;
-          box-shadow: none;
-        }
-        .editor-toolbar {
-          background: #f8f9fa;
-          padding: 1rem;
-          border-radius: 0.375rem 0.375rem 0 0;
-          border: 1px solid #dee2e6;
-          border-bottom: none;
-        }
-      </style>
     </head>
     <body>
       ${getNavbar(`Editing: ${fileName}`, 'fa-edit')}
@@ -1312,10 +1227,8 @@ async function renderEditor(filePath, urlPath) {
         </div>
       </div>
 
-      <!-- MDB -->
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      <script src="/static/js/common.js"></script>
-      
+      ${pageScripts}
+
       <script>
         // Page-specific functions (performSearch is in common.js)
         function saveFile() {
@@ -3345,84 +3258,7 @@ ${cleanContent}
         </nav>
 
         <!-- Time Tracking -->
-        ${currentTimer ? `
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${currentTimer.startTimeISO}">
-          <i class="fas fa-clock me-2"></i>
-          <div class="flex-grow-1">
-            <strong>${currentTimer.description}</strong>
-            <br>
-            <small>Started at ${currentTimer.startTime} • Duration: <span class="timer-duration">${currentTimer.duration}</span></small>
-          </div>
-          <a href="#" id="stopTimerBtn" onclick="
-            const btn = this;
-            const icon = btn.querySelector('i');
-            const text = btn.querySelector('.btn-text');
-            btn.disabled = true;
-            btn.style.pointerEvents = 'none';
-            icon.className = 'fas fa-spinner fa-spin';
-            text.textContent = ' Stopping...';
-            fetch('/api/track/stop', {method: 'POST'}).then(() => location.reload()).catch(() => {
-              btn.disabled = false;
-              btn.style.pointerEvents = 'auto';
-              icon.className = 'fas fa-stop';
-              text.textContent = ' Stop';
-            });
-            return false;" class="btn btn-sm btn-outline-dark ms-2">
-            <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
-          </a>
-        </div>
-        <script>
-          (function() {
-            // Update timer duration every second
-            function updateTimerDuration() {
-              const timerEl = document.querySelector('[data-timer-start]');
-              if (!timerEl) return;
-
-              const startTime = new Date(timerEl.dataset.timerStart);
-              const now = new Date();
-              const durationMs = now - startTime;
-              const hours = Math.floor(durationMs / (1000 * 60 * 60));
-              const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-
-              const durationText = hours > 0 ? hours + 'h ' + minutes + 'm' : minutes + 'm';
-              const durationSpan = timerEl.querySelector('.timer-duration');
-              if (durationSpan) {
-                durationSpan.textContent = durationText;
-              }
-            }
-
-            // Only start interval if not already running
-            if (!window.timerIntervalStarted) {
-              window.timerIntervalStarted = true;
-              updateTimerDuration();
-              setInterval(updateTimerDuration, 1000);
-            }
-          })();
-        </script>
-        ` : `
-        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-          <i class="fas fa-clock me-2"></i>
-          <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
-            <button class="btn btn-primary" id="startTimerBtn" onclick="
-              const btn = this;
-              const icon = btn.querySelector('i');
-              const text = btn.querySelector('.btn-text');
-              const desc = document.getElementById('timerDescription').value;
-              if (!desc.trim()) return;
-              btn.disabled = true;
-              icon.className = 'fas fa-spinner fa-spin';
-              text.textContent = ' Starting...';
-              fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
-                btn.disabled = false;
-                icon.className = 'fas fa-play';
-                text.textContent = ' Start';
-              })">
-              <i class="fas fa-play"></i><span class="btn-text"> Start</span>
-            </button>
-          </div>
-        </div>
-        `}
+        ${getTimerWidget(currentTimer)}
 
         <div class="row">
           <!-- Content column -->
@@ -3446,70 +3282,19 @@ ${cleanContent}
           
           <!-- Chat column -->
           <div class="col-12 col-md-5 mb-3">
-            <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
-            <div class="card shadow-sm">
-              <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
-                <i class="fas fa-robot me-2"></i>
-                <span>AI Assistant</span>
-                <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
-                  <i class="fas fa-chevron-right" id="toggleIcon"></i>
-                </button>
-              </div>
-              <div class="chat-container">
-                <div class="chat-messages" id="chatMessages">
-                  <div class="text-center text-muted p-3">
-                    <small>Start a conversation about this document</small>
-                  </div>
-                </div>
-                <div class="chat-input-area">
-                  <div class="input-group">
-                    <textarea 
-                      class="form-control" 
-                      id="chatInput" 
-                      placeholder="Type your message or /clear to reset..."
-                      rows="4"
-                      onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-                    <button class="btn btn-primary" onclick="sendMessage()">
-                      <i class="fas fa-paper-plane"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
+            ${getAIAssistantPanel('Start a conversation about this document')}
           </div>
         </div>
       </div>
 
-      <!-- Floating toggle button to restore AI assistant -->
-      <button class="floating-toggle-btn" onclick="toggleAIAssistant()" title="Show AI Assistant">
-        <i class="fas fa-robot"></i>
-      </button>
+      ${getFloatingToggleBtn()}
 
-      <!-- Marked.js for markdown rendering -->
-      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      ${pageScriptsWithMarked}
 
-      <!-- MDB -->
-      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      <script src="/static/js/common.js"></script>
-      
       <script>
-        // Page-specific: Chat functionality (common functions are in common.js)
-        // Version 4: Force clear all old chat to fix structure
-        const CHAT_VERSION = 4;
-        const storedVersion = localStorage.getItem('chatVersion');
-        if (storedVersion !== String(CHAT_VERSION)) {
-          // Clear ALL chat-related data
-          Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('chatHistory_') || key === 'inputHistory') {
-              localStorage.removeItem(key);
-            }
-          });
-          localStorage.setItem('chatVersion', String(CHAT_VERSION));
-          // Force page refresh to ensure clean start
-          window.location.reload();
-        }
-        
+        // Page-specific: Chat functionality
+        if (checkChatVersion()) return; // Page will reload if version changed
+
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory_${urlPath}') || '[]');
         let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
         let historyIndex = -1;
@@ -3524,14 +3309,7 @@ ${cleanContent}
             });
           }
         }
-        
-        // Escape HTML for safe display
-        function escapeHtml(text) {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
-        }
-        
+
         // Add a chat bubble to the interface
         function addChatBubble(message, role, save = true, replyTime = null) {
           const chatMessages = document.getElementById('chatMessages');
@@ -3544,31 +3322,19 @@ ${cleanContent}
             hour12: true 
           });
           
-          // Create renderer for external links
-          const renderer = new marked.Renderer();
-          const originalLink = renderer.link.bind(renderer);
-          renderer.link = function(href, title, text) {
-            const isExternal = /^https?:\/\//.test(href);
-            let link = originalLink(href, title, text);
-            if (isExternal) {
-              link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
-            }
-            return link;
-          };
-          
-          // Render markdown using marked with custom renderer
-          const renderedContent = marked.parse(message, { renderer });
+          // Render markdown using marked with external link renderer
+          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer() });
           
           let bubbleHtml = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">
+              <small class="d-block chat-timestamp">
                 \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
               </small>
-              <div class="markdown-content" style="margin: 0; padding: 0;">\${renderedContent}</div>
+              <div class="markdown-content">\${renderedContent}</div>
           \`;
           
           if (replyTime) {
-            bubbleHtml += \`<small class="d-block mt-1" style="opacity: 0.4; font-size: 0.55rem; font-style: italic;">Replied in \${replyTime}</small>\`;
+            bubbleHtml += \`<small class="d-block mt-1 chat-timestamp-subtle">Replied in \${replyTime}</small>\`;
           }
           
           bubbleHtml += \`</div>\`;
@@ -3625,14 +3391,14 @@ ${cleanContent}
           // Create initial HTML with space for thinking content
           typingIndicator.innerHTML = \`
             <div class="bubble-content">
-              <small class="d-block" style="opacity: 0.6; margin: 0 0 0.05rem 0; font-size: 0.65rem; line-height: 1;">AI · Processing...</small>
+              <small class="d-block chat-timestamp">AI · Processing...</small>
               <div class="d-flex align-items-center">
                 <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
                 <span class="text-muted" id="ai-timer">0 seconds</span>
               </div>
-              <div class="thinking-content text-muted small mt-2" style="max-height: 100px; overflow-y: auto; font-family: monospace; display: none;"></div>
+              <div class="thinking-content-display text-muted small mt-2" style="display: none;"></div>
             </div>
           \`;
           document.getElementById('chatMessages').appendChild(typingIndicator);
@@ -3726,12 +3492,12 @@ ${cleanContent}
                           const thinkingHtml = \`
                             <div class="chat-bubble assistant">
                               <div class="bubble-content">
-                                <small class="d-block" style="opacity: 0.6; margin: 0 0 0.25rem 0; font-size: 0.65rem; line-height: 1;">AI · Thinking Process</small>
+                                <small class="d-block chat-timestamp-lg">AI · Thinking Process</small>
                                 <details class="mb-2">
                                   <summary class="text-muted small" style="cursor: pointer;">
                                     <i class="fas fa-brain me-1"></i> View thinking process
                                   </summary>
-                                  <div class="mt-2 p-2 bg-light rounded" style="font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">
+                                  <div class="thinking-result mt-2 p-2 bg-light rounded">
                                     \${escapeHtml(thinkingContent)}
                                   </div>
                                 </details>
@@ -3751,7 +3517,7 @@ ${cleanContent}
                         responseBubble.id = 'streaming-response';
                         responseBubble.innerHTML = \`
                           <div class="bubble-content">
-                            <small class="d-block" style="opacity: 0.6; margin: 0 0 0.25rem 0; font-size: 0.65rem; line-height: 1;">AI · <span id="response-timer">Responding...</span></small>
+                            <small class="d-block chat-timestamp-lg">AI · <span id="response-timer">Responding...</span></small>
                             <div class="response-text"></div>
                           </div>
                         \`;
@@ -3763,18 +3529,7 @@ ${cleanContent}
                       responseContent += data.content;
                       const responseElement = document.querySelector('#streaming-response .response-text');
                       if (responseElement) {
-                        // Create renderer for external links
-                        const renderer = new marked.Renderer();
-                        const originalLink = renderer.link.bind(renderer);
-                        renderer.link = function(href, title, text) {
-                          const isExternal = /^https?:\/\//.test(href);
-                          let link = originalLink(href, title, text);
-                          if (isExternal) {
-                            link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
-                          }
-                          return link;
-                        };
-                        responseElement.innerHTML = marked.parse(responseContent, { renderer });
+                        responseElement.innerHTML = marked.parse(responseContent, { renderer: createExternalLinkRenderer() });
                       }
                       
                       // Scroll to bottom
@@ -5212,8 +4967,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
           }
         </script>
 
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      <script src="/static/js/common.js"></script>
+        ${pageScripts}
       </body>
       </html>
     `;
@@ -5248,11 +5002,6 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
         <title>Edit Task: ${task.title}</title>
         ${pageStyle}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-        <style>
-          .form-label { font-weight: 500; margin-bottom: 0.5rem; }
-          .form-control, .form-select { margin-bottom: 1rem; }
-          .task-form { max-width: 800px; margin: 0 auto; }
-        </style>
       </head>
       <body>
         ${getNavbar('Task Editor', 'fa-tasks', { showSearch: false })}
@@ -5377,8 +5126,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
 
         <!-- Scripts -->
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-      <script src="/static/js/common.js"></script>
+        ${pageScripts}
         <script>
           // Initialize date picker
           flatpickr("#do_date", {
