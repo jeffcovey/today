@@ -1,0 +1,173 @@
+/**
+ * Common JavaScript for Today web interface
+ */
+
+// Search functionality
+function performSearch(event) {
+  event.preventDefault();
+  const searchQuery = document.getElementById('searchInput').value.trim();
+  if (searchQuery) {
+    window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
+  }
+}
+
+// AI Assistant Toggle Functionality
+let isCollapsed = false;
+
+function initializeAIAssistant() {
+  const isMobile = window.innerWidth <= 767;
+  const savedState = localStorage.getItem('aiAssistantCollapsed');
+
+  // Default to collapsed on mobile, expanded on desktop
+  if (savedState !== null) {
+    isCollapsed = savedState === 'true';
+  } else {
+    isCollapsed = isMobile;
+  }
+
+  if (isCollapsed) {
+    document.body.classList.add('ai-collapsed');
+    const wrapper = document.getElementById('aiAssistantWrapper');
+    if (wrapper) wrapper.classList.add('collapsed');
+    updateToggleIcon();
+  }
+
+  // Add click handler for mobile header
+  if (isMobile) {
+    const header = document.getElementById('aiAssistantHeader');
+    if (header) {
+      header.style.cursor = 'pointer';
+      header.onclick = toggleAIAssistant;
+    }
+  }
+}
+
+function toggleAIAssistant() {
+  isCollapsed = !isCollapsed;
+  const wrapper = document.getElementById('aiAssistantWrapper');
+
+  if (isCollapsed) {
+    document.body.classList.add('ai-collapsed');
+    if (wrapper) wrapper.classList.add('collapsed');
+  } else {
+    document.body.classList.remove('ai-collapsed');
+    if (wrapper) wrapper.classList.remove('collapsed');
+  }
+
+  updateToggleIcon();
+  localStorage.setItem('aiAssistantCollapsed', isCollapsed);
+}
+
+function updateToggleIcon() {
+  const icon = document.getElementById('toggleIcon');
+  if (icon) {
+    const isMobile = window.innerWidth <= 767;
+    if (isMobile) {
+      icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    } else {
+      icon.className = isCollapsed ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+    }
+  }
+}
+
+// Handle resize events
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    updateToggleIcon();
+  }, 250);
+});
+
+// Timer functionality
+function updateTimerDuration() {
+  const timerAlert = document.querySelector('[data-timer-start]');
+  if (!timerAlert) return;
+
+  const startTime = new Date(timerAlert.dataset.timerStart);
+  const now = new Date();
+  const diff = Math.floor((now - startTime) / 1000);
+
+  const hours = Math.floor(diff / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+
+  const durationSpan = timerAlert.querySelector('.timer-duration');
+  if (durationSpan) {
+    if (hours > 0) {
+      durationSpan.textContent = `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      durationSpan.textContent = `${minutes}m ${seconds}s`;
+    } else {
+      durationSpan.textContent = `${seconds}s`;
+    }
+  }
+}
+
+// Collapse/expand functionality for sections
+function toggleCollapse(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (section) {
+    if (section.classList.contains('show')) {
+      section.classList.remove('show');
+      localStorage.setItem('collapse_' + sectionId, 'collapsed');
+    } else {
+      section.classList.add('show');
+      localStorage.setItem('collapse_' + sectionId, 'expanded');
+    }
+  }
+}
+
+// Restore collapse states from localStorage
+function restoreCollapseStates() {
+  document.querySelectorAll('.collapse').forEach(section => {
+    const state = localStorage.getItem('collapse_' + section.id);
+    if (state === 'expanded') {
+      section.classList.add('show');
+    } else if (state === 'collapsed') {
+      section.classList.remove('show');
+    }
+  });
+}
+
+// Task checkbox toggle
+async function toggleTaskCheckbox(checkbox) {
+  const taskId = checkbox.dataset.taskId;
+  if (!taskId) return;
+
+  const wasChecked = !checkbox.checked; // State before toggle
+
+  try {
+    const response = await fetch('/task/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, completed: checkbox.checked })
+    });
+
+    if (!response.ok) {
+      // Revert on failure
+      checkbox.checked = wasChecked;
+      console.error('Failed to toggle task');
+    }
+  } catch (error) {
+    checkbox.checked = wasChecked;
+    console.error('Error toggling task:', error);
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  initializeAIAssistant();
+  restoreCollapseStates();
+
+  // Start timer updates if there's an active timer
+  if (document.querySelector('[data-timer-start]')) {
+    updateTimerDuration();
+    setInterval(updateTimerDuration, 1000);
+  }
+
+  // Add event listeners for task checkboxes
+  document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', () => toggleTaskCheckbox(checkbox));
+  });
+});

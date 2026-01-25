@@ -29,6 +29,40 @@ const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
 const VAULT_PATH = path.join(__dirname, '..', 'vault');
+const TEMPLATES_PATH = path.join(__dirname, 'web', 'templates');
+
+// Template system - loads HTML templates from files
+const templateCache = new Map();
+
+async function loadTemplate(name) {
+  // In development, always reload from disk for hot reloading
+  // In production, cache templates
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (!isDev && templateCache.has(name)) {
+    return templateCache.get(name);
+  }
+
+  const templatePath = path.join(TEMPLATES_PATH, `${name}.html`);
+  try {
+    const content = await fs.readFile(templatePath, 'utf8');
+    if (!isDev) {
+      templateCache.set(name, content);
+    }
+    return content;
+  } catch (error) {
+    debug(`Template not found: ${name}`, error.message);
+    return null;
+  }
+}
+
+function renderTemplate(template, data = {}) {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value ?? '');
+  }
+  return result;
+}
 
 // Track pending markdown regenerations
 const pendingMarkdownUpdates = new Map();
@@ -139,34 +173,15 @@ function sessionAuth(req, res, next) {
   res.redirect("/auth/login");
 }
 
-app.get("/auth/login", (req, res) => {
+app.get("/auth/login", async (req, res) => {
   if (req.session && req.session.authenticated) return res.redirect("/");
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Login - Today Vault</title>
-      <style>
-        body { font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
-        form { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input { display: block; width: 200px; margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
-        button { width: 100%; padding: 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        h2 { margin: 0 0 1rem 0; color: #333; }
-      </style>
-    </head>
-    <body>
-      <form method="POST">
-        <h2>Today Vault</h2>
-        <input name="username" placeholder="Username" required autofocus>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
-      </form>
-    </body>
-    </html>
-  `);
+  const template = await loadTemplate('login');
+  if (template) {
+    res.send(template);
+  } else {
+    // Fallback if template not found
+    res.send('<h1>Login</h1><form method="POST"><input name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button>Login</button></form>');
+  }
 });
 
 app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
