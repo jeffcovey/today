@@ -8,12 +8,25 @@ import crypto from "crypto";
 import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import { marked } from 'marked';
+import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
+import { markedHighlight } from 'marked-highlight';
+import hljs from 'highlight.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import yaml from 'js-yaml';
+
+// Configure marked extensions
+marked.use(gfmHeadingId());
+marked.use(markedHighlight({
+  langPrefix: 'hljs language-',
+  highlight(code, lang) {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+    return hljs.highlight(code, { language }).value;
+  }
+}));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -206,6 +219,8 @@ const pageStyle = `
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet"/>
 <!-- MDB -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.min.css" rel="stylesheet"/>
+<!-- Highlight.js theme for code blocks -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" rel="stylesheet"/>
 <!-- Custom styles -->
 <link href="/static/css/style.css" rel="stylesheet"/>
 `;
@@ -1636,29 +1651,16 @@ function createExternalLinkRenderer() {
   return renderer;
 }
 
-// Generate table of contents from markdown headings
-function generateTableOfContents(content) {
-  const headings = [];
-  const headingRegex = /^(#{2,6})\s+(.+)$/gm;
-  let match;
-  let headingId = 0;
-  
-  while ((match = headingRegex.exec(content)) !== null) {
-    const level = match[1].length;
-    const text = match[2].trim();
-    // Skip if heading is inside a details/summary block
-    const beforeMatch = content.substring(0, match.index);
-    const openDetails = (beforeMatch.match(/<details/gi) || []).length;
-    const closeDetails = (beforeMatch.match(/<\/details>/gi) || []).length;
-    if (openDetails > closeDetails) continue;
-    
-    headingId++;
-    const id = `heading-${headingId}`;
-    headings.push({ level, text, id });
-  }
-  
-  if (headings.length === 0) return { toc: '', contentWithIds: content };
-  
+// Generate table of contents from parsed headings (using marked-gfm-heading-id)
+function generateTableOfContents() {
+  // Get headings from the most recent marked.parse() call
+  const headings = getHeadingList();
+
+  // Filter to h2-h6 only (skip h1 which is usually the title)
+  const tocHeadings = headings.filter(h => h.level >= 2 && h.level <= 6);
+
+  if (tocHeadings.length === 0) return '';
+
   // Generate TOC HTML for header
   let tocHtml = '';
   tocHtml += '<details class="toc-header">\n';
@@ -1666,26 +1668,19 @@ function generateTableOfContents(content) {
   tocHtml += '<div class="toc-links mt-1">\n';
   tocHtml += '<ul class="list-unstyled small mb-0">\n';
 
-  headings.forEach(heading => {
-    const indent = (heading.level - 2) * 15; // Start from h2, each level adds 15px (reduced from 20px)
+  tocHeadings.forEach(heading => {
+    const indent = (heading.level - 2) * 15; // Start from h2, each level adds 15px
     tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.15rem; line-height: 1.3;">`;
     tocHtml += `<a href="#${heading.id}">`;
     tocHtml += heading.text;
     tocHtml += '</a></li>\n';
   });
-  
+
   tocHtml += '</ul>\n';
   tocHtml += '</div>\n';
   tocHtml += '</details>\n';
-  
-  // Add IDs to headings in content
-  headingId = 0;
-  const contentWithIds = content.replace(headingRegex, (match, hashes, text) => {
-    headingId++;
-    return `${hashes} <span id="heading-${headingId}"></span>${text}`;
-  });
-  
-  return { toc: tocHtml, contentWithIds };
+
+  return tocHtml;
 }
 
 // The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
@@ -2740,10 +2735,6 @@ async function renderMarkdownUncached(filePath, urlPath) {
     contentToRender = content.replace(/^# .+\n?/m, '');
   }
 
-  // Generate table of contents
-  const { toc, contentWithIds } = generateTableOfContents(contentToRender);
-  contentToRender = contentWithIds;
-
   // Replace tags with emojis in the markdown content
   contentToRender = replaceTagsWithEmojis(contentToRender);
 
@@ -2782,11 +2773,12 @@ async function renderMarkdownUncached(filePath, urlPath) {
     return `<input type="checkbox" class="task-checkbox"${isChecked ? ' checked' : ''}>`;
   };
 
-  // Render the markdown with custom renderer (with IDs added to headings)
+  // Render the markdown with custom renderer (heading IDs added by marked-gfm-heading-id)
   let htmlContent = marked.parse(contentToRender, { renderer });
-  
-  // Don't prepend TOC to content - we'll add it to the header instead
-  
+
+  // Generate TOC from the parsed headings (must be called after marked.parse)
+  const toc = generateTableOfContents();
+
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
   
@@ -3059,11 +3051,9 @@ ${cleanContent}
 
   // Enhance remaining blockquotes with MDBootstrap styling
   htmlContent = htmlContent.replace(/<blockquote>/g, '<blockquote class="blockquote border-start border-4 border-primary ps-3 my-3">');
-  
-  // Enhance code blocks with better styling - using inline styles to override
-  htmlContent = htmlContent.replace(/<pre><code class="language-([^"]*)">([\s\S]*?)<\/code><\/pre>/g, 
-    '<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1rem !important; border: 1px solid #333 !important; border-radius: 0.375rem !important; overflow-x: auto !important;"><code class="language-$1" style="background: transparent !important; color: #d4d4d4 !important;">$2</code></pre>');
-  
+
+  // Code block styling is now handled by highlight.js CSS (github-dark theme)
+
   // Add alerts for certain keywords
   htmlContent = htmlContent.replace(/<p><strong>(NOTE|IMPORTANT|WARNING|TIP):<\/strong>([^<]*)<\/p>/g, function(match, type, content) {
     const alertClass = {
