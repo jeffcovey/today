@@ -1625,14 +1625,38 @@ function parseExistingDiaryEntries(sectionContent) {
     else if (header.includes('concern')) type = 'concern';
 
     if (type) {
-      // Extract bullet entries - match "- **date**: text"
+      // Extract bullet entries - handle multi-line entries
+      // An entry starts with "- **date**: text" and continues until the next "- **" or end
+      let currentDate = null;
+      let currentTextLines = [];
+
+      const saveCurrentEntry = () => {
+        if (currentDate && currentTextLines.length > 0) {
+          const fullText = currentTextLines.join('\n').trim();
+          existing[type].add(`${currentDate}|${fullText}`);
+        }
+        currentDate = null;
+        currentTextLines = [];
+      };
+
       for (const line of lines.slice(1)) {
-        const match = line.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
+        const match = line.match(/^-\s+\*\*([^*]+)\*\*:\s*(.*)$/);
         if (match) {
-          // Store as "date|text" for comparison
-          existing[type].add(`${match[1].trim()}|${match[2].trim()}`);
+          // New entry starting - save previous one first
+          saveCurrentEntry();
+          currentDate = match[1].trim();
+          if (match[2].trim()) {
+            currentTextLines.push(match[2].trim());
+          }
+        } else if (currentDate && line.trim()) {
+          // Continuation line of current entry
+          // Strip leading "- " if present (it's part of the text content)
+          const continuationText = line.replace(/^-\s*/, '- ').trim();
+          currentTextLines.push(continuationText);
         }
       }
+      // Don't forget the last entry
+      saveCurrentEntry();
     }
   }
 

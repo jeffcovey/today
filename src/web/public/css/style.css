@@ -1,0 +1,715 @@
+/* Custom styles to complement MDBootstrap */
+
+/* Sticky card header with TOC */
+.card-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: white;
+}
+
+/* Add scroll padding to account for sticky header and navbar */
+html {
+  scroll-padding-top: 200px;
+  scroll-behavior: smooth;
+}
+
+/* Ensure anchor targets are visible */
+[id]:target {
+  scroll-margin-top: 200px;
+}
+
+/* Table of Contents styles in header */
+.card-header .toc-header {
+  margin-bottom: 0;
+}
+
+.toc-header summary {
+  color: #6c757d;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.toc-header summary:hover {
+  color: #495057;
+}
+
+.toc-header .toc-links {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #f8f9fa;
+  margin-top: 0.25rem;
+}
+
+.toc-links a {
+  color: #495057;
+  text-decoration: none;
+  transition: all 0.3s;
+  display: inline-block;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.toc-links a:hover {
+  color: #007bff;
+  background: white;
+  text-decoration: underline;
+}
+
+/* Table of Contents styles */
+details summary.h5 {
+  color: #007bff;
+  font-weight: 500;
+}
+
+details summary.h5:hover {
+  color: #0056b3;
+}
+
+/* Styles for collapse components */
+.collapse-header {
+  transition: all 0.3s ease;
+}
+
+/* Styles for collapsible task sections */
+details.task-section {
+  margin: 1rem 0;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.75rem;
+}
+
+details.task-section summary {
+  cursor: pointer;
+  padding: 0.75rem;
+  margin: -0.75rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+details.task-section summary:hover {
+  background-color: #f8f9fa;
+}
+
+details.task-section[open] summary {
+  border-bottom: 1px solid #dee2e6;
+  margin-bottom: 0.75rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+details.task-section .section-content {
+  padding-top: 0.75rem;
+}
+
+details.task-section summary::-webkit-details-marker {
+  margin-right: 0.5rem;
+}
+
+/* Obsidian-style callout variations */
+details.callout-note { border-left: 4px solid #007bff; }
+details.callout-tip { border-left: 4px solid #28a745; }
+details.callout-warning { border-left: 4px solid #ffc107; }
+details.callout-danger { border-left: 4px solid #dc3545; }
+details.callout-info { border-left: 4px solid #17a2b8; }
+details.callout-success, details.callout-check, details.callout-done { border-left: 4px solid #28a745; }
+details.callout-abstract, details.callout-summary, details.callout-tldr { border-left: 4px solid #00b0ff; }
+details.callout-hint, details.callout-important { border-left: 4px solid #00bcd4; }
+details.callout-question, details.callout-help, details.callout-faq { border-left: 4px solid #ffc107; }
+details.callout-caution, details.callout-attention { border-left: 4px solid #ff9800; }
+details.callout-failure, details.callout-fail, details.callout-missing, details.callout-error, details.callout-bug { border-left: 4px solid #f44336; }
+details.callout-cite { border-left: 4px solid #9e9e9e; }
+
+body {
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+/* Markdown content styling */
+.markdown-content:not(.chat-bubble .markdown-content) {
+  background: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+
+.bubble-content .markdown-content {
+  margin: 0;
+  padding: 0;
+}
+
+.markdown-content h1 {
+  color: #1266f1;
+  font-weight: 300;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.markdown-content h2 {
+  color: #424242;
+  font-weight: 400;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content h3 {
+  color: #616161;
+  font-weight: 500;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content pre {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 1rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.markdown-content code {
+  background: rgba(18, 102, 241, 0.1);
+  color: #1266f1;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: #d4d4d4;
+  padding: 0;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #1266f1;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #757575;
+  font-style: italic;
+}
+
+.markdown-content table {
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin: 1rem 0;
+  padding-left: 2rem;
+}
+
+.markdown-content li {
+  margin: 0.5rem 0;
+  line-height: 1.7;
+}
+
+/* Task styles */
+.task-cancelled {
+  text-decoration: line-through;
+  opacity: 0.6;
+  color: #6c757d;
+}
+
+.task-cancelled input[type="checkbox"] {
+  opacity: 1;
+}
+
+.task-cancelled::after {
+  content: " (cancelled)";
+  font-style: italic;
+  color: #6c757d;
+}
+
+/* Properties card styles */
+.properties-card {
+  border-left: 4px solid #1266f1;
+}
+
+.properties-card .card-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.properties-card .badge {
+  font-weight: normal;
+}
+
+.properties-card details summary {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.properties-card details summary:hover {
+  opacity: 0.8;
+}
+
+.properties-card .progress {
+  background-color: #e9ecef;
+}
+
+.properties-card .progress-bar {
+  background-color: #1266f1;
+  transition: width 0.6s ease;
+}
+
+.properties-card time {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+/* Dataview styles */
+.dataview-table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-collapse: collapse;
+}
+
+.dataview-table thead {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 2px solid #1266f1;
+}
+
+.dataview-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #212529;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.dataview-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.dataview-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.dataview-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dataview-list {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.dataview-list li {
+  margin: 0.5rem 0;
+}
+
+.dataview-inline {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  background-color: #f8f9fa;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+/* Chat interface styles */
+.chat-container {
+  height: calc(100vh - 250px);
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-assistant-wrapper {
+  transition: all 0.3s ease;
+}
+
+/* Force row to be horizontal flex on desktop */
+@media (min-width: 768px) {
+  .container-fluid .row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .col-md-7 {
+    flex: 0 0 58.333333% !important;
+    max-width: 58.333333% !important;
+  }
+
+  .col-md-5 {
+    flex: 0 0 41.666667% !important;
+    max-width: 41.666667% !important;
+  }
+}
+
+/* When AI assistant is collapsed */
+@media (min-width: 768px) {
+  body.ai-collapsed .col-md-7 {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    transition: all 0.3s ease;
+  }
+
+  body.ai-collapsed .col-md-5 {
+    display: none;
+  }
+}
+
+/* Make chat card sticky on desktop */
+@media (min-width: 768px) {
+  .col-md-5 > .card {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+
+  .ai-assistant-wrapper.collapsed {
+    display: none;
+  }
+
+  body.ai-collapsed .floating-toggle-btn {
+    display: flex;
+  }
+}
+
+/* Floating toggle button */
+.floating-toggle-btn {
+  display: none;
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 1051;
+  font-size: 1.2rem;
+}
+
+.floating-toggle-btn:hover {
+  background: #0056b3;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Mobile styles */
+@media (max-width: 767px) {
+  .ai-assistant-wrapper.collapsed {
+    display: none;
+  }
+
+  body.ai-collapsed .floating-toggle-btn {
+    display: flex;
+    bottom: 20px;
+    top: auto;
+    transform: none;
+  }
+
+  .markdown-content {
+    padding: 1rem;
+  }
+
+  .container-fluid {
+    padding: 0.5rem;
+  }
+
+  .chat-container {
+    height: 40vh;
+  }
+}
+
+/* Toggle button styles */
+.toggle-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.toggle-btn:hover {
+  transform: scale(1.1);
+}
+
+@media (max-width: 767px) {
+  .toggle-btn.desktop-only {
+    display: none;
+  }
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background: #f8f9fa;
+}
+
+.chat-bubble {
+  max-width: 70%;
+  margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  padding: 0.35rem 0.5rem !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  border: none !important;
+}
+
+.chat-bubble.user {
+  margin-left: auto;
+  background: #007bff !important;
+  color: white !important;
+}
+
+.chat-bubble .card,
+.chat-bubble .card-body,
+.chat-bubble .markdown-content {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.chat-bubble.user .bubble-content,
+.chat-bubble.user .markdown-content,
+.chat-bubble.user .markdown-content * {
+  color: inherit !important;
+}
+
+.chat-bubble.ai .bubble-content,
+.chat-bubble.ai .markdown-content,
+.chat-bubble.ai .markdown-content * {
+  color: inherit !important;
+}
+
+/* Code blocks in chat */
+.chat-bubble pre {
+  background: #282c34 !important;
+  border: 1px solid #3e4451 !important;
+  margin: 0.5rem 0 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.chat-bubble pre code {
+  background: #282c34 !important;
+  color: #abb2bf !important;
+  padding: 0.75rem !important;
+  border-radius: 0.25rem !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  display: block !important;
+  overflow-x: auto !important;
+}
+
+.chat-bubble.user pre {
+  background: #f5f5f5 !important;
+  border: 1px solid #ccc !important;
+}
+
+.chat-bubble.user pre code {
+  background: #f5f5f5 !important;
+  color: #333 !important;
+}
+
+.chat-bubble.assistant pre,
+.chat-bubble.ai pre {
+  background: #1e1e1e !important;
+}
+
+.chat-bubble.assistant pre code,
+.chat-bubble.ai pre code {
+  background: #282c34 !important;
+  color: #abb2bf !important;
+}
+
+/* Inline code */
+.chat-bubble code:not(pre code) {
+  background: rgba(0,0,0,0.75) !important;
+  color: #e6e6e6 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 3px !important;
+  font-size: 0.9em !important;
+}
+
+.chat-bubble.user code:not(pre code) {
+  background: rgba(0,0,0,0.1) !important;
+  color: #333 !important;
+}
+
+.chat-bubble.assistant,
+.chat-bubble.ai {
+  background: #e9ecef !important;
+  color: #212529 !important;
+}
+
+.chat-bubble.typing-indicator {
+  background: #e9ecef !important;
+}
+
+.chat-bubble.typing-indicator .spinner-border {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* Remove margins in chat bubbles */
+.chat-bubble .markdown-content p:first-child,
+.chat-bubble .markdown-content ul:first-child,
+.chat-bubble .markdown-content ol:first-child,
+.chat-bubble .markdown-content blockquote:first-child,
+.chat-bubble .markdown-content pre:first-child {
+  margin-top: 0 !important;
+}
+
+.chat-bubble .markdown-content p:last-child,
+.chat-bubble .markdown-content ul:last-child,
+.chat-bubble .markdown-content ol:last-child,
+.chat-bubble .markdown-content blockquote:last-child,
+.chat-bubble .markdown-content pre:last-child {
+  margin-bottom: 0 !important;
+}
+
+.chat-bubble .markdown-content p {
+  margin: 0.2rem 0 !important;
+  line-height: 1.3 !important;
+}
+
+.chat-bubble .markdown-content {
+  line-height: 1.3 !important;
+}
+
+.chat-bubble .bubble-content {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.chat-input-area {
+  border-top: 1px solid #dee2e6;
+  padding: 1rem;
+  background: white;
+}
+
+.chat-input-area .input-group {
+  align-items: stretch;
+}
+
+.chat-input-area textarea {
+  resize: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  min-height: 100px !important;
+  height: auto !important;
+}
+
+.chat-input-area .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  align-self: stretch;
+}
+
+.card-body.markdown-content {
+  padding: 1.5rem;
+}
+
+/* Sticky navbar */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+}
+
+nav[aria-label="breadcrumb"] {
+  position: sticky;
+  top: 56px;
+  background: transparent;
+  z-index: 1010;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+}
+
+/* Editor page styles */
+.editor-container {
+  height: calc(100vh - 250px);
+  min-height: 400px;
+}
+#editor {
+  width: 100%;
+  height: 100%;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 1rem;
+  resize: none;
+}
+#editor:focus {
+  outline: none;
+  box-shadow: none;
+}
+.editor-toolbar {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 0.375rem 0.375rem 0 0;
+  border: 1px solid #dee2e6;
+  border-bottom: none;
+}
+
+/* Task form styles */
+/* Chat timestamp styles */
+.chat-timestamp {
+  opacity: 0.6;
+  margin: 0 0 0.05rem 0;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.chat-timestamp-lg {
+  opacity: 0.6;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.chat-timestamp-subtle {
+  opacity: 0.4;
+  font-size: 0.55rem;
+  font-style: italic;
+}
+
+.thinking-content-display {
+  max-height: 100px;
+  overflow-y: auto;
+  font-family: monospace;
+}
+
+.thinking-result {
+  font-family: monospace;
+  font-size: 0.85rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.task-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.task-form .form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.task-form .form-control,
+.task-form .form-select {
+  margin-bottom: 1rem;
+}

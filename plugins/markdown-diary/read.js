@@ -139,9 +139,17 @@ function generatePlanNavigationSection(date) {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const monthName = monthNames[dateObj.getMonth()];
 
+  // Check if now.md exists
+  const nowPath = path.join(projectRoot, 'vault', 'now.md');
+  const hasNow = fs.existsSync(nowPath);
+
+  // Build navigation links
+  const nowLink = hasNow ? '[[now|Now]] · ' : '';
+  const navLinks = `${nowLink}[[plans/${dailyFile}|Today]] · [[plans/${weeklyFile}|Week]] · [[plans/${monthlyFile}|Month]] · [[plans/${quarterlyFile}|Quarter]] · [[plans/${yearlyFile}|Year]]`;
+
   return `## 📅 ${dayName}, ${monthName} ${day}, ${year}
 
-📅 [[plans/${dailyFile}|Today's Plan]] | 📊 [[plans/${weeklyFile}|This Week]] | 📆 [[plans/${monthlyFile}|This Month]] | 🎯 [[plans/${quarterlyFile}|This Quarter]] | 📈 [[plans/${yearlyFile}|This Year]]`;
+${navLinks}`;
 }
 
 /**
@@ -323,8 +331,8 @@ function isEmptyDiaryFile(filePath) {
     // Remove time tracking sections
     contentWithoutAutoSections = contentWithoutAutoSections.replace(/## ⏱️ Time Tracking - Today[\s\S]*?```dataviewjs[\s\S]*?```/g, '');
 
-    // Remove plan navigation sections (with emoji headers and links)
-    contentWithoutAutoSections = contentWithoutAutoSections.replace(/## 📅 [^,]+, [^,]+ \d+, \d+[\s\S]*?📅 \[\[plans\/[^\]]+\]\][\s\S]*?\[\[plans\/[^\]]+\]\]/g, '');
+    // Remove plan navigation sections (header line + navigation links)
+    contentWithoutAutoSections = contentWithoutAutoSections.replace(/## 📅 [^,]+, [^,]+ \d+, \d+\n+(?:\[\[(?:now|plans\/)[^\]]*\]\][^\n]*\n?)+/g, '');
 
     // Remove stage notice lines (emoji + stage name + focus)
     contentWithoutAutoSections = contentWithoutAutoSections.replace(/[🎬🔧🎨] \*\*[^*]+\*\* - [^\n]+/g, '');
