@@ -967,7 +967,7 @@ ${contextSection}`;
       const child = spawn('node', [serverPath], {
         cwd: projectRoot,
         detached: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: 'ignore',
         env: { ...process.env }
       });
 
@@ -1037,7 +1037,7 @@ ${contextSection}`;
       const child = spawn('node', [serverPath], {
         cwd: projectRoot,
         detached: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: 'ignore',
         env: { ...process.env }
       });
 
