@@ -1675,20 +1675,29 @@ async function getCachedRender(filePath, urlPath) {
 }
 
 // Create a marked renderer that opens external links in new tabs
+// and makes internal relative links vault-root absolute (Obsidian behavior)
 function createExternalLinkRenderer() {
   const renderer = new marked.Renderer();
-  const originalLinkRenderer = renderer.link.bind(renderer);
-  renderer.link = function(href, title, text) {
+  renderer.link = function({ href, title, tokens }) {
     // Check if the link is external (starts with http:// or https://)
     const isExternal = /^https?:\/\//.test(href);
-    let link = originalLinkRenderer(href, title, text);
-    
-    if (isExternal) {
-      // Add target="_blank" and rel="noopener noreferrer" for external links
-      link = link.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+    // Check if it's an anchor link (starts with #)
+    const isAnchor = href.startsWith('#');
+    // Check if it's already absolute (starts with /)
+    const isAbsolute = href.startsWith('/');
+
+    // Make internal relative links vault-root absolute (Obsidian behavior)
+    // e.g., "tasks/plans" becomes "/tasks/plans" not "../tasks/plans"
+    if (!isExternal && !isAnchor && !isAbsolute) {
+      href = '/' + href;
     }
-    
-    return link;
+
+    // Render link text from tokens
+    const text = this.parser.parseInline(tokens);
+    const titleAttr = title ? ` title="${title}"` : '';
+    const externalAttrs = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+
+    return `<a href="${href}"${titleAttr}${externalAttrs}>${text}</a>`;
   };
   return renderer;
 }
