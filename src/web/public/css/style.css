@@ -229,6 +229,11 @@ body {
   color: #6c757d;
 }
 
+/* Hide list markers for task items (has checkbox) */
+li:has(.task-checkbox) {
+  list-style: none;
+}
+
 /* Properties card styles */
 .properties-card {
   border-left: 4px solid #1266f1;

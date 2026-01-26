@@ -2572,6 +2572,7 @@ async function executeTasksQuery(query) {
 
     // Get file path from metadata (strip 'vault/' prefix if present for consistent matching)
     const filePath = metadata.file_path ? metadata.file_path.replace(/^vault\//, '') : null;
+    const lineNumber = metadata.line_number || null;
 
     return {
       id: row.id,
@@ -2587,6 +2588,7 @@ async function executeTasksQuery(query) {
       happens: scheduledDate || dueDate,
       source: row.source,
       filePath: filePath,
+      lineNumber: lineNumber,
       file: { path: filePath }
     };
   });
@@ -2746,7 +2748,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -2779,7 +2781,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -2807,6 +2809,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
   debug('renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
 
+  // IMPORTANT: Save the original content BEFORE any modifications
+  // This is needed for accurate line tracking when mapping checkboxes
+  const originalContent = content;
+
   // Get current timer info
   const currentTimer = await getCurrentTimer();
 
@@ -2814,22 +2820,24 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const { properties, contentWithoutFrontmatter } = parseFrontmatter(content);
   content = contentWithoutFrontmatter;
 
-  // IMPORTANT: Save the original content BEFORE any modifications
-  // This is needed for accurate line tracking when mapping checkboxes
-  const originalContent = content;
+  // Calculate frontmatter offset for accurate line numbers
+  const frontmatterOffset = originalContent.length - contentWithoutFrontmatter.length > 0
+    ? originalContent.substring(0, originalContent.length - contentWithoutFrontmatter.length).split('\n').length - 1
+    : 0;
+
   const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
 
   // Insert metadata markers that won't break marked.js checkbox detection
   // We'll use {data-file="..." data-line="..."} which marked.js will pass through
   // Updated regex to also match tasks inside blockquotes (lines starting with >) and cancelled tasks
   const taskRegex = /^((?:\s*>)*\s*)- \[[ x-]\] (.+)$/i;
-  const originalLines = originalContent.split('\n');
+  const contentLines = content.split('\n'); // content is WITHOUT frontmatter
 
-  for (let i = 0; i < originalLines.length; i++) {
-    const line = originalLines[i];
+  for (let i = 0; i < contentLines.length; i++) {
+    const line = contentLines[i];
     const match = line.match(taskRegex);
     if (match) {
-      const lineNumber = i + 1; // 1-based line numbers
+      const lineNumber = i + 1 + frontmatterOffset; // Add offset to get original file line number
       const prefix = match[1]; // This now includes any > prefixes
       const isChecked = line.includes('[x]') || line.includes('[X]');
       const isCancelled = line.includes('[-]');
@@ -2839,10 +2847,10 @@ async function renderMarkdownUncached(filePath, urlPath) {
       // Convert cancelled tasks to unchecked for markdown parser, but preserve cancelled state in metadata
       const checkboxState = isChecked ? 'x' : ' '; // Always use valid markdown checkbox states
       const metadata = isCancelled ? `{data-file="${relativeFilePath}" data-line="${lineNumber}" data-cancelled="true"}` : `{data-file="${relativeFilePath}" data-line="${lineNumber}"}`;
-      originalLines[i] = `${prefix}- [${checkboxState}] ${taskText} ${metadata}`;
+      contentLines[i] = `${prefix}- [${checkboxState}] ${taskText} ${metadata}`;
     }
   }
-  content = originalLines.join('\n');
+  content = contentLines.join('\n');
 
   // NOTE: Tasks code blocks are processed AFTER markdown rendering to avoid
   // breaking HTML when tasks blocks are inside list items. See post-rendering
@@ -2877,7 +2885,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   const checkboxLines = [];
   let inTasksBlock = false;
 
-  originalLines.forEach((line, index) => {
+  contentLines.forEach((line, index) => {
     // Check if we're entering or leaving a ```tasks block
     if (line.match(/^```tasks/)) {
       inTasksBlock = true;
@@ -2904,7 +2912,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
     // The parameter is an object with a 'checked' property, not a boolean
     const isChecked = checkedObj && checkedObj.checked;
     // Return enabled checkboxes without the disabled attribute
-    return `<input type="checkbox" class="task-checkbox"${isChecked ? ' checked' : ''}>`;
+    return `<input type="checkbox" class="task-checkbox"${isChecked ? ' checked' : ''}> `;
   };
 
   // Render the markdown with custom renderer (heading IDs added by marked-gfm-heading-id)
@@ -2992,7 +3000,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
             }
             const taskLink = task.id ? `/task/${task.id}` : '';
             tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
             if (taskLink) {
               tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
             } else {
@@ -3020,7 +3028,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
             }
             const taskLink = task.id ? `/task/${task.id}` : '';
             tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
             if (taskLink) {
               tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
             } else {
@@ -3134,7 +3142,7 @@ ${cleanContent}
 
             const taskLink = task.id ? `/task/${task.id}` : '';
             replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
             if (taskLink) {
               replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
             } else {
@@ -3162,7 +3170,7 @@ ${cleanContent}
 
             const taskLink = task.id ? `/task/${task.id}` : '';
             replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}"> `;
+            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
             if (taskLink) {
               replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
             } else {
@@ -3853,8 +3861,10 @@ ${cleanContent}
         // Function to refresh just the content area
         async function refreshContentArea() {
           try {
-            // Fetch the current page again
-            const response = await fetch(window.location.href);
+            // Fetch the current page again with cache-busting
+            const cacheBuster = '_refresh=' + Date.now();
+            const separator = window.location.href.includes('?') ? '&' : '?';
+            const response = await fetch(window.location.href + separator + cacheBuster);
             if (!response.ok) throw new Error('Failed to fetch updated content');
             
             const html = await response.text();
@@ -3980,66 +3990,15 @@ ${cleanContent}
                 }
 
                 const result = await response.json();
+                console.log('Toggle successful:', result);
 
-                // Visual feedback
-                const listItem = checkbox.closest('li');
-                if (listItem) {
-                  listItem.style.transition = 'opacity 0.3s';
-                  listItem.style.opacity = '0.5';
-                  setTimeout(() => {
-                    listItem.style.opacity = '1';
-                  }, 300);
-                }
-
-                // If task was marked complete, update the display
-                if (isChecked && result.updatedLine) {
-                  // Find the parent li element and update its text content
-                  const listItem = checkbox.closest('li');
-                  if (listItem) {
-                    const today = new Date().toISOString().split('T')[0];
-                    // Get all the text content after the checkbox
-                    const allText = Array.from(listItem.childNodes)
-                      .filter(node => node !== checkbox && node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
-                      .map(node => node.textContent)
-                      .join('')
-                      .trim();
-
-                    // If there's no completion date, add it
-                    if (!allText.includes('✅')) {
-                      // Clear the list item except for the checkbox
-                      while (listItem.lastChild && listItem.lastChild !== checkbox) {
-                        listItem.removeChild(listItem.lastChild);
-                      }
-                      // Add a space after the checkbox
-                      listItem.appendChild(document.createTextNode(' '));
-                      // Add the text with completion date
-                      listItem.appendChild(document.createTextNode(allText + ' ✅ ' + today));
-                    }
-                  }
-                } else if (!isChecked) {
-                  // If unchecking, remove the completion date
-                  const listItem = checkbox.closest('li');
-                  if (listItem) {
-                    // Get all the text content after the checkbox
-                    const allText = Array.from(listItem.childNodes)
-                      .filter(node => node !== checkbox && node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
-                      .map(node => node.textContent)
-                      .join('')
-                      .trim();
-
-                    // Remove completion date if present
-                    const cleanedText = allText.replace(/ ✅ \d{4}-\d{2}-\d{2}$/, '');
-                    if (cleanedText !== allText) {
-                      // Clear the list item except for the checkbox
-                      while (listItem.lastChild && listItem.lastChild !== checkbox) {
-                        listItem.removeChild(listItem.lastChild);
-                      }
-                      // Add a space after the checkbox
-                      listItem.appendChild(document.createTextNode(' '));
-                      // Add the cleaned text
-                      listItem.appendChild(document.createTextNode(cleanedText));
-                    }
-                  }
+                // Refresh the content area to show updated task state
+                // This fetches fresh HTML from server with correct checkbox/text
+                try {
+                  await refreshContentArea();
+                } catch (refreshError) {
+                  console.error('Error refreshing content:', refreshError);
+                  // Toggle succeeded, just refresh failed - don't revert checkbox
                 }
               } catch (error) {
                 console.error('Error updating task:', error);
@@ -4947,7 +4906,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       // Mark as not done and remove completion date
       updatedLine = taskLine
         .replace(/^((?:\s*>)*\s*)- \[x\]/i, '$1- [ ]')  // Keep any blockquote prefix
-        .replace(/ ✅ \d{4}-\d{2}-\d{2}/, '');
+        .replace(/\s+✅ \d{4}-\d{2}-\d{2}/, '');  // Handle multiple spaces before ✅
     }
 
     // Update the file
@@ -4960,7 +4919,32 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
 
-    // Note: markdown_tasks cache was removed - file is the source of truth
+    // Update the database to keep it in sync with the file
+    try {
+      const db = getReadOnlyDatabase();
+      const taskId = `markdown-tasks/local:${dbFilePath}:${line}`;
+      const newStatus = completed ? 'done' : 'open';
+      const today = new Date().toISOString().split('T')[0];
+
+      if (completed) {
+        db.prepare(`
+          UPDATE tasks
+          SET status = ?, completed_at = ?
+          WHERE id = ?
+        `).run(newStatus, today, taskId);
+      } else {
+        db.prepare(`
+          UPDATE tasks
+          SET status = ?, completed_at = NULL
+          WHERE id = ?
+        `).run(newStatus, taskId);
+      }
+      debug(`[TASK] Updated database for task ${taskId} to status ${newStatus}`);
+    } catch (dbError) {
+      // Log but don't fail - file is the source of truth
+      console.error('[TASK] Failed to update database:', dbError.message);
+    }
+
     debug(`[TASK] Successfully updated task at line ${line}`);
     res.json({ success: true, updatedLine });
   } catch (error) {
@@ -5459,7 +5443,11 @@ app.get('/*path', authMiddleware, async (req, res) => {
       res.send(html);
     } else if (stats.isFile()) {
       if (fullPath.endsWith('.md')) {
-        const html = await renderMarkdown(fullPath, urlPath);
+        // Check for _refresh param to bypass cache (used after task toggle)
+        const bypassCache = req.query._refresh !== undefined;
+        const html = bypassCache
+          ? await renderMarkdownUncached(fullPath, urlPath)
+          : await renderMarkdown(fullPath, urlPath);
         res.send(html);
       } else {
         // Serve raw files
@@ -5470,7 +5458,10 @@ app.get('/*path', authMiddleware, async (req, res) => {
     if (error.code === 'ENOENT') {
       res.status(404).send('File not found');
     } else {
-      console.error(error);
+      console.error('=== SERVER ERROR ===');
+      console.error('Path:', req.path);
+      console.error('Error:', error.message);
+      console.error('Stack:', error.stack);
       res.status(500).send('Server error');
     }
   }
