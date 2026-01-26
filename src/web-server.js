@@ -2825,7 +2825,11 @@ async function renderMarkdownUncached(filePath, urlPath) {
     ? originalContent.substring(0, originalContent.length - contentWithoutFrontmatter.length).split('\n').length - 1
     : 0;
 
-  const relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+  // Ensure the relative file path includes .md extension for task IDs
+  let relativeFilePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+  if (!relativeFilePath.endsWith('.md')) {
+    relativeFilePath += '.md';
+  }
 
   // Insert metadata markers that won't break marked.js checkbox detection
   // We'll use {data-file="..." data-line="..."} which marked.js will pass through
@@ -3271,11 +3275,15 @@ ${cleanContent}
         return `<input${checkboxAttrs}>${textBetween}`;
       }
 
-      // Add data attributes to the checkbox
+      // Add data attributes to the checkbox and wrap text in link to task detail page
       const isChecked = checkboxAttrs.includes('checked');
       const isCancelled = cancelled === 'true';
       const taskClass = isCancelled ? ' class="task-checkbox task-cancelled"' : ' class="task-checkbox"';
-      return `<input type="checkbox"${taskClass} data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${textBetween}`;
+      const taskId = `markdown-tasks/local:vault/${file}:${line}`;
+      const taskLink = `/task/${taskId}`;
+      // Wrap the task text in a link (but keep any leading space outside the link)
+      const linkedText = textBetween.replace(/^(\s*)(.+)$/, `$1<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">$2</a>`);
+      return `<input type="checkbox"${taskClass} data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${linkedText}`;
     }
   );
 
@@ -5020,13 +5028,70 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
 });
 
 // Task detail page - uses tasks table (from plugins)
-app.get('/task/:taskId', authMiddleware, async (req, res) => {
+// Use wildcard to capture task IDs with slashes (e.g., markdown-tasks/local:vault/file.md:123)
+app.get('/task/*taskId', authMiddleware, async (req, res) => {
   try {
-    const taskId = req.params.taskId;
+    const taskId = Array.isArray(req.params.taskId) ? req.params.taskId.join('/') : req.params.taskId;
     const db = getReadOnlyDatabase();
 
     // Get task from tasks table
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+    let task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+
+    // If not in database, try to parse from file (for inline markdown tasks)
+    if (!task && taskId.startsWith('markdown-tasks/local:')) {
+      // Parse task ID format: markdown-tasks/local:vault/path/file.md:lineNumber
+      const match = taskId.match(/^markdown-tasks\/local:(.+):(\d+)$/);
+      if (match) {
+        const [, filePath, lineStr] = match;
+        const lineNumber = parseInt(lineStr, 10);
+        const fullPath = path.join(process.cwd(), filePath);
+
+        try {
+          const content = await fs.readFile(fullPath, 'utf-8');
+          const lines = content.split('\n');
+          const taskLine = lines[lineNumber - 1];
+
+          if (taskLine && /^\s*- \[[ xX-]\]/.test(taskLine)) {
+            // Extract task text (remove checkbox and metadata)
+            let title = taskLine
+              .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
+              .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
+              .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
+              .replace(/#[\w/-]+/g, '')            // Remove tags
+              .trim();
+
+            // Check completion status
+            const isCompleted = /^\s*- \[[xX]\]/.test(taskLine);
+
+            // Extract priority
+            let priority = null;
+            if (taskLine.includes('🔺')) priority = 'highest';
+            else if (taskLine.includes('⏫')) priority = 'high';
+            else if (taskLine.includes('🔼')) priority = 'medium';
+            else if (taskLine.includes('🔽')) priority = 'low';
+            else if (taskLine.includes('⏬')) priority = 'lowest';
+
+            // Build task object from file
+            task = {
+              id: taskId,
+              title: title || '(empty task)',
+              status: isCompleted ? 'done' : 'open',
+              priority,
+              source: 'markdown-tasks/local',
+              description: null,
+              due_date: null,
+              created_at: null,
+              updated_at: null,
+              completed_at: null,
+              metadata: JSON.stringify({ filePath, lineNumber, fromFile: true })
+            };
+          }
+        } catch (fileError) {
+          // File doesn't exist or can't be read
+          console.error('Error reading task from file:', fileError.message);
+        }
+      }
+    }
 
     if (!task) {
       return res.status(404).send('Task not found');
@@ -5086,6 +5151,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
                   <div class="mb-4">
                     <h6 class="text-muted mb-2">Source</h6>
                     <div><i class="fas fa-plug me-2"></i>${task.source}</div>
+                    ${(metadata.filePath || metadata.file_path) ? `<div class="mt-1"><a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${metadata.filePath || metadata.file_path}</a></div>` : ''}
                   </div>
 
                   <!-- Actions -->
@@ -5093,6 +5159,7 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
                     <button class="btn btn-success" onclick="startTimer()">
                       <i class="fas fa-play me-2"></i>Start Timer
                     </button>
+                    ${(metadata.filePath || metadata.file_path) ? `<a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
                     <button class="btn btn-outline-secondary" onclick="window.history.back()">
                       <i class="fas fa-arrow-left me-2"></i>Back
                     </button>
@@ -5150,238 +5217,6 @@ app.get('/task/:taskId', authMiddleware, async (req, res) => {
   }
 });
 
-// OLD Task detail/edit page route - DISABLED (database removed, using Obsidian Tasks in markdown)
-/*
-app.get('/task/:taskId', authMiddleware, async (req, res) => {
-  try {
-    const taskId = req.params.taskId;
-    const task = taskManager.getTask(taskId);
-    
-    if (!task) {
-      return res.status(404).send('Task not found');
-    }
-    
-    // Get all projects and topics for dropdowns
-    const projects = taskManager.db.prepare('SELECT id, name FROM projects ORDER BY name').all();
-    const topics = taskManager.db.prepare('SELECT id, name FROM topics ORDER BY name').all();
-    
-    // Build the task editing UI
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <title>Edit Task: ${task.title}</title>
-        ${pageStyle}
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-      </head>
-      <body>
-        ${getNavbar('Task Editor', 'fa-tasks', { showSearch: false })}
-
-        <div class="container mt-4">
-          <div class="task-form">
-            <div class="card shadow-sm">
-              <div class="card-header bg-white">
-                <h4 class="mb-0">
-                  <i class="fas fa-edit me-2"></i>Edit Task
-                </h4>
-              </div>
-              <div class="card-body">
-                <form id="taskForm">
-                  <!-- Title -->
-                  <div class="mb-3">
-                    <label for="title" class="form-label">Title</label>
-                    <input type="text" class="form-control" id="title" name="title" 
-                           value="${task.title.replace(/"/g, '&quot;')}" required>
-                  </div>
-                  
-                  <!-- Description -->
-                  <div class="mb-3">
-                    <label for="description" class="form-label">Description</label>
-                    <input type="text" class="form-control" id="description" name="description" 
-                           value="${(task.description || '').replace(/"/g, '&quot;')}">
-                  </div>
-                  
-                  <!-- Content -->
-                  <div class="mb-3">
-                    <label for="content" class="form-label">Content</label>
-                    <textarea class="form-control" id="content" name="content" rows="5">${task.content || ''}</textarea>
-                  </div>
-                  
-                  <!-- Due Date -->
-                  <div class="mb-3">
-                    <label for="do_date" class="form-label">Due Date</label>
-                    <input type="text" class="form-control" id="do_date" name="do_date" 
-                           value="${task.do_date || ''}" placeholder="Click to select date">
-                  </div>
-                  
-                  <!-- Status -->
-                  <div class="mb-3">
-                    <label for="status" class="form-label">Status</label>
-                    <select class="form-select" id="status" name="status">
-                      <option value="🗂️ To File" ${task.status === '🗂️ To File' ? 'selected' : ''}>🗂️ To File</option>
-                      <option value="1️⃣  1st Priority" ${task.status === '1️⃣  1st Priority' ? 'selected' : ''}>1️⃣ 1st Priority</option>
-                      <option value="2️⃣  2nd Priority" ${task.status === '2️⃣  2nd Priority' ? 'selected' : ''}>2️⃣ 2nd Priority</option>
-                      <option value="3️⃣  3rd Priority" ${task.status === '3️⃣  3rd Priority' ? 'selected' : ''}>3️⃣ 3rd Priority</option>
-                      <option value="🤔 Waiting" ${task.status === '🤔 Waiting' ? 'selected' : ''}>🤔 Waiting</option>
-                      <option value="⏸️  Paused" ${task.status === '⏸️  Paused' ? 'selected' : ''}>⏸️ Paused</option>
-                      <option value="✅ Done" ${task.status === '✅ Done' ? 'selected' : ''}>✅ Done</option>
-                    </select>
-                  </div>
-                  
-                  <!-- Stage -->
-                  <div class="mb-3">
-                    <label for="stage" class="form-label">Stage</label>
-                    <select class="form-select" id="stage" name="stage">
-                      <option value="">No Stage</option>
-                      <option value="Front Stage" ${task.stage === 'Front Stage' ? 'selected' : ''}>Front Stage</option>
-                      <option value="Back Stage" ${task.stage === 'Back Stage' ? 'selected' : ''}>Back Stage</option>
-                      <option value="Off Stage" ${task.stage === 'Off Stage' ? 'selected' : ''}>Off Stage</option>
-                    </select>
-                  </div>
-                  
-                  <!-- Project -->
-                  <div class="mb-3">
-                    <label for="project_id" class="form-label">Project</label>
-                    <select class="form-select" id="project_id" name="project_id">
-                      <option value="">No Project</option>
-                      ${projects.map(p => `
-                        <option value="${p.id}" ${task.project_id === p.id ? 'selected' : ''}>${p.name}</option>
-                      `).join('')}
-                    </select>
-                  </div>
-                  
-                  <!-- Topics -->
-                  <div class="mb-3">
-                    <label for="topics" class="form-label">Topics</label>
-                    <select class="form-select" id="topics" name="topics" multiple>
-                      ${topics.map(t => `
-                        <option value="${t.name}" ${task.topics && task.topics.includes(t.name) ? 'selected' : ''}>${t.name}</option>
-                      `).join('')}
-                    </select>
-                    <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
-                  </div>
-                  
-                  <!-- Repeat Interval -->
-                  <div class="mb-3">
-                    <label for="repeat_interval" class="form-label">Repeat Interval (days)</label>
-                    <input type="number" class="form-control" id="repeat_interval" name="repeat_interval" 
-                           value="${task.repeat_interval || ''}" min="0" placeholder="Leave empty for no repeat">
-                  </div>
-                  
-                  <!-- Buttons -->
-                  <div class="d-flex justify-content-between">
-                    <button type="submit" class="btn btn-primary">
-                      <i class="fas fa-save me-2"></i>Save Changes
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="window.history.back()">
-                      <i class="fas fa-times me-2"></i>Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-            
-            <!-- Task Info -->
-            <div class="card mt-3 shadow-sm">
-              <div class="card-body">
-                <small class="text-muted">
-                  <div>Task ID: ${task.id}</div>
-                  <div>Created: ${new Date(task.created_at).toLocaleString()}</div>
-                  <div>Updated: ${new Date(task.updated_at).toLocaleString()}</div>
-                  ${task.completed_at ? `<div>Completed: ${new Date(task.completed_at).toLocaleString()}</div>` : ''}
-                </small>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Scripts -->
-        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-        ${pageScripts}
-        <script>
-          // Initialize date picker
-          flatpickr("#do_date", {
-            dateFormat: "Y-m-d",
-            allowInput: true
-          });
-          
-          // Handle form submission
-          document.getElementById('taskForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
-            const data = {};
-            
-            // Process form data
-            for (let [key, value] of formData.entries()) {
-              if (key === 'topics') {
-                // Handle multiple topics
-                if (!data.topics) data.topics = [];
-                data.topics.push(value);
-              } else {
-                data[key] = value || null;
-              }
-            }
-            
-            // Handle empty values
-            if (data.stage === '') data.stage = null;
-            if (data.project_id === '') data.project_id = null;
-            if (data.repeat_interval === '') data.repeat_interval = null;
-            
-            try {
-              const response = await fetch('/task/${taskId}/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-              });
-              
-              if (response.ok) {
-                // Show success message
-                const alert = document.createElement('div');
-                alert.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-                alert.style.zIndex = '9999';
-                alert.innerHTML = '<i class="fas fa-check-circle me-2"></i>Task updated successfully!';
-                document.body.appendChild(alert);
-                
-                setTimeout(() => {
-                  alert.remove();
-                  window.history.back();
-                }, 1500);
-              } else {
-                throw new Error('Failed to update task');
-              }
-            } catch (error) {
-              alert('Error updating task: ' + error.message);
-            }
-          });
-        </script>
-      </body>
-      </html>
-    `;
-    
-    res.send(html);
-  } catch (error) {
-    console.error('Error loading task:', error);
-    res.status(500).send('Internal server error');
-  }
-});
-
-// Task update route
-app.post('/task/:taskId/update', authMiddleware, async (req, res) => {
-  try {
-    const taskId = req.params.taskId;
-    const updates = req.body;
-
-    // Update the task
-    taskManager.updateTask(taskId, updates);
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error updating task:', error);
-    res.status(500).json({ error: 'Failed to update task' });
-  }
-});
-*/
 
 // Main route handler for root
 app.get('/', authMiddleware, async (req, res) => {
