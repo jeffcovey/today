@@ -7,6 +7,7 @@ import path from 'path';
 import crypto from "crypto";
 import { execSync } from 'child_process';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import { marked } from 'marked';
 import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
 import { markedHighlight } from 'marked-highlight';
@@ -1627,17 +1628,17 @@ async function getCachedRender(filePath, urlPath) {
     const stats = await fs.stat(filePath);
     const mtime = stats.mtime.getTime();
     const size = stats.size;
-    
+
     // Create cache key from filepath
     const cacheKey = filePath;
-    
+
     // Check if we have a cached version
     const cached = renderCache.get(cacheKey);
     const cachedStats = fileStatsCache.get(cacheKey);
-    
+
     // Return cached version if file hasn't changed
-    if (cached && cachedStats && 
-        cachedStats.mtime === mtime && 
+    if (cached && cachedStats &&
+        cachedStats.mtime === mtime &&
         cachedStats.size === size) {
       cached.hits = (cached.hits || 0) + 1;
       debug(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
@@ -2047,21 +2048,48 @@ class DataviewAPI {
     return `<p>${text}</p>`;
   }
 
-  // Get current page metadata
+  // Get current page metadata (with tasks from file content)
   current() {
     const relPath = this.currentFilePath.replace(this.vaultPath + '/', '').replace(/^\//, '');
     const page = this.allFiles.find(f => f.path === relPath);
+
+    // Parse tasks from the current file
+    let tasks = [];
+    try {
+      const content = fsSync.readFileSync(this.currentFilePath, 'utf-8');
+      // Match tasks including those inside blockquotes (> prefix)
+      const taskRegex = /^(?:\s*>)*\s*- \[([x\s-])\]\s*(.+)$/gim;
+      let match;
+      while ((match = taskRegex.exec(content)) !== null) {
+        const isCompleted = match[1].toLowerCase() === 'x';
+        const isCancelled = match[1] === '-';
+        tasks.push({
+          text: match[2].trim(),
+          completed: isCompleted,
+          fullyCompleted: isCompleted,
+          cancelled: isCancelled,
+          status: isCompleted ? 'done' : (isCancelled ? 'cancelled' : 'open')
+        });
+      }
+    } catch (e) {
+      debug('[DataviewAPI.current] Error reading file:', this.currentFilePath, e.message);
+    }
+
+    // Create a DataviewArray for tasks with .where() method
+    const taskArray = new DataviewArray(...tasks);
+
+    const fileObj = {
+      path: relPath,
+      name: path.basename(relPath, '.md'),
+      folder: path.dirname(relPath),
+      tasks: taskArray
+    };
+
     if (page) {
-      return { ...page, ...page.frontmatter, file: page.file };
+      return { ...page, ...page.frontmatter, file: fileObj };
     }
     // Return basic info if page not found
-    return {
-      file: {
-        path: relPath,
-        name: path.basename(relPath, '.md'),
-        folder: path.dirname(relPath)
-      }
-    };
+    return { file: fileObj };
   }
 
   // Get a single page by path
@@ -2425,8 +2453,8 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
       if (expression.startsWith('this.')) {
         const propName = expression.substring(5);
         result = properties?.[propName];
-      } else if (expression.includes('dv.pages')) {
-        // Execute the expression using DataviewAPI (with pre-loaded files)
+      } else if (expression.includes('dv.')) {
+        // Execute dv expressions (dv.pages, dv.current, etc.) using DataviewAPI
         const allFiles = await DataviewAPI.getAllFiles(vaultPath);
         const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
         // Inline expressions are synchronous, so we can just evaluate directly
@@ -2542,6 +2570,9 @@ async function executeTasksQuery(query) {
     const dueDate = row.due_date ? new Date(row.due_date + 'T00:00:00') : null;
     const doneDate = row.completed_at ? new Date(row.completed_at) : null;
 
+    // Get file path from metadata (strip 'vault/' prefix if present for consistent matching)
+    const filePath = metadata.file_path ? metadata.file_path.replace(/^vault\//, '') : null;
+
     return {
       id: row.id,
       text: row.title,
@@ -2554,7 +2585,9 @@ async function executeTasksQuery(query) {
       priority: priorityMap[row.priority] || 0,
       priorityText: row.priority,
       happens: scheduledDate || dueDate,
-      source: row.source
+      source: row.source,
+      filePath: filePath,
+      file: { path: filePath }
     };
   });
 
@@ -2567,10 +2600,10 @@ async function executeTasksQuery(query) {
       filtered = filtered.filter(t => !t.dueDate);
     } else if (filter.startsWith('path includes ')) {
       const pathPattern = filter.replace('path includes ', '').trim();
-      filtered = filtered.filter(t => t.source && t.source.includes(pathPattern));
+      filtered = filtered.filter(t => t.filePath && t.filePath.includes(pathPattern));
     } else if (filter.startsWith('path does not include ')) {
       const pathPattern = filter.replace('path does not include ', '').trim();
-      filtered = filtered.filter(t => !t.source || !t.source.includes(pathPattern));
+      filtered = filtered.filter(t => !t.filePath || !t.filePath.includes(pathPattern));
     }
   }
 
@@ -2599,6 +2632,23 @@ async function executeTasksQuery(query) {
     const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
       if (a[0] === 'No date') return 1;
       if (b[0] === 'No date') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    const result = { grouped: sortedGroups };
+    taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
+    return result;
+  } else if (groupBy && groupBy.includes('task.file.path')) {
+    // Handle "group by function task.file.path..." - group by file path
+    const grouped = new Map();
+    for (const task of filtered) {
+      const key = task.filePath || 'Unknown file';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(task);
+    }
+
+    // Sort groups alphabetically
+    const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
       return a[0].localeCompare(b[0]);
     });
 
