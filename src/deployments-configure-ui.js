@@ -16,13 +16,14 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { listProviders } from './deploy/providers/index.js';
 import { getIpEnvVarName } from './deploy/config.js';
+import { getConfigPath } from './config.js';
 
 const html = htm.bind(React.createElement);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
-const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+const CONFIG_PATH = getConfigPath();
 
 // ============================================================================
 // Predefined jobs that can be toggled on/off

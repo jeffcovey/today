@@ -49,16 +49,46 @@ export async function deployCommand(server, args = []) {
 
   // Sync config files (always)
   printInfo('Syncing configuration files...');
-  const configFiles = ['.env', '.env.keys', 'config.toml'].filter(f =>
+
+  // Get the config path to determine if it's in vault or standalone
+  const { getConfigPath } = await import('../../config.js');
+  const configPath = getConfigPath();
+  const relativeConfigPath = configPath.replace(PROJECT_ROOT + '/', '');
+  const configInVault = relativeConfigPath.startsWith('vault/');
+
+  // Base config files (env files)
+  const configFiles = ['.env', '.env.keys'].filter(f =>
     fs.existsSync(path.join(PROJECT_ROOT, f))
   );
+
+  // Add config-path bootstrap file if it exists (tells server where config is)
+  if (fs.existsSync(path.join(PROJECT_ROOT, '.data', 'config-path'))) {
+    configFiles.push('.data/config-path');
+  }
+
+  // Only copy config.toml if it's NOT in vault (vault is synced via Resilio)
+  if (!configInVault && fs.existsSync(path.join(PROJECT_ROOT, 'config.toml'))) {
+    configFiles.push('config.toml');
+  }
 
   for (const file of configFiles) {
     server.scpToRemote(path.join(PROJECT_ROOT, file), `${deployPath}/${file}`);
   }
 
-  // Apply deployment-specific AI overrides to config.toml
-  if (server.ai) {
+  if (configInVault) {
+    printInfo(`Config file in vault (${relativeConfigPath}) - synced via Resilio`);
+  }
+
+  // Write deployment name file (used for runtime AI config overrides)
+  printInfo(`Setting deployment name: ${server.name}`);
+  const deploymentNameFile = path.join(PROJECT_ROOT, '.deploy-deployment-name');
+  fs.writeFileSync(deploymentNameFile, server.name + '\n');
+  server.scpToRemote(deploymentNameFile, `${deployPath}/.data/deployment-name`);
+  fs.unlinkSync(deploymentNameFile);
+
+  // Apply deployment-specific AI overrides to config (only if config is NOT in vault)
+  // If config is in vault, overrides are applied at runtime via .data/deployment-name
+  if (server.ai && !configInVault) {
     printInfo('Applying deployment AI configuration...');
     const { applyDeploymentOverrides } = await import('../../config.js');
     const tempConfigPath = path.join(PROJECT_ROOT, '.deploy-config.toml');
@@ -66,6 +96,8 @@ export async function deployCommand(server, args = []) {
     server.scpToRemote(tempConfigPath, `${deployPath}/config.toml`);
     fs.unlinkSync(tempConfigPath);
     printStatus('AI configuration applied');
+  } else if (server.ai && configInVault) {
+    printInfo('AI overrides will be applied at runtime (config in vault)');
   }
 
   // Configure git

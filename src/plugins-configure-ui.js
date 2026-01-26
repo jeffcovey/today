@@ -17,13 +17,14 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { schemas } from './plugin-schemas.js';
+import { getConfigPath } from './config.js';
 
 const html = htm.bind(React.createElement);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
-const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+const CONFIG_PATH = getConfigPath();
 const ENV_PATH = path.join(projectRoot, '.env');
 
 // ============================================================================

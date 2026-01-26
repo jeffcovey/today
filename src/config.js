@@ -1,22 +1,99 @@
 // Configuration helper for JavaScript modules
-import { readFileSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { parse, stringify } from 'smol-toml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..');
 
 let configCache = null;
 let lastReadTime = 0;
 const CACHE_TTL = 60000; // Cache for 1 minute
 
+const CONFIG_PATH_FILE = join(PROJECT_ROOT, '.data', 'config-path');
+
+/**
+ * Resolve a config path (handles absolute and relative paths).
+ */
+function resolveConfigPath(configPath) {
+  if (configPath.startsWith('/')) {
+    return configPath;
+  }
+  return join(PROJECT_ROOT, configPath);
+}
+
+/**
+ * Get the config file path.
+ * Priority: TODAY_CONFIG env var → .data/config-path file → default config.toml
+ * Supports absolute paths or paths relative to project root.
+ */
+export function getConfigPath() {
+  // 1. Environment variable takes precedence (for deployments)
+  if (process.env.TODAY_CONFIG) {
+    return resolveConfigPath(process.env.TODAY_CONFIG);
+  }
+
+  // 2. Check .data/config-path bootstrap file
+  try {
+    if (existsSync(CONFIG_PATH_FILE)) {
+      const customPath = readFileSync(CONFIG_PATH_FILE, 'utf8').trim();
+      if (customPath) {
+        return resolveConfigPath(customPath);
+      }
+    }
+  } catch {
+    // Ignore errors, fall through to default
+  }
+
+  // 3. Default location
+  return join(PROJECT_ROOT, 'config.toml');
+}
+
+/**
+ * Set the config file path (writes to .data/config-path).
+ * Pass empty string or null to reset to default.
+ */
+export function setConfigPath(configPath) {
+  const dataDir = join(PROJECT_ROOT, '.data');
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+
+  if (!configPath || configPath === 'config.toml') {
+    // Reset to default - remove the file
+    try {
+      unlinkSync(CONFIG_PATH_FILE);
+    } catch {
+      // Ignore if file doesn't exist
+    }
+  } else {
+    writeFileSync(CONFIG_PATH_FILE, configPath.trim() + '\n');
+  }
+}
+
 /**
  * Check if config.toml exists
  */
 export function configExists() {
-  const configPath = join(__dirname, '..', 'config.toml');
-  return existsSync(configPath);
+  return existsSync(getConfigPath());
+}
+
+const DEPLOYMENT_NAME_FILE = join(PROJECT_ROOT, '.data', 'deployment-name');
+
+/**
+ * Get the current deployment name (if running on a deployed server).
+ */
+export function getDeploymentName() {
+  try {
+    if (existsSync(DEPLOYMENT_NAME_FILE)) {
+      return readFileSync(DEPLOYMENT_NAME_FILE, 'utf8').trim();
+    }
+  } catch {
+    // Ignore
+  }
+  return null;
 }
 
 function readConfig() {
@@ -26,9 +103,24 @@ function readConfig() {
   }
 
   try {
-    const configPath = join(__dirname, '..', 'config.toml');
-    const configContent = readFileSync(configPath, 'utf8');
-    configCache = parse(configContent);
+    const configContent = readFileSync(getConfigPath(), 'utf8');
+    let config = parse(configContent);
+
+    // Apply deployment-specific AI overrides at runtime
+    const deploymentName = getDeploymentName();
+    if (deploymentName && config.deployments) {
+      // Find matching deployment config (e.g., deployments.digitalocean.droplet)
+      for (const provider of Object.keys(config.deployments)) {
+        const providerConfig = config.deployments[provider];
+        if (providerConfig[deploymentName]?.ai) {
+          // Merge deployment AI settings into main ai config
+          config.ai = { ...config.ai, ...providerConfig[deploymentName].ai };
+          break;
+        }
+      }
+    }
+
+    configCache = config;
     lastReadTime = now;
     return configCache;
   } catch {
@@ -140,8 +232,7 @@ export function getFocusPreset(name) {
  * @param {string} outputPath - Path to write the modified config
  */
 export function applyDeploymentOverrides(aiOverrides, outputPath) {
-  const configPath = join(__dirname, '..', 'config.toml');
-  const config = parse(readFileSync(configPath, 'utf8'));
+  const config = parse(readFileSync(getConfigPath(), 'utf8'));
 
   // Apply AI overrides
   if (!config.ai) config.ai = {};

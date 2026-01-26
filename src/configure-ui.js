@@ -24,6 +24,7 @@ import {
   getOllamaModels,
   getModelOptionsForProvider,
 } from './ai-settings-shared.js';
+import { getConfigPath, setConfigPath } from './config.js';
 
 // Bind htm to React.createElement
 const html = htm.bind(React.createElement);
@@ -31,7 +32,7 @@ const html = htm.bind(React.createElement);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
-const CONFIG_PATH = path.join(projectRoot, 'config.toml');
+const CONFIG_PATH = getConfigPath();
 const ENV_PATH = path.join(projectRoot, '.env');
 
 // ============================================================================
@@ -116,6 +117,7 @@ const CONFIG_SECTIONS = [
     key: 'general',
     title: 'General Settings',
     fields: [
+      { key: 'config_path', label: 'Config File Path', type: 'config-path', default: 'config.toml', description: 'Path to config.toml (e.g., vault/config.toml). Leave empty for default.' },
       { key: 'timezone', label: 'Current Timezone', path: ['timezone'], default: 'America/New_York' },
       { key: 'location', label: 'Current Location', path: ['location'], default: '' },
       { key: 'vault_path', label: 'Vault Path', path: ['vault_path'], default: 'vault', description: 'Path to markdown notes directory (e.g., vault, notes, ~/Obsidian)' },
@@ -414,6 +416,15 @@ function ConfigApp({ onAction, initialSection = 0 }) {
         const decryptedValue = fieldInfo.envVar ? (getEnvVar(fieldInfo.envVar) || '') : '';
         setEditValue(decryptedValue);
         setMode('edit');
+      } else if (field.type === 'config-path') {
+        // Get current config path (relative to project root)
+        const currentPath = getConfigPath();
+        const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+        const relativePath = currentPath.startsWith(projectRoot)
+          ? currentPath.slice(projectRoot.length + 1)
+          : currentPath;
+        setEditValue(relativePath || 'config.toml');
+        setMode('edit');
       } else {
         setEditValue(String(currentValue || ''));
         setMode('edit');
@@ -428,6 +439,12 @@ function ConfigApp({ onAction, initialSection = 0 }) {
       if (fieldInfo.envVar && value) {
         setEnvVar(fieldInfo.envVar, value);
       }
+      setMode('navigate');
+    } else if (field.type === 'config-path') {
+      // Save config path to .data/config-path
+      setConfigPath(value);
+      // Re-read config from new location
+      setConfig(readConfig());
       setMode('navigate');
     } else {
       const newConfig = JSON.parse(JSON.stringify(config)); // Deep clone
@@ -503,6 +520,25 @@ function ConfigApp({ onAction, initialSection = 0 }) {
           </${Text}>
           <${Text} color=${fInfo.hidden ? 'gray' : 'green'}> ${displayValue}</${Text}>
           ${isSelected && editHint ? html`<${Text} dimColor>${editHint}</${Text}>` : null}
+        </${Box}>
+      `;
+    }
+
+    // Handle config-path field (stored in .data/config-path, not config.toml)
+    if (f.type === 'config-path') {
+      const currentPath = getConfigPath();
+      const relativePath = currentPath.replace(projectRoot + '/', '');
+      const displayValue = relativePath || 'config.toml';
+
+      return html`
+        <${Box} key=${'field-' + section.key + '-' + f.key} flexDirection="column">
+          <${Box}>
+            <${Text} color=${isSelected ? 'cyan' : 'white'}>
+              ${isSelected ? '▸ ' : '  '}${f.label}:
+            </${Text}>
+            <${Text} color="green"> ${displayValue}</${Text}>
+          </${Box}>
+          ${isSelected && f.description ? html`<${Box} marginLeft=${4}><${Text} dimColor>${f.description}</${Text}></${Box}>` : null}
         </${Box}>
       `;
     }
