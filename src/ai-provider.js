@@ -228,6 +228,8 @@ async function getConfiguredModel(options = {}) {
  * @param {string} [options.model] - Model name (overrides config)
  * @param {number} [options.maxTokens=1000] - Maximum tokens to generate
  * @param {number} [options.temperature=0] - Temperature (0-1)
+ * @param {Object} [options.tools] - Tool definitions for the AI to use
+ * @param {number} [options.maxSteps=5] - Maximum tool use iterations
  * @returns {Promise<string>} - The generated text
  */
 export async function createCompletion(options) {
@@ -246,6 +248,12 @@ export async function createCompletion(options) {
     maxTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
   };
+
+  // Add tools if provided
+  if (options.tools) {
+    genOptions.tools = options.tools;
+    genOptions.maxSteps = options.maxSteps || 5;
+  }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)
   if (providerName === 'ollama') {
@@ -295,7 +303,10 @@ function getMessagesCharCount(messages, system) {
 /**
  * Create a streaming completion
  * @param {Object} options - Same as createCompletion
- * @returns {Promise<object>} - Stream result with textStream property
+ * @param {Object} [options.tools] - Tool definitions for the AI to use
+ * @param {number} [options.maxSteps=5] - Maximum tool use iterations
+ * @param {Function} [options.onStepFinish] - Callback when a step (text or tool) finishes
+ * @returns {Promise<object>} - Stream result with textStream and fullStream properties
  */
 export async function streamCompletion(options) {
   const config = getFullConfig();
@@ -313,6 +324,18 @@ export async function streamCompletion(options) {
     maxTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
   };
+
+  // Add tools if provided
+  if (options.tools) {
+    streamOptions.tools = options.tools;
+    streamOptions.maxSteps = options.maxSteps || 5;
+    console.log('[AI Provider] Tools enabled, maxSteps:', streamOptions.maxSteps, 'tool count:', Object.keys(options.tools).length);
+  }
+
+  // Add step finish callback if provided
+  if (options.onStepFinish) {
+    streamOptions.onStepFinish = options.onStepFinish;
+  }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)
   if (providerName === 'ollama') {

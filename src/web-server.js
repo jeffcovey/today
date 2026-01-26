@@ -16,7 +16,17 @@ import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
+import { getAbsoluteVaultPath } from './config.js';
 import yaml from 'js-yaml';
+import {
+  chatWithFile,
+  chatWithDirectory,
+  loadConversation,
+  saveConversation,
+  clearConversation,
+  getChatProviderName,
+  createChatTools,
+} from './ai-chat/index.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -41,7 +51,7 @@ const getReadOnlyDatabase = () => getDatabase('.data/today.db', { autoSync: fals
 const app = express();
 const PORT = process.env.WEB_PORT || 3000;
 app.set("trust proxy", 1);
-const VAULT_PATH = path.join(__dirname, '..', 'vault');
+const VAULT_PATH = getAbsoluteVaultPath();
 const TEMPLATES_PATH = path.join(__dirname, 'web', 'templates');
 
 // Template system - loads HTML templates from files
@@ -124,8 +134,8 @@ const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 
 // Middleware for parsing JSON and URL-encoded bodies
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Set up SQLite session store
 const SQLiteStore = connectSqlite3(session);
@@ -931,20 +941,56 @@ async function renderDirectory(dirPath, urlPath) {
         })))};
         
         // Chat functionality
-        if (checkChatVersion()) return; // Page will reload if version changed
+        checkChatVersion(); // Page will reload if version changed
 
-        let chatHistory = JSON.parse(localStorage.getItem('chatHistory_dir_${urlPath || 'root'}') || '[]');
+        let chatHistory = [];
         let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
         let historyIndex = -1;
-        
-        // Load existing chat messages
-        function loadChatHistory() {
+        const chatStorageKey = 'chatHistory_dir_${urlPath || 'root'}';
+        const chatApiPath = 'dir_${urlPath || 'root'}';
+
+        // Load existing chat messages (from server first, then localStorage fallback)
+        async function loadChatHistory() {
           const chatMessages = document.getElementById('chatMessages');
+
+          // Try to load from server first
+          try {
+            const response = await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.messages && data.messages.length > 0) {
+                chatHistory = data.messages;
+                // Also update localStorage as backup
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+              }
+            }
+          } catch (e) {
+            console.log('Failed to load chat from server, falling back to localStorage');
+          }
+
+          // Fall back to localStorage if no server data
+          if (chatHistory.length === 0) {
+            chatHistory = JSON.parse(localStorage.getItem(chatStorageKey) || '[]');
+          }
+
           if (chatHistory.length > 0) {
             chatMessages.innerHTML = '';
             chatHistory.forEach(msg => {
               addChatBubble(msg.content, msg.role, false);
             });
+          }
+        }
+
+        // Save conversation to server
+        async function saveConversationToServer() {
+          try {
+            await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messages: chatHistory })
+            });
+          } catch (e) {
+            console.log('Failed to save conversation to server');
           }
         }
         
@@ -982,21 +1028,24 @@ async function renderDirectory(dirPath, urlPath) {
               content: message,
               timestamp: new Date().toISOString()
             });
-            localStorage.setItem('chatHistory_dir_${urlPath || 'root'}', JSON.stringify(chatHistory));
+            localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+            saveConversationToServer();
           }
         }
-        
+
         // Send message to AI
         async function sendMessage() {
           const input = document.getElementById('chatInput');
           const message = input.value.trim();
-          
+
           if (!message) return;
-          
+
           // Handle /clear command
           if (message === '/clear') {
             chatHistory = [];
-            localStorage.removeItem('chatHistory_dir_${urlPath || 'root'}');
+            localStorage.removeItem(chatStorageKey);
+            // Also clear on server
+            fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, { method: 'DELETE' }).catch(() => {});
             document.getElementById('chatMessages').innerHTML = \`
               <div class="text-center text-muted p-3">
                 <small>Conversation cleared. Start fresh!</small>
@@ -2313,9 +2362,46 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
   return processedContent;
 }
 
-// Process inline dataview expressions ($= syntax)
+// Process inline dataview expressions ($= syntax and =this.property syntax)
 async function processInlineDataview(content, properties, vaultPath, currentFilePath) {
-  // Match $= expressions inside backticks: `$= expression`
+  // First, handle simple =this.property syntax (Obsidian Dataview style)
+  // Match =this.property where property is alphanumeric/underscore
+  // Must not be inside backticks or code blocks
+  const thisPropertyRegex = /=this\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+
+  let thisMatch;
+  const thisMatches = [];
+  while ((thisMatch = thisPropertyRegex.exec(content)) !== null) {
+    thisMatches.push({
+      fullMatch: thisMatch[0],
+      propName: thisMatch[1],
+      index: thisMatch.index
+    });
+  }
+
+  // Process =this.property matches in reverse to maintain indices
+  for (let i = thisMatches.length - 1; i >= 0; i--) {
+    const { fullMatch, propName, index } = thisMatches[i];
+    const value = properties?.[propName];
+
+    if (value !== undefined) {
+      // Format the value appropriately
+      let displayValue;
+      if (Array.isArray(value)) {
+        displayValue = value.join(', ');
+      } else if (value instanceof Date) {
+        displayValue = value.toISOString().split('T')[0];
+      } else {
+        displayValue = String(value);
+      }
+
+      content = content.substring(0, index) +
+                displayValue +
+                content.substring(index + fullMatch.length);
+    }
+  }
+
+  // Then handle $= expressions inside backticks: `$= expression`
   const inlineRegex = /`\$=\s*([^`]+?)`/g;
 
   const matches = [];
@@ -2479,6 +2565,12 @@ async function executeTasksQuery(query) {
       filtered = filtered.filter(t => !t.scheduledDate);
     } else if (filter === 'no due date') {
       filtered = filtered.filter(t => !t.dueDate);
+    } else if (filter.startsWith('path includes ')) {
+      const pathPattern = filter.replace('path includes ', '').trim();
+      filtered = filtered.filter(t => t.source && t.source.includes(pathPattern));
+    } else if (filter.startsWith('path does not include ')) {
+      const pathPattern = filter.replace('path does not include ', '').trim();
+      filtered = filtered.filter(t => !t.source || !t.source.includes(pathPattern));
     }
   }
 
@@ -3275,15 +3367,38 @@ ${cleanContent}
 
       <script>
         // Page-specific: Chat functionality
-        if (checkChatVersion()) return; // Page will reload if version changed
+        checkChatVersion(); // Page will reload if version changed
 
-        let chatHistory = JSON.parse(localStorage.getItem('chatHistory_${urlPath}') || '[]');
+        let chatHistory = [];
         let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
         let historyIndex = -1;
-        
-        // Load existing chat messages
-        function loadChatHistory() {
+        const chatStorageKey = 'chatHistory_${urlPath}';
+        const chatApiPath = '${urlPath}';
+
+        // Load existing chat messages (from server first, then localStorage fallback)
+        async function loadChatHistory() {
           const chatMessages = document.getElementById('chatMessages');
+
+          // Try to load from server first
+          try {
+            const response = await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.messages && data.messages.length > 0) {
+                chatHistory = data.messages;
+                // Also update localStorage as backup
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+              }
+            }
+          } catch (e) {
+            console.log('Failed to load chat from server, falling back to localStorage');
+          }
+
+          // Fall back to localStorage if no server data
+          if (chatHistory.length === 0) {
+            chatHistory = JSON.parse(localStorage.getItem(chatStorageKey) || '[]');
+          }
+
           if (chatHistory.length > 0) {
             chatMessages.innerHTML = '';
             chatHistory.forEach(msg => {
@@ -3292,21 +3407,34 @@ ${cleanContent}
           }
         }
 
+        // Save conversation to server
+        async function saveConversationToServer() {
+          try {
+            await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messages: chatHistory })
+            });
+          } catch (e) {
+            console.log('Failed to save conversation to server');
+          }
+        }
+
         // Add a chat bubble to the interface
         function addChatBubble(message, role, save = true, replyTime = null) {
           const chatMessages = document.getElementById('chatMessages');
           const bubble = document.createElement('div');
           bubble.className = \`chat-bubble \${role}\`;
-          
-          const timestamp = new Date().toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
+
+          const timestamp = new Date().toLocaleTimeString('en-US', {
+            hour: 'numeric',
             minute: '2-digit',
-            hour12: true 
+            hour12: true
           });
-          
+
           // Render markdown using marked with external link renderer
           const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer() });
-          
+
           let bubbleHtml = \`
             <div class="bubble-content">
               <small class="d-block chat-timestamp">
@@ -3314,38 +3442,41 @@ ${cleanContent}
               </small>
               <div class="markdown-content">\${renderedContent}</div>
           \`;
-          
+
           if (replyTime) {
             bubbleHtml += \`<small class="d-block mt-1 chat-timestamp-subtle">Replied in \${replyTime}</small>\`;
           }
-          
+
           bubbleHtml += \`</div>\`;
           bubble.innerHTML = bubbleHtml;
-          
+
           chatMessages.appendChild(bubble);
           chatMessages.scrollTop = chatMessages.scrollHeight;
-          
+
           if (save) {
             chatHistory.push({
               role: role,
               content: message,
               timestamp: new Date().toISOString()
             });
-            localStorage.setItem('chatHistory_${urlPath}', JSON.stringify(chatHistory));
+            localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+            saveConversationToServer();
           }
         }
-        
+
         // Send message to AI
         async function sendMessage() {
           const input = document.getElementById('chatInput');
           const message = input.value.trim();
-          
+
           if (!message) return;
-          
+
           // Handle /clear command
           if (message === '/clear') {
             chatHistory = [];
-            localStorage.removeItem('chatHistory_${urlPath}');
+            localStorage.removeItem(chatStorageKey);
+            // Also clear on server
+            fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, { method: 'DELETE' }).catch(() => {});
             document.getElementById('chatMessages').innerHTML = \`
               <div class="text-center text-muted p-3">
                 <small>Conversation cleared. Start fresh!</small>
@@ -3411,10 +3542,12 @@ ${cleanContent}
             let thinkingContent = '';
             let responseContent = '';
             let responseStarted = false;
+            let lastToolError = null;
             
             // Use fetch with streaming response for SSE
             const response = await fetch(\`/ai-chat-stream/${urlPath}\`, {
               method: 'POST',
+              credentials: 'same-origin',
               headers: {
                 'Content-Type': 'application/json',
               },
@@ -3462,6 +3595,34 @@ ${cleanContent}
                     } else if (data.type === 'thinking-complete') {
                       // Thinking is done, prepare to show response
                       thinkingContent = data.content;
+                    } else if (data.type === 'status') {
+                      // Update status message in typing indicator
+                      const labelElement = typingIndicator.querySelector('small');
+                      if (labelElement) {
+                        labelElement.textContent = 'AI · ' + data.message;
+                      }
+                    } else if (data.type === 'tool-call') {
+                      // Show tool being called
+                      const labelElement = typingIndicator.querySelector('small');
+                      if (labelElement) {
+                        const toolDisplayName = {
+                          'edit_file': 'Editing file',
+                          'query_database': 'Querying database',
+                          'run_command': 'Running command'
+                        }[data.toolName] || 'Using ' + data.toolName;
+                        labelElement.textContent = 'AI · ' + toolDisplayName + '...';
+                      }
+                    } else if (data.type === 'tool-result') {
+                      // Tool completed, update status and store any error
+                      const labelElement = typingIndicator.querySelector('small');
+                      const success = data.result && data.result.success !== false;
+                      if (!success && data.result) {
+                        // Store tool error for display if AI doesn't respond
+                        lastToolError = data.result.error || 'Tool execution failed';
+                      }
+                      if (labelElement) {
+                        labelElement.textContent = 'AI · ' + (success ? 'Processing result...' : 'Tool returned error');
+                      }
                     } else if (data.type === 'text') {
                       if (!responseStarted) {
                         // First text chunk - remove typing indicator
@@ -3528,20 +3689,52 @@ ${cleanContent}
                         const seconds = (responseTime % 60).toString().padStart(2, '0');
                         timeStr = minutes + ':' + seconds;
                       }
-                      
+
+                      // If no text response was received, handle gracefully
+                      if (!responseStarted) {
+                        clearInterval(timerInterval);
+                        typingIndicator.remove();
+
+                        // Show tool error or generic message
+                        let errorMsg = lastToolError
+                          ? 'Tool error: ' + lastToolError
+                          : 'The AI completed without providing a text response.';
+
+                        // If file was modified despite error, mention it
+                        if (data.fileModified) {
+                          errorMsg = 'The file was modified, but the AI did not provide a response. ' + (lastToolError || '');
+                        }
+
+                        addChatBubble(errorMsg, 'assistant', true, timeStr);
+
+                        // Still save to history so we don't lose context
+                        chatHistory.push(
+                          { role: 'user', content: message, timestamp: new Date().toISOString() },
+                          { role: 'assistant', content: errorMsg, timestamp: new Date().toISOString() }
+                        );
+                        localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+                        saveConversationToServer();
+
+                        if (data.fileModified) {
+                          refreshContentArea();
+                        }
+                        return;
+                      }
+
                       // Update timer in response
                       const timerElement = document.getElementById('response-timer');
                       if (timerElement) {
                         timerElement.textContent = 'Replied in ' + timeStr;
                       }
-                      
+
                       // Save to chat history
                       chatHistory.push(
-                        { role: 'user', content: message },
-                        { role: 'assistant', content: data.fullResponse || responseContent }
+                        { role: 'user', content: message, timestamp: new Date().toISOString() },
+                        { role: 'assistant', content: data.fullResponse || responseContent, timestamp: new Date().toISOString() }
                       );
-                      saveHistory();
-                      
+                      localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+                      saveConversationToServer();
+
                       // If file was modified, refresh the content area
                       if (data.fileModified) {
                         refreshContentArea();
@@ -3905,17 +4098,26 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
   }
 });
 
-// AI Chat route handler  
+// AI Chat route handler (non-streaming, uses ai-chat module)
 app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
-  // Set timeout for this specific request to 5 minutes
-  req.setTimeout(300000); // 5 minutes
-  res.setTimeout(300000); // 5 minutes
-  
+  req.setTimeout(300000);
+  res.setTimeout(300000);
+
   try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    const { message, history, documentContent } = req.body;
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+    const { message, history: rawHistory } = req.body;
+    // Filter out empty messages - Anthropic API rejects them
+    const history = (rawHistory || []).filter(msg => msg.content && msg.content.trim());
     const fullPath = path.join(VAULT_PATH, urlPath);
-    
+
+    // Read the actual file content from disk (not from client)
+    let documentContent = '';
+    try {
+      documentContent = await fs.readFile(fullPath, 'utf-8');
+    } catch (e) {
+      debug('[AI Chat] Could not read file:', fullPath, e.message);
+    }
+
     // Get initial file modification time
     let initialMtime = null;
     try {
@@ -3924,88 +4126,18 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
     } catch (e) {
       // File might not exist or be accessible
     }
-    
-    // Build conversation for Claude
-    let conversation = "You are an AI assistant helping with a markdown document. ";
-    conversation += `The user is viewing: ${urlPath}\n`;
-    conversation += `File location: vault/${urlPath}\n\n`;
-    conversation += "IMPORTANT: When the user asks you to edit or update this document:\n";
-    conversation += "- You have the ability to directly edit the file\n";
-    conversation += "- Make the requested changes to the content\n";
-    conversation += "- The interface will automatically refresh to show your changes\n\n";
-    conversation += "---CURRENT DOCUMENT CONTENT---\n";
-    conversation += documentContent || "(No document content available)";
-    conversation += "\n---END DOCUMENT---\n\n";
-    
-    if (history && history.length > 0) {
-      conversation += "Previous conversation:\n";
-      history.forEach(msg => {
-        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-      });
-      conversation += "\n";
-    }
-    
-    conversation += `User: ${message}\n`;
-    conversation += "Assistant: ";
-    
-    // Call Claude using the claude CLI
-    const { spawn } = await import('child_process');
-    
+
+    debug('[AI Chat] Starting chat with provider:', getChatProviderName());
+
     try {
-      // Debug logging
-      debug('[AI Chat] Starting Claude execution...');
-      debug('[AI Chat] Working directory:', process.cwd());
-      debug('[AI Chat] Conversation length:', conversation.length);
-      debug('[AI Chat] First 200 chars of conversation:', conversation.substring(0, 200));
+      const response = await chatWithFile({
+        urlPath,
+        message,
+        history,
+        documentContent,
+        stream: false,
+      });
 
-      // Use spawn to properly pipe input to claude --print
-      const claude = spawn('claude', ['--print'], {
-        cwd: process.cwd(),
-        timeout: 300000 // 5 minute timeout for complex requests
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      claude.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      claude.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      // Write the conversation to stdin
-      claude.stdin.write(conversation);
-      claude.stdin.end();
-      
-      // Wait for the process to complete
-      await new Promise((resolve, reject) => {
-        claude.on('close', (code) => {
-          debug('[AI Chat] Claude process exited with code:', code);
-          debug('[AI Chat] stdout length:', stdout.length);
-          debug('[AI Chat] stderr:', stderr || '(none)');
-
-          if (code !== 0) {
-            debug('[AI Chat] Claude failed with code:', code);
-            debug('[AI Chat] stderr:', stderr);
-            // Don't reject for timeout (code null) or non-zero codes, handle gracefully
-            if (code === null) {
-              reject(new Error('Request timed out after 5 minutes'));
-            } else {
-              reject(new Error(`Claude exited with code ${code}: ${stderr || 'Unknown error'}`));
-            }
-          } else {
-            resolve();
-          }
-        });
-        
-        claude.on('error', (err) => {
-          debug('[AI Chat] Failed to start Claude:', err);
-          reject(err);
-        });
-      });
-      
       // Check if file was modified
       let fileModified = false;
       if (initialMtime !== null) {
@@ -4016,62 +4148,75 @@ app.post('/ai-chat/*path', authMiddleware, async (req, res) => {
           // File might have been deleted or become inaccessible
         }
       }
-      
-      res.json({ 
-        response: stdout.trim(),
-        fileModified: fileModified
+
+      res.json({
+        response: response.trim(),
+        fileModified,
       });
     } catch (error) {
-      debug('[AI Chat] Error calling Claude:', error);
-      
+      debug('[AI Chat] Error:', error);
+
       let errorResponse = "I'm having trouble processing your request.";
       if (error.message && error.message.includes('timed out')) {
-        errorResponse = "The AI request took too long (over 5 minutes). Complex questions may need to be broken into smaller parts. Please try again.";
-      } else if (error.message && error.message.includes('code 124')) {
-        errorResponse = "The request timed out. Please try a shorter or simpler question.";
-      } else if (error.message && error.message.includes('code')) {
+        errorResponse = "The AI request took too long. Please try a shorter or simpler question.";
+      } else if (error.message) {
         errorResponse = "The AI service encountered an error. Please try again in a moment.";
       }
-      
-      res.json({ 
-        response: errorResponse
-      });
+
+      res.json({ response: errorResponse });
     }
-    
   } catch (error) {
     console.error('Error in AI chat:', error);
-    res.status(500).json({ 
-      success: false, 
-      response: 'An error occurred while processing your request.' 
+    res.status(500).json({
+      success: false,
+      response: 'An error occurred while processing your request.'
     });
   }
 });
 
-// SSE endpoint for streaming AI chat responses
+// SSE endpoint for streaming AI chat responses (uses ai-chat module)
 app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
-  // Set up SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*'
   });
-  
-  // Keep connection alive
+
+  // Timeout for the entire stream (2 minutes)
+  const STREAM_TIMEOUT_MS = 120000;
+  let timeoutId = null;
+  let isAborted = false;
+
   const keepAlive = setInterval(() => {
     res.write(':keepalive\n\n');
   }, 30000);
-  
-  // Clean up on client disconnect
-  req.on('close', () => {
+
+  const cleanup = () => {
     clearInterval(keepAlive);
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+
+  req.on('close', () => {
+    isAborted = true;
+    cleanup();
   });
-  
+
   try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    const { message, history, documentContent } = req.body;
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+    const { message, history: rawHistory } = req.body;
+    // Filter out empty messages - Anthropic API rejects them
+    const history = (rawHistory || []).filter(msg => msg.content && msg.content.trim());
     const fullPath = path.join(VAULT_PATH, urlPath);
-    
+
+    // Read the actual file content from disk (not from client)
+    let documentContent = '';
+    try {
+      documentContent = await fs.readFile(fullPath, 'utf-8');
+    } catch (e) {
+      debug('[AI Stream] Could not read file:', fullPath, e.message);
+    }
+
     // Get initial file modification time
     let initialMtime = null;
     try {
@@ -4080,229 +4225,239 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
     } catch (e) {
       // File might not exist or be accessible
     }
-    
-    // Build conversation for Claude
-    let conversation = "You are an AI assistant helping with a markdown document. ";
-    conversation += `The user is viewing: ${urlPath}\n`;
-    conversation += `File location: vault/${urlPath}\n\n`;
-    conversation += "IMPORTANT: When the user asks you to edit or update this document:\n";
-    conversation += "- You have the ability to directly edit the file\n";
-    conversation += "- Make the requested changes to the content\n";
-    conversation += "- The interface will automatically refresh to show your changes\n\n";
-    conversation += "---CURRENT DOCUMENT CONTENT---\n";
-    conversation += documentContent || "(No document content available)";
-    conversation += "\n---END DOCUMENT---\n\n";
-    
-    if (history && history.length > 0) {
-      conversation += "Previous conversation:\n";
-      history.forEach(msg => {
-        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-      });
-      conversation += "\n";
-    }
-    
-    conversation += `User: ${message}\n`;
-    conversation += "Assistant: ";
-    
-    // Call Claude using the claude CLI with streaming
-    const { spawn } = await import('child_process');
-    
-    debug('[AI Stream] Starting Claude with streaming...');
 
-    // Use spawn with --print for regular output (stream-json might not be supported)
-    const claude = spawn('claude', ['--print'], {
-      cwd: process.cwd(),
-      timeout: 300000 // 5 minute hard timeout
+    // Create tools for this chat session
+    const tools = createChatTools({
+      filePath: fullPath,
+      includeEdit: true,
+      includeDatabase: true,
+      includeCommands: true,
     });
-    
-    let fullResponse = '';
-    let thinkingContent = '';
-    let isThinking = false;
-    
-    claude.stdout.on('data', (data) => {
-      const chunk = data.toString();
-      
-      // For plain text output, just stream it directly
-      fullResponse += chunk;
-      
-      // Send text update to client
-      res.write(`data: ${JSON.stringify({
-        type: 'text',
-        content: chunk
-      })}\n\n`);
-    });
-    
-    claude.stderr.on('data', (data) => {
-      debug('[AI Stream] stderr:', data.toString());
-    });
-    
-    // Write the conversation to stdin
-    claude.stdin.write(conversation);
-    claude.stdin.end();
-    
-    claude.on('close', async (code) => {
-      debug('[AI Stream] Claude process exited with code:', code);
-      
-      if (code === 0) {
-        // Check if file was modified
-        let fileModified = false;
-        if (initialMtime !== null) {
-          try {
-            const newStats = await fs.stat(fullPath);
-            fileModified = newStats.mtimeMs !== initialMtime;
-          } catch (e) {
-            // File might have been deleted or become inaccessible
-          }
+
+    debug('[AI Stream] Starting streaming chat with provider:', getChatProviderName(), 'tools:', tools ? Object.keys(tools) : 'none');
+
+    // Send initial status
+    res.write(`data: ${JSON.stringify({
+      type: 'status',
+      message: 'Connecting to AI...'
+    })}\n\n`);
+
+    try {
+      // Set up timeout that covers the entire operation
+      timeoutId = setTimeout(() => {
+        if (!isAborted) {
+          isAborted = true;
+          console.error('[AI Stream] Request timed out after 2 minutes');
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            message: 'Request timed out after 2 minutes. The AI may be having trouble with this request.'
+          })}\n\n`);
+          cleanup();
+          res.end();
         }
-        
-        // Send completion signal
-        res.write(`data: ${JSON.stringify({
-          type: 'done',
-          fileModified: fileModified,
-          fullResponse: fullResponse
-        })}\n\n`);
-      } else {
-        res.write(`data: ${JSON.stringify({
-          type: 'error',
-          message: `Process exited with code ${code}`
-        })}\n\n`);
+      }, STREAM_TIMEOUT_MS);
+
+      console.log('[AI Stream] Calling chatWithFile, history length:', history?.length || 0);
+      const streamResult = await chatWithFile({
+        urlPath,
+        message,
+        history,
+        documentContent,
+        stream: true,
+        tools,
+      });
+      console.log('[AI Stream] Got streamResult, starting to iterate fullStream');
+
+      if (isAborted) {
+        cleanup();
+        return;
       }
-      
-      clearInterval(keepAlive);
+
+      let fullResponse = '';
+      const toolCalls = [];
+      let partCount = 0;
+      const partTypes = new Set();
+
+      // Use fullStream to handle both text and tool calls
+      for await (const part of streamResult.fullStream) {
+        partCount++;
+        partTypes.add(part.type);
+        if (partCount <= 10 || part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'error') {
+          console.log('[AI Stream] Part', partCount, 'type:', part.type, 'keys:', Object.keys(part));
+        }
+        if (isAborted) break;
+
+        if (part.type === 'start-step') {
+          console.log('[AI Stream] New step starting');
+        } else if (part.type === 'finish-step') {
+          console.log('[AI Stream] Step finished');
+        } else if (part.type === 'text-delta') {
+          const text = part.text ?? part.textDelta ?? '';
+          if (text) {
+            fullResponse += text;
+            res.write(`data: ${JSON.stringify({
+              type: 'text',
+              content: text
+            })}\n\n`);
+          }
+        } else if (part.type === 'tool-call') {
+          // Notify client that a tool is being called
+          debug('[AI Stream] Tool call:', part.toolName, part.args);
+          res.write(`data: ${JSON.stringify({
+            type: 'tool-call',
+            toolName: part.toolName,
+            args: part.args
+          })}\n\n`);
+          toolCalls.push({ name: part.toolName, args: part.args });
+        } else if (part.type === 'tool-result') {
+          // Notify client of tool result (SDK uses 'output' not 'result')
+          const result = part.output ?? part.result;
+          const resultPreview = typeof result === 'object'
+            ? JSON.stringify(result).slice(0, 200)
+            : String(result).slice(0, 200);
+          console.log('[AI Stream] Tool result:', part.toolName, resultPreview);
+          res.write(`data: ${JSON.stringify({
+            type: 'tool-result',
+            toolName: part.toolName,
+            result: result
+          })}\n\n`);
+        } else if (part.type === 'error') {
+          // AI provider returned an error
+          const errorMessage = part.error?.message || part.error?.toString() || 'Unknown AI error';
+          console.error('[AI Stream] Provider error:', errorMessage);
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            message: errorMessage
+          })}\n\n`);
+          cleanup();
+          res.end();
+          return;
+        }
+      }
+
+      console.log('[AI Stream] Stream ended, total parts:', partCount, 'response length:', fullResponse.length, 'part types:', Array.from(partTypes));
+
+      if (isAborted) {
+        cleanup();
+        return;
+      }
+
+      // Check if file was modified
+      let fileModified = false;
+      if (initialMtime !== null) {
+        try {
+          const newStats = await fs.stat(fullPath);
+          fileModified = newStats.mtimeMs !== initialMtime;
+        } catch (e) {
+          // File might have been deleted or become inaccessible
+        }
+      }
+
+      // Send completion signal
+      res.write(`data: ${JSON.stringify({
+        type: 'done',
+        fileModified,
+        fullResponse,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+      })}\n\n`);
+
+      cleanup();
       res.end();
-    });
-    
-    claude.on('error', (err) => {
-      console.error('[AI Stream] Failed to start Claude:', err);
+    } catch (error) {
+      console.error('[AI Stream] Error:', error);
       res.write(`data: ${JSON.stringify({
         type: 'error',
-        message: err.message
+        message: error.message || 'An error occurred'
       })}\n\n`);
-      clearInterval(keepAlive);
+      cleanup();
       res.end();
-    });
-    
+    }
   } catch (error) {
     console.error('[AI Stream] Error:', error);
     res.write(`data: ${JSON.stringify({
       type: 'error',
       message: error.message
     })}\n\n`);
-    clearInterval(keepAlive);
+    cleanup();
     res.end();
   }
 });
 
-// AI Chat route handler for directories
+// AI Chat route handler for directories (uses ai-chat module)
 app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
-  // Set timeout for this specific request to 5 minutes
-  req.setTimeout(300000); // 5 minutes
-  res.setTimeout(300000); // 5 minutes
-  
+  req.setTimeout(300000);
+  res.setTimeout(300000);
+
   try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
     const { message, history, directoryContext } = req.body;
-    const fullPath = path.join(VAULT_PATH, urlPath);
-    
-    // Build conversation for Claude
-    let conversation = "You are an AI assistant helping with a directory in a markdown vault. ";
-    conversation += `The user is viewing directory: ${urlPath || '/'}\n`;
-    conversation += `Full path: vault/${urlPath || '/'}\n\n`;
-    conversation += "Directory contents:\n";
-    conversation += directoryContext || "(No directory content available)";
-    conversation += "\n\n";
-    conversation += "You can help the user understand what files are in this directory, ";
-    conversation += "suggest which files to look at, and answer questions about organizing ";
-    conversation += "or navigating the content.\n\n";
-    
-    if (history && history.length > 0) {
-      conversation += "Previous conversation:\n";
-      history.forEach(msg => {
-        conversation += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-      });
-      conversation += "\n";
-    }
-    
-    conversation += `User: ${message}\n`;
-    conversation += "Assistant: ";
-    
-    // Call Claude using the claude CLI
-    const { spawn } = await import('child_process');
-    
+
+    debug('[AI Directory Chat] Starting chat with provider:', getChatProviderName());
+
     try {
-      // Debug logging
-      debug('[AI Directory Chat] Starting Claude execution...');
-      debug('[AI Directory Chat] Directory path:', urlPath || '/');
+      const response = await chatWithDirectory({
+        urlPath,
+        message,
+        history,
+        directoryContext,
+      });
 
-      // Use spawn to properly pipe input to claude --print
-      const claude = spawn('claude', ['--print'], {
-        cwd: process.cwd(),
-        timeout: 300000 // 5 minute timeout for complex requests
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      claude.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      claude.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      // Write the conversation to stdin
-      claude.stdin.write(conversation);
-      claude.stdin.end();
-      
-      // Wait for the process to complete
-      await new Promise((resolve, reject) => {
-        claude.on('close', (code) => {
-          debug('[AI Directory Chat] Claude process exited with code:', code);
-
-          if (code !== 0) {
-            debug('[AI Directory Chat] Claude failed with code:', code);
-            debug('[AI Directory Chat] stderr:', stderr);
-            if (code === null) {
-              reject(new Error('Request timed out after 5 minutes'));
-            } else {
-              reject(new Error(`Claude exited with code ${code}: ${stderr || 'Unknown error'}`));
-            }
-          } else {
-            resolve();
-          }
-        });
-        
-        claude.on('error', (err) => {
-          debug('[AI Directory Chat] Failed to start Claude:', err);
-          reject(err);
-        });
-      });
-      
-      res.json({ 
-        response: stdout.trim()
-      });
+      res.json({ response: response.trim() });
     } catch (error) {
-      console.error('[AI Directory Chat] Error calling Claude:', error);
-      
+      console.error('[AI Directory Chat] Error:', error);
+
       let errorResponse = "I'm having trouble processing your request.";
       if (error.message && error.message.includes('timed out')) {
         errorResponse = "The AI request took too long. Please try a shorter or simpler question.";
-      } else if (error.message && error.message.includes('code')) {
+      } else if (error.message) {
         errorResponse = "The AI service encountered an error. Please try again in a moment.";
       }
-      
-      res.json({ 
-        response: errorResponse
-      });
+
+      res.json({ response: errorResponse });
     }
-    
   } catch (error) {
     console.error('Error in AI directory chat:', error);
-    res.status(500).json({ 
-      success: false, 
-      response: 'An error occurred while processing your request.' 
+    res.status(500).json({
+      success: false,
+      response: 'An error occurred while processing your request.'
     });
+  }
+});
+
+// GET conversation history from vault
+app.get('/api/ai-chat/conversations/*path', authMiddleware, async (req, res) => {
+  try {
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+    const messages = await loadConversation(urlPath);
+    res.json({ messages });
+  } catch (error) {
+    console.error('Error loading conversation:', error);
+    res.status(500).json({ error: 'Failed to load conversation' });
+  }
+});
+
+// PUT (save) conversation to vault
+app.put('/api/ai-chat/conversations/*path', authMiddleware, async (req, res) => {
+  try {
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+    const { messages } = req.body;
+    await saveConversation(urlPath, messages || []);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving conversation:', error);
+    res.status(500).json({ error: 'Failed to save conversation' });
+  }
+});
+
+// DELETE conversation from vault
+app.delete('/api/ai-chat/conversations/*path', authMiddleware, async (req, res) => {
+  try {
+    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+    const deleted = await clearConversation(urlPath);
+    res.json({ success: true, deleted });
+  } catch (error) {
+    console.error('Error clearing conversation:', error);
+    res.status(500).json({ error: 'Failed to clear conversation' });
   }
 });
 
