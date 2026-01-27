@@ -16,7 +16,7 @@
 // Everything else uses dynamic import() after deps are verified.
 // =============================================================================
 
-import { existsSync, statSync, utimesSync } from 'fs';
+import { existsSync, statSync, utimesSync, openSync } from 'fs';
 import { dirname, join } from 'path';
 import { execSync as execSyncBuiltin } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -963,11 +963,12 @@ ${contextSection}`;
 
       const { spawn } = await import('child_process');
       const serverPath = path.join(projectRoot, 'src', 'web-server.js');
+      const logFile = openSync('/tmp/web-server.log', 'w');
 
       const child = spawn('node', [serverPath], {
         cwd: projectRoot,
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', logFile, logFile],
         env: { ...process.env }
       });
 
@@ -1016,6 +1017,9 @@ ${contextSection}`;
     .command('restart')
     .description('Restart the web server')
     .action(async () => {
+      const { spawn, execSync } = await import('child_process');
+
+      // First, stop by PID file if it exists
       const pid = getWebServerPid();
       if (pid) {
         console.log(`Stopping web server (PID: ${pid})...`);
@@ -1025,19 +1029,37 @@ ${contextSection}`;
         } catch {
           // Ignore errors, continue with start
         }
-        // Wait for process to fully stop
         await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Also check for any orphaned process on port 3001
+      try {
+        const portCheck = execSync('lsof -ti :3001 2>/dev/null', { encoding: 'utf8' }).trim();
+        if (portCheck) {
+          const orphanPid = parseInt(portCheck.split('\n')[0], 10);
+          if (orphanPid && orphanPid !== pid) {
+            console.log(`Killing orphaned process on port 3001 (PID: ${orphanPid})...`);
+            try {
+              process.kill(orphanPid, 'SIGTERM');
+              await new Promise(resolve => setTimeout(resolve, 500));
+            } catch {
+              // Ignore if already dead
+            }
+          }
+        }
+      } catch {
+        // No process on port, that's fine
       }
 
       console.log('Starting web server...');
 
-      const { spawn } = await import('child_process');
       const serverPath = path.join(projectRoot, 'src', 'web-server.js');
+      const logFile = openSync('/tmp/web-server.log', 'w');
 
       const child = spawn('node', [serverPath], {
         cwd: projectRoot,
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', logFile, logFile],
         env: { ...process.env }
       });
 

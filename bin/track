@@ -9,12 +9,14 @@ import { getSourcesForType, getWritableSource, writeEntryAndSync, ensureSyncForT
 import {
   getConfiguredTimezone,
   getCurrentTimeISO,
+  createTimeTodayISO,
   getTodayDate,
   getWeekAgoDate,
   addDaysToDate,
   formatDate,
   subtractSecondsISO,
   formatTime,
+  formatISO8601,
   sqlLocalDate
 } from '../src/date-utils.js';
 import {
@@ -34,6 +36,50 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
 
 const TIMEZONE = getConfiguredTimezone();
+
+/**
+ * Parse a time string into an ISO 8601 string for today in the configured timezone
+ * Supports formats: 9:00, 14:30, 9am, 2pm, 9:30am, 2:30pm
+ * @returns {{ iso: string, date: Date } | null}
+ */
+function parseTimeString(timeStr) {
+  if (!timeStr) return null;
+
+  const str = timeStr.trim().toLowerCase();
+  let hours = 0;
+  let minutes = 0;
+
+  // Try 24-hour format first: 14:30, 9:00
+  const match24 = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    hours = parseInt(match24[1], 10);
+    minutes = parseInt(match24[2], 10);
+  } else {
+    // Try 12-hour format: 9am, 2pm, 9:30am, 2:30pm
+    const match12 = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
+    if (match12) {
+      hours = parseInt(match12[1], 10);
+      minutes = match12[2] ? parseInt(match12[2], 10) : 0;
+      const isPM = match12[3] === 'pm';
+
+      if (hours === 12) {
+        hours = isPM ? 12 : 0;
+      } else if (isPM) {
+        hours += 12;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  // Validate
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  // Use the timezone-aware utility function
+  return createTimeTodayISO(hours, minutes, TIMEZONE);
+}
 
 // Start tracking
 async function cmdStart(description, options = {}) {
@@ -206,16 +252,19 @@ async function cmdAdd(durationStr, options = {}) {
   const description = descriptionParts.join(' ');
 
   if (!durationStr || !description) {
-    console.error(colors.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE]');
+    console.error(colors.red('✗') + ' Usage: track add DURATION "Description with #topic/tags" [--source SOURCE] [--start TIME]');
     console.log('');
     console.log('Examples:');
     console.log('  track add 20m "Reviewing pull requests #topic/programming"');
     console.log('  track add 2h "Deep work session #topic/programming"');
-    console.log('  track add 1.5h "Language practice #topic/languages"');
-    console.log('  track add 2h30m "Project planning #topic/personal_admin"');
+    console.log('  track add 1.5h "Language practice #topic/languages" --start 9:00');
+    console.log('  track add 2h30m "Project planning" --start 14:30');
     console.log('');
     console.log('Supported duration formats:');
     console.log('  20m, 35 minutes, 2h, 2 hours, 1.5h, 2h30m');
+    console.log('');
+    console.log('Supported start time formats:');
+    console.log('  9:00, 14:30, 9am, 2pm, 9:30am, 2:30pm');
     process.exit(1);
   }
 
@@ -228,11 +277,27 @@ async function cmdAdd(durationStr, options = {}) {
     process.exit(1);
   }
 
-  const endTime = getCurrentTimeISO();
   const durationSeconds = durationMinutes * 60;
+  let startTime, endTime;
 
-  // Calculate start time
-  const startTime = subtractSecondsISO(new Date(), durationSeconds);
+  if (options.start) {
+    // Parse the start time
+    const parsed = parseTimeString(options.start);
+    if (!parsed) {
+      console.error(colors.red('✗') + ` Could not parse start time: ${options.start}`);
+      console.log('');
+      console.log('Supported formats: 9:00, 14:30, 9am, 2pm, 9:30am, 2:30pm');
+      process.exit(1);
+    }
+    startTime = parsed.iso;
+    // Calculate end time from start + duration
+    const endDate = new Date(parsed.date.getTime() + durationSeconds * 1000);
+    endTime = formatISO8601(endDate, TIMEZONE);
+  } else {
+    // Default: entry ends now
+    endTime = getCurrentTimeISO();
+    startTime = subtractSecondsISO(new Date(), durationSeconds);
+  }
 
   // Write entry via plugin and sync
   const entry = {
@@ -1347,6 +1412,7 @@ program
   .argument('<duration>', 'Duration (e.g., 20m, 1.5h, 2h30m)')
   .argument('<description...>', 'Description with #topic/tags')
   .option('--source <source>', 'Plugin source to use')
+  .option('--start <time>', 'Start time (e.g., 9:00, 14:30, 9am, 2pm)')
   .action(async (duration, descriptionParts, options) => {
     await cmdAdd(duration, { ...options, _positional: descriptionParts });
   });

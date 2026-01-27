@@ -60,16 +60,28 @@ export async function chatWithFile({ urlPath, message, history, documentContent,
  * @param {string} options.message - The user's message
  * @param {Array} options.history - Previous conversation messages
  * @param {string} options.directoryContext - Description of directory contents
- * @returns {Promise<string>} - Response text
+ * @param {Object} [options.tools] - Tool definitions for the AI to use
+ * @param {boolean} [options.stream=false] - Whether to return a stream
+ * @returns {Promise<string|AsyncIterable>} - Response text or stream
  */
-export async function chatWithDirectory({ urlPath, message, history, directoryContext }) {
+export async function chatWithDirectory({ urlPath, message, history, directoryContext, tools, stream = false }) {
   const systemContext = buildDirectoryContext(urlPath, directoryContext);
   const { system, messages } = buildMessages(systemContext, history, message);
+
+  if (stream) {
+    return streamCompletion({
+      system,
+      messages,
+      maxTokens: DEFAULT_MAX_TOKENS,
+      tools,
+    });
+  }
 
   return createCompletion({
     system,
     messages,
     maxTokens: DEFAULT_MAX_TOKENS,
+    tools,
   });
 }
 

@@ -56,8 +56,10 @@ export function buildFileContext(urlPath, documentContent) {
 
   context += '## Guidelines\n\n';
   context += '- When editing, preserve the document structure (frontmatter, headings, etc.)\n';
-  context += '- Use tools proactively when they would help answer the user\'s question\n';
-  context += '- For questions about schedules, tasks, or data, query the database or run commands\n\n';
+  context += '- IMPORTANT: When the user asks about data (tasks, calendar, habits, etc.), IMMEDIATELY call the query_database or run_command tool. Do NOT just say you will search - actually invoke the tool in your response.\n';
+  context += '- CRITICAL: If the user requests MULTIPLE actions, make MULTIPLE tool calls IN THE SAME RESPONSE. Do not stop after one tool call.\n';
+  context += '- For questions about schedules, tasks, or data, query the database or run commands\n';
+  context += '- After using tools, report what happened. Say "I added X" or "I found Y", not "I will add X".\n\n';
 
   context += '---CURRENT DOCUMENT CONTENT---\n';
   context += documentContent || '(No document content available)';
@@ -78,9 +80,35 @@ export function buildDirectoryContext(urlPath, directoryContext) {
   context += 'Directory contents:\n';
   context += directoryContext || '(No directory content available)';
   context += '\n\n';
-  context += 'You can help the user understand what files are in this directory, ';
-  context += 'suggest which files to look at, and answer questions about organizing ';
-  context += 'or navigating the content.';
+
+  context += '## Available Tools\n\n';
+  context += 'You have access to the following tools:\n\n';
+
+  context += '### query_database\n';
+  context += 'Query the SQLite database containing user data from plugins. Available data:\n';
+  context += getAvailableDataTypes();
+  context += '\n\n';
+
+  context += '### run_command\n';
+  context += 'Run commands from the Today CLI toolkit (bin/ directory). Available commands include:\n';
+  context += '- calendar: View and manage calendar events\n';
+  context += '- tasks: List, add, and complete tasks\n';
+  context += '- track: Time tracking (start, stop, add entries)\n';
+  context += '- diary: Journal entries and reflections\n';
+  context += '- projects: Project management and review\n';
+  context += '- habits: Habit tracking and streaks\n';
+  context += '- contacts: Contact information and birthdays\n';
+  context += '- health: Health metrics and summaries\n';
+  context += '- finance: Financial data and budgets\n\n';
+
+  context += '## Guidelines\n\n';
+  context += '- You can help the user understand what files are in this directory\n';
+  context += '- IMPORTANT: When the user asks to add entries, track time, or modify data, IMMEDIATELY use the run_command tool.\n';
+  context += '- CRITICAL: If the user requests MULTIPLE items, you MUST address ALL of them. Either make tool calls for each, OR explain why you cannot do specific ones.\n';
+  context += '- NEVER silently skip a request. If you cannot do something, you MUST explain why in your text response.\n';
+  context += '- For queries about data, use query_database or run_command\n';
+  context += '- After executing tools, report what happened. Say "I added X" not "I will add X".\n';
+
   return context;
 }
 

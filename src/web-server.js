@@ -1005,7 +1005,7 @@ async function renderDirectory(dirPath, urlPath) {
           if (chatHistory.length > 0) {
             chatMessages.innerHTML = '';
             chatHistory.forEach(msg => {
-              addChatBubble(msg.content, msg.role, false);
+              addChatBubble(msg.content, msg.role, false, msg.timestamp);
             });
           }
         }
@@ -1024,19 +1024,20 @@ async function renderDirectory(dirPath, urlPath) {
         }
         
         // Add a chat bubble to the interface
-        function addChatBubble(message, role, save = true) {
+        function addChatBubble(message, role, save = true, msgTimestamp = null) {
           const chatMessages = document.getElementById('chatMessages');
           const bubble = document.createElement('div');
           bubble.className = \`chat-bubble \${role}\`;
-          
-          const timestamp = new Date().toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
+
+          const displayDate = msgTimestamp ? new Date(msgTimestamp) : new Date();
+          const timestamp = displayDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
             minute: '2-digit',
-            hour12: true 
+            hour12: true
           });
           
           // Render markdown using marked with external link renderer
-          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer() });
+          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer(), breaks: true });
           
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -3523,7 +3524,7 @@ ${cleanContent}
           if (chatHistory.length > 0) {
             chatMessages.innerHTML = '';
             chatHistory.forEach(msg => {
-              addChatBubble(msg.content, msg.role, false);
+              addChatBubble(msg.content, msg.role, false, null, msg.timestamp);
             });
           }
         }
@@ -3542,19 +3543,20 @@ ${cleanContent}
         }
 
         // Add a chat bubble to the interface
-        function addChatBubble(message, role, save = true, replyTime = null) {
+        function addChatBubble(message, role, save = true, replyTime = null, msgTimestamp = null) {
           const chatMessages = document.getElementById('chatMessages');
           const bubble = document.createElement('div');
           bubble.className = \`chat-bubble \${role}\`;
 
-          const timestamp = new Date().toLocaleTimeString('en-US', {
+          const displayDate = msgTimestamp ? new Date(msgTimestamp) : new Date();
+          const timestamp = displayDate.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
             hour12: true
           });
 
           // Render markdown using marked with external link renderer
-          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer() });
+          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer(), breaks: true });
 
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -4457,6 +4459,7 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
 
 // AI Chat route handler for directories (uses ai-chat module)
 app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
+  console.log('>>> AI DIRECTORY CHAT ENDPOINT HIT <<<');
   req.setTimeout(300000);
   res.setTimeout(300000);
 
@@ -4464,7 +4467,17 @@ app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
     const { message, history, directoryContext } = req.body;
 
-    debug('[AI Directory Chat] Starting chat with provider:', getChatProviderName());
+    console.log('[AI Directory Chat] Starting chat with provider:', getChatProviderName());
+
+    // Create tools for directory chat (no edit_file since we're not viewing a specific file)
+    const tools = createChatTools({
+      includeEdit: false,
+      includeDatabase: true,
+      includeCommands: true,
+    });
+
+    console.log('[AI Directory Chat] Tools created:', Object.keys(tools));
+    console.log('[AI Directory Chat] Message:', message?.slice(0, 100));
 
     try {
       const response = await chatWithDirectory({
@@ -4472,8 +4485,10 @@ app.post('/ai-chat-directory/*path', authMiddleware, async (req, res) => {
         message,
         history,
         directoryContext,
+        tools,
       });
 
+      console.log('[AI Directory Chat] Response:', response?.slice(0, 100));
       res.json({ response: response.trim() });
     } catch (error) {
       console.error('[AI Directory Chat] Error:', error);

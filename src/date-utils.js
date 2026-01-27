@@ -238,6 +238,28 @@ export function getCurrentTimeISO(timezone) {
 }
 
 /**
+ * Create an ISO 8601 timestamp for a specific time today in the configured timezone.
+ * @param {number} hours - Hour (0-23)
+ * @param {number} minutes - Minutes (0-59)
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {{ iso: string, date: Date }} ISO string and Date object for calculations
+ */
+export function createTimeTodayISO(hours, minutes, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const now = new TZDate(new Date(), tz);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const day = now.getDate();
+
+  // Create a TZDate at the specified time in the configured timezone
+  const targetDate = new TZDate(year, month, day, hours, minutes, 0, tz);
+  return {
+    iso: format(targetDate, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+    date: new Date(targetDate.getTime())
+  };
+}
+
+/**
  * Get today's date as YYYY-MM-DD in the configured timezone.
  * @param {string} [timezone] - Optional timezone override
  * @returns {string} Today's date

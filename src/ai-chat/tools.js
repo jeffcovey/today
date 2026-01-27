@@ -257,11 +257,17 @@ export function createRunCommandTool() {
 Available commands:
 ${commandList}
 
-These commands provide access to calendar, tasks, time tracking, diary, projects, and more.
-Pass arguments as needed (e.g., "today", "week", "--date 2024-01-15").`,
+Usage patterns:
+- track add <duration> "<description>" - Add entry ending now (e.g., track add 10m "meeting")
+- track start "<description>" - Start a timer
+- track stop - Stop current timer
+- tasks today - Show today's tasks
+- calendar today - Show today's calendar
+
+IMPORTANT: Use positional arguments, not flags. If a command fails, report the error to the user.`,
     inputSchema: z.object({
       command: z.string().describe('The command name without "bin/" prefix (e.g., "calendar", "tasks", "track")'),
-      args: z.string().optional().describe('Arguments to pass to the command (e.g., "today", "week", "--date 2024-01-15")'),
+      args: z.string().optional().describe('Positional arguments for the command. Example for track: "add 10m talking with John"'),
     }),
     execute: async ({ command, args }) => {
       try {

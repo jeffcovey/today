@@ -253,6 +253,7 @@ export async function createCompletion(options) {
   if (options.tools) {
     genOptions.tools = options.tools;
     genOptions.maxSteps = options.maxSteps || 5;
+    console.log('[AI Provider] createCompletion with tools:', Object.keys(options.tools), 'maxSteps:', genOptions.maxSteps);
   }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)
@@ -273,7 +274,79 @@ export async function createCompletion(options) {
   }
 
   const result = await generateText(genOptions);
-  return result.text;
+
+  // Minimal logging for tool usage (verbose logs disabled to avoid polluting command output)
+  if (options.tools && result.steps) {
+    const toolCallCount = result.steps.reduce((sum, s) => sum + (s.toolCalls?.length || 0), 0);
+    if (toolCallCount > 0) {
+      console.error(`[AI] ${toolCallCount} tool call(s), ${result.steps.length} step(s)`);
+    }
+  }
+
+  // Build response: model's text + tool results summary
+  let responseText = result.text || '';
+
+  if (options.tools && result.steps) {
+    const toolResults = [];
+    for (const step of result.steps) {
+      if (step.toolResults) {
+        for (const tr of step.toolResults) {
+          toolResults.push(tr);
+        }
+      }
+    }
+
+    // Build tool results summary
+    if (toolResults.length > 0) {
+      const summaryParts = [];
+      for (const tr of toolResults) {
+        const toolName = tr.toolName || 'unknown';
+        const output = tr.output;
+
+        if (toolName === 'run_command') {
+          if (output?.success) {
+            const cleanOutput = (output.output || '').trim();
+            if (cleanOutput) {
+              summaryParts.push(`✓ ${cleanOutput}`);
+            }
+          } else {
+            const errorMsg = output?.stderr || output?.error || 'Command failed';
+            // Include what was attempted for context
+            const attempted = tr.input?.args ? `\`${tr.input.command} ${tr.input.args}\`` : tr.input?.command;
+            summaryParts.push(`✗ Failed: ${attempted}\n   ${errorMsg.trim()}`);
+          }
+        } else if (toolName === 'query_database') {
+          if (output?.success) {
+            summaryParts.push(`✓ Query returned ${output.rowCount} results`);
+          } else {
+            summaryParts.push(`✗ Query error: ${output?.error || 'Unknown error'}`);
+          }
+        } else if (toolName === 'edit_file') {
+          if (output?.success) {
+            summaryParts.push(`✓ ${output.message || 'File updated'}`);
+          } else {
+            summaryParts.push(`✗ Edit failed: ${output?.error || 'Unknown error'}`);
+          }
+        }
+      }
+
+      // Combine model text with tool results
+      if (summaryParts.length > 0) {
+        // Use double newlines for markdown paragraph breaks
+        const toolSummary = summaryParts.join('\n\n');
+        // If model text is just fluff like "I'll add...", replace it
+        const fluffPatterns = /^(I('ll| will)|Let me|Sure|OK|Okay)/i;
+        if (!responseText || responseText.length < 100 || fluffPatterns.test(responseText.trim())) {
+          responseText = toolSummary;
+        } else {
+          // Model had substantive text, append tool results
+          responseText = responseText.trim() + '\n\n**Results:**\n\n' + toolSummary;
+        }
+      }
+    }
+  }
+
+  return responseText;
 }
 
 /**
