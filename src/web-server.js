@@ -18,6 +18,7 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath } from './config.js';
+import { isPluginConfigured } from './plugin-loader.js';
 import yaml from 'js-yaml';
 import {
   chatWithFile,
@@ -674,11 +675,6 @@ async function renderDirectory(dirPath, urlPath) {
     const week = getWeekNumber(today);
     const day = String(today.getDate()).padStart(2, '0');
     
-    // Check for today's plan
-    const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
-    const todayPlanPath = path.join(dirPath, 'plans', todayPlanFile);
-    const todayPlanExists = await fs.access(todayPlanPath).then(() => true).catch(() => false);
-    
     // Get task count for today from database cache
     let taskCount = 0;
     try {
@@ -697,53 +693,84 @@ async function renderDirectory(dirPath, urlPath) {
     } catch (error) {
       console.error('Error getting task count from database:', error);
     }
-    
+
     // Check for other plan files
+    const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
     const weekPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_00.md`;
     const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
     const quarterPlanFile = `${year}_${quarter}_00.md`;
     const yearPlanFile = `${year}_00.md`;
-    
+
     const plansDir = path.join(dirPath, 'plans');
     const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
     const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
     const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
     const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
-    
-    // Add today's plan button if it exists
-    if (todayPlanExists) {
+
+    // Determine "Today" link: diary if markdown-diary enabled, else plan if markdown-plans enabled
+    const diaryEnabled = isPluginConfigured('markdown-diary');
+    const plansEnabled = isPluginConfigured('markdown-plans');
+    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format for diary
+
+    // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
+    html += `<div class="row">`;
+
+    // Add Today's Plan/Diary button based on enabled plugins
+    if (diaryEnabled) {
       html += `
-            <div class="card shadow-sm mb-3">
-              <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white">
-                <div class="d-flex align-items-center ps-2">
-                  <i class="fas fa-calendar-day me-2"></i>
-                  <div>
-                    <strong>Today's Plan</strong>
-                    <br>
-                    <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
-                  </div>
-                </div>
-              </a>
-            </div>`;
-    }
-    
-    // Add Today's Tasks button (always show it)
-    html += `
-            <div class="card shadow-sm mb-3">
-              <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white">
-                <div class="d-flex align-items-center justify-content-between ps-2">
-                  <div class="d-flex align-items-center">
-                    <i class="fas fa-tasks me-2"></i>
-                    <div>
-                      <strong>Today's Tasks</strong>
-                      <br>
-                      <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today` : 'No tasks scheduled for today'}</small>
+              <div class="col-12 col-lg-6 mb-3">
+                <div class="card shadow-sm h-100">
+                  <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary text-white h-100">
+                    <div class="d-flex align-items-center ps-2 py-2">
+                      <i class="fas fa-book me-2"></i>
+                      <div>
+                        <strong>Today's Diary</strong>
+                        <br>
+                        <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                      </div>
                     </div>
-                  </div>
-                  ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
+                  </a>
                 </div>
-              </a>
-            </div>`;
+              </div>`;
+    } else if (plansEnabled) {
+      html += `
+              <div class="col-12 col-lg-6 mb-3">
+                <div class="card shadow-sm h-100">
+                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white h-100">
+                    <div class="d-flex align-items-center ps-2 py-2">
+                      <i class="fas fa-calendar-day me-2"></i>
+                      <div>
+                        <strong>Today's Plan</strong>
+                        <br>
+                        <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              </div>`;
+    }
+
+    // Add Today's Tasks button
+    html += `
+              <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
+                <div class="card shadow-sm h-100">
+                  <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white h-100">
+                    <div class="d-flex align-items-center justify-content-between ps-2 py-2">
+                      <div class="d-flex align-items-center">
+                        <i class="fas fa-tasks me-2"></i>
+                        <div>
+                          <strong>Today's Tasks</strong>
+                          <br>
+                          <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today` : 'No tasks scheduled for today'}</small>
+                        </div>
+                      </div>
+                      ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
+                    </div>
+                  </a>
+                </div>
+              </div>`;
+
+    html += `</div>`;
     
     // Add Plans section (collapsed)
     html += `
@@ -1672,6 +1699,21 @@ async function getCachedRender(filePath, urlPath) {
     // Fall back to uncached rendering
     return renderMarkdownUncached(filePath, urlPath);
   }
+}
+
+/**
+ * Convert Obsidian wiki links to standard markdown links.
+ * Handles: [[link]], [[link|text]], [[link#section]], [[link#section|text]]
+ * Links are made vault-root absolute (e.g., [[plans/today]] -> [today](/plans/today))
+ */
+function convertWikiLinks(markdown) {
+  // Match [[link]] or [[link|text]] patterns
+  // Captures: link path (with optional #section) and optional display text
+  return markdown.replace(/\[\[([^\]|#]+)(#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (match, link, section, text) => {
+    const displayText = text || link.split('/').pop(); // Use text if provided, else last part of path
+    const href = '/' + link + (section || '');
+    return `[${displayText}](${href})`;
+  });
 }
 
 // Create a marked renderer that opens external links in new tabs
@@ -2892,6 +2934,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Replace tags with emojis in the markdown content
   contentToRender = replaceTagsWithEmojis(contentToRender);
+
+  // Convert Obsidian wiki links [[link|text]] to standard markdown links
+  contentToRender = convertWikiLinks(contentToRender);
 
   // Find all checkbox lines in the ORIGINAL content (before modifications)
   // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
