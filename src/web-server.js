@@ -694,19 +694,6 @@ async function renderDirectory(dirPath, urlPath) {
       console.error('Error getting task count from database:', error);
     }
 
-    // Check for other plan files
-    const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
-    const weekPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_00.md`;
-    const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
-    const quarterPlanFile = `${year}_${quarter}_00.md`;
-    const yearPlanFile = `${year}_00.md`;
-
-    const plansDir = path.join(dirPath, 'plans');
-    const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
-    const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
-    const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
-    const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
-
     // Determine "Today" link: diary if markdown-diary enabled, else plan if markdown-plans enabled
     const diaryEnabled = isPluginConfigured('markdown-diary');
     const plansEnabled = isPluginConfigured('markdown-plans');
@@ -733,6 +720,7 @@ async function renderDirectory(dirPath, urlPath) {
                 </div>
               </div>`;
     } else if (plansEnabled) {
+      const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
       html += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
@@ -771,9 +759,21 @@ async function renderDirectory(dirPath, urlPath) {
               </div>`;
 
     html += `</div>`;
-    
-    // Add Plans section (collapsed)
-    html += `
+
+    // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
+    if (plansEnabled) {
+      const weekPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_00.md`;
+      const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
+      const quarterPlanFile = `${year}_${quarter}_00.md`;
+      const yearPlanFile = `${year}_00.md`;
+
+      const plansDir = path.join(dirPath, 'plans');
+      const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
+      const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
+      const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
+      const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
+
+      html += `
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
                 <div class="d-flex justify-content-between align-items-center">
@@ -783,40 +783,41 @@ async function renderDirectory(dirPath, urlPath) {
               </div>
               <div class="collapse" id="plansSection">
                 <div class="list-group list-group-flush">`;
-    
-    if (weekPlanExists) {
-      html += `
+
+      if (weekPlanExists) {
+        html += `
                   <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-week text-info me-3"></i>
                     Week ${week}
                   </a>`;
-    }
-    if (monthPlanExists) {
-      html += `
+      }
+      if (monthPlanExists) {
+        html += `
                   <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar text-success me-3"></i>
                     ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
                   </a>`;
-    }
-    if (quarterPlanExists) {
-      html += `
+      }
+      if (quarterPlanExists) {
+        html += `
                   <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-business-time text-warning me-3"></i>
                     Quarter ${quarter.slice(1)} - ${year}
                   </a>`;
-    }
-    if (yearPlanExists) {
-      html += `
+      }
+      if (yearPlanExists) {
+        html += `
                   <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-check text-danger me-3"></i>
                     Year ${year}
                   </a>`;
-    }
-    
-    html += `
+      }
+
+      html += `
                 </div>
               </div>
             </div>`;
+    }
     
     // Add Recents section (collapsed) - placeholder for now
     html += `
