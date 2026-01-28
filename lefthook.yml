@@ -55,6 +55,17 @@ pre-commit:
         scripts/check-docs
         echo "✅ Documentation checks passed!"
 
+post-merge:
+  commands:
+    install-deps:
+      run: |
+        changed=$(git diff-tree -r --name-only ORIG_HEAD HEAD -- package.json package-lock.json)
+        if [ -n "$changed" ]; then
+          echo "📦 package.json changed, running npm install..."
+          npm install
+          echo "✅ Dependencies installed"
+        fi
+
 pre-push:
   commands:
     outdated:
