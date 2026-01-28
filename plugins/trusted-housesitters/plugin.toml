@@ -1,0 +1,73 @@
+# TrustedHousesitters Plugin
+# Scrapes housesitting listings from TrustedHousesitters.com
+
+name = "trusted-housesitters"
+displayName = "TrustedHousesitters"
+description = "Housesitting opportunities from TrustedHousesitters.com"
+type = "issues"
+
+longDescription = """
+Scrapes housesitting listings from TrustedHousesitters.com using browser automation.
+
+Requires a TrustedHousesitters account. Credentials are stored encrypted.
+
+Configure availability windows, blocked dates, location preferences, and pet filters
+to see only relevant opportunities. Listings are stored in the database and optionally
+written to a browsable markdown file in your vault.
+
+Note: Syncing is slow (~2-5 minutes) due to browser automation. Run infrequently.
+"""
+
+aiInstructions = """
+To query housesitting listings, use the `issues` table:
+- `source`: 'trusted-housesitters/{source-name}'
+- `title`: Listing title
+- `url`: Link to the listing on TrustedHousesitters
+- `metadata`: JSON with details:
+  - `start_date`: Sit start date (YYYY-MM-DD)
+  - `end_date`: Sit end date (YYYY-MM-DD)
+  - `duration_days`: Length of sit
+  - `city`, `state`, `country`: Location
+  - `animals`: Object with pet counts, e.g., {"Dog": 1, "Cat": 2}
+  - `image`: Local path to listing image
+  - `date_added`: When the listing was first scraped
+
+Example queries:
+- All listings: SELECT title, url, json_extract(metadata, '$.country') as country FROM issues WHERE source LIKE 'trusted-housesitters/%'
+- By country: SELECT title, json_extract(metadata, '$.start_date') as start FROM issues WHERE source LIKE 'trusted-housesitters/%' AND json_extract(metadata, '$.country') = 'France'
+- Cats only: SELECT title FROM issues WHERE source LIKE 'trusted-housesitters/%' AND json_extract(metadata, '$.animals.Cat') > 0 AND json_extract(metadata, '$.animals.Dog') IS NULL
+"""
+
+[commands]
+read = "./read.js"
+login = "./login.js"
+
+[settings]
+# Credentials (encrypted)
+email = { type = "string", required = true, description = "TrustedHousesitters account email" }
+password = { type = "string", required = true, description = "TrustedHousesitters account password", encrypted = true }
+
+# Availability (arrays of {start, end} date ranges)
+# Configure in config.toml as: availability_windows = [{ start = "2026-06-01", end = "2026-07-15" }]
+availability_windows = { type = "array", default = [], description = "Date ranges when available (array of {start, end} objects)" }
+blocked_dates = { type = "array", default = [], description = "Date ranges to exclude (trips, commitments)" }
+require_full_overlap = { type = "boolean", default = false, description = "If true, sit must fit entirely within an availability window" }
+
+# Duration filters
+min_duration_days = { type = "number", default = 0, description = "Minimum sit length in days" }
+max_duration_days = { type = "number", default = 0, description = "Maximum sit length in days (0 = no limit)" }
+
+# Location filters
+countries = { type = "array", default = [], description = "Only show listings in these countries (empty = all)" }
+exclude_countries = { type = "array", default = [], description = "Exclude listings in these countries" }
+
+# Pet filters
+max_dogs = { type = "number", default = -1, description = "Maximum dogs allowed (-1 = no limit)" }
+max_cats = { type = "number", default = -1, description = "Maximum cats allowed (-1 = no limit)" }
+max_total_pets = { type = "number", default = -1, description = "Maximum total pets (-1 = no limit)" }
+allowed_pets = { type = "array", default = [], description = "Only these pet types (empty = all)" }
+excluded_pets = { type = "array", default = [], description = "Exclude these pet types" }
+
+# Output
+output_file = { type = "string", default = "vault/trusted-housesitters/current-listings.md", description = "Markdown file for browsable listings" }
+max_pages = { type = "number", default = 20, description = "Maximum pages to scrape (each page ~20 listings)" }

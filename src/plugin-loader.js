@@ -1,7 +1,7 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath } from './config.js';
@@ -387,6 +387,66 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceNa
       return { success: false, error: message };
     }
     // JSON parse error or other JavaScript error
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Run a plugin command interactively (with inherited stdio).
+ * Used for commands like `login` that need to prompt the user.
+ * @param {object} plugin - Plugin metadata from plugin.toml
+ * @param {string} command - Command name (e.g., 'login')
+ * @param {object} sourceConfig - Source configuration from config.toml
+ * @param {object} extraEnv - Additional environment variables
+ * @param {string} [sourceName] - Source name for decrypting encrypted settings
+ * @returns {{success: boolean, error?: string}}
+ */
+export function runInteractivePluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
+  const commandPath = plugin.commands?.[command];
+  if (!commandPath) {
+    return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
+  }
+
+  const fullPath = path.join(plugin._path, commandPath);
+  if (!fs.existsSync(fullPath)) {
+    return { success: false, error: `Command not found: ${fullPath}` };
+  }
+
+  // Apply plugin.toml settings defaults, then user config overrides
+  const settingsDefaults = {};
+  if (plugin.settings) {
+    for (const [key, def] of Object.entries(plugin.settings)) {
+      if (def.default !== undefined) {
+        settingsDefaults[key] = def.default;
+      }
+    }
+  }
+  const mergedConfig = { ...settingsDefaults, ...sourceConfig };
+
+  // Inject decrypted values for encrypted settings
+  const configWithSecrets = sourceName
+    ? injectDecryptedSettings(plugin, sourceName, mergedConfig)
+    : mergedConfig;
+
+  try {
+    const vaultPath = getVaultPath();
+    const result = spawnSync(fullPath, [], {
+      cwd: PROJECT_ROOT,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        PROJECT_ROOT,
+        VAULT_PATH: vaultPath,
+        PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
+        ...extraEnv
+      }
+    });
+
+    if (result.status !== 0) {
+      return { success: false, error: `Command exited with status ${result.status}` };
+    }
+    return { success: true };
+  } catch (error) {
     return { success: false, error: error.message };
   }
 }
