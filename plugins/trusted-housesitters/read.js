@@ -45,7 +45,8 @@ const maxPages = config.max_pages || 20;
 // Cache file for storing scraped data
 const cacheDir = path.join(projectRoot, '.data', 'trusted-housesitters');
 const cacheFile = path.join(cacheDir, 'listings.json');
-const imagesDir = path.join(cacheDir, 'images');
+const legacyImagesDir = path.join(cacheDir, 'images');
+const vaultImagesDir = path.join(projectRoot, 'vault', 'trusted-housesitters', 'images');
 
 /**
  * Parse date string like "12 Mar 2025" to Date object
@@ -250,12 +251,21 @@ function passesFilters(listing) {
 async function downloadImage(url, listingId) {
   if (!url) return null;
 
-  fs.mkdirSync(imagesDir, { recursive: true });
-  const localPath = path.join(imagesDir, `${listingId}.jpg`);
+  fs.mkdirSync(vaultImagesDir, { recursive: true });
+  const localPath = path.join(vaultImagesDir, `${listingId}.jpg`);
 
-  // Skip if already exists
+  // Skip if already exists in vault
   if (fs.existsSync(localPath)) {
     return localPath;
+  }
+
+  // Check legacy .data location and migrate if found (old files used slugified URLs as names)
+  if (fs.existsSync(legacyImagesDir)) {
+    const legacyFile = fs.readdirSync(legacyImagesDir).find(f => f.includes(`_${listingId}_`));
+    if (legacyFile) {
+      fs.copyFileSync(path.join(legacyImagesDir, legacyFile), localPath);
+      return localPath;
+    }
   }
 
   return new Promise((resolve) => {
@@ -286,7 +296,7 @@ async function downloadImage(url, listingId) {
  */
 function getListingId(url) {
   // URL like https://www.trustedhousesitters.com/house-and-pet-sitting-assignments/united-kingdom/england/649629
-  const match = url.match(/\/(\d+)(?:\?|$)/);
+  const match = url.match(/\/(\d+)(?:[/?]|$)/);
   return match ? match[1] : url.replace(/[^a-z0-9]/gi, '_');
 }
 
@@ -481,6 +491,45 @@ function generateMarkdown(listings, outputPath) {
     byCountry[country].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
   }
 
+  // Country name to ISO 3166-1 alpha-2 code
+  const countryCode = {
+    'Afghanistan': 'AF', 'Albania': 'AL', 'Algeria': 'DZ', 'Argentina': 'AR',
+    'Australia': 'AU', 'Austria': 'AT', 'Bahamas': 'BS', 'Barbados': 'BB',
+    'Belgium': 'BE', 'Belize': 'BZ', 'Bermuda': 'BM', 'Bolivia': 'BO',
+    'Bosnia and Herzegovina': 'BA', 'Brazil': 'BR', 'Bulgaria': 'BG',
+    'Cambodia': 'KH', 'Canada': 'CA', 'Chile': 'CL', 'China': 'CN',
+    'Colombia': 'CO', 'Costa Rica': 'CR', 'Croatia': 'HR', 'Cuba': 'CU',
+    'Cyprus': 'CY', 'Czech Republic': 'CZ', 'Czechia': 'CZ',
+    'Denmark': 'DK', 'Dominican Republic': 'DO', 'Ecuador': 'EC',
+    'Egypt': 'EG', 'El Salvador': 'SV', 'Estonia': 'EE', 'Fiji': 'FJ',
+    'Finland': 'FI', 'France': 'FR', 'Germany': 'DE', 'Ghana': 'GH',
+    'Greece': 'GR', 'Grenada': 'GD', 'Guatemala': 'GT', 'Guernsey': 'GG',
+    'Honduras': 'HN', 'Hong Kong': 'HK', 'Hungary': 'HU', 'Iceland': 'IS',
+    'India': 'IN', 'Indonesia': 'ID', 'Ireland': 'IE', 'Isle of Man': 'IM',
+    'Israel': 'IL', 'Italy': 'IT', 'Jamaica': 'JM', 'Japan': 'JP',
+    'Jersey': 'JE', 'Jordan': 'JO', 'Kenya': 'KE', 'Latvia': 'LV',
+    'Lithuania': 'LT', 'Luxembourg': 'LU', 'Malaysia': 'MY', 'Malta': 'MT',
+    'Mauritius': 'MU', 'Mexico': 'MX', 'Monaco': 'MC', 'Montenegro': 'ME',
+    'Morocco': 'MA', 'Nepal': 'NP', 'Netherlands': 'NL', 'New Zealand': 'NZ',
+    'Nicaragua': 'NI', 'Nigeria': 'NG', 'Norway': 'NO', 'Oman': 'OM',
+    'Pakistan': 'PK', 'Panama': 'PA', 'Paraguay': 'PY', 'Peru': 'PE',
+    'Philippines': 'PH', 'Poland': 'PL', 'Portugal': 'PT', 'Puerto Rico': 'PR',
+    'Romania': 'RO', 'Russia': 'RU', 'Saint Lucia': 'LC', 'Serbia': 'RS',
+    'Singapore': 'SG', 'Slovakia': 'SK', 'Slovenia': 'SI', 'South Africa': 'ZA',
+    'South Korea': 'KR', 'Spain': 'ES', 'Sri Lanka': 'LK', 'Sweden': 'SE',
+    'Switzerland': 'CH', 'Taiwan': 'TW', 'Tanzania': 'TZ', 'Thailand': 'TH',
+    'Trinidad and Tobago': 'TT', 'Tunisia': 'TN', 'Turkey': 'TR',
+    'Turks and Caicos Islands': 'TC', 'US': 'US', 'USA': 'US',
+    'United Kingdom': 'GB', 'UK': 'GB', 'United States': 'US',
+    'Uruguay': 'UY', 'Venezuela': 'VE', 'Vietnam': 'VN', 'Zambia': 'ZM',
+  };
+
+  function countryFlag(name) {
+    const code = countryCode[name];
+    if (!code) return '';
+    return String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  }
+
   // Build markdown
   const lines = [
     '# Current Housesit Listings',
@@ -497,7 +546,9 @@ function generateMarkdown(listings, outputPath) {
   lines.push('## Countries');
   lines.push('');
   for (const country of sortedCountries) {
-    lines.push(`- [${country}](#${country.toLowerCase().replace(/\s+/g, '-')}) (${byCountry[country].length})`);
+    const flag = countryFlag(country);
+    const flagPrefix = flag ? `${flag} ` : '';
+    lines.push(`- [${flagPrefix}${country}](#${country.toLowerCase().replace(/\s+/g, '-')}) (${byCountry[country].length})`);
   }
   lines.push('');
   lines.push('---');
@@ -529,12 +580,20 @@ function generateMarkdown(listings, outputPath) {
       lines.push(`### ${listing.title}${newBadge}`);
       lines.push('');
 
+      const imageFile = `${listing.id}.jpg`;
+      const hasImage = fs.existsSync(path.join(vaultImagesDir, imageFile));
+      if (hasImage) {
+        lines.push(`<img src="images/${imageFile}" alt="${listing.title.replace(/"/g, '&quot;')}" width="280" align="right" style="margin-left: 16px; margin-bottom: 8px; border-radius: 8px;">`);
+        lines.push('');
+      }
+
       const startDate = new Date(listing.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const endDate = new Date(listing.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       lines.push(`**Dates:** ${startDate} - ${endDate} (${listing.duration_days} days)`);
 
       const locationParts = [listing.city, listing.state, listing.country].filter(Boolean);
-      lines.push(`**Location:** ${locationParts.join(', ')}`);
+      const locFlag = countryFlag(listing.country);
+      lines.push(`**Location:** ${locationParts.join(', ')}${locFlag ? ' ' + locFlag : ''}`);
 
       if (Object.keys(listing.animals).length > 0) {
         const petStrings = Object.entries(listing.animals).map(([pet, count]) => {
@@ -546,6 +605,8 @@ function generateMarkdown(listings, outputPath) {
 
       lines.push('');
       lines.push(`[View on TrustedHousesitters](${listing.url})`);
+      lines.push('');
+      if (hasImage) lines.push('<br clear="both">');
       lines.push('');
       lines.push('---');
       lines.push('');
@@ -587,11 +648,20 @@ function saveCache(listings) {
 function mergeListings(cached, scraped) {
   const today = new Date().toISOString().split('T')[0];
   const byUrl = new Map();
+  const expiredIds = [];
 
-  // Add cached listings (non-expired)
+  // Add cached listings (non-expired), track expired ones for cleanup
   for (const listing of cached) {
     if (listing.start_date >= today) {
+      // Migrate legacy slugified IDs to numeric
+      const correctId = getListingId(listing.url);
+      if (listing.id !== correctId) {
+        listing.image_local = null; // force re-download/migration with new ID
+        listing.id = correctId;
+      }
       byUrl.set(listing.url, listing);
+    } else {
+      expiredIds.push(listing.id);
     }
   }
 
@@ -607,7 +677,26 @@ function mergeListings(cached, scraped) {
     }
   }
 
-  return Array.from(byUrl.values());
+  return { listings: Array.from(byUrl.values()), expiredIds };
+}
+
+/**
+ * Delete image files for expired listings
+ */
+function cleanupExpiredImages(expiredIds) {
+  for (const id of expiredIds) {
+    for (const dir of [vaultImagesDir, legacyImagesDir]) {
+      const imgPath = path.join(dir, `${id}.jpg`);
+      if (fs.existsSync(imgPath)) {
+        try {
+          fs.unlinkSync(imgPath);
+          console.error(`Cleaned up image: ${imgPath}`);
+        } catch (e) {
+          console.error(`Failed to clean up ${imgPath}: ${e.message}`);
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -627,17 +716,21 @@ async function main() {
 
       // Merge with cache
       const cachedListings = loadCache();
-      allListings = mergeListings(cachedListings, scrapedListings);
+      const { listings: merged, expiredIds } = mergeListings(cachedListings, scrapedListings);
+      allListings = merged;
 
-      // Save updated cache
-      saveCache(allListings);
-
-      // Download images for new listings
+      // Download images to vault for new listings
       for (const listing of allListings) {
         if (listing.image_url && !listing.image_local) {
           listing.image_local = await downloadImage(listing.image_url, listing.id);
         }
       }
+
+      // Save cache AFTER image download so image_local paths are persisted
+      saveCache(allListings);
+
+      // Clean up images for expired listings
+      cleanupExpiredImages(expiredIds);
     }
 
     // Apply filters

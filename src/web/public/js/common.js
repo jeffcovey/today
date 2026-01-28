@@ -163,7 +163,7 @@ function initializeLoadingSpinner() {
   // Handle link clicks with fetch
   document.addEventListener('click', async (e) => {
     const link = e.target.closest('a');
-    if (link && link.href && !link.target && !link.href.startsWith('javascript:') && !link.href.startsWith('#')) {
+    if (link && link.href && !link.target && !link.href.startsWith('javascript:') && !link.getAttribute('href')?.startsWith('#')) {
       // Only handle same-origin links
       try {
         if (new URL(link.href).origin !== window.location.origin) return;
