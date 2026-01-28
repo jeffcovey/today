@@ -471,153 +471,325 @@ async function scrapeListings() {
   }
 }
 
+// --- Shared markdown helpers ---
+
+const countryCode = {
+  'Afghanistan': 'AF', 'Albania': 'AL', 'Algeria': 'DZ', 'Argentina': 'AR',
+  'Australia': 'AU', 'Austria': 'AT', 'Bahamas': 'BS', 'Barbados': 'BB',
+  'Belgium': 'BE', 'Belize': 'BZ', 'Bermuda': 'BM', 'Bolivia': 'BO',
+  'Bosnia and Herzegovina': 'BA', 'Brazil': 'BR', 'Bulgaria': 'BG',
+  'Cambodia': 'KH', 'Canada': 'CA', 'Chile': 'CL', 'China': 'CN',
+  'Colombia': 'CO', 'Costa Rica': 'CR', 'Croatia': 'HR', 'Cuba': 'CU',
+  'Cyprus': 'CY', 'Czech Republic': 'CZ', 'Czechia': 'CZ',
+  'Denmark': 'DK', 'Dominican Republic': 'DO', 'Ecuador': 'EC',
+  'Egypt': 'EG', 'El Salvador': 'SV', 'Estonia': 'EE', 'Fiji': 'FJ',
+  'Finland': 'FI', 'France': 'FR', 'Germany': 'DE', 'Ghana': 'GH',
+  'Greece': 'GR', 'Grenada': 'GD', 'Guatemala': 'GT', 'Guernsey': 'GG',
+  'Honduras': 'HN', 'Hong Kong': 'HK', 'Hungary': 'HU', 'Iceland': 'IS',
+  'India': 'IN', 'Indonesia': 'ID', 'Ireland': 'IE', 'Isle of Man': 'IM',
+  'Israel': 'IL', 'Italy': 'IT', 'Jamaica': 'JM', 'Japan': 'JP',
+  'Jersey': 'JE', 'Jordan': 'JO', 'Kenya': 'KE', 'Latvia': 'LV',
+  'Lithuania': 'LT', 'Luxembourg': 'LU', 'Malaysia': 'MY', 'Malta': 'MT',
+  'Mauritius': 'MU', 'Mexico': 'MX', 'Monaco': 'MC', 'Montenegro': 'ME',
+  'Morocco': 'MA', 'Nepal': 'NP', 'Netherlands': 'NL', 'New Zealand': 'NZ',
+  'Nicaragua': 'NI', 'Nigeria': 'NG', 'Norway': 'NO', 'Oman': 'OM',
+  'Pakistan': 'PK', 'Panama': 'PA', 'Paraguay': 'PY', 'Peru': 'PE',
+  'Philippines': 'PH', 'Poland': 'PL', 'Portugal': 'PT', 'Puerto Rico': 'PR',
+  'Romania': 'RO', 'Russia': 'RU', 'Saint Lucia': 'LC', 'Serbia': 'RS',
+  'Singapore': 'SG', 'Slovakia': 'SK', 'Slovenia': 'SI', 'South Africa': 'ZA',
+  'South Korea': 'KR', 'Spain': 'ES', 'Sri Lanka': 'LK', 'Sweden': 'SE',
+  'Switzerland': 'CH', 'Taiwan': 'TW', 'Tanzania': 'TZ', 'Thailand': 'TH',
+  'Trinidad and Tobago': 'TT', 'Tunisia': 'TN', 'Turkey': 'TR',
+  'Turks and Caicos Islands': 'TC', 'US': 'US', 'USA': 'US',
+  'United Kingdom': 'GB', 'UK': 'GB', 'United States': 'US',
+  'Uruguay': 'UY', 'Venezuela': 'VE', 'Vietnam': 'VN', 'Zambia': 'ZM',
+};
+
+const petEmoji = {
+  Dog: '🐶', Cat: '🐱', Horse: '🐴', Bird: '🐦',
+  Fish: '🐟', Rabbit: '🐰', Reptile: '🦎', 'Small pet': '🐹'
+};
+
+function countryFlag(name) {
+  const code = countryCode[name];
+  if (!code) return '';
+  return String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+function renderListingCard(listing, lines, { imagesRelPath = 'images' } = {}) {
+  const isNew = new Date(listing.date_added) >= oneDayAgo;
+  const newBadge = isNew ? ' 🆕' : '';
+
+  lines.push(`### ${listing.title}${newBadge}`);
+  lines.push('');
+
+  const imageFile = `${listing.id}.jpg`;
+  const hasImage = fs.existsSync(path.join(vaultImagesDir, imageFile));
+  if (hasImage) {
+    lines.push(`<img src="${imagesRelPath}/${imageFile}" alt="${listing.title.replace(/"/g, '&quot;')}" width="280" align="right" style="margin-left: 16px; margin-bottom: 8px; border-radius: 8px;">`);
+    lines.push('');
+  }
+
+  const startDate = new Date(listing.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const endDate = new Date(listing.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  lines.push(`**Dates:** ${startDate} - ${endDate} (${listing.duration_days} days)`);
+
+  const locationParts = [listing.city, listing.state, listing.country].filter(Boolean);
+  const locFlag = countryFlag(listing.country);
+  lines.push(`**Location:** ${locationParts.join(', ')}${locFlag ? ' ' + locFlag : ''}`);
+
+  if (Object.keys(listing.animals).length > 0) {
+    const petStrings = Object.entries(listing.animals).map(([pet, count]) => {
+      const emoji = petEmoji[pet] || '🐾';
+      return `${count} ${pet.toLowerCase()}${count > 1 ? 's' : ''} ${emoji}`;
+    });
+    lines.push(`**Pets:** ${petStrings.join(', ')}`);
+  }
+
+  lines.push('');
+  lines.push(`[View on TrustedHousesitters](${listing.url})`);
+  lines.push('');
+  if (hasImage) lines.push('<br clear="both">');
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+}
+
+function writeMarkdown(relativePath, content) {
+  const fullPath = path.join(projectRoot, relativePath);
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  fs.writeFileSync(fullPath, content);
+  console.error(`Generated: ${fullPath}`);
+}
+
+function makeHeader(title, listings, navLinks) {
+  const lines = [
+    `# ${title}`,
+    '',
+    `Last updated: ${new Date().toISOString().replace('T', ' ').slice(0, 16)}`,
+    '',
+    `**${listings.length} listings**`,
+    '',
+  ];
+  if (navLinks && navLinks.length > 0) {
+    lines.push(navLinks.join(' · '));
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+  return lines;
+}
+
+// --- View generators ---
+
+const vaultDir = 'vault/trusted-housesitters';
+
+const viewNav = [
+  '[By Country](current-listings)',
+  '[By Month](by-month)',
+  '[By Duration](by-duration)',
+  '[By Pet Type](by-pet-type)',
+  '[New Listings](new-listings)',
+];
+
 /**
- * Generate markdown file for browsing listings
+ * By Country (current-listings.md) — the original view
  */
-function generateMarkdown(listings, outputPath) {
-  // Group by country
+function generateByCountry(listings) {
   const byCountry = {};
   for (const listing of listings) {
     const country = listing.country || 'Unknown';
-    if (!byCountry[country]) {
-      byCountry[country] = [];
-    }
+    if (!byCountry[country]) byCountry[country] = [];
     byCountry[country].push(listing);
   }
 
-  // Sort countries alphabetically, sort listings by start date within each country
   const sortedCountries = Object.keys(byCountry).sort();
   for (const country of sortedCountries) {
     byCountry[country].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
   }
 
-  // Country name to ISO 3166-1 alpha-2 code
-  const countryCode = {
-    'Afghanistan': 'AF', 'Albania': 'AL', 'Algeria': 'DZ', 'Argentina': 'AR',
-    'Australia': 'AU', 'Austria': 'AT', 'Bahamas': 'BS', 'Barbados': 'BB',
-    'Belgium': 'BE', 'Belize': 'BZ', 'Bermuda': 'BM', 'Bolivia': 'BO',
-    'Bosnia and Herzegovina': 'BA', 'Brazil': 'BR', 'Bulgaria': 'BG',
-    'Cambodia': 'KH', 'Canada': 'CA', 'Chile': 'CL', 'China': 'CN',
-    'Colombia': 'CO', 'Costa Rica': 'CR', 'Croatia': 'HR', 'Cuba': 'CU',
-    'Cyprus': 'CY', 'Czech Republic': 'CZ', 'Czechia': 'CZ',
-    'Denmark': 'DK', 'Dominican Republic': 'DO', 'Ecuador': 'EC',
-    'Egypt': 'EG', 'El Salvador': 'SV', 'Estonia': 'EE', 'Fiji': 'FJ',
-    'Finland': 'FI', 'France': 'FR', 'Germany': 'DE', 'Ghana': 'GH',
-    'Greece': 'GR', 'Grenada': 'GD', 'Guatemala': 'GT', 'Guernsey': 'GG',
-    'Honduras': 'HN', 'Hong Kong': 'HK', 'Hungary': 'HU', 'Iceland': 'IS',
-    'India': 'IN', 'Indonesia': 'ID', 'Ireland': 'IE', 'Isle of Man': 'IM',
-    'Israel': 'IL', 'Italy': 'IT', 'Jamaica': 'JM', 'Japan': 'JP',
-    'Jersey': 'JE', 'Jordan': 'JO', 'Kenya': 'KE', 'Latvia': 'LV',
-    'Lithuania': 'LT', 'Luxembourg': 'LU', 'Malaysia': 'MY', 'Malta': 'MT',
-    'Mauritius': 'MU', 'Mexico': 'MX', 'Monaco': 'MC', 'Montenegro': 'ME',
-    'Morocco': 'MA', 'Nepal': 'NP', 'Netherlands': 'NL', 'New Zealand': 'NZ',
-    'Nicaragua': 'NI', 'Nigeria': 'NG', 'Norway': 'NO', 'Oman': 'OM',
-    'Pakistan': 'PK', 'Panama': 'PA', 'Paraguay': 'PY', 'Peru': 'PE',
-    'Philippines': 'PH', 'Poland': 'PL', 'Portugal': 'PT', 'Puerto Rico': 'PR',
-    'Romania': 'RO', 'Russia': 'RU', 'Saint Lucia': 'LC', 'Serbia': 'RS',
-    'Singapore': 'SG', 'Slovakia': 'SK', 'Slovenia': 'SI', 'South Africa': 'ZA',
-    'South Korea': 'KR', 'Spain': 'ES', 'Sri Lanka': 'LK', 'Sweden': 'SE',
-    'Switzerland': 'CH', 'Taiwan': 'TW', 'Tanzania': 'TZ', 'Thailand': 'TH',
-    'Trinidad and Tobago': 'TT', 'Tunisia': 'TN', 'Turkey': 'TR',
-    'Turks and Caicos Islands': 'TC', 'US': 'US', 'USA': 'US',
-    'United Kingdom': 'GB', 'UK': 'GB', 'United States': 'US',
-    'Uruguay': 'UY', 'Venezuela': 'VE', 'Vietnam': 'VN', 'Zambia': 'ZM',
-  };
+  const lines = makeHeader('Housesit Listings — By Country', listings, viewNav);
 
-  function countryFlag(name) {
-    const code = countryCode[name];
-    if (!code) return '';
-    return String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
-  }
-
-  // Build markdown
-  const lines = [
-    '# Current Housesit Listings',
-    '',
-    `Last updated: ${new Date().toISOString().replace('T', ' ').slice(0, 16)}`,
-    '',
-    `**Total: ${listings.length} listings**`,
-    '',
-    '---',
-    ''
-  ];
-
-  // Table of contents
-  lines.push('## Countries');
-  lines.push('');
+  // TOC
   for (const country of sortedCountries) {
     const flag = countryFlag(country);
     const flagPrefix = flag ? `${flag} ` : '';
     lines.push(`- [${flagPrefix}${country}](#${country.toLowerCase().replace(/\s+/g, '-')}) (${byCountry[country].length})`);
   }
-  lines.push('');
-  lines.push('---');
-  lines.push('');
-
-  // Listings by country
-  const petEmoji = {
-    Dog: '🐶',
-    Cat: '🐱',
-    Horse: '🐴',
-    Bird: '🐦',
-    Fish: '🐟',
-    Rabbit: '🐰',
-    Reptile: '🦎',
-    'Small pet': '🐹'
-  };
-
-  const today = new Date();
-  const oneDayAgo = new Date(today - 24 * 60 * 60 * 1000);
+  lines.push('', '---', '');
 
   for (const country of sortedCountries) {
     lines.push(`## ${country}`);
     lines.push('');
-
     for (const listing of byCountry[country]) {
-      const isNew = new Date(listing.date_added) >= oneDayAgo;
-      const newBadge = isNew ? ' 🆕' : '';
-
-      lines.push(`### ${listing.title}${newBadge}`);
-      lines.push('');
-
-      const imageFile = `${listing.id}.jpg`;
-      const hasImage = fs.existsSync(path.join(vaultImagesDir, imageFile));
-      if (hasImage) {
-        lines.push(`<img src="images/${imageFile}" alt="${listing.title.replace(/"/g, '&quot;')}" width="280" align="right" style="margin-left: 16px; margin-bottom: 8px; border-radius: 8px;">`);
-        lines.push('');
-      }
-
-      const startDate = new Date(listing.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const endDate = new Date(listing.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      lines.push(`**Dates:** ${startDate} - ${endDate} (${listing.duration_days} days)`);
-
-      const locationParts = [listing.city, listing.state, listing.country].filter(Boolean);
-      const locFlag = countryFlag(listing.country);
-      lines.push(`**Location:** ${locationParts.join(', ')}${locFlag ? ' ' + locFlag : ''}`);
-
-      if (Object.keys(listing.animals).length > 0) {
-        const petStrings = Object.entries(listing.animals).map(([pet, count]) => {
-          const emoji = petEmoji[pet] || '🐾';
-          return `${count} ${pet.toLowerCase()}${count > 1 ? 's' : ''} ${emoji}`;
-        });
-        lines.push(`**Pets:** ${petStrings.join(', ')}`);
-      }
-
-      lines.push('');
-      lines.push(`[View on TrustedHousesitters](${listing.url})`);
-      lines.push('');
-      if (hasImage) lines.push('<br clear="both">');
-      lines.push('');
-      lines.push('---');
-      lines.push('');
+      renderListingCard(listing, lines);
     }
   }
 
-  // Write file
-  const fullPath = path.join(projectRoot, outputPath);
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, lines.join('\n'));
-  console.error(`Generated markdown: ${fullPath}`);
+  writeMarkdown(`${vaultDir}/current-listings.md`, lines.join('\n'));
+}
+
+/**
+ * By Month — grouped by start month
+ */
+function generateByMonth(listings) {
+  const sorted = [...listings].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+  const byMonth = {};
+  for (const listing of sorted) {
+    const d = new Date(listing.start_date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(listing);
+  }
+
+  const months = Object.keys(byMonth).sort();
+  const lines = makeHeader('Housesit Listings — By Month', listings, viewNav);
+
+  // TOC
+  for (const month of months) {
+    const label = new Date(month + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    lines.push(`- [${label}](#${label.toLowerCase().replace(/\s+/g, '-')}) (${byMonth[month].length})`);
+  }
+  lines.push('', '---', '');
+
+  for (const month of months) {
+    const label = new Date(month + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    lines.push(`## ${label}`);
+    lines.push('');
+    for (const listing of byMonth[month]) {
+      renderListingCard(listing, lines);
+    }
+  }
+
+  writeMarkdown(`${vaultDir}/by-month.md`, lines.join('\n'));
+}
+
+/**
+ * By Duration — short / medium / long stays
+ */
+function generateByDuration(listings) {
+  const buckets = {
+    'Short Stays (1–7 days)': [],
+    'Medium Stays (1–3 weeks)': [],
+    'Long Stays (3+ weeks)': [],
+  };
+
+  for (const listing of listings) {
+    const d = listing.duration_days;
+    if (d <= 7) buckets['Short Stays (1–7 days)'].push(listing);
+    else if (d <= 21) buckets['Medium Stays (1–3 weeks)'].push(listing);
+    else buckets['Long Stays (3+ weeks)'].push(listing);
+  }
+
+  // Sort each bucket by start date
+  for (const key of Object.keys(buckets)) {
+    buckets[key].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+  }
+
+  const lines = makeHeader('Housesit Listings — By Duration', listings, viewNav);
+
+  // TOC
+  for (const [label, items] of Object.entries(buckets)) {
+    if (items.length > 0) {
+      lines.push(`- [${label}](#${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}) (${items.length})`);
+    }
+  }
+  lines.push('', '---', '');
+
+  for (const [label, items] of Object.entries(buckets)) {
+    if (items.length === 0) continue;
+    lines.push(`## ${label}`);
+    lines.push('');
+    for (const listing of items) {
+      renderListingCard(listing, lines);
+    }
+  }
+
+  writeMarkdown(`${vaultDir}/by-duration.md`, lines.join('\n'));
+}
+
+/**
+ * By Pet Type — cats only / dogs only / mixed / other
+ */
+function generateByPetType(listings) {
+  const buckets = {
+    'Cats Only 🐱': [],
+    'Dogs Only 🐶': [],
+    'Cats & Dogs': [],
+    'Other Pets': [],
+  };
+
+  for (const listing of listings) {
+    const types = Object.keys(listing.animals || {});
+    const hasCat = types.includes('Cat');
+    const hasDog = types.includes('Dog');
+
+    if (hasCat && !hasDog && types.length === 1) buckets['Cats Only 🐱'].push(listing);
+    else if (hasDog && !hasCat && types.length === 1) buckets['Dogs Only 🐶'].push(listing);
+    else if (hasCat && hasDog) buckets['Cats & Dogs'].push(listing);
+    else buckets['Other Pets'].push(listing);
+  }
+
+  for (const key of Object.keys(buckets)) {
+    buckets[key].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+  }
+
+  const lines = makeHeader('Housesit Listings — By Pet Type', listings, viewNav);
+
+  for (const [label, items] of Object.entries(buckets)) {
+    if (items.length > 0) {
+      lines.push(`- [${label}](#${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}) (${items.length})`);
+    }
+  }
+  lines.push('', '---', '');
+
+  for (const [label, items] of Object.entries(buckets)) {
+    if (items.length === 0) continue;
+    lines.push(`## ${label}`);
+    lines.push('');
+    for (const listing of items) {
+      renderListingCard(listing, lines);
+    }
+  }
+
+  writeMarkdown(`${vaultDir}/by-pet-type.md`, lines.join('\n'));
+}
+
+/**
+ * New Listings — added in last 3 days, newest first
+ */
+function generateNewListings(listings) {
+  const recent = listings
+    .filter(l => new Date(l.date_added) >= threeDaysAgo)
+    .sort((a, b) => new Date(b.date_added) - new Date(a.date_added));
+
+  const lines = makeHeader(`New Listings (Last 3 Days)`, recent, viewNav);
+
+  if (recent.length === 0) {
+    lines.push('*No new listings in the last 3 days.*');
+    lines.push('');
+  } else {
+    for (const listing of recent) {
+      renderListingCard(listing, lines);
+    }
+  }
+
+  writeMarkdown(`${vaultDir}/new-listings.md`, lines.join('\n'));
+}
+
+/**
+ * Generate all markdown views
+ */
+function generateAllViews(listings) {
+  generateByCountry(listings);
+  generateByMonth(listings);
+  generateByDuration(listings);
+  generateByPetType(listings);
+  generateNewListings(listings);
 }
 
 /**
@@ -739,7 +911,7 @@ async function main() {
 
     // Generate markdown file (skip in CONTEXT_ONLY mode)
     if (!contextOnly && filteredListings.length > 0) {
-      generateMarkdown(filteredListings, outputFile);
+      generateAllViews(filteredListings);
     }
 
     // Transform to issues schema for database

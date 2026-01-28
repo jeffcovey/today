@@ -41,6 +41,15 @@ marked.use(markedHighlight({
 }));
 registerLinkRenderer();
 
+// Override checkbox renderer to make checkboxes enabled (not disabled by default)
+marked.use({
+  renderer: {
+    checkbox({ checked }) {
+      return `<input type="checkbox" class="task-checkbox"${checked ? ' checked' : ''}> `;
+    }
+  }
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -2890,18 +2899,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
     }
   });
   
-  // Use custom renderer for external links
-  // Custom link renderer + heading IDs registered globally via marked.use()
-
-  // Override the checkbox renderer to make checkboxes enabled (not disabled by default)
-  renderer.checkbox = function(checkedObj) {
-    // The parameter is an object with a 'checked' property, not a boolean
-    const isChecked = checkedObj && checkedObj.checked;
-    // Return enabled checkboxes without the disabled attribute
-    return `<input type="checkbox" class="task-checkbox"${isChecked ? ' checked' : ''}> `;
-  };
-
-  // Render the markdown with custom renderer (heading IDs added by marked-gfm-heading-id)
+  // Custom link renderer, checkbox renderer, and heading IDs registered globally via marked.use()
   // breaks: true makes single newlines render as <br>, matching Obsidian's default behavior
   let htmlContent = marked.parse(contentToRender, { breaks: true });
 
