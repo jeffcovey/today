@@ -1704,18 +1704,58 @@ async function getCachedRender(filePath, urlPath) {
 }
 
 /**
- * Convert Obsidian wiki links to standard markdown links.
+ * Convert Obsidian wiki links and embeds to standard markdown.
  * Handles: [[link]], [[link|text]], [[link#section]], [[link#section|text]]
+ * Also handles image embeds: ![[image.jpg]], ![[image.jpg|alt text]]
  * Links are made vault-root absolute (e.g., [[plans/today]] -> [today](/plans/today))
+ * @param {string} markdown - The markdown content
+ * @param {string} [currentPath] - The current file's URL path (for resolving relative images)
  */
-function convertWikiLinks(markdown) {
-  // Match [[link]] or [[link|text]] patterns
+function convertWikiLinks(markdown, currentPath = '') {
+  const currentDir = currentPath ? path.dirname(currentPath) : '';
+
+  // First, handle image embeds: ![[image.jpg]] or ![[image.jpg|alt text]]
+  let result = markdown.replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, imagePath, altText) => {
+    const alt = altText || imagePath.split('/').pop();
+
+    // If the path already includes a directory, use it as-is
+    if (imagePath.includes('/')) {
+      return `![${alt}](/${imagePath})`;
+    }
+
+    // Otherwise, try to find the image in common locations
+    const vaultPath = getAbsoluteVaultPath();
+    const possiblePaths = [
+      // Same directory as the file
+      path.join(currentDir, imagePath),
+      // zz-attachments subdirectory (common Obsidian pattern)
+      path.join(currentDir, 'zz-attachments', imagePath),
+      // attachments subdirectory
+      path.join(currentDir, 'attachments', imagePath),
+      // Root attachments folder
+      path.join('attachments', imagePath),
+    ];
+
+    for (const tryPath of possiblePaths) {
+      const fullPath = path.join(vaultPath, tryPath);
+      if (fsSync.existsSync(fullPath)) {
+        return `![${alt}](/${tryPath})`;
+      }
+    }
+
+    // Fallback: just use the image name at root (will likely 404)
+    return `![${alt}](/${imagePath})`;
+  });
+
+  // Then handle regular wiki links: [[link]] or [[link|text]]
   // Captures: link path (with optional #section) and optional display text
-  return markdown.replace(/\[\[([^\]|#]+)(#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (match, link, section, text) => {
+  result = result.replace(/\[\[([^\]|#]+)(#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (match, link, section, text) => {
     const displayText = text || link.split('/').pop(); // Use text if provided, else last part of path
     const href = '/' + link + (section || '');
     return `[${displayText}](${href})`;
   });
+
+  return result;
 }
 
 // Create a marked renderer that opens external links in new tabs
@@ -1806,146 +1846,28 @@ function renderProperties(properties) {
     return '';
   }
 
-  // Helper to format property values
-  function formatValue(value, key) {
-    // Handle cover images specially
-    if (key === 'cover_image' && typeof value === 'string' && value.match(/^https?:\/\//)) {
-      return `<img src="${value}" alt="Cover" class="img-fluid rounded mb-2" style="max-height: 200px; object-fit: cover;">`;
-    }
+  const propCount = Object.keys(properties).length;
 
-    // Handle URLs
-    if (typeof value === 'string' && value.match(/^https?:\/\//)) {
-      return `<a href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
-    }
-
-    // Handle dates
-    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
-      return `<time datetime="${value}">${value}</time>`;
-    }
-
-    // Handle arrays
-    if (Array.isArray(value)) {
-      if (value.length === 0) return '<span class="text-muted">[]</span>';
-      if (value.length > 5) {
-        return `<span class="badge bg-secondary">${value.length} items</span>`;
-      }
-      return value.map(v => `<span class="badge bg-light text-dark me-1">${formatValue(v, key)}</span>`).join('');
-    }
-
-    // Handle objects (nested properties)
-    if (typeof value === 'object' && value !== null) {
-      return '<details class="mt-1"><summary class="text-muted small" style="cursor: pointer;">View nested properties</summary><pre class="mt-1 small">' +
-        JSON.stringify(value, null, 2) + '</pre></details>';
-    }
-
-    // Handle booleans
-    if (typeof value === 'boolean') {
-      return value ?
-        '<i class="fas fa-check-circle text-success"></i>' :
-        '<i class="fas fa-times-circle text-danger"></i>';
-    }
-
-    // Handle numbers
-    if (typeof value === 'number') {
-      // Check if it's a percentage (property name contains 'percent' or value is between 0-100)
-      if (key.includes('percent') || key.includes('progress')) {
-        return `<div class="progress" style="height: 20px; min-width: 100px;">
-          <div class="progress-bar" role="progressbar" style="width: ${value}%" aria-valuenow="${value}" aria-valuemin="0" aria-valuemax="100">${value}%</div>
-        </div>`;
-      }
-      return value.toLocaleString();
-    }
-
-    // Default: return as string
-    return String(value);
+  // Format the YAML for display
+  let yamlContent;
+  try {
+    yamlContent = yaml.dump(properties, { indent: 2, lineWidth: -1 });
+  } catch {
+    yamlContent = JSON.stringify(properties, null, 2);
   }
 
-  // Helper to format property keys (convert snake_case to Title Case)
-  function formatKey(key) {
-    return key
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
+  // Escape HTML in the YAML content
+  const escapedYaml = yamlContent
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
-  // Separate important properties from the rest
-  const importantKeys = ['title', 'status', 'priority', 'category', 'goal', 'cover_image',
-                         'start_date', 'target_date', 'percent_done', 'progress_summary'];
-  const metricKeys = Object.keys(properties).filter(k => k === 'metrics' || k.includes('savings') || k.includes('next_'));
-
-  const important = {};
-  const metrics = {};
-  const other = {};
-
-  for (const [key, value] of Object.entries(properties)) {
-    if (importantKeys.includes(key)) {
-      important[key] = value;
-    } else if (metricKeys.includes(key)) {
-      metrics[key] = value;
-    } else {
-      other[key] = value;
-    }
-  }
-
-  let html = '<div class="properties-card card mb-3 shadow-sm">';
-  html += '<div class="card-header bg-light border-bottom">';
-  html += '<h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Properties</h6>';
-  html += '</div>';
-  html += '<div class="card-body">';
-
-  // Render cover image first if present
-  if (important.cover_image) {
-    html += '<div class="mb-3">' + formatValue(important.cover_image, 'cover_image') + '</div>';
-  }
-
-  // Render important properties
-  if (Object.keys(important).length > 0) {
-    html += '<div class="row g-2 mb-3">';
-    for (const [key, value] of Object.entries(important)) {
-      if (key === 'cover_image') continue; // Already rendered
-      const colSize = key === 'goal' || key === 'progress_summary' ? 'col-12' : 'col-md-6';
-      html += `<div class="${colSize}">`;
-      html += `<div class="d-flex flex-column">`;
-      html += `<small class="text-muted">${formatKey(key)}</small>`;
-      html += `<div>${formatValue(value, key)}</div>`;
-      html += `</div></div>`;
-    }
-    html += '</div>';
-  }
-
-  // Render metrics in a collapsible section
-  if (Object.keys(metrics).length > 0) {
-    html += '<details class="mb-2">';
-    html += '<summary class="text-primary fw-bold" style="cursor: pointer; user-select: none;"><i class="fas fa-chart-line me-2"></i>Metrics & Targets</summary>';
-    html += '<div class="mt-2 row g-2">';
-    for (const [key, value] of Object.entries(metrics)) {
-      html += `<div class="col-md-6">`;
-      html += `<div class="d-flex flex-column">`;
-      html += `<small class="text-muted">${formatKey(key)}</small>`;
-      html += `<div>${formatValue(value, key)}</div>`;
-      html += `</div></div>`;
-    }
-    html += '</div></details>';
-  }
-
-  // Render other properties in a collapsed section
-  if (Object.keys(other).length > 0) {
-    html += '<details>';
-    html += '<summary class="text-muted small" style="cursor: pointer; user-select: none;"><i class="fas fa-ellipsis-h me-2"></i>Additional Properties</summary>';
-    html += '<div class="mt-2 row g-2 small">';
-    for (const [key, value] of Object.entries(other)) {
-      html += `<div class="col-md-6">`;
-      html += `<div class="d-flex flex-column">`;
-      html += `<small class="text-muted">${formatKey(key)}</small>`;
-      html += `<div>${formatValue(value, key)}</div>`;
-      html += `</div></div>`;
-    }
-    html += '</div></details>';
-  }
-
-  html += '</div></div>';
-
-  return html;
+  return `<details class="properties-toggle mb-3">
+    <summary class="text-muted small" style="cursor: pointer; user-select: none;">
+      <i class="fas fa-code me-1"></i>Properties (${propCount})
+    </summary>
+    <pre class="mt-2 p-2 bg-light rounded small" style="max-height: 300px; overflow: auto;"><code>${escapedYaml}</code></pre>
+  </details>`;
 }
 
 // Dataview API Implementation
@@ -2938,7 +2860,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   contentToRender = replaceTagsWithEmojis(contentToRender);
 
   // Convert Obsidian wiki links [[link|text]] to standard markdown links
-  contentToRender = convertWikiLinks(contentToRender);
+  contentToRender = convertWikiLinks(contentToRender, urlPath);
 
   // Find all checkbox lines in the ORIGINAL content (before modifications)
   // We need to exclude checkboxes inside ```tasks blocks since those are rendered separately
@@ -2976,7 +2898,8 @@ async function renderMarkdownUncached(filePath, urlPath) {
   };
 
   // Render the markdown with custom renderer (heading IDs added by marked-gfm-heading-id)
-  let htmlContent = marked.parse(contentToRender, { renderer });
+  // breaks: true makes single newlines render as <br>, matching Obsidian's default behavior
+  let htmlContent = marked.parse(contentToRender, { renderer, breaks: true });
 
   // Generate TOC from the parsed headings (must be called after marked.parse)
   const toc = generateTableOfContents();

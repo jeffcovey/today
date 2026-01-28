@@ -212,6 +212,11 @@ body {
   line-height: 1.7;
 }
 
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Task styles */
 .task-cancelled {
   text-decoration: line-through;
