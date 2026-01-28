@@ -26,7 +26,8 @@ function getAvailableDataTypes() {
 export function buildFileContext(urlPath, documentContent) {
   let context = 'You are an AI assistant helping with a markdown document in a personal knowledge vault. ';
   context += `The user is viewing: ${urlPath}\n`;
-  context += `File location: vault/${urlPath}\n\n`;
+  context += `File location: vault/${urlPath}\n`;
+  context += `Today's date: ${new Date().toISOString().split('T')[0]}\n\n`;
 
   context += '## Available Tools\n\n';
   context += 'You have access to the following tools:\n\n';
@@ -56,7 +57,7 @@ export function buildFileContext(urlPath, documentContent) {
 
   context += '## Guidelines\n\n';
   context += '- When editing, preserve the document structure (frontmatter, headings, etc.)\n';
-  context += '- IMPORTANT: When the user asks about data (tasks, calendar, habits, etc.), IMMEDIATELY call the query_database or run_command tool. Do NOT just say you will search - actually invoke the tool in your response.\n';
+  context += '- CRITICAL: When a user asks you to do something, CALL THE TOOL IMMEDIATELY. Never respond with "Let me..." or "I\'ll..." without actually invoking a tool in the same response. The user cannot see your intentions - they can only see tool results.\n';
   context += '- CRITICAL: If the user requests MULTIPLE actions, make MULTIPLE tool calls IN THE SAME RESPONSE. Do not stop after one tool call.\n';
   context += '- For questions about schedules, tasks, or data, query the database or run commands\n';
   context += '- After using tools, report what happened. Say "I added X" or "I found Y", not "I will add X".\n\n';
@@ -76,7 +77,8 @@ export function buildFileContext(urlPath, documentContent) {
 export function buildDirectoryContext(urlPath, directoryContext) {
   let context = 'You are an AI assistant helping with a directory in a markdown vault. ';
   context += `The user is viewing directory: ${urlPath || '/'}\n`;
-  context += `Full path: vault/${urlPath || '/'}\n\n`;
+  context += `Full path: vault/${urlPath || '/'}\n`;
+  context += `Today's date: ${new Date().toISOString().split('T')[0]}\n\n`;
   context += 'Directory contents:\n';
   context += directoryContext || '(No directory content available)';
   context += '\n\n';
@@ -103,7 +105,7 @@ export function buildDirectoryContext(urlPath, directoryContext) {
 
   context += '## Guidelines\n\n';
   context += '- You can help the user understand what files are in this directory\n';
-  context += '- IMPORTANT: When the user asks to add entries, track time, or modify data, IMMEDIATELY use the run_command tool.\n';
+  context += '- CRITICAL: When a user asks you to do something, CALL THE TOOL IMMEDIATELY. Never respond with "Let me..." or "I\'ll..." without actually invoking a tool in the same response. The user cannot see your intentions - they can only see tool results.\n';
   context += '- CRITICAL: If the user requests MULTIPLE items, you MUST address ALL of them. Either make tool calls for each, OR explain why you cannot do specific ones.\n';
   context += '- NEVER silently skip a request. If you cannot do something, you MUST explain why in your text response.\n';
   context += '- For queries about data, use query_database or run_command\n';

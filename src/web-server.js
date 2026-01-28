@@ -3752,14 +3752,7 @@ ${cleanContent}
                         }
 
                         addChatBubble(errorMsg, 'assistant', true, timeStr);
-
-                        // Still save to history so we don't lose context
-                        chatHistory.push(
-                          { role: 'user', content: message, timestamp: new Date().toISOString() },
-                          { role: 'assistant', content: errorMsg, timestamp: new Date().toISOString() }
-                        );
-                        localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
-                        saveConversationToServer();
+                        // addChatBubble saves to history, no need to push again
 
                         if (data.fileModified) {
                           refreshContentArea();
@@ -3773,9 +3766,9 @@ ${cleanContent}
                         timerElement.textContent = 'Replied in ' + timeStr;
                       }
 
-                      // Save to chat history
+                      // Save assistant response to chat history
+                      // (user message was already added by addChatBubble)
                       chatHistory.push(
-                        { role: 'user', content: message, timestamp: new Date().toISOString() },
                         { role: 'assistant', content: data.fullResponse || responseContent, timestamp: new Date().toISOString() }
                       );
                       localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
@@ -4272,6 +4265,7 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
 
       let fullResponse = '';
       const toolCalls = [];
+      const toolResults = [];  // Store tool results for summary building
       let partCount = 0;
       const partTypes = new Set();
 
@@ -4318,6 +4312,8 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
             toolName: part.toolName,
             result: result
           })}\n\n`);
+          // Store for summary building
+          toolResults.push({ toolName: part.toolName, result });
         } else if (part.type === 'error') {
           // AI provider returned an error
           const errorMessage = part.error?.message || part.error?.toString() || 'Unknown AI error';
@@ -4337,6 +4333,55 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
       if (isAborted) {
         cleanup();
         return;
+      }
+
+      // Build tool result summary if the model didn't provide a proper follow-up
+      // This matches the behavior in ai-provider.js createCompletion()
+      if (toolResults.length > 0) {
+        const fluffPatterns = /^(I('ll| will)|Let me|Sure|OK|Okay)/i;
+        const responseIsFluff = !fullResponse || fullResponse.length < 100 || fluffPatterns.test(fullResponse.trim());
+
+        if (responseIsFluff) {
+          const summaryParts = [];
+          for (const tr of toolResults) {
+            const { toolName, result } = tr;
+
+            if (toolName === 'run_command') {
+              if (result?.success) {
+                const cleanOutput = (result.output || '').trim();
+                if (cleanOutput) {
+                  summaryParts.push(`✓ ${cleanOutput}`);
+                }
+              } else {
+                const errorMsg = result?.stderr || result?.error || 'Command failed';
+                summaryParts.push(`✗ Failed: ${errorMsg.trim()}`);
+              }
+            } else if (toolName === 'query_database') {
+              if (result?.success) {
+                summaryParts.push(`✓ Query returned ${result.rowCount} results`);
+              } else {
+                summaryParts.push(`✗ Query error: ${result?.error || 'Unknown error'}`);
+              }
+            } else if (toolName === 'edit_file') {
+              if (result?.success) {
+                summaryParts.push(`✓ ${result.message || 'File updated'}`);
+              } else {
+                summaryParts.push(`✗ Edit failed: ${result?.error || 'Unknown error'}`);
+              }
+            }
+          }
+
+          if (summaryParts.length > 0) {
+            const toolSummary = '\n\n' + summaryParts.join('\n\n');
+            // Send the summary as additional text
+            res.write(`data: ${JSON.stringify({
+              type: 'text',
+              content: toolSummary
+            })}\n\n`);
+            fullResponse += toolSummary;
+            console.log('[AI Stream] Added tool summary to response:', toolSummary.slice(0, 100));
+          }
+        }
       }
 
       // Check if file was modified
