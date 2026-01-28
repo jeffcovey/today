@@ -349,6 +349,10 @@ async function scrapeListings() {
     const allListings = [];
     let pageNum = 1;
 
+    // Load existing cache for early pagination stop
+    const cachedListings = loadCache();
+    const cachedUrls = new Set(cachedListings.map(l => l.url));
+
     while (pageNum <= maxPages) {
       console.error(`Scraping page ${pageNum}...`);
 
@@ -370,6 +374,8 @@ async function scrapeListings() {
         console.error('No listings found on page, stopping');
         break;
       }
+
+      const pageListings = [];
 
       listingCards.each((_, card) => {
         const $card = $(card);
@@ -404,7 +410,7 @@ async function scrapeListings() {
 
         if (title && url && start && end) {
           const listingId = getListingId(url);
-          allListings.push({
+          pageListings.push({
             id: listingId,
             title,
             url,
@@ -420,6 +426,17 @@ async function scrapeListings() {
           });
         }
       });
+
+      // Check for new listings on this page
+      const newOnThisPage = pageListings.filter(l => !cachedUrls.has(l.url));
+      console.error(`  ${newOnThisPage.length} new listings on page ${pageNum}`);
+
+      allListings.push(...pageListings);
+
+      if (newOnThisPage.length === 0) {
+        console.error('All listings on this page already cached, stopping pagination');
+        break;
+      }
 
       // Check for next page
       const nextLink = $('a[aria-label="Go to next page"]');
