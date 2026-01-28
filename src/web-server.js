@@ -39,6 +39,7 @@ marked.use(markedHighlight({
     return hljs.highlight(code, { language }).value;
   }
 }));
+registerLinkRenderer();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1037,7 +1038,7 @@ async function renderDirectory(dirPath, urlPath) {
           });
           
           // Render markdown using marked with external link renderer
-          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer(), breaks: true });
+          const renderedContent = marked.parse(message, { breaks: true });
           
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -1758,32 +1759,35 @@ function convertWikiLinks(markdown, currentPath = '') {
   return result;
 }
 
-// Create a marked renderer that opens external links in new tabs
-// and makes internal relative links vault-root absolute (Obsidian behavior)
-function createExternalLinkRenderer() {
-  const renderer = new marked.Renderer();
-  renderer.link = function({ href, title, tokens }) {
-    // Check if the link is external (starts with http:// or https://)
-    const isExternal = /^https?:\/\//.test(href);
-    // Check if it's an anchor link (starts with #)
-    const isAnchor = href.startsWith('#');
-    // Check if it's already absolute (starts with /)
-    const isAbsolute = href.startsWith('/');
+// Register a custom link renderer that opens external links in new tabs
+// and makes internal relative links vault-root absolute (Obsidian behavior).
+// Uses marked.use() so it composes with gfmHeadingId rather than replacing it.
+function registerLinkRenderer() {
+  marked.use({
+    renderer: {
+      link({ href, title, tokens }) {
+        // Check if the link is external (starts with http:// or https://)
+        const isExternal = /^https?:\/\//.test(href);
+        // Check if it's an anchor link (starts with #)
+        const isAnchor = href.startsWith('#');
+        // Check if it's already absolute (starts with /)
+        const isAbsolute = href.startsWith('/');
 
-    // Make internal relative links vault-root absolute (Obsidian behavior)
-    // e.g., "tasks/plans" becomes "/tasks/plans" not "../tasks/plans"
-    if (!isExternal && !isAnchor && !isAbsolute) {
-      href = '/' + href;
+        // Make internal relative links vault-root absolute (Obsidian behavior)
+        // e.g., "tasks/plans" becomes "/tasks/plans" not "../tasks/plans"
+        if (!isExternal && !isAnchor && !isAbsolute) {
+          href = '/' + href;
+        }
+
+        // Render link text from tokens
+        const text = this.parser.parseInline(tokens);
+        const titleAttr = title ? ` title="${title}"` : '';
+        const externalAttrs = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+
+        return `<a href="${href}"${titleAttr}${externalAttrs}>${text}</a>`;
+      }
     }
-
-    // Render link text from tokens
-    const text = this.parser.parseInline(tokens);
-    const titleAttr = title ? ` title="${title}"` : '';
-    const externalAttrs = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-
-    return `<a href="${href}"${titleAttr}${externalAttrs}>${text}</a>`;
-  };
-  return renderer;
+  });
 }
 
 // Generate table of contents from parsed headings (using marked-gfm-heading-id)
@@ -2887,7 +2891,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   });
   
   // Use custom renderer for external links
-  const renderer = createExternalLinkRenderer();
+  // Custom link renderer + heading IDs registered globally via marked.use()
 
   // Override the checkbox renderer to make checkboxes enabled (not disabled by default)
   renderer.checkbox = function(checkedObj) {
@@ -2899,7 +2903,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Render the markdown with custom renderer (heading IDs added by marked-gfm-heading-id)
   // breaks: true makes single newlines render as <br>, matching Obsidian's default behavior
-  let htmlContent = marked.parse(contentToRender, { renderer, breaks: true });
+  let htmlContent = marked.parse(contentToRender, { breaks: true });
 
   // Generate TOC from the parsed headings (must be called after marked.parse)
   const toc = generateTableOfContents();
@@ -3479,7 +3483,7 @@ ${cleanContent}
           });
 
           // Render markdown using marked with external link renderer
-          const renderedContent = marked.parse(message, { renderer: createExternalLinkRenderer(), breaks: true });
+          const renderedContent = marked.parse(message, { breaks: true });
 
           let bubbleHtml = \`
             <div class="bubble-content">
@@ -3718,7 +3722,7 @@ ${cleanContent}
                       responseContent += data.content;
                       const responseElement = document.querySelector('#streaming-response .response-text');
                       if (responseElement) {
-                        responseElement.innerHTML = marked.parse(responseContent, { renderer: createExternalLinkRenderer() });
+                        responseElement.innerHTML = marked.parse(responseContent);
                       }
                       
                       // Scroll to bottom
