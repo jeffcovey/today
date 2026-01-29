@@ -549,6 +549,10 @@ function renderListingCard(listing, lines, { imagesRelPath = 'images' } = {}) {
     lines.push(`**Pets:** ${petStrings.join(', ')}`);
   }
 
+  const daysAgo = Math.floor((Date.now() - new Date(listing.date_added).getTime()) / (24 * 60 * 60 * 1000));
+  const postedLabel = daysAgo === 0 ? 'today' : daysAgo === 1 ? 'yesterday' : `${daysAgo} days ago`;
+  lines.push(`**Posted:** ${postedLabel}`);
+
   lines.push('');
   lines.push(`[View on TrustedHousesitters](${listing.url})`);
   lines.push('');
