@@ -583,6 +583,25 @@ function makeHeader(title, listings, navLinks) {
   return lines;
 }
 
+/**
+ * Slugify a heading label for use as an anchor ID (GitHub-flavored style).
+ */
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+}
+
+/**
+ * Push a section heading with an explicit HTML anchor so TOC links work
+ * in both Obsidian (which doesn't use GitHub-style heading IDs) and
+ * the web view (which does via gfmHeadingId).
+ */
+function pushHeading(lines, label) {
+  lines.push(`<a id="${slugify(label)}"></a>`);
+  lines.push('');
+  lines.push(`## ${label}`);
+  lines.push('');
+}
+
 // --- View generators ---
 
 const vaultDir = 'vault/trusted-housesitters';
@@ -617,13 +636,12 @@ function generateByCountry(listings) {
   for (const country of sortedCountries) {
     const flag = countryFlag(country);
     const flagPrefix = flag ? `${flag} ` : '';
-    lines.push(`- [${flagPrefix}${country}](#${country.toLowerCase().replace(/\s+/g, '-')}) (${byCountry[country].length})`);
+    lines.push(`- [${flagPrefix}${country}](#${slugify(country)}) (${byCountry[country].length})`);
   }
   lines.push('', '---', '');
 
   for (const country of sortedCountries) {
-    lines.push(`## ${country}`);
-    lines.push('');
+    pushHeading(lines, country);
     for (const listing of byCountry[country]) {
       renderListingCard(listing, lines);
     }
@@ -652,14 +670,13 @@ function generateByMonth(listings) {
   // TOC
   for (const month of months) {
     const label = new Date(month + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    lines.push(`- [${label}](#${label.toLowerCase().replace(/\s+/g, '-')}) (${byMonth[month].length})`);
+    lines.push(`- [${label}](#${slugify(label)}) (${byMonth[month].length})`);
   }
   lines.push('', '---', '');
 
   for (const month of months) {
     const label = new Date(month + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    lines.push(`## ${label}`);
-    lines.push('');
+    pushHeading(lines, label);
     for (const listing of byMonth[month]) {
       renderListingCard(listing, lines);
     }
@@ -695,15 +712,14 @@ function generateByDuration(listings) {
   // TOC
   for (const [label, items] of Object.entries(buckets)) {
     if (items.length > 0) {
-      lines.push(`- [${label}](#${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}) (${items.length})`);
+      lines.push(`- [${label}](#${slugify(label)}) (${items.length})`);
     }
   }
   lines.push('', '---', '');
 
   for (const [label, items] of Object.entries(buckets)) {
     if (items.length === 0) continue;
-    lines.push(`## ${label}`);
-    lines.push('');
+    pushHeading(lines, label);
     for (const listing of items) {
       renderListingCard(listing, lines);
     }
@@ -742,15 +758,14 @@ function generateByPetType(listings) {
 
   for (const [label, items] of Object.entries(buckets)) {
     if (items.length > 0) {
-      lines.push(`- [${label}](#${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}) (${items.length})`);
+      lines.push(`- [${label}](#${slugify(label)}) (${items.length})`);
     }
   }
   lines.push('', '---', '');
 
   for (const [label, items] of Object.entries(buckets)) {
     if (items.length === 0) continue;
-    lines.push(`## ${label}`);
-    lines.push('');
+    pushHeading(lines, label);
     for (const listing of items) {
       renderListingCard(listing, lines);
     }
@@ -909,8 +924,8 @@ async function main() {
     const filteredListings = allListings.filter(passesFilters);
     console.error(`${filteredListings.length} listings after filtering (from ${allListings.length} total)`);
 
-    // Generate markdown file (skip in CONTEXT_ONLY mode)
-    if (!contextOnly && filteredListings.length > 0) {
+    // Generate markdown views
+    if (filteredListings.length > 0) {
       generateAllViews(filteredListings);
     }
 
