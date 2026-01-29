@@ -1594,7 +1594,7 @@ function formatDiaryEntries(entries, type) {
     const dateLabel = timeStr && timeStr !== '00:00' ? `${dateStr} ${timeStr}` : dateStr;
 
     // Clean up the text (remove "I'm grateful for " prefix if present for gratitude)
-    let text = entry.text.trim();
+    let text = entry.text.split('\n').map(l => l.trim()).join('\n').trim();
     if (type === 'gratitude' && text.toLowerCase().startsWith("i'm grateful for ")) {
       text = text.substring(17);
     }
@@ -1705,7 +1705,7 @@ function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
     const timeStr = entry.date.substring(11, 16);
     const dateLabel = timeStr && timeStr !== '00:00' ? `${dateStr} ${timeStr}` : dateStr;
 
-    let text = entry.text.trim();
+    let text = entry.text.split('\n').map(l => l.trim()).join('\n').trim();
     if (type === 'gratitude' && text.toLowerCase().startsWith("i'm grateful for ")) {
       text = text.substring(17);
     }
@@ -2163,56 +2163,14 @@ function formatProjectsForWeek(projects, startDate, endDate) {
   const startStr = formatDateStr(startDate);
   const endStr = formatDateStr(endDate);
 
-  const lines = [];
+  // Add date badges to each project
+  const enriched = projects.map(proj => ({
+    ...proj,
+    startsThisMonth: proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr,
+    endsThisMonth: proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr,
+  }));
 
-  for (const proj of projects) {
-    // Determine badges for this project
-    const badges = [];
-    if (proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr) {
-      badges.push(`Starts ${proj.start_date}`);
-    }
-    if (proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr) {
-      badges.push(`Due ${proj.due_date}`);
-    }
-
-    // Status emoji
-    const statusEmoji = {
-      'active': '🟢',
-      'planning': '📋',
-      'on_hold': '⏸️',
-      'completed': '✅',
-      'archived': '📦',
-    }[proj.status] || '•';
-
-    // Create link if project has a URL
-    let titleDisplay = proj.title;
-    if (proj.url) {
-      titleDisplay = `[${proj.title}](${proj.url})`;
-    }
-
-    // Build the line
-    let line = `- ${statusEmoji} **${titleDisplay}**`;
-
-    if (proj.status && proj.status !== 'active') {
-      line += ` [${proj.status}]`;
-    }
-
-    if (proj.priority && proj.priority !== 'medium') {
-      line += ` (${proj.priority})`;
-    }
-
-    if (badges.length > 0) {
-      line += ` — ${badges.join(', ')}`;
-    }
-
-    if (proj.progress && proj.progress > 0) {
-      line += ` (${proj.progress}%)`;
-    }
-
-    lines.push(line);
-  }
-
-  return lines.join('\n');
+  return formatProjectList(enriched);
 }
 
 /**
@@ -2328,56 +2286,13 @@ function formatProjectsForMonth(projects, startDate, endDate) {
   const startStr = formatDateStr(startDate);
   const endStr = formatDateStr(endDate);
 
-  const lines = [];
+  const enriched = projects.map(proj => ({
+    ...proj,
+    startsThisMonth: proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr,
+    endsThisMonth: proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr,
+  }));
 
-  for (const proj of projects) {
-    // Determine badges for this project
-    const badges = [];
-    if (proj.start_date && proj.start_date >= startStr && proj.start_date <= endStr) {
-      badges.push(`Starts ${proj.start_date}`);
-    }
-    if (proj.due_date && proj.due_date >= startStr && proj.due_date <= endStr) {
-      badges.push(`Due ${proj.due_date}`);
-    }
-
-    // Status emoji
-    const statusEmoji = {
-      'active': '🟢',
-      'planning': '📋',
-      'on_hold': '⏸️',
-      'completed': '✅',
-      'archived': '📦',
-    }[proj.status] || '•';
-
-    // Create link if project has a URL
-    let titleDisplay = proj.title;
-    if (proj.url) {
-      titleDisplay = `[${proj.title}](${proj.url})`;
-    }
-
-    // Build the line
-    let line = `- ${statusEmoji} **${titleDisplay}**`;
-
-    if (proj.status && proj.status !== 'active') {
-      line += ` [${proj.status}]`;
-    }
-
-    if (proj.priority && proj.priority !== 'medium') {
-      line += ` (${proj.priority})`;
-    }
-
-    if (badges.length > 0) {
-      line += ` — ${badges.join(', ')}`;
-    }
-
-    if (proj.progress && proj.progress > 0) {
-      line += ` (${proj.progress}%)`;
-    }
-
-    lines.push(line);
-  }
-
-  return lines.join('\n');
+  return formatProjectList(enriched);
 }
 
 /**
@@ -2484,6 +2399,74 @@ function getProjectsForQuarter(startDate, endDate) {
 /**
  * Format projects for display in quarterly plan, grouped by month
  */
+function formatProjectLine(proj) {
+  const statusEmoji = {
+    'active': '🟢',
+    'planning': '📋',
+    'on_hold': '⏸️',
+    'completed': '✅',
+    'archived': '📦',
+  }[proj.status] || '•';
+
+  let titleDisplay = proj.title;
+  if (proj.url) {
+    titleDisplay = `[${proj.title}](${proj.url})`;
+  }
+
+  const badges = [];
+  if (proj.startsThisMonth && proj.start_date) {
+    badges.push(`Starts ${proj.start_date}`);
+  }
+  if (proj.endsThisMonth && proj.due_date) {
+    badges.push(`Due ${proj.due_date}`);
+  }
+
+  let line = `- ${statusEmoji} **${titleDisplay}**`;
+
+  if (proj.status && proj.status !== 'active') {
+    line += ` [${proj.status}]`;
+  }
+
+  if (proj.priority && proj.priority !== 'medium') {
+    line += ` (${proj.priority})`;
+  }
+
+  if (badges.length > 0) {
+    line += ` — ${badges.join(', ')}`;
+  }
+
+  if (proj.progress && proj.progress > 0) {
+    line += ` (${proj.progress}%)`;
+  }
+
+  return line;
+}
+
+/**
+ * Format a flat project list with active projects first, then paused/completed.
+ * Used by week and month formatters (no sub-grouping).
+ */
+function formatProjectList(projects) {
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
+  const active = projects.filter(p => !inactiveStatuses.has(p.status));
+  const inactive = projects.filter(p => inactiveStatuses.has(p.status));
+
+  const lines = [];
+  for (const proj of active) {
+    lines.push(formatProjectLine(proj));
+  }
+
+  if (inactive.length > 0) {
+    if (active.length > 0) lines.push('');
+    lines.push('*Paused / Completed:*');
+    for (const proj of inactive) {
+      lines.push(formatProjectLine(proj));
+    }
+  }
+
+  return lines.join('\n');
+}
+
 function formatProjectsForQuarter(projects, startDate, endDate) {
   if (projects.length === 0) return null;
 
@@ -2536,6 +2519,7 @@ function formatProjectsForQuarter(projects, startDate, endDate) {
   }
 
   // Format output
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
   const lines = [];
   for (const [key, group] of Object.entries(monthGroups)) {
     if (group.projects.length === 0) continue;
@@ -2543,51 +2527,19 @@ function formatProjectsForQuarter(projects, startDate, endDate) {
     lines.push(`#### ${group.name}`);
     lines.push('');
 
-    for (const proj of group.projects) {
-      // Status emoji
-      const statusEmoji = {
-        'active': '🟢',
-        'planning': '📋',
-        'on_hold': '⏸️',
-        'completed': '✅',
-        'archived': '📦',
-      }[proj.status] || '•';
+    const activeProjects = group.projects.filter(p => !inactiveStatuses.has(p.status));
+    const inactiveProjects = group.projects.filter(p => inactiveStatuses.has(p.status));
 
-      // Create link if project has a URL
-      let titleDisplay = proj.title;
-      if (proj.url) {
-        titleDisplay = `[${proj.title}](${proj.url})`;
+    for (const proj of activeProjects) {
+      lines.push(formatProjectLine(proj));
+    }
+
+    if (inactiveProjects.length > 0) {
+      if (activeProjects.length > 0) lines.push('');
+      lines.push('*Paused / Completed:*');
+      for (const proj of inactiveProjects) {
+        lines.push(formatProjectLine(proj));
       }
-
-      // Determine badges
-      const badges = [];
-      if (proj.startsThisMonth && proj.start_date) {
-        badges.push(`Starts ${proj.start_date}`);
-      }
-      if (proj.endsThisMonth && proj.due_date) {
-        badges.push(`Due ${proj.due_date}`);
-      }
-
-      // Build the line
-      let line = `- ${statusEmoji} **${titleDisplay}**`;
-
-      if (proj.status && proj.status !== 'active') {
-        line += ` [${proj.status}]`;
-      }
-
-      if (proj.priority && proj.priority !== 'medium') {
-        line += ` (${proj.priority})`;
-      }
-
-      if (badges.length > 0) {
-        line += ` — ${badges.join(', ')}`;
-      }
-
-      if (proj.progress && proj.progress > 0) {
-        line += ` (${proj.progress}%)`;
-      }
-
-      lines.push(line);
     }
 
     lines.push('');
@@ -2771,6 +2723,7 @@ function formatProjectsForYear(projects, startDate, endDate) {
   }
 
   // Format output
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
   const lines = [];
   for (const [quarter, group] of Object.entries(quarterGroups)) {
     if (group.projects.length === 0) continue;
@@ -2778,51 +2731,26 @@ function formatProjectsForYear(projects, startDate, endDate) {
     lines.push(`#### ${group.name}`);
     lines.push('');
 
-    for (const proj of group.projects) {
-      // Status emoji
-      const statusEmoji = {
-        'active': '🟢',
-        'planning': '📋',
-        'on_hold': '⏸️',
-        'completed': '✅',
-        'archived': '📦',
-      }[proj.status] || '•';
+    // Map quarter date fields to the generic names formatProjectLine expects
+    const mapped = group.projects.map(p => ({
+      ...p,
+      startsThisMonth: p.startsThisQuarter,
+      endsThisMonth: p.endsThisQuarter,
+    }));
 
-      // Create link if project has a URL
-      let titleDisplay = proj.title;
-      if (proj.url) {
-        titleDisplay = `[${proj.title}](${proj.url})`;
+    const activeProjects = mapped.filter(p => !inactiveStatuses.has(p.status));
+    const inactiveProjects = mapped.filter(p => inactiveStatuses.has(p.status));
+
+    for (const proj of activeProjects) {
+      lines.push(formatProjectLine(proj));
+    }
+
+    if (inactiveProjects.length > 0) {
+      if (activeProjects.length > 0) lines.push('');
+      lines.push('*Paused / Completed:*');
+      for (const proj of inactiveProjects) {
+        lines.push(formatProjectLine(proj));
       }
-
-      // Determine badges
-      const badges = [];
-      if (proj.startsThisQuarter && proj.start_date) {
-        badges.push(`Starts ${proj.start_date}`);
-      }
-      if (proj.endsThisQuarter && proj.due_date) {
-        badges.push(`Due ${proj.due_date}`);
-      }
-
-      // Build the line
-      let line = `- ${statusEmoji} **${titleDisplay}**`;
-
-      if (proj.status && proj.status !== 'active') {
-        line += ` [${proj.status}]`;
-      }
-
-      if (proj.priority && proj.priority !== 'medium') {
-        line += ` (${proj.priority})`;
-      }
-
-      if (badges.length > 0) {
-        line += ` — ${badges.join(', ')}`;
-      }
-
-      if (proj.progress && proj.progress > 0) {
-        line += ` (${proj.progress}%)`;
-      }
-
-      lines.push(line);
     }
 
     lines.push('');
