@@ -4701,19 +4701,27 @@ app.get('/search', authMiddleware, async (req, res) => {
 app.get('/edit/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    const fullPath = path.join(VAULT_PATH, urlPath);
-    
+    let fullPath = path.join(VAULT_PATH, urlPath);
+
     // Security: prevent directory traversal
     if (!fullPath.startsWith(VAULT_PATH)) {
       return res.status(403).send('Access denied');
     }
-    
+
+    // If path has no extension, try adding .md (Obsidian-style URLs)
+    if (!path.extname(urlPath)) {
+      fullPath = fullPath + '.md';
+      if (!fullPath.startsWith(VAULT_PATH)) {
+        return res.status(403).send('Access denied');
+      }
+    }
+
     // Check if file exists and is a markdown file
     const stats = await fs.stat(fullPath);
     if (!stats.isFile() || !fullPath.endsWith('.md')) {
       return res.status(400).send('Can only edit markdown files');
     }
-    
+
     const html = await renderEditor(fullPath, urlPath);
     res.send(html);
   } catch (error) {
