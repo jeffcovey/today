@@ -61,6 +61,12 @@ export class DigitalOceanProvider extends RemoteServer {
       echo "Installing system dependencies..."
       apt-get install -y git nginx certbot python3-certbot-nginx sqlite3 rsync jq
 
+      echo "Installing Chromium dependencies for Puppeteer..."
+      apt-get install -y libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+        libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+        libpango-1.0-0 libcairo2 libasound2 libnspr4 libnss3 libxshmfence1 \
+        libx11-xcb1 fonts-liberation
+
       echo "Creating deployment directory..."
       mkdir -p ${this.deployPath}
       mkdir -p ${this.deployPath}/.data
