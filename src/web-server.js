@@ -3762,11 +3762,16 @@ ${cleanContent}
                         return;
                       }
 
-                      // Update timer in response
+                      // Update timer in response and remove its id to avoid conflicts with future messages
                       const timerElement = document.getElementById('response-timer');
                       if (timerElement) {
                         timerElement.textContent = 'Replied in ' + timeStr;
+                        timerElement.removeAttribute('id');
                       }
+
+                      // Remove streaming id so future messages don't target this bubble
+                      const streamingBubble = document.getElementById('streaming-response');
+                      if (streamingBubble) streamingBubble.removeAttribute('id');
 
                       // Save assistant response to chat history
                       // (user message was already added by addChatBubble)
