@@ -89,7 +89,12 @@ async function main() {
     await page.goto('https://www.trustedhousesitters.com/login/', { waitUntil: 'networkidle2' });
 
     // Fill in email and password
-    await page.waitForSelector('input#email', { timeout: 15000 });
+    try {
+      await page.waitForSelector('input#email', { timeout: 15000 });
+    } catch {
+      await saveDebugHtml(page, 'login-page');
+      throw new Error('Waiting for selector `input#email` failed');
+    }
     await page.type('input#email', email);
     await page.type('input#password', password);
     console.error('Submitting credentials...');
