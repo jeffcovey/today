@@ -18,7 +18,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { parseRecurrence, getCurrentPeriodStart, formatDate, isNewPeriod } from '../../src/recurrence-parser.js';
+import { parseRecurrence, getCurrentPeriodStart, getNextPeriodStart, formatDate } from '../../src/recurrence-parser.js';
 import { TZDate } from '@date-fns/tz';
 
 // Read config from environment
@@ -230,9 +230,17 @@ function resetTasks(body, tasks, newDate) {
     // Reset checkbox to unchecked
     line = line.replace(/^(\s*-\s*\[)[ xX](\].*)$/, '$1 $2');
 
-    // Update scheduled date
+    // Update or add scheduled date
     if (task.scheduledDate) {
       line = line.replace(/⏳\s*\d{4}-\d{2}-\d{2}/, `⏳ ${newDateStr}`);
+    } else {
+      // Add scheduled date before any existing emoji dates or at end
+      const emojiDatePos = line.search(/[➕✅🛫⏳]\s*\d{4}-\d{2}-\d{2}/);
+      if (emojiDatePos > -1) {
+        line = line.slice(0, emojiDatePos) + `⏳ ${newDateStr} ` + line.slice(emojiDatePos);
+      } else {
+        line = line + ` ⏳ ${newDateStr}`;
+      }
     }
 
     lines[task.lineIndex] = line;
@@ -289,28 +297,58 @@ function processRoutine(filePath, today) {
     };
   }
 
-  // Get scheduled date from first task
-  const scheduledDate = tasks[0]?.scheduledDate;
+  // Get scheduled date from first task that has one
+  const scheduledDate = tasks.find(t => t.scheduledDate)?.scheduledDate;
   const todayStr = getTodayStr();
 
   let modified = false;
   let newBody = body;
   let newHistory = [...history];
 
-  // Check if we need to reset (new period)
-  // Only reset if:
-  // 1. The scheduled date is in the past (before today)
-  // 2. We haven't already recorded history for this scheduled date
-  const scheduledDateIsBeforeToday = scheduledDate && scheduledDate < todayStr;
-  const alreadyHasHistoryForDate = history.some(h => h.date === scheduledDate);
+  // Determine if the current period starts today (e.g. daily, weekday on a weekday)
+  // vs. started in the past (e.g. monthly on the 1st when today is the 15th).
+  // This controls both the scheduled date and reset condition:
+  //
+  // Period starts today (daily-like):
+  //   ⏳ = today, reset fires tomorrow via scheduledDate < todayStr
+  //   History records scheduledDate directly (the day work was done)
+  //
+  // Period started in past (weekly/monthly/quarterly/yearly):
+  //   ⏳ = next period start, reset fires that day via scheduledDate <= todayStr
+  //   History records current period start (the period work was done in)
+  const parsed = parseRecurrence(recurrence);
+  const currentPeriodStart = getCurrentPeriodStart(parsed, today);
+  const currentPeriodStr = formatDate(currentPeriodStart);
+  const periodStartsToday = currentPeriodStr === todayStr;
 
-  if (scheduledDateIsBeforeToday && !alreadyHasHistoryForDate) {
+  const needsReset = scheduledDate && (
+    periodStartsToday
+      ? scheduledDate < todayStr      // yesterday < today
+      : scheduledDate <= todayStr     // next period start has arrived
+  );
+
+  if (needsReset) {
     // Count completed tasks
     const completedTasks = tasks.filter(t => t.isCompleted).length;
 
-    // Add to history
+    // Record history for the period the work was done in
+    let historyDate;
+    if (periodStartsToday) {
+      // Daily-like: scheduledDate is the day work was done
+      historyDate = scheduledDate;
+    } else {
+      // Non-daily: scheduledDate is the next period start, so the completed
+      // period is the one containing the day before the scheduled date
+      const scheduledDateObj = new TZDate(scheduledDate + 'T00:00:00', configuredTimezone);
+      const dayBefore = new TZDate(
+        scheduledDateObj.getFullYear(), scheduledDateObj.getMonth(),
+        scheduledDateObj.getDate() - 1, configuredTimezone
+      );
+      historyDate = formatDate(getCurrentPeriodStart(parsed, dayBefore));
+    }
+
     newHistory.unshift({
-      date: scheduledDate,
+      date: historyDate,
       completed: completedTasks,
       total: totalTasks
     });
@@ -320,12 +358,11 @@ function processRoutine(filePath, today) {
       newHistory = newHistory.slice(0, historyLimit);
     }
 
-    // Get current period start
-    const parsed = parseRecurrence(recurrence);
-    const periodStart = getCurrentPeriodStart(parsed, today);
+    // Schedule for today if period starts today, otherwise next period
+    const newDate = periodStartsToday ? currentPeriodStart : getNextPeriodStart(parsed, today);
 
     // Reset tasks and update dates
-    newBody = resetTasks(body, tasks, periodStart);
+    newBody = resetTasks(body, tasks, newDate);
     modified = true;
   }
 

@@ -67,6 +67,13 @@ export function parseRecurrence(pattern) {
     }
   }
 
+  // Monthly on ordinal "day" (e.g., "monthly on the first day", "monthly on the second day")
+  const monthlyOrdinalDayMatch = p.match(/^monthly\s+on\s+the\s+(first|second|third|fourth|fifth)\s+day$/);
+  if (monthlyOrdinalDayMatch) {
+    const day = ORDINALS.indexOf(monthlyOrdinalDayMatch[1]) + 1;
+    return { type: 'monthly', day };
+  }
+
   // Monthly on specific day (e.g., "monthly on the 15th")
   const monthlyDayMatch = p.match(/^monthly(?:\s+on\s+the\s+(\d+)(?:st|nd|rd|th)?)?$/);
   if (monthlyDayMatch) {
@@ -79,8 +86,8 @@ export function parseRecurrence(pattern) {
     return { type: 'monthly', lastDay: true };
   }
 
-  // Quarterly
-  if (p === 'quarterly') {
+  // Quarterly (with optional "on the first day" suffix)
+  if (p === 'quarterly' || p === 'quarterly on the first day') {
     return { type: 'quarterly' };
   }
 
