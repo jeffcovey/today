@@ -152,6 +152,8 @@ bin/today web --port 8080        # Start on custom port
 
 Then visit `http://localhost:3000` to browse your vault.
 
+For remote access, deploy Today to a server using `bin/today configure` and `bin/deploy` commands. See the [Server Deployment](#server-deployment) section for details.
+
 ### Features
 
 - **Vault browsing**: Navigate your markdown files with Obsidian compatibility
