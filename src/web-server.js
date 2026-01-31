@@ -1765,6 +1765,21 @@ function convertWikiLinks(markdown, currentPath = '') {
     return `[${displayText}](${href})`;
   });
 
+  // Resolve relative standard markdown links to be directory-relative
+  // e.g., [text](current-listings) in trusted-housesitters/by-duration.md
+  // becomes [text](/trusted-housesitters/current-listings)
+  if (currentDir) {
+    result = result.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, text, href) => {
+      // Skip external links, anchor links, already-absolute links, and image URLs
+      if (/^https?:\/\//.test(href) || href.startsWith('#') || href.startsWith('/')) {
+        return match;
+      }
+      // Resolve relative to current directory
+      const resolved = '/' + path.join(currentDir, href);
+      return `[${text}](${resolved})`;
+    });
+  }
+
   return result;
 }
 
