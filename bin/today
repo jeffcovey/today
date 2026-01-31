@@ -750,9 +750,16 @@ ${contextSection}`;
   }
 
   // Helper to merge parent (global) options with command-specific options
+  // Only override parent options with subcommand options that were explicitly set
   function mergeOptions(cmdOptions, cmd) {
     const parentOpts = cmd?.parent?.opts() || {};
-    return { ...parentOpts, ...cmdOptions };
+    const merged = { ...parentOpts };
+    for (const [key, value] of Object.entries(cmdOptions)) {
+      if (cmd.getOptionValueSource(key) !== 'default') {
+        merged[key] = value;
+      }
+    }
+    return merged;
   }
 
   program
