@@ -2,7 +2,13 @@
 
 `today` pulls in all the information you track or which is flowing into your life, and hands it to an AI that helps you work and play. Any AI provider can be used, allowing whatever mixture of purely-local and cloud-based data sharing makes you comfortable.
 
-## Example
+## Examples
+
+### Web Interface
+
+![Today Web Interface](docs/images/today.png)
+
+### Command Line Interface
 
 ```
 $ bin/today --no-sync --non-interactive now
@@ -53,6 +59,8 @@ $ bin/today --no-sync --non-interactive now
 > **One quick check:** The healthcheck `newsletter-continuous-catchup` went DOWN today. You might want to glance at that, though it can wait until tomorrow (a Back Stage day) if you prefer to keep tonight personal.
 > 
 > Want me to stop the time tracker or help with anything specific?
+
+---
 
 Sessions can be interactive conversations or one-off suggestions like the above. You can run `bin/today` to start a session with general advice, or `bin/today "What do I need to do for my trip to St. Louis?"` to work on something particular.
 
@@ -128,6 +136,44 @@ bin/today --focus --non-interactive  # Automated preset run
 Many file-based plugins look for a "vault" directory and follow some [Obsidian](https://obsidian.md) conventions. The path to the vault can be configured, and defaults to `vault/` under Today's directory. Plugins automatically create their required directories inside the vault when first used.
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, Obsidian, etc.). Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
+
+---
+
+## Web Interface
+
+Today includes a web server for browsing and interacting with your vault through a browser. The web interface provides full Obsidian compatibility and additional features for task and project management.
+
+### Starting the Web Server
+
+```bash
+bin/today web                    # Start web server (default port 3000)
+bin/today web --port 8080        # Start on custom port
+```
+
+Then visit `http://localhost:3000` to browse your vault.
+
+### Features
+
+- **Vault browsing**: Navigate your markdown files with Obsidian compatibility
+- **Task management**: Interactive task lists with clickable links and detail pages
+- **AI chat integration**: Built-in AI assistant with access to your context and tools
+- **Live editing**: Edit tasks and markdown files directly in the browser
+- **Image support**: View embedded images and Obsidian-style image syntax
+- **Wiki links**: Full support for `[[internal links]]` and relative paths
+- **Table of contents**: Auto-generated TOC for long documents
+- **Responsive design**: Works on desktop and mobile devices
+
+### Obsidian Compatibility
+
+The web interface supports Obsidian markdown features:
+
+- `[[Wiki Links]]` and `![[Image Embeds]]`
+- Frontmatter properties (YAML)
+- Task syntax with priorities and dates
+- Callouts and admonitions
+- Line breaks and formatting
+
+This makes it easy to use alongside Obsidian or as a standalone interface to your vault.
 
 ---
 
