@@ -2404,6 +2404,7 @@ function formatProjectLine(proj) {
     'active': '🟢',
     'planning': '📋',
     'on_hold': '⏸️',
+    'paused': '⏸️',
     'completed': '✅',
     'archived': '📦',
   }[proj.status] || '•';
@@ -2447,7 +2448,7 @@ function formatProjectLine(proj) {
  * Used by week and month formatters (no sub-grouping).
  */
 function formatProjectList(projects) {
-  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold', 'paused']);
   const active = projects.filter(p => !inactiveStatuses.has(p.status));
   const inactive = projects.filter(p => inactiveStatuses.has(p.status));
 
@@ -2519,7 +2520,7 @@ function formatProjectsForQuarter(projects, startDate, endDate) {
   }
 
   // Format output
-  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold', 'paused']);
   const lines = [];
   for (const [key, group] of Object.entries(monthGroups)) {
     if (group.projects.length === 0) continue;
@@ -2723,7 +2724,7 @@ function formatProjectsForYear(projects, startDate, endDate) {
   }
 
   // Format output
-  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold']);
+  const inactiveStatuses = new Set(['completed', 'archived', 'on_hold', 'paused']);
   const lines = [];
   for (const [quarter, group] of Object.entries(quarterGroups)) {
     if (group.projects.length === 0) continue;
