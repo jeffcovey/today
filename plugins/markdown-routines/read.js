@@ -29,7 +29,7 @@ const routinesDirectory = config.routines_directory || `${process.env.VAULT_PATH
 const historyLimit = config.history_limit || 30;
 
 // Get timezone from global config
-const globalConfigPath = path.join(projectRoot, 'config.toml');
+const globalConfigPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
 let configuredTimezone = 'America/New_York'; // Default
 try {
   const tomlContent = fs.readFileSync(globalConfigPath, 'utf8');

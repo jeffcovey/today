@@ -14,6 +14,7 @@ jest.unstable_mockModule('../src/config.js', () => ({
   getTimezone: jest.fn().mockReturnValue('America/New_York'),
   getClaudeModel: jest.fn().mockReturnValue('claude-sonnet-4-20250514'),
   getVaultPath: jest.fn().mockReturnValue('vault'),
+  getConfigPath: jest.fn().mockReturnValue('config.toml'),
 }));
 
 // Import after mocking

@@ -350,7 +350,7 @@ function validateCalendarSource(calendarSource) {
 // Function to update property status in config.toml
 function updatePropertyStatus(sourceKey, newStatus) {
   const projectRoot = process.env.PROJECT_ROOT || process.cwd();
-  const configPath = path.join(projectRoot, 'config.toml');
+  const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
 
   try {
     const configContent = fs.readFileSync(configPath, 'utf-8');

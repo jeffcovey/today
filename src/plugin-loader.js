@@ -4,7 +4,7 @@ import path from 'path';
 import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
-import { getFullConfig, getVaultPath } from './config.js';
+import { getFullConfig, getVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
@@ -359,6 +359,7 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceNa
         ...process.env,
         PROJECT_ROOT,
         VAULT_PATH: vaultPath,
+        CONFIG_PATH: getConfigPath(),
         PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
         ...extraEnv
       },
@@ -437,6 +438,7 @@ export function runInteractivePluginCommand(plugin, command, sourceConfig, extra
         ...process.env,
         PROJECT_ROOT,
         VAULT_PATH: vaultPath,
+        CONFIG_PATH: getConfigPath(),
         PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
         ...extraEnv
       }

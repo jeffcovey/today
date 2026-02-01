@@ -43,7 +43,7 @@ function getTodayDateString() {
  */
 function isPluginEnabled(pluginName) {
   try {
-    const configPath = path.join(projectRoot, 'config.toml');
+    const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
     if (!fs.existsSync(configPath)) {
       return false;
     }
@@ -159,8 +159,8 @@ function generateStageNoticeSection(date) {
   try {
     const dateObj = new Date(date + 'T00:00:00');
 
-    // Read stages plugin configuration from config.toml
-    const configPath = path.join(projectRoot, 'config.toml');
+    // Read stages plugin configuration from config
+    const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
     if (!fs.existsSync(configPath)) {
       return null;
     }

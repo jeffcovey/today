@@ -36,7 +36,7 @@ const UPDATE_HEADER_REGEX = /^## Update: (\d{4}-\d{2}-\d{2} \d{2}:\d{2})/;
  * Read main config.toml to get wake/sleep times, timezone, and vault path
  */
 function getScheduleConfig() {
-  const configPath = path.join(projectRoot, 'config.toml');
+  const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
 
   let wakeTime = '05:30';
   let bedTime = '21:30';

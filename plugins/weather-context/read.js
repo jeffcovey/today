@@ -19,8 +19,8 @@ async function getLocationFromConfig() {
     return config.location;
   }
 
-  // Read from main config.toml
-  const configPath = path.join(projectRoot, 'config.toml');
+  // Read from main config
+  const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
   const configContent = fs.readFileSync(configPath, 'utf-8');
 
   // Simple TOML parsing for location field

@@ -1244,7 +1244,7 @@ function getStageForDay(dayOfWeek) {
   // Try to read from config
   let dayMapping = defaultDayMapping;
   try {
-    const configPath = path.join(projectRoot, 'config.toml');
+    const configPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, 'utf-8');
       // Simple parsing for [stages] section

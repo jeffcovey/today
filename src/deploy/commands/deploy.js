@@ -66,9 +66,9 @@ export async function deployCommand(server, args = []) {
     configFiles.push('.data/config-path');
   }
 
-  // Only copy config.toml if it's NOT in vault (vault is synced via Resilio)
-  if (!configInVault && fs.existsSync(path.join(PROJECT_ROOT, 'config.toml'))) {
-    configFiles.push('config.toml');
+  // Only copy config if it's NOT in vault (vault is synced via Resilio)
+  if (!configInVault && fs.existsSync(configPath)) {
+    configFiles.push(relativeConfigPath);
   }
 
   for (const file of configFiles) {
@@ -93,7 +93,7 @@ export async function deployCommand(server, args = []) {
     const { applyDeploymentOverrides } = await import('../../config.js');
     const tempConfigPath = path.join(PROJECT_ROOT, '.deploy-config.toml');
     applyDeploymentOverrides(server.ai, tempConfigPath);
-    server.scpToRemote(tempConfigPath, `${deployPath}/config.toml`);
+    server.scpToRemote(tempConfigPath, `${deployPath}/${relativeConfigPath}`);
     fs.unlinkSync(tempConfigPath);
     printStatus('AI configuration applied');
   } else if (server.ai && configInVault) {
