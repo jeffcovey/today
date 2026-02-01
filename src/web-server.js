@@ -20,6 +20,7 @@ import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import yaml from 'js-yaml';
+import moment from 'moment';
 import {
   chatWithFile,
   chatWithDirectory,
@@ -2133,18 +2134,85 @@ class DataviewAPI {
       }
     }
 
-    // Create a pseudo-element that tracks its children
+    // Create a pseudo-element that tracks its children and supports DOM-like APIs
+    const self = this;
     const element = {
       _tag: tag,
       _attrStr: attrStr,
       _content: content,
       _children: [],
+      _textContent: null,
       innerHTML: '',
+      // Style proxy that accumulates CSS properties
+      style: new Proxy({}, {
+        _styles: {},
+        set(target, prop, value) {
+          target[prop] = value;
+          return true;
+        },
+        get(target, prop) {
+          return target[prop];
+        }
+      }),
+      // Create a child element (Obsidian DOM API)
+      createEl(childTag, childOptions = {}) {
+        const { text, cls, type, placeholder } = childOptions;
+        const childAttr = {};
+        if (type) childAttr.type = type;
+        if (placeholder) childAttr.placeholder = placeholder;
+        const child = self.el(childTag, text || '', { cls, attr: childAttr });
+        // Remove from root elements since it's a child
+        if (self._rootElements) {
+          const idx = self._rootElements.indexOf(child);
+          if (idx !== -1) self._rootElements.splice(idx, 1);
+        }
+        this._children.push(child);
+        return child;
+      },
+      // Append an existing pseudo-element as a child
+      appendChild(child) {
+        if (self._rootElements) {
+          const idx = self._rootElements.indexOf(child);
+          if (idx !== -1) self._rootElements.splice(idx, 1);
+        }
+        this._children.push(child);
+        return child;
+      },
+      // Append a text node
+      appendText(text) {
+        this._children.push({ render: () => text.replace(/</g, '&lt;').replace(/>/g, '&gt;') });
+      },
+      // Set text content (replaces children)
+      set textContent(text) {
+        this._textContent = text;
+      },
+      get textContent() {
+        return this._textContent;
+      },
       // Render this element and all its children
       render() {
+        // Build style attribute from accumulated styles
+        let styleStr = '';
+        const styleObj = this.style;
+        const styleEntries = Object.entries(styleObj).filter(([k]) => !k.startsWith('_'));
+        if (styleEntries.length > 0) {
+          const cssProps = styleEntries.map(([k, v]) => {
+            // Convert camelCase to kebab-case
+            const kebab = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+            return `${kebab}: ${v}`;
+          });
+          styleStr = ` style="${cssProps.join('; ')}"`;
+        }
+
+        // If textContent was explicitly set, use it instead of children
+        if (this._textContent !== null) {
+          const escaped = this._textContent.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return `<${this._tag}${this._attrStr}${styleStr}>${escaped}</${this._tag}>`;
+        }
+
         let childContent = this._children.map(c => c.render ? c.render() : c).join('');
         let innerContent = this._content + childContent + this.innerHTML;
-        return `<${this._tag}${this._attrStr}>${innerContent}</${this._tag}>`;
+        return `<${this._tag}${this._attrStr}${styleStr}>${innerContent}</${this._tag}>`;
       }
     };
 
@@ -2178,6 +2246,21 @@ class DataviewAPI {
     };
   }
 
+  // Obsidian app API (minimal shim for vault write operations)
+  get app() {
+    const self = this;
+    return {
+      vault: {
+        adapter: {
+          async write(filePath, content) {
+            const fullPath = path.join(self.vaultPath, filePath);
+            await fs.writeFile(fullPath, content, 'utf-8');
+          }
+        }
+      }
+    };
+  }
+
   // View - load and execute an external script
   async view(scriptPath, input = {}) {
     // Resolve the script path
@@ -2192,10 +2275,10 @@ class DataviewAPI {
       // Create a child DataviewAPI for the view with its own output buffer
       const viewDv = new DataviewAPI(this.vaultPath, this.currentFilePath, this.allFiles);
 
-      // Execute the script in a sandbox with dv and input available
+      // Execute the script in a sandbox with dv, input, and moment available
       const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-      const scriptFn = new AsyncFunction('dv', 'input', scriptContent);
-      await scriptFn(viewDv, input);
+      const scriptFn = new AsyncFunction('dv', 'input', 'moment', scriptContent);
+      await scriptFn(viewDv, input, moment);
 
       // Get the output from the view
       const output = viewDv.getOutput();
@@ -2336,10 +2419,10 @@ async function executeDataviewJS(code, vaultPath, currentFilePath) {
       output += originalParagraph(...args);
     };
 
-    // Create async function and execute
+    // Create async function and execute (moment provided for Obsidian compatibility)
     const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-    const fn = new AsyncFunction('dv', 'console', code);
-    await fn(dv, context.console);
+    const fn = new AsyncFunction('dv', 'console', 'moment', code);
+    await fn(dv, context.console, moment);
 
     // Return both manual capture and buffer output
     const bufferOutput = dv.getOutput();
@@ -5033,13 +5116,21 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 app.post('/save/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    const fullPath = path.join(VAULT_PATH, urlPath);
-    
+    let fullPath = path.join(VAULT_PATH, urlPath);
+
     // Security: prevent directory traversal
     if (!fullPath.startsWith(VAULT_PATH)) {
       return res.status(403).send('Access denied');
     }
-    
+
+    // If path has no extension, try adding .md (Obsidian-style URLs)
+    if (!path.extname(urlPath)) {
+      fullPath = fullPath + '.md';
+      if (!fullPath.startsWith(VAULT_PATH)) {
+        return res.status(403).send('Access denied');
+      }
+    }
+
     // Check if file exists and is a markdown file
     const stats = await fs.stat(fullPath);
     if (!stats.isFile() || !fullPath.endsWith('.md')) {
