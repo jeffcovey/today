@@ -3015,7 +3015,7 @@ async function renderMarkdownUncached(filePath, urlPath) {
   htmlContent = await (async () => {
     // Match blockquotes with Obsidian callout syntax that contain code blocks
     // Marked.js adds class="language-tasks" to the code tag
-    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|info|todo|abstract|summary|tldr|success|check|done|tip|hint|important|question|help|faq|warning|caution|attention|failure|fail|missing|danger|error|bug|example|quote|cite)\]([-+]?)\s*(.*?)<\/p>\n?<pre(?:[^>]*)><code(?:\s+class="language-tasks"[^>]*)?>([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
+    const calloutWithCodeRegex = /<blockquote>\n?<p>\[!(note|info|todo|abstract|summary|tldr|success|check|done|tip|hint|important|question|help|faq|warning|caution|attention|failure|fail|missing|danger|error|bug|example|quote|cite)\]([-+]?)\s*(.*?)<\/p>\n?<pre(?:[^>]*)><code(?:\s+class="[^"]*language-tasks[^"]*"[^>]*)?>([\s\S]*?)<\/code><\/pre>([\s\S]*?)<\/blockquote>/gi;
 
     let result = htmlContent;
     const matches = [];
@@ -3169,7 +3169,7 @@ ${cleanContent}
   // Process tasks code blocks after markdown rendering
   // Marked.js converts ```tasks to <pre><code class="language-tasks">
   htmlContent = await (async () => {
-    const tasksCodeBlockRegex = /<pre[^>]*><code[^>]*class="language-tasks"[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
+    const tasksCodeBlockRegex = /<pre[^>]*><code[^>]*class="[^"]*language-tasks[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
     let result = htmlContent;
     const matches = [];
     let match;
