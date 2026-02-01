@@ -357,6 +357,7 @@ async function scrapeListings() {
 
     // Scrape pages
     const allListings = [];
+    const allReviewingIds = [];
     let pageNum = 1;
 
     // Load existing cache for early pagination stop
@@ -375,6 +376,24 @@ async function scrapeListings() {
         fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(debugPath, html);
         console.error(`Saved debug HTML to ${debugPath}`);
+      }
+
+      // Extract reviewing status from embedded state data
+      const reviewingIds = await page.evaluate(() => {
+        const state = window.__INITIAL_STATE__;
+        if (!state?.search?.listing) return [];
+        const ids = [];
+        for (const [listingId, listing] of Object.entries(state.search.listing)) {
+          const assignments = listing.openAssignments || [];
+          const allReviewing = assignments.length > 0 && assignments.every(a => a.isReviewing || a.isConfirmed);
+          if (allReviewing) ids.push(listingId);
+        }
+        return ids;
+      });
+      const reviewingSet = new Set(reviewingIds);
+      allReviewingIds.push(...reviewingIds);
+      if (reviewingSet.size > 0) {
+        console.error(`  ${reviewingSet.size} listings closed to new applicants on page ${pageNum}`);
       }
 
       const listingCards = $('div[data-testid="ListingCard__container"]');
@@ -420,20 +439,24 @@ async function scrapeListings() {
 
         if (title && url && start && end) {
           const listingId = getListingId(url);
-          pageListings.push({
-            id: listingId,
-            title,
-            url,
-            start_date: start.toISOString().split('T')[0],
-            end_date: end.toISOString().split('T')[0],
-            duration_days: getDurationDays(start, end),
-            city: location.city,
-            state: location.state,
-            country: location.country,
-            animals,
-            image_url: imageUrl,
-            date_added: new Date().toISOString().split('T')[0]
-          });
+          if (reviewingSet.has(listingId)) {
+            console.error(`  Skipping "${title}" (closed to new applicants)`);
+          } else {
+            pageListings.push({
+              id: listingId,
+              title,
+              url,
+              start_date: start.toISOString().split('T')[0],
+              end_date: end.toISOString().split('T')[0],
+              duration_days: getDurationDays(start, end),
+              city: location.city,
+              state: location.state,
+              country: location.country,
+              animals,
+              image_url: imageUrl,
+              date_added: new Date().toISOString().split('T')[0]
+            });
+          }
         }
       });
 
@@ -464,10 +487,11 @@ async function scrapeListings() {
     }
 
     console.error(`Scraped ${allListings.length} listings total`);
-    return allListings;
+    return { listings: allListings, reviewingIds: allReviewingIds, page, browser };
 
-  } finally {
+  } catch (e) {
     await browser.close();
+    throw e;
   }
 }
 
@@ -836,14 +860,20 @@ function saveCache(listings) {
 /**
  * Merge new listings with cached, removing duplicates and expired
  */
-function mergeListings(cached, scraped) {
+function mergeListings(cached, scraped, reviewingIds = []) {
   const today = new Date().toISOString().split('T')[0];
   const byUrl = new Map();
   const expiredIds = [];
+  const reviewingSet = new Set(reviewingIds);
 
-  // Add cached listings (non-expired), track expired ones for cleanup
+  // Add cached listings (non-expired, non-reviewing), track removed ones for cleanup
   for (const listing of cached) {
-    if (listing.start_date >= today) {
+    if (listing.start_date < today) {
+      expiredIds.push(listing.id);
+    } else if (reviewingSet.has(listing.id)) {
+      expiredIds.push(listing.id);
+      console.error(`Removing cached listing "${listing.title}" (closed to new applicants)`);
+    } else {
       // Migrate legacy slugified IDs to numeric
       const correctId = getListingId(listing.url);
       if (listing.id !== correctId) {
@@ -851,8 +881,6 @@ function mergeListings(cached, scraped) {
         listing.id = correctId;
       }
       byUrl.set(listing.url, listing);
-    } else {
-      expiredIds.push(listing.id);
     }
   }
 
@@ -891,6 +919,95 @@ function cleanupExpiredImages(expiredIds) {
 }
 
 /**
+ * Remove image files that don't correspond to any cached listing.
+ */
+function cleanupOrphanedImages(listings) {
+  const cachedIds = new Set(listings.map(l => l.id));
+  for (const dir of [vaultImagesDir, legacyImagesDir]) {
+    if (!fs.existsSync(dir)) continue;
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.jpg')) continue;
+      const id = file.replace('.jpg', '');
+      if (!cachedIds.has(id)) {
+        try {
+          fs.unlinkSync(path.join(dir, file));
+          console.error(`Cleaned up orphaned image: ${file}`);
+        } catch (e) {
+          console.error(`Failed to clean up orphaned image ${file}: ${e.message}`);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Check cached listings for reviewing/confirmed status by fetching their
+ * detail pages from within the browser (reusing auth cookies).  Looks for
+ * `"isReviewing":true` or `"isConfirmed":true` in the raw HTML, which is
+ * faster and more reliable than parsing the full __INITIAL_STATE__ blob.
+ */
+async function checkCachedListingStatus(page, listings, alreadyCheckedIds) {
+  const toCheck = listings.filter(l => !alreadyCheckedIds.has(l.id));
+  if (toCheck.length === 0) return [];
+
+  console.error(`Checking ${toCheck.length} cached listings for reviewing status...`);
+  const reviewingIds = [];
+  const BATCH_SIZE = 10;
+
+  for (let i = 0; i < toCheck.length; i += BATCH_SIZE) {
+    const batch = toCheck.slice(i, i + BATCH_SIZE);
+    const results = await page.evaluate(async (items) => {
+      const checks = items.map(async ({ url, id, startDate, endDate }) => {
+        try {
+          const resp = await fetch(url, { credentials: 'include' });
+          const html = await resp.text();
+          // Match assignments by date range to find the specific one we cached.
+          // A listing profile can have many assignments; we need the one whose
+          // dates match our cached entry.
+          const re = /"id":"\d+","startDate":"([^"]+)","endDate":"([^"]+)"[^}]*?"isReviewing":(true|false|null)[^}]*?"isConfirmed":(true|false|null)[^}]*?"canApply":(true|false|null)/g;
+          let m;
+          while ((m = re.exec(html)) !== null) {
+            if (m[1] === startDate && m[2] === endDate) {
+              const isReviewing = m[3] === 'true';
+              const isConfirmed = m[4] === 'true';
+              const canApply = m[5] === 'true';
+              if ((isReviewing || isConfirmed) && !canApply) {
+                return { id, reviewing: true };
+              }
+              return { id, reviewing: false };
+            }
+          }
+          // No matching assignment found — may have been removed
+          return { id, reviewing: false };
+        } catch {
+          return { id, reviewing: false };
+        }
+      });
+      return Promise.all(checks);
+    }, batch.map(l => ({ url: l.url, id: l.id, startDate: l.start_date, endDate: l.end_date })));
+
+    for (const { id, reviewing } of results) {
+      if (reviewing) {
+        const listing = batch.find(l => l.id === id);
+        console.error(`  "${listing?.title}" (${id}) is closed to new applicants`);
+        reviewingIds.push(id);
+      }
+    }
+
+    if (i + BATCH_SIZE < toCheck.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if ((i / BATCH_SIZE) % 20 === 19) {
+      console.error(`  ...checked ${i + BATCH_SIZE} of ${toCheck.length} listings`);
+    }
+  }
+
+  console.error(`Found ${reviewingIds.length} reviewing listings out of ${toCheck.length} checked`);
+  return reviewingIds;
+}
+
+/**
  * Main entry point
  */
 async function main() {
@@ -903,12 +1020,30 @@ async function main() {
       allListings = loadCache();
     } else {
       // Full scrape
-      const scrapedListings = await scrapeListings();
+      const { listings: scrapedListings, reviewingIds, page, browser } = await scrapeListings();
+      let expiredIds;
 
-      // Merge with cache
-      const cachedListings = loadCache();
-      const { listings: merged, expiredIds } = mergeListings(cachedListings, scrapedListings);
-      allListings = merged;
+      try {
+        // Merge with cache (removing expired and reviewing listings from search pages)
+        const cachedListings = loadCache();
+        ({ listings: allListings, expiredIds } = mergeListings(cachedListings, scrapedListings, reviewingIds));
+
+        // Check remaining cached listings for reviewing status
+        const scrapedIdSet = new Set([
+          ...reviewingIds,
+          ...scrapedListings.map(l => l.id)
+        ]);
+        const moreReviewingIds = await checkCachedListingStatus(page, allListings, scrapedIdSet);
+
+        // Remove newly-found reviewing listings and clean up their images
+        if (moreReviewingIds.length > 0) {
+          const reviewingSet = new Set(moreReviewingIds);
+          allListings = allListings.filter(l => !reviewingSet.has(l.id));
+          expiredIds.push(...moreReviewingIds);
+        }
+      } finally {
+        await browser.close();
+      }
 
       // Download images to vault for new listings
       for (const listing of allListings) {
@@ -920,8 +1055,11 @@ async function main() {
       // Save cache AFTER image download so image_local paths are persisted
       saveCache(allListings);
 
-      // Clean up images for expired listings
+      // Clean up images for expired and reviewing listings
       cleanupExpiredImages(expiredIds);
+
+      // Safety net: remove any orphaned images not in the cache
+      cleanupOrphanedImages(allListings);
     }
 
     // Apply filters
