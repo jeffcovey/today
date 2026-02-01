@@ -5,7 +5,7 @@ import session from 'express-session';
 import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
 import crypto from "crypto";
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import { marked } from 'marked';
@@ -283,6 +283,9 @@ function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
         <div class="container-fluid">
           <a class="navbar-brand" href="/">
             <i class="fas ${icon} me-2"></i>${title}
+          </a>
+          <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
+            <i class="fas fa-code-branch"></i>
           </a>${searchForm}
         </div>
       </nav>`;
@@ -4169,6 +4172,468 @@ app.post('/_cache/clear', sessionAuth, (req, res) => {
     success: true,
     message: `Cache cleared. Removed ${previousSize} entries.`
   });
+});
+
+// ── Git helpers ──────────────────────────────────────────────────────────────
+
+function safeVaultPath(filePath) {
+  const resolved = path.resolve(VAULT_PATH, filePath);
+  if (!resolved.startsWith(VAULT_PATH + path.sep) && resolved !== VAULT_PATH) {
+    return null;
+  }
+  return resolved;
+}
+
+function gitExec(args, options = {}) {
+  const timeout = options.timeout || 10000;
+  return execFileSync('git', args, {
+    cwd: VAULT_PATH,
+    encoding: 'utf8',
+    timeout,
+    maxBuffer: 10 * 1024 * 1024,
+    ...options,
+  });
+}
+
+// ── Git page & API routes ────────────────────────────────────────────────────
+
+app.get('/_git', authMiddleware, async (req, res) => {
+  try {
+    // Parse git status
+    const statusOutput = gitExec(['status', '--porcelain=v1']).trimEnd();
+    const staged = [];
+    const modified = [];
+    const untracked = [];
+
+    if (statusOutput) {
+      for (const line of statusOutput.split('\n')) {
+        const x = line[0]; // index status
+        const y = line[1]; // worktree status
+        const file = line.slice(3);
+        if (x === '?' && y === '?') {
+          untracked.push(file);
+        } else {
+          if (x !== ' ' && x !== '?') staged.push(file);
+          if (y !== ' ' && y !== '?') modified.push(file);
+        }
+      }
+    }
+
+    // Branch name
+    let branch = 'unknown';
+    try { branch = gitExec(['rev-parse', '--abbrev-ref', 'HEAD']).trim(); } catch {}
+
+    // Today's commits
+    const today = new Date().toISOString().slice(0, 10);
+    let todayCommits = [];
+    try {
+      const log = gitExec(['log', '--since=' + today + 'T00:00:00', '--format=%h|%s|%ar']);
+      if (log.trim()) {
+        todayCommits = log.trim().split('\n').map(l => {
+          const [hash, subject, rel] = l.split('|');
+          return { hash, subject, rel };
+        });
+      }
+    } catch {}
+
+    // Check if remote exists
+    let hasRemote = false;
+    try {
+      const remotes = gitExec(['remote']).trim();
+      hasRemote = remotes.length > 0;
+    } catch {}
+
+    // Ahead/behind
+    let ahead = 0;
+    try {
+      const count = gitExec(['rev-list', '--count', '@{u}..HEAD']).trim();
+      ahead = parseInt(count, 10) || 0;
+    } catch {}
+
+    const fileItem = (file, section) => `
+      <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center file-item"
+         data-file="${file.replace(/"/g, '&quot;')}" data-section="${section}"
+         onclick="loadDiff(this); return false;">
+        <span class="text-truncate me-2" style="font-size: 0.85rem;">${file}</span>
+      </a>`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Git Changes</title>
+  ${pageStyle}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+  <style>
+    .file-item.active { background-color: var(--mdb-primary); color: #fff !important; }
+    .file-item.active span { color: #fff !important; }
+    .diff-container { min-height: 200px; }
+    .commit-list { max-height: 300px; overflow-y: auto; }
+    .d2h-wrapper { font-size: 0.82rem; }
+    .action-bar { position: sticky; top: 0; z-index: 100; }
+  </style>
+</head>
+<body>
+  ${getNavbar('Git Changes', 'fa-code-branch', { showSearch: false })}
+  <div class="container-fluid mt-3 px-3">
+
+    <!-- Summary bar -->
+    <div class="card mb-3 action-bar">
+      <div class="card-body py-2 d-flex align-items-center flex-wrap gap-2">
+        <span class="badge bg-dark me-2"><i class="fas fa-code-branch me-1"></i>${branch}</span>
+        <span class="badge bg-success">${staged.length} staged</span>
+        <span class="badge bg-warning text-dark">${modified.length} modified</span>
+        <span class="badge bg-info text-dark">${untracked.length} untracked</span>
+        ${ahead > 0 ? `<span class="badge bg-primary">${ahead} ahead</span>` : ''}
+        <div class="ms-auto d-flex gap-2">
+          ${hasRemote ? `<button class="btn btn-sm btn-outline-primary" onclick="gitPush()" id="pushBtn">
+            <i class="fas fa-upload me-1"></i>Push${ahead > 0 ? ' (' + ahead + ')' : ''}
+          </button>` : ''}
+          <button class="btn btn-sm btn-outline-secondary" onclick="location.reload()">
+            <i class="fas fa-sync-alt me-1"></i>Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- Left column: file lists & commit -->
+      <div class="col-md-4 mb-3">
+        ${staged.length > 0 ? `
+        <div class="card mb-3">
+          <div class="card-header py-2 d-flex align-items-center justify-content-between">
+            <strong class="text-success"><i class="fas fa-check-circle me-1"></i>Staged (${staged.length})</strong>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unstageAll()">Unstage All</button>
+          </div>
+          <div class="list-group list-group-flush">
+            ${staged.map(f => fileItem(f, 'staged')).join('')}
+          </div>
+        </div>` : ''}
+
+        ${modified.length > 0 ? `
+        <div class="card mb-3">
+          <div class="card-header py-2 d-flex align-items-center justify-content-between">
+            <strong class="text-warning"><i class="fas fa-pencil-alt me-1"></i>Modified (${modified.length})</strong>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll()">Stage All</button>
+          </div>
+          <div class="list-group list-group-flush">
+            ${modified.map(f => fileItem(f, 'modified')).join('')}
+          </div>
+        </div>` : ''}
+
+        ${untracked.length > 0 ? `
+        <div class="card mb-3">
+          <div class="card-header py-2 d-flex align-items-center justify-content-between">
+            <strong class="text-info"><i class="fas fa-plus-circle me-1"></i>Untracked (${untracked.length})</strong>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll()">Stage All</button>
+          </div>
+          <div class="list-group list-group-flush">
+            ${untracked.map(f => fileItem(f, 'untracked')).join('')}
+          </div>
+        </div>` : ''}
+
+        ${staged.length === 0 && modified.length === 0 && untracked.length === 0 ? `
+        <div class="card mb-3">
+          <div class="card-body text-center text-muted py-4">
+            <i class="fas fa-check-double fa-2x mb-2"></i>
+            <p class="mb-0">Working tree clean</p>
+          </div>
+        </div>` : ''}
+
+        <!-- Commit form -->
+        <div class="card mb-3">
+          <div class="card-header py-2"><strong><i class="fas fa-save me-1"></i>Commit</strong></div>
+          <div class="card-body">
+            <textarea id="commitMsg" class="form-control mb-2" rows="3" placeholder="Commit message..."
+              ${staged.length === 0 ? 'disabled' : ''}></textarea>
+            <button class="btn btn-primary btn-sm w-100" id="commitBtn" onclick="gitCommit()"
+              ${staged.length === 0 ? 'disabled' : ''}>
+              <i class="fas fa-check me-1"></i>Commit
+            </button>
+          </div>
+        </div>
+
+        <!-- Today's commits -->
+        ${todayCommits.length > 0 ? `
+        <div class="card mb-3">
+          <div class="card-header py-2"><strong><i class="fas fa-history me-1"></i>Today's Commits (${todayCommits.length})</strong></div>
+          <div class="list-group list-group-flush commit-list">
+            ${todayCommits.map(c => `
+              <div class="list-group-item py-2">
+                <code class="me-2">${c.hash}</code>
+                <span style="font-size:0.85rem;">${c.subject}</span>
+                <small class="text-muted d-block">${c.rel}</small>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+
+      <!-- Right column: diff viewer -->
+      <div class="col-md-8 mb-3">
+        <div class="card">
+          <div class="card-header py-2 d-flex align-items-center justify-content-between" id="diffHeader">
+            <strong><i class="fas fa-file-code me-1"></i>Diff Viewer</strong>
+            <div id="diffActions"></div>
+          </div>
+          <div class="card-body p-0 diff-container" id="diffContent">
+            <div class="text-center text-muted py-5">
+              <i class="fas fa-hand-pointer fa-2x mb-2"></i>
+              <p>Select a file to view its diff</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  ${pageScripts}
+  <script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui-slim.min.js"></script>
+  <script>
+    let currentFile = null;
+    let currentSection = null;
+
+    async function loadDiff(el) {
+      document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+
+      const file = el.dataset.file;
+      const section = el.dataset.section;
+      currentFile = file;
+      currentSection = section;
+
+      const type = section === 'staged' ? 'staged' : (section === 'untracked' ? 'untracked' : 'unstaged');
+
+      try {
+        const resp = await fetch('/_git/diff?file=' + encodeURIComponent(file) + '&type=' + type);
+        const data = await resp.json();
+        if (!resp.ok) { document.getElementById('diffContent').innerHTML = '<div class="p-3 text-danger">' + (data.error || 'Error') + '</div>'; return; }
+
+        const diffEl = document.getElementById('diffContent');
+        diffEl.innerHTML = '';
+        if (data.diff) {
+          const config = {
+            drawFileList: false,
+            outputFormat: 'side-by-side',
+            highlight: true,
+            fileListToggle: false,
+          };
+          const ui = new Diff2HtmlUI(diffEl, data.diff, config);
+          ui.draw();
+          ui.highlightCode();
+        } else {
+          diffEl.innerHTML = '<div class="p-3 text-muted">No diff available (empty or binary file)</div>';
+        }
+
+        // Update action buttons
+        const actions = document.getElementById('diffActions');
+        let btns = '';
+        if (section === 'staged') {
+          btns = '<button class="btn btn-sm btn-outline-warning py-0 px-2 me-1" onclick="unstageFile()"><i class="fas fa-minus me-1"></i>Unstage</button>';
+        } else {
+          btns = '<button class="btn btn-sm btn-outline-success py-0 px-2 me-1" onclick="stageFile()"><i class="fas fa-plus me-1"></i>Stage</button>';
+          btns += '<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="discardFile()"><i class="fas fa-trash me-1"></i>Discard</button>';
+        }
+        actions.innerHTML = btns;
+      } catch (err) {
+        document.getElementById('diffContent').innerHTML = '<div class="p-3 text-danger">Failed to load diff: ' + err.message + '</div>';
+      }
+    }
+
+    async function postGit(url, body) {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return resp.json();
+    }
+
+    async function stageFile() {
+      if (!currentFile) return;
+      await postGit('/_git/stage', { files: [currentFile] });
+      location.reload();
+    }
+
+    async function unstageFile() {
+      if (!currentFile) return;
+      await postGit('/_git/unstage', { files: [currentFile] });
+      location.reload();
+    }
+
+    async function stageAll() {
+      await postGit('/_git/stage', { all: true });
+      location.reload();
+    }
+
+    async function unstageAll() {
+      await postGit('/_git/unstage', { all: true });
+      location.reload();
+    }
+
+    async function discardFile() {
+      if (!currentFile) return;
+      if (!confirm('Discard changes to ' + currentFile + '? This cannot be undone.')) return;
+      await postGit('/_git/discard', { file: currentFile });
+      location.reload();
+    }
+
+    async function gitCommit() {
+      const msg = document.getElementById('commitMsg').value.trim();
+      if (!msg) { alert('Please enter a commit message.'); return; }
+      const btn = document.getElementById('commitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Committing...';
+      try {
+        const data = await postGit('/_git/commit', { message: msg });
+        if (data.error) { alert(data.error); return; }
+        location.reload();
+      } catch (err) {
+        alert('Commit failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Commit';
+      }
+    }
+
+    async function gitPush() {
+      const btn = document.getElementById('pushBtn');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pushing...';
+      try {
+        const data = await postGit('/_git/push', {});
+        if (data.error) { alert(data.error); return; }
+        location.reload();
+      } catch (err) {
+        alert('Push failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-upload me-1"></i>Push';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+    res.send(html);
+  } catch (err) {
+    console.error('Error rendering git page:', err);
+    res.status(500).json({ error: 'Failed to load git status' });
+  }
+});
+
+app.get('/_git/diff', authMiddleware, (req, res) => {
+  try {
+    const file = req.query.file;
+    const type = req.query.type || 'unstaged';
+
+    if (!file) return res.status(400).json({ error: 'Missing file parameter' });
+    if (!safeVaultPath(file)) return res.status(400).json({ error: 'Invalid file path' });
+
+    let diff = '';
+    try {
+      if (type === 'staged') {
+        diff = gitExec(['diff', '--cached', '--', file]);
+      } else if (type === 'untracked') {
+        diff = gitExec(['diff', '--no-index', '/dev/null', file]);
+      } else {
+        diff = gitExec(['diff', '--', file]);
+      }
+    } catch (err) {
+      // git diff --no-index exits with code 1 when files differ; that's normal
+      if (err.stdout) diff = err.stdout;
+      else if (err.status === 1 && err.output) diff = err.output.filter(Boolean).join('');
+    }
+    res.json({ diff });
+  } catch (err) {
+    console.error('Error getting diff:', err);
+    res.status(500).json({ error: 'Failed to get diff' });
+  }
+});
+
+app.post('/_git/stage', authMiddleware, (req, res) => {
+  try {
+    if (req.body.all) {
+      gitExec(['add', '-A']);
+    } else {
+      const files = req.body.files;
+      if (!Array.isArray(files) || files.length === 0) return res.status(400).json({ error: 'No files specified' });
+      for (const f of files) {
+        if (!safeVaultPath(f)) return res.status(400).json({ error: 'Invalid file path: ' + f });
+      }
+      gitExec(['add', '--', ...files]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error staging files:', err);
+    res.status(500).json({ error: 'Failed to stage files' });
+  }
+});
+
+app.post('/_git/unstage', authMiddleware, (req, res) => {
+  try {
+    if (req.body.all) {
+      gitExec(['reset', 'HEAD']);
+    } else {
+      const files = req.body.files;
+      if (!Array.isArray(files) || files.length === 0) return res.status(400).json({ error: 'No files specified' });
+      for (const f of files) {
+        if (!safeVaultPath(f)) return res.status(400).json({ error: 'Invalid file path: ' + f });
+      }
+      gitExec(['reset', 'HEAD', '--', ...files]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error unstaging files:', err);
+    res.status(500).json({ error: 'Failed to unstage files' });
+  }
+});
+
+app.post('/_git/commit', authMiddleware, (req, res) => {
+  try {
+    const message = req.body.message;
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Commit message is required' });
+    }
+    gitExec(['commit', '-m', message.trim()]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error committing:', err);
+    res.status(500).json({ error: err.stderr || 'Failed to commit' });
+  }
+});
+
+app.post('/_git/push', authMiddleware, (req, res) => {
+  try {
+    gitExec(['push'], { timeout: 30000 });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error pushing:', err);
+    res.status(500).json({ error: err.stderr || 'Failed to push' });
+  }
+});
+
+app.post('/_git/discard', authMiddleware, async (req, res) => {
+  try {
+    const file = req.body.file;
+    if (!file || typeof file !== 'string') return res.status(400).json({ error: 'Missing file parameter' });
+    const resolved = safeVaultPath(file);
+    if (!resolved) return res.status(400).json({ error: 'Invalid file path' });
+
+    // Check if file is tracked
+    try {
+      gitExec(['ls-files', '--error-unmatch', '--', file]);
+      // Tracked file: checkout to discard changes
+      gitExec(['checkout', '--', file]);
+    } catch {
+      // Untracked file: delete it
+      await fs.unlink(resolved);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error discarding file:', err);
+    res.status(500).json({ error: 'Failed to discard changes' });
+  }
 });
 
 // File edit endpoint for AI
