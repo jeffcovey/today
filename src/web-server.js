@@ -4283,7 +4283,13 @@ app.get('/_git', authMiddleware, async (req, res) => {
             <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="${action}(JSON.parse(this.dataset.files))" data-files="${escaped}">${action === 'stageAll' ? 'Stage' : 'Unstage'}</button>
           </div>`;
         }
-        html += dirFiles.map(f => fileItem(f, section)).join('');
+        if (dir && dirFiles.length > 1) {
+          html += `<div style="border-left: 3px solid var(--bs-secondary-bg, #ccc); margin-left: 0;">`;
+          html += dirFiles.map(f => fileItem(f, section)).join('');
+          html += `</div>`;
+        } else {
+          html += dirFiles.map(f => fileItem(f, section)).join('');
+        }
       }
       return html;
     };
