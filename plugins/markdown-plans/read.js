@@ -62,7 +62,17 @@ function getPlanFilePaths(date = new Date()) {
   const week = getISOWeek(date);
   const quarter = getQuarter(month);
 
+  // For weekly paths, use the Monday of the ISO week to determine the month,
+  // so that weeks spanning a month boundary always resolve to the same file.
+  const monday = new Date(date);
+  const dayOfWeek = monday.getDay() || 7; // Convert Sunday=0 to 7
+  monday.setDate(monday.getDate() - (dayOfWeek - 1));
+  const weekMonth = monday.getMonth() + 1;
+  const weekYear = monday.getFullYear();
+  const weekQuarter = getQuarter(weekMonth);
+
   const mm = String(month).padStart(2, '0');
+  const wmm = String(weekMonth).padStart(2, '0');
   const ww = String(week).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
 
@@ -83,7 +93,7 @@ function getPlanFilePaths(date = new Date()) {
       type: 'month',
     },
     week: {
-      path: path.join(plansDir, `${year}_Q${quarter}_${mm}_W${ww}_00.md`),
+      path: path.join(plansDir, `${weekYear}_Q${weekQuarter}_${wmm}_W${ww}_00.md`),
       label: `Week ${week} Plan`,
       type: 'week',
     },
