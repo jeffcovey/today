@@ -389,31 +389,111 @@ function processRoutine(filePath, today) {
     status = 'partial';
   }
 
+  // For non-daily routines where the current period was already completed
+  // (tasks have been reset for next period), reflect the period's completion
+  // status in the today entry so it shows correctly in current-period plans.
+  let todayValue = currentCompleted;
+  let todayTotal = currentTotal;
+  let todayStatus = status;
+  if (!periodStartsToday) {
+    const currentPeriodHistory = newHistory.find(h => h.date === currentPeriodStr);
+    if (currentPeriodHistory) {
+      todayValue = currentPeriodHistory.completed;
+      todayTotal = currentPeriodHistory.total;
+      if (todayValue === todayTotal) {
+        todayStatus = 'completed';
+      } else if (todayValue > 0) {
+        todayStatus = 'partial';
+      } else {
+        todayStatus = 'pending';
+      }
+    }
+  }
+
   // Calculate streak
   const streak = calculateStreak(newHistory, todayStr);
 
-  // Build entry for habits table
+  // Build entry for habits table (today)
   const entry = {
     id: `markdown-routines/${routineId}:${todayStr}`,
     habit_id: routineId,
     title: name,
     date: todayStr,
-    status: status,
+    status: todayStatus,
     goal_type: 'achieve',
-    value: currentCompleted,
+    value: todayValue,
     category: 'routine',
     metadata: JSON.stringify({
       target_type: 'steps',
-      target_value: currentTotal,
+      target_value: todayTotal,
       current_streak: streak,
       estimated_minutes: estimatedMinutes,
-      completion_pct: Math.round((currentCompleted / currentTotal) * 100),
+      completion_pct: Math.round((todayValue / todayTotal) * 100),
       recurrence: recurrence
     })
   };
 
+  // Build historical entries from history array.
+  // For multi-week periods (monthly, quarterly, yearly), emit an entry for
+  // each Monday within the period so the completion shows up in every weekly
+  // plan that falls inside that period.
+  const historyEntries = [];
+  const emittedDates = new Set([todayStr]); // track to avoid duplicates
+
+  for (const h of newHistory.slice(0, historyLimit)) {
+    let hStatus = 'pending';
+    if (h.completed === h.total) {
+      hStatus = 'completed';
+    } else if (h.completed > 0) {
+      hStatus = 'partial';
+    }
+    const hMeta = JSON.stringify({
+      target_value: h.total,
+      completion_pct: h.total > 0 ? Math.round((h.completed / h.total) * 100) : 0,
+      recurrence: recurrence
+    });
+
+    // Determine which dates to emit for this history entry
+    const periodStart = new TZDate(h.date + 'T00:00:00', configuredTimezone);
+    const nextPeriod = getNextPeriodStart(parsed, periodStart);
+    const periodDays = Math.round((nextPeriod - periodStart) / (1000 * 60 * 60 * 24));
+
+    const dates = [h.date]; // always include the period start date
+
+    if (periodDays > 7) {
+      // Multi-week period: also emit at each Monday within the period
+      let d = new TZDate(periodStart.getFullYear(), periodStart.getMonth(),
+        periodStart.getDate(), configuredTimezone);
+      // Advance to first Monday after period start
+      const dow = d.getDay(); // 0=Sun
+      const daysToMon = dow === 0 ? 1 : dow === 1 ? 7 : (8 - dow);
+      d = new TZDate(d.getFullYear(), d.getMonth(), d.getDate() + daysToMon, configuredTimezone);
+      while (d < nextPeriod) {
+        dates.push(formatDate(d));
+        d = new TZDate(d.getFullYear(), d.getMonth(), d.getDate() + 7, configuredTimezone);
+      }
+    }
+
+    for (const dateStr of dates) {
+      if (emittedDates.has(dateStr)) continue;
+      emittedDates.add(dateStr);
+      historyEntries.push({
+        id: `markdown-routines/${routineId}:${dateStr}`,
+        habit_id: routineId,
+        title: name,
+        date: dateStr,
+        status: hStatus,
+        goal_type: 'achieve',
+        value: h.completed,
+        category: 'routine',
+        metadata: hMeta
+      });
+    }
+  }
+
   return {
     entry,
+    historyEntries,
     modified,
     history: newHistory
   };
@@ -476,6 +556,9 @@ for (const file of files) {
 
     if (result.entry) {
       entries.push(result.entry);
+      if (result.historyEntries) {
+        entries.push(...result.historyEntries);
+      }
       processed.push({
         routine: path.basename(file, '.md'),
         modified: result.modified,
