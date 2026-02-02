@@ -4264,6 +4264,30 @@ app.get('/_git', authMiddleware, async (req, res) => {
         <span class="text-truncate me-2" style="font-size: 0.85rem;">${file}</span>
       </a>`;
 
+    // Group files by directory prefix; returns HTML with directory headers for dirs with 2+ files
+    const fileListWithDirHeaders = (files, section, action) => {
+      const byDir = {};
+      for (const f of files) {
+        const slash = f.lastIndexOf('/');
+        const dir = slash >= 0 ? f.slice(0, slash + 1) : '';
+        if (!byDir[dir]) byDir[dir] = [];
+        byDir[dir].push(f);
+      }
+      let html = '';
+      for (const dir of Object.keys(byDir)) {
+        const dirFiles = byDir[dir];
+        if (dir && dirFiles.length > 1) {
+          const escaped = JSON.stringify(dirFiles).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+          html += `<div class="list-group-item d-flex justify-content-between align-items-center py-1" style="background: var(--bs-tertiary-bg, #f0f0f0);">
+            <span style="font-size:0.8rem; font-weight:600; opacity:0.7;">${dir}</span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="${action}(JSON.parse(this.dataset.files))" data-files="${escaped}">${action === 'stageAll' ? 'Stage' : 'Unstage'}</button>
+          </div>`;
+        }
+        html += dirFiles.map(f => fileItem(f, section)).join('');
+      }
+      return html;
+    };
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -4316,7 +4340,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
             <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unstageAll(stagedFiles)">Unstage All</button>
           </div>
           <div class="list-group list-group-flush">
-            ${staged.map(f => fileItem(f, 'staged')).join('')}
+            ${fileListWithDirHeaders(staged, 'staged', 'unstageAll')}
           </div>
         </div>` : ''}
 
@@ -4327,7 +4351,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
             <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll(modifiedFiles)">Stage All</button>
           </div>
           <div class="list-group list-group-flush">
-            ${modified.map(f => fileItem(f, 'modified')).join('')}
+            ${fileListWithDirHeaders(modified, 'modified', 'stageAll')}
           </div>
         </div>` : ''}
 
@@ -4338,7 +4362,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
             <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll(untrackedFiles)">Stage All</button>
           </div>
           <div class="list-group list-group-flush">
-            ${untracked.map(f => fileItem(f, 'untracked')).join('')}
+            ${fileListWithDirHeaders(untracked, 'untracked', 'stageAll')}
           </div>
         </div>` : ''}
 
@@ -4541,7 +4565,11 @@ app.get('/_git', authMiddleware, async (req, res) => {
       try {
         const data = await postGit('/_git/pull', {});
         if (data.error) { alert(data.error); return; }
-        if (data.stashed) { alert('Pull succeeded (local changes were stashed and re-applied).'); }
+        if (data.conflicts && data.conflicts.length > 0) {
+          alert('Pull succeeded but merge conflicts need manual resolution in:\\n\\n' + data.conflicts.join('\\n'));
+        } else if (data.stashed) {
+          alert('Pull succeeded (local changes were stashed and re-applied).');
+        }
         location.reload();
       } catch (err) {
         alert('Pull failed: ' + err.message);
@@ -4675,8 +4703,23 @@ app.post('/_git/pull', authMiddleware, (req, res) => {
         console.error('Error pulling (after stash):', retryErr);
         return res.status(500).json({ error: retryErr.stderr || 'Pull failed even after stashing changes' });
       }
-      try { gitExec(['stash', 'pop']); } catch {}
-      res.json({ ok: true, stashed: true });
+      let conflicts = [];
+      try {
+        gitExec(['stash', 'pop']);
+      } catch {
+        // stash pop may produce merge conflicts — report them to the user
+        try {
+          const conflicted = gitExec(['diff', '--name-only', '--diff-filter=U']).trim();
+          if (conflicted) {
+            conflicts = conflicted.split('\n');
+          }
+        } catch {}
+      }
+      if (conflicts.length > 0) {
+        res.json({ ok: true, stashed: true, conflicts });
+      } else {
+        res.json({ ok: true, stashed: true });
+      }
     } catch (stashErr) {
       console.error('Error pulling:', pullErr);
       res.status(500).json({ error: pullErr.stderr || 'Failed to pull' });
