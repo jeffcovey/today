@@ -4246,9 +4246,15 @@ app.get('/_git', authMiddleware, async (req, res) => {
 
     // Ahead/behind
     let ahead = 0;
+    let behind = 0;
     try {
       const count = gitExec(['rev-list', '--count', '@{u}..HEAD']).trim();
       ahead = parseInt(count, 10) || 0;
+    } catch {}
+    try {
+      gitExec(['fetch'], { timeout: 15000 });
+      const count = gitExec(['rev-list', '--count', 'HEAD..@{u}']).trim();
+      behind = parseInt(count, 10) || 0;
     } catch {}
 
     const fileItem = (file, section) => `
@@ -4285,7 +4291,11 @@ app.get('/_git', authMiddleware, async (req, res) => {
         <span class="badge bg-warning text-dark">${modified.length} modified</span>
         <span class="badge bg-info text-dark">${untracked.length} untracked</span>
         ${ahead > 0 ? `<span class="badge bg-primary">${ahead} ahead</span>` : ''}
+        ${behind > 0 ? `<span class="badge bg-secondary">${behind} behind</span>` : ''}
         <div class="ms-auto d-flex gap-2">
+          ${hasRemote ? `<button class="btn btn-sm btn-outline-success" onclick="gitPull()" id="pullBtn">
+            <i class="fas fa-download me-1"></i>Pull${behind > 0 ? ' (' + behind + ')' : ''}
+          </button>` : ''}
           ${hasRemote ? `<button class="btn btn-sm btn-outline-primary" onclick="gitPush()" id="pushBtn">
             <i class="fas fa-upload me-1"></i>Push${ahead > 0 ? ' (' + ahead + ')' : ''}
           </button>` : ''}
@@ -4520,6 +4530,24 @@ app.get('/_git', authMiddleware, async (req, res) => {
       }
     }
 
+    async function gitPull() {
+      const btn = document.getElementById('pullBtn');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pulling...';
+      try {
+        const data = await postGit('/_git/pull', {});
+        if (data.error) { alert(data.error); return; }
+        if (data.stashed) { alert('Pull succeeded (local changes were stashed and re-applied).'); }
+        location.reload();
+      } catch (err) {
+        alert('Pull failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download me-1"></i>Pull';
+      }
+    }
+
     async function gitPush() {
       const btn = document.getElementById('pushBtn');
       if (!btn) return;
@@ -4625,6 +4653,31 @@ app.post('/_git/commit', authMiddleware, (req, res) => {
   } catch (err) {
     console.error('Error committing:', err);
     res.status(500).json({ error: err.stderr || 'Failed to commit' });
+  }
+});
+
+app.post('/_git/pull', authMiddleware, (req, res) => {
+  try {
+    gitExec(['pull'], { timeout: 30000 });
+    res.json({ ok: true });
+  } catch (pullErr) {
+    // Pull failed — try stash, pull, stash pop
+    try {
+      gitExec(['stash', '--include-untracked'], { timeout: 10000 });
+      try {
+        gitExec(['pull'], { timeout: 30000 });
+      } catch (retryErr) {
+        // Pull still failed after stash — restore stash and report error
+        try { gitExec(['stash', 'pop']); } catch {}
+        console.error('Error pulling (after stash):', retryErr);
+        return res.status(500).json({ error: retryErr.stderr || 'Pull failed even after stashing changes' });
+      }
+      try { gitExec(['stash', 'pop']); } catch {}
+      res.json({ ok: true, stashed: true });
+    } catch (stashErr) {
+      console.error('Error pulling:', pullErr);
+      res.status(500).json({ error: pullErr.stderr || 'Failed to pull' });
+    }
   }
 });
 
