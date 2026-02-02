@@ -19,6 +19,7 @@ import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { isPluginConfigured } from './plugin-loader.js';
+import { createCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import {
@@ -4345,10 +4346,16 @@ app.get('/_git', authMiddleware, async (req, res) => {
           <div class="card-body">
             <textarea id="commitMsg" class="form-control mb-2" rows="3" placeholder="Commit message..."
               ${staged.length === 0 ? 'disabled' : ''}></textarea>
-            <button class="btn btn-primary btn-sm w-100" id="commitBtn" onclick="gitCommit()"
-              ${staged.length === 0 ? 'disabled' : ''}>
-              <i class="fas fa-check me-1"></i>Commit
-            </button>
+            <div class="d-flex gap-2 mb-0">
+              <button class="btn btn-outline-secondary btn-sm" id="aiMsgBtn" onclick="generateCommitMsg()"
+                ${staged.length === 0 ? 'disabled' : ''}>
+                <i class="fas fa-wand-magic-sparkles me-1"></i>AI Message
+              </button>
+              <button class="btn btn-primary btn-sm flex-grow-1" id="commitBtn" onclick="gitCommit()"
+                ${staged.length === 0 ? 'disabled' : ''}>
+                <i class="fas fa-check me-1"></i>Commit
+              </button>
+            </div>
           </div>
         </div>
 
@@ -4475,6 +4482,24 @@ app.get('/_git', authMiddleware, async (req, res) => {
       if (!confirm('Discard changes to ' + currentFile + '? This cannot be undone.')) return;
       await postGit('/_git/discard', { file: currentFile });
       location.reload();
+    }
+
+    async function generateCommitMsg() {
+      const btn = document.getElementById('aiMsgBtn');
+      btn.disabled = true;
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
+      try {
+        const resp = await fetch('/_git/ai-commit-message', { method: 'POST' });
+        const data = await resp.json();
+        if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
+        document.getElementById('commitMsg').value = data.message;
+      } catch (err) {
+        alert('Failed to generate commit message: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
     }
 
     async function gitCommit() {
@@ -4610,6 +4635,44 @@ app.post('/_git/push', authMiddleware, (req, res) => {
   } catch (err) {
     console.error('Error pushing:', err);
     res.status(500).json({ error: err.stderr || 'Failed to push' });
+  }
+});
+
+app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
+  try {
+    const available = await isAIAvailable();
+    if (!available) {
+      return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
+    }
+
+    let diff = '';
+    try {
+      diff = gitExec(['diff', '--cached']);
+    } catch (err) {
+      diff = '';
+    }
+
+    if (!diff.trim()) {
+      return res.status(400).json({ error: 'No staged changes to generate a message for.' });
+    }
+
+    // Truncate very large diffs to avoid exceeding context limits
+    const maxDiffLength = 15000;
+    if (diff.length > maxDiffLength) {
+      diff = diff.slice(0, maxDiffLength) + '\n\n[... diff truncated ...]';
+    }
+
+    const message = await createCompletion({
+      system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
+      messages: [{ role: 'user', content: diff }],
+      maxTokens: 100,
+      temperature: 0,
+    });
+
+    res.json({ message: message.trim() });
+  } catch (err) {
+    console.error('Error generating AI commit message:', err);
+    res.status(500).json({ error: 'Failed to generate commit message: ' + (err.message || 'Unknown error') });
   }
 });
 
@@ -5542,6 +5605,9 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     }
 
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+
+    // Clear the task query cache so the next page load reflects the change
+    taskQueryCache.clear();
 
     // Update the database to keep it in sync with the file
     try {
