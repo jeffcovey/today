@@ -4313,7 +4313,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
         <div class="card mb-3">
           <div class="card-header py-2 d-flex align-items-center justify-content-between">
             <strong class="text-success"><i class="fas fa-check-circle me-1"></i>Staged (${staged.length})</strong>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unstageAll()">Unstage All</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="unstageAll(stagedFiles)">Unstage All</button>
           </div>
           <div class="list-group list-group-flush">
             ${staged.map(f => fileItem(f, 'staged')).join('')}
@@ -4324,7 +4324,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
         <div class="card mb-3">
           <div class="card-header py-2 d-flex align-items-center justify-content-between">
             <strong class="text-warning"><i class="fas fa-pencil-alt me-1"></i>Modified (${modified.length})</strong>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll()">Stage All</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll(modifiedFiles)">Stage All</button>
           </div>
           <div class="list-group list-group-flush">
             ${modified.map(f => fileItem(f, 'modified')).join('')}
@@ -4335,7 +4335,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
         <div class="card mb-3">
           <div class="card-header py-2 d-flex align-items-center justify-content-between">
             <strong class="text-info"><i class="fas fa-plus-circle me-1"></i>Untracked (${untracked.length})</strong>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll()">Stage All</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="stageAll(untrackedFiles)">Stage All</button>
           </div>
           <div class="list-group list-group-flush">
             ${untracked.map(f => fileItem(f, 'untracked')).join('')}
@@ -4408,6 +4408,9 @@ app.get('/_git', authMiddleware, async (req, res) => {
   <script>
     let currentFile = null;
     let currentSection = null;
+    const stagedFiles = ${JSON.stringify(staged)};
+    const modifiedFiles = ${JSON.stringify(modified)};
+    const untrackedFiles = ${JSON.stringify(untracked)};
 
     async function loadDiff(el) {
       document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
@@ -4477,13 +4480,13 @@ app.get('/_git', authMiddleware, async (req, res) => {
       location.reload();
     }
 
-    async function stageAll() {
-      await postGit('/_git/stage', { all: true });
+    async function stageAll(files) {
+      await postGit('/_git/stage', { files });
       location.reload();
     }
 
-    async function unstageAll() {
-      await postGit('/_git/unstage', { all: true });
+    async function unstageAll(files) {
+      await postGit('/_git/unstage', { files });
       location.reload();
     }
 
