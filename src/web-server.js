@@ -4210,7 +4210,11 @@ app.get('/_git', authMiddleware, async (req, res) => {
       for (const line of statusOutput.split('\n')) {
         const x = line[0]; // index status
         const y = line[1]; // worktree status
-        const file = line.slice(3);
+        let file = line.slice(3);
+        // git status quotes filenames with spaces/special chars — unquote them
+        if (file.startsWith('"') && file.endsWith('"')) {
+          file = file.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\t/g, '\t').replace(/\\n/g, '\n');
+        }
         if (x === '?' && y === '?') {
           untracked.push(file);
         } else {
@@ -4571,8 +4575,8 @@ app.get('/_git', authMiddleware, async (req, res) => {
       try {
         const data = await postGit('/_git/pull', {});
         if (data.error) { alert(data.error); return; }
-        if (data.conflicts && data.conflicts.length > 0) {
-          alert('Pull succeeded but merge conflicts need manual resolution in:\\n\\n' + data.conflicts.join('\\n'));
+        if (data.resolved && data.resolved.length > 0) {
+          alert('Pull succeeded. Conflicts in ' + data.resolved.length + ' file(s) were auto-resolved (union merge):\\n\\n' + data.resolved.join('\\n'));
         } else if (data.stashed) {
           alert('Pull succeeded (local changes were stashed and re-applied).');
         }
@@ -4709,23 +4713,41 @@ app.post('/_git/pull', authMiddleware, (req, res) => {
         console.error('Error pulling (after stash):', retryErr);
         return res.status(500).json({ error: retryErr.stderr || 'Pull failed even after stashing changes' });
       }
-      let conflicts = [];
+      let resolved = [];
       try {
         gitExec(['stash', 'pop']);
       } catch {
-        // stash pop may produce merge conflicts — report them to the user
+        // stash pop produced merge conflicts — auto-resolve with union merge
         try {
           const conflicted = gitExec(['diff', '--name-only', '--diff-filter=U']).trim();
           if (conflicted) {
-            conflicts = conflicted.split('\n');
+            const files = conflicted.split('\n');
+            const tmpDir = fsSync.mkdtempSync(path.join(require('os').tmpdir(), 'git-union-'));
+            for (const file of files) {
+              try {
+                // Extract the three merge stages from the index:
+                // stage 1 = base, stage 2 = ours (pulled), stage 3 = theirs (stashed)
+                const base = path.join(tmpDir, 'base');
+                const ours = path.join(tmpDir, 'ours');
+                const theirs = path.join(tmpDir, 'theirs');
+                try { fsSync.writeFileSync(base, gitExec(['show', ':1:' + file])); }
+                catch { fsSync.writeFileSync(base, ''); } // no base = new file on one side
+                fsSync.writeFileSync(ours, gitExec(['show', ':2:' + file]));
+                fsSync.writeFileSync(theirs, gitExec(['show', ':3:' + file]));
+                // merge-file writes result into the first file; --union keeps both sides
+                try { execFileSync('git', ['merge-file', '--union', ours, base, theirs], { cwd: VAULT_PATH, encoding: 'utf8' }); } catch {}
+                fsSync.copyFileSync(ours, path.join(VAULT_PATH, file));
+                gitExec(['add', '--', file]);
+                resolved.push(file);
+              } catch (e) {
+                console.error('Union merge failed for ' + file + ':', e.message);
+              }
+            }
+            try { fsSync.rmSync(tmpDir, { recursive: true }); } catch {}
           }
         } catch {}
       }
-      if (conflicts.length > 0) {
-        res.json({ ok: true, stashed: true, conflicts });
-      } else {
-        res.json({ ok: true, stashed: true });
-      }
+      res.json({ ok: true, stashed: true, resolved });
     } catch (stashErr) {
       console.error('Error pulling:', pullErr);
       res.status(500).json({ error: pullErr.stderr || 'Failed to pull' });
