@@ -144,6 +144,15 @@ export function buildMessages(systemContext, history, userMessage) {
     content: userMessage,
   });
 
+  // Merge consecutive same-role messages (can happen when AI stream fails
+  // and only the user message gets saved, creating consecutive user entries)
+  for (let i = messages.length - 2; i >= 0; i--) {
+    if (messages[i].role === messages[i + 1].role) {
+      messages[i].content += '\n\n' + messages[i + 1].content;
+      messages.splice(i + 1, 1);
+    }
+  }
+
   return {
     system: systemContext,
     messages,

@@ -2480,6 +2480,228 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
   return processedContent;
 }
 
+// Process Dataview DQL (query language) code blocks in markdown content
+// Supports a subset of Obsidian Dataview query language
+async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, properties) {
+  const codeBlockRegex = /```dataview\n([\s\S]*?)```/g;
+  let processedContent = content;
+  const matches = [];
+  let match;
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      code: match[1].trim(),
+      index: match.index
+    });
+  }
+
+  const currentProperties = properties || {};
+
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { fullMatch, code } = matches[i];
+
+    try {
+      const html = await executeDQLQuery(code, vaultPath, currentFilePath, currentProperties);
+      processedContent = processedContent.replace(fullMatch, html);
+    } catch (error) {
+      debug('Error executing dataview DQL block:', error);
+      const errorHtml = `<div class="alert alert-danger" role="alert">
+        <strong>Dataview DQL Error:</strong> ${error.message}
+      </div>`;
+      processedContent = processedContent.replace(fullMatch, errorHtml);
+    }
+  }
+
+  return processedContent;
+}
+
+// Execute a Dataview DQL query and return HTML
+async function executeDQLQuery(query, vaultPath, currentFilePath, properties) {
+  const lines = query.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return '';
+
+  debug('DQL query lines:', lines);
+  const firstLine = lines[0].toUpperCase();
+
+  // Pattern 1: LIST WITHOUT ID item / FLATTEN this.<prop> AS item / WHERE file = this.file
+  // This renders a frontmatter array property as a bullet list
+  if (firstLine.startsWith('LIST')) {
+    return executeDQLList(lines, vaultPath, currentFilePath, properties);
+  }
+
+  // Pattern 2: TABLE queries
+  if (firstLine.startsWith('TABLE')) {
+    return executeDQLTable(lines, vaultPath, currentFilePath, properties);
+  }
+
+  // Unsupported query type - show as code block
+  return `<div class="alert alert-info"><small>Unsupported Dataview query</small></div>`;
+}
+
+// Execute a DQL LIST query
+async function executeDQLList(lines, vaultPath, currentFilePath, properties) {
+  const joinedQuery = lines.join(' ');
+
+  // Check for: LIST WITHOUT ID item / FLATTEN this.<prop> AS item / WHERE file = this.file
+  const flattenMatch = joinedQuery.match(/FLATTEN\s+this\.(\w+)\s+AS\s+(\w+)/i);
+  if (flattenMatch && joinedQuery.match(/WHERE\s+file\s*=\s*this\.file/i)) {
+    const propName = flattenMatch[1];
+    const items = properties[propName];
+
+    if (!items || !Array.isArray(items)) {
+      return `<p class="text-muted"><em>No items in ${propName}</em></p>`;
+    }
+
+    let html = '<ul>\n';
+    for (const item of items) {
+      html += `<li>${String(item)}</li>\n`;
+    }
+    html += '</ul>\n';
+    return html;
+  }
+
+  // Check for: LIST FROM "folder" WHERE ...
+  const fromMatch = joinedQuery.match(/FROM\s+"([^"]+)"/i);
+  if (fromMatch) {
+    const folder = fromMatch[1];
+    const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
+
+    // Apply WHERE clause if present
+    const whereMatch = joinedQuery.match(/WHERE\s+(.+?)(?:SORT|LIMIT|$)/i);
+    if (whereMatch) {
+      const whereClause = whereMatch[1].trim();
+      // Handle: contains(this.related_projects, file.name)
+      const containsMatch = whereClause.match(/contains\s*\(\s*this\.(\w+)\s*,\s*file\.name\s*\)/i);
+      if (containsMatch && properties) {
+        const prop = properties[containsMatch[1]];
+        if (Array.isArray(prop)) {
+          filtered = filtered.filter(f => prop.includes(f.name));
+        } else {
+          filtered = [];
+        }
+      }
+    }
+
+    // Apply LIMIT
+    const limitMatch = joinedQuery.match(/LIMIT\s+(\d+)/i);
+    if (limitMatch) {
+      filtered = filtered.slice(0, parseInt(limitMatch[1]));
+    }
+
+    if (filtered.length === 0) {
+      return `<p class="text-muted"><em>No results</em></p>`;
+    }
+
+    let html = '<ul>\n';
+    for (const file of filtered) {
+      html += `<li><a href="/${file.path}">${file.name}</a></li>\n`;
+    }
+    html += '</ul>\n';
+    return html;
+  }
+
+  return `<div class="alert alert-info"><small>Unsupported LIST query</small></div>`;
+}
+
+// Execute a DQL TABLE query
+async function executeDQLTable(lines, vaultPath, currentFilePath, properties) {
+  const joinedQuery = lines.join(' ');
+
+  // Parse FROM clause
+  const fromMatch = joinedQuery.match(/FROM\s+"([^"]+)"/i);
+  if (!fromMatch) {
+    return `<div class="alert alert-info"><small>TABLE query requires FROM clause</small></div>`;
+  }
+
+  const folder = fromMatch[1];
+  const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+  let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
+
+  // Parse SORT clause
+  const sortMatch = joinedQuery.match(/SORT\s+file\.(\w+)\s+(ASC|DESC)?/i);
+  if (sortMatch) {
+    const sortField = sortMatch[1];
+    const sortDir = (sortMatch[2] || 'ASC').toUpperCase();
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+      if (sortField === 'mtime') {
+        // We don't have mtime in the data, sort by name as fallback
+        aVal = a.name;
+        bVal = b.name;
+      } else {
+        aVal = a.file[sortField] || a[sortField] || '';
+        bVal = b.file[sortField] || b[sortField] || '';
+      }
+      const cmp = String(aVal).localeCompare(String(bVal));
+      return sortDir === 'DESC' ? -cmp : cmp;
+    });
+  }
+
+  // Parse LIMIT clause
+  const limitMatch = joinedQuery.match(/LIMIT\s+(\d+)/i);
+  if (limitMatch) {
+    filtered = filtered.slice(0, parseInt(limitMatch[1]));
+  }
+
+  if (filtered.length === 0) {
+    return `<p class="text-muted"><em>No results</em></p>`;
+  }
+
+  // Parse column definitions from TABLE WITHOUT ID ... FROM
+  const colSection = joinedQuery.match(/TABLE\s+(?:WITHOUT\s+ID\s+)?([\s\S]+?)\s+FROM/i);
+  const withoutId = /TABLE\s+WITHOUT\s+ID/i.test(joinedQuery);
+
+  // Default columns: just file link
+  let html = '<table class="table table-striped table-hover table-sm">\n<thead><tr>';
+
+  if (!withoutId) {
+    html += '<th>File</th>';
+  }
+
+  // Parse column expressions
+  let columns = [];
+  if (colSection) {
+    const colStr = colSection[1];
+    columns = colStr.split(',').map(c => {
+      const asMatch = c.trim().match(/(.+?)\s+as\s+"([^"]+)"/i);
+      if (asMatch) {
+        return { expr: asMatch[1].trim(), label: asMatch[2] };
+      }
+      return { expr: c.trim(), label: c.trim() };
+    });
+
+    for (const col of columns) {
+      html += `<th>${col.label}</th>`;
+    }
+  }
+
+  html += '</tr></thead>\n<tbody>\n';
+
+  for (const file of filtered) {
+    html += '<tr>';
+    if (!withoutId) {
+      html += `<td><a href="/${file.path}">${file.name}</a></td>`;
+    }
+    for (const col of columns) {
+      let value = '';
+      if (col.expr === 'file.link') {
+        value = `<a href="/${file.path}">${file.name}</a>`;
+      } else if (col.expr.startsWith('file.')) {
+        value = file.file[col.expr.replace('file.', '')] || '';
+      } else {
+        value = String(col.expr);
+      }
+      html += `<td>${value}</td>`;
+    }
+    html += '</tr>\n';
+  }
+
+  html += '</tbody></table>\n';
+  return html;
+}
+
 // Process inline dataview expressions ($= syntax and =this.property syntax)
 async function processInlineDataview(content, properties, vaultPath, currentFilePath) {
   // First, handle simple =this.property syntax (Obsidian Dataview style)
@@ -2950,8 +3172,9 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // breaking HTML when tasks blocks are inside list items. See post-rendering
   // processing below for <pre><code class="language-tasks"> blocks.
 
-  // Process dataviewjs code blocks before rendering
+  // Process dataview code blocks before rendering
   const vaultPath = path.join(process.cwd(), 'vault');
+  content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties);
   content = await processDataviewJSBlocks(content, vaultPath, filePath);
 
   // Process inline dataview expressions
@@ -3888,9 +4111,11 @@ ${cleanContent}
                         refreshContentArea();
                       }
                     } else if (data.type === 'error') {
-                      throw new Error(data.message);
+                      // Re-throw outside the JSON parse try/catch
+                      throw Object.assign(new Error(data.message), { isStreamError: true });
                     }
                   } catch (error) {
+                    if (error.isStreamError) throw error;
                     console.error('Error parsing SSE data:', error);
                   }
                 }
