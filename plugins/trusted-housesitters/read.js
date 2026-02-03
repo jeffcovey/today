@@ -277,6 +277,16 @@ async function downloadImage(url, listingId) {
     }, (response) => {
       if (response.statusCode === 200) {
         const file = fs.createWriteStream(localPath);
+        file.on('error', (err) => {
+          console.error(`Error writing image ${listingId}: ${err.message}`);
+          file.close();
+          resolve(null);
+        });
+        response.on('error', (err) => {
+          console.error(`Error downloading image ${listingId}: ${err.message}`);
+          file.close();
+          resolve(null);
+        });
         response.pipe(file);
         file.on('finish', () => {
           file.close();
@@ -1057,10 +1067,19 @@ async function main() {
       }
 
       // Download images to vault for new listings (or re-download if file was cleaned up)
+      let imageDownloadErrors = 0;
       for (const listing of allListings) {
         if (listing.image_url && (!listing.image_local || !fs.existsSync(listing.image_local))) {
-          listing.image_local = await downloadImage(listing.image_url, listing.id);
+          const result = await downloadImage(listing.image_url, listing.id);
+          if (result) {
+            listing.image_local = result;
+          } else {
+            imageDownloadErrors++;
+          }
         }
+      }
+      if (imageDownloadErrors > 0) {
+        console.error(`Warning: ${imageDownloadErrors} image downloads failed`);
       }
 
       // Save cache AFTER image download so image_local paths are persisted
@@ -1070,7 +1089,10 @@ async function main() {
       cleanupExpiredImages(expiredIds);
 
       // Safety net: remove any orphaned images not in the cache
-      cleanupOrphanedImages(allListings);
+      // Only run this if we have a reasonable number of listings (sync didn't fail badly)
+      if (allListings.length > 0) {
+        cleanupOrphanedImages(allListings);
+      }
     }
 
     // Apply filters
