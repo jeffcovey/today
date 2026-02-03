@@ -27,6 +27,7 @@ const staleness_days = config.staleness_days || 7;
 const createDateFields = config.create_date_fields === true || config.create_date_fields === 'true';
 const createPriorityField = config.create_priority_field === true || config.create_priority_field === 'true';
 const createStatusField = config.create_status_field === true || config.create_status_field === 'true';
+const createStageField = config.create_stage_field === true || config.create_stage_field === 'true';
 
 // Priority options for the single-select field
 const PRIORITY_OPTIONS = [
@@ -45,6 +46,14 @@ const STATUS_OPTIONS = [
   { name: 'Cancelled', color: 'GRAY' }
 ];
 const STATUS_FIELD_NAME = 'Project Status';
+
+// Stage options for the single-select field
+const STAGE_OPTIONS = [
+  { name: 'Front Stage', color: 'BLUE' },
+  { name: 'Back Stage', color: 'ORANGE' },
+  { name: 'Off Stage', color: 'GREEN' }
+];
+const STAGE_FIELD_NAME = 'Stage';
 
 if (!owner) {
   console.error(JSON.stringify({
@@ -234,6 +243,67 @@ function ensureStatusField(project) {
 
   if (!hasStatus) {
     return createStatusFieldOnProject(project.id);
+  }
+  return false;
+}
+
+/**
+ * Create a stage single-select field on a project if it doesn't exist
+ * @param {string} projectId - GitHub project node ID
+ * @returns {boolean} - Whether the field was created
+ */
+function createStageFieldOnProject(projectId) {
+  // Build options in GraphQL input syntax (not JSON)
+  const optionsList = STAGE_OPTIONS.map(opt =>
+    `{ name: "${opt.name}", color: ${opt.color}, description: "${opt.name.toLowerCase()} work" }`
+  ).join(', ');
+
+  const mutation = `
+    mutation {
+      createProjectV2Field(input: {
+        projectId: "${projectId}"
+        dataType: SINGLE_SELECT
+        name: "${STAGE_FIELD_NAME}"
+        singleSelectOptions: [${optionsList}]
+      }) {
+        projectV2Field {
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    execSync(`gh api graphql -f query='${mutation.replace(/'/g, "\\'")}'`, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    // Silently fail - likely missing write scope
+    return false;
+  }
+}
+
+/**
+ * Ensure a project has a Stage field
+ * @param {Object} project - Project object with id and fields
+ * @returns {boolean} - Whether the field was created
+ */
+function ensureStageField(project) {
+  if (!project.fields?.nodes) return false;
+
+  const fieldNames = project.fields.nodes
+    .filter(f => f.name)
+    .map(f => f.name.toLowerCase());
+
+  const hasStage = fieldNames.some(n => n === STAGE_FIELD_NAME.toLowerCase());
+
+  if (!hasStage) {
+    return createStageFieldOnProject(project.id);
   }
   return false;
 }
@@ -440,6 +510,13 @@ if (createStatusField) {
   }
 }
 
+// Create stage field on projects that don't have it (if enabled)
+if (createStageField) {
+  for (const project of projects) {
+    ensureStageField(project);
+  }
+}
+
 /**
  * Calculate GitHub-native attention score and reasons
  * @param {Object} project - GitHub project data
@@ -511,11 +588,12 @@ const entries = projects.map(project => {
     metadata.repository = repository;
   }
 
-  // Extract item information, date field values, priority, and status
+  // Extract item information, date field values, priority, status, and stage
   let projectStartDate = null;
   let projectDueDate = null;
   let projectPriority = null;
   let projectStatus = null;
+  let projectStage = null;
 
   if (project.items) {
     metadata.item_count = project.items.totalCount;
@@ -536,12 +614,13 @@ const entries = projects.map(project => {
       metadata.items = items;
     }
 
-    // Extract dates, priority, and status from item field values
-    // Look for "Start Date", "Due Date", "Priority", and "Project Status" fields
+    // Extract dates, priority, status, and stage from item field values
+    // Look for "Start Date", "Due Date", "Priority", "Project Status", and "Stage" fields
     const startDates = [];
     const dueDates = [];
     const priorities = [];
     const statuses = [];
+    const stages = [];
 
     for (const item of project.items.nodes) {
       if (!item.fieldValues?.nodes) continue;
@@ -557,13 +636,15 @@ const entries = projects.map(project => {
           }
         }
 
-        // Handle single-select fields (Priority, Status)
+        // Handle single-select fields (Priority, Status, Stage)
         if (fieldValue.name && fieldValue.field?.name) {
           const fieldName = fieldValue.field.name.toLowerCase();
           if (fieldName === 'priority') {
             priorities.push(fieldValue.name.toLowerCase());
           } else if (fieldName === STATUS_FIELD_NAME.toLowerCase()) {
             statuses.push(fieldValue.name.toLowerCase());
+          } else if (fieldName === STAGE_FIELD_NAME.toLowerCase()) {
+            stages.push(fieldValue.name.toLowerCase().replace(/\s+/g, '-'));
           }
         }
       }
@@ -608,6 +689,16 @@ const entries = projects.map(project => {
         projectStatus = statuses[0];
       }
     }
+
+    // Use the first stage found (stages are mutually exclusive)
+    if (stages.length > 0) {
+      projectStage = stages[0];
+    }
+  }
+
+  // Add stage to metadata if present
+  if (projectStage) {
+    metadata.stage = projectStage;
   }
 
   // Calculate progress from items if available

@@ -117,6 +117,7 @@ async function getProjectDetails(owner, number, ownerType) {
   const dueDateField = fields.find(f => f.name.toLowerCase() === 'due date');
   const priorityField = fields.find(f => f.name.toLowerCase() === 'priority');
   const statusField = fields.find(f => f.name.toLowerCase() === 'project status');
+  const stageField = fields.find(f => f.name.toLowerCase() === 'stage');
   const nextReviewDateField = fields.find(f => f.name.toLowerCase() === 'next review date');
 
   // Get first item and review metadata item
@@ -135,6 +136,8 @@ async function getProjectDetails(owner, number, ownerType) {
     priorityOptions: priorityField?.options || [],
     statusFieldId: statusField?.id,
     statusOptions: statusField?.options || [],
+    stageFieldId: stageField?.id,
+    stageOptions: stageField?.options || [],
     nextReviewDateFieldId: nextReviewDateField?.id,
     firstItemId: firstItem?.id,
     reviewMetadataItem: reviewMetadataItem,
@@ -542,6 +545,80 @@ async function handleSetStatus() {
   }
 }
 
+// Handle set-stage action
+async function handleSetStage() {
+  const { projectId, stage } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (stage === undefined) {
+    return output({ success: false, error: 'stage is required' });
+  }
+
+  try {
+    // Parse the project ID
+    const { owner, number, type } = parseProjectId(projectId, args.ownerType);
+
+    // Get project details
+    const details = await getProjectDetails(owner, number, type);
+
+    if (!details.firstItemId) {
+      return output({ success: false, error: 'Project has no items. Add an item first to set stage.' });
+    }
+
+    if (!details.stageFieldId) {
+      return output({ success: false, error: 'Project has no "Stage" field. Enable create_stage_field in config.' });
+    }
+
+    // Clear stage if null
+    if (stage === null) {
+      clearItemSingleSelectField(details.projectId, details.firstItemId, details.stageFieldId);
+      return output({
+        success: true,
+        updated: {
+          project: details.title,
+          itemId: details.firstItemId,
+          stage: null,
+        }
+      });
+    }
+
+    // Find the option ID for the requested stage
+    // Convert from CLI format (front-stage) to display format (Front Stage)
+    const displayStage = stage.split('-').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+
+    const option = details.stageOptions.find(
+      opt => opt.name.toLowerCase() === displayStage.toLowerCase()
+    );
+
+    if (!option) {
+      const validOptions = details.stageOptions.map(o => o.name).join(', ');
+      return output({
+        success: false,
+        error: `Invalid stage "${stage}". Valid options: ${validOptions.toLowerCase().replace(/ stage/g, '-stage')}`
+      });
+    }
+
+    // Update the stage
+    updateItemSingleSelectField(details.projectId, details.firstItemId, details.stageFieldId, option.id);
+
+    return output({
+      success: true,
+      updated: {
+        project: details.title,
+        itemId: details.firstItemId,
+        stage: option.name,
+      }
+    });
+  } catch (error) {
+    return output({ success: false, error: error.message });
+  }
+}
+
 // Handle set-review-date action
 async function handleSetReviewDate() {
   const { projectId, reviewDate, frequency } = args;
@@ -632,6 +709,8 @@ if (args.action === 'set-dates') {
   handleSetPriority();
 } else if (args.action === 'set-status') {
   handleSetStatus();
+} else if (args.action === 'set-stage') {
+  handleSetStage();
 } else if (args.action === 'set-review-date') {
   handleSetReviewDate();
 } else {

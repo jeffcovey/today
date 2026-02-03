@@ -855,6 +855,101 @@ program
     }
   });
 
+// Set stage command - update stage for a project
+program
+  .command('set-stage <id> [stage]')
+  .description('Set stage for a project (front-stage, back-stage, off-stage)')
+  .option('--clear', 'Clear the stage')
+  .action(async (id, stage, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    // Validate stage
+    const validStages = ['front-stage', 'back-stage', 'off-stage'];
+
+    if (options.clear) {
+      var normalizedStage = null;
+    } else if (!stage) {
+      console.log(colors.red('✗') + ' Stage is required unless using --clear option');
+      console.log('Valid stages: ' + validStages.join(', '));
+      process.exit(1);
+    } else {
+      var normalizedStage = stage.toLowerCase();
+      if (!validStages.includes(normalizedStage)) {
+        console.log(colors.red('✗') + ` Invalid stage: ${stage}`);
+        console.log('Valid stages: ' + validStages.join(', '));
+        process.exit(1);
+      }
+    }
+
+    // Determine plugin from source
+    const pluginName = project.source.split('/')[0];
+
+    // Extract owner_type from metadata if available (for github-projects)
+    let ownerType = null;
+    if (project.metadata) {
+      try {
+        const metadata = JSON.parse(project.metadata);
+        ownerType = metadata.owner_type;
+      } catch (e) { /* ignore parse errors */ }
+    }
+
+    // Build the write command arguments
+    const writeArgs = {
+      action: 'set-stage',
+      projectId: project.id,
+      stage: normalizedStage,
+      ownerType: ownerType,
+    };
+
+    // Call the plugin's write command
+    const pluginDir = `plugins/${pluginName}`;
+    const writeScript = `${pluginDir}/write.js`;
+
+    try {
+      const result = execSync(`node ${writeScript}`, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PROJECT_ROOT: process.cwd(),
+        }
+      });
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        console.log(colors.green('✓') + ` Updated stage for "${project.title}"`);
+        console.log(`  Stage: ${normalizedStage || '(cleared)'}`);
+
+        // Sync to update the database
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Syncing to update database...');
+        execSync(`bin/plugins sync ${pluginName}`, { stdio: 'inherit' });
+      } else {
+        console.log(colors.red('✗') + ` Failed to update stage: ${response.error}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
+        console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting stage`);
+      } else {
+        console.log(colors.red('✗') + ` Error: ${error.message}`);
+      }
+      process.exit(1);
+    }
+  });
+
 // Set review date command - schedule project review for specific date
 program
   .command('set-review-date <id> <date>')
@@ -959,6 +1054,173 @@ program
       }
       process.exit(1);
     }
+  });
+
+// Stage command - manage and view projects by stage
+program
+  .command('stage [stage]')
+  .description('List projects by stage or show projects for today\'s stage')
+  .option('-a, --all', 'Show all stages')
+  .option('--today', 'Show only projects matching today\'s stage (default if no stage specified)')
+  .action(async (stageFilter, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Get stage information from stages plugin (with fallback)
+    let stagesData = null;
+    let stagesAvailable = false;
+    try {
+      const stagesResult = execSync('node plugins/stages/read.js', {
+        encoding: 'utf8',
+        env: { ...process.env, PLUGIN_CONFIG: '{}' },
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      const stagesOutput = JSON.parse(stagesResult);
+      stagesData = stagesOutput.metadata;
+      stagesAvailable = true;
+    } catch (error) {
+      // Stages plugin not available - continue without stage filtering
+      stagesAvailable = false;
+    }
+
+    // Stage mapping (convert from plugin format to our format)
+    const stageMap = {
+      'front-stage': 'Front Stage',
+      'back-stage': 'Back Stage',
+      'off-stage': 'Off Stage'
+    };
+
+    // Get today's stage from plugin data (convert tag to our format)
+    let todaysStage = null;
+    if (stagesAvailable && stagesData && stagesData.stage_tag) {
+      if (stagesData.stage_tag.includes('front-stage')) {
+        todaysStage = 'front-stage';
+      } else if (stagesData.stage_tag.includes('back-stage')) {
+        todaysStage = 'back-stage';
+      } else if (stagesData.stage_tag.includes('off-stage')) {
+        todaysStage = 'off-stage';
+      }
+    }
+
+    // Build query conditions
+    let conditions = ["status NOT IN ('completed', 'archived')"];
+    let params = [];
+
+    if (options.all) {
+      // Show all projects, grouped by stage
+    } else if (stageFilter) {
+      // Show specific stage
+      const normalizedStage = stageFilter.toLowerCase();
+      if (!Object.keys(stageMap).includes(normalizedStage)) {
+        console.log(colors.red('✗') + ` Invalid stage: ${stageFilter}`);
+        console.log('Valid stages: ' + Object.keys(stageMap).join(', '));
+        process.exit(1);
+      }
+
+      // Warn if stages plugin isn't available but user is filtering by stage
+      if (!stagesAvailable) {
+        console.log(colors.yellow('⚠') + ' Stages plugin not enabled - filtering by metadata may show unexpected results');
+        console.log('');
+      }
+
+      // Query by metadata JSON field for stage
+      conditions.push(`(JSON_EXTRACT(metadata, '$.stage') = ? OR JSON_EXTRACT(metadata, '$.stage') IS NULL)`);
+      params.push(normalizedStage);
+    } else if (stagesAvailable && todaysStage) {
+      // Show today's stage (when stages plugin is available)
+      conditions.push(`(JSON_EXTRACT(metadata, '$.stage') = ? OR JSON_EXTRACT(metadata, '$.stage') IS NULL)`);
+      params.push(todaysStage);
+    } else {
+      // Stages plugin not available - show all projects without stage filtering
+      // (no additional conditions needed)
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+    const sql = `
+      SELECT id, title, status, priority, JSON_EXTRACT(metadata, '$.stage') as stage,
+             review_frequency, last_reviewed
+      FROM projects
+      ${whereClause}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        title
+    `;
+
+    const projects = db.prepare(sql).all(...params);
+
+    if (projects.length === 0) {
+      if (stageFilter) {
+        console.log(colors.blue('ℹ') + ` No projects found for stage: ${stageFilter}`);
+      } else if (!options.all && stagesAvailable && todaysStage) {
+        console.log(colors.blue('ℹ') + ` No projects found for today's stage: ${todaysStage}`);
+      } else {
+        console.log(colors.blue('ℹ') + ' No active projects found');
+      }
+      return;
+    }
+
+    console.log('');
+
+    if (options.all) {
+      // Group by stage
+      const byStage = {};
+      for (const project of projects) {
+        const stage = project.stage || 'unassigned';
+        if (!byStage[stage]) byStage[stage] = [];
+        byStage[stage].push(project);
+      }
+
+      for (const [stage, stageProjects] of Object.entries(byStage)) {
+        const stageDisplay = stage === 'unassigned' ? 'Unassigned' :
+                            (stageMap[stage] || stage);
+        console.log(colors.bold(`📋 ${stageDisplay} (${stageProjects.length})`));
+        console.log('');
+
+        for (const project of stageProjects) {
+          const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+          console.log(`  ${priorityEmoji} ${project.title}`);
+        }
+        console.log('');
+      }
+    } else {
+      // Single stage view
+      let stageDisplay;
+      if (stageFilter) {
+        stageDisplay = stageMap[stageFilter.toLowerCase()] || stageFilter;
+      } else if (stagesAvailable && todaysStage) {
+        stageDisplay = `Today's Stage: ${stageMap[todaysStage]}`;
+      } else if (!stagesAvailable) {
+        stageDisplay = `All Projects (stages plugin not enabled)`;
+      } else {
+        stageDisplay = `All Projects`;
+      }
+
+      console.log(colors.bold(`📋 ${stageDisplay} (${projects.length})`));
+
+      // Show helpful message about stages plugin if not available
+      if (!stagesAvailable && !stageFilter) {
+        console.log(colors.gray('ℹ Enable the stages plugin to filter projects by daily stage'));
+        console.log('');
+      } else {
+        console.log('');
+      }
+
+      for (const project of projects) {
+        const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+        console.log(`  ${priorityEmoji} ${project.title}`);
+      }
+      console.log('');
+    }
+
+    console.log(colors.gray(`${projects.length} projects`));
   });
 
 program.parse();

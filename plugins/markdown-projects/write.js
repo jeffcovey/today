@@ -81,6 +81,9 @@ const VALID_PRIORITIES = ['highest', 'high', 'medium', 'low', 'lowest'];
 // Valid status values (normalized to lowercase)
 const VALID_STATUSES = ['active', 'paused', 'completed', 'cancelled'];
 
+// Valid stage values (normalized to lowercase)
+const VALID_STAGES = ['front-stage', 'back-stage', 'off-stage'];
+
 // Handle set-dates action
 function handleSetDates() {
   const { projectId, startDate, dueDate } = args;
@@ -250,6 +253,63 @@ function handleSetStatus() {
   });
 }
 
+// Handle set-stage action
+function handleSetStage() {
+  const { projectId, stage } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (stage === undefined) {
+    return output({ success: false, error: 'stage is required' });
+  }
+
+  // Project ID for markdown-projects is the file path
+  let filePath = projectId;
+  if (filePath.includes(':')) {
+    filePath = filePath.split(':').pop();
+  }
+
+  const fullPath = path.join(projectRoot, filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return output({ success: false, error: `Project file not found: ${filePath}` });
+  }
+
+  // Validate stage value
+  const normalizedStage = stage === null ? null : stage.toLowerCase();
+  if (normalizedStage !== null && !VALID_STAGES.includes(normalizedStage)) {
+    return output({
+      success: false,
+      error: `Invalid stage "${stage}". Valid options: ${VALID_STAGES.join(', ')}`
+    });
+  }
+
+  // Read and parse the file
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const { frontmatter, body, raw } = parseFrontmatter(content);
+
+  if (!raw) {
+    return output({ success: false, error: 'Project file has no frontmatter' });
+  }
+
+  // Update the frontmatter
+  const updatedRaw = updateFrontmatterField(raw, 'stage', normalizedStage);
+
+  // Write back the file
+  const newContent = `---\n${updatedRaw}\n---${body}`;
+  fs.writeFileSync(fullPath, newContent, 'utf8');
+
+  return output({
+    success: true,
+    updated: {
+      file: filePath,
+      stage: normalizedStage,
+    }
+  });
+}
+
 // Handle set-review-date action
 function handleSetReviewDate() {
   const { projectId, reviewDate, frequency } = args;
@@ -345,6 +405,8 @@ if (args.action === 'set-dates') {
   handleSetPriority();
 } else if (args.action === 'set-status') {
   handleSetStatus();
+} else if (args.action === 'set-stage') {
+  handleSetStage();
 } else if (args.action === 'set-review-date') {
   handleSetReviewDate();
 } else {

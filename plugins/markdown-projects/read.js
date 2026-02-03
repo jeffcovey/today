@@ -212,6 +212,9 @@ for (const filePath of projectFiles) {
   // Map category to topic
   const topic = frontmatter.category || frontmatter.topic || null;
 
+  // Map stage
+  const stage = frontmatter.stage || null;
+
   // Extract dates
   const startDate = frontmatter.start_date || null;
   const dueDate = frontmatter.target_date || frontmatter.target_completion || frontmatter.due_date || null;
@@ -237,6 +240,7 @@ for (const filePath of projectFiles) {
   const metadata = {};
   if (frontmatter.cover_image) metadata.cover_image = frontmatter.cover_image;
   if (frontmatter.related_projects) metadata.related_projects = frontmatter.related_projects;
+  if (stage) metadata.stage = stage;
   metadata.file_path = relativePath;
 
   // Define how to query related items (tasks) for this project
@@ -252,7 +256,7 @@ for (const filePath of projectFiles) {
 
   // Add any other frontmatter fields we didn't explicitly handle
   const handledFields = [
-    'title', 'status', 'priority', 'category', 'topic',
+    'title', 'status', 'priority', 'category', 'topic', 'stage',
     'start_date', 'target_date', 'target_completion', 'due_date',
     'percent_done', 'review_frequency', 'last_reviewed',
     'cover_image', 'related_projects', 'cssclasses'
