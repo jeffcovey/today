@@ -276,7 +276,7 @@ for (const filePath of projectFiles) {
     progress,
     review_frequency: reviewFrequency,
     last_reviewed: lastReviewed,
-    url: vaultRelativePath,
+    url: '/' + vaultRelativePath,
     parent_id: null,
     metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
   });
