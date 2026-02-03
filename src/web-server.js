@@ -5353,6 +5353,12 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
               } else {
                 summaryParts.push(`✗ Edit failed: ${result?.error || 'Unknown error'}`);
               }
+            } else if (toolName === 'create_file') {
+              if (result?.success) {
+                summaryParts.push(`✓ ${result.message || 'File created'}`);
+              } else {
+                summaryParts.push(`✗ Create failed: ${result?.error || 'Unknown error'}`);
+              }
             }
           }
 

@@ -38,6 +38,12 @@ export function buildFileContext(urlPath, documentContent) {
   context += '- newText: The replacement text\n';
   context += 'The interface will automatically refresh after edits.\n\n';
 
+  context += '### create_file\n';
+  context += 'Use this to create a new file in the vault. Provide:\n';
+  context += '- filePath: Path relative to vault root (e.g., "projects/attachments/letter.html")\n';
+  context += '- content: The full content of the new file\n';
+  context += 'Use this for creating separate documents, attachments, exports, etc.\n\n';
+
   context += '### query_database\n';
   context += 'Query the SQLite database containing user data from plugins. Available data:\n';
   context += getAvailableDataTypes();

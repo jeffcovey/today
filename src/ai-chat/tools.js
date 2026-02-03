@@ -176,6 +176,58 @@ export function createEditFileTool(filePath) {
 }
 
 /**
+ * Create the create_file tool
+ */
+export function createCreateFileTool() {
+  return tool({
+    description: `Create a new file in the vault. Use this to create new documents, attachments, or any other files the user requests. The file path should be relative to the vault root (e.g., "projects/attachments/letter.html").`,
+    inputSchema: z.object({
+      filePath: z.string().describe('The path for the new file, relative to the vault root (e.g., "projects/attachments/letter.html")'),
+      content: z.string().describe('The content to write to the file'),
+    }),
+    execute: async ({ filePath, content }) => {
+      try {
+        const vaultPath = getAbsoluteVaultPath();
+
+        // Normalize the path (remove leading slash if present)
+        const normalizedPath = filePath.replace(/^\//, '');
+        const fullPath = path.join(vaultPath, normalizedPath);
+        const resolvedPath = path.resolve(fullPath);
+
+        // Security check: ensure the path is within the vault
+        if (!resolvedPath.startsWith(vaultPath)) {
+          return { success: false, error: 'Cannot create files outside the vault' };
+        }
+
+        // Check if file already exists
+        try {
+          await fs.access(resolvedPath);
+          return { success: false, error: `File already exists: ${normalizedPath}. Use edit_file to modify existing files.` };
+        } catch {
+          // File doesn't exist, good to proceed
+        }
+
+        // Create parent directories if they don't exist
+        const parentDir = path.dirname(resolvedPath);
+        await fs.mkdir(parentDir, { recursive: true });
+
+        // Write the file
+        await fs.writeFile(resolvedPath, content, 'utf-8');
+
+        return {
+          success: true,
+          message: `File created successfully: ${normalizedPath}`,
+          path: normalizedPath,
+          size: content.length,
+        };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    },
+  });
+}
+
+/**
  * Create the query_database tool
  */
 export function createQueryDatabaseTool() {
@@ -309,6 +361,7 @@ IMPORTANT: Use positional arguments, not flags. If a command fails, report the e
  * @param {Object} options
  * @param {string} options.filePath - Full path to the file being discussed (for edit tool)
  * @param {boolean} options.includeEdit - Whether to include the edit_file tool (default: true)
+ * @param {boolean} options.includeCreate - Whether to include create_file tool (default: true)
  * @param {boolean} options.includeDatabase - Whether to include query_database tool (default: true)
  * @param {boolean} options.includeCommands - Whether to include run_command tool (default: true)
  */
@@ -316,6 +369,7 @@ export function createChatTools(options = {}) {
   const {
     filePath,
     includeEdit = true,
+    includeCreate = true,
     includeDatabase = true,
     includeCommands = true,
   } = options;
@@ -324,6 +378,10 @@ export function createChatTools(options = {}) {
 
   if (includeEdit && filePath) {
     tools.edit_file = createEditFileTool(filePath);
+  }
+
+  if (includeCreate) {
+    tools.create_file = createCreateFileTool();
   }
 
   if (includeDatabase) {
