@@ -889,8 +889,9 @@ function mergeListings(cached, scraped, reviewingIds = []) {
     if (listing.start_date >= today) {
       const existing = byUrl.get(listing.url);
       if (existing) {
-        // Keep original date_added
+        // Keep original date_added and image_local from cache
         listing.date_added = existing.date_added;
+        if (existing.image_local) listing.image_local = existing.image_local;
       }
       byUrl.set(listing.url, listing);
     }
@@ -947,9 +948,16 @@ function cleanupOrphanedImages(listings) {
  * faster and more reliable than parsing the full __INITIAL_STATE__ blob.
  */
 async function checkCachedListingStatus(page, listings, alreadyCheckedIds) {
-  const toCheck = listings.filter(l => !alreadyCheckedIds.has(l.id));
-  if (toCheck.length === 0) return [];
+  const MAX_CHECK = 200;
+  const allToCheck = listings.filter(l => !alreadyCheckedIds.has(l.id));
+  if (allToCheck.length === 0) return [];
 
+  // Check oldest-added listings first — most likely to have changed status
+  allToCheck.sort((a, b) => (a.date_added || '').localeCompare(b.date_added || ''));
+  const toCheck = allToCheck.slice(0, MAX_CHECK);
+  if (allToCheck.length > MAX_CHECK) {
+    console.error(`${allToCheck.length} cached listings to check, limiting to ${MAX_CHECK}`);
+  }
   console.error(`Checking ${toCheck.length} cached listings for reviewing status...`);
   const reviewingIds = [];
   const BATCH_SIZE = 10;
@@ -959,8 +967,11 @@ async function checkCachedListingStatus(page, listings, alreadyCheckedIds) {
     const results = await page.evaluate(async (items) => {
       const checks = items.map(async ({ url, id, startDate, endDate }) => {
         try {
-          const resp = await fetch(url, { credentials: 'include' });
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          const resp = await fetch(url, { credentials: 'include', signal: controller.signal });
           const html = await resp.text();
+          clearTimeout(timeout);
           // Match assignments by date range to find the specific one we cached.
           // A listing profile can have many assignments; we need the one whose
           // dates match our cached entry.
@@ -1045,9 +1056,9 @@ async function main() {
         await browser.close();
       }
 
-      // Download images to vault for new listings
+      // Download images to vault for new listings (or re-download if file was cleaned up)
       for (const listing of allListings) {
-        if (listing.image_url && !listing.image_local) {
+        if (listing.image_url && (!listing.image_local || !fs.existsSync(listing.image_local))) {
           listing.image_local = await downloadImage(listing.image_url, listing.id);
         }
       }

@@ -96,6 +96,82 @@ export function getDeploymentName() {
   return null;
 }
 
+/**
+ * Deep merge source into target (mutates target).
+ * Arrays are replaced, not concatenated.
+ */
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (
+      source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) &&
+      target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])
+    ) {
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+/**
+ * Parse TOML with graceful recovery. If the full parse fails,
+ * split into sections and parse each independently, merging
+ * successful ones and logging errors for broken sections.
+ */
+function parseConfigWithRecovery(content) {
+  // Fast path: try full parse
+  try {
+    return { config: parse(content), errors: [] };
+  } catch (fullError) {
+    const errors = [];
+    const config = {};
+
+    // Split content into sections by [header] lines
+    const lines = content.split('\n');
+    const sections = []; // { name, startLine, text }
+    let currentName = '(root)';
+    let currentStart = 1;
+    let currentLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const headerMatch = lines[i].match(/^\s*\[([^\]]+)\]\s*$/);
+      if (headerMatch) {
+        // Save previous section
+        sections.push({ name: currentName, startLine: currentStart, text: currentLines.join('\n') });
+        currentName = headerMatch[1].trim();
+        currentStart = i + 1; // 1-based
+        currentLines = [lines[i]];
+      } else {
+        currentLines.push(lines[i]);
+      }
+    }
+    // Push final section
+    sections.push({ name: currentName, startLine: currentStart, text: currentLines.join('\n') });
+
+    for (const section of sections) {
+      const trimmed = section.text.trim();
+      if (!trimmed) continue;
+
+      try {
+        const parsed = parse(trimmed);
+        deepMerge(config, parsed);
+      } catch (sectionError) {
+        errors.push({ section: section.name, line: section.startLine, error: sectionError });
+        console.error(
+          `[config] Skipping broken section [${section.name}] (line ${section.startLine}): ${sectionError.message}`
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error(`[config] Recovered ${Object.keys(config).length} top-level key(s) despite ${errors.length} broken section(s)`);
+    }
+
+    return { config, errors };
+  }
+}
+
 function readConfig() {
   const now = Date.now();
   if (configCache && (now - lastReadTime) < CACHE_TTL) {
@@ -104,7 +180,7 @@ function readConfig() {
 
   try {
     const configContent = readFileSync(getConfigPath(), 'utf8');
-    let config = parse(configContent);
+    const { config } = parseConfigWithRecovery(configContent);
 
     // Apply deployment-specific AI overrides at runtime
     const deploymentName = getDeploymentName();
@@ -124,7 +200,7 @@ function readConfig() {
     lastReadTime = now;
     return configCache;
   } catch {
-    // Return defaults if config can't be read
+    // Return defaults if config can't be read (file missing, permissions, etc.)
     return {
       timezone: 'America/New_York'
     };
