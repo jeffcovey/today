@@ -120,6 +120,8 @@ async function ensurePluginConfig() {
             // Escape newlines and quotes for single-line TOML string
             const escaped = defaultValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
             valueStr = `"${escaped}"`;
+          } else if (Array.isArray(defaultValue)) {
+            valueStr = defaultValue.length === 0 ? '[]' : JSON.stringify(defaultValue);
           } else {
             valueStr = defaultValue;
           }
@@ -962,13 +964,14 @@ function deleteSourceConfig(pluginName, sourceName) {
 }
 
 /**
- * Convert smol-toml output to use multi-line strings for ai_instructions
+ * Convert smol-toml output to use multi-line strings for fields that should be multi-line
  * smol-toml uses \n escapes, but triple-quoted strings are more readable
  */
 function formatMultilineStrings(tomlStr) {
-  // Match ai_instructions = "..." and convert to triple-quoted if it contains \n
+  // Match any field that commonly contains multi-line text and convert to triple-quoted if it contains \n
+  // This includes: instructions, ai_instructions, description, vocation, and other text fields
   return tomlStr.replace(
-    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
+    /^((?:ai_)?(?:instructions|description|vocation|note|summary|comment)\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
     (match, prefix, content) => {
       // Check if it has escaped newlines
       if (!content.includes('\\n')) {

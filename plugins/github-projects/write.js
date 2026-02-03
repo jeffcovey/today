@@ -88,9 +88,15 @@ async function getProjectDetails(owner, number, ownerType) {
               }
             }
           }
-          items(first: 1) {
+          items(first: 50) {
             nodes {
               id
+              content {
+                ... on Issue {
+                  number
+                  title
+                }
+              }
             }
           }
         }
@@ -111,9 +117,14 @@ async function getProjectDetails(owner, number, ownerType) {
   const dueDateField = fields.find(f => f.name.toLowerCase() === 'due date');
   const priorityField = fields.find(f => f.name.toLowerCase() === 'priority');
   const statusField = fields.find(f => f.name.toLowerCase() === 'project status');
+  const nextReviewDateField = fields.find(f => f.name.toLowerCase() === 'next review date');
 
-  // Get first item
+  // Get first item and review metadata item
   const firstItem = project.items.nodes[0];
+  const reviewMetadataItem = project.items.nodes.find(item =>
+    item.content?.title?.includes('[META]') &&
+    item.content?.title?.includes('Review Schedule')
+  );
 
   return {
     projectId: project.id,
@@ -124,7 +135,9 @@ async function getProjectDetails(owner, number, ownerType) {
     priorityOptions: priorityField?.options || [],
     statusFieldId: statusField?.id,
     statusOptions: statusField?.options || [],
+    nextReviewDateFieldId: nextReviewDateField?.id,
     firstItemId: firstItem?.id,
+    reviewMetadataItem: reviewMetadataItem,
   };
 }
 
@@ -198,6 +211,136 @@ function clearItemSingleSelectField(projectId, itemId, fieldId) {
   `;
 
   graphql(mutation);
+}
+
+// Create a "Next Review Date" field on a project
+function createNextReviewDateField(projectId) {
+  const mutation = `
+    mutation {
+      createProjectV2Field(input: {
+        projectId: "${projectId}"
+        dataType: DATE
+        name: "Next Review Date"
+      }) {
+        projectV2Field {
+          ... on ProjectV2Field {
+            id
+            name
+            dataType
+          }
+        }
+      }
+    }
+  `;
+
+  const result = graphql(mutation);
+  return result.data?.createProjectV2Field?.projectV2Field?.id;
+}
+
+// Get repository for project (assumes project contains issues from one repository)
+function getProjectRepository(owner, number, ownerType) {
+  const ownerField = ownerType === 'user' ? 'user' : 'organization';
+
+  const query = `
+    query {
+      ${ownerField}(login: "${owner}") {
+        projectV2(number: ${number}) {
+          items(first: 10) {
+            nodes {
+              content {
+                ... on Issue {
+                  repository {
+                    name
+                    owner {
+                      login
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const result = graphql(query);
+  const items = result.data?.[ownerField]?.projectV2?.items?.nodes || [];
+
+  for (const item of items) {
+    if (item.content?.repository) {
+      return {
+        owner: item.content.repository.owner.login,
+        name: item.content.repository.name
+      };
+    }
+  }
+
+  // Default fallback - use project owner (works for org projects)
+  return { owner, name: owner === 'OlderGay-Men' ? 'OlderGay.Men' : 'today' };
+}
+
+// Create metadata issue for review scheduling
+function createMetadataIssue(repoOwner, repoName, projectTitle, reviewDate, frequency) {
+  const dayOfWeek = new Date(reviewDate).toLocaleDateString('en-US', { weekday: 'long' });
+  const body = `This issue tracks review scheduling for the ${projectTitle} project.
+
+**Next Review Date:** ${reviewDate} (${dayOfWeek})
+**Review Frequency:** ${frequency}
+
+This is a metadata issue for project management - not a development task.`;
+
+  const mutation = `
+    mutation {
+      createIssue(input: {
+        repositoryId: "${getRepositoryId(repoOwner, repoName)}"
+        title: "[META] ${projectTitle} Review Schedule"
+        body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+      }) {
+        issue {
+          id
+          number
+          url
+        }
+      }
+    }
+  `;
+
+  const result = graphql(mutation);
+  return result.data?.createIssue?.issue;
+}
+
+// Get repository ID for creating issues
+function getRepositoryId(owner, name) {
+  const query = `
+    query {
+      repository(owner: "${owner}", name: "${name}") {
+        id
+      }
+    }
+  `;
+
+  const result = graphql(query);
+  return result.data?.repository?.id;
+}
+
+// Add issue to project
+function addIssueToProject(projectId, issueId) {
+  const mutation = `
+    mutation {
+      addProjectV2ItemById(input: {
+        projectId: "${projectId}"
+        contentId: "${issueId}"
+      }) {
+        item {
+          id
+        }
+      }
+    }
+  `;
+
+  const result = graphql(mutation);
+  return result.data?.addProjectV2ItemById?.item?.id;
 }
 
 // Handle set-dates action
@@ -399,6 +542,89 @@ async function handleSetStatus() {
   }
 }
 
+// Handle set-review-date action
+async function handleSetReviewDate() {
+  const { projectId, reviewDate, frequency } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (!reviewDate) {
+    return output({ success: false, error: 'reviewDate is required' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(reviewDate)) {
+    return output({ success: false, error: 'Invalid date format. Use YYYY-MM-DD' });
+  }
+
+  try {
+    // Parse the project ID
+    const { owner, number, type } = parseProjectId(projectId, args.ownerType);
+
+    // Get project details
+    const details = await getProjectDetails(owner, number, type);
+
+    // Create "Next Review Date" field if it doesn't exist
+    let nextReviewDateFieldId = details.nextReviewDateFieldId;
+    if (!nextReviewDateFieldId) {
+      nextReviewDateFieldId = createNextReviewDateField(details.projectId);
+      if (!nextReviewDateFieldId) {
+        return output({ success: false, error: 'Failed to create Next Review Date field' });
+      }
+    }
+
+    // Get repository for creating metadata issue
+    const repo = getProjectRepository(owner, number, type);
+
+    // Create or update metadata issue
+    let metadataIssue;
+    const finalFrequency = frequency || 'weekly';
+
+    if (details.reviewMetadataItem) {
+      // Update existing metadata issue (close and create new one for simplicity)
+      // TODO: Could implement update logic instead
+      metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
+    } else {
+      // Create new metadata issue
+      metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
+    }
+
+    if (!metadataIssue) {
+      return output({ success: false, error: 'Failed to create metadata issue' });
+    }
+
+    // Add metadata issue to project
+    const metadataItemId = addIssueToProject(details.projectId, metadataIssue.id);
+
+    if (!metadataItemId) {
+      return output({ success: false, error: 'Failed to add metadata issue to project' });
+    }
+
+    // Set the review date on the metadata issue
+    updateItemDateField(details.projectId, metadataItemId, nextReviewDateFieldId, reviewDate);
+
+    return output({
+      success: true,
+      updated: {
+        project: details.title,
+        reviewDate: reviewDate,
+        frequency: finalFrequency,
+        metadataIssue: {
+          number: metadataIssue.number,
+          url: metadataIssue.url,
+          itemId: metadataItemId,
+        },
+        fieldId: nextReviewDateFieldId,
+      }
+    });
+  } catch (error) {
+    return output({ success: false, error: error.message });
+  }
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
@@ -406,6 +632,8 @@ if (args.action === 'set-dates') {
   handleSetPriority();
 } else if (args.action === 'set-status') {
   handleSetStatus();
+} else if (args.action === 'set-review-date') {
+  handleSetReviewDate();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }

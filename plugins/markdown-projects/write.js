@@ -250,6 +250,94 @@ function handleSetStatus() {
   });
 }
 
+// Handle set-review-date action
+function handleSetReviewDate() {
+  const { projectId, reviewDate, frequency } = args;
+
+  if (!projectId) {
+    return output({ success: false, error: 'projectId is required' });
+  }
+
+  if (!reviewDate) {
+    return output({ success: false, error: 'reviewDate is required' });
+  }
+
+  // Validate date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(reviewDate)) {
+    return output({ success: false, error: 'Invalid date format. Use YYYY-MM-DD' });
+  }
+
+  // Project ID for markdown-projects is the file path
+  let filePath = projectId;
+  if (filePath.includes(':')) {
+    filePath = filePath.split(':').pop();
+  }
+
+  const fullPath = path.join(projectRoot, filePath);
+
+  if (!fs.existsSync(fullPath)) {
+    return output({ success: false, error: `Project file not found: ${filePath}` });
+  }
+
+  // Read and parse the file
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const { frontmatter, body, raw } = parseFrontmatter(content);
+
+  if (!raw) {
+    return output({ success: false, error: 'Project file has no frontmatter' });
+  }
+
+  // Calculate last_reviewed date based on review frequency
+  // Target review date minus frequency = last_reviewed date
+  const reviewDateObj = new Date(reviewDate);
+
+  // Get current frequency or use provided frequency
+  const reviewFrequency = frequency || frontmatter.review_frequency || 'weekly';
+
+  // Calculate days to subtract based on frequency
+  const frequencyDays = {
+    daily: 1,
+    weekly: 7,
+    monthly: 30,
+    quarterly: 90,
+    yearly: 365
+  };
+
+  const daysToSubtract = frequencyDays[reviewFrequency] || 7;
+
+  // Calculate last_reviewed date
+  const lastReviewedObj = new Date(reviewDateObj);
+  lastReviewedObj.setDate(lastReviewedObj.getDate() - daysToSubtract);
+  const lastReviewedDate = lastReviewedObj.toISOString().split('T')[0];
+
+  // Update the frontmatter
+  let updatedRaw = raw;
+
+  // Set review frequency if provided
+  if (frequency) {
+    updatedRaw = updateFrontmatterField(updatedRaw, 'review_frequency', frequency);
+  }
+
+  // Set last_reviewed date to calculated value
+  updatedRaw = updateFrontmatterField(updatedRaw, 'last_reviewed', lastReviewedDate);
+
+  // Write back the file
+  const newContent = `---\n${updatedRaw}\n---${body}`;
+  fs.writeFileSync(fullPath, newContent, 'utf8');
+
+  return output({
+    success: true,
+    updated: {
+      file: filePath,
+      reviewDate: reviewDate,
+      frequency: frequency || frontmatter.review_frequency || 'weekly',
+      lastReviewedDate: lastReviewedDate,
+      calculatedDaysBack: daysToSubtract,
+    }
+  });
+}
+
 // Main
 if (args.action === 'set-dates') {
   handleSetDates();
@@ -257,6 +345,8 @@ if (args.action === 'set-dates') {
   handleSetPriority();
 } else if (args.action === 'set-status') {
   handleSetStatus();
+} else if (args.action === 'set-review-date') {
+  handleSetReviewDate();
 } else {
   output({ success: false, error: `Unknown action: ${args.action}` });
 }

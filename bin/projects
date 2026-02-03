@@ -855,4 +855,110 @@ program
     }
   });
 
+// Set review date command - schedule project review for specific date
+program
+  .command('set-review-date <id> <date>')
+  .description('Schedule project review for a specific date (YYYY-MM-DD)')
+  .option('-f, --frequency <freq>', 'Review frequency (daily, weekly, monthly, quarterly, yearly)')
+  .action(async (id, date, options) => {
+    const db = getDatabase();
+    ensureSyncForType(db, 'projects');
+
+    // Find the project
+    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+    if (!project) {
+      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
+    }
+
+    if (!project) {
+      console.log(colors.red('✗') + ` Project not found: ${id}`);
+      process.exit(1);
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      console.log(colors.red('✗') + ' Invalid date format. Use YYYY-MM-DD');
+      process.exit(1);
+    }
+
+    // Validate frequency if provided
+    const validFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+    const frequency = options.frequency;
+    if (frequency && !validFrequencies.includes(frequency)) {
+      console.log(colors.red('✗') + ` Invalid frequency: ${frequency}`);
+      console.log('Valid frequencies: ' + validFrequencies.join(', '));
+      process.exit(1);
+    }
+
+    // Determine plugin from source
+    const pluginName = project.source.split('/')[0];
+
+    // Extract owner_type from metadata if available (for github-projects)
+    let ownerType = null;
+    if (project.metadata) {
+      try {
+        const metadata = JSON.parse(project.metadata);
+        ownerType = metadata.owner_type;
+      } catch (e) { /* ignore parse errors */ }
+    }
+
+    // Build the write command arguments
+    const writeArgs = {
+      action: 'set-review-date',
+      projectId: project.id,
+      reviewDate: date,
+      frequency: frequency,
+      ownerType: ownerType,
+    };
+
+    // Call the plugin's write command
+    const pluginDir = `plugins/${pluginName}`;
+    const writeScript = `${pluginDir}/write.js`;
+
+    try {
+      const result = execSync(`node ${writeScript}`, {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PROJECT_ROOT: process.cwd(),
+        }
+      });
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        console.log(colors.green('✓') + ` Scheduled review for "${project.title}"`);
+        console.log(`  Review Date: ${date}`);
+
+        if (response.updated.frequency) {
+          console.log(`  Frequency: ${response.updated.frequency}`);
+        }
+
+        // Show plugin-specific details
+        if (pluginName === 'github-projects' && response.updated.metadataIssue) {
+          console.log(`  Metadata Issue: #${response.updated.metadataIssue.number}`);
+          console.log(colors.cyan(`  View: ${response.updated.metadataIssue.url}`));
+        } else if (pluginName === 'markdown-projects' && response.updated.lastReviewedDate) {
+          console.log(`  Last Reviewed: ${response.updated.lastReviewedDate} (calculated ${response.updated.calculatedDaysBack}d back)`);
+        }
+
+        // Sync to update the database
+        console.log('');
+        console.log(colors.blue('ℹ') + ' Syncing to update database...');
+        execSync(`bin/plugins sync ${pluginName}`, { stdio: 'inherit' });
+      } else {
+        console.log(colors.red('✗') + ` Failed to schedule review: ${response.error}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error.message?.includes('Cannot find module') || error.message?.includes('ENOENT')) {
+        console.log(colors.red('✗') + ` Plugin ${pluginName} does not support setting review dates`);
+      } else {
+        console.log(colors.red('✗') + ` Error: ${error.message}`);
+      }
+      process.exit(1);
+    }
+  });
+
 program.parse();
