@@ -44,6 +44,11 @@ export function buildFileContext(urlPath, documentContent) {
   context += '- content: The full content of the new file\n';
   context += 'Use this for creating separate documents, attachments, exports, etc.\n\n';
 
+  context += '### delete_file\n';
+  context += 'Use this to delete a file or empty directory in the vault. Provide:\n';
+  context += '- filePath: Path relative to vault root\n';
+  context += 'Use this to clean up files created by mistake. Directories must be empty to delete.\n\n';
+
   context += '### query_database\n';
   context += 'Query the SQLite database containing user data from plugins. Available data:\n';
   context += getAvailableDataTypes();

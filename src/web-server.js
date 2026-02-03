@@ -5359,6 +5359,12 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
               } else {
                 summaryParts.push(`✗ Create failed: ${result?.error || 'Unknown error'}`);
               }
+            } else if (toolName === 'delete_file') {
+              if (result?.success) {
+                summaryParts.push(`✓ ${result.message || 'Deleted'}`);
+              } else {
+                summaryParts.push(`✗ Delete failed: ${result?.error || 'Unknown error'}`);
+              }
             }
           }
 

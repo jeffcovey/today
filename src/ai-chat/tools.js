@@ -176,6 +176,68 @@ export function createEditFileTool(filePath) {
 }
 
 /**
+ * Create the delete_file tool
+ */
+export function createDeleteFileTool() {
+  return tool({
+    description: `Delete a file or empty directory in the vault. Use this to clean up files created by mistake or that are no longer needed. The path should be relative to the vault root.`,
+    inputSchema: z.object({
+      filePath: z.string().describe('The path to delete, relative to the vault root (e.g., "projects/attachments/old-file.html")'),
+    }),
+    execute: async ({ filePath }) => {
+      try {
+        const vaultPath = getAbsoluteVaultPath();
+
+        // Normalize the path (remove leading slash if present)
+        const normalizedPath = filePath.replace(/^\//, '');
+        const fullPath = path.join(vaultPath, normalizedPath);
+        const resolvedPath = path.resolve(fullPath);
+
+        // Security check: ensure the path is within the vault
+        if (!resolvedPath.startsWith(vaultPath)) {
+          return { success: false, error: 'Cannot delete files outside the vault' };
+        }
+
+        // Check if path exists
+        let stats;
+        try {
+          stats = await fs.stat(resolvedPath);
+        } catch {
+          return { success: false, error: `Path does not exist: ${normalizedPath}` };
+        }
+
+        if (stats.isDirectory()) {
+          // Try to remove directory (will fail if not empty)
+          try {
+            await fs.rmdir(resolvedPath);
+            return {
+              success: true,
+              message: `Directory deleted: ${normalizedPath}`,
+              path: normalizedPath,
+            };
+          } catch (err) {
+            if (err.code === 'ENOTEMPTY') {
+              return { success: false, error: `Directory is not empty: ${normalizedPath}. Delete the files inside first.` };
+            }
+            throw err;
+          }
+        } else {
+          // Delete file
+          await fs.unlink(resolvedPath);
+          return {
+            success: true,
+            message: `File deleted: ${normalizedPath}`,
+            path: normalizedPath,
+          };
+        }
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    },
+  });
+}
+
+/**
  * Create the create_file tool
  */
 export function createCreateFileTool() {
@@ -362,6 +424,7 @@ IMPORTANT: Use positional arguments, not flags. If a command fails, report the e
  * @param {string} options.filePath - Full path to the file being discussed (for edit tool)
  * @param {boolean} options.includeEdit - Whether to include the edit_file tool (default: true)
  * @param {boolean} options.includeCreate - Whether to include create_file tool (default: true)
+ * @param {boolean} options.includeDelete - Whether to include delete_file tool (default: true)
  * @param {boolean} options.includeDatabase - Whether to include query_database tool (default: true)
  * @param {boolean} options.includeCommands - Whether to include run_command tool (default: true)
  */
@@ -370,6 +433,7 @@ export function createChatTools(options = {}) {
     filePath,
     includeEdit = true,
     includeCreate = true,
+    includeDelete = true,
     includeDatabase = true,
     includeCommands = true,
   } = options;
@@ -382,6 +446,10 @@ export function createChatTools(options = {}) {
 
   if (includeCreate) {
     tools.create_file = createCreateFileTool();
+  }
+
+  if (includeDelete) {
+    tools.delete_file = createDeleteFileTool();
   }
 
   if (includeDatabase) {
