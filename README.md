@@ -91,6 +91,8 @@ Plugin types:
 - **Projects** (`bin/projects`): GitHub Projects, Notion, Basecamp, etc.
 - **Tasks** (`bin/tasks`): Todoist, Things, Reminders, Obsidian, etc.
 - **Time Logs** (`bin/track`): Toggl, Clockify, Harvest, RescueTime, etc.
+- **Contacts** (`bin/contacts`): Address books, birthdays, contact management.
+- **Finance** (`bin/finance`): Budgets, transactions, account balances.
 - **Utility**: Inbox processing, file cleanup, linting, etc.
 
 You can configure multiple sources for each plugin, for example, for a work Gmail account and a personal Gmail account. You can add instructions for each source to tell the AI something about it ("This is my birthdays calendar. Remind me of these events one week in advance, and then the day of."). *Only some of the above-listed services already have [plugins](plugins/)!* Please share your own where you see a gap you want to fill. The [Plugin README](plugins/README.md) explains how to create plugins. Reach out at https://github.com/jeffcovey/today/discussions to share your work or ideas or to ask questions.
@@ -187,6 +189,7 @@ The `vault/inbox/` directory is a drop zone for quick capture. The inbox-process
 |-----------|-----------|--------|
 | **Progress notes** | First line is `# Progress` | Appended to diary file, moved to `.trash` |
 | **Concern notes** | First line is `# Concerns` or filename contains "concerns" | Appended to diary file, moved to `.trash` |
+| **Gratitude notes** | First line is `# Gratitude` or filename contains "gratitude" | Appended to diary file, moved to `.trash` |
 | **Task files** | Contains only checkbox lines (`- [ ]` or `- [x]`) | Tasks appended to `tasks/tasks.md`, moved to `.trash` |
 | **Other notes** | Default | Left in inbox for user review |
 
@@ -259,7 +262,7 @@ pm2 save
 crontab -e
 
 # Add entries like:
-*/10 * * * * cd /path/to/today && bin/sync --quick
+*/10 * * * * cd /path/to/today && bin/plugins sync
 0 */2 * * * cd /path/to/today && bin/today update
 ```
 
