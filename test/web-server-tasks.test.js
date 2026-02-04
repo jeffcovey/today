@@ -11,8 +11,17 @@ import path from 'path';
 
 // Test configuration
 const BASE_URL = 'http://localhost:3001';
-const TEST_FILE = 'vault/routines/evening.md';
-const TEST_LINE = 112; // "Lock the doors" task
+const FIXTURE_SOURCE = 'test/fixtures/task-toggle-fixture.md';
+const TEST_FILE = 'vault/test/task-toggle-fixture.md'; // Where server expects it
+const TEST_LINE = 8; // "Test task for toggle testing" - stable fixture line
+
+// Copy fixture from test/fixtures/ to vault/test/ (server reads from vault)
+async function ensureFixture() {
+  const sourcePath = path.join(process.cwd(), FIXTURE_SOURCE);
+  const destPath = path.join(process.cwd(), TEST_FILE);
+  await fs.mkdir(path.dirname(destPath), { recursive: true });
+  await fs.copyFile(sourcePath, destPath);
+}
 
 // Helper to get session cookie
 let sessionCookie = null;
@@ -89,10 +98,16 @@ async function isServerRunning() {
 
 describe('Task Toggle API', () => {
   beforeAll(async () => {
+    await ensureFixture();
     const running = await isServerRunning();
     if (!running) {
       console.warn('Web server not running on localhost:3001 - skipping tests');
     }
+  });
+
+  beforeEach(async () => {
+    // Reset fixture to clean state before each test
+    await ensureFixture();
   });
 
   describe('POST /task/toggle', () => {
