@@ -675,8 +675,8 @@ async function renderDirectory(dirPath, urlPath) {
         ${getTimerWidget(currentTimer)}
 
         <div class="row">
-          <!-- Content column -->
-          <div class="col-12 col-md-7 mb-3">
+          <!-- Content column (order-2 on mobile so AI chat appears first) -->
+          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
   `;
 
   // Special homepage content
@@ -966,8 +966,8 @@ async function renderDirectory(dirPath, urlPath) {
         </div>
       </div>
 
-    <!-- Chat column -->
-    <div class="col-12 col-md-5 mb-3">
+    <!-- Chat column (order-1 on mobile so it appears first) -->
+    <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
       ${getAIAssistantPanel('Ask questions about this directory and its contents')}
     </div>
   </div>
@@ -3707,8 +3707,8 @@ ${cleanContent}
         ${getTimerWidget(currentTimer)}
 
         <div class="row">
-          <!-- Content column -->
-          <div class="col-12 col-md-7 mb-3">
+          <!-- Content column (order-2 on mobile so AI chat appears first) -->
+          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
             <div class="card shadow-sm">
               <div class="card-header bg-white border-bottom">
                 <div class="d-flex justify-content-between align-items-center">
@@ -3726,8 +3726,8 @@ ${cleanContent}
             </div>
           </div>
           
-          <!-- Chat column -->
-          <div class="col-12 col-md-5 mb-3">
+          <!-- Chat column (order-1 on mobile so it appears first) -->
+          <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
             ${getAIAssistantPanel('Start a conversation about this document')}
           </div>
         </div>
