@@ -168,7 +168,30 @@ program
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const sql = `
+    const sql = options.review ? `
+      SELECT id, title, status, priority, topic, due_date, progress,
+             review_frequency, last_reviewed
+      FROM projects
+      ${whereClause}
+      ORDER BY
+        CASE review_frequency
+          WHEN 'daily' THEN 1
+          WHEN 'weekly' THEN 2
+          WHEN 'monthly' THEN 3
+          WHEN 'quarterly' THEN 4
+          WHEN 'yearly' THEN 5
+          ELSE 6
+        END,
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        title
+    ` : `
       SELECT id, title, status, priority, topic, due_date, progress,
              review_frequency, last_reviewed
       FROM projects
@@ -202,29 +225,73 @@ program
 
     console.log('');
 
-    // Group by status
-    const byStatus = {};
-    for (const project of projects) {
-      if (!byStatus[project.status]) {
-        byStatus[project.status] = [];
+    if (options.review) {
+      // Group by review frequency
+      const byReviewFrequency = {};
+      for (const project of projects) {
+        const freq = project.review_frequency || 'none';
+        if (!byReviewFrequency[freq]) {
+          byReviewFrequency[freq] = [];
+        }
+        byReviewFrequency[freq].push(project);
       }
-      byStatus[project.status].push(project);
-    }
 
-    for (const [status, statusProjects] of Object.entries(byStatus)) {
-      const statusEmoji = STATUS_EMOJI[status] || '●';
-      console.log(colors.bold(`${statusEmoji} ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')} (${statusProjects.length})`));
-      console.log('');
+      // Define display order and emojis for review frequencies
+      const frequencyOrder = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'none'];
+      const frequencyEmojis = {
+        daily: '📅',
+        weekly: '📆',
+        monthly: '🗓️',
+        quarterly: '📋',
+        yearly: '📊',
+        none: '❓'
+      };
 
-      for (const project of statusProjects) {
-        const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
-        const progressStr = project.progress ? colors.cyan(` [${project.progress}%]`) : '';
-        const topicStr = project.topic ? colors.gray(` #${project.topic}`) : '';
-        const dueStr = project.due_date ? colors.yellow(` 📅 ${project.due_date}`) : '';
+      for (const frequency of frequencyOrder) {
+        if (byReviewFrequency[frequency]) {
+          const frequencyProjects = byReviewFrequency[frequency];
+          const emoji = frequencyEmojis[frequency] || '●';
+          const displayName = frequency === 'none' ? 'No Review Frequency' : frequency.charAt(0).toUpperCase() + frequency.slice(1);
+          console.log(colors.bold(`${emoji} ${displayName} (${frequencyProjects.length})`));
+          console.log('');
 
-        console.log(`  ${priorityEmoji} ${project.title}${progressStr}${topicStr}${dueStr}`);
+          for (const project of frequencyProjects) {
+            const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+            const statusEmoji = STATUS_EMOJI[project.status] || '●';
+            const progressStr = project.progress ? colors.cyan(` [${project.progress}%]`) : '';
+            const topicStr = project.topic ? colors.gray(` #${project.topic}`) : '';
+            const dueStr = project.due_date ? colors.yellow(` 📅 ${project.due_date}`) : '';
+
+            console.log(`  ${priorityEmoji} ${project.title}${progressStr} ${statusEmoji}${topicStr}${dueStr}`);
+          }
+          console.log('');
+        }
       }
-      console.log('');
+    } else {
+      // Group by status (original behavior)
+      const byStatus = {};
+      for (const project of projects) {
+        if (!byStatus[project.status]) {
+          byStatus[project.status] = [];
+        }
+        byStatus[project.status].push(project);
+      }
+
+      for (const [status, statusProjects] of Object.entries(byStatus)) {
+        const statusEmoji = STATUS_EMOJI[status] || '●';
+        console.log(colors.bold(`${statusEmoji} ${status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')} (${statusProjects.length})`));
+        console.log('');
+
+        for (const project of statusProjects) {
+          const priorityEmoji = PRIORITY_EMOJI[project.priority] || '  ';
+          const progressStr = project.progress ? colors.cyan(` [${project.progress}%]`) : '';
+          const topicStr = project.topic ? colors.gray(` #${project.topic}`) : '';
+          const dueStr = project.due_date ? colors.yellow(` 📅 ${project.due_date}`) : '';
+
+          console.log(`  ${priorityEmoji} ${project.title}${progressStr}${topicStr}${dueStr}`);
+        }
+        console.log('');
+      }
     }
 
     console.log(colors.gray(`${projects.length} projects`));
