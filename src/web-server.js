@@ -22,6 +22,7 @@ import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
+import { parse as parseToml } from 'smol-toml';
 import {
   chatWithFile,
   chatWithDirectory,
@@ -1306,7 +1307,7 @@ async function renderEditor(filePath, urlPath) {
               <div class="col">
                 <span class="text-muted">
                   <i class="fas fa-keyboard me-2"></i>
-                  Markdown Editor
+                  ${fileName.endsWith('.toml') ? 'TOML Editor' : 'Markdown Editor'}
                 </span>
               </div>
               <div class="col-auto">
@@ -1335,10 +1336,10 @@ async function renderEditor(filePath, urlPath) {
         function saveFile() {
           const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
-          
+
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
           saveStatus.className = 'text-primary small me-3';
-          
+
           fetch('/save/${urlPath}', {
             method: 'POST',
             headers: {
@@ -1362,7 +1363,7 @@ async function renderEditor(filePath, urlPath) {
             saveStatus.className = 'text-danger small me-3';
           });
         }
-        
+
         // Auto-save on Ctrl+S / Cmd+S
         document.addEventListener('keydown', function(e) {
           if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -1370,10 +1371,10 @@ async function renderEditor(filePath, urlPath) {
             saveFile();
           }
         });
-        
+
         // Focus the editor when page loads
         document.getElementById('editor').focus();
-        
+
         // Add Tab key support in textarea
         document.getElementById('editor').addEventListener('keydown', function(e) {
           if (e.key === 'Tab') {
@@ -1389,6 +1390,315 @@ async function renderEditor(filePath, urlPath) {
     </body>
     </html>
   `;
+}
+
+// TOML rendering
+async function renderToml(filePath, urlPath) {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const fileName = path.basename(urlPath);
+
+  // Get current timer info
+  const currentTimer = await getCurrentTimer();
+
+  // Build breadcrumb
+  const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
+  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
+  let currentPath = '';
+  breadcrumbParts.forEach((part, index) => {
+    currentPath += '/' + part;
+    if (index === breadcrumbParts.length - 1) {
+      breadcrumbHtml += `<li class="breadcrumb-item active" aria-current="page">${part}</li>`;
+    } else {
+      breadcrumbHtml += `<li class="breadcrumb-item"><a href="${currentPath}">${part}</a></li>`;
+    }
+  });
+
+  // Parse TOML content to validate syntax
+  let parsedContent = null;
+  let parseError = null;
+  try {
+    parsedContent = parseToml(content);
+  } catch (error) {
+    parseError = error.message;
+  }
+
+  // Apply syntax highlighting to TOML content
+  const language = hljs.getLanguage('toml') ? 'toml' : 'plaintext';
+  const highlightedContent = hljs.highlight(content, { language }).value;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <title>${fileName}</title>
+      ${pageStyle}
+    </head>
+    <body>
+      ${getNavbar(fileName, 'fa-cog')}
+
+      <!-- Main content with chat -->
+      <div class="container-fluid mt-3">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            ${breadcrumbHtml}
+          </ol>
+        </nav>
+
+        <!-- Time Tracking -->
+        ${getTimerWidget(currentTimer)}
+
+        <div class="row">
+          <!-- Content column (order-2 on mobile so AI chat appears first) -->
+          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
+            <div class="card shadow-sm">
+              <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">
+                    <i class="fas fa-cog me-2 text-secondary"></i>${fileName}
+                  </h5>
+                  <a href="/edit/${urlPath}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-edit me-1"></i>Edit
+                  </a>
+                </div>
+              </div>
+              <div class="card-body">
+                ${parseError ? `
+                <div class="alert alert-warning" role="alert">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  <strong>TOML Syntax Issue:</strong> ${parseError}
+                </div>
+                ` : ''}
+
+                <div class="mb-3">
+                  <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    TOML Configuration File
+                  </small>
+                </div>
+
+                <pre class="toml-content"><code class="language-toml hljs">${highlightedContent}</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat column (order-1 on mobile so it appears first) -->
+          <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
+            ${getAIAssistantPanel('Ask me about this configuration file')}
+          </div>
+        </div>
+      </div>
+
+      ${getFloatingToggleBtn()}
+
+      ${pageScriptsWithMarked}
+
+      <script>
+        // Page-specific: Chat functionality
+        checkChatVersion(); // Page will reload if version changed
+
+        let chatHistory = [];
+        let inputHistory = JSON.parse(localStorage.getItem('inputHistory') || '[]');
+        let historyIndex = -1;
+        const chatStorageKey = 'chatHistory_${urlPath}';
+        const chatApiPath = '${urlPath}';
+
+        // Load existing chat messages (from server first, then localStorage fallback)
+        async function loadChatHistory() {
+          const chatMessages = document.getElementById('chatMessages');
+
+          // Try to load from server first
+          try {
+            const response = await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.messages && data.messages.length > 0) {
+                chatHistory = data.messages;
+                // Also update localStorage as backup
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+              }
+            }
+          } catch (e) {
+            console.log('Failed to load chat from server, falling back to localStorage');
+          }
+
+          // Fall back to localStorage if no server data
+          if (chatHistory.length === 0) {
+            chatHistory = JSON.parse(localStorage.getItem(chatStorageKey) || '[]');
+          }
+
+          if (chatHistory.length > 0) {
+            chatMessages.innerHTML = '';
+            chatHistory.forEach(msg => {
+              addChatBubble(msg.content, msg.role, false, null, msg.timestamp);
+            });
+          }
+        }
+
+        // Save conversation to server
+        async function saveConversationToServer() {
+          try {
+            await fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messages: chatHistory })
+            });
+          } catch (e) {
+            console.log('Failed to save conversation to server');
+          }
+        }
+
+        // Add a chat bubble to the interface
+        function addChatBubble(message, role, save = true, replyTime = null, msgTimestamp = null) {
+          const chatMessages = document.getElementById('chatMessages');
+          const bubble = document.createElement('div');
+          bubble.className = \`chat-bubble \${role}\`;
+
+          const displayDate = msgTimestamp ? new Date(msgTimestamp) : new Date();
+          const timestamp = displayDate.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+
+          // Render markdown using marked with external link renderer
+          const renderedContent = marked.parse(message, { breaks: true });
+
+          let bubbleHtml = \`
+            <div class="bubble-content">
+              <small class="d-block chat-timestamp">
+                \${role === 'user' ? 'You' : 'AI'} · \${timestamp}
+              </small>
+              <div class="markdown-content">\${renderedContent}</div>
+          \`;
+
+          if (replyTime) {
+            bubbleHtml += \`<small class="d-block mt-1 chat-timestamp-subtle">Replied in \${replyTime}</small>\`;
+          }
+
+          bubbleHtml += \`</div>\`;
+          bubble.innerHTML = bubbleHtml;
+
+          chatMessages.appendChild(bubble);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+
+          if (save) {
+            chatHistory.push({
+              role: role,
+              content: message,
+              timestamp: new Date().toISOString()
+            });
+            localStorage.setItem(chatStorageKey, JSON.stringify(chatHistory));
+            saveConversationToServer();
+          }
+        }
+
+        // Send message to AI
+        async function sendMessage() {
+          const input = document.getElementById('chatInput');
+          const message = input.value.trim();
+
+          if (!message) return;
+
+          // Handle /clear command
+          if (message === '/clear') {
+            chatHistory = [];
+            localStorage.removeItem(chatStorageKey);
+            // Also clear on server
+            fetch(\`/api/ai-chat/conversations/\${chatApiPath}\`, { method: 'DELETE' }).catch(() => {});
+            document.getElementById('chatMessages').innerHTML = \`
+              <div class="text-center text-muted p-3">
+                <small>Conversation cleared. Start fresh!</small>
+              </div>
+            \`;
+            input.value = '';
+            return;
+          }
+
+          // Add to input history
+          inputHistory.unshift(message);
+          inputHistory = inputHistory.slice(0, 50); // Keep last 50
+          localStorage.setItem('inputHistory', JSON.stringify(inputHistory));
+          historyIndex = -1;
+
+          // Add user message
+          addChatBubble(message, 'user');
+          input.value = '';
+
+          // Show typing indicator
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'chat-bubble assistant typing-indicator';
+          typingIndicator.innerHTML = \`
+            <div class="bubble-content">
+              <small class="d-block chat-timestamp">AI · Thinking...</small>
+              <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          \`;
+          document.getElementById('chatMessages').appendChild(typingIndicator);
+
+          try {
+            // Get the TOML content
+            const tomlContent = document.querySelector('.toml-content').innerText || '';
+
+            const response = await fetch(\`/ai-chat/\${chatApiPath}\`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: message,
+                history: chatHistory,
+                documentContent: tomlContent
+              })
+            });
+
+            if (!response.ok) throw new Error('Failed to get AI response');
+
+            const data = await response.json();
+
+            // Remove typing indicator
+            typingIndicator.remove();
+
+            // Add AI response
+            addChatBubble(data.response, 'assistant');
+
+          } catch (error) {
+            console.error('Error sending message:', error);
+            typingIndicator.remove();
+            addChatBubble('Sorry, I encountered an error. Please try again.', 'assistant');
+          }
+        }
+
+        // Handle input history with arrow keys
+        document.getElementById('chatInput').addEventListener('keydown', function(e) {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex < inputHistory.length - 1) {
+              historyIndex++;
+              this.value = inputHistory[historyIndex];
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+              historyIndex--;
+              this.value = inputHistory[historyIndex];
+            } else if (historyIndex === 0) {
+              historyIndex = -1;
+              this.value = '';
+            }
+          }
+        });
+
+        // Load chat history on page load
+        loadChatHistory();
+      </script>
+    </body>
+    </html>
+  `;
+
+  return html;
 }
 
 // Emoji to Font Awesome icon mapping
@@ -5711,10 +6021,10 @@ app.get('/edit/*path', authMiddleware, async (req, res) => {
       }
     }
 
-    // Check if file exists and is a markdown file
+    // Check if file exists and is a markdown or TOML file
     const stats = await fs.stat(fullPath);
-    if (!stats.isFile() || !fullPath.endsWith('.md')) {
-      return res.status(400).send('Can only edit markdown files');
+    if (!stats.isFile() || (!fullPath.endsWith('.md') && !fullPath.endsWith('.toml'))) {
+      return res.status(400).send('Can only edit markdown and TOML files');
     }
 
     const html = await renderEditor(fullPath, urlPath);
@@ -6026,10 +6336,10 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
       }
     }
 
-    // Check if file exists and is a markdown file
+    // Check if file exists and is a markdown or TOML file
     const stats = await fs.stat(fullPath);
-    if (!stats.isFile() || !fullPath.endsWith('.md')) {
-      return res.status(400).send('Can only save markdown files');
+    if (!stats.isFile() || (!fullPath.endsWith('.md') && !fullPath.endsWith('.toml'))) {
+      return res.status(400).send('Can only save markdown and TOML files');
     }
     
     // Write the content
@@ -6336,7 +6646,10 @@ app.get('/*path', authMiddleware, async (req, res) => {
         const bypassCache = req.query._refresh !== undefined;
         const html = bypassCache
           ? await renderMarkdownUncached(fullPath, urlPath)
-          : await renderMarkdown(fullPath, urlPath);
+          : await getCachedRender(fullPath, urlPath);
+        res.send(html);
+      } else if (fullPath.endsWith('.toml')) {
+        const html = await renderToml(fullPath, urlPath);
         res.send(html);
       } else {
         // Serve raw files
