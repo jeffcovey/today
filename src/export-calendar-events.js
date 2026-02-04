@@ -11,11 +11,11 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Convert database time to proper timezone-aware ISO string
+ * Convert database time to proper timezone-aware ISO string with offset
  * @param {string} dateTime - Database datetime string
  * @param {string} timezone - Event timezone (e.g., "America/New_York")
  * @param {string} defaultTimezone - Default timezone from config
- * @returns {string} Properly formatted ISO string
+ * @returns {string} ISO string with timezone offset (e.g., "2026-02-04T08:00:00-05:00")
  */
 function convertDatabaseTime(dateTime, timezone, defaultTimezone) {
   if (!dateTime) return null;
@@ -27,8 +27,8 @@ function convertDatabaseTime(dateTime, timezone, defaultTimezone) {
   const parsed = parseISO(dateTime);
   const tzDate = new TZDate(parsed, tz);
 
-  // Return as ISO string that maintains timezone context
-  return format(tzDate, "yyyy-MM-dd'T'HH:mm:ss");
+  // Return as ISO string WITH timezone offset for unambiguous interpretation
+  return format(tzDate, "yyyy-MM-dd'T'HH:mm:ssxxx");
 }
 
 /**

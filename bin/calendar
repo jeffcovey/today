@@ -8,7 +8,21 @@ autoDotenvx();
 import { execSync } from 'child_process';
 import { getDatabase } from '../src/database-service.js';
 import { discoverPlugins, getPluginSources, getPluginAccess, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
-import { getConfiguredTimezone, formatTime } from '../src/date-utils.js';
+import { getConfiguredTimezone, formatTime, getStartOfDay, getEndOfDay } from '../src/date-utils.js';
+import { TZDate } from '@date-fns/tz';
+import { format, parseISO } from 'date-fns';
+
+// Get local date string (YYYY-MM-DD) for an event start time
+function getLocalDateKey(startTime, timezone) {
+  if (!startTime.includes('T')) {
+    // All-day event stored as date only
+    return startTime;
+  }
+  // Timed event - convert to local timezone and get date
+  const d = parseISO(startTime);
+  const tzDate = new TZDate(d, timezone);
+  return format(tzDate, 'yyyy-MM-dd');
+}
 import { program } from 'commander';
 
 // Get configured timezone
@@ -69,7 +83,20 @@ function ensureSync(db) {
 }
 
 // Get events from database
+// Finds events that overlap with the given date range
+// Handles both timed events (stored as UTC datetime) and all-day events (stored as YYYY-MM-DD)
 function getEventsForRange(db, startDate, endDate) {
+  // Convert boundaries to both formats for comparison:
+  // - Date strings (YYYY-MM-DD) for all-day events
+  // - ISO strings for timed events
+  const startISO = startDate.toISOString();
+  const endISO = endDate.toISOString();
+  const startDateOnly = startISO.slice(0, 10);
+  const endDateOnly = endISO.slice(0, 10);
+
+  // Query uses CASE to handle all-day vs timed events differently:
+  // - All-day events: compare dates only (all_day = 1)
+  // - Timed events: compare full timestamps (all_day = 0)
   return db.prepare(`
     SELECT
       id, source, calendar_name, title,
@@ -77,9 +104,13 @@ function getEventsForRange(db, startDate, endDate) {
       start_timezone, end_timezone,
       location, description, all_day
     FROM events
-    WHERE start_date <= ? AND end_date >= ?
-    ORDER BY start_date
-  `).all(endDate.toISOString(), startDate.toISOString()).map(event => ({
+    WHERE (
+      (all_day = 1 AND start_date < ? AND end_date > ?)
+      OR
+      (all_day = 0 AND start_date < ? AND end_date > ?)
+    )
+    ORDER BY all_day DESC, start_date
+  `).all(endDateOnly, startDateOnly, endISO, startISO).map(event => ({
     ...event,
     allDay: event.all_day === 1,
     calendar: event.calendar_name
@@ -184,9 +215,10 @@ function parseEventArgs(args) {
 async function cmdDate(db, targetDate) {
   ensureSync(db);
 
-  // Parse target date to get start and end of day
-  const startOfDay = new Date(targetDate + 'T00:00:00');
-  const endOfDay = new Date(targetDate + 'T23:59:59');
+  // Parse target date with timezone awareness
+  const targetDateObj = new Date(targetDate + 'T12:00:00'); // Use noon to avoid DST issues
+  const startOfDay = getStartOfDay(targetDateObj, TIMEZONE);
+  const endOfDay = getEndOfDay(targetDateObj, TIMEZONE);
 
   const events = getEventsForRange(db, startOfDay, endOfDay);
 
@@ -209,10 +241,9 @@ async function cmdDate(db, targetDate) {
 async function cmdToday(db) {
   ensureSync(db);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Use timezone-aware day boundaries
+  const today = getStartOfDay(new Date(), TIMEZONE);
+  const tomorrow = getEndOfDay(new Date(), TIMEZONE);
 
   const events = getEventsForRange(db, today, tomorrow);
 
@@ -243,10 +274,10 @@ async function cmdToday(db) {
 async function cmdWeek(db) {
   ensureSync(db);
 
-  const weekStart = new Date();
-  weekStart.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+  // Use timezone-aware day boundaries
+  const weekStart = getStartOfDay(new Date(), TIMEZONE);
+  const weekEndDate = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const weekEnd = getEndOfDay(weekEndDate, TIMEZONE);
 
   const events = getEventsForRange(db, weekStart, weekEnd);
 
@@ -257,7 +288,7 @@ async function cmdWeek(db) {
 
     const byDate = {};
     for (const event of events) {
-      const dateKey = event.start.split('T')[0];
+      const dateKey = getLocalDateKey(event.start, TIMEZONE);
       if (!byDate[dateKey]) byDate[dateKey] = [];
       byDate[dateKey].push(event);
     }

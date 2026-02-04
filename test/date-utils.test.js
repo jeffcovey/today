@@ -2,6 +2,9 @@ import { jest } from '@jest/globals';
 import {
   formatDate,
   formatDateTime,
+  formatTime,
+  getStartOfDay,
+  getEndOfDay,
   getWeekNumber,
   getQuarterNumber,
   getQuarterString,
@@ -174,6 +177,77 @@ describe('date-utils', () => {
 
     test('should return short day name', () => {
       expect(getShortDayName(testDate)).toBe('Tue');
+    });
+  });
+
+  describe('formatTime (timezone-aware)', () => {
+    test('should include timezone abbreviation in output', () => {
+      // Use a fixed UTC time and check it includes timezone info
+      const utcTime = '2025-12-09T17:30:00Z'; // 5:30 PM UTC
+      const result = formatTime(utcTime, 'America/New_York');
+      // Should be 12:30 PM Eastern (UTC-5 in winter)
+      expect(result).toMatch(/12:30 PM/);
+      expect(result).toMatch(/GMT-5|EST/); // Should include timezone indicator
+    });
+
+    test('should format morning time correctly', () => {
+      const utcTime = '2025-12-09T13:00:00Z'; // 1 PM UTC = 8 AM Eastern
+      const result = formatTime(utcTime, 'America/New_York');
+      expect(result).toMatch(/8:00 AM/);
+    });
+
+    test('should format evening time correctly', () => {
+      const utcTime = '2025-12-10T00:00:00Z'; // Midnight UTC = 7 PM Eastern (prev day)
+      const result = formatTime(utcTime, 'America/New_York');
+      expect(result).toMatch(/7:00 PM/);
+    });
+  });
+
+  describe('getStartOfDay (timezone-aware)', () => {
+    test('should return midnight in specified timezone', () => {
+      // Feb 4, 2026 noon UTC
+      const date = new Date('2026-02-04T12:00:00Z');
+      const result = getStartOfDay(date, 'America/New_York');
+
+      // Midnight Feb 4 Eastern = 5 AM Feb 4 UTC (EST is UTC-5)
+      expect(result.toISOString()).toBe('2026-02-04T05:00:00.000Z');
+    });
+
+    test('should handle date near midnight correctly', () => {
+      // 3 AM UTC on Feb 4 = 10 PM Feb 3 Eastern
+      const date = new Date('2026-02-04T03:00:00Z');
+      const result = getStartOfDay(date, 'America/New_York');
+
+      // Start of Feb 3 Eastern = 5 AM Feb 3 UTC
+      expect(result.toISOString()).toBe('2026-02-03T05:00:00.000Z');
+    });
+
+    test('should work with Pacific timezone', () => {
+      const date = new Date('2026-02-04T12:00:00Z');
+      const result = getStartOfDay(date, 'America/Los_Angeles');
+
+      // Midnight Feb 4 Pacific = 8 AM Feb 4 UTC (PST is UTC-8)
+      expect(result.toISOString()).toBe('2026-02-04T08:00:00.000Z');
+    });
+  });
+
+  describe('getEndOfDay (timezone-aware)', () => {
+    test('should return midnight of next day in specified timezone', () => {
+      const date = new Date('2026-02-04T12:00:00Z');
+      const result = getEndOfDay(date, 'America/New_York');
+
+      // Midnight Feb 5 Eastern = 5 AM Feb 5 UTC
+      expect(result.toISOString()).toBe('2026-02-05T05:00:00.000Z');
+    });
+
+    test('should be exactly 24 hours after getStartOfDay', () => {
+      const date = new Date('2026-02-04T12:00:00Z');
+      const start = getStartOfDay(date, 'America/New_York');
+      const end = getEndOfDay(date, 'America/New_York');
+
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      expect(diffHours).toBe(24);
     });
   });
 });

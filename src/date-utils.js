@@ -299,16 +299,17 @@ export function getWeekAgoDate(timezone) {
 }
 
 /**
- * Format a time for display (e.g., "7:31 PM").
+ * Format a time for display (e.g., "7:31 PM EST").
+ * Includes timezone abbreviation for unambiguous time representation.
  * @param {Date|string} date - Date object or ISO string
  * @param {string} [timezone] - Optional timezone override
- * @returns {string} Formatted time
+ * @returns {string} Formatted time with timezone
  */
 export function formatTime(date, timezone) {
   const tz = timezone || getConfiguredTimezone();
   const d = typeof date === 'string' ? parseISO(date) : date;
   const tzDate = new TZDate(d, tz);
-  return format(tzDate, 'h:mm a');
+  return format(tzDate, 'h:mm a zzz');
 }
 
 /**
@@ -332,6 +333,31 @@ export function getStartOfDayTimestamp(timezone) {
   const now = new TZDate(new Date(), tz);
   const startOfToday = dfStartOfDay(now);
   return new TZDate(startOfToday, tz).getTime();
+}
+
+/**
+ * Get the start of a day in the configured timezone as a Date object.
+ * Use this for database queries that need timezone-aware day boundaries.
+ * @param {Date} [date] - Date to get start of day for (default: now)
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {Date} Date object representing midnight in the specified timezone
+ */
+export function getStartOfDay(date, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const d = date ? new TZDate(date, tz) : new TZDate(new Date(), tz);
+  const startOfDay = dfStartOfDay(d);
+  return new Date(new TZDate(startOfDay, tz).getTime());
+}
+
+/**
+ * Get the end of a day (midnight of next day) in the configured timezone as a Date object.
+ * @param {Date} [date] - Date to get end of day for (default: now)
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {Date} Date object representing midnight of the next day
+ */
+export function getEndOfDay(date, timezone) {
+  const start = getStartOfDay(date, timezone);
+  return new Date(start.getTime() + 24 * 60 * 60 * 1000);
 }
 
 /**
