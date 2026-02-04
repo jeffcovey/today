@@ -2,7 +2,7 @@
  * Web Server Task Toggle Tests
  *
  * Tests the /task/toggle endpoint for completing/uncompleting tasks.
- * Requires the web server to be running on localhost:3001.
+ * Requires the web server to be running on localhost:3001 with VAULT_PATH=test/fixtures.
  */
 
 import { jest } from '@jest/globals';
@@ -11,16 +11,26 @@ import path from 'path';
 
 // Test configuration
 const BASE_URL = 'http://localhost:3001';
-const FIXTURE_SOURCE = 'test/fixtures/task-toggle-fixture.md';
-const TEST_FILE = 'vault/test/task-toggle-fixture.md'; // Where server expects it
+const VAULT_PATH = 'test/fixtures'; // Tests expect server to use this as VAULT_PATH
+const TEST_FILE = 'task-toggle-fixture.md';
+const TEST_FILE_PATH = path.join(VAULT_PATH, TEST_FILE);
 const TEST_LINE = 8; // "Test task for toggle testing" - stable fixture line
 
-// Copy fixture from test/fixtures/ to vault/test/ (server reads from vault)
-async function ensureFixture() {
-  const sourcePath = path.join(process.cwd(), FIXTURE_SOURCE);
-  const destPath = path.join(process.cwd(), TEST_FILE);
-  await fs.mkdir(path.dirname(destPath), { recursive: true });
-  await fs.copyFile(sourcePath, destPath);
+// Original fixture content for reset
+const FIXTURE_CONTENT = `# Test Tasks
+
+This file is used by web-server-tasks.test.js for testing task toggle functionality.
+Do not modify manually.
+
+## Tasks
+
+- [ ] Test task for toggle testing #test ⏳ 2099-12-31 ➕ 2025-01-01
+- [ ] Another test task #test
+`;
+
+// Reset fixture to clean state
+async function resetFixture() {
+  await fs.writeFile(TEST_FILE_PATH, FIXTURE_CONTENT, 'utf-8');
 }
 
 // Helper to get session cookie
@@ -81,16 +91,27 @@ async function fetchWithAuth(url, options = {}) {
 
 // Helper to read task line from file
 async function readTaskLine(lineNumber) {
-  const content = await fs.readFile(path.join(process.cwd(), TEST_FILE), 'utf-8');
+  const content = await fs.readFile(TEST_FILE_PATH, 'utf-8');
   const lines = content.split('\n');
   return lines[lineNumber - 1];
 }
 
-// Helper to check if server is running
-async function isServerRunning() {
+// Helper to check if server is running with correct VAULT_PATH
+async function isServerConfiguredForTests() {
   try {
     const response = await fetch(BASE_URL, { method: 'HEAD' });
-    return response.status < 500;
+    if (response.status >= 500) return false;
+
+    // Try to access test fixture - if server uses wrong VAULT_PATH, this will fail
+    const cookie = await login();
+    const testResponse = await fetch(`${BASE_URL}/task/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Cookie': cookie },
+      body: JSON.stringify({ filePath: TEST_FILE, lineNumber: TEST_LINE, completed: false })
+    });
+    // 400 "Not a task line" or 200 means file was found; 400 "file not found" means wrong VAULT_PATH
+    const result = await testResponse.json().catch(() => ({}));
+    return testResponse.ok || (testResponse.status === 400 && result.error !== 'File not found');
   } catch {
     return false;
   }
@@ -98,21 +119,22 @@ async function isServerRunning() {
 
 describe('Task Toggle API', () => {
   beforeAll(async () => {
-    await ensureFixture();
-    const running = await isServerRunning();
-    if (!running) {
-      console.warn('Web server not running on localhost:3001 - skipping tests');
+    await resetFixture();
+    const configured = await isServerConfiguredForTests();
+    if (!configured) {
+      console.warn('Web server not running or not configured for tests - skipping');
+      console.warn('Start server with: VAULT_PATH=test/fixtures bin/web-server');
     }
   });
 
   beforeEach(async () => {
     // Reset fixture to clean state before each test
-    await ensureFixture();
+    await resetFixture();
   });
 
   describe('POST /task/toggle', () => {
     test('should complete a task and update file', async () => {
-      const running = await isServerRunning();
+      const running = await isServerConfiguredForTests();
       if (!running) return;
 
       // First ensure task is unchecked
@@ -120,7 +142,7 @@ describe('Task Toggle API', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
+          filePath: TEST_FILE,
           lineNumber: TEST_LINE,
           completed: false
         })
@@ -131,7 +153,7 @@ describe('Task Toggle API', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
+          filePath: TEST_FILE,
           lineNumber: TEST_LINE,
           completed: true
         })
@@ -151,7 +173,7 @@ describe('Task Toggle API', () => {
     });
 
     test('should uncomplete a task and update file', async () => {
-      const running = await isServerRunning();
+      const running = await isServerConfiguredForTests();
       if (!running) return;
 
       // First ensure task is checked
@@ -159,7 +181,7 @@ describe('Task Toggle API', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
+          filePath: TEST_FILE,
           lineNumber: TEST_LINE,
           completed: true
         })
@@ -170,7 +192,7 @@ describe('Task Toggle API', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
+          filePath: TEST_FILE,
           lineNumber: TEST_LINE,
           completed: false
         })
@@ -190,7 +212,7 @@ describe('Task Toggle API', () => {
     });
 
     test('should return 400 for missing parameters', async () => {
-      const running = await isServerRunning();
+      const running = await isServerConfiguredForTests();
       if (!running) return;
 
       const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
@@ -206,15 +228,15 @@ describe('Task Toggle API', () => {
     });
 
     test('should return 400 for non-task line', async () => {
-      const running = await isServerRunning();
+      const running = await isServerConfiguredForTests();
       if (!running) return;
 
       const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
-          lineNumber: 1, // Line 1 is frontmatter, not a task
+          filePath: TEST_FILE,
+          lineNumber: 1, // Line 1 is a heading, not a task
           completed: true
         })
       });
@@ -225,14 +247,14 @@ describe('Task Toggle API', () => {
     });
 
     test('should require authentication', async () => {
-      const running = await isServerRunning();
+      const running = await isServerConfiguredForTests();
       if (!running) return;
 
       const response = await fetch(`${BASE_URL}/task/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: TEST_FILE.replace('vault/', ''),
+          filePath: TEST_FILE,
           lineNumber: TEST_LINE,
           completed: true
         }),
@@ -248,8 +270,12 @@ describe('Task Toggle API', () => {
 });
 
 describe('Task Toggle - Edge Cases', () => {
+  beforeEach(async () => {
+    await resetFixture();
+  });
+
   test('should handle tasks with multiple spaces before completion date', async () => {
-    const running = await isServerRunning();
+    const running = await isServerConfiguredForTests();
     if (!running) return;
 
     // Complete the task (which adds completion date)
@@ -257,7 +283,7 @@ describe('Task Toggle - Edge Cases', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: TEST_FILE.replace('vault/', ''),
+        filePath: TEST_FILE,
         lineNumber: TEST_LINE,
         completed: true
       })
@@ -268,7 +294,7 @@ describe('Task Toggle - Edge Cases', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: TEST_FILE.replace('vault/', ''),
+        filePath: TEST_FILE,
         lineNumber: TEST_LINE,
         completed: false
       })
@@ -280,7 +306,7 @@ describe('Task Toggle - Edge Cases', () => {
   });
 
   test('should preserve task metadata when toggling', async () => {
-    const running = await isServerRunning();
+    const running = await isServerConfiguredForTests();
     if (!running) return;
 
     // Get original line
@@ -294,7 +320,7 @@ describe('Task Toggle - Edge Cases', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: TEST_FILE.replace('vault/', ''),
+        filePath: TEST_FILE,
         lineNumber: TEST_LINE,
         completed: true
       })
@@ -305,7 +331,7 @@ describe('Task Toggle - Edge Cases', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: TEST_FILE.replace('vault/', ''),
+        filePath: TEST_FILE,
         lineNumber: TEST_LINE,
         completed: false
       })
