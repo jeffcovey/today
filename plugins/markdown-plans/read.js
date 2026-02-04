@@ -2122,6 +2122,155 @@ function updateWeeklyPlanWithHabitStats(weeklyPlanPath, startDate, endDate) {
   };
 }
 
+// Priority emoji map for review projects
+const REVIEW_PRIORITY_EMOJI = {
+  highest: '🔺',
+  high: '⏫',
+  medium: '🔼',
+  low: '🔽',
+  lowest: '⏬',
+};
+
+/**
+ * Query projects from database that need review
+ * Returns projects with review_frequency that are overdue
+ */
+function getProjectsForReview(dateStr) {
+  const dbPath = path.join(projectRoot, '.data/today.db');
+  if (!fs.existsSync(dbPath)) {
+    return [];
+  }
+
+  const query = `
+    SELECT id, title, status, priority, review_frequency, last_reviewed, url,
+           julianday('${dateStr}') - julianday(last_reviewed) as days_since
+    FROM projects
+    WHERE status IN ('active', 'planning')
+      AND review_frequency IS NOT NULL
+      AND (
+        last_reviewed IS NULL
+        OR (review_frequency = 'daily' AND julianday('${dateStr}') - julianday(last_reviewed) >= 1)
+        OR (review_frequency = 'weekly' AND julianday('${dateStr}') - julianday(last_reviewed) >= 7)
+        OR (review_frequency = 'monthly' AND julianday('${dateStr}') - julianday(last_reviewed) >= 30)
+        OR (review_frequency = 'quarterly' AND julianday('${dateStr}') - julianday(last_reviewed) >= 90)
+        OR (review_frequency = 'yearly' AND julianday('${dateStr}') - julianday(last_reviewed) >= 365)
+      )
+    ORDER BY
+      CASE
+        WHEN last_reviewed IS NULL THEN 0
+        ELSE julianday('${dateStr}') - julianday(last_reviewed)
+      END DESC
+  `;
+
+  try {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query}"`, { encoding: 'utf8' });
+    return JSON.parse(result || '[]');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Format projects for display in daily plan review section
+ */
+function formatProjectsForDailyReview(projects) {
+  if (projects.length === 0) return null;
+
+  const lines = [];
+  for (const proj of projects) {
+    const priorityEmoji = REVIEW_PRIORITY_EMOJI[proj.priority] || '🔼';
+    const daysSince = proj.days_since ? Math.floor(proj.days_since) : null;
+    const reviewInfo = daysSince !== null
+      ? `${daysSince}d since last review`
+      : 'never reviewed';
+
+    let titleDisplay = proj.title;
+    if (proj.url) {
+      titleDisplay = `[${proj.title}](${proj.url})`;
+    }
+
+    lines.push(`- ${priorityEmoji} **${titleDisplay}** — ${reviewInfo} (${proj.review_frequency})`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Update daily plan file with projects needing review
+ * Uses markers: <!-- REVIEW_PROJECTS:START --> ... <!-- REVIEW_PROJECTS:END -->
+ */
+function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
+  if (!fs.existsSync(dailyPlanPath)) {
+    return { updated: false, reason: 'file not found' };
+  }
+
+  const projects = getProjectsForReview(dateStr);
+
+  let content = fs.readFileSync(dailyPlanPath, 'utf-8');
+
+  const startMarker = '<!-- REVIEW_PROJECTS:START -->';
+  const endMarker = '<!-- REVIEW_PROJECTS:END -->';
+
+  // Check if markers already exist
+  const startIndex = content.indexOf(startMarker);
+  const endIndex = content.indexOf(endMarker);
+
+  if (projects.length === 0) {
+    // Remove section if no projects need review and markers exist
+    if (startIndex !== -1 && endIndex !== -1) {
+      const before = content.substring(0, startIndex);
+      const after = content.substring(endIndex + endMarker.length);
+      // Remove any trailing newlines from the removed section
+      content = before.trimEnd() + '\n\n' + after.trimStart();
+      fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+      return { updated: true, removed: true, count: 0 };
+    }
+    return { updated: false, reason: 'no projects', count: 0 };
+  }
+
+  const formattedProjects = formatProjectsForDailyReview(projects);
+  const newSection = `${startMarker}\n### 🔍 Projects to Review\n\n${formattedProjects}\n${endMarker}`;
+
+  if (startIndex !== -1 && endIndex !== -1) {
+    // Replace existing section
+    const before = content.substring(0, startIndex);
+    const after = content.substring(endIndex + endMarker.length);
+    content = before + newSection + after;
+  } else {
+    // Add new section after "Today's Focus" / before "Due or Scheduled Today"
+    const dueTodayMatch = content.match(/<!-- DUE_TODAY:/);
+    const topPrioritiesMatch = content.match(/<!-- TOP_PRIORITIES:/);
+
+    if (dueTodayMatch && dueTodayMatch.index !== undefined) {
+      content = content.substring(0, dueTodayMatch.index) + newSection + '\n\n' + content.substring(dueTodayMatch.index);
+    } else if (topPrioritiesMatch && topPrioritiesMatch.index !== undefined) {
+      content = content.substring(0, topPrioritiesMatch.index) + newSection + '\n\n' + content.substring(topPrioritiesMatch.index);
+    } else {
+      // Fallback: add after Today's Focus section
+      const focusEndMatch = content.match(/<!-- \/TODAY_FOCUS -->\n/);
+      if (focusEndMatch && focusEndMatch.index !== undefined) {
+        const insertPos = focusEndMatch.index + focusEndMatch[0].length;
+        content = content.substring(0, insertPos) + '\n' + newSection + '\n' + content.substring(insertPos);
+      } else {
+        // Last fallback: add before Reflection
+        const reflectionMatch = content.match(/<!-- REFLECTION:/);
+        if (reflectionMatch && reflectionMatch.index !== undefined) {
+          content = content.substring(0, reflectionMatch.index) + newSection + '\n\n' + content.substring(reflectionMatch.index);
+        } else {
+          content += '\n\n' + newSection;
+        }
+      }
+    }
+  }
+
+  fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+
+  return {
+    updated: true,
+    count: projects.length,
+  };
+}
+
 /**
  * Query projects from database for a week
  * Returns projects active during the week (start before/during AND end during/after)
@@ -3768,6 +3917,13 @@ async function main() {
     metadata.plans_created.push({ type: 'day', file: dailyResult.file });
   }
 
+  // Update today's daily plan with projects needing review
+  const todayStr = formatDateStr(today);
+  const dailyReviewResult = updateDailyPlanWithReviewProjects(planPaths.day.path, todayStr);
+  if (dailyReviewResult.updated) {
+    metadata.daily_review_projects_updated = dailyReviewResult.count;
+  }
+
   // Ensure this week's weekly plan exists
   const weeklyResult = ensureWeeklyPlan(planPaths.week, today);
   if (weeklyResult.created) {
@@ -3962,6 +4118,12 @@ async function main() {
   const tomorrowResult = ensureDailyPlan(tomorrowPaths.day, tomorrow);
   if (tomorrowResult.created) {
     metadata.plans_created.push({ type: 'day', file: tomorrowResult.file });
+  }
+
+  // Update tomorrow's daily plan with projects needing review
+  const tomorrowReviewResult = updateDailyPlanWithReviewProjects(tomorrowPaths.day.path, tomorrowStr);
+  if (tomorrowReviewResult.updated) {
+    metadata.tomorrow_review_projects_updated = tomorrowReviewResult.count;
   }
 
   // Fix "done today" in past daily files
