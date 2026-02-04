@@ -235,9 +235,10 @@ program
     console.log('');
 
     for (const m of metrics) {
+      const hasCustomDisplay = !!METRIC_DISPLAY[m.metric_name];
       const display = METRIC_DISPLAY[m.metric_name] || { emoji: '📊', label: m.metric_name, format: v => v };
       const value = display.format(m.value);
-      const unit = m.units && !String(value).includes(m.units) ? ` ${m.units}` : '';
+      const unit = !hasCustomDisplay && m.units ? ` ${m.units}` : '';
       console.log(`  ${display.emoji} ${display.label}: ${value}${unit}`);
     }
 
@@ -366,8 +367,11 @@ program
   });
 
 // Handle --date option at top level (used by bin/today for historical queries)
-const dateArgIdx = process.argv.findIndex(a => a === '--date');
-if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+// Only run if no subcommand is present
+const subcommands = ['list', 'metric', 'summary'];
+const hasSubcommand = process.argv.some(a => subcommands.includes(a));
+const dateArgIdx = process.argv.findIndex(a => a === '--date' || a === '-d');
+if (!hasSubcommand && dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
   const targetDate = process.argv[dateArgIdx + 1];
   const db = getDatabase();
   ensureSyncForType(db, 'health');
