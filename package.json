@@ -25,7 +25,7 @@
     "@date-fns/tz": "^1.4.1",
     "@dotenvx/dotenvx": "^1.51.1",
     "@inkjs/ui": "^2.0.0",
-    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "ai": "^6.0.3",
     "better-sqlite3": "^12.5.0",
     "blessed": "^0.1.81",
