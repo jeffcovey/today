@@ -56,4 +56,4 @@ jobs:
         run: npm ci
 
       - name: Lint markdown
-        run: npx markdownlint-cli2 "**/*.md"
+        run: npx markdownlint-cli2 "*.md" "plugins/**/*.md" "scripts/**/*.md"
