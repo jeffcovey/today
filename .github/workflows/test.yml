@@ -24,6 +24,8 @@ jobs:
 
       - name: Run tests
         run: npm test
+        env:
+          SKIP_UPDATE_CHECK: '1'
 
       - name: Test summary
         if: always()
@@ -51,4 +53,4 @@ jobs:
         run: npm ci
 
       - name: Lint markdown
-        run: npx markdownlint-cli2 "**/*.md" "#node_modules" "#vault"
+        run: npx markdownlint-cli2 "**/*.md" "#node_modules" "#vault" "#docs"

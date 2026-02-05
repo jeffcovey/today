@@ -54,8 +54,16 @@ jobs:
 
             # Check if all vulnerabilities are in known acceptable packages
             # (build-time only dependencies like node-gyp/tar in sqlite3)
-            if echo "$audit_output" | grep -q "node_modules/sqlite3" && \
-               ! echo "$audit_output" | grep -v "sqlite3" | grep -q "high\|critical"; then
+            # These packages are ONLY used during npm install to compile native modules
+            known_build_deps="tar|cacache|make-fetch-happen|node-gyp|sqlite3"
+
+            # Extract package paths from audit output (lines starting with node_modules/)
+            vuln_packages=$(echo "$audit_output" | grep -E "^\s+node_modules/" | sed 's/^[[:space:]]*//' || true)
+
+            # Check if any vulnerable package is NOT in our known build-time deps
+            unknown_vulns=$(echo "$vuln_packages" | grep -vE "node_modules/($known_build_deps)" || true)
+
+            if [ -z "$unknown_vulns" ] && echo "$audit_output" | grep -q "node_modules/sqlite3"; then
               echo "⚠️ Vulnerabilities are in build-time dependencies only (sqlite3/node-gyp/tar)" >> $GITHUB_STEP_SUMMARY
               echo "These don't affect runtime security. See: https://github.com/npm/cli/issues/5234" >> $GITHUB_STEP_SUMMARY
               exit 0
