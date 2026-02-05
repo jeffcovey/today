@@ -12,6 +12,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { getSourcesForType } from '../src/plugin-loader.js';
+import { getConfigPath } from '../src/config.js';
 import { colors } from '../src/cli-utils.js';
 import { program } from 'commander';
 
@@ -39,6 +40,7 @@ async function runContextPlugin(pluginName, sourceId, sourceConfig) {
       env: {
         ...process.env,
         PROJECT_ROOT,
+        CONFIG_PATH: getConfigPath(),
         PLUGIN_CONFIG: JSON.stringify(sourceConfig || {}),
         SOURCE_ID: sourceId
       }

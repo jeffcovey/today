@@ -231,7 +231,7 @@ async function main() {
   const { execSync, spawnSync } = await import('child_process');
   const readline = await import('readline');
 
-  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath, getFocusPresets, getFocusPreset } = await import('../src/config.js');
+  const { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath, getFocusPresets, getFocusPreset, getConfigPath } = await import('../src/config.js');
   const { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync } = await import('../src/ai-provider.js');
   const { getAIInstructionsByType, getPluginSources, checkPluginVaultFileChanges } = await import('../src/plugin-loader.js');
   const { program } = await import('commander');
@@ -477,6 +477,7 @@ The following data was retrieved for the specified date.
           env: {
             ...process.env,
             PROJECT_ROOT: projectRoot,
+            CONFIG_PATH: getConfigPath(),
             PLUGIN_CONFIG: JSON.stringify(sourceConfig),
             SOURCE_ID: sourceId,
             CONTEXT_ONLY: 'true' // Skip expensive operations during context gathering
