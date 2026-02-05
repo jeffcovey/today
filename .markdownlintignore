@@ -8,3 +8,7 @@ vendor/
 # Ignore all dot directories
 .*
 **/.*
+# Ignore generated/template files
+tmp/
+docs/
+vault/
