@@ -20,13 +20,13 @@
     "@ai-sdk/anthropic": "^3.0.1",
     "@ai-sdk/google": "^3.0.1",
     "@ai-sdk/openai": "^3.0.1",
-    "@anthropic-ai/sdk": "^0.71.2",
+    "@anthropic-ai/sdk": "^0.72.1",
     "@clack/prompts": "^0.11.0",
     "@date-fns/tz": "^1.4.1",
     "@dotenvx/dotenvx": "^1.51.1",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "ai": "^6.0.3",
+    "ai": "^6.0.72",
     "better-sqlite3": "^12.5.0",
     "blessed": "^0.1.81",
     "cheerio": "^1.2.0",
@@ -54,7 +54,7 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "ollama-ai-provider-v2": "^1.5.5",
-    "puppeteer": "^24.36.0",
+    "puppeteer": "^24.37.1",
     "react": "^19.2.3",
     "smol-toml": "^1.5.2",
     "sqlite3": "^5.1.7",
@@ -71,7 +71,7 @@
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
     "lefthook": "^2.0.9",
-    "markdownlint-cli2": "^0.19.1"
+    "markdownlint-cli2": "^0.20.0"
   },
   "overrides": {
     "nodemailer": "^7.0.11"
