@@ -26,8 +26,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 RUN ln -s /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true && \
     ln -s /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
 
-# Install global packages in Docker layers
-RUN npm install -g @anthropic-ai/claude-code
+# Install Claude Code to user home directory via official installer
+RUN su node -c "curl -fsSL https://claude.ai/install.sh | bash"
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 # Install mdless (Ruby gem for markdown viewing)

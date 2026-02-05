@@ -27,7 +27,7 @@
 		"DEVCONTAINER_PROJECT": "today"
 	},
 	"remoteEnv": {
-		"PATH": "/home/node/.fly/bin:${containerEnv:PATH}"
+		"PATH": "/home/node/.local/bin:/home/node/.fly/bin:${containerEnv:PATH}"
 	},
 	"forwardPorts": [
 		2222,
