@@ -68,9 +68,9 @@ export function buildFileContext(urlPath, documentContent) {
 
   context += '## Guidelines\n\n';
   context += '- When editing, preserve the document structure (frontmatter, headings, etc.)\n';
-  context += '- CRITICAL: When a user asks you to do something, CALL THE TOOL IMMEDIATELY. Never respond with "Let me..." or "I\'ll..." without actually invoking a tool in the same response. The user cannot see your intentions - they can only see tool results.\n';
+  context += '- CRITICAL: When a user asks you to do something, your response MUST include tool calls. Do NOT respond with only text like "Let me..." or "I\'ll..." or "I understand, let me..." — you MUST actually invoke tools in the same response. A text-only response that promises future action is a failure because the user cannot see your intentions.\n';
   context += '- CRITICAL: If the user requests MULTIPLE actions, make MULTIPLE tool calls IN THE SAME RESPONSE. Do not stop after one tool call.\n';
-  context += '- For questions about schedules, tasks, or data, query the database or run commands\n';
+  context += '- For questions about schedules, tasks, or data, query the database or run commands IMMEDIATELY — do not just describe what you would do.\n';
   context += '- After using tools, report what happened. Say "I added X" or "I found Y", not "I will add X".\n\n';
 
   context += '---CURRENT DOCUMENT CONTENT---\n';
@@ -116,10 +116,10 @@ export function buildDirectoryContext(urlPath, directoryContext) {
 
   context += '## Guidelines\n\n';
   context += '- You can help the user understand what files are in this directory\n';
-  context += '- CRITICAL: When a user asks you to do something, CALL THE TOOL IMMEDIATELY. Never respond with "Let me..." or "I\'ll..." without actually invoking a tool in the same response. The user cannot see your intentions - they can only see tool results.\n';
+  context += '- CRITICAL: When a user asks you to do something, your response MUST include tool calls. Do NOT respond with only text like "Let me..." or "I\'ll..." or "I understand, let me..." — you MUST actually invoke tools in the same response. A text-only response that promises future action is a failure.\n';
   context += '- CRITICAL: If the user requests MULTIPLE items, you MUST address ALL of them. Either make tool calls for each, OR explain why you cannot do specific ones.\n';
   context += '- NEVER silently skip a request. If you cannot do something, you MUST explain why in your text response.\n';
-  context += '- For queries about data, use query_database or run_command\n';
+  context += '- For queries about data, use query_database or run_command IMMEDIATELY — do not just describe what you would do.\n';
   context += '- After executing tools, report what happened. Say "I added X" not "I will add X".\n';
 
   return context;

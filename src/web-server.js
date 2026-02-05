@@ -19,7 +19,7 @@ import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { isPluginConfigured } from './plugin-loader.js';
-import { createCompletion, isAIAvailable } from './ai-provider.js';
+import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -31,6 +31,8 @@ import {
   clearConversation,
   getChatProviderName,
   createChatTools,
+  buildFileContext,
+  buildMessages,
 } from './ai-chat/index.js';
 
 // Configure marked extensions
@@ -1983,8 +1985,8 @@ async function getCachedRender(filePath, urlPath) {
     const mtime = stats.mtime.getTime();
     const size = stats.size;
 
-    // Create cache key from filepath
-    const cacheKey = filePath;
+    // Create cache key from filepath + urlPath (urlPath is baked into rendered HTML for chat paths)
+    const cacheKey = `${filePath}::${urlPath}`;
 
     // Check if we have a cached version
     const cached = renderCache.get(cacheKey);
@@ -5687,6 +5689,58 @@ app.post('/ai-chat-stream/*path', authMiddleware, async (req, res) => {
             })}\n\n`);
             fullResponse += toolSummary;
             console.log('[AI Stream] Added tool summary to response:', toolSummary.slice(0, 100));
+          }
+        }
+      }
+
+      // Detect fluff: AI promised to act but made no tool calls
+      // Retry once with a nudge to actually use tools
+      if (toolCalls.length === 0 && fullResponse && !isAborted) {
+        const promisePattern = /\b(Let me|I'll|I will|I'm going to|I can)\b.{0,40}\b(get|check|look|analyze|find|count|query|search|run|fetch|pull|review|examine)/i;
+        if (promisePattern.test(fullResponse) && fullResponse.length < 500) {
+          console.log('[AI Stream] Detected promise-without-action, retrying with nudge...');
+
+          res.write(`data: ${JSON.stringify({
+            type: 'status',
+            message: 'Running requested actions...'
+          })}\n\n`);
+
+          try {
+            const retrySystemContext = buildFileContext(urlPath, documentContent || '');
+            const baseMessages = buildMessages(retrySystemContext, history, message).messages;
+            const retryMessages = [
+              ...baseMessages,
+              { role: 'assistant', content: fullResponse },
+              { role: 'user', content: 'You described what you would do but did not call any tools. Please make the tool calls now.' }
+            ];
+
+            const retryStream = await streamCompletion({
+              system: retrySystemContext,
+              messages: retryMessages,
+              maxTokens: 4000,
+              tools,
+            });
+
+            for await (const part of retryStream.fullStream) {
+              if (isAborted) break;
+              if (part.type === 'text-delta') {
+                const text = part.text ?? part.textDelta ?? '';
+                if (text) {
+                  fullResponse += text;
+                  res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
+                }
+              } else if (part.type === 'tool-call') {
+                res.write(`data: ${JSON.stringify({ type: 'tool-call', toolName: part.toolName, args: part.args })}\n\n`);
+                toolCalls.push({ name: part.toolName, args: part.args });
+              } else if (part.type === 'tool-result') {
+                const result = part.output ?? part.result;
+                res.write(`data: ${JSON.stringify({ type: 'tool-result', toolName: part.toolName, result })}\n\n`);
+                toolResults.push({ toolName: part.toolName, result });
+              }
+            }
+            console.log('[AI Stream] Retry completed, tool calls:', toolCalls.length);
+          } catch (retryError) {
+            console.error('[AI Stream] Retry failed:', retryError.message);
           }
         }
       }
