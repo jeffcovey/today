@@ -196,6 +196,7 @@ try {
       line: taskLine,
       needs_sync: true  // Database should be refreshed to include new task
     }));
+    process.exit(0);
 
   } else if (action === 'complete') {
     // COMPLETE: Find and mark task as done
