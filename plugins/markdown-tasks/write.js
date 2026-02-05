@@ -128,9 +128,10 @@ function markCompleted(line) {
 function extractTitle(line) {
   return line
     .replace(/^- \[[x ]\] /, '')      // Remove checkbox
+    .replace(/<!--.*?-->/g, '')        // Remove HTML comments (Obsidian IDs)
     .replace(/[🔺⏫🔼🔽⏬]/g, '')      // Remove priority
     .replace(/#\w+\/[\w-]+/g, '')     // Remove tags
-    .replace(/[➕📅⏳✅🔁] \d{4}-\d{2}-\d{2}/g, '') // Remove dates
+    .replace(/[➕📅⏳✅🔁]\s*\d{4}-\d{2}-\d{2}/g, '') // Remove dates
     .replace(/🔁 [^\s#]+(?:\s+[^\s#]+)*/g, '') // Remove recurrence
     .replace(/\s+/g, ' ')
     .trim();
@@ -141,8 +142,13 @@ function extractTitle(line) {
  */
 function lineMatchesTitle(line, expectedTitle) {
   const lineTitle = extractTitle(line);
-  // Case-insensitive comparison, normalize whitespace
-  return lineTitle.toLowerCase() === expectedTitle.toLowerCase().trim();
+  // Normalize expected title too (may contain HTML comments from database)
+  const normalizedExpected = expectedTitle
+    .replace(/<!--.*?-->/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Case-insensitive comparison
+  return lineTitle.toLowerCase() === normalizedExpected.toLowerCase();
 }
 
 /**

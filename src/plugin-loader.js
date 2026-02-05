@@ -372,6 +372,17 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceNa
     // Distinguish between execSync errors (command failed) and JSON parse errors
     if (error.status !== undefined) {
       // execSync error - command exited with non-zero status
+      // First, try to parse stdout for structured JSON error from plugin
+      if (error.stdout) {
+        try {
+          const data = JSON.parse(error.stdout);
+          if (data.error) {
+            return { success: false, error: data.error, data };
+          }
+        } catch {
+          // stdout isn't valid JSON, fall through to stderr scanning
+        }
+      }
       // Extract just the error message, not all progress output from stderr
       const stderr = error.stderr || '';
       // Look for actual error lines (starting with "Error:" or containing "error")
