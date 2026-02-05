@@ -505,8 +505,10 @@ program
 
 // Handle --date option at top level (used by bin/today for historical queries)
 // Shows tasks due, scheduled, or completed on a specific date
+// Only process this if no subcommand is being used (like add, complete, etc.)
+const hasSubcommand = process.argv.find(a => ['add', 'complete', 'list', 'search', 'today', 'recent', 'sync'].includes(a));
 const dateArgIdx = process.argv.findIndex(a => a === '--date');
-if (dateArgIdx > 0 && process.argv[dateArgIdx + 1]) {
+if (dateArgIdx > 0 && process.argv[dateArgIdx + 1] && !hasSubcommand) {
   const targetDate = process.argv[dateArgIdx + 1];
   const db = getDatabase();
   ensureSyncForType(db, 'tasks');
