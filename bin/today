@@ -457,6 +457,16 @@ The following data was retrieved for the specified date.
 
     const lines = ['## Contextual Information', ''];
 
+    // Include user ai_instructions for context plugins
+    if (typeData.instructions && typeData.instructions.length > 0) {
+      lines.push('**Specific instructions from the user:**');
+      for (const { sourceId, text } of typeData.instructions) {
+        lines.push(`From ${sourceId}:`);
+        lines.push(`> ${text.replace(/\n/g, '\n> ')}`);
+        lines.push('');
+      }
+    }
+
     for (const sourceId of typeData.sources) {
       try {
         const [pluginName, sourceName] = sourceId.split('/');
@@ -551,8 +561,9 @@ ${timeInfo}
 
 ## User Profile
 ${profileLines.join('\n')}
-${aiInstructionsSection}
+
 ${dataContext}
+${aiInstructionsSection}
 ${timeReminder}`;
 
     if (dryRun && targetDate) {

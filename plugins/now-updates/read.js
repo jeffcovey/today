@@ -27,6 +27,7 @@ const fileName = config.file_path || 'now.md';
 const updateIntervalHours = config.update_interval_hours || 2;
 const retentionHours = config.retention_hours || 24;
 const updateInstructions = (config.instructions || '').trim();
+const userAiInstructions = (config.ai_instructions || '').trim();
 
 // Divider pattern between updates
 const DIVIDER = '\n\n---\n\n';
@@ -167,11 +168,17 @@ function generateUpdate(now) {
 
   const timestamp = formatTimestamp(now);
 
+  // Combine plugin instructions with user's ai_instructions
+  let fullRequest = updateInstructions;
+  if (userAiInstructions) {
+    fullRequest += '\n\nIMPORTANT — the user requires:\n' + userAiInstructions;
+  }
+
   try {
     // Call bin/today with instructions, just like --focus does
     // Options must come before the request due to passThroughOptions()
     const output = execSync(
-      `bin/today --non-interactive --no-sync --quiet "${updateInstructions.replace(/"/g, '\\"')}"`,
+      `bin/today --non-interactive --no-sync --quiet "${fullRequest.replace(/"/g, '\\"')}"`,
       {
         cwd: projectRoot,
         encoding: 'utf8',
