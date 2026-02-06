@@ -1000,7 +1000,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
           max_per_file: maxTasksPerFile,
           distribution: distributionInfo
         };
-      }
     }
 
     console.log(JSON.stringify({
@@ -1012,6 +1011,8 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       files_modified: Array.from(filesModified),
       needs_sync: filesModified.size > 0
     }));
+
+  }
 
 } catch (error) {
   console.log(JSON.stringify({ success: false, error: `Failed to write: ${error.message}` }));
