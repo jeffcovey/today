@@ -234,7 +234,7 @@ app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
 app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/auth/login")));
 
 const authMiddleware = sessionAuth;
-app.use('/static', express.static(path.join(__dirname, 'web', 'public')));
+app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAge: '1d' }));
 
 // MDBootstrap and custom styles (CSS moved to web/public/css/style.css)
 const pageStyle = `
@@ -2700,10 +2700,10 @@ class DataviewArray extends Array {
 }
 
 // Execute DataviewJS code block
-async function executeDataviewJS(code, vaultPath, currentFilePath) {
+async function executeDataviewJS(code, vaultPath, currentFilePath, allFiles) {
   try {
     // Pre-load all files so dv.pages() can be synchronous
-    const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
     const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
 
     // Create a safe sandbox context
@@ -2750,7 +2750,7 @@ async function executeDataviewJS(code, vaultPath, currentFilePath) {
 }
 
 // Process dataviewjs code blocks in markdown content
-async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
+async function processDataviewJSBlocks(content, vaultPath, currentFilePath, allFiles) {
   const codeBlockRegex = /```dataviewjs\s*([\s\S]*?)```/g;
   let processedContent = content;
   const matches = [];
@@ -2776,7 +2776,7 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
 
     try {
       debug(`Executing dataviewjs block`);
-      const html = await executeDataviewJS(code, vaultPath, currentFilePath);
+      const html = await executeDataviewJS(code, vaultPath, currentFilePath, allFiles);
 
       // Replace the code block with the rendered HTML
       processedContent = processedContent.replace(fullMatch, html);
@@ -2794,7 +2794,7 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath) {
 
 // Process Dataview DQL (query language) code blocks in markdown content
 // Supports a subset of Obsidian Dataview query language
-async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, properties) {
+async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, properties, allFiles) {
   const codeBlockRegex = /```dataview\n([\s\S]*?)```/g;
   let processedContent = content;
   const matches = [];
@@ -2814,7 +2814,7 @@ async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, pro
     const { fullMatch, code } = matches[i];
 
     try {
-      const html = await executeDQLQuery(code, vaultPath, currentFilePath, currentProperties);
+      const html = await executeDQLQuery(code, vaultPath, currentFilePath, currentProperties, allFiles);
       processedContent = processedContent.replace(fullMatch, html);
     } catch (error) {
       debug('Error executing dataview DQL block:', error);
@@ -2829,7 +2829,7 @@ async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, pro
 }
 
 // Execute a Dataview DQL query and return HTML
-async function executeDQLQuery(query, vaultPath, currentFilePath, properties) {
+async function executeDQLQuery(query, vaultPath, currentFilePath, properties, allFiles) {
   const lines = query.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length === 0) return '';
 
@@ -2839,12 +2839,12 @@ async function executeDQLQuery(query, vaultPath, currentFilePath, properties) {
   // Pattern 1: LIST WITHOUT ID item / FLATTEN this.<prop> AS item / WHERE file = this.file
   // This renders a frontmatter array property as a bullet list
   if (firstLine.startsWith('LIST')) {
-    return executeDQLList(lines, vaultPath, currentFilePath, properties);
+    return executeDQLList(lines, vaultPath, currentFilePath, properties, allFiles);
   }
 
   // Pattern 2: TABLE queries
   if (firstLine.startsWith('TABLE')) {
-    return executeDQLTable(lines, vaultPath, currentFilePath, properties);
+    return executeDQLTable(lines, vaultPath, currentFilePath, properties, allFiles);
   }
 
   // Unsupported query type - show as code block
@@ -2852,7 +2852,7 @@ async function executeDQLQuery(query, vaultPath, currentFilePath, properties) {
 }
 
 // Execute a DQL LIST query
-async function executeDQLList(lines, vaultPath, currentFilePath, properties) {
+async function executeDQLList(lines, vaultPath, currentFilePath, properties, allFiles) {
   const joinedQuery = lines.join(' ');
 
   // Check for: LIST WITHOUT ID item / FLATTEN this.<prop> AS item / WHERE file = this.file
@@ -2877,7 +2877,7 @@ async function executeDQLList(lines, vaultPath, currentFilePath, properties) {
   const fromMatch = joinedQuery.match(/FROM\s+"([^"]+)"/i);
   if (fromMatch) {
     const folder = fromMatch[1];
-    const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
     let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
 
     // Apply WHERE clause if present
@@ -2918,7 +2918,7 @@ async function executeDQLList(lines, vaultPath, currentFilePath, properties) {
 }
 
 // Execute a DQL TABLE query
-async function executeDQLTable(lines, vaultPath, currentFilePath, properties) {
+async function executeDQLTable(lines, vaultPath, currentFilePath, properties, allFiles) {
   const joinedQuery = lines.join(' ');
 
   // Parse FROM clause
@@ -2928,7 +2928,7 @@ async function executeDQLTable(lines, vaultPath, currentFilePath, properties) {
   }
 
   const folder = fromMatch[1];
-  const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+  if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
   let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
 
   // Parse SORT clause
@@ -3015,7 +3015,7 @@ async function executeDQLTable(lines, vaultPath, currentFilePath, properties) {
 }
 
 // Process inline dataview expressions ($= syntax and =this.property syntax)
-async function processInlineDataview(content, properties, vaultPath, currentFilePath) {
+async function processInlineDataview(content, properties, vaultPath, currentFilePath, allFiles) {
   // First, handle simple =this.property syntax (Obsidian Dataview style)
   // Match =this.property where property is alphanumeric/underscore
   // Must not be inside backticks or code blocks
@@ -3079,7 +3079,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
         result = properties?.[propName];
       } else if (expression.includes('dv.')) {
         // Execute dv expressions (dv.pages, dv.current, etc.) using DataviewAPI
-        const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+        if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
         const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
         // Inline expressions are synchronous, so we can just evaluate directly
         const fn = new Function('dv', `return ${expression}`);
@@ -3102,8 +3102,32 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
   return content;
 }
 
-// Simple cache for task query results (expires after 30 seconds)
-const taskQueryCache = new Map();
+// LRU map for task query results (capped at 200 entries, TTL 30 seconds)
+class LRUMap {
+  constructor(maxSize = 200) {
+    this.maxSize = maxSize;
+    this.cache = new Map();
+  }
+  get(key) {
+    if (!this.cache.has(key)) return undefined;
+    const value = this.cache.get(key);
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+  set(key, value) {
+    if (this.cache.has(key)) this.cache.delete(key);
+    this.cache.set(key, value);
+    if (this.cache.size > this.maxSize) {
+      this.cache.delete(this.cache.keys().next().value);
+    }
+  }
+  clear() {
+    this.cache.clear();
+  }
+}
+
+const taskQueryCache = new LRUMap(200);
 const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
 
 // Execute Obsidian Tasks query and return matching tasks
@@ -3483,11 +3507,12 @@ async function renderMarkdownUncached(filePath, urlPath) {
 
   // Process dataview code blocks before rendering
   const vaultPath = path.join(process.cwd(), 'vault');
-  content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties);
-  content = await processDataviewJSBlocks(content, vaultPath, filePath);
+  const allFiles = await DataviewAPI.getAllFiles(vaultPath);
+  content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties, allFiles);
+  content = await processDataviewJSBlocks(content, vaultPath, filePath, allFiles);
 
   // Process inline dataview expressions
-  content = await processInlineDataview(content, properties, vaultPath, filePath);
+  content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
