@@ -3437,9 +3437,6 @@ async function renderMarkdownUncached(filePath, urlPath) {
   // This is needed for accurate line tracking when mapping checkboxes
   const originalContent = content;
 
-  // Get current timer info
-  const currentTimer = await getCurrentTimer();
-
   // Parse YAML frontmatter
   const { properties, contentWithoutFrontmatter } = parseFrontmatter(content);
   content = contentWithoutFrontmatter;
@@ -4016,7 +4013,7 @@ ${cleanContent}
         </nav>
 
         <!-- Time Tracking -->
-        ${getTimerWidget(currentTimer)}
+        <!--TIMER_PLACEHOLDER-->
 
         <div class="row">
           <!-- Content column (order-2 on mobile so AI chat appears first) -->
@@ -4671,7 +4668,10 @@ ${cleanContent}
 
 // New cached renderMarkdown function that replaces the original
 async function renderMarkdown(filePath, urlPath) {
-  return getCachedRender(filePath, urlPath);
+  const html = await getCachedRender(filePath, urlPath);
+  // Inject live timer widget on every request (not cached)
+  const currentTimer = await getCurrentTimer();
+  return html.replace('<!--TIMER_PLACEHOLDER-->', getTimerWidget(currentTimer));
 }
 
 // Cache status endpoint
@@ -6698,9 +6698,12 @@ app.get('/*path', authMiddleware, async (req, res) => {
       if (fullPath.endsWith('.md')) {
         // Check for _refresh param to bypass cache (used after task toggle)
         const bypassCache = req.query._refresh !== undefined;
-        const html = bypassCache
+        const cachedHtml = bypassCache
           ? await renderMarkdownUncached(fullPath, urlPath)
           : await getCachedRender(fullPath, urlPath);
+        // Inject live timer widget (not cached)
+        const currentTimer = await getCurrentTimer();
+        const html = cachedHtml.replace('<!--TIMER_PLACEHOLDER-->', getTimerWidget(currentTimer));
         res.send(html);
       } else if (fullPath.endsWith('.toml')) {
         const html = await renderToml(fullPath, urlPath);
