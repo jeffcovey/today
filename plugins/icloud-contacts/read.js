@@ -44,27 +44,27 @@ function parseVCard(vCardText) {
         const parts = value.split(';');
         contact.last_name = parts[0]?.trim() || '';
         contact.first_name = parts[1]?.trim() || '';
-      } else if (key.startsWith('EMAIL')) {
+      } else if (key.startsWith('EMAIL') || key.includes('.EMAIL')) {
         if (!contact.emails) contact.emails = [];
         const email = value.trim();
         contact.emails.push(email);
         if (!contact.primary_email || key.includes('PREF')) {
           contact.primary_email = email;
         }
-      } else if (key.startsWith('TEL')) {
+      } else if (key.startsWith('TEL') || key.includes('.TEL')) {
         if (!contact.phones) contact.phones = [];
         const phone = value.trim();
         contact.phones.push(phone);
         if (!contact.primary_phone || key.includes('PREF')) {
           contact.primary_phone = phone;
         }
-      } else if (key.startsWith('ORG')) {
+      } else if (key.startsWith('ORG') || key.includes('.ORG')) {
         contact.organization = value.trim();
-      } else if (key.startsWith('TITLE')) {
+      } else if (key.startsWith('TITLE') || key.includes('.TITLE')) {
         contact.job_title = value.trim();
-      } else if (key.startsWith('BDAY')) {
+      } else if (key.startsWith('BDAY') || key.includes('.BDAY')) {
         contact.birthday = value.trim();
-      } else if (key.startsWith('ADR')) {
+      } else if (key.startsWith('ADR') || key.includes('.ADR')) {
         // Parse address for location
         const parts = value.split(';');
         if (parts.length >= 6) {
