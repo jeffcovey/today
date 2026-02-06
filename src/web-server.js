@@ -206,6 +206,9 @@ const validPassword = getOrCreatePassword();
 function sessionAuth(req, res, next) {
   if (req.path === "/auth/login" || req.path === "/auth/logout") return next();
   if (req.session && req.session.authenticated) return next();
+  // Allow Bearer token authentication (e.g. for devices that can only set HTTP headers)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7) === validPassword) return next();
   // Don't save static asset requests as return URL
   if (!req.path.match(/\.(ico|png|jpg|jpeg|gif|css|js|woff|woff2|ttf|svg)$/)) {
     req.session.returnTo = req.originalUrl;
