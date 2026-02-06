@@ -63,6 +63,8 @@ program
              json_extract(metadata, '$.target_value') as target_value
       FROM habits
       WHERE date = ?
+        AND (json_extract(metadata, '$.recurrence') IS NULL
+             OR json_extract(metadata, '$.recurrence') = 'daily')
     `;
     const params = [today];
 
