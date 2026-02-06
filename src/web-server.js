@@ -3456,7 +3456,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 
 
 // Uncached Markdown rendering (original implementation)
-async function renderMarkdownUncached(filePath, urlPath) {
+async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   debug('renderMarkdown called for:', urlPath);
   let content = await fs.readFile(filePath, 'utf-8');
 
@@ -4007,7 +4007,26 @@ ${cleanContent}
   // No post-processing needed for task links
 
   const fileName = pageTitle || path.basename(urlPath);
-  
+
+  // Embed mode: return minimal HTML with just the content
+  if (options.embed) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>${fileName}</title>
+  ${pageStyle}
+</head>
+<body>
+  <div class="container-fluid mt-3">
+    <div class="markdown-content">
+      ${renderProperties(properties)}
+      ${htmlContent}
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
   let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
@@ -6724,6 +6743,12 @@ app.get('/*path', authMiddleware, async (req, res) => {
       res.send(html);
     } else if (stats.isFile()) {
       if (fullPath.endsWith('.md')) {
+        const embed = req.query.embed !== undefined;
+        if (embed) {
+          // Embed mode: minimal HTML, bypass cache, no timer
+          const html = await renderMarkdownUncached(fullPath, urlPath, { embed: true });
+          return res.send(html);
+        }
         // Check for _refresh param to bypass cache (used after task toggle)
         const bypassCache = req.query._refresh !== undefined;
         const cachedHtml = bypassCache
