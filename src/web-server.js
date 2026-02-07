@@ -3300,9 +3300,12 @@ async function executeTasksQuery(query) {
       grouped.get(key).push(task);
     }
 
-    // Sort groups alphabetically
+    // Sort groups: non-routines first (alphabetically), then routines (reverse alphabetically)
     const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
-      return a[0].localeCompare(b[0]);
+      const aIsRoutine = a[0].includes('routines/');
+      const bIsRoutine = b[0].includes('routines/');
+      if (aIsRoutine !== bIsRoutine) return aIsRoutine ? 1 : -1;
+      return aIsRoutine ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]);
     });
 
     const result = { grouped: sortedGroups };
