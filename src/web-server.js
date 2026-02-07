@@ -4024,7 +4024,6 @@ ${cleanContent}
 <body>
   <div class="container-fluid mt-3">
     <div class="markdown-content">
-      ${renderProperties(properties)}
       ${htmlContent}
     </div>
   </div>
