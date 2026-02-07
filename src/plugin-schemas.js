@@ -249,11 +249,10 @@ and availability, and to look for timing conflicts and anything that needs
 preparation.`,
       defaultCommand: 'bin/calendar today ; bin/calendar week',
       dateCommand: 'bin/calendar --date $DATE',
-      queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar sync
-SQL: SELECT title, start_date, end_date, location FROM events WHERE DATE(start_date) >= DATE('now') ORDER BY start_date LIMIT 20
+      queryInstructions: `Commands: bin/calendar today, bin/calendar week, bin/calendar --date YYYY-MM-DD
+IMPORTANT: Do NOT use raw SQL to read event times. Times in the database are stored in UTC and will appear wrong if read directly. Always use bin/calendar commands which display times in the user's configured timezone.
 
-Note: Only recent events are synced to the database. For historical events,
-use: bin/calendar show <source> <date> (e.g., bin/calendar show personal 2023-01-15)
+For historical events: bin/calendar show <source> <date>
 Run 'bin/calendar list' to see available sources.`
     },
     fields: {
@@ -284,13 +283,13 @@ Run 'bin/calendar list' to see available sources.`
         sqlType: 'DATETIME NOT NULL',
         jsType: 'string',
         required: true,
-        description: 'Event start time (ISO 8601)'
+        description: 'Event start time (ISO 8601, stored in UTC — use bin/calendar to read)'
       },
       end_date: {
         sqlType: 'DATETIME NOT NULL',
         jsType: 'string',
         required: true,
-        description: 'Event end time (ISO 8601)'
+        description: 'Event end time (ISO 8601, stored in UTC — use bin/calendar to read)'
       },
       start_timezone: {
         sqlType: 'TEXT',
