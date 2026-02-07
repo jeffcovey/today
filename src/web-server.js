@@ -4010,11 +4010,13 @@ ${cleanContent}
 
   // Embed mode: return minimal HTML with just the content
   if (options.embed) {
+    const zoomStyle = options.zoom ? `<style>html { font-size: ${options.zoom}%; }</style>` : '';
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <title>${fileName}</title>
   ${pageStyle}
+  ${zoomStyle}
 </head>
 <body>
   <div class="container-fluid mt-3">
@@ -6746,7 +6748,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
         const embed = req.query.embed !== undefined;
         if (embed) {
           // Embed mode: minimal HTML, bypass cache, no timer
-          const html = await renderMarkdownUncached(fullPath, urlPath, { embed: true });
+          const zoom = parseFloat(req.query.zoom) || undefined;
+          const html = await renderMarkdownUncached(fullPath, urlPath, { embed: true, zoom });
           return res.send(html);
         }
         // Check for _refresh param to bypass cache (used after task toggle)
