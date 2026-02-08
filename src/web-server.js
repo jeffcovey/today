@@ -3180,12 +3180,12 @@ async function executeTasksQuery(query) {
     return cached.result;
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
-  const tomorrow = new Date(today);
+  // Compute today/tomorrow in the user's configured timezone, not UTC
+  const tz = getConfiguredTimezone();
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
+  const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: tz });
 
   // Build SQL query for the tasks table
   let sqlWhere = [];
