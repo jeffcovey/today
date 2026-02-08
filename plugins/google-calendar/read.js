@@ -139,8 +139,8 @@ function formatDateTime(dateStr, isAllDay) {
     // All-day event: YYYY-MM-DD
     return dateStr;
   }
-  // Timed event: return ISO string
-  return new Date(dateStr).toISOString().replace('Z', '').slice(0, 19);
+  // Timed event: return ISO string (keep Z suffix so times are unambiguously UTC)
+  return new Date(dateStr).toISOString().slice(0, 19) + 'Z';
 }
 
 main().catch(err => {
