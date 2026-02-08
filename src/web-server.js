@@ -1999,20 +1999,30 @@ async function getCachedRender(filePath, urlPath) {
     if (cached && cachedStats &&
         cachedStats.mtime === mtime &&
         cachedStats.size === size) {
-      cached.hits = (cached.hits || 0) + 1;
-      debug(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
-      return cached.html;
+      // Pages with dynamic DB queries (tasks blocks) need time-based expiry
+      // since their content changes even when the file doesn't
+      if (cached.hasDynamicContent &&
+          (Date.now() - cached.timestamp > TASK_QUERY_CACHE_TTL)) {
+        debug(`[CACHE EXPIRED] ${urlPath} - dynamic content stale`);
+        // Fall through to re-render
+      } else {
+        cached.hits = (cached.hits || 0) + 1;
+        debug(`[CACHE HIT] ${urlPath} (hits: ${cached.hits})`);
+        return cached.html;
+      }
     }
 
     // Render and cache the result
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
     const rendered = await renderMarkdownUncached(filePath, urlPath);
     
-    // Store in cache
+    // Store in cache (flag pages with tasks queries for shorter time-based expiry)
+    const hasDynamicContent = rendered.includes('tasks-query-result');
     renderCache.set(cacheKey, {
       html: rendered,
       timestamp: Date.now(),
-      hits: 0
+      hits: 0,
+      hasDynamicContent
     });
     
     fileStatsCache.set(cacheKey, {
