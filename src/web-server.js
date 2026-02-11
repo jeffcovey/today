@@ -3187,6 +3187,27 @@ async function executeTasksQuery(query) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: tz });
 
+  // Helper function to parse relative dates
+  const parseRelativeDate = (dateStr) => {
+    const match = dateStr.match(/in (\d+) (days?|weeks?|months?)/);
+    if (match) {
+      const amount = parseInt(match[1]);
+      const unit = match[2];
+      const date = new Date();
+
+      if (unit.startsWith('day')) {
+        date.setDate(date.getDate() + amount);
+      } else if (unit.startsWith('week')) {
+        date.setDate(date.getDate() + (amount * 7));
+      } else if (unit.startsWith('month')) {
+        date.setMonth(date.getMonth() + amount);
+      }
+
+      return date.toLocaleDateString('en-CA', { timeZone: tz });
+    }
+    return dateStr; // Return as-is if not a relative date
+  };
+
   // Build SQL query for the tasks table
   let sqlWhere = [];
 
@@ -3202,6 +3223,20 @@ async function executeTasksQuery(query) {
     } else if (filter.includes('OR') && filter.includes('before tomorrow')) {
       // Handle "(scheduled before tomorrow) OR (due before tomorrow)"
       sqlWhere.push(`(due_date <= '${todayStr}' OR json_extract(metadata, '$.scheduled_date') <= '${todayStr}')`);
+    } else if (filter.includes('OR') && filter.includes('after tomorrow')) {
+      // Parse end date from filter (look for "before in X weeks/days" pattern)
+      const endDateMatch = filter.match(/before (in \d+ \w+)/);
+      const endDateStr = endDateMatch ? parseRelativeDate(endDateMatch[1]) : tomorrowStr;
+
+      // Handle upcoming tasks with dynamic date limits
+      sqlWhere.push(`(
+        (due_date > '${tomorrowStr}' AND due_date <= '${endDateStr}') OR
+        (json_extract(metadata, '$.scheduled_date') > '${todayStr}' AND json_extract(metadata, '$.scheduled_date') <= '${endDateStr}')
+      )`);
+    } else if (filter.includes('has scheduled date')) {
+      sqlWhere.push(`json_extract(metadata, '$.scheduled_date') IS NOT NULL`);
+    } else if (filter.includes('has due date')) {
+      sqlWhere.push(`due_date IS NOT NULL`);
     }
   }
 
