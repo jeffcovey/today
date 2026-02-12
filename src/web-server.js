@@ -2178,6 +2178,11 @@ function generateTableOfContents() {
 
 // The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
 
+// Convert markdown links [text](url) to HTML <a> tags in task display text
+function renderMarkdownLinks(text) {
+  return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+
 // Parse YAML frontmatter from markdown content
 function parseFrontmatter(content) {
   const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
@@ -3154,16 +3159,17 @@ async function executeTasksQuery(query) {
 
   // Parse query components
   let filters = [];
-  let sortBy = null;
-  let sortReverse = false;
+  let sortDirectives = [];
   let groupBy = null;
 
   for (const line of lines) {
-    if (line.startsWith('sort by')) {
+    if (line.startsWith('sort by function ')) {
+      const expr = line.replace('sort by function ', '').trim();
+      sortDirectives.push({ type: 'function', expr });
+    } else if (line.startsWith('sort by')) {
       const sortMatch = line.match(/sort by (\w+)( reverse)?/);
       if (sortMatch) {
-        sortBy = sortMatch[1];
-        sortReverse = !!sortMatch[2];
+        sortDirectives.push({ type: 'field', field: sortMatch[1], reverse: !!sortMatch[2] });
       }
     } else if (line.startsWith('group by')) {
       groupBy = line.replace('group by ', '').trim();
@@ -3172,8 +3178,13 @@ async function executeTasksQuery(query) {
     }
   }
 
+  // Backwards compat: extract single sortBy/sortReverse for existing code paths
+  const fieldSort = sortDirectives.find(s => s.type === 'field');
+  let sortBy = fieldSort ? fieldSort.field : null;
+  let sortReverse = fieldSort ? fieldSort.reverse : false;
+
   // Check cache first
-  const cacheKey = JSON.stringify({ filters, sortBy, sortReverse, groupBy });
+  const cacheKey = JSON.stringify({ filters, sortDirectives, groupBy });
   const cached = taskQueryCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < TASK_QUERY_CACHE_TTL)) {
     debug(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
@@ -3305,14 +3316,40 @@ async function executeTasksQuery(query) {
     }
   }
 
-  // Sort
-  if (sortBy === 'priority') {
-    filtered.sort((a, b) => sortReverse ? a.priority - b.priority : b.priority - a.priority);
-  } else if (sortBy === 'done') {
-    filtered.sort((a, b) => {
+  // Sort - apply directives in order (first = primary, last = least significant)
+  // We reverse the directives and use stable sort so the first directive has final precedence
+  const evalSortFunction = (task, expr) => {
+    try {
+      return new Function('task', `return (${expr})`)(task);
+    } catch (e) {
+      debug(`Error evaluating sort function: ${e.message}`);
+      return '';
+    }
+  };
+
+  const compareByDirective = (a, b, directive) => {
+    if (directive.type === 'function') {
+      const aVal = evalSortFunction(a, directive.expr);
+      const bVal = evalSortFunction(b, directive.expr);
+      if (typeof aVal === 'string' && typeof bVal === 'string') return aVal.localeCompare(bVal);
+      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    } else if (directive.field === 'priority') {
+      return directive.reverse ? a.priority - b.priority : b.priority - a.priority;
+    } else if (directive.field === 'done') {
       const aTime = a.doneDate ? a.doneDate.getTime() : 0;
       const bTime = b.doneDate ? b.doneDate.getTime() : 0;
-      return sortReverse ? bTime - aTime : aTime - bTime;
+      return directive.reverse ? bTime - aTime : aTime - bTime;
+    }
+    return 0;
+  };
+
+  if (sortDirectives.length > 0) {
+    filtered.sort((a, b) => {
+      for (const directive of sortDirectives) {
+        const cmp = compareByDirective(a, b, directive);
+        if (cmp !== 0) return cmp;
+      }
+      return 0;
     });
   }
 
@@ -3432,7 +3469,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
           // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-          let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+          let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -3465,7 +3502,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
-          let displayText = replaceTagsWithEmojis(task.text);
+          let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
             const dateStr = task.doneDate.toISOString().split('T')[0];
@@ -3684,7 +3721,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
             // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
@@ -3712,7 +3749,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
-            let displayText = replaceTagsWithEmojis(task.text);
+            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
@@ -3789,7 +3826,7 @@ ${cleanContent}
     while ((match = tasksCodeBlockRegex.exec(htmlContent)) !== null) {
       matches.push({
         fullMatch: match[0],
-        query: match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'")
+        query: match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&#x27;/g, "'")
       });
     }
 
@@ -3826,7 +3863,7 @@ ${cleanContent}
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            let displayText = replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, ''));
+            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
@@ -3854,7 +3891,7 @@ ${cleanContent}
             const checkbox = task.isDone ? 'checked' : '';
             const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
             const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
-            let displayText = replaceTagsWithEmojis(task.text);
+            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
             if (task.isDone && task.doneDate) {
               const dateStr = task.doneDate.toISOString().split('T')[0];
               displayText += ` ✅ ${dateStr}`;
