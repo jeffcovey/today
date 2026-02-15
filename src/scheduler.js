@@ -42,12 +42,6 @@ const SERVICE_MAINTENANCE_JOBS = {
     schedule: '0 */2 * * *', // Every 2 hours
     command: 'systemctl restart resilio-sync || true',
     description: 'Restart Resilio Sync to prevent stale connections'
-  },
-  'vault-watcher': {
-    name: 'vault-watcher-restart',
-    schedule: '0 4 * * *', // Daily at 4 AM
-    command: 'systemctl restart vault-watcher || true',
-    description: 'Restart vault-watcher to ensure latest code'
   }
 };
 

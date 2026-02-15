@@ -62,10 +62,14 @@ export async function secretsCommand(server, args = []) {
   printInfo('Setting permissions...');
   server.sshCmd(`chmod 600 ${deployPath}/.env*`);
 
-  // Restart services to pick up new secrets
+  // Restart enabled services to pick up new secrets
   printInfo('Restarting services...');
-  server.systemctl('restart', 'today-scheduler', { check: false });
-  server.systemctl('restart', 'vault-watcher', { check: false });
+  const enabledServices = Object.entries(server.services || {})
+    .filter(([_, enabled]) => enabled)
+    .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
+  for (const service of enabledServices) {
+    server.systemctl('restart', service, { check: false });
+  }
 
   printStatus('Secrets updated!');
 }

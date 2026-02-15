@@ -37,7 +37,6 @@ describe('deploy/config', () => {
       const config = servicesConfig || {};
       return {
         scheduler: config.scheduler === true,
-        'vault-watcher': config['vault-watcher'] === true,
         'vault-web': config['vault-web'] === true,
         'inbox-api': config['inbox-api'] === true,
         'resilio-sync': config['resilio-sync'] === true
@@ -47,12 +46,10 @@ describe('deploy/config', () => {
     test('parses enabled services', () => {
       const services = parseServices({
         scheduler: true,
-        'vault-watcher': true,
         'inbox-api': false
       });
 
       expect(services.scheduler).toBe(true);
-      expect(services['vault-watcher']).toBe(true);
       expect(services['inbox-api']).toBe(false);
       expect(services['vault-web']).toBe(false);
     });
@@ -60,7 +57,7 @@ describe('deploy/config', () => {
     test('defaults all to false when empty', () => {
       const services = parseServices({});
       expect(services.scheduler).toBe(false);
-      expect(services['vault-watcher']).toBe(false);
+      expect(services['vault-web']).toBe(false);
     });
 
     test('defaults all to false when undefined', () => {
@@ -71,10 +68,10 @@ describe('deploy/config', () => {
     test('only enables when explicitly true', () => {
       const services = parseServices({
         scheduler: 'yes',  // truthy but not true
-        'vault-watcher': 1  // truthy but not true
+        'vault-web': 1  // truthy but not true
       });
       expect(services.scheduler).toBe(false);
-      expect(services['vault-watcher']).toBe(false);
+      expect(services['vault-web']).toBe(false);
     });
   });
 
@@ -152,7 +149,6 @@ describe('deploy/config', () => {
         ssh_port: 22,
         services: {
           scheduler: true,
-          'vault-watcher': true,
           'inbox-api': false
         },
         jobs: {

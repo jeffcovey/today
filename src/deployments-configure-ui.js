@@ -259,7 +259,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
     // Services mode
     if (mode === 'services') {
-      const serviceKeys = ['scheduler', 'vault-watcher', 'inbox-api', 'vault-web', '__back__'];
+      const serviceKeys = ['scheduler', 'inbox-api', 'vault-web', '__back__'];
       if (key.escape || input === 'q') {
         setMode('edit');
         setServiceIndex(0);
@@ -660,7 +660,6 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
     const services = selected.services || {};
     const servicesList = [
       { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'vault-watcher', label: 'Vault Watcher', desc: 'Watch vault changes' },
       { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
       { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
     ];
@@ -759,7 +758,6 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
     const services = selected.services || {};
     const servicesList = [
       { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'vault-watcher', label: 'Vault Watcher', desc: 'Watch vault changes' },
       { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
       { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
     ];

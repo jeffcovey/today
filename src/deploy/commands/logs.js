@@ -8,7 +8,6 @@ import { printInfo, printError } from '../remote-server.js';
 
 const KNOWN_SERVICES = [
   'today-scheduler',
-  'vault-watcher',
   'vault-web',
   'inbox-api',
   'resilio-sync',

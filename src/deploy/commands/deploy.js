@@ -195,6 +195,47 @@ async function installServices(server) {
     server.sshCmd('systemctl daemon-reload');
     printStatus(`Installed ${serviceFiles.length} service(s)`);
   }
+
+  // Clean up stale services that no longer have templates
+  await cleanupStaleServices(server, serviceFiles);
+}
+
+/**
+ * Remove systemd services that reference our deploy path but no longer have templates
+ */
+async function cleanupStaleServices(server, currentServiceFiles) {
+  const deployPath = server.deployPath;
+
+  // Find all .service files on the server that reference our deploy path
+  const result = server.sshCmd(
+    `grep -l '${deployPath}' /etc/systemd/system/*.service 2>/dev/null || true`,
+    { capture: true, check: false }
+  );
+
+  const remoteServices = result.stdout.trim().split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(fullPath => fullPath.split('/').pop());
+
+  if (remoteServices.length === 0) return;
+
+  const staleServices = remoteServices.filter(f => !currentServiceFiles.includes(f));
+
+  if (staleServices.length === 0) return;
+
+  printWarning(`Found ${staleServices.length} stale service(s) to remove: ${staleServices.join(', ')}`);
+
+  for (const serviceFile of staleServices) {
+    const serviceName = serviceFile.replace('.service', '');
+    printInfo(`Removing stale service: ${serviceName}`);
+    server.systemctl('stop', serviceName, { check: false });
+    server.systemctl('disable', serviceName, { check: false });
+    server.sshCmd(`rm -f /etc/systemd/system/${serviceFile}`, { check: false });
+  }
+
+  server.sshCmd('systemctl daemon-reload');
+  server.sshCmd('systemctl reset-failed', { check: false });
+  printStatus(`Removed ${staleServices.length} stale service(s)`);
 }
 
 export default deployCommand;

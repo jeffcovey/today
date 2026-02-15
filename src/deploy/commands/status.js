@@ -46,7 +46,7 @@ echo "  Disk: $(df -h / | tail -1 | awk '{printf "%s / %s (%s)", $3, $2, $5}')"
 echo ""
 
 echo "Services:"
-for service in today-scheduler vault-watcher vault-web resilio-sync nginx; do
+for service in today-scheduler vault-web inbox-api resilio-sync nginx; do
     if systemctl is-active --quiet $service 2>/dev/null; then
         echo "  ✓ $service (running)"
     elif systemctl is-enabled --quiet $service 2>/dev/null; then

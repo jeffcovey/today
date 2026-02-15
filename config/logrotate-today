@@ -13,8 +13,6 @@
     create 0644 root root
     postrotate
         # Restart services to release file handles
-        systemctl reload vault-watcher 2>/dev/null || true
-        systemctl reload vault-api 2>/dev/null || true
         systemctl reload inbox-api 2>/dev/null || true
     endscript
 }

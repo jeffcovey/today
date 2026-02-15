@@ -331,7 +331,6 @@ Deployment copies your **local configuration** to the remote server, making the 
 Configure which services run and what scheduled jobs execute in `bin/today configure` under Deployments. Available services:
 
 - **scheduler**: Runs scheduled jobs (plugin sync, maintenance, custom commands)
-- **vault-watcher**: Watches for vault changes and triggers actions
 - **vault-web**: Serves your vault as a web site
 - **inbox-api**: Receives files uploaded from mobile apps
 
