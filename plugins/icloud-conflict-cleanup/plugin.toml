@@ -29,3 +29,4 @@ read = "./read.js"
 
 [settings]
 directory = { type = "string", default = "vault", description = "Directory to scan for duplicate files" }
+skip_directories = { type = "string", default = "node_modules,.git,.git.nosync,.sync,.obsidian,.stfolder,.stversions,.backups,_tmp", description = "Comma-separated directory names to skip during scanning" }

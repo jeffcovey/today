@@ -9,23 +9,46 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
-// Read settings from environment (set by plugin loader)
-const directory = process.env.PLUGIN_SETTING_DIRECTORY || process.env.VAULT_PATH;
+const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+
+const directory = path.join(projectRoot, config.directory || process.env.VAULT_PATH || 'vault');
+
+const CONFLICT_PATTERN = /\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7}\./;
+
+const skipDirsDefault = 'node_modules,.git,.git.nosync,.sync,.obsidian,.stfolder,.stversions,.backups,_tmp';
+const SKIP_DIRS = new Set(
+  (config.skip_directories || skipDirsDefault).split(',').map(s => s.trim())
+);
 
 /**
  * Find all sync-conflict files in the directory
  */
 function findConflictFiles(dir) {
-  try {
-    const result = execSync(`find "${dir}" -name "*sync-conflict-*" -type f 2>/dev/null`, {
-      encoding: 'utf8'
-    });
-    return result.trim().split('\n').filter(f => f);
-  } catch {
-    return [];
+  const results = [];
+  const resolvedDir = fs.realpathSync(dir);
+
+  function walk(currentDir) {
+    let entries;
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) {
+          walk(path.join(currentDir, entry.name));
+        }
+      } else if (entry.isFile() && CONFLICT_PATTERN.test(entry.name)) {
+        results.push(path.join(currentDir, entry.name));
+      }
+    }
   }
+
+  walk(resolvedDir);
+  return results;
 }
 
 /**
@@ -41,8 +64,12 @@ function getOriginalPath(conflictPath) {
  */
 function filesAreIdentical(file1, file2) {
   try {
-    execSync(`diff -q "${file1}" "${file2}"`, { stdio: 'ignore' });
-    return true;
+    const stat1 = fs.statSync(file1);
+    const stat2 = fs.statSync(file2);
+    if (stat1.size !== stat2.size) return false;
+    const buf1 = fs.readFileSync(file1);
+    const buf2 = fs.readFileSync(file2);
+    return buf1.equals(buf2);
   } catch {
     return false;
   }

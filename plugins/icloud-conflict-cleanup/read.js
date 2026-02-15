@@ -9,10 +9,19 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
-// Read settings from environment (set by plugin loader)
-const directory = process.env.PLUGIN_SETTING_DIRECTORY || process.env.VAULT_PATH;
+const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+
+const directory = path.join(projectRoot, config.directory || process.env.VAULT_PATH || 'vault');
+
+// Match: any text + space + single digit + dot + extension (no spaces in ext)
+const DUPLICATE_PATTERN = /^.+ \d\.[^ ]+$/;
+
+const skipDirsDefault = 'node_modules,.git,.git.nosync,.sync,.obsidian,.stfolder,.stversions,.backups,_tmp';
+const SKIP_DIRS = new Set(
+  (config.skip_directories || skipDirsDefault).split(',').map(s => s.trim())
+);
 
 /**
  * Find all iCloud duplicate files in the directory
@@ -20,29 +29,29 @@ const directory = process.env.PLUGIN_SETTING_DIRECTORY || process.env.VAULT_PATH
  * The space+digit must be immediately before the extension.
  */
 function findDuplicateFiles(dir) {
-  try {
-    // Find files matching " N.ext" pattern for digits 2-9
-    // Use multiple -name patterns since -name doesn't support character classes well
-    // Use -L to follow symlinks (vault is often a symlink)
-    const result = execSync(
-      `find -L "${dir}" -type f \\( ` +
-      `-name "* 2.*" -o -name "* 3.*" -o -name "* 4.*" -o ` +
-      `-name "* 5.*" -o -name "* 6.*" -o -name "* 7.*" -o ` +
-      `-name "* 8.*" -o -name "* 9.*" \\) 2>/dev/null`,
-      { encoding: 'utf8' }
-    );
+  const results = [];
+  const resolvedDir = fs.realpathSync(dir);
 
-    // Filter to only include files where the pattern is right before extension
-    // Pattern: "name N.ext" where N is single digit and ext has no spaces
-    const candidates = result.trim().split('\n').filter(f => f);
-    return candidates.filter(f => {
-      const basename = path.basename(f);
-      // Match: any text + space + single digit + dot + extension (no spaces in ext)
-      return /^.+ \d\.[^ ]+$/.test(basename);
-    });
-  } catch {
-    return [];
+  function walk(currentDir) {
+    let entries;
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) {
+          walk(path.join(currentDir, entry.name));
+        }
+      } else if (entry.isFile() && DUPLICATE_PATTERN.test(entry.name)) {
+        results.push(path.join(currentDir, entry.name));
+      }
+    }
   }
+
+  walk(resolvedDir);
+  return results;
 }
 
 /**
@@ -66,8 +75,12 @@ function getOriginalPath(duplicatePath) {
  */
 function filesAreIdentical(file1, file2) {
   try {
-    execSync(`diff -q "${file1}" "${file2}"`, { stdio: 'ignore' });
-    return true;
+    const stat1 = fs.statSync(file1);
+    const stat2 = fs.statSync(file2);
+    if (stat1.size !== stat2.size) return false;
+    const buf1 = fs.readFileSync(file1);
+    const buf2 = fs.readFileSync(file2);
+    return buf1.equals(buf2);
   } catch {
     return false;
   }

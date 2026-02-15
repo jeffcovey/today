@@ -21,11 +21,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
-// Read settings from environment (set by plugin loader)
-const inboxDirectory = process.env.PLUGIN_SETTING_INBOX_DIRECTORY || `${process.env.VAULT_PATH}/inbox`;
-const diaryDirectory = process.env.PLUGIN_SETTING_DIARY_DIRECTORY || `${process.env.VAULT_PATH}/diary`;
-const tasksFile = process.env.PLUGIN_SETTING_TASKS_FILE || `${process.env.VAULT_PATH}/tasks/tasks.md`;
-const trashRetentionDays = parseInt(process.env.PLUGIN_SETTING_TRASH_RETENTION_DAYS || '7', 10);
+const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const inboxDirectory = config.inbox_directory || `${process.env.VAULT_PATH}/inbox`;
+const diaryDirectory = config.diary_directory || `${process.env.VAULT_PATH}/diary`;
+const tasksFile = config.tasks_file || `${process.env.VAULT_PATH}/tasks/tasks.md`;
+const trashRetentionDays = parseInt(config.trash_retention_days || '7', 10);
 
 // Resolve paths relative to project root
 const inboxDir = path.join(PROJECT_ROOT, inboxDirectory);

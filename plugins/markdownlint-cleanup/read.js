@@ -18,8 +18,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
-// Read settings from environment (set by plugin loader)
-const directory = process.env.PLUGIN_SETTING_DIRECTORY || `${process.env.VAULT_PATH}/**/*.md`;
+const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const directory = config.directory || `${process.env.VAULT_PATH}/**/*.md`;
 const vaultDir = directory.replace('/**/*.md', '').replace('/*.md', '');
 
 /**
