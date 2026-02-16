@@ -45,7 +45,7 @@ function getDecryptedEnvVar(key) {
 /**
  * Inject decrypted values for encrypted settings into source config
  */
-function injectDecryptedSettings(plugin, sourceName, sourceConfig) {
+export function injectDecryptedSettings(plugin, sourceName, sourceConfig) {
   const settings = plugin.settings || {};
   const injected = { ...sourceConfig };
 

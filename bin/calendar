@@ -7,7 +7,7 @@ autoDotenvx();
 
 import { execSync } from 'child_process';
 import { getDatabase } from '../src/database-service.js';
-import { discoverPlugins, getPluginSources, getPluginAccess, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { discoverPlugins, getPluginSources, getPluginAccess, injectDecryptedSettings, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfiguredTimezone, formatTime, getStartOfDay, getEndOfDay } from '../src/date-utils.js';
 import { TZDate } from '@date-fns/tz';
 import { format, parseISO } from 'date-fns';
@@ -120,7 +120,8 @@ function getEventsForRange(db, startDate, endDate) {
 // Call a plugin's write command
 function callPluginWrite(source, action, eventData) {
   const pluginDir = `plugins/${source.plugin}`;
-  const pluginConfig = JSON.stringify(source.config);
+  const configWithSecrets = injectDecryptedSettings(source.pluginMeta, source.name, source.config);
+  const pluginConfig = JSON.stringify(configWithSecrets);
   const input = JSON.stringify({ action, event: eventData });
 
   try {
@@ -146,7 +147,8 @@ function callPluginWrite(source, action, eventData) {
 // Call a plugin's read command with --date
 function callPluginRead(source, date) {
   const pluginDir = `plugins/${source.plugin}`;
-  const pluginConfig = JSON.stringify(source.config);
+  const configWithSecrets = injectDecryptedSettings(source.pluginMeta, source.name, source.config);
+  const pluginConfig = JSON.stringify(configWithSecrets);
 
   try {
     const result = execSync(`node ${pluginDir}/read.js --date=${date}`, {
