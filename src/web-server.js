@@ -18,6 +18,7 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath } from './config.js';
+import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
@@ -472,6 +473,221 @@ async function getCurrentTimer() {
   }
 }
 
+// Task Timer functions
+async function getTodayTaskTimerItems() {
+  const db = getDatabase();
+  const today = getTodayDate();
+
+  const tasks = db.prepare(`
+    SELECT id, title, priority, source
+    FROM tasks
+    WHERE status = 'open'
+      AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
+    ORDER BY
+      CASE priority
+        WHEN 'highest' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'medium' THEN 3
+        WHEN 'low' THEN 4
+        WHEN 'lowest' THEN 5
+        ELSE 6
+      END,
+      due_date NULLS LAST
+  `).all(today, today);
+
+  const habits = db.prepare(`
+    SELECT habit_id, title, category
+    FROM habits
+    WHERE date = ?
+      AND status = 'pending'
+      AND (goal_type IS NULL OR goal_type != 'limit')
+      AND (json_extract(metadata, '$.recurrence') IS NULL
+           OR json_extract(metadata, '$.recurrence') = 'daily')
+      AND habit_id != 'evening'
+    ORDER BY category, title
+  `).all(today);
+
+  const projects = db.prepare(`
+    SELECT id, title, priority, review_frequency, last_reviewed,
+           julianday(?) - julianday(last_reviewed) as days_since
+    FROM projects
+    WHERE status IN ('active', 'planning')
+      AND review_frequency IS NOT NULL
+      AND (
+        last_reviewed IS NULL
+        OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
+        OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
+        OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
+        OR (review_frequency = 'quarterly' AND julianday(?) - julianday(last_reviewed) >= 90)
+        OR (review_frequency = 'yearly' AND julianday(?) - julianday(last_reviewed) >= 365)
+      )
+    ORDER BY
+      CASE
+        WHEN last_reviewed IS NULL THEN 0
+        ELSE julianday(?) - julianday(last_reviewed)
+      END DESC
+  `).all(today, today, today, today, today, today, today);
+
+  const items = [];
+
+  // Add tasks with completion capability
+  for (const task of tasks) {
+    const emoji = {
+      'highest': '🔺',
+      'high': '⏫',
+      'medium': '🔼',
+      'low': '🔽',
+      'lowest': '⏬'
+    }[task.priority] || '';
+
+    items.push({
+      id: `task-${task.id}`,
+      type: 'task',
+      title: task.title,
+      displayText: `${emoji} ${task.title}`,
+      canComplete: task.source === 'markdown-tasks/local',
+      linkUrl: task.source === 'markdown-tasks/local' ? `/vault/${task.id}` : null
+    });
+  }
+
+  // Add habits with completion capability
+  for (const habit of habits) {
+    items.push({
+      id: `habit-${habit.habit_id}`,
+      type: 'habit',
+      title: habit.title,
+      displayText: habit.title + (habit.category ? ` (${habit.category})` : ''),
+      canComplete: true,
+      linkUrl: null
+    });
+  }
+
+  // Add projects (cannot be completed, but can link to)
+  for (const project of projects) {
+    const emoji = {
+      'highest': '🔺',
+      'high': '⏫',
+      'medium': '🔼',
+      'low': '🔽',
+      'lowest': '⏬'
+    }[project.priority] || '';
+
+    const daysSince = project.days_since != null ? Math.floor(project.days_since) : null;
+    const reviewNote = daysSince != null ? `(${daysSince}d since review)` : '(never reviewed)';
+
+    items.push({
+      id: `project-${project.id}`,
+      type: 'project',
+      title: project.title,
+      displayText: `${emoji} ${project.title} ${reviewNote}`,
+      canComplete: false,
+      linkUrl: project.id.startsWith('markdown-projects/local:') ?
+        `/vault/${project.id.replace('markdown-projects/local:', '')}` : null
+    });
+  }
+
+  // Shuffle the items
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+
+  return items;
+}
+
+// Get current task timer state
+let taskTimerState = {
+  isRunning: false,
+  currentItem: null,
+  startTime: null,
+  duration: 2, // default 2 minutes
+  items: []
+};
+
+function getTaskTimerWidget(items) {
+  if (!items || items.length === 0) {
+    return `
+      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+        <i class="fas fa-tasks me-2"></i>
+        <div class="flex-grow-1">
+          No tasks, habits, or project reviews due today.
+        </div>
+      </div>`;
+  }
+
+  if (taskTimerState.isRunning && taskTimerState.currentItem) {
+    const item = taskTimerState.currentItem;
+    return `
+      <div class="alert alert-success d-flex align-items-center mb-3" role="alert" data-timer-start="${taskTimerState.startTime}" data-timer-duration="${taskTimerState.duration}">
+        <i class="fas fa-play-circle me-2"></i>
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center">
+            ${item.canComplete ?
+              `<input type="checkbox" class="form-check-input me-2" onchange="
+                fetch('/api/task-timer/complete', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: '${item.id}'})}).then((response) => response.json()).then((data) => {
+                  if (data.message === 'All tasks completed!') alert('All tasks completed!');
+                  location.reload();
+                }).catch(() => alert('Failed to complete item'));" title="Mark as complete">` :
+              ''
+            }
+            <strong>${item.linkUrl ?
+              `<a href="${item.linkUrl}" class="text-decoration-none text-success">${item.displayText}</a>` :
+              item.displayText
+            }</strong>
+          </div>
+          <small>Timer: <span class="task-timer-countdown">${taskTimerState.duration}:00</span> • Item <span id="task-timer-position">1</span> of ${items.length}</small>
+        </div>
+        <button class="btn btn-sm btn-outline-success ms-2" onclick="
+          fetch('/api/task-timer/stop', {method: 'POST'}).then(() => location.reload()).catch(() => alert('Failed to stop timer'));">
+          <i class="fas fa-stop"></i> Stop
+        </button>
+        <button class="btn btn-sm btn-outline-secondary ms-1" onclick="
+          fetch('/api/task-timer/skip', {method: 'POST'}).then((response) => response.json()).then((data) => {
+            if (data.message === 'All tasks completed!') alert('All tasks completed!');
+            location.reload();
+          }).catch(() => alert('Failed to skip item'));">
+          <i class="fas fa-forward"></i> Skip
+        </button>
+      </div>`;
+  } else {
+    return `
+      <div class="alert alert-primary d-flex align-items-center mb-3" role="alert">
+        <i class="fas fa-tasks me-2"></i>
+        <div class="flex-grow-1">
+          <div class="row g-2 align-items-center">
+            <div class="col">
+              <strong>Task Timer</strong> - ${items.length} items ready
+            </div>
+            <div class="col-auto">
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="taskTimerMinutes" value="${taskTimerState.duration}" min="1" max="60" style="width: 60px;">
+                <span class="input-group-text">min</span>
+              </div>
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-primary" onclick="
+                const btn = this;
+                const icon = btn.querySelector('i');
+                const text = btn.querySelector('.btn-text');
+                const minutesInput = document.getElementById('taskTimerMinutes');
+                const duration = parseInt(minutesInput.value) || 2;
+                btn.disabled = true;
+                icon.className = 'fas fa-spinner fa-spin';
+                text.textContent = ' Starting...';
+                fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(() => location.reload()).catch(() => {
+                  btn.disabled = false;
+                  icon.className = 'fas fa-play';
+                  text.textContent = ' Start';
+                });">
+                <i class="fas fa-play"></i><span class="btn-text"> Start</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
 // Initialize markdown file cache
 const markdownCache = getMarkdownFileCache();
 
@@ -677,8 +893,8 @@ async function renderDirectory(dirPath, urlPath) {
           </ol>
         </nav>
 
-        <!-- Time Tracking -->
-        ${getTimerWidget(currentTimer)}
+        <!-- Timer Widgets -->
+        <!--TIMER_WIDGETS_PLACEHOLDER-->
 
         <div class="row">
           <!-- Content column (order-2 on mobile so AI chat appears first) -->
@@ -1264,8 +1480,21 @@ Contents:
     </body>
     </html>
   `;
-  
-  return html;
+
+  // Inject timer widgets
+  const taskTimerItems = await getTodayTaskTimerItems();
+
+  const widgetsHtml = `
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        ${getTimerWidget(currentTimer)}
+      </div>
+      <div class="col-12 col-lg-6">
+        ${getTaskTimerWidget(taskTimerItems)}
+      </div>
+    </div>`;
+
+  return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
 
 // Editor rendering
@@ -4145,8 +4374,8 @@ ${cleanContent}
           </ol>
         </nav>
 
-        <!-- Time Tracking -->
-        <!--TIMER_PLACEHOLDER-->
+        <!-- Timer Widgets -->
+        <!--TIMER_WIDGETS_PLACEHOLDER-->
 
         <div class="row">
           <!-- Content column (order-2 on mobile so AI chat appears first) -->
@@ -4802,9 +5031,21 @@ ${cleanContent}
 // New cached renderMarkdown function that replaces the original
 async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
-  // Inject live timer widget on every request (not cached)
+  // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-  return html.replace('<!--TIMER_PLACEHOLDER-->', getTimerWidget(currentTimer));
+  const taskTimerItems = await getTodayTaskTimerItems();
+
+  const widgetsHtml = `
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        ${getTimerWidget(currentTimer)}
+      </div>
+      <div class="col-12 col-lg-6">
+        ${getTaskTimerWidget(taskTimerItems)}
+      </div>
+    </div>`;
+
+  return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
 
 // Cache status endpoint
@@ -6578,6 +6819,114 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
   }
 });
 
+// Task Timer API endpoints
+app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, res) => {
+  try {
+    const { duration } = req.body;
+    const items = await getTodayTaskTimerItems();
+
+    if (items.length === 0) {
+      return res.status(400).json({ success: false, message: 'No tasks available' });
+    }
+
+    taskTimerState = {
+      isRunning: true,
+      currentItem: items[0],
+      startTime: new Date().toISOString(),
+      duration: duration || 2,
+      items: items
+    };
+
+    res.json({ success: true, message: 'Task timer started', item: items[0] });
+  } catch (error) {
+    console.error('Error starting task timer:', error);
+    res.status(500).json({ success: false, message: 'Failed to start task timer' });
+  }
+});
+
+app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
+  try {
+    taskTimerState = {
+      isRunning: false,
+      currentItem: null,
+      startTime: null,
+      duration: taskTimerState.duration,
+      items: []
+    };
+
+    res.json({ success: true, message: 'Task timer stopped' });
+  } catch (error) {
+    console.error('Error stopping task timer:', error);
+    res.status(500).json({ success: false, message: 'Failed to stop task timer' });
+  }
+});
+
+app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
+  try {
+    if (!taskTimerState.isRunning) {
+      return res.status(400).json({ success: false, message: 'No timer running' });
+    }
+
+    // Get fresh items and start next timer
+    const items = await getTodayTaskTimerItems();
+    if (items.length === 0) {
+      taskTimerState.isRunning = false;
+      return res.json({ success: true, message: 'All tasks completed!' });
+    }
+
+    taskTimerState = {
+      isRunning: true,
+      currentItem: items[0],
+      startTime: new Date().toISOString(),
+      duration: taskTimerState.duration,
+      items: items
+    };
+
+    res.json({ success: true, message: 'Skipped to next item', item: items[0] });
+  } catch (error) {
+    console.error('Error skipping task timer:', error);
+    res.status(500).json({ success: false, message: 'Failed to skip task timer' });
+  }
+});
+
+app.post('/api/task-timer/complete', authMiddleware, express.json(), async (req, res) => {
+  try {
+    const { itemId } = req.body;
+
+    // Complete the item based on type
+    if (itemId.startsWith('task-')) {
+      const taskId = itemId.replace('task-', '');
+      const db = getDatabase();
+      db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('completed', taskId);
+    } else if (itemId.startsWith('habit-')) {
+      const habitId = itemId.replace('habit-', '');
+      const today = getTodayDate();
+      const db = getDatabase();
+      db.prepare('UPDATE habits SET status = ? WHERE habit_id = ? AND date = ?').run('completed', habitId, today);
+    }
+
+    // Start next timer
+    const items = await getTodayTaskTimerItems();
+    if (items.length === 0) {
+      taskTimerState.isRunning = false;
+      return res.json({ success: true, message: 'All tasks completed!' });
+    }
+
+    taskTimerState = {
+      isRunning: true,
+      currentItem: items[0],
+      startTime: new Date().toISOString(),
+      duration: taskTimerState.duration,
+      items: items
+    };
+
+    res.json({ success: true, message: 'Item completed, started next timer', item: items[0] });
+  } catch (error) {
+    console.error('Error completing task timer item:', error);
+    res.status(500).json({ success: false, message: 'Failed to complete item' });
+  }
+});
+
 // Task detail page - uses tasks table (from plugins)
 // Use wildcard to capture task IDs with slashes (e.g., markdown-tasks/local:vault/file.md:123)
 app.get('/task/*taskId', authMiddleware, async (req, res) => {
@@ -6841,9 +7190,21 @@ app.get('/*path', authMiddleware, async (req, res) => {
         const cachedHtml = bypassCache
           ? await renderMarkdownUncached(fullPath, urlPath)
           : await getCachedRender(fullPath, urlPath);
-        // Inject live timer widget (not cached)
+        // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-        const html = cachedHtml.replace('<!--TIMER_PLACEHOLDER-->', getTimerWidget(currentTimer));
+        const taskTimerItems = await getTodayTaskTimerItems();
+
+        const widgetsHtml = `
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-lg-6">
+              ${getTimerWidget(currentTimer)}
+            </div>
+            <div class="col-12 col-lg-6">
+              ${getTaskTimerWidget(taskTimerItems)}
+            </div>
+          </div>`;
+
+        const html = cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
         res.send(html);
       } else if (fullPath.endsWith('.toml')) {
         const html = await renderToml(fullPath, urlPath);

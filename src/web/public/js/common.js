@@ -104,6 +104,30 @@ function updateTimerDuration() {
   }
 }
 
+// Task Timer countdown functionality
+function updateTaskTimerCountdown() {
+  const taskTimerAlert = document.querySelector('[data-timer-duration]');
+  if (!taskTimerAlert) return;
+
+  const startTime = new Date(taskTimerAlert.dataset.timerStart);
+  const duration = parseInt(taskTimerAlert.dataset.timerDuration) * 60; // convert minutes to seconds
+  const now = new Date();
+  const elapsed = Math.floor((now - startTime) / 1000);
+  const remaining = Math.max(0, duration - elapsed);
+
+  const countdownSpan = taskTimerAlert.querySelector('.task-timer-countdown');
+  if (countdownSpan) {
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    // Auto-advance when timer expires
+    if (remaining === 0) {
+      fetch('/api/task-timer/skip', {method: 'POST'}).then(() => location.reload());
+    }
+  }
+}
+
 // Collapse/expand functionality for sections
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
@@ -202,6 +226,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.querySelector('[data-timer-start]')) {
     updateTimerDuration();
     setInterval(updateTimerDuration, 1000);
+  }
+
+  // Start task timer countdown if there's an active task timer
+  if (document.querySelector('[data-timer-duration]')) {
+    updateTaskTimerCountdown();
+    setInterval(updateTaskTimerCountdown, 1000);
   }
 
   // Add event listeners for task checkboxes
