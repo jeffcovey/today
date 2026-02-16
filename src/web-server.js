@@ -634,10 +634,12 @@ function getTaskTimerWidget(items) {
         <div class="flex-grow-1">
           <div class="d-flex align-items-center">
             ${item.canComplete && item.toggleData ?
-              `<input type="checkbox" class="form-check-input me-2" onchange="
-                fetch('/task/toggle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(${JSON.stringify(item.toggleData)})}).then(() =>
-                  fetch('/api/task-timer/skip', {method: 'POST'})
-                ).then(() => location.reload()).catch(() => alert('Failed to complete item'));" title="Mark as complete">` :
+              `<input type="checkbox" class="form-check-input me-2"
+                data-toggle='${JSON.stringify(item.toggleData).replace(/'/g, '&#39;')}'
+                onchange="
+                  fetch('/task/toggle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: this.dataset.toggle}).then(function() {
+                    return fetch('/api/task-timer/skip', {method: 'POST'});
+                  }).then(function() { location.reload(); }).catch(function() { alert('Failed to complete item'); });" title="Mark as complete">` :
               ''
             }
             <strong>${item.linkUrl ?
