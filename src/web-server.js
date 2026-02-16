@@ -540,12 +540,23 @@ async function getTodayTaskTimerItems() {
       'lowest': '⏬'
     }[task.priority] || '';
 
+    // Parse task ID to get file path and line number for toggle
+    // Format: markdown-tasks/local:vault/path/file.md:lineNumber
+    let toggleData = null;
+    if (task.source === 'markdown-tasks/local') {
+      const match = task.id.match(/^markdown-tasks\/local:vault\/(.+):(\d+)$/);
+      if (match) {
+        toggleData = { filePath: match[1], lineNumber: parseInt(match[2]), completed: true };
+      }
+    }
+
     items.push({
       id: `task-${task.id}`,
       type: 'task',
       title: task.title,
       displayText: `${emoji} ${task.title}`,
-      canComplete: task.source === 'markdown-tasks/local',
+      canComplete: task.source === 'markdown-tasks/local' && !!toggleData,
+      toggleData,
       linkUrl: task.source === 'markdown-tasks/local' ? `/vault/${task.id}` : null
     });
   }
@@ -622,12 +633,11 @@ function getTaskTimerWidget(items) {
         <i class="fas fa-play-circle me-2"></i>
         <div class="flex-grow-1">
           <div class="d-flex align-items-center">
-            ${item.canComplete ?
+            ${item.canComplete && item.toggleData ?
               `<input type="checkbox" class="form-check-input me-2" onchange="
-                fetch('/api/task-timer/complete', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: '${item.id}'})}).then((response) => response.json()).then((data) => {
-                  if (data.message === 'All tasks completed!') alert('All tasks completed!');
-                  location.reload();
-                }).catch(() => alert('Failed to complete item'));" title="Mark as complete">` :
+                fetch('/task/toggle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(${JSON.stringify(item.toggleData)})}).then(() =>
+                  fetch('/api/task-timer/skip', {method: 'POST'})
+                ).then(() => location.reload()).catch(() => alert('Failed to complete item'));" title="Mark as complete">` :
               ''
             }
             <strong>${item.linkUrl ?
@@ -6886,44 +6896,6 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error skipping task timer:', error);
     res.status(500).json({ success: false, message: 'Failed to skip task timer' });
-  }
-});
-
-app.post('/api/task-timer/complete', authMiddleware, express.json(), async (req, res) => {
-  try {
-    const { itemId } = req.body;
-
-    // Complete the item based on type
-    if (itemId.startsWith('task-')) {
-      const taskId = itemId.replace('task-', '');
-      const db = getDatabase();
-      db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('completed', taskId);
-    } else if (itemId.startsWith('habit-')) {
-      const habitId = itemId.replace('habit-', '');
-      const today = getTodayDate();
-      const db = getDatabase();
-      db.prepare('UPDATE habits SET status = ? WHERE habit_id = ? AND date = ?').run('completed', habitId, today);
-    }
-
-    // Start next timer
-    const items = await getTodayTaskTimerItems();
-    if (items.length === 0) {
-      taskTimerState.isRunning = false;
-      return res.json({ success: true, message: 'All tasks completed!' });
-    }
-
-    taskTimerState = {
-      isRunning: true,
-      currentItem: items[0],
-      startTime: new Date().toISOString(),
-      duration: taskTimerState.duration,
-      items: items
-    };
-
-    res.json({ success: true, message: 'Item completed, started next timer', item: items[0] });
-  } catch (error) {
-    console.error('Error completing task timer item:', error);
-    res.status(500).json({ success: false, message: 'Failed to complete item' });
   }
 });
 
