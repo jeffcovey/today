@@ -106,14 +106,18 @@ function updateTimerDuration() {
 
 // Task Timer countdown functionality
 function updateTaskTimerCountdown() {
-  const taskTimerAlert = document.querySelector('[data-timer-duration]');
+  const taskTimerAlert = document.querySelector('[data-timer-total-seconds]');
   if (!taskTimerAlert) return;
 
+  // Don't count down while paused
+  if (taskTimerAlert.dataset.timerPaused === 'true') return;
+
   const startTime = new Date(taskTimerAlert.dataset.timerStart);
-  const duration = parseInt(taskTimerAlert.dataset.timerDuration) * 60; // convert minutes to seconds
+  const totalSeconds = parseInt(taskTimerAlert.dataset.timerTotalSeconds);
+  const phase = taskTimerAlert.dataset.timerPhase || 'work';
   const now = new Date();
   const elapsed = Math.floor((now - startTime) / 1000);
-  const remaining = Math.max(0, duration - elapsed);
+  const remaining = Math.max(0, totalSeconds - elapsed);
 
   const countdownSpan = taskTimerAlert.querySelector('.task-timer-countdown');
   if (countdownSpan) {
@@ -123,7 +127,13 @@ function updateTaskTimerCountdown() {
 
     // Auto-advance when timer expires
     if (remaining === 0) {
-      fetch('/api/task-timer/skip', {method: 'POST'}).then(() => location.reload());
+      if (phase === 'work') {
+        // Transition to rest period
+        fetch('/api/task-timer/rest', {method: 'POST'}).then(function() { location.reload(); });
+      } else {
+        // Rest done, advance to next item
+        fetch('/api/task-timer/skip', {method: 'POST'}).then(function() { location.reload(); });
+      }
     }
   }
 }
@@ -229,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Start task timer countdown if there's an active task timer
-  if (document.querySelector('[data-timer-duration]')) {
+  if (document.querySelector('[data-timer-total-seconds]')) {
     updateTaskTimerCountdown();
     setInterval(updateTaskTimerCountdown, 1000);
   }

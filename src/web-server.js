@@ -5,7 +5,8 @@ import session from 'express-session';
 import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
 import crypto from "crypto";
-import { execSync, execFileSync } from 'child_process';
+import { exec, execSync, execFileSync } from 'child_process';
+import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import { marked } from 'marked';
@@ -612,8 +613,32 @@ let taskTimerState = {
   currentItem: null,
   startTime: null,
   duration: 2, // default 2 minutes
-  items: []
+  items: [],
+  currentIndex: 0,
+  phase: 'work', // 'work' or 'rest'
+  isPaused: false,
+  pausedAt: null
 };
+let taskTimerSyncedItems = null;
+
+function triggerTaskTimerSync() {
+  const execAsync = promisify(exec);
+  // Intentionally not awaited — runs in background
+  (async () => {
+    try {
+      await execAsync('bin/plugins sync --type tasks');
+      await execAsync('bin/plugins sync --type habits');
+      await execAsync('bin/plugins sync --type projects');
+      taskTimerSyncedItems = await getTodayTaskTimerItems();
+    } catch (e) {
+      // Sync failed, keep current items
+    }
+  })();
+}
+
+function processMarkdownLinks(text) {
+  return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+}
 
 function getTaskTimerWidget(items) {
   if (!items || items.length === 0) {
@@ -628,38 +653,87 @@ function getTaskTimerWidget(items) {
 
   if (taskTimerState.isRunning && taskTimerState.currentItem) {
     const item = taskTimerState.currentItem;
+    const { phase, isPaused } = taskTimerState;
+    const workSeconds = taskTimerState.duration * 60;
+    const restSeconds = Math.round(workSeconds * 0.1);
+    const totalSeconds = phase === 'rest' ? restSeconds : workSeconds;
+    const position = taskTimerState.currentIndex + 1;
+    const total = taskTimerState.items.length;
+    const displayText = processMarkdownLinks(item.displayText);
+
+    // Calculate initial display time (for paused state or page load)
+    const elapsed = isPaused
+      ? Math.floor((new Date(taskTimerState.pausedAt) - new Date(taskTimerState.startTime)) / 1000)
+      : Math.floor((new Date() - new Date(taskTimerState.startTime)) / 1000);
+    const remaining = Math.max(0, totalSeconds - elapsed);
+    const initMin = Math.floor(remaining / 60);
+    const initSec = remaining % 60;
+
+    if (phase === 'rest') {
+      return `
+        <div class="alert alert-info mb-3 py-2 px-3" role="alert"
+          data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest">
+          <div><strong>Rest</strong> — next item in <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
+          <small class="d-flex gap-2">
+            <span>${position}/${total}</span>
+            <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
+              if (data.message === 'All tasks completed!') alert('All tasks completed!'); location.reload();
+            }).catch(function() { alert('Failed to skip'); });">Skip Rest</a>
+            <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
+          </small>
+        </div>`;
+    }
+
+    const alertClass = isPaused ? 'alert-warning' : 'alert-success';
+    const iconClass = isPaused ? 'fas fa-pause-circle' : 'fas fa-play-circle';
+    const phaseLabel = isPaused ? 'Paused' : 'Work';
+    const pausedAttr = isPaused ? ' data-timer-paused="true"' : '';
+
     return `
-      <div class="alert alert-success d-flex align-items-center mb-3" role="alert" data-timer-start="${taskTimerState.startTime}" data-timer-duration="${taskTimerState.duration}">
-        <i class="fas fa-play-circle me-2"></i>
-        <div class="flex-grow-1">
-          <div class="d-flex align-items-center">
-            ${item.canComplete && item.toggleData ?
-              `<input type="checkbox" class="form-check-input me-2"
-                data-toggle='${JSON.stringify(item.toggleData).replace(/'/g, '&#39;')}'
-                onchange="
-                  fetch('/task/toggle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: this.dataset.toggle}).then(function() {
-                    return fetch('/api/task-timer/skip', {method: 'POST'});
-                  }).then(function() { location.reload(); }).catch(function() { alert('Failed to complete item'); });" title="Mark as complete">` :
-              ''
-            }
+      <div class="alert ${alertClass} mb-3" role="alert"
+        data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}>
+        <div class="d-flex align-items-start">
+          <i class="${iconClass} me-2 mt-1"></i>
+          ${item.canComplete && item.toggleData ?
+            `<input type="checkbox" class="form-check-input me-2 mt-1" style="min-width:1em"
+              data-toggle='${JSON.stringify(item.toggleData).replace(/'/g, '&#39;')}'
+              onchange="
+                fetch('/task/toggle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: this.dataset.toggle}).then(function() {
+                  return fetch('/api/task-timer/skip', {method: 'POST'});
+                }).then(function() { location.reload(); }).catch(function() { alert('Failed to complete item'); });" title="Mark as complete">` :
+            ''
+          }
+          <div>
             <strong>${item.linkUrl ?
-              `<a href="${item.linkUrl}" class="text-decoration-none text-success">${item.displayText}</a>` :
-              item.displayText
+              `<a href="${item.linkUrl}" class="text-decoration-none">${displayText}</a>` :
+              displayText
             }</strong>
+            <div><small><span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span> (${phaseLabel}) · Item ${position} of ${total}</small></div>
+            <div class="mt-1 d-flex gap-1">
+              ${isPaused ?
+                `<button class="btn btn-sm btn-outline-warning" onclick="
+                  fetch('/api/task-timer/resume', {method: 'POST'}).then(function() { location.reload(); });">
+                  <i class="fas fa-play"></i> Resume
+                </button>` :
+                `<button class="btn btn-sm btn-outline-success" onclick="
+                  fetch('/api/task-timer/pause', {method: 'POST'}).then(function() { location.reload(); });">
+                  <i class="fas fa-pause"></i> Pause
+                </button>`
+              }
+              <button class="btn btn-sm btn-outline-secondary" onclick="
+                fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">
+                <i class="fas fa-stop"></i> Stop
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="
+                fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
+                  if (data.message === 'All tasks completed!') alert('All tasks completed!');
+                  location.reload();
+                }).catch(function() { alert('Failed to skip'); });">
+                <i class="fas fa-forward"></i> Skip
+              </button>
+            </div>
           </div>
-          <small>Timer: <span class="task-timer-countdown">${taskTimerState.duration}:00</span> • Item <span id="task-timer-position">1</span> of ${items.length}</small>
         </div>
-        <button class="btn btn-sm btn-outline-success ms-2" onclick="
-          fetch('/api/task-timer/stop', {method: 'POST'}).then(() => location.reload()).catch(() => alert('Failed to stop timer'));">
-          <i class="fas fa-stop"></i> Stop
-        </button>
-        <button class="btn btn-sm btn-outline-secondary ms-1" onclick="
-          fetch('/api/task-timer/skip', {method: 'POST'}).then((response) => response.json()).then((data) => {
-            if (data.message === 'All tasks completed!') alert('All tasks completed!');
-            location.reload();
-          }).catch(() => alert('Failed to skip item'));">
-          <i class="fas fa-forward"></i> Skip
-        </button>
       </div>`;
   } else {
     return `
@@ -668,7 +742,7 @@ function getTaskTimerWidget(items) {
         <div class="flex-grow-1">
           <div class="row g-2 align-items-center">
             <div class="col">
-              <strong>Task Timer</strong> - ${items.length} items ready
+              <strong>Task Timer</strong> — ${items.length} items ready
             </div>
             <div class="col-auto">
               <div class="input-group input-group-sm">
@@ -686,7 +760,7 @@ function getTaskTimerWidget(items) {
                 btn.disabled = true;
                 icon.className = 'fas fa-spinner fa-spin';
                 text.textContent = ' Starting...';
-                fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(() => location.reload()).catch(() => {
+                fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(function() { location.reload(); }).catch(function() {
                   btn.disabled = false;
                   icon.className = 'fas fa-play';
                   text.textContent = ' Start';
@@ -6846,8 +6920,16 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
       currentItem: items[0],
       startTime: new Date().toISOString(),
       duration: duration || 2,
-      items: items
+      items: items,
+      currentIndex: 0,
+      phase: 'work',
+      isPaused: false,
+      pausedAt: null
     };
+
+    // Background sync so next timer has fresh data
+    taskTimerSyncedItems = null;
+    triggerTaskTimerSync();
 
     res.json({ success: true, message: 'Task timer started', item: items[0] });
   } catch (error) {
@@ -6858,13 +6940,19 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
 
 app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
   try {
+    const duration = taskTimerState.duration;
     taskTimerState = {
       isRunning: false,
       currentItem: null,
       startTime: null,
-      duration: taskTimerState.duration,
-      items: []
+      duration,
+      items: [],
+      currentIndex: 0,
+      phase: 'work',
+      isPaused: false,
+      pausedAt: null
     };
+    taskTimerSyncedItems = null;
 
     res.json({ success: true, message: 'Task timer stopped' });
   } catch (error) {
@@ -6879,26 +6967,74 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'No timer running' });
     }
 
-    // Get fresh items and start next timer
-    const items = await getTodayTaskTimerItems();
-    if (items.length === 0) {
-      taskTimerState.isRunning = false;
-      return res.json({ success: true, message: 'All tasks completed!' });
+    // Use synced items if background sync completed, otherwise advance in current list
+    if (taskTimerSyncedItems) {
+      taskTimerState.items = taskTimerSyncedItems;
+      taskTimerState.currentIndex = 0;
+      taskTimerSyncedItems = null;
+    } else {
+      taskTimerState.currentIndex++;
     }
 
-    taskTimerState = {
-      isRunning: true,
-      currentItem: items[0],
-      startTime: new Date().toISOString(),
-      duration: taskTimerState.duration,
-      items: items
-    };
+    // If we've exhausted the list, re-fetch from DB
+    if (taskTimerState.currentIndex >= taskTimerState.items.length) {
+      const freshItems = await getTodayTaskTimerItems();
+      if (freshItems.length === 0) {
+        taskTimerState.isRunning = false;
+        return res.json({ success: true, message: 'All tasks completed!' });
+      }
+      taskTimerState.items = freshItems;
+      taskTimerState.currentIndex = 0;
+    }
 
-    res.json({ success: true, message: 'Skipped to next item', item: items[0] });
+    taskTimerState.currentItem = taskTimerState.items[taskTimerState.currentIndex];
+    taskTimerState.startTime = new Date().toISOString();
+    taskTimerState.phase = 'work';
+    taskTimerState.isPaused = false;
+    taskTimerState.pausedAt = null;
+
+    // Background sync so next timer has fresh data
+    taskTimerSyncedItems = null;
+    triggerTaskTimerSync();
+
+    res.json({ success: true, message: 'Skipped to next item', item: taskTimerState.currentItem });
   } catch (error) {
     console.error('Error skipping task timer:', error);
     res.status(500).json({ success: false, message: 'Failed to skip task timer' });
   }
+});
+
+app.post('/api/task-timer/pause', authMiddleware, async (req, res) => {
+  if (!taskTimerState.isRunning || taskTimerState.isPaused) {
+    return res.status(400).json({ success: false });
+  }
+  taskTimerState.isPaused = true;
+  taskTimerState.pausedAt = new Date().toISOString();
+  res.json({ success: true });
+});
+
+app.post('/api/task-timer/resume', authMiddleware, async (req, res) => {
+  if (!taskTimerState.isRunning || !taskTimerState.isPaused) {
+    return res.status(400).json({ success: false });
+  }
+  // Shift startTime forward by the pause duration so remaining time is preserved
+  const pauseDuration = Date.now() - new Date(taskTimerState.pausedAt).getTime();
+  const adjustedStart = new Date(new Date(taskTimerState.startTime).getTime() + pauseDuration);
+  taskTimerState.startTime = adjustedStart.toISOString();
+  taskTimerState.isPaused = false;
+  taskTimerState.pausedAt = null;
+  res.json({ success: true });
+});
+
+app.post('/api/task-timer/rest', authMiddleware, async (req, res) => {
+  if (!taskTimerState.isRunning) {
+    return res.status(400).json({ success: false });
+  }
+  taskTimerState.phase = 'rest';
+  taskTimerState.startTime = new Date().toISOString();
+  taskTimerState.isPaused = false;
+  taskTimerState.pausedAt = null;
+  res.json({ success: true });
 });
 
 // Task detail page - uses tasks table (from plugins)
