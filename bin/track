@@ -1078,29 +1078,113 @@ async function generateSuggestions(db, problems) {
         break;
 
       case 'impossible_day_total':
-        // For days with >24 hours, look for the longest entries to fix
-        const dayEntries = db.prepare(`
+        // Get all entries for this day
+        const allDayEntries = db.prepare(`
           SELECT * FROM time_logs
           WHERE DATE(start_time, 'localtime') = ?
-            AND duration_minutes > 480
+          ORDER BY start_time
+        `).all(problem.date);
+
+        const handledIds = new Set();
+
+        // 1. Find near-duplicate entries (same description, start within 5 min)
+        for (let i = 0; i < allDayEntries.length; i++) {
+          for (let j = i + 1; j < allDayEntries.length; j++) {
+            const a = allDayEntries[i];
+            const b = allDayEntries[j];
+
+            if (handledIds.has(a.id) || handledIds.has(b.id)) continue;
+
+            if (a.description === b.description) {
+              const startDiffMin = Math.abs(new Date(a.start_time) - new Date(b.start_time)) / 60000;
+
+              if (startDiffMin < 5) {
+                const shorter = (a.duration_minutes || 0) <= (b.duration_minutes || 0) ? a : b;
+                handledIds.add(shorter.id);
+                suggestions.push({
+                  type: 'remove_duplicate',
+                  problem,
+                  description: `Remove duplicate: "${shorter.description.substring(0, 50)}${shorter.description.length > 50 ? '...' : ''}"`,
+                  action: {
+                    type: 'remove_entry',
+                    entryId: shorter.id,
+                    entry: shorter,
+                    reason: `Near-duplicate entry (same description, starts ${Math.round(startDiffMin)}min after another)`
+                  }
+                });
+              }
+            }
+          }
+        }
+
+        // 2. Find entries entirely contained within another with same description
+        for (let i = 0; i < allDayEntries.length; i++) {
+          for (let j = i + 1; j < allDayEntries.length; j++) {
+            const a = allDayEntries[i];
+            const b = allDayEntries[j];
+
+            if (handledIds.has(a.id) || handledIds.has(b.id)) continue;
+            if (a.description !== b.description) continue;
+
+            const aStart = new Date(a.start_time).getTime();
+            const aEnd = a.end_time ? new Date(a.end_time).getTime() : Date.now();
+            const bStart = new Date(b.start_time).getTime();
+            const bEnd = b.end_time ? new Date(b.end_time).getTime() : Date.now();
+
+            if (bStart >= aStart && bEnd <= aEnd) {
+              handledIds.add(b.id);
+              suggestions.push({
+                type: 'remove_contained',
+                problem,
+                description: `Remove redundant entry: "${b.description.substring(0, 50)}${b.description.length > 50 ? '...' : ''}"`,
+                action: {
+                  type: 'remove_entry',
+                  entryId: b.id,
+                  entry: b,
+                  reason: `Entirely contained within a longer "${a.description.substring(0, 30)}" entry (${formatTime(a.start_time)} - ${formatTime(a.end_time)})`
+                }
+              });
+            } else if (aStart >= bStart && aEnd <= bEnd) {
+              handledIds.add(a.id);
+              suggestions.push({
+                type: 'remove_contained',
+                problem,
+                description: `Remove redundant entry: "${a.description.substring(0, 50)}${a.description.length > 50 ? '...' : ''}"`,
+                action: {
+                  type: 'remove_entry',
+                  entryId: a.id,
+                  entry: a,
+                  reason: `Entirely contained within a longer "${b.description.substring(0, 30)}" entry (${formatTime(b.start_time)} - ${formatTime(b.end_time)})`
+                }
+              });
+            }
+          }
+        }
+
+        // 3. Fall back: cap longest entries on this day (lower threshold for impossible days)
+        const cappableEntries = db.prepare(`
+          SELECT * FROM time_logs
+          WHERE DATE(start_time, 'localtime') = ?
+            AND duration_minutes > 180
           ORDER BY duration_minutes DESC
           LIMIT 3
         `).all(problem.date);
 
-        for (const entry of dayEntries) {
+        for (const entry of cappableEntries) {
+          if (handledIds.has(entry.id)) continue;
           const reasonableEndTime = await suggestReasonableEndTime(db, entry);
           if (reasonableEndTime) {
             suggestions.push({
               type: 'cap_day_entry',
-              problem: problem,
-              description: `Cap long entry on ${problem.date}: "${entry.description.substring(0, 40)}..."`,
+              problem: { ...problem, entry },
+              description: `Cap long entry on ${problem.date}: "${entry.description.substring(0, 40)}${entry.description.length > 40 ? '...' : ''}"`,
               action: {
                 type: 'update_end_time',
                 entryId: entry.id,
                 entryStartTime: entry.start_time,
                 currentEndTime: entry.end_time,
                 suggestedEndTime: reasonableEndTime,
-                reason: `Part of ${problem.totalHours}h day - likely forgotten timer`
+                reason: `Part of ${problem.totalHours}h day - likely overlapping with concurrent entries`
               }
             });
           }
@@ -1154,6 +1238,17 @@ function displaySuggestion(suggestion, dryRun = false) {
   if (action.type === 'stop_timer') {
     console.log(colors.yellow('  Current:') + ` Timer running since ${formatTime(problem.entry.start_time)} (${problem.hours}h)`);
     console.log(colors.green('  Fix:') + ' Stop the timer now');
+  }
+  else if (action.type === 'remove_entry') {
+    const entry = action.entry;
+    const duration = entry.duration_minutes || 0;
+    console.log(colors.cyan('  Entry:') + ` "${entry.description}"`);
+    console.log(colors.yellow('  Time:') + ` ${formatTime(entry.start_time)} - ${formatTime(entry.end_time)} (${formatDurationMinutes(duration)})`);
+    if (entry.id) {
+      console.log(colors.gray('  File:') + ` ${entry.id}`);
+    }
+    console.log(colors.green('  Fix:') + ' Remove this entry');
+    console.log(colors.gray('  Reason:') + ` ${action.reason}`);
   }
   else if (action.type === 'update_end_time') {
     const entryStartTime = action.entryStartTime;
@@ -1234,6 +1329,9 @@ async function applyFix(db, suggestion) {
     } else if (action.type === 'update_end_time') {
       // Update an entry's end time
       return await updateEntryEndTime(db, suggestion);
+    } else if (action.type === 'remove_entry') {
+      // Remove a duplicate/redundant entry
+      return await removeEntry(db, suggestion);
     } else {
       return { success: false, error: `Unknown action type: ${action.type}` };
     }
@@ -1373,6 +1471,94 @@ async function updateMarkdownSourceFile(entry, newEndTime) {
 
   } catch (error) {
     throw new Error(`Failed to update source file: ${error.message}`);
+  }
+}
+
+// Remove a duplicate/redundant entry
+async function removeEntry(db, suggestion) {
+  const { action } = suggestion;
+
+  // Re-lookup entry by start_time and description to handle shifted line numbers after previous removals
+  const currentEntry = db.prepare(`
+    SELECT * FROM time_logs
+    WHERE start_time = ? AND description = ?
+    LIMIT 1
+  `).get(action.entry.start_time, action.entry.description);
+
+  if (!currentEntry) {
+    return { success: false, error: 'Entry not found (may have already been removed)' };
+  }
+
+  // Remove from source file first (before DB delete, so we can use the ID for line lookup)
+  if (currentEntry.id?.includes('markdown-time-tracking')) {
+    try {
+      const result = await removeMarkdownSourceLine(currentEntry);
+      if (result.success) {
+        console.log(colors.gray('    Source file updated'));
+      }
+    } catch (error) {
+      console.log(colors.yellow('⚠') + ` Couldn't update source file: ${error.message}`);
+      return { success: false, error: `Failed to update source file: ${error.message}` };
+    }
+  }
+
+  // Delete from database
+  db.prepare('DELETE FROM time_logs WHERE id = ?').run(currentEntry.id);
+
+  return { success: true };
+}
+
+// Remove a line from a markdown time-tracking source file
+async function removeMarkdownSourceLine(entry) {
+  try {
+    const entryId = entry.id;
+    if (!entryId || !entryId.includes(':')) {
+      throw new Error('Invalid entry ID format');
+    }
+
+    const parts = entryId.split(':');
+    if (parts.length < 3) {
+      throw new Error('Invalid entry ID format - expected source:path:line');
+    }
+
+    const filePath = parts.slice(1, -1).join(':');
+    const lineNum = parseInt(parts[parts.length - 1]);
+
+    if (isNaN(lineNum)) {
+      throw new Error('Invalid line number in entry ID');
+    }
+
+    const fullFilePath = path.join(PROJECT_ROOT, filePath);
+
+    const fs = await import('fs');
+    if (!fs.existsSync(fullFilePath)) {
+      throw new Error(`Source file not found: ${filePath}`);
+    }
+
+    const content = fs.readFileSync(fullFilePath, 'utf8');
+    const lines = content.split('\n');
+
+    if (lineNum >= lines.length) {
+      throw new Error(`Line ${lineNum} does not exist in file`);
+    }
+
+    // Verify the line matches the entry (check start_time and a portion of description)
+    const currentLine = lines[lineNum];
+    const descPrefix = entry.description ? entry.description.split(' #')[0].substring(0, 15) : '';
+    if (descPrefix && !currentLine.includes(descPrefix)) {
+      throw new Error('Source line does not match entry - file may have changed');
+    }
+
+    // Remove the line
+    lines.splice(lineNum, 1);
+
+    const updatedContent = lines.join('\n');
+    fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
+
+    return { success: true, filePath, lineNum };
+
+  } catch (error) {
+    throw new Error(`Failed to remove source line: ${error.message}`);
   }
 }
 
