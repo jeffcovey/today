@@ -640,7 +640,52 @@ function processMarkdownLinks(text) {
   return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
+// Server-side auto-advance: the single source of truth for timer progression.
+// Called before rendering any page so all browsers see consistent state.
+function advanceTimerIfNeeded() {
+  if (!taskTimerState.isRunning || taskTimerState.isPaused) return;
+
+  const now = Date.now();
+  const start = new Date(taskTimerState.startTime).getTime();
+  const workMs = taskTimerState.duration * 60 * 1000;
+  const restMs = Math.round(workMs * 0.1);
+
+  if (taskTimerState.phase === 'work' && now - start >= workMs) {
+    // Work phase expired → transition to rest
+    taskTimerState.phase = 'rest';
+    taskTimerState.startTime = new Date(start + workMs).toISOString();
+  }
+
+  if (taskTimerState.phase === 'rest' && now - new Date(taskTimerState.startTime).getTime() >= restMs) {
+    // Rest expired → advance to next item
+    if (taskTimerSyncedItems) {
+      taskTimerState.items = taskTimerSyncedItems;
+      taskTimerState.currentIndex = 0;
+      taskTimerSyncedItems = null;
+    } else {
+      taskTimerState.currentIndex++;
+    }
+
+    if (taskTimerState.currentIndex >= taskTimerState.items.length) {
+      // Exhausted the list — stop the timer
+      taskTimerState.isRunning = false;
+      return;
+    }
+
+    taskTimerState.currentItem = taskTimerState.items[taskTimerState.currentIndex];
+    taskTimerState.startTime = new Date().toISOString();
+    taskTimerState.phase = 'work';
+    taskTimerSyncedItems = null;
+    triggerTaskTimerSync();
+
+    // Recurse in case new work phase also expired (user was away a long time)
+    advanceTimerIfNeeded();
+  }
+}
+
 function getTaskTimerWidget(items) {
+  advanceTimerIfNeeded();
+
   if (!items || items.length === 0) {
     return `
       <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
@@ -7026,16 +7071,6 @@ app.post('/api/task-timer/resume', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/task-timer/rest', authMiddleware, async (req, res) => {
-  if (!taskTimerState.isRunning) {
-    return res.status(400).json({ success: false });
-  }
-  taskTimerState.phase = 'rest';
-  taskTimerState.startTime = new Date().toISOString();
-  taskTimerState.isPaused = false;
-  taskTimerState.pausedAt = null;
-  res.json({ success: true });
-});
 
 // Task detail page - uses tasks table (from plugins)
 // Use wildcard to capture task IDs with slashes (e.g., markdown-tasks/local:vault/file.md:123)

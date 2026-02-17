@@ -125,15 +125,9 @@ function updateTaskTimerCountdown() {
     const seconds = remaining % 60;
     countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    // Auto-advance when timer expires
+    // Auto-advance: just reload — server auto-advances based on elapsed time
     if (remaining === 0) {
-      if (phase === 'work') {
-        // Transition to rest period
-        fetch('/api/task-timer/rest', {method: 'POST'}).then(function() { location.reload(); });
-      } else {
-        // Rest done, advance to next item
-        fetch('/api/task-timer/skip', {method: 'POST'}).then(function() { location.reload(); });
-      }
+      location.reload();
     }
   }
 }
