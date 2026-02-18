@@ -715,11 +715,20 @@ function getTaskTimerWidget(items) {
     const initSec = remaining % 60;
 
     if (phase === 'rest') {
+      let nextItem = null;
+      if (taskTimerSyncedItems && taskTimerSyncedItems.length > 0) {
+        nextItem = taskTimerSyncedItems[0];
+      } else if (taskTimerState.currentIndex + 1 < taskTimerState.items.length) {
+        nextItem = taskTimerState.items[taskTimerState.currentIndex + 1];
+      }
+      const nextText = nextItem ? processMarkdownLinks(nextItem.displayText) : null;
+
       return `
         <div class="alert alert-info mb-3 py-2 px-3" role="alert"
           data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest">
-          <div><strong>Rest</strong> — next item in <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
-          <small class="d-flex gap-2">
+          <div><strong>Rest</strong> — <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
+          ${nextText ? `<div class="mt-1"><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
+          <small class="d-flex gap-2 mt-1">
             <span>${position}/${total}</span>
             <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
               if (data.message === 'All tasks completed!') alert('All tasks completed!'); location.reload();
