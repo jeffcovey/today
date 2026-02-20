@@ -89,8 +89,37 @@ export class DatabaseService {
     this.localDb.pragma('busy_timeout = 30000');
     this.localDb.pragma('foreign_keys = OFF');
 
+    // Record the file's inode so we can detect replacement
+    try {
+      this._dbIno = fs.statSync(this.dbPath).ino;
+    } catch {
+      this._dbIno = null;
+    }
+    this._lastInodeCheck = Date.now();
+
     // Install signal handlers to ensure clean shutdown
     installSignalHandlers();
+  }
+
+  /**
+   * Check if the database file has been replaced (different inode).
+   * Checks at most once every 10 seconds to avoid stat overhead.
+   * If the file was replaced, automatically reopens the connection.
+   */
+  _checkFileReplaced() {
+    const now = Date.now();
+    if (now - this._lastInodeCheck < 10_000) return;
+    this._lastInodeCheck = now;
+
+    try {
+      const currentIno = fs.statSync(this.dbPath).ino;
+      if (this._dbIno !== null && currentIno !== this._dbIno) {
+        console.log(`Database file replaced (inode ${this._dbIno} → ${currentIno}), reopening connection`);
+        this.refresh();
+      }
+    } catch {
+      // File may not exist yet during rebuild; ignore
+    }
   }
 
   /**
@@ -110,6 +139,7 @@ export class DatabaseService {
    * Prepare a statement
    */
   prepare(sql) {
+    this._checkFileReplaced();
     return this.localDb.prepare(sql);
   }
 
@@ -118,6 +148,7 @@ export class DatabaseService {
    * Note: Schema changes should be done through migrations, not here
    */
   exec(sql) {
+    this._checkFileReplaced();
     return this.localDb.exec(sql);
   }
 
@@ -125,6 +156,7 @@ export class DatabaseService {
    * Run a parameterized query
    */
   run(sql, ...params) {
+    this._checkFileReplaced();
     const stmt = this.localDb.prepare(sql);
     return stmt.run(...params);
   }
@@ -133,6 +165,7 @@ export class DatabaseService {
    * Get a single row
    */
   get(sql, ...params) {
+    this._checkFileReplaced();
     const stmt = this.localDb.prepare(sql);
     return stmt.get(...params);
   }
@@ -141,6 +174,7 @@ export class DatabaseService {
    * Get all rows
    */
   all(sql, ...params) {
+    this._checkFileReplaced();
     const stmt = this.localDb.prepare(sql);
     return stmt.all(...params);
   }
@@ -149,6 +183,7 @@ export class DatabaseService {
    * Create a transaction
    */
   transaction(fn) {
+    this._checkFileReplaced();
     return this.localDb.transaction(fn);
   }
 
@@ -156,6 +191,7 @@ export class DatabaseService {
    * Execute a pragma command
    */
   pragma(sql, options) {
+    this._checkFileReplaced();
     return this.localDb.pragma(sql, options);
   }
 
