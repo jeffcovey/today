@@ -18,7 +18,7 @@ import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
@@ -509,7 +509,7 @@ async function getTodayTaskTimerItems() {
   `).all(today);
 
   const projects = db.prepare(`
-    SELECT id, title, priority, review_frequency, last_reviewed,
+    SELECT id, source, title, priority, review_frequency, last_reviewed,
            julianday(?) - julianday(last_reviewed) as days_since
     FROM projects
     WHERE status IN ('active', 'planning')
@@ -542,10 +542,11 @@ async function getTodayTaskTimerItems() {
     }[task.priority] || '';
 
     // Parse task ID to get file path and line number for toggle
-    // Format: markdown-tasks/local:vault/path/file.md:lineNumber
+    // Format: {source}:vault/path/file.md:lineNumber  (e.g. markdown-tasks/local:vault/...)
     let toggleData = null;
-    if (task.source === 'markdown-tasks/local') {
-      const match = task.id.match(/^markdown-tasks\/local:vault\/(.+):(\d+)$/);
+    if (task.source.startsWith('markdown-tasks/')) {
+      const escapedSource = task.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = task.id.match(new RegExp('^' + escapedSource + ':vault/(.+):(\\d+)$'));
       if (match) {
         toggleData = { filePath: match[1], lineNumber: parseInt(match[2]), completed: true };
       }
@@ -556,9 +557,9 @@ async function getTodayTaskTimerItems() {
       type: 'task',
       title: task.title,
       displayText: `${emoji} ${task.title}`,
-      canComplete: task.source === 'markdown-tasks/local' && !!toggleData,
+      canComplete: task.source.startsWith('markdown-tasks/') && !!toggleData,
       toggleData,
-      linkUrl: task.source === 'markdown-tasks/local' ? `/vault/${task.id}` : null
+      linkUrl: task.source.startsWith('markdown-tasks/') ? `/vault/${task.id}` : null
     });
   }
 
@@ -587,14 +588,20 @@ async function getTodayTaskTimerItems() {
     const daysSince = project.days_since != null ? Math.floor(project.days_since) : null;
     const reviewNote = daysSince != null ? `(${daysSince}d since review)` : '(never reviewed)';
 
+    let projectLinkUrl = null;
+    if (project.source.startsWith('markdown-projects/')) {
+      const vaultDir = getVaultPath().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const idPath = project.id.replace(project.source + ':', '');
+      projectLinkUrl = '/' + idPath.replace(new RegExp('^' + vaultDir + '/'), '');
+    }
+
     items.push({
       id: `project-${project.id}`,
       type: 'project',
       title: project.title,
       displayText: `${emoji} ${project.title} ${reviewNote}`,
       canComplete: false,
-      linkUrl: project.id.startsWith('markdown-projects/local:') ?
-        `/vault/${project.id.replace('markdown-projects/local:', '')}` : null
+      linkUrl: projectLinkUrl
     });
   }
 
