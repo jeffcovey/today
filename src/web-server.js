@@ -18,7 +18,7 @@ import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
@@ -587,14 +587,20 @@ async function getTodayTaskTimerItems() {
     const daysSince = project.days_since != null ? Math.floor(project.days_since) : null;
     const reviewNote = daysSince != null ? `(${daysSince}d since review)` : '(never reviewed)';
 
+    let projectLinkUrl = null;
+    if (project.id.startsWith('markdown-projects/local:')) {
+      const vaultDir = getVaultPath().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const idPath = project.id.replace('markdown-projects/local:', '');
+      projectLinkUrl = '/' + idPath.replace(new RegExp('^' + vaultDir + '/'), '');
+    }
+
     items.push({
       id: `project-${project.id}`,
       type: 'project',
       title: project.title,
       displayText: `${emoji} ${project.title} ${reviewNote}`,
       canComplete: false,
-      linkUrl: project.id.startsWith('markdown-projects/local:') ?
-        `/vault/${project.id.replace('markdown-projects/local:', '')}` : null
+      linkUrl: projectLinkUrl
     });
   }
 
