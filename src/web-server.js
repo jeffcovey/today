@@ -620,18 +620,41 @@ let taskTimerState = {
   pausedAt: null
 };
 let taskTimerSyncedItems = null;
+let taskTimerSyncInProgress = false;
+let taskTimerSyncChild = null;
+
+function cancelTaskTimerSync() {
+  if (taskTimerSyncChild) {
+    try { taskTimerSyncChild.kill(); } catch { /* already exited */ }
+    taskTimerSyncChild = null;
+  }
+  taskTimerSyncInProgress = false;
+}
 
 function triggerTaskTimerSync() {
-  const execAsync = promisify(exec);
+  // Kill stale sync from previous timer item and start fresh
+  cancelTaskTimerSync();
+  // Guard against concurrent syncs (belt-and-suspenders with cancel above)
+  if (taskTimerSyncInProgress) return;
+  taskTimerSyncInProgress = true;
   // Intentionally not awaited — runs in background
   (async () => {
     try {
-      await execAsync('bin/plugins sync --type tasks');
-      await execAsync('bin/plugins sync --type habits');
-      await execAsync('bin/plugins sync --type projects');
+      for (const type of ['tasks', 'habits', 'projects']) {
+        const child = exec(`bin/plugins sync --type ${type}`);
+        taskTimerSyncChild = child;
+        await new Promise((resolve, reject) => {
+          child.on('close', resolve);
+          child.on('error', reject);
+        });
+      }
+      taskTimerSyncChild = null;
       taskTimerSyncedItems = await getTodayTaskTimerItems();
     } catch (e) {
-      // Sync failed, keep current items
+      // Sync failed or was cancelled, keep current items
+      taskTimerSyncChild = null;
+    } finally {
+      taskTimerSyncInProgress = false;
     }
   })();
 }
