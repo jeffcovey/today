@@ -617,7 +617,9 @@ let taskTimerState = {
   currentIndex: 0,
   phase: 'work', // 'work' or 'rest'
   isPaused: false,
-  pausedAt: null
+  pausedAt: null,
+  seenIds: new Set(),      // item IDs already shown this session (prevents repeats)
+  itemsSeenCount: 0        // running count of items shown (for accurate "X of Y")
 };
 let taskTimerSyncedItems = null;
 let taskTimerSyncInProgress = false;
@@ -663,6 +665,16 @@ function processMarkdownLinks(text) {
   return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
 
+// Filter synced items to remove any already shown this session
+function applySyncedItems() {
+  if (!taskTimerSyncedItems) return false;
+  const filtered = taskTimerSyncedItems.filter(item => !taskTimerState.seenIds.has(item.id));
+  taskTimerState.items = filtered;
+  taskTimerState.currentIndex = 0;
+  taskTimerSyncedItems = null;
+  return true;
+}
+
 // Server-side auto-advance: the single source of truth for timer progression.
 // Called before rendering any page so all browsers see consistent state.
 function advanceTimerIfNeeded() {
@@ -681,11 +693,7 @@ function advanceTimerIfNeeded() {
 
   if (taskTimerState.phase === 'rest' && now - new Date(taskTimerState.startTime).getTime() >= restMs) {
     // Rest expired → advance to next item
-    if (taskTimerSyncedItems) {
-      taskTimerState.items = taskTimerSyncedItems;
-      taskTimerState.currentIndex = 0;
-      taskTimerSyncedItems = null;
-    } else {
+    if (!applySyncedItems()) {
       taskTimerState.currentIndex++;
     }
 
@@ -696,6 +704,8 @@ function advanceTimerIfNeeded() {
     }
 
     taskTimerState.currentItem = taskTimerState.items[taskTimerState.currentIndex];
+    taskTimerState.seenIds.add(taskTimerState.currentItem.id);
+    taskTimerState.itemsSeenCount++;
     taskTimerState.startTime = new Date().toISOString();
     taskTimerState.phase = 'work';
     taskTimerSyncedItems = null;
@@ -725,8 +735,8 @@ function getTaskTimerWidget(items) {
     const workSeconds = taskTimerState.duration * 60;
     const restSeconds = Math.round(workSeconds * 0.1);
     const totalSeconds = phase === 'rest' ? restSeconds : workSeconds;
-    const position = taskTimerState.currentIndex + 1;
-    const total = taskTimerState.items.length;
+    const position = taskTimerState.itemsSeenCount;
+    const total = taskTimerState.itemsSeenCount + (taskTimerState.items.length - taskTimerState.currentIndex - 1);
     const displayText = processMarkdownLinks(item.displayText);
 
     // Calculate initial display time (for paused state or page load)
@@ -740,7 +750,7 @@ function getTaskTimerWidget(items) {
     if (phase === 'rest') {
       let nextItem = null;
       if (taskTimerSyncedItems && taskTimerSyncedItems.length > 0) {
-        nextItem = taskTimerSyncedItems[0];
+        nextItem = taskTimerSyncedItems.find(item => !taskTimerState.seenIds.has(item.id)) || null;
       } else if (taskTimerState.currentIndex + 1 < taskTimerState.items.length) {
         nextItem = taskTimerState.items[taskTimerState.currentIndex + 1];
       }
@@ -7001,7 +7011,9 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
       currentIndex: 0,
       phase: 'work',
       isPaused: false,
-      pausedAt: null
+      pausedAt: null,
+      seenIds: new Set([items[0].id]),
+      itemsSeenCount: 1
     };
 
     // Background sync so next timer has fresh data
@@ -7027,7 +7039,9 @@ app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
       currentIndex: 0,
       phase: 'work',
       isPaused: false,
-      pausedAt: null
+      pausedAt: null,
+      seenIds: new Set(),
+      itemsSeenCount: 0
     };
     taskTimerSyncedItems = null;
 
@@ -7045,17 +7059,13 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     }
 
     // Use synced items if background sync completed, otherwise advance in current list
-    if (taskTimerSyncedItems) {
-      taskTimerState.items = taskTimerSyncedItems;
-      taskTimerState.currentIndex = 0;
-      taskTimerSyncedItems = null;
-    } else {
+    if (!applySyncedItems()) {
       taskTimerState.currentIndex++;
     }
 
-    // If we've exhausted the list, re-fetch from DB
+    // If we've exhausted the list, re-fetch from DB (filtering out seen items)
     if (taskTimerState.currentIndex >= taskTimerState.items.length) {
-      const freshItems = await getTodayTaskTimerItems();
+      const freshItems = (await getTodayTaskTimerItems()).filter(item => !taskTimerState.seenIds.has(item.id));
       if (freshItems.length === 0) {
         taskTimerState.isRunning = false;
         return res.json({ success: true, message: 'All tasks completed!' });
@@ -7065,6 +7075,8 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     }
 
     taskTimerState.currentItem = taskTimerState.items[taskTimerState.currentIndex];
+    taskTimerState.seenIds.add(taskTimerState.currentItem.id);
+    taskTimerState.itemsSeenCount++;
     taskTimerState.startTime = new Date().toISOString();
     taskTimerState.phase = 'work';
     taskTimerState.isPaused = false;
