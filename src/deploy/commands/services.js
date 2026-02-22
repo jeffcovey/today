@@ -8,6 +8,7 @@ import { printStatus, printInfo, printWarning, printError } from '../remote-serv
 
 const SERVICES = [
   'today-scheduler',
+  'vault-watcher',
   'vault-web',
   'inbox-api',
   'resilio-sync'

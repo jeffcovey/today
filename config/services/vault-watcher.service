@@ -1,0 +1,23 @@
+[Unit]
+Description=Today Vault Watcher - Real-time file sync
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{deploy_path}}
+Environment="NODE_ENV=production"
+Environment="TZ=America/New_York"
+EnvironmentFile=-{{deploy_path}}/.env.keys
+ExecStart=/usr/bin/npx dotenvx run -- node src/vault-watcher.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

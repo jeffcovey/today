@@ -207,6 +207,15 @@ function readConfig() {
   }
 }
 
+/**
+ * Clear the in-memory config cache.
+ * Forces the next read to reload from disk.
+ */
+export function clearConfigCache() {
+  configCache = null;
+  lastReadTime = 0;
+}
+
 export function getTimezone() {
   const config = readConfig();
   return config.timezone || 'America/New_York';
