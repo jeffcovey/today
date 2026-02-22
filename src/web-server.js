@@ -504,7 +504,6 @@ async function getTodayTaskTimerItems() {
       AND (goal_type IS NULL OR goal_type != 'limit')
       AND (json_extract(metadata, '$.recurrence') IS NULL
            OR json_extract(metadata, '$.recurrence') = 'daily')
-      AND habit_id != 'evening'
     ORDER BY category, title
   `).all(today);
 
