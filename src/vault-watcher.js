@@ -24,11 +24,21 @@ const VAULT_DIR = getAbsoluteVaultPath();
 const DEFAULT_DEBOUNCE = 3000;
 const DEFAULT_IGNORE = ['.stfolder', '.stversions', '.backups', '.DS_Store'];
 
+// Plugins that scan the entire vault and are too expensive for real-time watching.
+// These run on the scheduler's 10-minute cron instead.
+const DEFAULT_EXCLUDE_PLUGINS = [
+  'markdownlint-cleanup',
+  'icloud-conflict-cleanup',
+  'resilio-conflict-cleanup',
+  'vault-changes'
+];
+
 function loadWatcherConfig() {
   const cfg = getConfig('watcher') || {};
   return {
     debounce: cfg.debounce || DEFAULT_DEBOUNCE,
-    ignore: cfg.ignore || DEFAULT_IGNORE
+    ignore: cfg.ignore || DEFAULT_IGNORE,
+    exclude_plugins: cfg.exclude_plugins || DEFAULT_EXCLUDE_PLUGINS
   };
 }
 
@@ -73,10 +83,12 @@ function getWatchedVaultPaths(plugin, sourceConfig) {
  */
 async function buildWatchMap() {
   const plugins = await discoverPlugins();
+  const excluded = new Set(watcherConfig.exclude_plugins);
   const watchMap = [];
 
   for (const [name, plugin] of plugins) {
     if (!plugin.commands?.read) continue;
+    if (excluded.has(name)) continue;
 
     const sources = getPluginSources(name);
     for (const { sourceName, config: sourceConfig } of sources) {
@@ -152,6 +164,7 @@ console.log(`Watching: ${VAULT_DIR}`);
 console.log(`Timezone: ${configuredTimezone}`);
 console.log(`Debounce: ${watcherConfig.debounce}ms`);
 console.log(`Ignored: ${watcherConfig.ignore.join(', ')}`);
+console.log(`Excluded plugins: ${watcherConfig.exclude_plugins.join(', ')}`);
 
 // Ensure database is healthy before starting
 const healthResult = await ensureHealthyDatabase({ verbose: false });
@@ -201,7 +214,11 @@ async function runSync() {
   }
 
   isSyncing = true;
-  console.log(`\n[${timestamp()}] Syncing ${affected.length} source(s)...`);
+  console.log(`\n[${timestamp()}] Syncing ${affected.length} source(s) for ${changedFiles.length} file(s)...`);
+
+  // Build relative file filter for targeted sync (e.g. "vault/plans/foo.md,vault/plans/bar.md")
+  const relativeFiles = changedFiles.map(f => path.relative(PROJECT_ROOT, f));
+  const fileFilter = relativeFiles.join(',');
 
   const db = getDatabase();
   const context = { db, vaultPath };
@@ -210,7 +227,8 @@ async function runSync() {
     try {
       console.log(`  ${entry.sourceId}...`);
       const result = await syncPluginSource(
-        entry.plugin, entry.sourceName, entry.sourceConfig, context
+        entry.plugin, entry.sourceName, entry.sourceConfig, context,
+        { fileFilter }
       );
       if (result.success) {
         console.log(`    ${result.message}`);
