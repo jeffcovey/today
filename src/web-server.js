@@ -18,7 +18,7 @@ import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
@@ -529,10 +529,17 @@ async function getTodayTaskTimerItems() {
       END DESC
   `).all(today, today, today, today, today, today, today);
 
+  // Filter out tasks from excluded files (vault-relative paths)
+  const excludeFiles = getConfig('task_timer.exclude_files') || [];
+  const vaultPrefix = getVaultPath() + '/';
+  const filteredTasks = excludeFiles.length > 0
+    ? tasks.filter(task => !excludeFiles.some(f => task.id.includes(vaultPrefix + f)))
+    : tasks;
+
   const items = [];
 
   // Add tasks with completion capability
-  for (const task of tasks) {
+  for (const task of filteredTasks) {
     const emoji = {
       'highest': '🔺',
       'high': '⏫',
