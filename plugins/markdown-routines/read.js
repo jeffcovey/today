@@ -27,6 +27,7 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 
 const routinesDirectory = config.routines_directory || `${process.env.VAULT_PATH}/routines`;
 const historyLimit = config.history_limit || 30;
+const fileFilter = process.env.FILE_FILTER || '';
 
 // Get timezone from global config
 const globalConfigPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
@@ -533,13 +534,28 @@ if (!fs.existsSync(routinesDir)) {
   fs.mkdirSync(routinesDir, { recursive: true });
 }
 
-// Find all .md files in routines directory
-let files = fs.readdirSync(routinesDir)
-  .filter(f => f.endsWith('.md'))
-  .map(f => path.join(routinesDir, f));
+// Parse file filter (comma-separated list of relative paths from project root)
+const filterFiles = fileFilter
+  ? fileFilter.split(',').map(f => path.join(projectRoot, f.trim()))
+  : null;
 
-// Create sample routine if none exist
-if (files.length === 0) {
+// Find .md files in routines directory
+let files;
+let isIncremental = false;
+
+if (filterFiles) {
+  // Only process filtered files that exist and are within routines directory
+  files = filterFiles.filter(f => fs.existsSync(f) && f.endsWith('.md') &&
+    (f === routinesDir || f.startsWith(routinesDir + path.sep)));
+  isIncremental = true;
+} else {
+  files = fs.readdirSync(routinesDir)
+    .filter(f => f.endsWith('.md'))
+    .map(f => path.join(routinesDir, f));
+}
+
+// Create sample routine if none exist (only on full scan)
+if (!isIncremental && files.length === 0) {
   const todayStr = formatDate(getToday());
   const samplePath = path.join(routinesDir, 'morning.md');
   fs.writeFileSync(samplePath, getSampleMorningRoutine(todayStr), 'utf8');
@@ -575,13 +591,20 @@ for (const file of files) {
 }
 
 // Output
-console.log(JSON.stringify({
+const output = {
   entries: entries,
   metadata: {
     routines_count: files.length,
     entries_count: entries.length,
     processed: processed,
+    incremental: isIncremental,
     created_sample: createdSample || undefined,
     errors: errors.length > 0 ? errors : undefined
   }
-}));
+};
+
+if (isIncremental) {
+  output.files_processed = files.map(f => path.relative(projectRoot, f));
+}
+
+console.log(JSON.stringify(output));

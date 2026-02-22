@@ -17,6 +17,7 @@ const excludePaths = (config.exclude_paths || 'templates,zz-attachments')
   .map(p => p.trim())
   .filter(Boolean);
 const completedFolder = config.completed_folder || 'completed';
+const fileFilter = process.env.FILE_FILTER || '';
 
 const rootDir = path.join(projectRoot, directory);
 
@@ -168,8 +169,24 @@ function extractDescription(content) {
   return description || null;
 }
 
+// Parse file filter (comma-separated list of relative paths from project root)
+const filterFiles = fileFilter
+  ? fileFilter.split(',').map(f => path.join(projectRoot, f.trim()))
+  : null;
+
 // Process project files
-const projectFiles = findProjectFiles(rootDir);
+let projectFiles;
+let isIncremental = false;
+
+if (filterFiles) {
+  // Only process filtered files that exist and are within projects directory
+  projectFiles = filterFiles.filter(f => fs.existsSync(f) && f.endsWith('.md') &&
+    (f === rootDir || f.startsWith(rootDir + path.sep)));
+  isIncremental = true;
+} else {
+  projectFiles = findProjectFiles(rootDir);
+}
+
 const entries = [];
 
 for (const filePath of projectFiles) {
@@ -287,8 +304,14 @@ for (const filePath of projectFiles) {
 }
 
 // Output JSON
-// Note: We intentionally don't include files_processed to force full sync.
-// This ensures stale entries are cleaned up when project files are renamed/deleted.
-console.log(JSON.stringify({
-  entries
-}));
+// When FILE_FILTER is set, include files_processed for incremental sync.
+// Otherwise, omit it to force full sync (ensures stale entries are cleaned up
+// when project files are renamed/deleted).
+const output = { entries };
+
+if (isIncremental) {
+  output.files_processed = projectFiles.map(f => path.relative(projectRoot, f));
+  output.incremental = true;
+}
+
+console.log(JSON.stringify(output));
