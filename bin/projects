@@ -132,7 +132,7 @@ program
   .option('--review', 'Show only projects with review tracking')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     let conditions = [];
     const params = [];
@@ -304,7 +304,7 @@ program
   .description('Show details for a specific project')
   .action(async (id) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Try exact match first, then partial match on title or id
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -379,8 +379,8 @@ program
 
     // Sync relevant sources for fresh data (unless --no-sync)
     if (options.sync !== false) {
-      ensureSyncForType(db, 'projects');
-      ensureSyncForType(db, 'tasks');
+      await ensureSyncForType(db, 'projects');
+      await ensureSyncForType(db, 'tasks');
     }
 
     // Find the project
@@ -437,7 +437,7 @@ program
   .description('Show projects overdue for review')
   .action(async () => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     const today = getTodayDate();
 
@@ -498,7 +498,7 @@ program
   .description('Show project statistics')
   .action(async () => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     console.log('');
     console.log(colors.bold('Project Statistics'));
@@ -599,7 +599,7 @@ program
   .option('-s, --status <status>', 'Filter by status (default: active)')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     const status = options.status || 'active';
 
@@ -654,7 +654,7 @@ program
   .option('--clear-due', 'Clear the due date')
   .action(async (id, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -753,7 +753,7 @@ program
   .option('--clear', 'Clear the priority')
   .action(async (id, priority, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -841,7 +841,7 @@ program
   .option('--clear', 'Clear the status')
   .action(async (id, status, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -929,7 +929,7 @@ program
   .option('--clear', 'Clear the stage')
   .action(async (id, stage, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -1024,7 +1024,7 @@ program
   .option('-f, --frequency <freq>', 'Review frequency (daily, weekly, monthly, quarterly, yearly)')
   .action(async (id, date, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Find the project
     let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
@@ -1131,7 +1131,7 @@ program
   .option('--today', 'Show only projects matching today\'s stage (default if no stage specified)')
   .action(async (stageFilter, options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'projects');
+    await ensureSyncForType(db, 'projects');
 
     // Get stage information from stages plugin (with fallback)
     let stagesData = null;

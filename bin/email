@@ -20,7 +20,7 @@ program
   .description('Show email database statistics')
   .action(async () => {
     const db = getDatabase();
-    ensureSyncForType(db, 'email');
+    await ensureSyncForType(db, 'email');
 
     console.log(colors.blue('📊 Email Database Statistics'));
 
@@ -93,7 +93,7 @@ program
   .option('--unread', 'Show only unread emails')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'email');
+    await ensureSyncForType(db, 'email');
 
     const conditions = [];
     const params = [];
@@ -290,7 +290,7 @@ program
       console.log(colors.blue(`🔍 Searching local cache for: ${query}`));
 
       const db = getDatabase();
-      ensureSyncForType(db, 'email');
+      await ensureSyncForType(db, 'email');
 
       const conditions = [
         "(subject LIKE ? OR from_address LIKE ? OR from_name LIKE ? OR text_content LIKE ?)"

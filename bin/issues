@@ -18,7 +18,7 @@ const PROJECT_ROOT = path.dirname(__dirname);
 // Open command - show open issues (default)
 async function cmdOpen(options = {}) {
   const db = getDatabase();
-  ensureSyncForType(db, 'issues');
+  await ensureSyncForType(db, 'issues');
   const limitPerSource = options.limit || 10;
 
   // Validate source filter if provided
@@ -85,7 +85,7 @@ async function cmdOpen(options = {}) {
 // Closed command - show recently closed issues
 async function cmdClosed(options = {}) {
   const db = getDatabase();
-  ensureSyncForType(db, 'issues');
+  await ensureSyncForType(db, 'issues');
   const limit = options.limit || 10;
 
   // Validate source filter if provided
@@ -143,7 +143,7 @@ async function cmdSearch(searchTerm, options = {}) {
   }
 
   const db = getDatabase();
-  ensureSyncForType(db, 'issues');
+  await ensureSyncForType(db, 'issues');
   const limit = options.limit || 10;
 
   // Build query with optional source filter
@@ -193,7 +193,7 @@ async function cmdShow(issueId, options = {}) {
   }
 
   const db = getDatabase();
-  ensureSyncForType(db, 'issues');
+  await ensureSyncForType(db, 'issues');
 
   // Search for issue by ID (could be "52" or full ID like "github-issues/today:52")
   const issue = db.prepare(`
@@ -214,7 +214,7 @@ async function cmdShow(issueId, options = {}) {
 // Stats command - show issue statistics
 async function cmdStats() {
   const db = getDatabase();
-  ensureSyncForType(db, 'issues');
+  await ensureSyncForType(db, 'issues');
 
   const stats = db.prepare(`
     SELECT

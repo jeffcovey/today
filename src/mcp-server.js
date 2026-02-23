@@ -36,9 +36,12 @@ import {
   writeEntryAndSync,
   getWritableSource,
   ensureSyncForType,
+  syncPluginSource,
+  syncAllPlugins,
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
+import { getAbsoluteVaultPath } from './config.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -298,7 +301,7 @@ export function createMCPServer() {
         }
 
         case 'list_tasks': {
-          ensureSyncForType(db, 'tasks');
+          await ensureSyncForType(db, 'tasks');
 
           const conditions = [];
           const params = [];
@@ -387,7 +390,7 @@ export function createMCPServer() {
         }
 
         case 'list_events': {
-          ensureSyncForType(db, 'events');
+          await ensureSyncForType(db, 'events');
 
           const targetDate = args.date || getTodayDate();
           const days = args.days || 1;
@@ -462,13 +465,14 @@ export function createMCPServer() {
 
         case 'sync_data': {
           try {
-            const typeArg = args.plugin_type ? `--type ${args.plugin_type}` : '';
-            execSync(`bin/plugins sync ${typeArg}`, {
-              cwd: PROJECT_ROOT,
-              encoding: 'utf8',
-              stdio: ['pipe', 'pipe', 'pipe'],
-            });
-            db.refresh();
+            const vaultPath = getAbsoluteVaultPath();
+            const context = { db, vaultPath };
+
+            if (args.plugin_type) {
+              await ensureSyncForType(db, args.plugin_type, { force: true });
+            } else {
+              await syncAllPlugins(context);
+            }
 
             return {
               content: [{
@@ -614,7 +618,7 @@ export function createMCPServer() {
 
     try {
       if (uri === 'today://tasks') {
-        ensureSyncForType(db, 'tasks');
+        await ensureSyncForType(db, 'tasks');
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
           FROM tasks
@@ -635,7 +639,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://tasks/today') {
-        ensureSyncForType(db, 'tasks');
+        await ensureSyncForType(db, 'tasks');
         const today = getTodayDate();
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
@@ -657,7 +661,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://events') {
-        ensureSyncForType(db, 'events');
+        await ensureSyncForType(db, 'events');
         const today = getTodayDate();
         const events = db.prepare(`
           SELECT id, title, start_date, end_date, location, calendar_name, source
@@ -677,7 +681,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://events/today') {
-        ensureSyncForType(db, 'events');
+        await ensureSyncForType(db, 'events');
         const today = getTodayDate();
         const events = db.prepare(`
           SELECT id, title, start_date, end_date, location, calendar_name, source
@@ -696,7 +700,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://time-logs') {
-        ensureSyncForType(db, 'time-logs');
+        await ensureSyncForType(db, 'time-logs');
         const today = getTodayDate();
         const logs = db.prepare(`
           SELECT id, start_time, end_time, duration_minutes, description, source
@@ -716,7 +720,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://diary') {
-        ensureSyncForType(db, 'diary');
+        await ensureSyncForType(db, 'diary');
         const logs = db.prepare(`
           SELECT id, date, content, metadata, source
           FROM diary
@@ -839,8 +843,8 @@ export function createMCPServer() {
     switch (name) {
       case 'daily_planning': {
         // Gather context for daily planning
-        ensureSyncForType(db, 'tasks');
-        ensureSyncForType(db, 'events');
+        await ensureSyncForType(db, 'tasks');
+        await ensureSyncForType(db, 'events');
 
         const today = getTodayDate();
 
@@ -902,7 +906,7 @@ Based on this information, help me:
       }
 
       case 'weekly_review': {
-        ensureSyncForType(db, 'tasks');
+        await ensureSyncForType(db, 'tasks');
 
         const today = getTodayDate();
         const weekAgo = new Date();
@@ -952,7 +956,7 @@ Please help me:
       }
 
       case 'task_triage': {
-        ensureSyncForType(db, 'tasks');
+        await ensureSyncForType(db, 'tasks');
 
         const tasks = db.prepare(`
           SELECT id, title, priority, due_date, metadata, source

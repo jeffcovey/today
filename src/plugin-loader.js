@@ -4,7 +4,7 @@ import path from 'path';
 import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
-import { getFullConfig, getVaultPath, getConfigPath } from './config.js';
+import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 
@@ -513,7 +513,7 @@ export function getLatestSyncTimeForType(db, pluginType) {
  * @param {boolean} options.force - Force sync even if not stale (default: false)
  * @returns {boolean} - True if sync was performed, false if data was fresh
  */
-export function ensureSyncForType(db, pluginType, options = {}) {
+export async function ensureSyncForType(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType), force = false } = options;
 
   // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
@@ -534,13 +534,16 @@ export function ensureSyncForType(db, pluginType, options = {}) {
   }
 
   try {
-    execSync(`bin/plugins sync --type ${pluginType}`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    // Refresh the database connection to ensure subprocess writes are visible
-    // This closes and reopens the connection, guaranteeing a fresh view of WAL data
-    db.refresh();
+    const vaultPath = getAbsoluteVaultPath();
+    const context = { db, vaultPath };
+    const enabledPlugins = await getEnabledPlugins();
+
+    for (const { plugin, sources } of enabledPlugins) {
+      if (!plugin.commands?.read || plugin.type !== pluginType) continue;
+      for (const { sourceName, config } of sources) {
+        await syncPluginSource(plugin, sourceName, config, context, { _caller: 'ensure-sync' });
+      }
+    }
     return true;
   } catch {
     // Silently ignore sync errors for read operations

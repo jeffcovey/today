@@ -624,7 +624,7 @@ async function cmdWeek(options = {}) {
 // Quiet sync - ensures database is current before read operations
 function ensureSync() {
   const db = getDatabase();
-  ensureSyncForType(db, 'time-logs');
+  await ensureSyncForType(db, 'time-logs');
 }
 
 // Restart command - start a new timer with the same description as the most recent entry

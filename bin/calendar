@@ -79,7 +79,7 @@ async function getDefaultWritableSource() {
 
 // Quiet sync - ensures database is current before read operations
 function ensureSync(db) {
-  ensureSyncForType(db, 'events');
+  await ensureSyncForType(db, 'events');
 }
 
 // Get events from database

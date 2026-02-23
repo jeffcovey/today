@@ -62,7 +62,7 @@ program
   .option('--category <category>', 'Filter by category')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'finance');
+    await ensureSyncForType(db, 'finance');
 
     const days = parseInt(options.days);
     const limit = parseInt(options.limit);
@@ -129,7 +129,7 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'finance');
+    await ensureSyncForType(db, 'finance');
 
     const days = parseInt(options.days);
     const today = getTodayDate();
@@ -214,7 +214,7 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'finance');
+    await ensureSyncForType(db, 'finance');
 
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
@@ -269,7 +269,7 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'finance');
+    await ensureSyncForType(db, 'finance');
 
     let sql = `
       SELECT account, COUNT(*) as count, SUM(amount) as balance,
@@ -321,7 +321,7 @@ program
   .option('--categories', 'List all budget categories for the month')
   .action(async (options) => {
     const db = getDatabase();
-    ensureSyncForType(db, 'finance');
+    await ensureSyncForType(db, 'finance');
 
     let month;
     if (options.month) {
