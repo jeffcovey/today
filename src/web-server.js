@@ -7086,10 +7086,6 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     taskTimerState.isPaused = false;
     taskTimerState.pausedAt = null;
 
-    // Background sync so next timer has fresh data
-    taskTimerSyncedItems = null;
-    triggerTaskTimerSync();
-
     res.json({ success: true, message: 'Skipped to next item', item: taskTimerState.currentItem });
   } catch (error) {
     console.error('Error skipping task timer:', error);
