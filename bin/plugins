@@ -268,7 +268,7 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
 
     for (const { sourceName: src, config } of toSync) {
       console.log(`Syncing ${pluginName}/${src}...`);
-      const result = await syncPluginSource(plugin, src, config, context);
+      const result = await syncPluginSource(plugin, src, config, context, { _caller: 'sync-cmd' });
 
       if (result.success) {
         console.log(colors.green(`  ✓ ${result.message}`));
@@ -331,7 +331,7 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
         }
 
         console.log(`  ${plugin.name}/${src}...`);
-        const result = await syncPluginSource(plugin, src, config, context);
+        const result = await syncPluginSource(plugin, src, config, context, { _caller: 'sync-cmd' });
 
         if (result.success) {
           console.log(colors.green(`    ✓ ${result.message}`));

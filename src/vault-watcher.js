@@ -228,7 +228,7 @@ async function runSync() {
       console.log(`  ${entry.sourceId}...`);
       const result = await syncPluginSource(
         entry.plugin, entry.sourceName, entry.sourceConfig, context,
-        { fileFilter }
+        { fileFilter, _caller: 'vault-watcher' }
       );
       if (result.success) {
         console.log(`    ${result.message}`);

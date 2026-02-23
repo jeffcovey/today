@@ -585,13 +585,51 @@ export function getSyncStatusMessage(db, pluginType) {
 }
 
 /**
- * Update sync metadata after a successful sync
+ * Update sync metadata after a successful sync.
+ * Uses upsert to preserve lock columns (INSERT OR REPLACE would delete and re-insert, nulling them).
  */
 function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null) {
   db.prepare(`
-    INSERT OR REPLACE INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
+    INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
     VALUES (?, datetime('now'), ?, ?, ?)
+    ON CONFLICT(source) DO UPDATE SET
+      last_synced_at = datetime('now'),
+      last_sync_files = excluded.last_sync_files,
+      entries_count = excluded.entries_count,
+      extra_data = excluded.extra_data
   `).run(sourceId, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
+}
+
+const SYNC_LOCK_STALE_MINUTES = 5;
+
+/**
+ * Try to acquire a sync lock for a source. Uses atomic UPDATE ... WHERE as a cross-process CAS.
+ * Returns true if lock was acquired, false if another process holds it.
+ */
+function tryAcquireSyncLock(db, sourceId, lockedBy) {
+  // Ensure the row exists
+  db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
+
+  // Atomic CAS: acquire if unlocked OR if lock is stale (zombie detection)
+  const result = db.prepare(`
+    UPDATE sync_metadata
+    SET sync_locked_at = datetime('now'), sync_locked_by = ?
+    WHERE source = ?
+      AND (sync_locked_at IS NULL OR sync_locked_at < datetime('now', ?))
+  `).run(lockedBy, sourceId, `-${SYNC_LOCK_STALE_MINUTES} minutes`);
+
+  return result.changes === 1;
+}
+
+/**
+ * Release a sync lock. Only releases if lockedBy matches to prevent releasing another process's lock.
+ */
+function releaseSyncLock(db, sourceId, lockedBy) {
+  db.prepare(`
+    UPDATE sync_metadata
+    SET sync_locked_at = NULL, sync_locked_by = NULL
+    WHERE source = ? AND sync_locked_by = ?
+  `).run(sourceId, lockedBy);
 }
 
 /**
@@ -604,9 +642,30 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
  */
 export async function syncPluginSource(plugin, sourceName, sourceConfig, context, options = {}) {
   const { db } = context;
-  const { fileFilter } = options;
+  const { fileFilter, _caller } = options;
   // Source identifier for the `source` column (e.g., "markdown-time-tracking/default")
   const sourceId = `${plugin.name}/${sourceName}`;
+
+  // Per-source locking: skip if another process is already syncing this source
+  const lockedBy = `${_caller || 'unknown'}:${process.pid}`;
+  if (!tryAcquireSyncLock(db, sourceId, lockedBy)) {
+    return {
+      success: true,
+      count: 0,
+      message: `Skipped ${sourceId}: sync already in progress`
+    };
+  }
+
+  try {
+    return await _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId);
+  } finally {
+    releaseSyncLock(db, sourceId, lockedBy);
+  }
+}
+
+async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId) {
+  const { db } = context;
+  const { fileFilter } = options;
 
   // Get last sync time to enable incremental sync
   const syncMeta = getSyncMetadata(db, sourceId);
@@ -1034,7 +1093,7 @@ export async function syncAllPlugins(context) {
 
   for (const { plugin, sources } of enabledPlugins) {
     for (const { sourceName, config } of sources) {
-      const result = await syncPluginSource(plugin, sourceName, config, context);
+      const result = await syncPluginSource(plugin, sourceName, config, context, { _caller: 'sync-all' });
       results.push({
         plugin: plugin.name,
         source: sourceName,
@@ -1288,7 +1347,7 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
       ? path.relative(PROJECT_ROOT, writeResult.data.file)
       : null;
 
-    await syncPluginSource(source.plugin, source.sourceName, source.config, context, { fileFilter });
+    await syncPluginSource(source.plugin, source.sourceName, source.config, context, { fileFilter, _caller: 'write-sync' });
   }
 
   return { success: true, source, writeResult: writeResult.data };

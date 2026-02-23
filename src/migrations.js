@@ -67,6 +67,14 @@ const systemMigrations = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_files_source ON vault_files(source)`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_vault_files_path ON vault_files(path)`);
     }
+  },
+  {
+    version: 104,
+    description: 'Add sync lock columns to sync_metadata for per-source sync locking',
+    fn: (db) => {
+      db.exec(`ALTER TABLE sync_metadata ADD COLUMN sync_locked_at DATETIME`);
+      db.exec(`ALTER TABLE sync_metadata ADD COLUMN sync_locked_by TEXT`);
+    }
   }
 ];
 
