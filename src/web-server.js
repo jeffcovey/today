@@ -600,7 +600,7 @@ async function getTodayTaskTimerItems() {
       displayText: `${emoji} ${project.title} ${reviewNote}`,
       canComplete: false,
       linkUrl: project.id.startsWith('markdown-projects/local:') ?
-        `/vault/${project.id.replace('markdown-projects/local:', '')}` : null
+        `/${project.id.replace('markdown-projects/local:' + vaultPrefix, '')}` : null
     });
   }
 
