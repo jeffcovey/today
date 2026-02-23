@@ -3,61 +3,62 @@
 /**
  * Markdownlint Cleanup Plugin - Sync Command
  *
- * Runs markdownlint-cli2 with --fix to auto-correct markdown formatting issues.
+ * Uses the markdownlint Node API directly (no child process) to auto-fix
+ * markdown formatting issues.
  *
  * Uses src/vault-changes.js to only process files that have actually changed
  * today (added or modified), making it much faster than scanning everything.
  */
 
-import { execSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { glob } from 'glob';
+import { lint, readConfig } from 'markdownlint/sync';
+import { applyFixes } from 'markdownlint';
 import { getChangedFilePaths, updateBaseline, getBaselineStatus } from '../../src/vault-changes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const MARKDOWNLINT_BIN = path.join(PROJECT_ROOT, 'node_modules/.bin/markdownlint-cli2');
 
-const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
-const directory = config.directory || `${process.env.VAULT_PATH}/**/*.md`;
+const pluginConfig = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
+const directory = pluginConfig.directory || `${process.env.VAULT_PATH}/**/*.md`;
 const vaultDir = directory.replace('/**/*.md', '').replace('/*.md', '');
 
+// Load config once
+const markdownlintConfig = readConfig(path.join(PROJECT_ROOT, '.markdownlint.json'));
+
 /**
- * Run markdownlint on specific files
+ * Lint and fix specific files using the markdownlint Node API
  */
-function lintFiles(files) {
+function lintAndFix(files) {
   if (files.length === 0) {
     return { cleaned: 0, message: 'No changed markdown files to process' };
   }
 
-  // markdownlint-cli2 can take multiple file arguments
-  const fileArgs = files.map(f => `"${f}"`).join(' ');
+  const result = lint({ files, config: markdownlintConfig });
 
-  try {
-    execSync(`${MARKDOWNLINT_BIN} --fix ${fileArgs}`, {
-      stdio: 'pipe',
-      cwd: PROJECT_ROOT
-    });
+  let fixedCount = 0;
+  for (const file of files) {
+    const issues = result[file];
+    if (!issues || issues.length === 0) continue;
+
+    const fixableIssues = issues.filter(i => i.fixInfo);
+    if (fixableIssues.length === 0) continue;
+
+    const content = fs.readFileSync(file, 'utf8');
+    const fixed = applyFixes(content, issues);
+    if (fixed !== content) {
+      fs.writeFileSync(file, fixed, 'utf8');
+      fixedCount++;
+    }
+  }
+
+  if (fixedCount === 0) {
     return { cleaned: 0, message: `Checked ${files.length} file(s) - all clean` };
-  } catch (error) {
-    return { cleaned: files.length, message: `Fixed formatting in ${files.length} file(s)` };
   }
-}
-
-/**
- * Run markdownlint on all files matching glob pattern
- */
-function lintAllFiles() {
-  try {
-    execSync(`${MARKDOWNLINT_BIN} --fix "${directory}"`, {
-      stdio: 'pipe',
-      cwd: PROJECT_ROOT
-    });
-    return { cleaned: 0, message: 'All markdown files are clean' };
-  } catch (error) {
-    return { cleaned: 1, message: 'Fixed formatting in markdown files' };
-  }
+  return { cleaned: fixedCount, message: `Fixed formatting in ${fixedCount} file(s)` };
 }
 
 function sync() {
@@ -65,7 +66,7 @@ function sync() {
   const fileFilter = process.env.FILE_FILTER;
   if (fileFilter) {
     const files = fileFilter.split(',').filter(f => f.endsWith('.md'));
-    const result = lintFiles(files);
+    const result = lintAndFix(files);
     result.filesChecked = files.length;
     console.log(JSON.stringify({ ...result, mode: 'targeted' }));
     return;
@@ -81,11 +82,9 @@ function sync() {
     console.error('Baseline initialized - subsequent runs will be incremental');
 
     // Do a full lint on first run
-    const result = lintAllFiles();
-    console.log(JSON.stringify({
-      ...result,
-      mode: 'initial'
-    }));
+    const allFiles = glob.sync(directory, { cwd: PROJECT_ROOT });
+    const result = lintAndFix(allFiles);
+    console.log(JSON.stringify({ ...result, mode: 'initial' }));
     return;
   }
 
@@ -96,7 +95,7 @@ function sync() {
     includeGit: false
   });
 
-  const result = lintFiles(changedFiles);
+  const result = lintAndFix(changedFiles);
   result.filesChecked = changedFiles.length;
 
   console.log(JSON.stringify({
