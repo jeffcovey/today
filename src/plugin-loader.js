@@ -1,12 +1,15 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, exec as execCb } from 'child_process';
+import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
+
+const execAsync = promisify(execCb);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -320,7 +323,7 @@ export function isPluginConfigured(pluginName) {
  * @param {string} [sourceName] - Source name for decrypting encrypted settings
  * @returns {{success: boolean, data?: any, error?: string}}
  */
-function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
+async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
     return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
@@ -347,58 +350,58 @@ function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceNa
     ? injectDecryptedSettings(plugin, sourceName, mergedConfig)
     : mergedConfig;
 
-  try {
-    // Run from project root so relative paths in plugins work correctly
-    // Explicitly pipe all stdio to prevent stderr from leaking to terminal
-    const vaultPath = getVaultPath();
-    const output = execSync(fullPath, {
-      cwd: PROJECT_ROOT,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        PROJECT_ROOT,
-        VAULT_PATH: vaultPath,
-        CONFIG_PATH: getConfigPath(),
-        PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
-        ...extraEnv
-      },
-      maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
-    });
+  const vaultPath = getVaultPath();
+  const execOpts = {
+    cwd: PROJECT_ROOT,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PROJECT_ROOT,
+      VAULT_PATH: vaultPath,
+      CONFIG_PATH: getConfigPath(),
+      PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
+      ...extraEnv
+    },
+    maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
+  };
 
-    const data = JSON.parse(output);
+  let stdout;
+  try {
+    const result = await execAsync(fullPath, execOpts);
+    stdout = result.stdout;
+  } catch (error) {
+    // exec error - command exited with non-zero status
+    // First, try to parse stdout for structured JSON error from plugin
+    if (error.stdout) {
+      try {
+        const data = JSON.parse(error.stdout);
+        if (data.error) {
+          return { success: false, error: data.error, data };
+        }
+      } catch {
+        // stdout isn't valid JSON, fall through to stderr scanning
+      }
+    }
+    // Extract just the error message, not all progress output from stderr
+    const stderr = error.stderr || '';
+    // Look for actual error lines (starting with "Error:" or containing "error")
+    const errorLines = stderr.split('\n').filter(line =>
+      line.toLowerCase().includes('error') ||
+      line.startsWith('Error:') ||
+      line.includes('failed') ||
+      line.includes('ECONNREFUSED') ||
+      line.includes('ETIMEDOUT')
+    );
+    const message = errorLines.length > 0
+      ? errorLines[errorLines.length - 1].trim()  // Use last error line
+      : `Command exited with status ${error.code}`;
+    return { success: false, error: message };
+  }
+
+  try {
+    const data = JSON.parse(stdout);
     return { success: true, data };
   } catch (error) {
-    // Distinguish between execSync errors (command failed) and JSON parse errors
-    if (error.status !== undefined) {
-      // execSync error - command exited with non-zero status
-      // First, try to parse stdout for structured JSON error from plugin
-      if (error.stdout) {
-        try {
-          const data = JSON.parse(error.stdout);
-          if (data.error) {
-            return { success: false, error: data.error, data };
-          }
-        } catch {
-          // stdout isn't valid JSON, fall through to stderr scanning
-        }
-      }
-      // Extract just the error message, not all progress output from stderr
-      const stderr = error.stderr || '';
-      // Look for actual error lines (starting with "Error:" or containing "error")
-      const errorLines = stderr.split('\n').filter(line =>
-        line.toLowerCase().includes('error') ||
-        line.startsWith('Error:') ||
-        line.includes('failed') ||
-        line.includes('ECONNREFUSED') ||
-        line.includes('ETIMEDOUT')
-      );
-      const message = errorLines.length > 0
-        ? errorLines[errorLines.length - 1].trim()  // Use last error line
-        : `Command exited with status ${error.status}`;
-      return { success: false, error: message };
-    }
-    // JSON parse error or other JavaScript error
     return { success: false, error: error.message };
   }
 }
@@ -686,7 +689,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   }
 
   // Run the read command with last sync time and source ID
-  const result = runPluginCommand(plugin, 'read', sourceConfig, envVars, sourceName);
+  const result = await runPluginCommand(plugin, 'read', sourceConfig, envVars, sourceName);
 
   if (!result.success) {
     return {
@@ -801,7 +804,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
       // If we tagged entries, read again to update database
       if (taggingResult.tagged > 0) {
-        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '', // Force full re-read of modified files
           SOURCE_ID: sourceId
         }, sourceName);
@@ -832,7 +835,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       // If we archived/rebalanced, read again to update database
       if (archiveResult.files_modified?.length > 0) {
         const fileFilter = archiveResult.files_modified.join(',');
-        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
@@ -866,7 +869,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       // If we added dates, read again to update database
       if (dateCreatedResult.added > 0 && dateCreatedResult.files_modified?.length > 0) {
         const fileFilter = dateCreatedResult.files_modified.join(',');
-        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
@@ -901,7 +904,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       // If we classified entries, read again to update database
       if (classificationResult.classified > 0 && classificationResult.files_modified?.length > 0) {
         const fileFilter = classificationResult.files_modified.join(',');
-        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
@@ -936,7 +939,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       // If we prioritized entries, read again to update database
       if (priorityResult.prioritized > 0 && priorityResult.files_modified?.length > 0) {
         const fileFilter = priorityResult.files_modified.join(',');
-        const resyncResult = runPluginCommand(plugin, 'read', sourceConfig, {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
           LAST_SYNC_TIME: '',
           SOURCE_ID: sourceId,
           FILE_FILTER: fileFilter
@@ -1255,7 +1258,7 @@ export async function writePluginEntry(pluginName, sourceName, entry) {
     return { success: false, error: `Source not found: ${pluginName}/${sourceName}` };
   }
 
-  return runPluginCommand(plugin, 'write', source.config, {
+  return await runPluginCommand(plugin, 'write', source.config, {
     ENTRY_JSON: JSON.stringify(entry)
   }, sourceName);
 }
