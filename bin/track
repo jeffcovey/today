@@ -165,7 +165,7 @@ async function cmdStart(description, options = {}) {
 // Stop command
 async function cmdStop(options = {}) {
   process.stdout.write(colors.gray('Syncing... '));
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
@@ -330,7 +330,7 @@ async function cmdAdd(durationStr, options = {}) {
 // Status command - queries DB for running timers (end_time IS NULL)
 async function cmdStatus() {
   // Perform daily sanity check (silent if no problems)
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
   await performDailyCheck(db, { verbose: false });
 
@@ -370,7 +370,7 @@ async function cmdStatus() {
 
 // Date command - queries time_logs table for a specific date
 async function cmdDate(targetDate, options = {}) {
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
   const currentTime = getCurrentTimeISO();
 
@@ -533,7 +533,7 @@ async function cmdYesterday(options = {}) {
 
 // Week command - queries time_logs table
 async function cmdWeek(options = {}) {
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
 
   // Validate source filter if provided
@@ -622,14 +622,14 @@ async function cmdWeek(options = {}) {
 }
 
 // Quiet sync - ensures database is current before read operations
-function ensureSync() {
+async function ensureSync() {
   const db = getDatabase();
   await ensureSyncForType(db, 'time-logs');
 }
 
 // Restart command - start a new timer with the same description as the most recent entry
 async function cmdRestart(options = {}) {
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
 
   // Find the most recent completed entry
@@ -681,7 +681,7 @@ async function cmdSync() {
 
 // Audit command - check for problematic time entries
 async function cmdAudit(options = {}) {
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
 
   // Handle daily check mode
@@ -908,7 +908,7 @@ function markCheckedToday(db) {
 
 // Fix command - suggest and apply corrections to problematic entries
 async function cmdFix(options = {}) {
-  ensureSync();
+  await ensureSync();
   const db = getDatabase();
 
   // Find problems in last 30 days by default
