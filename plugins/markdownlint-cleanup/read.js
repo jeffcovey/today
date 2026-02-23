@@ -17,6 +17,7 @@ import { getChangedFilePaths, updateBaseline, getBaselineStatus } from '../../sr
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
+const MARKDOWNLINT_BIN = path.join(PROJECT_ROOT, 'node_modules/.bin/markdownlint-cli2');
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const directory = config.directory || `${process.env.VAULT_PATH}/**/*.md`;
@@ -34,7 +35,7 @@ function lintFiles(files) {
   const fileArgs = files.map(f => `"${f}"`).join(' ');
 
   try {
-    execSync(`npx markdownlint-cli2 --fix ${fileArgs}`, {
+    execSync(`${MARKDOWNLINT_BIN} --fix ${fileArgs}`, {
       stdio: 'pipe',
       cwd: PROJECT_ROOT
     });
@@ -49,7 +50,7 @@ function lintFiles(files) {
  */
 function lintAllFiles() {
   try {
-    execSync(`npx markdownlint-cli2 --fix "${directory}"`, {
+    execSync(`${MARKDOWNLINT_BIN} --fix "${directory}"`, {
       stdio: 'pipe',
       cwd: PROJECT_ROOT
     });
@@ -60,6 +61,16 @@ function lintAllFiles() {
 }
 
 function sync() {
+  // If FILE_FILTER is set (e.g. from vault watcher), only lint those specific files
+  const fileFilter = process.env.FILE_FILTER;
+  if (fileFilter) {
+    const files = fileFilter.split(',').filter(f => f.endsWith('.md'));
+    const result = lintFiles(files);
+    result.filesChecked = files.length;
+    console.log(JSON.stringify({ ...result, mode: 'targeted' }));
+    return;
+  }
+
   // Check if baseline exists
   const status = getBaselineStatus({ sourceId: 'vault-changes/default' });
 
