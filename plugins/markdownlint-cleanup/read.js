@@ -88,15 +88,18 @@ function sync() {
     return;
   }
 
-  // Get changed files using the vault-changes module
+  // Get files changed since last baseline update
   const changedFiles = getChangedFilePaths({
     directory: vaultDir,
-    todayOnly: true,
+    todayOnly: false,
     includeGit: false
   });
 
   const result = lintAndFix(changedFiles);
   result.filesChecked = changedFiles.length;
+
+  // Update baseline so next sync only sees new changes
+  updateBaseline({ directory: vaultDir });
 
   console.log(JSON.stringify({
     ...result,
