@@ -20,7 +20,7 @@ import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
-import { isPluginConfigured } from './plugin-loader.js';
+import { isPluginConfigured, getEnabledPlugins, syncPluginSource } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
@@ -629,38 +629,36 @@ let taskTimerState = {
 };
 let taskTimerSyncedItems = null;
 let taskTimerSyncInProgress = false;
-let taskTimerSyncChild = null;
 
 function cancelTaskTimerSync() {
-  if (taskTimerSyncChild) {
-    try { taskTimerSyncChild.kill(); } catch { /* already exited */ }
-    taskTimerSyncChild = null;
-  }
   taskTimerSyncInProgress = false;
 }
 
 function triggerTaskTimerSync() {
-  // Kill stale sync from previous timer item and start fresh
-  cancelTaskTimerSync();
-  // Guard against concurrent syncs (belt-and-suspenders with cancel above)
+  // Guard against concurrent syncs
   if (taskTimerSyncInProgress) return;
   taskTimerSyncInProgress = true;
   // Intentionally not awaited — runs in background
   (async () => {
     try {
-      for (const type of ['tasks', 'habits', 'projects']) {
-        const child = exec(`bin/plugins sync --type ${type}`);
-        taskTimerSyncChild = child;
-        await new Promise((resolve, reject) => {
-          child.on('close', resolve);
-          child.on('error', reject);
-        });
+      const db = getDatabase();
+      const vaultPath = getAbsoluteVaultPath();
+      const context = { db, vaultPath };
+      const enabledPlugins = await getEnabledPlugins();
+      const targetTypes = new Set(['tasks', 'habits', 'projects']);
+
+      for (const { plugin, sources } of enabledPlugins) {
+        if (!plugin.commands?.read || !targetTypes.has(plugin.type)) continue;
+        for (const { sourceName, config } of sources) {
+          if (!taskTimerSyncInProgress) return; // cancelled
+          await syncPluginSource(plugin, sourceName, config, context, { _caller: 'task-timer' });
+        }
       }
-      taskTimerSyncChild = null;
-      taskTimerSyncedItems = await getTodayTaskTimerItems();
+      if (taskTimerSyncInProgress) {
+        taskTimerSyncedItems = await getTodayTaskTimerItems();
+      }
     } catch (e) {
       // Sync failed or was cancelled, keep current items
-      taskTimerSyncChild = null;
     } finally {
       taskTimerSyncInProgress = false;
     }
