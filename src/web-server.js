@@ -2649,6 +2649,22 @@ class DataviewAPI {
     this._outputBuffer = []; // Accumulates rendered HTML
   }
 
+  // Cached version - reuses result for 5 minutes to avoid reading 13k+ files on every render
+  static _cachedFiles = null;
+  static _cachedFilesTime = 0;
+  static _cachedFilesPath = null;
+  static async getCachedAllFiles(vaultPath) {
+    const now = Date.now();
+    if (DataviewAPI._cachedFiles && DataviewAPI._cachedFilesPath === vaultPath && now - DataviewAPI._cachedFilesTime < 5 * 60 * 1000) {
+      return DataviewAPI._cachedFiles;
+    }
+    const files = await DataviewAPI.getAllFiles(vaultPath);
+    DataviewAPI._cachedFiles = files;
+    DataviewAPI._cachedFilesTime = now;
+    DataviewAPI._cachedFilesPath = vaultPath;
+    return files;
+  }
+
   // Get all files in the vault with their frontmatter (static method for initialization)
   static async getAllFiles(vaultPath) {
     const files = [];
@@ -3127,7 +3143,7 @@ class DataviewArray extends Array {
 async function executeDataviewJS(code, vaultPath, currentFilePath, allFiles) {
   try {
     // Pre-load all files so dv.pages() can be synchronous
-    if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
     const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
 
     // Create a safe sandbox context
@@ -3301,7 +3317,7 @@ async function executeDQLList(lines, vaultPath, currentFilePath, properties, all
   const fromMatch = joinedQuery.match(/FROM\s+"([^"]+)"/i);
   if (fromMatch) {
     const folder = fromMatch[1];
-    if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
+    if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
     let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
 
     // Apply WHERE clause if present
@@ -3352,7 +3368,7 @@ async function executeDQLTable(lines, vaultPath, currentFilePath, properties, al
   }
 
   const folder = fromMatch[1];
-  if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
+  if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
   let filtered = allFiles.filter(f => f.folder === folder || f.path.startsWith(folder + '/'));
 
   // Parse SORT clause
@@ -3503,7 +3519,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
         result = properties?.[propName];
       } else if (expression.includes('dv.')) {
         // Execute dv expressions (dv.pages, dv.current, etc.) using DataviewAPI
-        if (!allFiles) allFiles = await DataviewAPI.getAllFiles(vaultPath);
+        if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
         const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
         // Inline expressions are synchronous, so we can just evaluate directly
         const fn = new Function('dv', `return ${expression}`);
@@ -3999,14 +4015,17 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   // breaking HTML when tasks blocks are inside list items. See post-rendering
   // processing below for <pre><code class="language-tasks"> blocks.
 
-  // Process dataview code blocks before rendering
+  // Process dataview code blocks before rendering (only scan vault if needed)
   const vaultPath = path.join(process.cwd(), 'vault');
-  const allFiles = await DataviewAPI.getAllFiles(vaultPath);
-  content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties, allFiles);
-  content = await processDataviewJSBlocks(content, vaultPath, filePath, allFiles);
+  const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.');
+  if (hasDataview) {
+    const allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
+    content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties, allFiles);
+    content = await processDataviewJSBlocks(content, vaultPath, filePath, allFiles);
 
-  // Process inline dataview expressions
-  content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
+    // Process inline dataview expressions
+    content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
+  }
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
