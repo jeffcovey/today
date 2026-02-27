@@ -1,0 +1,32 @@
+# Obsidian Sync Conflict Cleanup Plugin
+# Cleans up conflict files created by Obsidian Sync
+
+name = "obsidian-sync-conflict-cleanup"
+displayName = "Obsidian Sync Conflict Cleanup"
+description = "Clean up conflict files created by Obsidian Sync"
+type = "utility"
+
+
+longDescription = """
+Cleans up conflict files created by Obsidian Sync.
+
+When Obsidian Sync detects a conflict (same file edited on multiple devices), it creates
+files with the `.!sync` extension, e.g. `filename.!sync` alongside `filename.md`.
+
+This plugin:
+1. Finds all `*.!sync` files in the vault
+2. For each conflict file:
+   - If original exists and files are identical: deletes the conflict (duplicate)
+   - If original exists and conflict is older: deletes the conflict (stale)
+   - If original doesn't exist: restores the conflict as the original (.md)
+   - If files differ and conflict is newer: keeps it for manual review
+
+Run `bin/plugins sync obsidian-sync-conflict-cleanup` to clean up conflicts.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+directory = { type = "string", default = "vault", description = "Directory to scan for conflict files" }
+skip_directories = { type = "string", default = "node_modules,.git,.git.nosync,.sync,.obsidian,.stfolder,.stversions,.backups,_tmp", description = "Comma-separated directory names to skip during scanning" }
