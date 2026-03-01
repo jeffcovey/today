@@ -432,7 +432,9 @@ else if (type === 'weekly-summaries') {
       }
 
       if (week.week_priorities && week.week_priorities.length > 0) {
-        const priorities = week.week_priorities.filter(p => p && p.trim());
+        const priorities = week.week_priorities
+          .map(p => typeof p === 'object' && p !== null ? Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(', ') : p)
+          .filter(p => typeof p === 'string' && p.trim());
         if (priorities.length > 0) {
           const ul = dv.el('ul', '', { container, attr: { style: 'margin: 4px 0 0 0; padding-left: 20px;' } });
           for (const p of priorities) {
@@ -501,7 +503,9 @@ else if (type === 'monthly-summaries') {
       }
 
       if (month.month_priorities && month.month_priorities.length > 0) {
-        const priorities = month.month_priorities.filter(p => p && p.trim());
+        const priorities = month.month_priorities
+          .map(p => typeof p === 'object' && p !== null ? Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(', ') : p)
+          .filter(p => typeof p === 'string' && p.trim());
         if (priorities.length > 0) {
           const ul = dv.el('ul', '', { container, attr: { style: 'margin: 4px 0 0 0; padding-left: 20px;' } });
           for (const p of priorities) {

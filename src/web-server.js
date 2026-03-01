@@ -2687,6 +2687,7 @@ class DataviewAPI {
             const { properties } = parseFrontmatter(content);
 
             files.push({
+              ...(properties || {}),
               path: relPath,
               name: entry.name.replace('.md', ''),
               folder: path.dirname(relPath),
