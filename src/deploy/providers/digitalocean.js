@@ -203,6 +203,8 @@ ExecStartPre=/bin/chown rslsync:rslsync /var/run/resilio-sync
 ExecStart=/usr/bin/rslsync --config /etc/resilio-sync/config.json --nodaemon
 Restart=always
 RestartSec=5
+RuntimeMaxSec=43200
+MemoryMax=768M
 
 [Install]
 WantedBy=multi-user.target

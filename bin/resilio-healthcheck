@@ -1,0 +1,64 @@
+#!/bin/bash
+# Resilio Sync health check
+# Restarts the service if it has 0 peers for too long.
+# Intended to run every 5 minutes via scheduler.
+
+MARKER_FILE="/var/lib/resilio-sync/.no-peers-since"
+MAX_NO_PEERS_SECONDS=600  # 10 minutes
+
+# Only check if the service is running
+if ! systemctl is-active --quiet resilio-sync; then
+  exit 0
+fi
+
+# Skip if started less than 5 minutes ago
+pid=$(systemctl show resilio-sync --property=MainPID --value)
+if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -d "/proc/$pid" ]; then
+  uptime_seconds=$(( $(date +%s) - $(stat -c %Z /proc/$pid) ))
+  if [ "$uptime_seconds" -lt 300 ]; then
+    rm -f "$MARKER_FILE"
+    exit 0
+  fi
+fi
+
+# Check recent logs for peer count
+peer_counts=$(journalctl -u resilio-sync --since "5 min ago" --no-pager 2>/dev/null \
+  | grep -oP 'Got list of \K[0-9]+(?= peers)' | tail -10)
+
+if [ -z "$peer_counts" ]; then
+  # No peer count logs — can't determine status
+  exit 0
+fi
+
+# Check if ANY recent peer counts are > 0
+has_peers=false
+for count in $peer_counts; do
+  if [ "$count" -gt 0 ]; then
+    has_peers=true
+    break
+  fi
+done
+
+if $has_peers; then
+  rm -f "$MARKER_FILE"
+  exit 0
+fi
+
+# No peers — check/set marker
+if [ ! -f "$MARKER_FILE" ]; then
+  date +%s > "$MARKER_FILE"
+  echo "⚠ No peers detected, starting watch"
+  exit 0
+fi
+
+# Check how long we've had no peers
+no_peers_since=$(cat "$MARKER_FILE")
+elapsed=$(( $(date +%s) - no_peers_since ))
+
+if [ "$elapsed" -ge "$MAX_NO_PEERS_SECONDS" ]; then
+  echo "✗ No peers for ${elapsed}s — restarting resilio-sync"
+  systemctl restart resilio-sync
+  rm -f "$MARKER_FILE"
+else
+  echo "⚠ No peers for ${elapsed}s (restart at ${MAX_NO_PEERS_SECONDS}s)"
+fi

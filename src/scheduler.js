@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import cron from 'node-cron';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
@@ -37,27 +37,52 @@ const MAINTENANCE_JOBS = [
  * Service-specific maintenance jobs (auto-enabled when service is running)
  */
 const SERVICE_MAINTENANCE_JOBS = {
-  'resilio-sync': {
-    name: 'resilio-sync-restart',
-    schedule: '0 */2 * * *', // Every 2 hours
-    command: 'systemctl restart resilio-sync || true',
-    description: 'Restart Resilio Sync to prevent stale connections'
-  }
+  'resilio-sync': [
+    {
+      name: 'resilio-sync-healthcheck',
+      schedule: '*/5 * * * *', // Every 5 minutes
+      command: 'bin/resilio-healthcheck',
+      description: 'Check Resilio Sync peer connectivity'
+    },
+    {
+      name: 'resilio-sync-restart',
+      schedule: '0 */12 * * *', // Every 12 hours
+      command: 'systemctl restart resilio-sync || true',
+      description: 'Restart Resilio Sync to prevent stale connections'
+    }
+  ]
 };
 
 /**
  * Check which services are enabled
+ * Reads from config file if present, then also checks systemctl for running services
  */
 function getEnabledServices() {
+  const services = {};
+
+  // Read config file if present
   const configPath = path.join(PROJECT_ROOT, '.data', 'services-config.json');
   if (fs.existsSync(configPath)) {
     try {
-      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      Object.assign(services, JSON.parse(fs.readFileSync(configPath, 'utf8')));
     } catch {
-      return {};
+      // ignore
     }
   }
-  return {};
+
+  // Also detect running services via systemctl
+  for (const service of Object.keys(SERVICE_MAINTENANCE_JOBS)) {
+    if (!services[service]) {
+      try {
+        execSync(`systemctl is-active --quiet ${service}`, { stdio: 'pipe' });
+        services[service] = true;
+      } catch {
+        // not running
+      }
+    }
+  }
+
+  return services;
 }
 
 /**
@@ -72,10 +97,11 @@ function loadJobs() {
 
   // 2. Add service-specific maintenance jobs (auto-enabled when service is running)
   const services = getEnabledServices();
-  for (const [service, job] of Object.entries(SERVICE_MAINTENANCE_JOBS)) {
+  for (const [service, serviceJobs] of Object.entries(SERVICE_MAINTENANCE_JOBS)) {
     if (services[service]) {
-      jobs.push(job);
-      console.log(`📋 Added ${service} maintenance job`);
+      const jobList = Array.isArray(serviceJobs) ? serviceJobs : [serviceJobs];
+      jobs.push(...jobList);
+      console.log(`📋 Added ${jobList.length} ${service} maintenance job(s)`);
     }
   }
 
