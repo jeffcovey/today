@@ -12,7 +12,7 @@ import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
 
 // Quiet sync - ensures database is current before read operations
-function ensureSync(db) {
+async function ensureSync(db) {
   await ensureSyncForType(db, 'contacts');
 }
 
