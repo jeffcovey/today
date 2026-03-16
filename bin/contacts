@@ -101,7 +101,8 @@ function searchContacts(db, query) {
   const searchTerm = `%${query.toLowerCase()}%`;
 
   return db.prepare(`
-    SELECT full_name, organization, primary_email, primary_phone, birthday, notes
+    SELECT full_name, organization, job_title, primary_email, primary_phone,
+           birthday, notes, metadata, location_city, location_state, location_country
     FROM contacts
     WHERE LOWER(full_name) LIKE ?
        OR LOWER(organization) LIKE ?
@@ -117,14 +118,45 @@ function displayContact(contact) {
   if (contact.organization) {
     console.log(`  ${colors.gray('Organization:')} ${contact.organization}`);
   }
+  if (contact.job_title) {
+    console.log(`  ${colors.gray('Title:')} ${contact.job_title}`);
+  }
   if (contact.primary_email) {
     console.log(`  ${colors.gray('Email:')} ${contact.primary_email}`);
   }
   if (contact.primary_phone) {
     console.log(`  ${colors.gray('Phone:')} ${contact.primary_phone}`);
   }
+
+  // Show additional phones from metadata
+  if (contact.metadata) {
+    try {
+      const metadata = typeof contact.metadata === 'string' ? JSON.parse(contact.metadata) : contact.metadata;
+      if (metadata.phones && metadata.phones.length > 1) {
+        const otherPhones = metadata.phones.filter(p => p !== contact.primary_phone);
+        for (const phone of otherPhones) {
+          console.log(`  ${colors.gray('Cell:')} ${phone}`);
+        }
+      }
+    } catch (e) {
+      // Ignore metadata parsing errors
+    }
+  }
   if (contact.birthday) {
     console.log(`  ${colors.gray('Birthday:')} ${contact.birthday}`);
+  }
+
+  // Address (street may be in metadata since DB has no street column)
+  let street = null;
+  if (contact.metadata) {
+    try {
+      const meta = typeof contact.metadata === 'string' ? JSON.parse(contact.metadata) : contact.metadata;
+      street = meta.street || null;
+    } catch (e) { /* ignore */ }
+  }
+  const addrParts = [street, contact.location_city, contact.location_state, contact.location_country].filter(Boolean);
+  if (addrParts.length > 0) {
+    console.log(`  ${colors.gray('Address:')} ${addrParts.join(', ')}`);
   }
   if (contact.notes && contact.notes.length > 0) {
     const shortNotes = contact.notes.length > 100
@@ -333,8 +365,21 @@ async function cmdAdd(options) {
   if (options.email) entry.primary_email = options.email;
   if (options.phone) entry.primary_phone = options.phone;
   if (options.organization) entry.organization = options.organization;
+  if (options.title) entry.job_title = options.title;
+  if (options.address) entry.street = options.address;
+  if (options.city) entry.location_city = options.city;
+  if (options.state) entry.location_state = options.state;
+  if (options.country) entry.location_country = options.country;
   if (options.birthday) entry.birthday = options.birthday;
   if (options.notes) entry.notes = options.notes;
+
+  // Handle multiple phone numbers
+  const phones = [];
+  if (options.phone) phones.push(options.phone);
+  if (options.cell) phones.push(options.cell);
+  if (phones.length > 0) {
+    entry.metadata = JSON.stringify({ phones });
+  }
 
   // Require at least a name
   if (!entry.full_name && !entry.first_name) {
@@ -408,8 +453,23 @@ async function cmdEdit(nameOrSearch, options) {
   if (options.newEmail) updates.primary_email = options.newEmail;
   if (options.phone) updates.primary_phone = options.phone;
   if (options.organization) updates.organization = options.organization;
+  if (options.title) updates.job_title = options.title;
+  if (options.address) updates.street = options.address;
+  if (options.city) updates.location_city = options.city;
+  if (options.state) updates.location_state = options.state;
+  if (options.country) updates.location_country = options.country;
   if (options.birthday) updates.birthday = options.birthday;
   if (options.notes) updates.notes = options.notes;
+
+  // Handle multiple phone numbers for edit
+  if (options.phone || options.cell) {
+    const phones = [];
+    if (options.phone) phones.push(options.phone);
+    if (options.cell && options.cell !== options.phone) phones.push(options.cell);
+    if (phones.length > 0) {
+      updates.metadata = JSON.stringify({ emails: [], phones });
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     console.error(colors.red('✗') + ' No updates specified.');
@@ -598,7 +658,13 @@ program
   .option('--last-name <lastName>', 'Last name')
   .option('--email <email>', 'Email address')
   .option('--phone <phone>', 'Phone number')
+  .option('--cell <cell>', 'Cell phone number')
   .option('--organization <org>', 'Organization/company')
+  .option('--title <jobTitle>', 'Job title')
+  .option('--address <address>', 'Street address')
+  .option('--city <city>', 'City')
+  .option('--state <state>', 'State/region')
+  .option('--country <country>', 'Country')
   .option('--birthday <date>', 'Birthday (YYYY-MM-DD)')
   .option('--notes <notes>', 'Notes about the contact')
   .action(async (options) => {
@@ -615,7 +681,13 @@ program
   .option('--last-name <lastName>', 'Update last name')
   .option('--new-email <newEmail>', 'Update email address')
   .option('--phone <phone>', 'Update phone number')
+  .option('--cell <cell>', 'Update cell phone number')
   .option('--organization <org>', 'Update organization')
+  .option('--title <jobTitle>', 'Update job title')
+  .option('--address <address>', 'Update street address')
+  .option('--city <city>', 'Update city')
+  .option('--state <state>', 'Update state/region')
+  .option('--country <country>', 'Update country')
   .option('--birthday <date>', 'Update birthday (YYYY-MM-DD)')
   .option('--notes <notes>', 'Update notes')
   .action(async (name, options) => {
