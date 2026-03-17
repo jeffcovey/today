@@ -107,8 +107,14 @@ async function isServerConfiguredForTests() {
     const testResponse = await fetch(`${BASE_URL}/task/toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cookie': cookie },
-      body: JSON.stringify({ filePath: TEST_FILE, lineNumber: TEST_LINE, completed: false })
+      body: JSON.stringify({ filePath: TEST_FILE, lineNumber: TEST_LINE, completed: false }),
+      redirect: 'manual'
     });
+    // A redirect means auth failed (sent to login page)
+    if (testResponse.status >= 300 && testResponse.status < 400) return false;
+    // Non-JSON response means we hit the login page or something unexpected
+    const contentType = testResponse.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return false;
     // 400 "Not a task line" or 200 means file was found; 400 "file not found" means wrong VAULT_PATH
     const result = await testResponse.json().catch(() => ({}));
     return testResponse.ok || (testResponse.status === 400 && result.error !== 'File not found');
