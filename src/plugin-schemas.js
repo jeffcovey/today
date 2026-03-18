@@ -1059,6 +1059,18 @@ Common queries:
         required: false,
         description: 'Birthday in YYYY-MM-DD or --MM-DD format'
       },
+      street: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Street address'
+      },
+      postal_code: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Postal/ZIP code'
+      },
       location_city: {
         sqlType: 'TEXT',
         jsType: 'string',

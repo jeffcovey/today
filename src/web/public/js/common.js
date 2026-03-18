@@ -183,13 +183,13 @@ async function toggleTaskCheckbox(checkbox) {
   }
 }
 
-// Loading spinner for navigation (using fetch to keep page alive)
+// Loading spinner for navigation
 function initializeLoadingSpinner() {
   const overlay = document.getElementById('loadingOverlay');
   if (!overlay) return;
 
-  // Handle link clicks with fetch
-  document.addEventListener('click', async (e) => {
+  // Show loading spinner during same-origin navigation
+  document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link && link.href && !link.target && !link.href.startsWith('javascript:') && !link.getAttribute('href')?.startsWith('#')) {
       // Only handle same-origin links
@@ -197,25 +197,8 @@ function initializeLoadingSpinner() {
         if (new URL(link.href).origin !== window.location.origin) return;
       } catch { return; }
 
-      e.preventDefault();
       overlay.style.display = 'flex';
-
-      try {
-        const response = await fetch(link.href);
-        const html = await response.text();
-
-        // Replace the entire document
-        document.open();
-        document.write(html);
-        document.close();
-
-        // Update URL
-        history.pushState(null, '', link.href);
-      } catch (err) {
-        overlay.style.display = 'none';
-        // Fallback to normal navigation on error
-        window.location.href = link.href;
-      }
+      // Let the browser navigate normally so DOMContentLoaded fires on the new page
     }
   });
 }

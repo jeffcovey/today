@@ -12,8 +12,8 @@ const localMounts = existsSync(mountsLocalPath)
 export default {
   testEnvironment: 'node',
   transform: {},
-  modulePathIgnorePatterns: [...localMounts.map(t => `<rootDir>/${t}/`), '<rootDir>/.worktrees/'],
-  testPathIgnorePatterns: ['/node_modules/', '/.worktrees/'],
+  modulePathIgnorePatterns: [...localMounts.map(t => `<rootDir>/${t}/`), '<rootDir>/.worktrees/', '<rootDir>/.claude/'],
+  testPathIgnorePatterns: ['/node_modules/', '/.worktrees/', '/.claude/'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },

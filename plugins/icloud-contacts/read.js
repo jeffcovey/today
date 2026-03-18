@@ -65,11 +65,13 @@ function parseVCard(vCardText) {
       } else if (key.startsWith('BDAY') || key.includes('.BDAY')) {
         contact.birthday = value.trim();
       } else if (key.startsWith('ADR') || key.includes('.ADR')) {
-        // Parse address for location
+        // Parse address for location (ADR format: PO;ext;street;city;state;zip;country)
         const parts = value.split(';');
         if (parts.length >= 6) {
+          contact.street = parts[2]?.trim() || '';
           contact.location_city = parts[3]?.trim() || '';
           contact.location_state = parts[4]?.trim() || '';
+          contact.postal_code = parts[5]?.trim() || '';
           contact.location_country = parts[6]?.trim() || '';
         }
       } else if (key === 'UID') {
@@ -124,12 +126,15 @@ async function synciCloudContacts() {
           contact.id = `icloud:${contact.full_name.replace(/\s+/g, '_').toLowerCase()}`;
         }
 
-        // Store all emails and phones as metadata
-        if (contact.emails || contact.phones) {
-          contact.metadata = JSON.stringify({
+        // Store all emails, phones, and address as metadata
+        if (contact.emails || contact.phones || contact.street) {
+          const meta = {
             emails: contact.emails || [],
             phones: contact.phones || [],
-          });
+          };
+          if (contact.street) meta.street = contact.street;
+          if (contact.postal_code) meta.postal_code = contact.postal_code;
+          contact.metadata = JSON.stringify(meta);
         }
 
         // Clean up temporary arrays

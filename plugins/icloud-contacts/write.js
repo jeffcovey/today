@@ -60,11 +60,31 @@ function buildVCard(contact) {
     lines.push(`TITLE:${contact.job_title}`);
   }
 
-  // Contact info
+  // Contact info - emails
   if (contact.email || contact.primary_email) {
     lines.push(`EMAIL;TYPE=INTERNET:${contact.email || contact.primary_email}`);
   }
-  if (contact.phone || contact.primary_phone) {
+
+  // Contact info - phones (support multiple from metadata)
+  let phonesWritten = false;
+  if (contact.metadata) {
+    try {
+      const metadata = typeof contact.metadata === 'string' ? JSON.parse(contact.metadata) : contact.metadata;
+      if (metadata.phones && metadata.phones.length > 0) {
+        metadata.phones.forEach((phone, i) => {
+          if (i === 0) {
+            lines.push(`TEL;TYPE=WORK:${phone}`);
+          } else {
+            lines.push(`TEL;TYPE=CELL:${phone}`);
+          }
+        });
+        phonesWritten = true;
+      }
+    } catch (e) {
+      // Fall through to single phone
+    }
+  }
+  if (!phonesWritten && (contact.phone || contact.primary_phone)) {
     lines.push(`TEL:${contact.phone || contact.primary_phone}`);
   }
 
@@ -303,11 +323,21 @@ function parseVCardBasic(vCardText) {
       contact.first_name = parts[1]?.trim() || '';
     }
     else if (key.startsWith('EMAIL')) contact.primary_email = value.trim();
-    else if (key.startsWith('TEL')) contact.primary_phone = value.trim();
+    else if (key.startsWith('TEL')) {
+      if (!contact._phones) contact._phones = [];
+      contact._phones.push(value.trim());
+      if (!contact.primary_phone) contact.primary_phone = value.trim();
+    }
     else if (key.startsWith('ORG')) contact.organization = value.trim();
     else if (key.startsWith('TITLE')) contact.job_title = value.trim();
     else if (key.startsWith('BDAY')) contact.birthday = value.trim();
   }
+
+  // Preserve multiple phones in metadata
+  if (contact._phones && contact._phones.length > 0) {
+    contact.metadata = JSON.stringify({ emails: [], phones: contact._phones });
+  }
+  delete contact._phones;
 
   return contact;
 }
