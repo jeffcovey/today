@@ -1,0 +1,111 @@
+#!/usr/bin/env node
+
+import { program } from 'commander';
+import { getDatabase } from '../src/database-service.js';
+import { colors } from '../src/cli-utils.js';
+import { getSupportedSources, getMetrics } from '../src/graph-sources.js';
+import { execSync } from 'child_process';
+import { parse } from 'smol-toml';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+program
+  .name('graph')
+  .description('Generate and manage data graphs');
+
+// sources command
+program
+  .command('sources')
+  .description('List available data sources for graphing')
+  .action(() => {
+    const sources = getSupportedSources();
+    console.log('Available Graph Sources\n');
+    for (const source of sources) {
+      console.log(`  ${colors.bold(source.name)}`);
+      console.log(`    ${source.description}`);
+    }
+    console.log(`\nRun ${colors.cyan("bin/graph metrics <source>")} to see available metrics.`);
+  });
+
+// metrics command
+program
+  .command('metrics <source>')
+  .description('List available metrics for a data source')
+  .action((sourceName) => {
+    const db = getDatabase();
+    try {
+      const metrics = getMetrics(sourceName, db);
+      console.log(`Metrics for ${colors.bold(sourceName)}\n`);
+      if (metrics.length === 0) {
+        console.log('  (no metrics available — sync this source first)');
+      } else {
+        for (const metric of metrics) {
+          console.log(`  ${metric.description || metric.name}`);
+        }
+      }
+      console.log(`\n${metrics.length} metrics available`);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  });
+
+// list command
+program
+  .command('list')
+  .description('Show configured graphs from settings')
+  .action(() => {
+    const configPath = path.join(PROJECT_ROOT, 'vault', 'today.toml');
+    if (!fs.existsSync(configPath)) {
+      console.log('No configuration file found.');
+      return;
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = parse(configContent);
+    const graphPlugins = config?.plugins?.['data-graphing'];
+
+    if (!graphPlugins) {
+      console.log('No graph sources configured in vault/today.toml');
+      return;
+    }
+
+    console.log('Configured Graphs\n');
+    for (const [name, sourceConfig] of Object.entries(graphPlugins)) {
+      if (!sourceConfig.enabled) continue;
+
+      const metrics = sourceConfig.metrics || (sourceConfig.metric ? [sourceConfig.metric] : []);
+      const status = sourceConfig.enabled ? colors.green('enabled') : colors.gray('disabled');
+
+      console.log(`  ${colors.bold(name)} [${status}]`);
+      console.log(`    Source: ${sourceConfig.source || 'health'}`);
+      console.log(`    Metrics: ${metrics.join(', ')}`);
+      console.log(`    Period: ${sourceConfig.time_period || '6 months'}`);
+      if (sourceConfig.output_path) {
+        console.log(`    Output: ${sourceConfig.output_path}`);
+      }
+      console.log('');
+    }
+  });
+
+// generate command
+program
+  .command('generate [name]')
+  .description('Generate one or all configured graphs')
+  .action((name) => {
+    try {
+      const cmd = name
+        ? `bin/plugins sync data-graphing --source ${name}`
+        : 'bin/plugins sync data-graphing';
+      const result = execSync(cmd, { cwd: PROJECT_ROOT, encoding: 'utf8', stdio: 'inherit' });
+    } catch (error) {
+      process.exit(1);
+    }
+  });
+
+program.parse();

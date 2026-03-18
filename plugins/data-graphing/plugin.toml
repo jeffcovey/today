@@ -1,0 +1,58 @@
+# Data Graphing Plugin
+# Generates graphs from various data sources and saves them as images
+
+name = "data-graphing"
+displayName = "Data Graphing"
+description = "Generate graphs from data sources and save as images"
+type = "utility"
+
+longDescription = """
+Generates time-series graphs from data sources in your Today system.
+Supports multiple data curves on a single chart.
+
+Run `bin/graph sources` to see available sources.
+Run `bin/graph metrics <source>` to see available metrics.
+
+**Supported Sources:**
+- **health**: Health metrics (Weight, Steps, Sleep, Heart Rate, etc.)
+- **finance**: Financial data (Expenses, Income, or any category group)
+- **habits**: Habit completion over time
+- **tasks**: Task completion and creation rates
+- **time-logs**: Time tracked per day
+
+**Multi-Curve Charts:**
+Use `metrics` (array) instead of `metric` to plot multiple curves:
+```toml
+[plugins.data-graphing.income-vs-expenses]
+enabled = true
+source = "finance"
+metrics = ["Income", "Expenses"]
+colors = ["#4CAF50", "#e53935"]
+time_period = "6 months"
+chart_title = "Income vs Expenses"
+```
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+# Data source settings
+source = { type = "string", default = "health", description = "Data source (run bin/graph sources to see options)" }
+metric = { type = "string", default = "", description = "Single metric name (run bin/graph metrics <source> to see options)" }
+metrics = { type = "string", default = "", description = "JSON array of metric names for multi-curve charts" }
+time_period = { type = "string", default = "6 months", description = "Time period (e.g., '6 months', '1 year', '30 days')" }
+filename = { type = "string", default = "", description = "Output filename (without extension; defaults to source name)" }
+
+# Output settings
+output_path = { type = "string", default = "vault/graphs", description = "Directory for graph images" }
+image_format = { type = "string", default = "png", description = "Image format (png, jpg)" }
+width = { type = "number", default = 800, description = "Graph width in pixels" }
+height = { type = "number", default = 600, description = "Graph height in pixels" }
+
+# Styling
+chart_title = { type = "string", default = "", description = "Chart title" }
+x_axis_label = { type = "string", default = "Date", description = "X-axis label" }
+y_axis_label = { type = "string", default = "", description = "Y-axis label" }
+data_color = { type = "string", default = "#2196f3", description = "Single-curve color (hex)" }
+colors = { type = "string", default = "", description = "JSON array of colors for multi-curve charts" }
