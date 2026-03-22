@@ -564,7 +564,7 @@ async function getTodayTaskTimerItems() {
       displayText: `${emoji} ${task.title}`,
       canComplete: task.source === 'markdown-tasks/local' && !!toggleData,
       toggleData,
-      linkUrl: task.source === 'markdown-tasks/local' ? `/vault/${task.id}` : null
+      linkUrl: task.source === 'markdown-tasks/local' ? `/task/${task.id}` : null
     });
   }
 
