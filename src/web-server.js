@@ -6833,6 +6833,122 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/task/edit', authMiddleware, async (req, res) => {
+  try {
+    const { filePath: file, lineNumber: line, title, priority, dueDate, scheduledDate, startDate, tags, completed } = req.body;
+    debug(`[TASK] Editing task - file: ${file}, line: ${line}`);
+
+    if (!file || !line) {
+      return res.status(400).json({ error: 'Missing file path or line number' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Task title is required' });
+    }
+
+    const filePath = path.join(VAULT_PATH, file);
+
+    // Security: prevent directory traversal
+    if (!path.resolve(filePath).startsWith(VAULT_PATH)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const taskLine = lines[line - 1];
+
+    if (!taskLine) {
+      return res.status(400).json({ error: 'Task line not found' });
+    }
+
+    if (!taskLine.match(/^(?:\s*>)*\s*- \[[ xX]\]/)) {
+      return res.status(400).json({ error: 'Not a task line' });
+    }
+
+    // Preserve leading whitespace / blockquote prefix
+    const prefixMatch = taskLine.match(/^((?:\s*>)*\s*)/);
+    const prefix = prefixMatch ? prefixMatch[1] : '';
+
+    const checkbox = completed === true || completed === 'true' ? '[x]' : '[ ]';
+
+    const priorityEmojis = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' };
+    const priorityEmoji = priority && priorityEmojis[priority] ? priorityEmojis[priority] : '';
+
+    // Preserve recurrence pattern from original line (stop at next date emoji or end)
+    const recurringMatch = taskLine.match(/🔁\s+[^⏳📅🛫✅➕\n]+/);
+    const recurrence = recurringMatch ? recurringMatch[0].trim() : '';
+
+    // Preserve creation date from original line
+    const creationMatch = taskLine.match(/➕\s*(\d{4}-\d{2}-\d{2})/);
+    const creationDate = creationMatch ? `➕ ${creationMatch[1]}` : '';
+
+    // Handle completion date
+    let completionDate = '';
+    const isCompleted = completed === true || completed === 'true';
+    if (isCompleted) {
+      const existingCompletion = taskLine.match(/✅\s*(\d{4}-\d{2}-\d{2})/);
+      if (existingCompletion) {
+        completionDate = `✅ ${existingCompletion[1]}`;
+      } else {
+        completionDate = `✅ ${new Date().toISOString().split('T')[0]}`;
+      }
+    }
+
+    // Normalise tags input (array or comma/space-separated string)
+    let tagList = [];
+    if (Array.isArray(tags)) {
+      tagList = tags;
+    } else if (typeof tags === 'string' && tags.trim()) {
+      tagList = tags.trim().split(/[\s,]+/);
+    }
+    const tagStr = tagList
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(t => (t.startsWith('#') ? t : `#${t}`))
+      .join(' ');
+
+    // Reconstruct the task line
+    const parts = [`${prefix}- ${checkbox} ${title.trim()}`];
+    if (priorityEmoji) parts.push(priorityEmoji);
+    if (startDate) parts.push(`🛫 ${startDate}`);
+    if (scheduledDate) parts.push(`⏳ ${scheduledDate}`);
+    if (dueDate) parts.push(`📅 ${dueDate}`);
+    if (tagStr) parts.push(tagStr);
+    if (recurrence) parts.push(recurrence);
+    if (creationDate) parts.push(creationDate);
+    if (completionDate) parts.push(completionDate);
+
+    const updatedLine = parts.join(' ');
+    lines[line - 1] = updatedLine;
+
+    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+
+    // Keep query cache in sync
+    taskQueryCache.clear();
+
+    // Update database status
+    try {
+      const db = getReadOnlyDatabase();
+      const dbFilePath = path.join('vault', file);
+      const taskId = `markdown-tasks/local:${dbFilePath}:${line}`;
+      const newStatus = isCompleted ? 'done' : 'open';
+      if (isCompleted) {
+        const today = new Date().toISOString().split('T')[0];
+        db.prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?').run(newStatus, today, taskId);
+      } else {
+        db.prepare('UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ?').run(newStatus, taskId);
+      }
+    } catch (dbError) {
+      console.error('[TASK] Failed to update database after edit:', dbError.message);
+    }
+
+    debug(`[TASK] Successfully edited task at line ${line}`);
+    res.json({ success: true, updatedLine });
+  } catch (error) {
+    console.error('Error editing task:', error);
+    res.status(500).json({ error: 'Failed to edit task', details: error.message });
+  }
+});
+
 app.post('/save/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
@@ -7036,6 +7152,12 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     // Get task from tasks table
     let task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
 
+    // Extra fields parsed from the raw markdown line
+    let rawDueDate = null;
+    let rawScheduledDate = null;
+    let rawStartDate = null;
+    let rawTags = [];
+
     // If not in database, try to parse from file (for inline markdown tasks)
     if (!task && taskId.startsWith('markdown-tasks/local:')) {
       // Parse task ID format: markdown-tasks/local:vault/path/file.md:lineNumber
@@ -7056,6 +7178,7 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
               .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
               .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
               .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
+              .replace(/🔁\s+\S+(?:\s+\S+)*/g, '')  // Remove recurrence
               .replace(/#[\w/-]+/g, '')            // Remove tags
               .trim();
 
@@ -7070,6 +7193,18 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
             else if (taskLine.includes('🔽')) priority = 'low';
             else if (taskLine.includes('⏬')) priority = 'lowest';
 
+            // Extract dates
+            const dueDateMatch = taskLine.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+            const scheduledDateMatch = taskLine.match(/⏳\s*(\d{4}-\d{2}-\d{2})/);
+            const startDateMatch = taskLine.match(/🛫\s*(\d{4}-\d{2}-\d{2})/);
+            rawDueDate = dueDateMatch ? dueDateMatch[1] : null;
+            rawScheduledDate = scheduledDateMatch ? scheduledDateMatch[1] : null;
+            rawStartDate = startDateMatch ? startDateMatch[1] : null;
+
+            // Extract tags
+            const tagMatches = taskLine.match(/#[\w/-]+/g);
+            rawTags = tagMatches || [];
+
             // Build task object from file
             task = {
               id: taskId,
@@ -7078,7 +7213,7 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
               priority,
               source: 'markdown-tasks/local',
               description: null,
-              due_date: null,
+              due_date: rawDueDate,
               created_at: null,
               updated_at: null,
               completed_at: null,
@@ -7097,38 +7232,158 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     }
 
     const metadata = task.metadata ? JSON.parse(task.metadata) : {};
-    const priorityEmoji = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' }[task.priority] || '';
-    const sourceFile = metadata.filePath || metadata.file_path;
-    const safeTitle = escapeHtmlEntities(task.title);
+    const isMarkdownTask = task.source === 'markdown-tasks/local' && (metadata.filePath || metadata.file_path) && metadata.lineNumber;
+    const editFilePath = metadata.filePath || metadata.file_path || null;
+    const editLineNumber = metadata.lineNumber || null;
+    const editFileRelPath = editFilePath ? editFilePath.replace(/^vault\//, '') : null;
+
+    // For DB tasks without raw dates, fall back to task.due_date
+    if (!rawDueDate && task.due_date) rawDueDate = task.due_date;
+
+    const esc = escapeHtmlEntities;
+
+    // Build body content based on whether this is an editable markdown task
+    let bodyContent;
+    if (isMarkdownTask) {
+      bodyContent = `
+        <form id="editForm">
+          <input type="hidden" name="filePath" value="${esc(editFileRelPath)}">
+          <input type="hidden" name="lineNumber" value="${esc(String(editLineNumber))}">
+
+          <!-- Title -->
+          <div class="mb-3">
+            <label for="taskTitle" class="form-label fw-semibold">Task</label>
+            <input type="text" class="form-control" id="taskTitle" name="title" value="${esc(task.title)}" required>
+          </div>
+
+          <!-- Status -->
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="taskCompleted" name="completed" value="true" ${task.status === 'done' ? 'checked' : ''}>
+              <label class="form-check-label fw-semibold" for="taskCompleted">Completed</label>
+            </div>
+          </div>
+
+          <!-- Priority -->
+          <div class="mb-3">
+            <label for="taskPriority" class="form-label fw-semibold">Priority</label>
+            <select class="form-select" id="taskPriority" name="priority">
+              <option value="" ${!task.priority ? 'selected' : ''}>(none)</option>
+              <option value="highest" ${task.priority === 'highest' ? 'selected' : ''}>🔺 Highest</option>
+              <option value="high" ${task.priority === 'high' ? 'selected' : ''}>⏫ High</option>
+              <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>🔼 Medium</option>
+              <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🔽 Low</option>
+              <option value="lowest" ${task.priority === 'lowest' ? 'selected' : ''}>⏬ Lowest</option>
+            </select>
+          </div>
+
+          <!-- Dates row -->
+          <div class="row g-3 mb-3">
+            <div class="col-sm-4">
+              <label for="taskStartDate" class="form-label fw-semibold">🛫 Start Date</label>
+              <input type="date" class="form-control" id="taskStartDate" name="startDate" value="${esc(rawStartDate || '')}">
+            </div>
+            <div class="col-sm-4">
+              <label for="taskScheduledDate" class="form-label fw-semibold">⏳ Scheduled</label>
+              <input type="date" class="form-control" id="taskScheduledDate" name="scheduledDate" value="${esc(rawScheduledDate || '')}">
+            </div>
+            <div class="col-sm-4">
+              <label for="taskDueDate" class="form-label fw-semibold">📅 Due Date</label>
+              <input type="date" class="form-control" id="taskDueDate" name="dueDate" value="${esc(rawDueDate || '')}">
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div class="mb-4">
+            <label for="taskTags" class="form-label fw-semibold">Tags</label>
+            <input type="text" class="form-control" id="taskTags" name="tags" value="${esc(rawTags.join(' '))}" placeholder="#tag1 #tag2">
+            <div class="form-text">Space-separated tags (# prefix optional)</div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+            <a href="/${esc(editFileRelPath)}" class="btn btn-outline-secondary">
+              <i class="fas fa-file-alt me-2"></i>Open File
+            </a>
+            <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+              <i class="fas fa-arrow-left me-2"></i>Back
+            </button>
+          </div>
+        </form>`;
+    } else {
+      bodyContent = `
+        <!-- Read-only view for non-markdown tasks -->
+        <div class="mb-4">
+          <h5 class="text-muted mb-2">Task</h5>
+          <p class="fs-5">${esc(task.title)}</p>
+        </div>
+        <div class="mb-4">
+          <h6 class="text-muted mb-2">Status</h6>
+          <span class="badge ${task.status === 'done' || task.status === 'completed' ? 'bg-success' : 'bg-primary'}">${esc(task.status)}</span>
+          ${task.priority ? `<span class="badge bg-secondary ms-2">${esc(task.priority)}</span>` : ''}
+        </div>
+        ${task.due_date ? `<div class="mb-4"><h6 class="text-muted mb-2">Due Date</h6><div><i class="fas fa-calendar me-2"></i>${esc(task.due_date)}</div></div>` : ''}
+        <div class="mb-4">
+          <h6 class="text-muted mb-2">Source</h6>
+          <div><i class="fas fa-plug me-2"></i>${esc(task.source)}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary" onclick="window.history.back()">
+            <i class="fas fa-arrow-left me-2"></i>Back
+          </button>
+        </div>`;
+    }
+
+    // Build edit form script for markdown tasks
+    const editFormScript = isMarkdownTask ? `
+      document.getElementById('editForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+          filePath: form.filePath.value,
+          lineNumber: parseInt(form.lineNumber.value, 10),
+          title: form.title.value.trim(),
+          priority: form.priority.value || null,
+          dueDate: form.dueDate.value || null,
+          scheduledDate: form.scheduledDate.value || null,
+          startDate: form.startDate.value || null,
+          tags: form.tags.value.trim() || null,
+          completed: form.completed.checked
+        };
+        try {
+          const resp = await fetch('/task/edit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+          });
+          const result = await resp.json();
+          if (result.success) {
+            window.location.reload();
+          } else {
+            alert('Save failed: ' + (result.error || 'Unknown error'));
+          }
+        } catch (err) {
+          alert('Error saving task: ' + err.message);
+        }
+      });` : '';
 
     const taskTemplate = await loadTemplate('task-detail');
     const html = renderTemplate(taskTemplate, {
-      taskTitle: safeTitle,
-      navbar: getNavbar('Task Details', 'fa-tasks', { showSearch: false }),
-      priorityEmoji,
-      statusBadgeClass: task.status === 'completed' ? 'bg-success' : 'bg-primary',
-      statusText: escapeHtmlEntities(task.status),
-      priorityBadge: task.priority ? `<span class="badge bg-secondary ms-2">${escapeHtmlEntities(task.priority)}</span>` : '',
-      dueDateSection: task.due_date
-        ? `<div class="mb-4"><h6 class="text-muted mb-2">Due Date</h6><div><i class="fas fa-calendar me-2"></i>${escapeHtmlEntities(task.due_date)}</div></div>`
-        : '',
-      descriptionSection: task.description
-        ? `<div class="mb-4"><h6 class="text-muted mb-2">Description</h6><p>${escapeHtmlEntities(task.description)}</p></div>`
-        : '',
-      source: escapeHtmlEntities(task.source),
-      sourceFileLink: sourceFile
-        ? `<div class="mt-1"><a href="/${escapeHtmlEntities(sourceFile.replace(/^vault\//, ''))}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${escapeHtmlEntities(sourceFile)}</a></div>`
-        : '',
-      editFileBtn: sourceFile
-        ? `<a href="/${escapeHtmlEntities(sourceFile.replace(/^vault\//, ''))}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>`
-        : '',
-      taskId: escapeHtmlEntities(task.id),
+      taskTitle: esc(task.title.substring(0, 50)),
+      navbar: getNavbar('Edit Task', 'fa-tasks', { showSearch: false }),
+      heading: isMarkdownTask ? 'Edit Task' : 'Task Details',
+      bodyContent,
+      taskId: esc(task.id),
       createdAt: task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A',
       updatedAt: task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A',
       completedAtSection: task.completed_at
         ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>`
         : '',
       taskTitleJson: JSON.stringify(task.title),
+      editFormScript,
     });
 
     res.send(html);
