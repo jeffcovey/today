@@ -201,6 +201,15 @@ function initializeLoadingSpinner() {
       // Let the browser navigate normally so DOMContentLoaded fires on the new page
     }
   });
+
+  // Hide the spinner when the page is restored from the back-forward cache
+  // (e.g. Safari's bfcache restore on Back navigation). In this case,
+  // DOMContentLoaded does not re-fire, so the overlay must be reset here.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      overlay.style.display = 'none';
+    }
+  });
 }
 
 // Initialize on page load
