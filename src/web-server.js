@@ -106,6 +106,25 @@ function renderTemplate(template, data = {}) {
   return result;
 }
 
+// HTML-escape a string to prevent XSS when interpolating user data into templates
+function escapeHtmlEntities(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Render a user-facing error page using the error.html template
+async function renderError(errorCode, errorMessage) {
+  const template = await loadTemplate('error');
+  if (!template) {
+    return `<html><body><h1>${errorCode}</h1><p>${errorMessage}</p></body></html>`;
+  }
+  return renderTemplate(template, { errorCode: String(errorCode), errorMessage });
+}
+
 // Track pending markdown regenerations
 const pendingMarkdownUpdates = new Map();
 const MARKDOWN_UPDATE_DELAY = 3000; // 3 seconds
@@ -1051,32 +1070,7 @@ async function renderDirectory(dirPath, urlPath) {
     }
   });
 
-  let html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>Vault: ${urlPath || '/'}</title>
-      ${pageStyle}
-    </head>
-    <body>
-      ${getNavbar()}
-
-      <!-- Main content with chat -->
-      <div class="container-fluid mt-3">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            ${breadcrumbHtml}
-          </ol>
-        </nav>
-
-        <!-- Timer Widgets -->
-        <!--TIMER_WIDGETS_PLACEHOLDER-->
-
-        <div class="row">
-          <!-- Content column (order-2 on mobile so AI chat appears first) -->
-          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
-  `;
+  let contentHtml = '';
 
   // Special homepage content
   if (!urlPath) {
@@ -1114,11 +1108,11 @@ async function renderDirectory(dirPath, urlPath) {
     const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format for diary
 
     // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
-    html += `<div class="row">`;
+    contentHtml += `<div class="row">`;
 
     // Add Today's Plan/Diary button based on enabled plugins
     if (diaryEnabled) {
-      html += `
+      contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary text-white h-100">
@@ -1135,7 +1129,7 @@ async function renderDirectory(dirPath, urlPath) {
               </div>`;
     } else if (plansEnabled) {
       const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
-      html += `
+      contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white h-100">
@@ -1153,7 +1147,7 @@ async function renderDirectory(dirPath, urlPath) {
     }
 
     // Add Today's Tasks button
-    html += `
+    contentHtml += `
               <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white h-100">
@@ -1172,7 +1166,7 @@ async function renderDirectory(dirPath, urlPath) {
                 </div>
               </div>`;
 
-    html += `</div>`;
+    contentHtml += `</div>`;
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
@@ -1187,7 +1181,7 @@ async function renderDirectory(dirPath, urlPath) {
       const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
       const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
 
-      html += `
+      contentHtml += `
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1199,42 +1193,42 @@ async function renderDirectory(dirPath, urlPath) {
                 <div class="list-group list-group-flush">`;
 
       if (weekPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-week text-info me-3"></i>
                     Week ${week}
                   </a>`;
       }
       if (monthPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar text-success me-3"></i>
                     ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
                   </a>`;
       }
       if (quarterPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-business-time text-warning me-3"></i>
                     Quarter ${quarter.slice(1)} - ${year}
                   </a>`;
       }
       if (yearPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-check text-danger me-3"></i>
                     Year ${year}
                   </a>`;
       }
 
-      html += `
+      contentHtml += `
                 </div>
               </div>
             </div>`;
     }
     
     // Add Recents section (collapsed) - placeholder for now
-    html += `
+    contentHtml += `
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1252,7 +1246,7 @@ async function renderDirectory(dirPath, urlPath) {
             </div>`;
   }
   
-  html += `
+  contentHtml += `
             <div class="card shadow-sm h-100">
               <div class="list-group list-group-flush">
   `;
@@ -1260,7 +1254,7 @@ async function renderDirectory(dirPath, urlPath) {
   // Add parent directory link if not at root
   if (urlPath) {
     const parentPath = path.dirname(urlPath);
-    html += `
+    contentHtml += `
       <a href="/${parentPath === '.' ? '' : parentPath}" class="list-group-item list-group-item-action">
         <i class="fas fa-level-up-alt text-muted me-3"></i>
         <span class="text-muted">..</span>
@@ -1271,7 +1265,7 @@ async function renderDirectory(dirPath, urlPath) {
   for (const item of items) {
     if (item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
-      html += `
+      contentHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action">
           <i class="fas fa-folder text-warning me-3"></i>
           <strong>${item.name}/</strong>
@@ -1353,29 +1347,16 @@ async function renderDirectory(dirPath, urlPath) {
           </div>`;
       }
 
-      html += `
+      contentHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
         </a>`;
     }
   }
   
-  html += `
-          </div>
-        </div>
-      </div>
-
-    <!-- Chat column (order-1 on mobile so it appears first) -->
-    <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
-      ${getAIAssistantPanel('Ask questions about this directory and its contents')}
-    </div>
-  </div>
-
-      ${getFloatingToggleBtn()}
-
-      ${pageScriptsWithMarked}
-
-      <script>
+  // Build page using directory template
+  const dirTemplate = await loadTemplate('directory');
+  const dirInlineScript = `<script>
         // Page-specific data for AI context
         const directoryPath = '${urlPath || '/'}';
         const directoryContents = ${JSON.stringify(items.map(item => ({
@@ -1653,10 +1634,16 @@ Contents:
             recentsList.innerHTML = recentsHtml;
           }
         }
-      </script>
-    </body>
-    </html>
-  `;
+      </script>`;
+  const html = renderTemplate(dirTemplate, {
+    title: `Vault: ${urlPath || '/'}`,
+    navbar: getNavbar(),
+    breadcrumb: breadcrumbHtml,
+    content: contentHtml,
+    sidebar: getAIAssistantPanel('Ask questions about this directory and its contents'),
+    floatingToggle: getFloatingToggleBtn(),
+    inlineScript: dirInlineScript,
+  });
 
   // Inject timer widgets
   const taskTimerItems = await getTodayTaskTimerItems();
@@ -4552,60 +4539,9 @@ ${cleanContent}
     }
   });
   
-  const html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>${fileName}</title>
-      ${pageStyle}
-    </head>
-    <body>
-      ${getNavbar(fileName, 'fa-file-alt')}
-
-      <!-- Main content with chat -->
-      <div class="container-fluid mt-3">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            ${breadcrumbHtml}
-          </ol>
-        </nav>
-
-        <!-- Timer Widgets -->
-        <!--TIMER_WIDGETS_PLACEHOLDER-->
-
-        <div class="row">
-          <!-- Content column (order-2 on mobile so AI chat appears first) -->
-          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
-            <div class="card shadow-sm">
-              <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                  <h5 class="mb-0">${pageTitle || fileName}</h5>
-                  <a href="/edit/${urlPath}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-edit me-1"></i>Edit
-                  </a>
-                </div>
-                ${toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : ''}
-              </div>
-              <div class="card-body markdown-content">
-                ${renderProperties(properties)}
-                ${htmlContent}
-              </div>
-            </div>
-          </div>
-          
-          <!-- Chat column (order-1 on mobile so it appears first) -->
-          <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
-            ${getAIAssistantPanel('Start a conversation about this document')}
-          </div>
-        </div>
-      </div>
-
-      ${getFloatingToggleBtn()}
-
-      ${pageScriptsWithMarked}
-
-      <script>
+  // Build page using markdown template
+  const mdTemplate = await loadTemplate('markdown');
+  const inlineScript = `<script>
         // Page-specific: Chat functionality
         checkChatVersion(); // Page will reload if version changed
 
@@ -5216,10 +5152,20 @@ ${cleanContent}
 
           localStorage.setItem('recentPages', JSON.stringify(recentPages));
         }
-      </script>
-    </body>
-    </html>
-  `;
+      </script>`;
+  const html = renderTemplate(mdTemplate, {
+    title: fileName,
+    navbar: getNavbar(fileName, 'fa-file-alt'),
+    breadcrumb: breadcrumbHtml,
+    pageTitle: pageTitle || fileName,
+    editUrl: `/edit/${urlPath}`,
+    toc: toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : '',
+    properties: renderProperties(properties),
+    content: htmlContent,
+    aiPanel: getAIAssistantPanel('Start a conversation about this document'),
+    floatingToggle: getFloatingToggleBtn(),
+    inlineScript,
+  });
 
   debug('HTML includes chatMessages:', html.includes('chatMessages'));
   return html;
@@ -6461,7 +6407,8 @@ app.get('/search', authMiddleware, async (req, res) => {
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
-    
+    const searchTemplate = await loadTemplate('search');
+
     try {
       // Search in file contents (excluding hidden directories)
       const { stdout: contentResults } = await execAsync(
@@ -6524,101 +6471,44 @@ app.get('/search', authMiddleware, async (req, res) => {
         return a.fileName.localeCompare(b.fileName);
       });
       
-      // Render search results page
-      const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <title>Search: ${searchQuery}</title>
-          ${pageStyle}
-        </head>
-        <body>
-          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
-          
-          <div class="container-fluid mt-3">
-            <div class="row">
-              <div class="col">
-                <div class="card shadow-sm">
-                  <div class="card-header">
-                    <h5 class="mb-0">
-                      <i class="fas fa-search me-2"></i>
-                      Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${searchQuery}"
-                    </h5>
-                  </div>
-                  <div class="list-group list-group-flush">
-                    ${results.length === 0 ? `
-                      <div class="list-group-item text-muted text-center py-4">
-                        No results found. Try a different search term.
-                      </div>
-                    ` : results.map(result => `
-                      <a href="/${result.path}" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                          <h6 class="mb-1">
-                            <i class="fas fa-file-alt text-info me-2"></i>
-                            ${result.fileName}
-                          </h6>
-                        </div>
-                        <p class="mb-1 text-muted small">${result.path}</p>
-                        ${result.snippet ? `
-                          <small class="text-muted">
-                            ...${result.snippet}...
-                          </small>
-                        ` : ''}
-                      </a>
-                    `).join('')}
-                  </div>
-                </div>
-              </div>
+      // Render search results page using template
+      const safeQuery = escapeHtmlEntities(searchQuery);
+      const resultsHtml = results.length === 0
+        ? '<div class="list-group-item text-muted text-center py-4">No results found. Try a different search term.</div>'
+        : results.map(result => `
+          <a href="/${escapeHtmlEntities(result.path)}" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">
+                <i class="fas fa-file-alt text-info me-2"></i>
+                ${escapeHtmlEntities(result.fileName)}
+              </h6>
             </div>
-          </div>
-          
-          ${pageScripts}
-        </body>
-        </html>
-      `;
+            <p class="mb-1 text-muted small">${escapeHtmlEntities(result.path)}</p>
+            ${result.snippet ? `<small class="text-muted">...${escapeHtmlEntities(result.snippet)}...</small>` : ''}
+          </a>
+        `).join('');
+      const html = renderTemplate(searchTemplate, {
+        query: safeQuery,
+        navbar: getNavbar('Search Results', 'fa-search', { searchValue: searchQuery }),
+        heading: `Found ${results.length} result${results.length !== 1 ? 's' : ''} for &ldquo;${safeQuery}&rdquo;`,
+        resultsHtml,
+      });
 
       res.send(html);
       
     } catch (error) {
       console.error('Search error:', error);
       
-      // Return empty results on error
-      const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <title>Search: ${searchQuery}</title>
-          ${pageStyle}
-        </head>
-        <body>
-          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
-          
-          <div class="container-fluid mt-3">
-            <div class="row">
-              <div class="col">
-                <div class="card shadow-sm">
-                  <div class="card-header">
-                    <h5 class="mb-0">
-                      <i class="fas fa-search me-2"></i>
-                      Search Results for "${searchQuery}"
-                    </h5>
-                  </div>
-                  <div class="list-group list-group-flush">
-                    <div class="list-group-item text-muted text-center py-4">
-                      An error occurred while searching. Please try again.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          ${pageScripts}
-        </body>
-        </html>
-      `;
+      // Return empty results on error using template
+      const safeQuery = escapeHtmlEntities(searchQuery);
+      const errorResultHtml = renderTemplate(searchTemplate, {
+        query: safeQuery,
+        navbar: getNavbar('Search Results', 'fa-search', { searchValue: searchQuery }),
+        heading: `Search Results for &ldquo;${safeQuery}&rdquo;`,
+        resultsHtml: '<div class="list-group-item text-muted text-center py-4">An error occurred while searching. Please try again.</div>',
+      });
 
-      res.send(html);
+      res.send(errorResultHtml);
     }
     
   } catch (error) {
@@ -7208,116 +7098,38 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
 
     const metadata = task.metadata ? JSON.parse(task.metadata) : {};
     const priorityEmoji = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' }[task.priority] || '';
+    const sourceFile = metadata.filePath || metadata.file_path;
+    const safeTitle = escapeHtmlEntities(task.title);
 
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <title>Task: ${task.title.substring(0, 50)}...</title>
-        ${pageStyle}
-      </head>
-      <body>
-        ${getNavbar('Task Details', 'fa-tasks', { showSearch: false })}
-
-        <div class="container mt-4">
-          <div class="row justify-content-center">
-            <div class="col-md-10 col-lg-8">
-              <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                  <h4 class="mb-0">
-                    <i class="fas fa-check-circle me-2"></i>Task Details
-                  </h4>
-                </div>
-                <div class="card-body">
-                  <!-- Task Text -->
-                  <div class="mb-4">
-                    <h5 class="text-muted mb-2">Task</h5>
-                    <p class="fs-5">${priorityEmoji} ${task.title}</p>
-                  </div>
-
-                  <!-- Status -->
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Status</h6>
-                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-primary'}">${task.status}</span>
-                    ${task.priority ? `<span class="badge bg-secondary ms-2">${task.priority}</span>` : ''}
-                  </div>
-
-                  ${task.due_date ? `
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Due Date</h6>
-                    <div><i class="fas fa-calendar me-2"></i>${task.due_date}</div>
-                  </div>
-                  ` : ''}
-
-                  ${task.description ? `
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Description</h6>
-                    <p>${task.description}</p>
-                  </div>
-                  ` : ''}
-
-                  <!-- Source -->
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Source</h6>
-                    <div><i class="fas fa-plug me-2"></i>${task.source}</div>
-                    ${(metadata.filePath || metadata.file_path) ? `<div class="mt-1"><a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${metadata.filePath || metadata.file_path}</a></div>` : ''}
-                  </div>
-
-                  <!-- Actions -->
-                  <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-success" onclick="startTimer()">
-                      <i class="fas fa-play me-2"></i>Start Timer
-                    </button>
-                    ${(metadata.filePath || metadata.file_path) ? `<a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
-                    <button class="btn btn-outline-secondary" onclick="window.history.back()">
-                      <i class="fas fa-arrow-left me-2"></i>Back
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Task Metadata -->
-              <div class="card mt-3 shadow-sm">
-                <div class="card-body">
-                  <small class="text-muted">
-                    <div class="mb-2"><strong>Task ID:</strong> ${task.id}</div>
-                    <div class="mb-2"><strong>Created:</strong> ${task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</div>
-                    <div class="mb-2"><strong>Updated:</strong> ${task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A'}</div>
-                    ${task.completed_at ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>` : ''}
-                  </small>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <script>
-          function startTimer() {
-            const taskText = ${JSON.stringify(task.title)};
-            fetch('/api/track/start', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({description: taskText})
-            })
-            .then(response => response.json())
-            .then(data => {
-              if (data.success) {
-                alert('Timer started: ' + taskText);
-                window.location.href = '/';
-              } else {
-                alert('Failed to start timer: ' + data.message);
-              }
-            })
-            .catch(error => {
-              alert('Error starting timer: ' + error.message);
-            });
-          }
-        </script>
-
-        ${pageScripts}
-      </body>
-      </html>
-    `;
+    const taskTemplate = await loadTemplate('task-detail');
+    const html = renderTemplate(taskTemplate, {
+      taskTitle: safeTitle,
+      navbar: getNavbar('Task Details', 'fa-tasks', { showSearch: false }),
+      priorityEmoji,
+      statusBadgeClass: task.status === 'completed' ? 'bg-success' : 'bg-primary',
+      statusText: escapeHtmlEntities(task.status),
+      priorityBadge: task.priority ? `<span class="badge bg-secondary ms-2">${escapeHtmlEntities(task.priority)}</span>` : '',
+      dueDateSection: task.due_date
+        ? `<div class="mb-4"><h6 class="text-muted mb-2">Due Date</h6><div><i class="fas fa-calendar me-2"></i>${escapeHtmlEntities(task.due_date)}</div></div>`
+        : '',
+      descriptionSection: task.description
+        ? `<div class="mb-4"><h6 class="text-muted mb-2">Description</h6><p>${escapeHtmlEntities(task.description)}</p></div>`
+        : '',
+      source: escapeHtmlEntities(task.source),
+      sourceFileLink: sourceFile
+        ? `<div class="mt-1"><a href="/${escapeHtmlEntities(sourceFile.replace(/^vault\//, ''))}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${escapeHtmlEntities(sourceFile)}</a></div>`
+        : '',
+      editFileBtn: sourceFile
+        ? `<a href="/${escapeHtmlEntities(sourceFile.replace(/^vault\//, ''))}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>`
+        : '',
+      taskId: escapeHtmlEntities(task.id),
+      createdAt: task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A',
+      updatedAt: task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A',
+      completedAtSection: task.completed_at
+        ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>`
+        : '',
+      taskTitleJson: JSON.stringify(task.title),
+    });
 
     res.send(html);
   } catch (error) {
@@ -7425,13 +7237,15 @@ app.get('/*path', authMiddleware, async (req, res) => {
     }
   } catch (error) {
     if (error.code === 'ENOENT') {
-      res.status(404).send('File not found');
+      const html = await renderError(404, 'File not found');
+      res.status(404).send(html);
     } else {
       console.error('=== SERVER ERROR ===');
       console.error('Path:', req.path);
       console.error('Error:', error.message);
       console.error('Stack:', error.stack);
-      res.status(500).send('Server error');
+      const html = await renderError(500, 'An unexpected error occurred. Please try again.');
+      res.status(500).send(html);
     }
   }
 });
