@@ -1,7 +1,7 @@
 /**
  * Web Server Task Toggle Tests
  *
- * Tests the /task/toggle endpoint for completing/uncompleting tasks.
+ * Tests the /task/toggle and /task/edit endpoints for completing/uncompleting tasks.
  * Requires the web server to be running on localhost:3001 with VAULT_PATH=test/fixtures.
  */
 
@@ -349,5 +349,186 @@ describe('Task Toggle - Edge Cases', () => {
     if (hasScheduledDate) expect(result.updatedLine).toContain('⏳');
     if (hasCreatedDate) expect(result.updatedLine).toContain('➕');
     if (hasPriority) expect(result.updatedLine).toMatch(/⏫|🔼/);
+  });
+});
+
+describe('Task Edit API', () => {
+  beforeEach(async () => {
+    await resetFixture();
+  });
+
+  describe('POST /task/edit', () => {
+    test('should update task title', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Updated task title',
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.success).toBe(true);
+      expect(result.updatedLine).toContain('Updated task title');
+
+      const taskLine = await readTaskLine(TEST_LINE);
+      expect(taskLine).toContain('Updated task title');
+    });
+
+    test('should set priority', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Test task for toggle testing',
+          priority: 'high',
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.updatedLine).toContain('⏫');
+
+      const taskLine = await readTaskLine(TEST_LINE);
+      expect(taskLine).toContain('⏫');
+    });
+
+    test('should set due date', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Test task for toggle testing',
+          dueDate: '2099-06-15',
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.updatedLine).toContain('📅 2099-06-15');
+
+      const taskLine = await readTaskLine(TEST_LINE);
+      expect(taskLine).toContain('📅 2099-06-15');
+    });
+
+    test('should mark task as completed', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Test task for toggle testing',
+          completed: true
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.updatedLine).toMatch(/- \[x\]/);
+      expect(result.updatedLine).toContain('✅');
+
+      const taskLine = await readTaskLine(TEST_LINE);
+      expect(taskLine).toMatch(/- \[x\]/);
+    });
+
+    test('should preserve creation date when editing', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Updated title',
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      // Original fixture has ➕ 2025-01-01
+      expect(result.updatedLine).toContain('➕ 2025-01-01');
+    });
+
+    test('should return 400 for missing title', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: '',
+          completed: false
+        })
+      });
+
+      expect(response.status).toBe(400);
+      const result = await response.json();
+      expect(result.error).toContain('title');
+    });
+
+    test('should return 400 for missing filePath', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineNumber: TEST_LINE,
+          title: 'Some title',
+          completed: false
+        })
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should require authentication', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetch(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: TEST_LINE,
+          title: 'Some title',
+          completed: false
+        }),
+        redirect: 'manual'
+      });
+
+      expect([302, 401, 403]).toContain(response.status);
+    });
   });
 });
