@@ -7232,9 +7232,9 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     }
 
     const metadata = task.metadata ? JSON.parse(task.metadata) : {};
-    const isMarkdownTask = task.source === 'markdown-tasks/local' && (metadata.filePath || metadata.file_path) && metadata.lineNumber;
+    const isMarkdownTask = task.source === 'markdown-tasks/local' && (metadata.filePath || metadata.file_path) && (metadata.lineNumber || metadata.line_number);
     const editFilePath = metadata.filePath || metadata.file_path || null;
-    const editLineNumber = metadata.lineNumber || null;
+    const editLineNumber = metadata.lineNumber || metadata.line_number || null;
     const editFileRelPath = editFilePath ? editFilePath.replace(/^vault\//, '') : null;
 
     // For DB tasks without raw dates, fall back to task.due_date
@@ -7329,8 +7329,10 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
         <div class="mb-4">
           <h6 class="text-muted mb-2">Source</h6>
           <div><i class="fas fa-plug me-2"></i>${esc(task.source)}</div>
+          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          ${editFileRelPath ? `<a href="/${esc(editFileRelPath)}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
           <button class="btn btn-outline-secondary" onclick="window.history.back()">
             <i class="fas fa-arrow-left me-2"></i>Back
           </button>
