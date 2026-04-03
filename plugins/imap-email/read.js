@@ -292,16 +292,22 @@ async function syncFolder(folderPath, isIncremental, lastState) {
       const currentHighestModseq = status.highestModseq;
 
       // Determine sync strategy
-      let fetchRange;           // String range for FETCH (used with CONDSTORE)
-      let fetchSearchCriteria;  // Object criteria for SEARCH+FETCH
-      let fetchOptions = {};    // Extra fetch options (uid, changedSince)
+      let isCondstoreSync = false; // True when using CONDSTORE CHANGEDSINCE fetch
+      let fetchRange;              // String range for FETCH (used with CONDSTORE)
+      let fetchSearchCriteria;     // Object criteria for SEARCH+FETCH
+      let fetchOptions = {};       // Extra fetch options (uid, changedSince)
       const pendingFlagUpdates = [];
 
       if (isIncremental && lastState && lastState.uidValidity === currentUidValidity) {
         // UIDVALIDITY matches - we can do incremental sync
-        const lastHighestModseq = lastState.highestModseq
-          ? BigInt(lastState.highestModseq)
-          : null;
+        let lastHighestModseq = null;
+        try {
+          lastHighestModseq = lastState.highestModseq
+            ? BigInt(lastState.highestModseq)
+            : null;
+        } catch {
+          // Ignore invalid stored modseq - fall back to UID-based sync
+        }
         const condstoreAvailable = currentHighestModseq != null && lastHighestModseq != null;
         const hasNewMessages = lastState.uidNext && currentUidNext > lastState.uidNext;
 
@@ -310,6 +316,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           // last sync in one round-trip (covers both new messages and flag changes).
           // Use a string range with uid:true so ImapFlow issues UID FETCH...CHANGEDSINCE.
           // Per RFC 4551, any mailbox change (new message, flag change) increments MODSEQ.
+          isCondstoreSync = true;
           fetchRange = '1:*';
           fetchOptions = { uid: true, changedSince: lastHighestModseq };
           syncType = 'incremental';
@@ -371,7 +378,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           // the server only returns messages whose MODSEQ > changedSince.
           // Messages with UID below the previous uidNext are existing entries whose
           // flags changed; route them to the flag-update path instead of full insert.
-          if (fetchRange && lastState?.uidNext &&
+          if (isCondstoreSync && lastState?.uidNext &&
               Number(message.uid) < lastState.uidNext) {
             // Existing message with flag change: update flags only
             pendingFlagUpdates.push({ folder: folderPath, uid: message.uid, flags });
