@@ -8,7 +8,7 @@
 // - Only fetches new messages on subsequent syncs
 // - Falls back to full sync if UIDVALIDITY changes (folder recreated)
 // - Clears stale DB entries for any folder whose UIDVALIDITY changed
-// - CONDSTORE/QRESYNC: when server supports CONDSTORE, also tracks highestmodseq
+// - CONDSTORE/QRESYNC: when server supports CONDSTORE, also tracks highestModseq
 //   and fetches flag changes (read/unread, flagged, etc.) for existing messages
 //
 // Two-phase sync:
@@ -299,21 +299,23 @@ async function syncFolder(folderPath, isIncremental, lastState) {
 
       if (isIncremental && lastState && lastState.uidValidity === currentUidValidity) {
         // UIDVALIDITY matches - we can do incremental sync
-        const lastHighestModseq = lastState.highestmodseq
-          ? BigInt(lastState.highestmodseq)
+        const lastHighestModseq = lastState.highestModseq
+          ? BigInt(lastState.highestModseq)
           : null;
         const condstoreAvailable = currentHighestModseq != null && lastHighestModseq != null;
+        const hasNewMessages = lastState.uidNext && currentUidNext > lastState.uidNext;
 
         if (condstoreAvailable && currentHighestModseq > lastHighestModseq) {
           // CONDSTORE is supported: use CHANGEDSINCE to fetch all messages changed since
-          // last sync (covers both new messages and flag changes to existing messages).
-          // Use a string range with uid:true so ImapFlow issues a single UID FETCH...CHANGEDSINCE
+          // last sync in one round-trip (covers both new messages and flag changes).
+          // Use a string range with uid:true so ImapFlow issues UID FETCH...CHANGEDSINCE.
+          // Per RFC 4551, any mailbox change (new message, flag change) increments MODSEQ.
           fetchRange = '1:*';
           fetchOptions = { uid: true, changedSince: lastHighestModseq };
           syncType = 'incremental';
           console.error(`  📁 ${folderPath} (CONDSTORE, modseq changed)...`);
-        } else if (lastState.uidNext && currentUidNext > lastState.uidNext) {
-          // No CONDSTORE (or modseq unchanged): fetch only new messages by UID
+        } else if (hasNewMessages) {
+          // No CONDSTORE (or modseq unchanged - fallback): fetch only new messages by UID
           fetchSearchCriteria = { uid: `${lastState.uidNext}:*` };
           syncType = 'incremental';
           console.error(`  📁 ${folderPath} (new: ${currentUidNext - lastState.uidNext})...`);
@@ -323,7 +325,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           newFolderState[folderPath] = {
             uidValidity: currentUidValidity,
             uidNext: currentUidNext,
-            highestmodseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
+            highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
           };
           metadata.folders_synced.push({ folder: folderPath, count: 0, type: 'skip' });
           lock.release();
@@ -341,11 +343,11 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         }
       }
 
-      // Store new folder state (including highestmodseq for CONDSTORE)
+      // Store new folder state (including highestModseq for CONDSTORE)
       newFolderState[folderPath] = {
         uidValidity: currentUidValidity,
         uidNext: currentUidNext,
-        highestmodseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
+        highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
       };
 
       // Use the appropriate range/criteria for the fetch
@@ -365,11 +367,13 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         try {
           const flags = parseFlags(message.flags);
 
-          // When doing a CONDSTORE-based incremental sync, messages with UID below the
-          // previous uidNext are existing entries whose flags may have changed.
-          if (syncType === 'incremental' && lastState?.uidNext &&
+          // During a CONDSTORE-based incremental sync (range '1:*' with CHANGEDSINCE),
+          // the server only returns messages whose MODSEQ > changedSince.
+          // Messages with UID below the previous uidNext are existing entries whose
+          // flags changed; route them to the flag-update path instead of full insert.
+          if (fetchRange && lastState?.uidNext &&
               Number(message.uid) < lastState.uidNext) {
-            // Existing message: only update flags, don't create a full entry
+            // Existing message with flag change: update flags only
             pendingFlagUpdates.push({ folder: folderPath, uid: message.uid, flags });
             continue;
           }
