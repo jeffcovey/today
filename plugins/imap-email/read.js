@@ -6,7 +6,10 @@
 // Supports incremental sync:
 // - Stores UIDVALIDITY and UIDNEXT per folder
 // - Only fetches new messages on subsequent syncs
-// - Falls back to full sync if UIDVALIDITY changes
+// - Falls back to full sync if UIDVALIDITY changes (folder recreated)
+// - Clears stale DB entries for any folder whose UIDVALIDITY changed
+// - CONDSTORE/QRESYNC: when server supports CONDSTORE, also tracks highestmodseq
+//   and fetches flag changes (read/unread, flagged, etc.) for existing messages
 //
 // Two-phase sync:
 // 1. Fast metadata sync (envelope, flags, size) - runs in foreground
@@ -129,6 +132,63 @@ function getFolderState(sourceId) {
   }
 }
 
+// Delete all email entries for a specific folder (called when UIDVALIDITY changes)
+function deleteOldFolderEntries(sourceId, folderPath) {
+  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+  const dbPath = path.join(projectRoot, '.data', 'today.db');
+
+  try {
+    const db = new Database(dbPath, { timeout: 5000 });
+    db.pragma('busy_timeout = 5000');
+    db.pragma('journal_mode = WAL');
+
+    const result = db.prepare(`
+      DELETE FROM email WHERE source = ? AND folder = ?
+    `).run(sourceId, folderPath);
+
+    db.close();
+    return result.changes;
+  } catch (err) {
+    console.error(`  Warning: could not clear old entries for ${folderPath}: ${err.message}`);
+    return 0;
+  }
+}
+
+// Batch-update flags for emails changed via CONDSTORE (avoids full row replace)
+function applyFlagUpdates(sourceId, updates) {
+  if (!updates || updates.length === 0) return 0;
+
+  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+  const dbPath = path.join(projectRoot, '.data', 'today.db');
+
+  try {
+    const db = new Database(dbPath, { timeout: 5000 });
+    db.pragma('busy_timeout = 5000');
+    db.pragma('journal_mode = WAL');
+
+    const stmt = db.prepare(`
+      UPDATE email SET flags = ? WHERE id = ?
+    `);
+
+    const transaction = db.transaction(() => {
+      let updated = 0;
+      for (const { folder, uid, flags } of updates) {
+        const id = `${sourceId}:${folder}:${uid}`;
+        const result = stmt.run(JSON.stringify(flags), id);
+        updated += result.changes;
+      }
+      return updated;
+    });
+
+    const updated = transaction();
+    db.close();
+    return updated;
+  } catch (err) {
+    console.error(`  Warning: could not apply flag updates: ${err.message}`);
+    return 0;
+  }
+}
+
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const sourceId = process.env.SOURCE_ID || 'imap-email/default';
@@ -202,10 +262,24 @@ let existingEmails = new Map();
 let previousFolderState = {};
 const newFolderState = {};
 
+// Convert IMAP flag set to our string array format
+function parseFlags(flagSet) {
+  const flags = [];
+  if (flagSet) {
+    if (flagSet.has('\\Seen')) flags.push('seen');
+    if (flagSet.has('\\Flagged')) flags.push('flagged');
+    if (flagSet.has('\\Answered')) flags.push('answered');
+    if (flagSet.has('\\Draft')) flags.push('draft');
+    if (flagSet.has('\\Deleted')) flags.push('deleted');
+  }
+  return flags;
+}
+
 async function syncFolder(folderPath, isIncremental, lastState) {
   try {
     const lock = await client.getMailboxLock(folderPath);
     let folderCount = 0;
+    let flagUpdateCount = 0;
     let syncType = 'full';
 
     try {
@@ -214,23 +288,42 @@ async function syncFolder(folderPath, isIncremental, lastState) {
       const status = client.mailbox;
       const currentUidValidity = Number(status.uidValidity);
       const currentUidNext = Number(status.uidNext);
+      // highestModseq is a BigInt when server supports CONDSTORE, undefined otherwise
+      const currentHighestModseq = status.highestModseq;
 
       // Determine sync strategy
-      let fetchQuery;
+      let fetchRange;           // String range for FETCH (used with CONDSTORE)
+      let fetchSearchCriteria;  // Object criteria for SEARCH+FETCH
+      let fetchOptions = {};    // Extra fetch options (uid, changedSince)
+      const pendingFlagUpdates = [];
 
       if (isIncremental && lastState && lastState.uidValidity === currentUidValidity) {
         // UIDVALIDITY matches - we can do incremental sync
-        // Fetch only messages with UID >= last UIDNEXT
-        if (lastState.uidNext && currentUidNext > lastState.uidNext) {
-          fetchQuery = { uid: `${lastState.uidNext}:*` };
+        const lastHighestModseq = lastState.highestmodseq
+          ? BigInt(lastState.highestmodseq)
+          : null;
+        const condstoreAvailable = currentHighestModseq != null && lastHighestModseq != null;
+
+        if (condstoreAvailable && currentHighestModseq > lastHighestModseq) {
+          // CONDSTORE is supported: use CHANGEDSINCE to fetch all messages changed since
+          // last sync (covers both new messages and flag changes to existing messages).
+          // Use a string range with uid:true so ImapFlow issues a single UID FETCH...CHANGEDSINCE
+          fetchRange = '1:*';
+          fetchOptions = { uid: true, changedSince: lastHighestModseq };
+          syncType = 'incremental';
+          console.error(`  📁 ${folderPath} (CONDSTORE, modseq changed)...`);
+        } else if (lastState.uidNext && currentUidNext > lastState.uidNext) {
+          // No CONDSTORE (or modseq unchanged): fetch only new messages by UID
+          fetchSearchCriteria = { uid: `${lastState.uidNext}:*` };
           syncType = 'incremental';
           console.error(`  📁 ${folderPath} (new: ${currentUidNext - lastState.uidNext})...`);
         } else {
-          // No new messages
+          // No new messages and no CONDSTORE changes
           console.error(`  📁 ${folderPath} (no new)...`);
           newFolderState[folderPath] = {
             uidValidity: currentUidValidity,
-            uidNext: currentUidNext
+            uidNext: currentUidNext,
+            highestmodseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
           };
           metadata.folders_synced.push({ folder: folderPath, count: 0, type: 'skip' });
           lock.release();
@@ -238,45 +331,53 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         }
       } else {
         // Full sync needed (first sync or UIDVALIDITY changed)
-        fetchQuery = { since: sinceDate };
+        fetchSearchCriteria = { since: sinceDate };
         if (lastState && lastState.uidValidity !== currentUidValidity) {
-          console.error(`  📁 ${folderPath} (UIDVALIDITY changed, full sync)...`);
+          // UIDVALIDITY changed: folder was recreated, remove stale DB entries first
+          const deleted = deleteOldFolderEntries(sourceId, folderPath);
+          console.error(`  📁 ${folderPath} (UIDVALIDITY changed, full sync, cleared ${deleted} stale entries)...`);
         } else {
           console.error(`  📁 ${folderPath}...`);
         }
       }
 
-      // Store new folder state
+      // Store new folder state (including highestmodseq for CONDSTORE)
       newFolderState[folderPath] = {
         uidValidity: currentUidValidity,
-        uidNext: currentUidNext
+        uidNext: currentUidNext,
+        highestmodseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
       };
+
+      // Use the appropriate range/criteria for the fetch
+      const fetchTarget = fetchRange || fetchSearchCriteria;
 
       // Fast metadata-only fetch
       for await (const message of client.fetch(
-        fetchQuery,
+        fetchTarget,
         {
           envelope: true,
           flags: true,
           size: true
           // NOT fetching source - that's slow
-        }
+        },
+        fetchOptions
       )) {
         try {
+          const flags = parseFlags(message.flags);
+
+          // When doing a CONDSTORE-based incremental sync, messages with UID below the
+          // previous uidNext are existing entries whose flags may have changed.
+          if (syncType === 'incremental' && lastState?.uidNext &&
+              Number(message.uid) < lastState.uidNext) {
+            // Existing message: only update flags, don't create a full entry
+            pendingFlagUpdates.push({ folder: folderPath, uid: message.uid, flags });
+            continue;
+          }
+
           const envelope = message.envelope || {};
           const fromAddr = envelope.from?.[0];
           const toAddrs = envelope.to || [];
           const ccAddrs = envelope.cc || [];
-
-          // Convert IMAP flags to our format
-          const flags = [];
-          if (message.flags) {
-            if (message.flags.has('\\Seen')) flags.push('seen');
-            if (message.flags.has('\\Flagged')) flags.push('flagged');
-            if (message.flags.has('\\Answered')) flags.push('answered');
-            if (message.flags.has('\\Draft')) flags.push('draft');
-            if (message.flags.has('\\Deleted')) flags.push('deleted');
-          }
 
           const emailId = `${folderPath}:${message.uid}`;
           const existingData = existingEmails.get(emailId);
@@ -328,9 +429,23 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         }
       }
 
-      metadata.folders_synced.push({ folder: folderPath, count: folderCount, type: syncType });
+      // Apply CONDSTORE flag updates for existing messages
+      if (pendingFlagUpdates.length > 0) {
+        flagUpdateCount = applyFlagUpdates(sourceId, pendingFlagUpdates);
+      }
+
+      metadata.folders_synced.push({
+        folder: folderPath,
+        count: folderCount,
+        flag_updates: flagUpdateCount,
+        type: syncType
+      });
       metadata.total_fetched += folderCount;
-      console.error(`     ✓ ${folderCount} emails`);
+      if (flagUpdateCount > 0) {
+        console.error(`     ✓ ${folderCount} new emails, ${flagUpdateCount} flag updates`);
+      } else {
+        console.error(`     ✓ ${folderCount} emails`);
+      }
 
     } finally {
       lock.release();
@@ -458,8 +573,11 @@ async function main() {
   }
 
   // Output in plugin format
+  // files_processed: [] signals incremental mode to plugin-loader (preserve existing entries)
+  // files_processed: null (omitted) signals full sync (plugin-loader deletes and replaces all)
   console.log(JSON.stringify({
     entries,
+    files_processed: isIncremental ? [] : undefined,
     metadata
   }));
 }
