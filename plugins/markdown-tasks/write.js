@@ -904,22 +904,19 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
 
     filesToRebalance.push(...numberedFiles);
 
-    // Collect all tasks and check if any file exceeds limit
-    let needsRebalancing = false;
+    // Collect all tasks from all files
     for (const filePath of filesToRebalance) {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf8');
         const lines = content.split('\n').filter(line => line.trim());
-
-        if (lines.length > maxTasksPerFile) {
-          needsRebalancing = true;
-        }
-
         allTasks.push(...lines);
       }
     }
 
-    if (needsRebalancing && allTasks.length > 0) {
+    if (allTasks.length > 0) {
+
+        // Sort tasks alphabetically (case-insensitive) so they distribute a-z across files
+        allTasks.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
         // Calculate number of files needed
         const numFilesNeeded = Math.ceil(allTasks.length / maxTasksPerFile);
