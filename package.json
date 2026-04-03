@@ -20,7 +20,7 @@
     "@ai-sdk/anthropic": "^3.0.63",
     "@ai-sdk/google": "^3.0.52",
     "@ai-sdk/openai": "^3.0.47",
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.81.0",
     "@clack/prompts": "^1.1.0",
     "@date-fns/tz": "^1.4.1",
     "@dotenvx/dotenvx": "^1.57.1",
