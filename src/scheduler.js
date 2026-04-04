@@ -30,6 +30,12 @@ const MAINTENANCE_JOBS = [
     schedule: '0 */6 * * *', // Every 6 hours
     command: 'bin/deploy maintenance --local || true',
     description: 'System maintenance (cleanup logs, check disk, database)'
+  },
+  {
+    name: 'prerender-markdown',
+    schedule: '*/30 * * * *', // Every 30 minutes
+    command: 'bin/prerender',
+    description: 'Pre-render vault markdown files to disk HTML cache'
   }
 ];
 
