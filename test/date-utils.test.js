@@ -8,6 +8,19 @@ import {
   getWeekNumber,
   getQuarterNumber,
   getQuarterString,
+  getConfiguredTimezone,
+  getCurrentTime,
+  formatISO8601,
+  getCurrentTimeISO,
+  createTimeTodayISO,
+  getTodayDate,
+  subtractSecondsISO,
+  getWeekAgoDate,
+  formatTimeRange,
+  getStartOfDayTimestamp,
+  formatFullDateTime,
+  getTimezoneOffset,
+  sqlLocalDate,
   getDateComponents,
   getWeekStart,
   getWeekEnd,
@@ -248,6 +261,171 @@ describe('date-utils', () => {
       const diffMs = end.getTime() - start.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
       expect(diffHours).toBe(24);
+    });
+  });
+
+  describe('getConfiguredTimezone', () => {
+    test('returns a string IANA timezone', () => {
+      const tz = getConfiguredTimezone();
+      expect(typeof tz).toBe('string');
+      expect(tz.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getCurrentTime', () => {
+    test('returns a TZDate-like object for a valid timezone', () => {
+      const t = getCurrentTime('America/New_York');
+      expect(t).not.toBeNull();
+      expect(typeof t.getTime()).toBe('number');
+      expect(isNaN(t.getTime())).toBe(false);
+    });
+
+    test('falls back to UTC for an invalid timezone', () => {
+      const t = getCurrentTime('Invalid/Timezone');
+      expect(t).not.toBeNull();
+      expect(isNaN(t.getTime())).toBe(false);
+    });
+  });
+
+  describe('formatISO8601', () => {
+    test('formats a Date with timezone offset', () => {
+      const date = new Date('2025-12-09T17:30:00Z');
+      const result = formatISO8601(date, 'America/New_York');
+      // 5:30 PM UTC = 12:30 PM Eastern (UTC-5 in winter)
+      expect(result).toBe('2025-12-09T12:30:00-05:00');
+    });
+
+    test('formats an ISO string with timezone offset', () => {
+      const result = formatISO8601('2025-12-09T17:30:00Z', 'America/New_York');
+      expect(result).toBe('2025-12-09T12:30:00-05:00');
+    });
+
+    test('formats with UTC timezone', () => {
+      const result = formatISO8601('2025-12-09T17:30:00Z', 'UTC');
+      expect(result).toBe('2025-12-09T17:30:00+00:00');
+    });
+  });
+
+  describe('getCurrentTimeISO', () => {
+    test('returns a string matching ISO 8601 with offset', () => {
+      const result = getCurrentTimeISO('America/New_York');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+    });
+  });
+
+  describe('createTimeTodayISO', () => {
+    test('returns iso string and date object', () => {
+      const result = createTimeTodayISO(9, 30, 'America/New_York');
+      expect(result).toHaveProperty('iso');
+      expect(result).toHaveProperty('date');
+      expect(result.iso).toMatch(/^\d{4}-\d{2}-\d{2}T09:30:00[+-]\d{2}:\d{2}$/);
+      expect(result.date instanceof Date).toBe(true);
+    });
+
+    test('creates timestamp at the specified hour and minute', () => {
+      const result = createTimeTodayISO(14, 45, 'UTC');
+      expect(result.iso).toMatch(/T14:45:00\+00:00$/);
+    });
+  });
+
+  describe('getTodayDate', () => {
+    test('returns a date string in YYYY-MM-DD format', () => {
+      const result = getTodayDate('America/New_York');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  describe('subtractSecondsISO', () => {
+    test('subtracts seconds from a date', () => {
+      const result = subtractSecondsISO('2025-12-09T12:30:00-05:00', 1800, 'America/New_York');
+      expect(result).toBe('2025-12-09T12:00:00-05:00');
+    });
+
+    test('subtracts across hour boundaries', () => {
+      const result = subtractSecondsISO('2025-12-09T12:00:00-05:00', 3600, 'America/New_York');
+      expect(result).toBe('2025-12-09T11:00:00-05:00');
+    });
+  });
+
+  describe('getWeekAgoDate', () => {
+    test('returns a date string approximately 7 days before today', () => {
+      const result = getWeekAgoDate('UTC');
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // Use UTC-based today to avoid timezone offset issues
+      const todayUTC = new Date().toISOString().slice(0, 10);
+      const todayMs = new Date(todayUTC).getTime();
+      const weekAgoMs = new Date(result).getTime();
+      const diff = Math.round((todayMs - weekAgoMs) / (1000 * 60 * 60 * 24));
+      expect(diff).toBe(7);
+    });
+  });
+
+  describe('formatTimeRange', () => {
+    test('formats a time range with both start and end', () => {
+      const start = '2025-12-09T17:30:00Z';
+      const end = '2025-12-09T19:00:00Z';
+      const result = formatTimeRange(start, end, 'America/New_York');
+      expect(result).toMatch(/12:30 PM/);
+      expect(result).toMatch(/2:00 PM/);
+      expect(result).toContain(' - ');
+    });
+  });
+
+  describe('getStartOfDayTimestamp', () => {
+    test('returns a numeric timestamp', () => {
+      const result = getStartOfDayTimestamp('America/New_York');
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThan(0);
+    });
+
+    test('timestamp corresponds to midnight in the timezone', () => {
+      const result = getStartOfDayTimestamp('UTC');
+      const date = new Date(result);
+      expect(date.getUTCHours()).toBe(0);
+      expect(date.getUTCMinutes()).toBe(0);
+      expect(date.getUTCSeconds()).toBe(0);
+    });
+  });
+
+  describe('formatFullDateTime', () => {
+    test('formats a date/time with full details including timezone', () => {
+      const date = '2025-12-09T17:30:00Z';
+      const result = formatFullDateTime(date, 'America/New_York');
+      expect(result).toMatch(/Tuesday/);
+      expect(result).toMatch(/December/);
+      expect(result).toMatch(/2025/);
+      expect(result).toMatch(/12:30 PM/);
+    });
+
+    test('handles invalid date gracefully', () => {
+      const result = formatFullDateTime('not-a-date', 'America/New_York');
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getTimezoneOffset', () => {
+    test('returns offset string like -05:00 for Eastern winter', () => {
+      const date = '2025-12-09T12:00:00Z';
+      const result = getTimezoneOffset(date, 'America/New_York');
+      expect(result).toBe('-05:00');
+    });
+
+    test('returns +00:00 for UTC', () => {
+      const result = getTimezoneOffset('2025-12-09T12:00:00Z', 'UTC');
+      expect(result).toBe('+00:00');
+    });
+
+    test('works without a date argument (defaults to now)', () => {
+      const result = getTimezoneOffset(undefined, 'UTC');
+      expect(result).toBe('+00:00');
+    });
+  });
+
+  describe('sqlLocalDate', () => {
+    test('returns SQL SUBSTR expression for given column', () => {
+      expect(sqlLocalDate('start_time')).toBe('SUBSTR(start_time, 1, 10)');
+      expect(sqlLocalDate('created_at')).toBe('SUBSTR(created_at, 1, 10)');
     });
   });
 });
