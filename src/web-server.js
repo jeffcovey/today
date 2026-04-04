@@ -195,8 +195,11 @@ function getDiskCachePaths(urlPath) {
   const normalised = path.normalize(safePath);
   const htmlPath = path.join(DISK_CACHE_DIR, normalised + '.html');
   const metaPath = path.join(DISK_CACHE_DIR, normalised + '.meta.json');
-  // Reject any path that escapes the cache directory or equals it (must be a file inside it)
-  if (!htmlPath.startsWith(DISK_CACHE_DIR + path.sep) || htmlPath === DISK_CACHE_DIR) {
+  // Reject any path that escapes the cache directory or equals it (must be a file inside it).
+  // Both derived paths share the same normalised prefix so checking htmlPath is sufficient,
+  // but we verify metaPath as well for defence in depth.
+  const cachePrefix = DISK_CACHE_DIR + path.sep;
+  if (!htmlPath.startsWith(cachePrefix) || !metaPath.startsWith(cachePrefix)) {
     return null;
   }
   return { html: htmlPath, meta: metaPath };
