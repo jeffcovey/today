@@ -3730,6 +3730,10 @@ async function executeTasksQuery(query) {
     } else if (filter === 'done today') {
       sqlWhere.push(`status = 'completed'`);
       sqlWhere.push(`DATE(completed_at) = '${todayStr}'`);
+    } else if (/^done on \d{4}-\d{2}-\d{2}$/.test(filter)) {
+      const doneOnDate = filter.replace('done on ', '').trim();
+      sqlWhere.push(`status = 'completed'`);
+      sqlWhere.push(`DATE(completed_at) = '${doneOnDate}'`);
     } else if (filter.includes('OR') && filter.includes('before tomorrow')) {
       // Handle "(scheduled before tomorrow) OR (due before tomorrow)"
       sqlWhere.push(`(due_date <= '${todayStr}' OR json_extract(metadata, '$.scheduled_date') <= '${todayStr}')`);
