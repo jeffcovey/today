@@ -171,6 +171,76 @@ const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 
+// Disk-based HTML cache (persists across server restarts)
+const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
+
+/**
+ * Returns true when rendered HTML contains content that changes independently
+ * of the source file's mtime (task query results, dataview results).
+ * Such pages are excluded from the persistent disk cache.
+ */
+function containsDynamicContent(html) {
+  return html.includes('tasks-query-result') ||
+    html.includes('dataview-table') ||
+    html.includes('dataview-list');
+}
+
+/**
+ * Resolve and validate disk cache paths for a given URL path.
+ * Returns null when the resolved path would escape DISK_CACHE_DIR (path traversal guard).
+ */
+function getDiskCachePaths(urlPath) {
+  const safePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+  // Normalise to remove any ".." segments before joining with DISK_CACHE_DIR
+  const normalised = path.normalize(safePath);
+  const htmlPath = path.join(DISK_CACHE_DIR, normalised + '.html');
+  const metaPath = path.join(DISK_CACHE_DIR, normalised + '.meta.json');
+  // Reject any path that escapes the cache directory or equals it (must be a file inside it).
+  // Both derived paths share the same normalised prefix so checking htmlPath is sufficient,
+  // but we verify metaPath as well for defence in depth.
+  const cachePrefix = DISK_CACHE_DIR + path.sep;
+  if (!htmlPath.startsWith(cachePrefix) || !metaPath.startsWith(cachePrefix)) {
+    return null;
+  }
+  return { html: htmlPath, meta: metaPath };
+}
+
+async function readFromDiskCache(urlPath, sourceMtime) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return null;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try {
+    const metaRaw = await fs.readFile(metaPath, 'utf-8');
+    const meta = JSON.parse(metaRaw);
+    if (meta.mtime !== sourceMtime) return null; // stale
+    const html = await fs.readFile(htmlPath, 'utf-8');
+    return html;
+  } catch {
+    return null;
+  }
+}
+
+async function writeToDiskCache(urlPath, html, sourceMtime) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try {
+    await fs.mkdir(path.dirname(htmlPath), { recursive: true });
+    await fs.writeFile(htmlPath, html, 'utf-8');
+    await fs.writeFile(metaPath, JSON.stringify({ mtime: sourceMtime, timestamp: Date.now() }), 'utf-8');
+  } catch (err) {
+    debug('Failed to write disk cache:', err.message);
+  }
+}
+
+async function deleteDiskCache(urlPath) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try { await fs.unlink(htmlPath); } catch { /* ignore */ }
+  try { await fs.unlink(metaPath); } catch { /* ignore */ }
+}
+
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -2405,12 +2475,24 @@ async function getCachedRender(filePath, urlPath) {
       }
     }
 
+    // On memory-cache miss, check disk cache before doing a full render
+    const diskHtml = await readFromDiskCache(urlPath, mtime);
+    if (diskHtml) {
+      debug(`[DISK CACHE HIT] ${urlPath}`);
+      const hasDynamicContent = containsDynamicContent(diskHtml);
+      renderCache.set(cacheKey, { html: diskHtml, timestamp: Date.now(), hits: 1, hasDynamicContent });
+      fileStatsCache.set(cacheKey, { mtime, size });
+      return diskHtml;
+    }
+
     // Render and cache the result
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
     const rendered = await renderMarkdownUncached(filePath, urlPath);
     
-    // Store in cache (flag pages with tasks queries for shorter time-based expiry)
-    const hasDynamicContent = rendered.includes('tasks-query-result');
+    // Flag pages with dynamic content (task queries or dataview blocks) — these are
+    // excluded from the disk cache because their content changes independently of
+    // the source file's mtime.
+    const hasDynamicContent = containsDynamicContent(rendered);
     renderCache.set(cacheKey, {
       html: rendered,
       timestamp: Date.now(),
@@ -2422,7 +2504,14 @@ async function getCachedRender(filePath, urlPath) {
       mtime: mtime,
       size: size
     });
-    
+
+    // Persist to disk cache for non-dynamic files (survives server restarts)
+    if (!hasDynamicContent) {
+      writeToDiskCache(urlPath, rendered, mtime).catch(err => {
+        debug('Disk cache write error:', err.message);
+      });
+    }
+
     // Cleanup old entries periodically
     if (Math.random() < 0.1) { // 10% chance to cleanup
       cleanupCache();
@@ -5218,15 +5307,89 @@ app.get('/_cache/status', sessionAuth, (req, res) => {
 });
 
 // Clear cache endpoint
-app.post('/_cache/clear', sessionAuth, (req, res) => {
+app.post('/_cache/clear', sessionAuth, async (req, res) => {
   const previousSize = renderCache.size;
   renderCache.clear();
   fileStatsCache.clear();
-  
+
+  // Also clear disk cache directory (await so response reflects completed state)
+  try {
+    await fs.rm(DISK_CACHE_DIR, { recursive: true, force: true });
+  } catch (err) {
+    debug('Failed to clear disk cache dir:', err.message);
+  }
+
   res.json({
     success: true,
     message: `Cache cleared. Removed ${previousSize} entries.`
   });
+});
+
+// Warm cache endpoint — walks the vault and pre-renders all stale static markdown files.
+// Restricted to localhost so no session auth is required (safe for cron jobs).
+let cacheWarmInProgress = false;
+app.post('/_cache/warm', async (req, res) => {
+  // Use the raw socket address (not req.ip) to bypass trust-proxy header spoofing.
+  // This endpoint must only be reachable from the local machine.
+  const ip = req.socket?.remoteAddress || '';
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (!isLocal) {
+    return res.status(403).json({ error: 'Forbidden - localhost only' });
+  }
+
+  if (cacheWarmInProgress) {
+    return res.json({ success: true, message: 'Cache warm already in progress, skipping' });
+  }
+
+  // Run asynchronously so the response returns immediately
+  res.json({ success: true, message: 'Cache warm started in background' });
+  cacheWarmInProgress = true;
+
+  (async () => {
+    let checked = 0, rendered = 0, skipped = 0, errors = 0;
+    const startTime = Date.now();
+
+    async function walkVault(dir) {
+      let entries;
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue;
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walkVault(fullPath);
+        } else if (entry.name.endsWith('.md')) {
+          checked++;
+          try {
+            const stats = await fs.stat(fullPath);
+            const mtime = stats.mtime.getTime();
+            const urlPath = '/' + path.relative(VAULT_PATH, fullPath);
+
+            const diskHtml = await readFromDiskCache(urlPath, mtime);
+            if (diskHtml) {
+              skipped++;
+              continue; // disk cache is fresh — nothing to do
+            }
+
+            // Render and save to disk cache (getCachedRender handles the write)
+            await getCachedRender(fullPath, urlPath);
+            rendered++;
+          } catch (err) {
+            debug(`[WARM] Error processing ${fullPath}:`, err.message);
+            errors++;
+          }
+        }
+      }
+    }
+
+    await walkVault(VAULT_PATH);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[/_cache/warm] Done: checked=${checked} rendered=${rendered} skipped=${skipped} errors=${errors} time=${elapsed}s`);
+  })().catch(err => console.error('[/_cache/warm] Unexpected error:', err.message))
+    .finally(() => { cacheWarmInProgress = false; });
 });
 
 // ── Git helpers ──────────────────────────────────────────────────────────────
