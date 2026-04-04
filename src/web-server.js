@@ -174,17 +174,27 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 // Disk-based HTML cache (persists across server restarts)
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
 
+/**
+ * Resolve and validate disk cache paths for a given URL path.
+ * Returns null when the resolved path would escape DISK_CACHE_DIR (path traversal guard).
+ */
 function getDiskCachePaths(urlPath) {
-  // Map a URL path like /diary/2024-01-01.md to cache files under DISK_CACHE_DIR
   const safePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
-  return {
-    html: path.join(DISK_CACHE_DIR, safePath + '.html'),
-    meta: path.join(DISK_CACHE_DIR, safePath + '.meta.json')
-  };
+  // Normalise to remove any ".." segments before joining with DISK_CACHE_DIR
+  const normalised = path.normalize(safePath);
+  const htmlPath = path.join(DISK_CACHE_DIR, normalised + '.html');
+  const metaPath = path.join(DISK_CACHE_DIR, normalised + '.meta.json');
+  // Reject any path that escapes the cache directory
+  if (!htmlPath.startsWith(DISK_CACHE_DIR + path.sep) && htmlPath !== DISK_CACHE_DIR) {
+    return null;
+  }
+  return { html: htmlPath, meta: metaPath };
 }
 
 async function readFromDiskCache(urlPath, sourceMtime) {
-  const { html: htmlPath, meta: metaPath } = getDiskCachePaths(urlPath);
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return null;
+  const { html: htmlPath, meta: metaPath } = paths;
   try {
     const metaRaw = await fs.readFile(metaPath, 'utf-8');
     const meta = JSON.parse(metaRaw);
@@ -197,7 +207,9 @@ async function readFromDiskCache(urlPath, sourceMtime) {
 }
 
 async function writeToDiskCache(urlPath, html, sourceMtime) {
-  const { html: htmlPath, meta: metaPath } = getDiskCachePaths(urlPath);
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
   try {
     await fs.mkdir(path.dirname(htmlPath), { recursive: true });
     await fs.writeFile(htmlPath, html, 'utf-8');
@@ -208,7 +220,9 @@ async function writeToDiskCache(urlPath, html, sourceMtime) {
 }
 
 async function deleteDiskCache(urlPath) {
-  const { html: htmlPath, meta: metaPath } = getDiskCachePaths(urlPath);
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
   try { await fs.unlink(htmlPath); } catch { /* ignore */ }
   try { await fs.unlink(metaPath); } catch { /* ignore */ }
 }
@@ -2451,7 +2465,9 @@ async function getCachedRender(filePath, urlPath) {
     const diskHtml = await readFromDiskCache(urlPath, mtime);
     if (diskHtml) {
       debug(`[DISK CACHE HIT] ${urlPath}`);
-      const hasDynamicContent = diskHtml.includes('tasks-query-result');
+      const hasDynamicContent = diskHtml.includes('tasks-query-result') ||
+        diskHtml.includes('dataview-table') ||
+        diskHtml.includes('dataview-list');
       renderCache.set(cacheKey, { html: diskHtml, timestamp: Date.now(), hits: 1, hasDynamicContent });
       fileStatsCache.set(cacheKey, { mtime, size });
       return diskHtml;
@@ -2461,8 +2477,12 @@ async function getCachedRender(filePath, urlPath) {
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
     const rendered = await renderMarkdownUncached(filePath, urlPath);
     
-    // Store in cache (flag pages with tasks queries for shorter time-based expiry)
-    const hasDynamicContent = rendered.includes('tasks-query-result');
+    // Flag pages with dynamic content (task queries or dataview blocks) — these are
+    // excluded from the disk cache because their content changes independently of
+    // the source file's mtime.
+    const hasDynamicContent = rendered.includes('tasks-query-result') ||
+      rendered.includes('dataview-table') ||
+      rendered.includes('dataview-list');
     renderCache.set(cacheKey, {
       html: rendered,
       timestamp: Date.now(),
@@ -5277,15 +5297,18 @@ app.get('/_cache/status', sessionAuth, (req, res) => {
 });
 
 // Clear cache endpoint
-app.post('/_cache/clear', sessionAuth, (req, res) => {
+app.post('/_cache/clear', sessionAuth, async (req, res) => {
   const previousSize = renderCache.size;
   renderCache.clear();
   fileStatsCache.clear();
 
-  // Also clear disk cache directory
-  fs.rm(DISK_CACHE_DIR, { recursive: true, force: true })
-    .catch(err => debug('Failed to clear disk cache dir:', err.message));
-  
+  // Also clear disk cache directory (await so response reflects completed state)
+  try {
+    await fs.rm(DISK_CACHE_DIR, { recursive: true, force: true });
+  } catch (err) {
+    debug('Failed to clear disk cache dir:', err.message);
+  }
+
   res.json({
     success: true,
     message: `Cache cleared. Removed ${previousSize} entries.`
@@ -5294,6 +5317,7 @@ app.post('/_cache/clear', sessionAuth, (req, res) => {
 
 // Warm cache endpoint — walks the vault and pre-renders all stale static markdown files.
 // Restricted to localhost so no session auth is required (safe for cron jobs).
+let cacheWarmInProgress = false;
 app.post('/_cache/warm', async (req, res) => {
   const ip = req.ip || req.socket?.remoteAddress || '';
   const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
@@ -5301,8 +5325,13 @@ app.post('/_cache/warm', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden - localhost only' });
   }
 
+  if (cacheWarmInProgress) {
+    return res.json({ success: true, message: 'Cache warm already in progress, skipping' });
+  }
+
   // Run asynchronously so the response returns immediately
   res.json({ success: true, message: 'Cache warm started in background' });
+  cacheWarmInProgress = true;
 
   (async () => {
     let checked = 0, rendered = 0, skipped = 0, errors = 0;
@@ -5347,7 +5376,8 @@ app.post('/_cache/warm', async (req, res) => {
     await walkVault(VAULT_PATH);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[/_cache/warm] Done: checked=${checked} rendered=${rendered} skipped=${skipped} errors=${errors} time=${elapsed}s`);
-  })().catch(err => console.error('[/_cache/warm] Unexpected error:', err.message));
+  })().catch(err => console.error('[/_cache/warm] Unexpected error:', err.message))
+    .finally(() => { cacheWarmInProgress = false; });
 });
 
 // ── Git helpers ──────────────────────────────────────────────────────────────

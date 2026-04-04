@@ -43,4 +43,7 @@ async function main() {
   console.log('[prerender] The server will log progress as it renders files in the background.');
 }
 
-main();
+main().catch(err => {
+  console.error('[prerender] Unexpected error:', err.message);
+  process.exit(1);
+});
