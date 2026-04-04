@@ -175,6 +175,17 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
 
 /**
+ * Returns true when rendered HTML contains content that changes independently
+ * of the source file's mtime (task query results, dataview results).
+ * Such pages are excluded from the persistent disk cache.
+ */
+function containsDynamicContent(html) {
+  return html.includes('tasks-query-result') ||
+    html.includes('dataview-table') ||
+    html.includes('dataview-list');
+}
+
+/**
  * Resolve and validate disk cache paths for a given URL path.
  * Returns null when the resolved path would escape DISK_CACHE_DIR (path traversal guard).
  */
@@ -184,8 +195,8 @@ function getDiskCachePaths(urlPath) {
   const normalised = path.normalize(safePath);
   const htmlPath = path.join(DISK_CACHE_DIR, normalised + '.html');
   const metaPath = path.join(DISK_CACHE_DIR, normalised + '.meta.json');
-  // Reject any path that escapes the cache directory
-  if (!htmlPath.startsWith(DISK_CACHE_DIR + path.sep) && htmlPath !== DISK_CACHE_DIR) {
+  // Reject any path that escapes the cache directory or equals it (must be a file inside it)
+  if (!htmlPath.startsWith(DISK_CACHE_DIR + path.sep) || htmlPath === DISK_CACHE_DIR) {
     return null;
   }
   return { html: htmlPath, meta: metaPath };
@@ -2465,9 +2476,7 @@ async function getCachedRender(filePath, urlPath) {
     const diskHtml = await readFromDiskCache(urlPath, mtime);
     if (diskHtml) {
       debug(`[DISK CACHE HIT] ${urlPath}`);
-      const hasDynamicContent = diskHtml.includes('tasks-query-result') ||
-        diskHtml.includes('dataview-table') ||
-        diskHtml.includes('dataview-list');
+      const hasDynamicContent = containsDynamicContent(diskHtml);
       renderCache.set(cacheKey, { html: diskHtml, timestamp: Date.now(), hits: 1, hasDynamicContent });
       fileStatsCache.set(cacheKey, { mtime, size });
       return diskHtml;
@@ -2480,9 +2489,7 @@ async function getCachedRender(filePath, urlPath) {
     // Flag pages with dynamic content (task queries or dataview blocks) — these are
     // excluded from the disk cache because their content changes independently of
     // the source file's mtime.
-    const hasDynamicContent = rendered.includes('tasks-query-result') ||
-      rendered.includes('dataview-table') ||
-      rendered.includes('dataview-list');
+    const hasDynamicContent = containsDynamicContent(rendered);
     renderCache.set(cacheKey, {
       html: rendered,
       timestamp: Date.now(),
@@ -5319,7 +5326,9 @@ app.post('/_cache/clear', sessionAuth, async (req, res) => {
 // Restricted to localhost so no session auth is required (safe for cron jobs).
 let cacheWarmInProgress = false;
 app.post('/_cache/warm', async (req, res) => {
-  const ip = req.ip || req.socket?.remoteAddress || '';
+  // Use the raw socket address (not req.ip) to bypass trust-proxy header spoofing.
+  // This endpoint must only be reachable from the local machine.
+  const ip = req.socket?.remoteAddress || '';
   const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   if (!isLocal) {
     return res.status(403).json({ error: 'Forbidden - localhost only' });
