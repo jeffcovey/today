@@ -1,0 +1,43 @@
+# Vault Snapshot Plugin
+# Creates Time Machine-style incremental backups of the vault using rsync
+
+name = "vault-snapshot"
+displayName = "Vault Snapshot"
+description = "Create incremental Time Machine-style backups of the vault using rsync"
+type = "utility"
+
+
+longDescription = """
+Creates incremental backups of the vault directory using rsync with hard links,
+similar to macOS Time Machine.
+
+Each snapshot is stored in a timestamped subdirectory under `snapshot_dir`. Hard
+links (`--link-dest`) are used so unchanged files share storage with the previous
+snapshot, keeping disk usage minimal. A `latest` symlink always points to the most
+recent snapshot.
+
+Old snapshots are automatically pruned so only the most recent `keep` snapshots
+are retained.
+
+## Usage
+
+Run manually:
+
+```
+bin/plugins sync vault-snapshot
+```
+
+Or configure it to run automatically alongside your other plugins.
+
+## Requirements
+
+`rsync` must be installed and available on `PATH`.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+snapshot_dir = { type = "string", default = "~/vault-snapshots", description = "Directory where snapshots are stored" }
+keep = { type = "number", default = 30, description = "Number of snapshots to retain" }
+vault_directory = { type = "string", default = "vault", description = "Vault subdirectory (relative to project root) to snapshot" }
