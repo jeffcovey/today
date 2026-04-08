@@ -7325,8 +7325,10 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     let rawStartDate = null;
     let rawTags = [];
 
-    // If not in database, try to parse from file (for inline markdown tasks)
-    if (!task && taskId.startsWith('markdown-tasks/local:')) {
+    // For markdown tasks, always parse the raw line from the file so the edit form
+    // reflects the current on-disk state (dates/tags may have been edited since the
+    // last database sync).
+    if (taskId.startsWith('markdown-tasks/local:')) {
       // Parse task ID format: markdown-tasks/local:vault/path/file.md:lineNumber
       const match = taskId.match(/^markdown-tasks\/local:(.+):(\d+)$/);
       if (match) {
@@ -7340,27 +7342,7 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
           const taskLine = lines[lineNumber - 1];
 
           if (taskLine && /^\s*- \[[ xX-]\]/.test(taskLine)) {
-            // Extract task text (remove checkbox and metadata)
-            let title = taskLine
-              .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
-              .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
-              .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
-              .replace(/🔁\s+\S+(?:\s+\S+)*/g, '')  // Remove recurrence
-              .replace(/#[\w/-]+/g, '')            // Remove tags
-              .trim();
-
-            // Check completion status
-            const isCompleted = /^\s*- \[[xX]\]/.test(taskLine);
-
-            // Extract priority
-            let priority = null;
-            if (taskLine.includes('🔺')) priority = 'highest';
-            else if (taskLine.includes('⏫')) priority = 'high';
-            else if (taskLine.includes('🔼')) priority = 'medium';
-            else if (taskLine.includes('🔽')) priority = 'low';
-            else if (taskLine.includes('⏬')) priority = 'lowest';
-
-            // Extract dates
+            // Extract dates (always needed so the edit form shows current values)
             const dueDateMatch = taskLine.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
             const scheduledDateMatch = taskLine.match(/⏳\s*(\d{4}-\d{2}-\d{2})/);
             const startDateMatch = taskLine.match(/🛫\s*(\d{4}-\d{2}-\d{2})/);
@@ -7372,20 +7354,43 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
             const tagMatches = taskLine.match(/#[\w/-]+/g);
             rawTags = tagMatches || [];
 
-            // Build task object from file
-            task = {
-              id: taskId,
-              title: title || '(empty task)',
-              status: isCompleted ? 'done' : 'open',
-              priority,
-              source: 'markdown-tasks/local',
-              description: null,
-              due_date: rawDueDate,
-              created_at: null,
-              updated_at: null,
-              completed_at: null,
-              metadata: JSON.stringify({ filePath, lineNumber, fromFile: true })
-            };
+            // If not in database, build a full task object from the file
+            if (!task) {
+              // Extract task text (remove checkbox and metadata)
+              let title = taskLine
+                .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
+                .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
+                .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
+                .replace(/🔁\s+\S+(?:\s+\S+)*/g, '')  // Remove recurrence
+                .replace(/#[\w/-]+/g, '')            // Remove tags
+                .trim();
+
+              // Check completion status
+              const isCompleted = /^\s*- \[[xX]\]/.test(taskLine);
+
+              // Extract priority
+              let priority = null;
+              if (taskLine.includes('🔺')) priority = 'highest';
+              else if (taskLine.includes('⏫')) priority = 'high';
+              else if (taskLine.includes('🔼')) priority = 'medium';
+              else if (taskLine.includes('🔽')) priority = 'low';
+              else if (taskLine.includes('⏬')) priority = 'lowest';
+
+              // Build task object from file
+              task = {
+                id: taskId,
+                title: title || '(empty task)',
+                status: isCompleted ? 'done' : 'open',
+                priority,
+                source: 'markdown-tasks/local',
+                description: null,
+                due_date: rawDueDate,
+                created_at: null,
+                updated_at: null,
+                completed_at: null,
+                metadata: JSON.stringify({ filePath, lineNumber, fromFile: true })
+              };
+            }
           }
         } catch (fileError) {
           // File doesn't exist or can't be read

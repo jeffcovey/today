@@ -532,3 +532,87 @@ describe('Task Edit API', () => {
     });
   });
 });
+
+describe('Task Detail Page - Date Display', () => {
+  // Task ID for the fixture task (format: markdown-tasks/local:vault/relpath:lineNumber)
+  const TASK_ID = `markdown-tasks/local:vault/${TEST_FILE}:${TEST_LINE}`;
+
+  beforeEach(async () => {
+    await resetFixture();
+  });
+
+  test('should show updated due date in edit form after saving', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    // Edit the task to set a new due date
+    const editResp = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: TEST_LINE,
+        title: 'Test task for toggle testing',
+        dueDate: '2099-11-30',
+        completed: false
+      })
+    });
+    expect(editResp.ok).toBe(true);
+
+    // Fetch the task detail page and verify it shows the new due date
+    const detailResp = await fetchWithAuth(`${BASE_URL}/task/${encodeURIComponent(TASK_ID)}`);
+    expect(detailResp.ok).toBe(true);
+    const html = await detailResp.text();
+    expect(html).toContain('2099-11-30');
+  });
+
+  test('should show updated scheduled date in edit form after saving', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    // Edit the task to set a new scheduled date
+    const editResp = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: TEST_LINE,
+        title: 'Test task for toggle testing',
+        scheduledDate: '2099-10-15',
+        completed: false
+      })
+    });
+    expect(editResp.ok).toBe(true);
+
+    // Fetch the task detail page and verify it shows the new scheduled date
+    const detailResp = await fetchWithAuth(`${BASE_URL}/task/${encodeURIComponent(TASK_ID)}`);
+    expect(detailResp.ok).toBe(true);
+    const html = await detailResp.text();
+    expect(html).toContain('2099-10-15');
+  });
+
+  test('should show updated start date in edit form after saving', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    // Edit the task to set a new start date
+    const editResp = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: TEST_LINE,
+        title: 'Test task for toggle testing',
+        startDate: '2099-09-01',
+        completed: false
+      })
+    });
+    expect(editResp.ok).toBe(true);
+
+    // Fetch the task detail page and verify it shows the new start date
+    const detailResp = await fetchWithAuth(`${BASE_URL}/task/${encodeURIComponent(TASK_ID)}`);
+    expect(detailResp.ok).toBe(true);
+    const html = await detailResp.text();
+    expect(html).toContain('2099-09-01');
+  });
+});
