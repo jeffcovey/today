@@ -469,9 +469,8 @@ async function syncFolder(folderPath, isIncremental, lastState) {
 }
 
 async function main() {
+  const isIncremental = !!lastSyncTime;
   try {
-    // Check for incremental sync
-    const isIncremental = !!lastSyncTime;
     if (isIncremental) {
       previousFolderState = getFolderState(sourceId);
       metadata.incremental = true;
