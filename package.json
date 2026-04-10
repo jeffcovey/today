@@ -57,6 +57,7 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "ollama-ai-provider-v2": "^3.5.0",
+    "pdf-lib": "^1.17.1",
     "picocolors": "^1.1.1",
     "puppeteer": "^24.40.0",
     "react": "^19.2.3",
