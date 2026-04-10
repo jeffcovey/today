@@ -624,6 +624,12 @@ async function getTodayTaskTimerItems() {
     ? tasks.filter(task => !excludeFiles.some(f => task.id.includes(vaultPrefix + f)))
     : tasks;
 
+  // Filter out habits with excluded habit IDs
+  const excludeHabits = getConfig('task_timer.exclude_habits') || [];
+  const filteredHabits = excludeHabits.length > 0
+    ? habits.filter(habit => !excludeHabits.includes(habit.habit_id))
+    : habits;
+
   const items = [];
 
   // Add tasks with completion capability
@@ -658,7 +664,7 @@ async function getTodayTaskTimerItems() {
   }
 
   // Add habits with completion capability
-  for (const habit of habits) {
+  for (const habit of filteredHabits) {
     items.push({
       id: `habit-${habit.habit_id}`,
       type: 'habit',
