@@ -693,13 +693,21 @@ async function getTodayTaskTimerItems() {
     });
   }
 
+  // Deduplicate items by ID (e.g., habits with same habit_id from multiple sources)
+  const seenItemIds = new Set();
+  const dedupedItems = items.filter(item => {
+    if (seenItemIds.has(item.id)) return false;
+    seenItemIds.add(item.id);
+    return true;
+  });
+
   // Shuffle the items
-  for (let i = items.length - 1; i > 0; i--) {
+  for (let i = dedupedItems.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
+    [dedupedItems[i], dedupedItems[j]] = [dedupedItems[j], dedupedItems[i]];
   }
 
-  return items;
+  return dedupedItems;
 }
 
 // Get current task timer state
@@ -787,7 +795,15 @@ function advanceTimerIfNeeded() {
   if (taskTimerState.phase === 'rest' && now - new Date(taskTimerState.startTime).getTime() >= restMs) {
     // Rest expired → advance to next item
     if (!applySyncedItems()) {
+      // Advance past any items already seen (defensive: prevents repeats if the list has
+      // items whose IDs are already in seenIds, e.g. duplicate entries from multiple sources)
       taskTimerState.currentIndex++;
+      while (
+        taskTimerState.currentIndex < taskTimerState.items.length &&
+        taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id)
+      ) {
+        taskTimerState.currentIndex++;
+      }
     }
 
     if (taskTimerState.currentIndex >= taskTimerState.items.length) {
@@ -7257,7 +7273,15 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
 
     // Use synced items if background sync completed, otherwise advance in current list
     if (!applySyncedItems()) {
+      // Advance past any items already seen (defensive: prevents repeats if the list has
+      // items whose IDs are already in seenIds, e.g. duplicate entries from multiple sources)
       taskTimerState.currentIndex++;
+      while (
+        taskTimerState.currentIndex < taskTimerState.items.length &&
+        taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id)
+      ) {
+        taskTimerState.currentIndex++;
+      }
     }
 
     // If we've exhausted the list, re-fetch from DB (filtering out seen items)
