@@ -825,18 +825,8 @@ function advanceTimerIfNeeded() {
   }
 }
 
-function getTaskTimerWidget(items) {
+async function getTaskTimerWidget() {
   advanceTimerIfNeeded();
-
-  if (!items || items.length === 0) {
-    return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          No tasks, habits, or project reviews due today.
-        </div>
-      </div>`;
-  }
 
   if (taskTimerState.isRunning && taskTimerState.currentItem) {
     const item = taskTimerState.currentItem;
@@ -932,6 +922,17 @@ function getTaskTimerWidget(items) {
         </div>
       </div>`;
   } else {
+    // Timer is not running — fetch items only now (avoids DB queries on every page load when running)
+    const items = await getTodayTaskTimerItems();
+    if (!items || items.length === 0) {
+      return `
+      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+        <i class="fas fa-tasks me-2"></i>
+        <div class="flex-grow-1">
+          No tasks, habits, or project reviews due today.
+        </div>
+      </div>`;
+    }
     return `
       <div class="alert alert-primary d-flex align-items-center mb-3" role="alert">
         <i class="fas fa-tasks me-2"></i>
@@ -1732,15 +1733,13 @@ Contents:
   });
 
   // Inject timer widgets
-  const taskTimerItems = await getTodayTaskTimerItems();
-
   const widgetsHtml = `
     <div class="row g-3 mb-3">
       <div class="col-12 col-lg-6">
         ${getTimerWidget(currentTimer)}
       </div>
       <div class="col-12 col-lg-6">
-        ${getTaskTimerWidget(taskTimerItems)}
+        ${await getTaskTimerWidget()}
       </div>
     </div>`;
 
@@ -5285,7 +5284,6 @@ async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-  const taskTimerItems = await getTodayTaskTimerItems();
 
   const widgetsHtml = `
     <div class="row g-3 mb-3">
@@ -5293,7 +5291,7 @@ async function renderMarkdown(filePath, urlPath) {
         ${getTimerWidget(currentTimer)}
       </div>
       <div class="col-12 col-lg-6">
-        ${getTaskTimerWidget(taskTimerItems)}
+        ${await getTaskTimerWidget()}
       </div>
     </div>`;
 
@@ -7666,7 +7664,6 @@ app.get('/*path', authMiddleware, async (req, res) => {
           : await getCachedRender(fullPath, urlPath);
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-        const taskTimerItems = await getTodayTaskTimerItems();
 
         const widgetsHtml = `
           <div class="row g-3 mb-3">
@@ -7674,7 +7671,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
               ${getTimerWidget(currentTimer)}
             </div>
             <div class="col-12 col-lg-6">
-              ${getTaskTimerWidget(taskTimerItems)}
+              ${await getTaskTimerWidget()}
             </div>
           </div>`;
 
