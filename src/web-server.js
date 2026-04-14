@@ -21,7 +21,7 @@ import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
-import { isPluginConfigured, getEnabledPlugins, syncPluginSource } from './plugin-loader.js';
+import { isPluginConfigured } from './plugin-loader.js';
 import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
@@ -522,13 +522,7 @@ function getTimerWidget(timer) {
 
 // Get configured timezone
 function getConfiguredTimezone() {
-  try {
-    const { execSync } = require('child_process');
-    const result = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
-    return result || 'America/New_York';
-  } catch {
-    return 'America/New_York';
-  }
+  return getConfig('timezone') || 'America/New_York';
 }
 
 // Helper function to get current time tracking timer info
@@ -753,27 +747,18 @@ function triggerTaskTimerSync() {
   // Guard against concurrent syncs
   if (taskTimerSyncInProgress) return;
   taskTimerSyncInProgress = true;
-  // Intentionally not awaited — runs in background
+  // Intentionally not awaited — runs in background.
+  // Re-running all plugin syncs here would execute external scripts and then call
+  // insertEntries() synchronously via better-sqlite3, blocking the Node.js event
+  // loop for every plugin source and making the web server unresponsive during
+  // those windows.  Instead, we just re-query the already-up-to-date database
+  // (kept fresh by the vault-watcher) so we can surface any newly-added or
+  // newly-completed items without the blocking overhead.
   (async () => {
     try {
-      const db = getDatabase();
-      const vaultPath = getAbsoluteVaultPath();
-      const context = { db, vaultPath };
-      const enabledPlugins = await getEnabledPlugins();
-      const targetTypes = new Set(['tasks', 'habits', 'projects']);
-
-      for (const { plugin, sources } of enabledPlugins) {
-        if (!plugin.commands?.read || !targetTypes.has(plugin.type)) continue;
-        for (const { sourceName, config } of sources) {
-          if (!taskTimerSyncInProgress) return; // cancelled
-          await syncPluginSource(plugin, sourceName, config, context, { _caller: 'task-timer' });
-        }
-      }
-      if (taskTimerSyncInProgress) {
-        taskTimerSyncedItems = await getTodayTaskTimerItems();
-      }
+      taskTimerSyncedItems = await getTodayTaskTimerItems();
     } catch (e) {
-      // Sync failed or was cancelled, keep current items
+      // Sync failed, keep current items
     } finally {
       taskTimerSyncInProgress = false;
     }
