@@ -1,20 +1,14 @@
 name: Security Audit
 
 on:
-  pull_request:
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-  push:
-    branches:
-      - main
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
   schedule:
     # Run weekly on Monday at 9am UTC to catch new vulnerabilities
     - cron: '0 9 * * 1'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   audit:
@@ -33,10 +27,8 @@ jobs:
         run: npm ci
 
       - name: Run security audit
+        id: audit
         run: |
-          echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
-
-          # Run audit and capture output
           set +e
           audit_output=$(npm audit --audit-level=high 2>&1)
           audit_exit=$?
@@ -44,36 +36,31 @@ jobs:
 
           echo "$audit_output"
 
-          if [ $audit_exit -eq 0 ]; then
-            echo "✅ No high or critical vulnerabilities found" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### Vulnerabilities Found" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$audit_output" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-
-            # Check if all vulnerabilities are in known acceptable packages
-            # (build-time only dependencies like node-gyp/tar in sqlite3)
-            # These packages are ONLY used during npm install to compile native modules
-            known_build_deps="tar|cacache|make-fetch-happen|node-gyp|sqlite3"
-
-            # Extract package paths from audit output (lines starting with node_modules/)
-            vuln_packages=$(echo "$audit_output" | grep -E "^\s+node_modules/" | sed 's/^[[:space:]]*//' || true)
-
-            # Check if any vulnerable package is NOT in our known build-time deps
-            unknown_vulns=$(echo "$vuln_packages" | grep -vE "node_modules/($known_build_deps)" || true)
-
-            if [ -z "$unknown_vulns" ] && echo "$audit_output" | grep -q "node_modules/sqlite3"; then
-              echo "⚠️ Vulnerabilities are in build-time dependencies only (sqlite3/node-gyp/tar)" >> $GITHUB_STEP_SUMMARY
-              echo "These don't affect runtime security. See: https://github.com/npm/cli/issues/5234" >> $GITHUB_STEP_SUMMARY
-              exit 0
+          {
+            echo "## Security Audit Results"
+            if [ $audit_exit -eq 0 ]; then
+              echo "No high or critical vulnerabilities found"
+            else
+              echo "### Vulnerabilities Found"
+              echo '```'
+              echo "$audit_output"
+              echo '```'
             fi
+          } >> $GITHUB_STEP_SUMMARY
 
-            exit 1
-          fi
+          exit $audit_exit
 
-      - name: Check for new advisories
-        if: github.event_name == 'schedule'
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # On scheduled runs, create an issue if new vulnerabilities are found
-          echo "Scheduled audit completed - check workflow summary for details"
+          title="Security audit found high/critical vulnerabilities"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already open, skipping"
+            exit 0
+          fi
+          gh issue create \
+            --title "$title" \
+            --body "The \`Security Audit\` workflow found high or critical vulnerabilities. See the [workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for the audit output. Run \`npm audit\` locally to reproduce."

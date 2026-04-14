@@ -28,6 +28,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^6.0.146",
     "better-sqlite3": "^12.8.0",
+    "better-sqlite3-session-store": "^0.1.0",
     "blessed": "^0.1.81",
     "canvas": "^3.2.3",
     "chart.js": "^4.5.1",
@@ -35,7 +36,6 @@
     "chokidar": "^5.0.0",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.2",
-    "connect-sqlite3": "^0.9.16",
     "countries-and-timezones": "^3.8.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.0",
@@ -62,7 +62,6 @@
     "puppeteer": "^24.40.0",
     "react": "^19.2.3",
     "smol-toml": "^1.6.1",
-    "sqlite3": "^6.0.1",
     "tsdav": "^2.1.8",
     "zod": "^4.2.1"
   },

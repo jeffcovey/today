@@ -2,7 +2,8 @@
 
 import express from 'express';
 import session from 'express-session';
-import connectSqlite3 from 'connect-sqlite3';
+import Database from 'better-sqlite3';
+import betterSqliteSessionStore from 'better-sqlite3-session-store';
 import path from 'path';
 import crypto from "crypto";
 import { exec, execSync, execFileSync } from 'child_process';
@@ -246,15 +247,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Set up SQLite session store
-const SQLiteStore = connectSqlite3(session);
+const SQLiteStore = betterSqliteSessionStore(session);
+const sessionDb = new Database(path.join(__dirname, '..', '.data', 'sessions.db'));
 
 // Session middleware - must come before auth
 app.use(session({
   store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: path.join(__dirname, '..', '.data'),
-    table: 'sessions',
-    concurrentDB: true
+    client: sessionDb,
+    expired: {
+      clear: true,
+      intervalMs: 15 * 60 * 1000
+    }
   }),
   secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"),
   resave: false,
