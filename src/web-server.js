@@ -249,6 +249,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Set up SQLite session store
 const SQLiteStore = betterSqliteSessionStore(session);
 const sessionDb = new Database(path.join(__dirname, '..', '.data', 'sessions.db'));
+// Drop any legacy `sessions` table left over from connect-sqlite3, whose
+// schema used an `expired` column instead of `expire`. Safe to drop — it
+// just forces a one-time re-login after the upgrade.
+{
+  const legacy = sessionDb
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+    .get();
+  if (legacy) {
+    const hasExpire = sessionDb
+      .prepare("PRAGMA table_info(sessions)")
+      .all()
+      .some(col => col.name === 'expire');
+    if (!hasExpire) sessionDb.exec('DROP TABLE sessions');
+  }
+}
 
 // Session middleware - must come before auth
 app.use(session({
