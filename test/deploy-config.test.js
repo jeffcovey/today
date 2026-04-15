@@ -39,7 +39,8 @@ describe('deploy/config', () => {
         scheduler: config.scheduler === true,
         'vault-web': config['vault-web'] === true,
         'inbox-api': config['inbox-api'] === true,
-        'resilio-sync': config['resilio-sync'] === true
+        'resilio-sync': config['resilio-sync'] === true,
+        'git-sync.timer': config['git-sync.timer'] === true
       };
     }
 

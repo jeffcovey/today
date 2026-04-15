@@ -11,7 +11,8 @@ const SERVICES = [
   'vault-watcher',
   'vault-web',
   'inbox-api',
-  'resilio-sync'
+  'resilio-sync',
+  'git-sync.timer'
 ];
 
 export async function servicesCommand(server, args = []) {

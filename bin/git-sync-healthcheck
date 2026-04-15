@@ -1,0 +1,86 @@
+#!/bin/bash
+# Vault git-sync health check.
+#
+# Verifies the git-sync.timer is firing successfully. If the last run failed,
+# or the last successful run was too long ago, surfaces a conflict/failure
+# marker in the vault so it's visible during normal use.
+#
+# Intended to run every 5 minutes via the Today scheduler.
+
+set -o pipefail
+
+UNIT=git-sync.service
+TIMER=git-sync.timer
+VAULT=/opt/today/vault
+MARKER="$VAULT/.sync-status.md"
+MAX_STALE_SECONDS=600  # 10 minutes — alert if no successful run in this window
+
+# Only check if the timer is enabled
+if ! systemctl is-enabled --quiet "$TIMER" 2>/dev/null; then
+  exit 0
+fi
+
+# Look at the last run result
+last_result=$(systemctl show "$UNIT" --property=Result --value 2>/dev/null)
+last_exit_status=$(systemctl show "$UNIT" --property=ExecMainStatus --value 2>/dev/null)
+last_exit_ts=$(systemctl show "$UNIT" --property=ExecMainExitTimestampMonotonic --value 2>/dev/null)
+
+# Compute seconds since last exit (monotonic clock)
+now_mono=$(awk '{print int($1 * 1000000)}' /proc/uptime)
+if [ -n "$last_exit_ts" ] && [ "$last_exit_ts" -gt 0 ] 2>/dev/null; then
+  elapsed=$(( (now_mono - last_exit_ts) / 1000000 ))
+else
+  elapsed=-1
+fi
+
+write_marker() {
+  local status="$1"
+  local detail="$2"
+  cat > "$MARKER" << EOF
+---
+tags: [sync, alert]
+updated: $(date -Iseconds)
+---
+# ⚠ Vault sync alert
+
+**Status:** $status
+**Last run result:** $last_result (exit $last_exit_status)
+**Last run:** ${elapsed}s ago
+**Detail:** $detail
+
+Investigate with:
+\`\`\`
+systemctl status $UNIT
+journalctl -u $UNIT --since '1 hour ago'
+tail -50 /var/log/git-sync.log
+\`\`\`
+
+Resolve conflicts on the peer where they were introduced, then delete this file.
+EOF
+}
+
+clear_marker() {
+  [ -f "$MARKER" ] && rm -f "$MARKER"
+}
+
+# Decide status
+if [ "$last_result" = "success" ] && [ "$last_exit_status" = "0" ]; then
+  if [ "$elapsed" -ge 0 ] && [ "$elapsed" -gt "$MAX_STALE_SECONDS" ]; then
+    write_marker "STALE" "Last success was ${elapsed}s ago; timer may be stopped or stuck."
+    exit 1
+  fi
+  clear_marker
+  exit 0
+fi
+
+if [ "$last_result" = "exit-code" ]; then
+  case "$last_exit_status" in
+    2) write_marker "PULL FAILED" "git pull --rebase failed — likely a conflict or network error." ;;
+    3) write_marker "PUSH FAILED" "git push failed — likely a non-fast-forward or auth error." ;;
+    *) write_marker "FAILED" "git-sync exited with status $last_exit_status." ;;
+  esac
+  exit 1
+fi
+
+# Unknown state — don't flap the marker
+exit 0

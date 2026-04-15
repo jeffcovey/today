@@ -1,0 +1,11 @@
+[Unit]
+Description=Vault git sync (pull/rebase/push)
+Documentation=https://github.com/jeffcovey/today
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/today/bin/git-sync
+User=root
+Nice=10
