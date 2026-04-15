@@ -28,7 +28,12 @@ export async function servicesCommand(server, args = []) {
     console.log(`📋 Services on ${server.name}:`);
     console.log('');
 
-    server.sshScript(`
+    if (server.provider === 'local') {
+      // Local deployments use docker-compose, not systemd. Ask compose
+      // which services are up instead of shelling to systemctl.
+      server.sshCmd('docker compose ps --format "  {{if eq .State \\"running\\"}}✓{{else}}○{{end}} {{.Service}} ({{.State}})" 2>/dev/null || docker compose ps', { check: false });
+    } else {
+      server.sshScript(`
 for service in ${SERVICES.join(' ')}; do
     if systemctl is-active --quiet $service 2>/dev/null; then
         echo "  ✓ $service (running)"
@@ -39,6 +44,7 @@ for service in ${SERVICES.join(' ')}; do
     fi
 done
 `);
+    }
     return;
   }
 

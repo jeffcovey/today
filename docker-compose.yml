@@ -24,6 +24,32 @@ services:
     depends_on:
       - ollama
 
+  # Scheduler service for local deployments.
+  #
+  # Runs node src/scheduler.js as a long-lived process, so user-configured
+  # cron jobs (plugin-sync, git-sync, etc.) fire without needing systemd
+  # on the host. Enable it per-deployment via `bin/deploy <name>` — the
+  # local provider will bring this up via `docker compose up -d scheduler`.
+  #
+  # Jobs are read from .data/scheduler-config.json, which `bin/deploy`
+  # writes from [deployments.local.<name>.jobs.*] in config.toml.
+  scheduler:
+    build: .
+    container_name: today-scheduler
+    command: ["node", "src/scheduler.js"]
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
+      - SKIP_DEP_CHECK=true
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - .:/app
+      - calendar-cache:/app/.calendar-cache
+      - /app/node_modules
+      - ~/.ssh:/root/.ssh:ro
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama

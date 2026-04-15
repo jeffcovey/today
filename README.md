@@ -332,6 +332,47 @@ Deployment copies your **local configuration** to the remote server, making the 
 | `digitalocean` | DigitalOcean Droplets with automated setup |
 | `hetzner` | Hetzner Cloud servers |
 | `generic` | Any VPS with SSH access |
+| `local` | The current machine, managed via docker-compose (e.g. running Today on a Mac) |
+
+### Local deployments (running Today on a Mac via Docker)
+
+A `local` deployment configures the machine you're on instead of SSHing to a remote. It's designed for running the Today containers via docker-compose on a Mac (or a Linux dev machine) while still using the same `config.toml` → `bin/deploy` → scheduler model as the remote droplets.
+
+Example config.toml entry for a Mac:
+
+```toml
+[deployments.local.macbook]
+deploy_path = "/Users/you/today"
+enabled = true
+
+[deployments.local.macbook.services]
+scheduler = true
+
+[deployments.local.macbook.jobs.plugin-sync]
+schedule = "*/10 * * * *"
+command = "bin/plugins sync"
+
+[deployments.local.macbook.jobs.git-sync]
+schedule = "* * * * *"
+command = "bin/git-sync"
+description = "Pull/rebase/push vault via git"
+```
+
+Then on the Mac:
+
+```bash
+bin/deploy macbook setup       # one-time: docker compose build
+bin/deploy macbook              # write scheduler-config.json and `docker compose up -d scheduler`
+bin/deploy macbook services     # show compose service status
+bin/deploy macbook logs scheduler
+```
+
+A few things to know about local deployments:
+
+- **No systemd, no apt.** Service management maps to `docker compose up/stop/restart/ps`; package install is the image's job.
+- **git-sync as a scheduler job.** On remote deployments, `--git-sync` installs a systemd timer out-of-band. On local deployments, git-sync runs as a regular cron entry inside the scheduler container — add it to `[deployments.local.<name>.jobs.git-sync]` as in the example above. Running `bin/deploy <name> setup --git-sync` on a local deployment prints a reminder rather than installing anything.
+- **Resilio Sync is not supported** on local deployments (`--resilio` emits a warning and exits).
+- **Git push credentials inside the container**: the compose file bind-mounts `~/.ssh` read-only, so SSH URLs just work. If your vault remote is HTTPS, switch it: `cd <vault> && git remote set-url origin git@github.com:<user>/<vault>.git`. macOS Keychain credential helpers don't work inside a Linux container.
 
 ### Services & Jobs
 
