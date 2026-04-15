@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+
+/**
+ * Sync the vault with its git remote via pull --rebase + push.
+ *
+ * Designed to run from a systemd timer (Linux) or launchd agent (macOS)
+ * every ~60s. Exits non-zero on error so the supervisor reports failure;
+ * the next scheduled run retries automatically.
+ *
+ * The vault path is read from config.toml via getAbsoluteVaultPath().
+ * The log path can be overridden with GIT_SYNC_LOG; default is
+ * /var/log/git-sync.log on Linux, ~/Library/Logs/git-sync.log on macOS.
+ *
+ * Exit codes:
+ *   0  success (including no-op runs)
+ *   1  setup / environment problem (not a git repo, no vault, etc.)
+ *   2  git pull --rebase failed (likely a conflict or network error)
+ *   3  git push failed (likely non-fast-forward or auth error)
+ */
+
+import { execSync } from 'child_process';
+import { appendFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import os from 'os';
+import { getAbsoluteVaultPath } from '../src/config.js';
+
+function defaultLogPath() {
+  if (process.platform === 'darwin') {
+    return join(os.homedir(), 'Library', 'Logs', 'git-sync.log');
+  }
+  return '/var/log/git-sync.log';
+}
+
+const LOG = process.env.GIT_SYNC_LOG || defaultLogPath();
+const VAULT = getAbsoluteVaultPath();
+
+function log(msg) {
+  const line = `${new Date().toISOString()} ${msg}\n`;
+  try {
+    appendFileSync(LOG, line);
+  } catch {
+    // Log path may not be writable (e.g. first run on a new system). Fall
+    // back to stderr so the supervisor still sees the message in its journal.
+    process.stderr.write(line);
+  }
+}
+
+function runGit(args) {
+  return execSync(`git ${args}`, {
+    cwd: VAULT,
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+}
+
+function stderrOf(err) {
+  return (err.stderr && err.stderr.toString().trim()) || err.message || '';
+}
+
+if (!existsSync(VAULT)) {
+  log(`FATAL vault path ${VAULT} does not exist`);
+  process.exit(1);
+}
+
+let gitDir;
+try {
+  gitDir = runGit('rev-parse --git-dir').toString().trim();
+  if (!gitDir.startsWith('/')) gitDir = join(VAULT, gitDir);
+} catch (err) {
+  log(`FATAL ${VAULT} is not a git repo: ${stderrOf(err)}`);
+  process.exit(1);
+}
+
+// Clean up stale rebase state from a previous failed run before trying again.
+const rebaseInProgress = () =>
+  existsSync(join(gitDir, 'rebase-merge')) || existsSync(join(gitDir, 'rebase-apply'));
+
+if (rebaseInProgress()) {
+  log('WARN stale rebase state detected, aborting');
+  try { runGit('rebase --abort'); } catch { /* best-effort */ }
+}
+
+// Pull first so we don't push over upstream changes.
+try {
+  runGit('pull --rebase --autostash');
+} catch (err) {
+  log(`ERROR pull failed: ${stderrOf(err)}`);
+  if (rebaseInProgress()) {
+    try { runGit('rebase --abort'); } catch { /* best-effort */ }
+  }
+  process.exit(2);
+}
+
+// Push any local commits.
+try {
+  runGit('push');
+} catch (err) {
+  log(`ERROR push failed: ${stderrOf(err)}`);
+  process.exit(3);
+}
+
+process.exit(0);

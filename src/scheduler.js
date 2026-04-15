@@ -56,6 +56,14 @@ const SERVICE_MAINTENANCE_JOBS = {
       command: 'systemctl restart resilio-sync || true',
       description: 'Restart Resilio Sync to prevent stale connections'
     }
+  ],
+  'git-sync.timer': [
+    {
+      name: 'git-sync-healthcheck',
+      schedule: '*/5 * * * *', // Every 5 minutes
+      command: 'bin/git-sync-healthcheck',
+      description: 'Check git-sync is firing and surface conflicts in the vault'
+    }
   ]
 };
 
