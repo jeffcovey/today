@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically sync the vault with its git remote
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=55s
+RandomizedDelaySec=10s
+AccuracySec=5s
+Unit=git-sync.service
+
+[Install]
+WantedBy=timers.target

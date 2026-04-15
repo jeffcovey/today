@@ -1,0 +1,40 @@
+#!/bin/bash
+# Sync /opt/today/vault with origin/main via git pull --rebase + push.
+# Designed to run from a systemd timer every ~60s. Exits non-zero on error
+# so systemd reports failure; the timer keeps firing regardless.
+
+set -o pipefail
+
+VAULT=/opt/today/vault
+LOG=/var/log/git-sync.log
+
+cd "$VAULT" || { echo "$(date -Iseconds) FATAL cannot cd to $VAULT" >>"$LOG"; exit 1; }
+
+log() { echo "$(date -Iseconds) $*" >>"$LOG"; }
+
+# Abort any in-progress rebase from a previous failure before trying again.
+GITDIR=$(git rev-parse --git-dir 2>/dev/null) || { log "FATAL not a git repo"; exit 1; }
+if [ -d "$GITDIR/rebase-merge" ] || [ -d "$GITDIR/rebase-apply" ]; then
+  log "WARN stale rebase state detected, aborting"
+  git rebase --abort 2>>"$LOG" || true
+fi
+
+# Pull first so we don't push over upstream changes.
+if ! git pull --rebase --autostash 2>>"$LOG"; then
+  log "ERROR pull failed"
+  # If the rebase left state behind, clean up so next run starts fresh.
+  if [ -d "$GITDIR/rebase-merge" ] || [ -d "$GITDIR/rebase-apply" ]; then
+    git rebase --abort 2>>"$LOG" || true
+  fi
+  exit 2
+fi
+
+# Push any local commits.
+if ! git push 2>>"$LOG"; then
+  log "ERROR push failed"
+  exit 3
+fi
+
+# Only log success if something actually changed, to keep the log quiet.
+# Not strictly necessary; we can refine later.
+exit 0

@@ -229,6 +229,68 @@ SERVICE
   }
 
   /**
+   * Install the git-based vault sync (systemd timer + shell script).
+   *
+   * Pulls/rebases/pushes /opt/today/vault against its git remote every 60s.
+   * Unit files live in deploy/systemd/ in the Today repo so they can be edited
+   * with the rest of the code; this method just inlines them over SSH.
+   *
+   * Assumes the deploy already placed bin/git-sync and bin/git-sync-healthcheck
+   * under ${this.deployPath}/bin/ (standard deploy does). Assumes the vault
+   * directory is already a git checkout with working credentials for push.
+   */
+  async setupGitSync() {
+    printInfo('Setting up git-sync...');
+
+    const repoRoot = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..');
+    const serviceUnit = fs.readFileSync(
+      path.join(repoRoot, 'deploy', 'systemd', 'git-sync.service'),
+      'utf8'
+    );
+    const timerUnit = fs.readFileSync(
+      path.join(repoRoot, 'deploy', 'systemd', 'git-sync.timer'),
+      'utf8'
+    );
+
+    this.sshScript(`
+      set -e
+
+      if [ ! -x ${this.deployPath}/bin/git-sync ]; then
+        echo "✗ ${this.deployPath}/bin/git-sync not found — run 'bin/deploy ${this.name}' first"
+        exit 1
+      fi
+      if [ ! -d ${this.deployPath}/${this.remoteVaultPath}/.git ] && [ ! -f ${this.deployPath}/${this.remoteVaultPath}/.git ]; then
+        echo "✗ ${this.deployPath}/${this.remoteVaultPath} is not a git checkout"
+        echo "  Clone the vault repo there first, then re-run this setup."
+        exit 1
+      fi
+
+      touch /var/log/git-sync.log
+      chmod 644 /var/log/git-sync.log
+
+      cat > /etc/systemd/system/git-sync.service << 'SERVICE'
+${serviceUnit}SERVICE
+
+      cat > /etc/systemd/system/git-sync.timer << 'TIMER'
+${timerUnit}TIMER
+
+      systemctl daemon-reload
+      systemctl enable --now git-sync.timer
+
+      # Kick off an immediate run so the timer's first pull happens before 30s boot delay
+      systemctl start git-sync.service || true
+
+      echo ""
+      echo "✓ git-sync installed"
+      echo "  Timer: git-sync.timer (every 60s)"
+      echo "  Log:   /var/log/git-sync.log"
+      echo "  Healthcheck: ${this.deployPath}/bin/git-sync-healthcheck (run via scheduler)"
+    `);
+
+    printStatus('git-sync setup complete');
+  }
+
+  /**
    * Setup Ollama for local LLM support
    */
   async setupOllama() {

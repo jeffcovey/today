@@ -137,7 +137,14 @@ bin/today --focus --non-interactive  # Automated preset run
 
 Many file-based plugins look for a "vault" directory and follow some [Obsidian](https://obsidian.md) conventions. The path to the vault can be configured, and defaults to `vault/` under Today's directory. Plugins automatically create their required directories inside the vault when first used.
 
-**Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution (Resilio Sync, Syncthing, iCloud, Obsidian, etc.). Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
+**Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution. Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
+
+For multi-device sync, Today supports two built-in options on remote deployments (see `bin/deploy <name> setup --git-sync` or `--resilio`):
+
+- **git-sync** (recommended): a systemd timer pulls/rebases/pushes the vault against its git remote every ~60s. No background daemon, no opaque state — conflicts surface as normal git rebase failures and get resolved on whichever peer introduced them. Requires the vault to be a git checkout with push credentials configured.
+- **Resilio Sync**: peer-to-peer sync via the Resilio daemon. Realtime and requires no git setup, but introduces a stateful daemon with its own sync metadata. Make sure `.git`, `.git.nosync`, and `node_modules` are in the share's IgnoreList before adding the folder — unignored git directories will flood the daemon.
+
+You can also use any external sync you already run (Syncthing, iCloud, Dropbox, etc.); those don't need integration with Today.
 
 ---
 

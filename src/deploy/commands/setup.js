@@ -17,6 +17,12 @@ export async function setupCommand(server, args = []) {
   const skipConfirm = args.includes('--yes') || args.includes('-y');
   const withOllama = args.includes('--ollama');
   const withResilio = args.includes('--resilio');
+  const withGitSync = args.includes('--git-sync');
+
+  if (withResilio && withGitSync) {
+    printError('--resilio and --git-sync are mutually exclusive; pick one vault sync method.');
+    process.exit(1);
+  }
 
   if (!skipConfirm && process.stdin.isTTY) {
     console.log('');
@@ -31,6 +37,9 @@ export async function setupCommand(server, args = []) {
     }
     if (withResilio) {
       console.log('  • Install Resilio Sync for vault synchronization');
+    }
+    if (withGitSync) {
+      console.log('  • Install git-sync for vault synchronization via GitHub');
     }
     console.log('');
 
@@ -65,6 +74,11 @@ export async function setupCommand(server, args = []) {
     await server.setupResilioSync();
   }
 
+  // Optional: git-sync
+  if (withGitSync && typeof server.setupGitSync === 'function') {
+    await server.setupGitSync();
+  }
+
   // Optional: Ollama
   if (withOllama && typeof server.setupOllama === 'function') {
     await server.setupOllama();
@@ -75,8 +89,10 @@ export async function setupCommand(server, args = []) {
   console.log('Next steps:');
   console.log(`  1. bin/deploy ${server.name} secrets    # Upload encrypted secrets`);
   console.log(`  2. bin/deploy ${server.name}            # Deploy code`);
-  if (!withResilio) {
-    console.log(`  3. bin/deploy ${server.name} setup --resilio  # Optional: Setup vault sync`);
+  if (!withResilio && !withGitSync) {
+    console.log('  3. Pick a vault sync method:');
+    console.log(`       bin/deploy ${server.name} setup --git-sync   # Sync via GitHub (recommended)`);
+    console.log(`       bin/deploy ${server.name} setup --resilio    # Sync via Resilio Sync`);
   }
 }
 
