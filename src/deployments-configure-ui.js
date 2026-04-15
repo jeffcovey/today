@@ -36,6 +36,13 @@ const PREDEFINED_JOBS = [
     description: 'Sync all plugins every 10 minutes',
     schedule: '*/10 * * * *',
     command: 'bin/plugins sync'
+  },
+  {
+    key: 'git-sync',
+    label: 'Git Sync (vault)',
+    description: 'Pull/rebase/push the vault via git every minute (for local deployments)',
+    schedule: '* * * * *',
+    command: 'bin/git-sync'
   }
 ];
 
