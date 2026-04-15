@@ -207,10 +207,31 @@ async function installServices(server) {
 }
 
 /**
- * Remove systemd services that reference our deploy path but no longer have templates
+ * Remove systemd services that reference our deploy path but no longer have templates.
+ *
+ * "Known" services come from two places in the repo:
+ *
+ *   - config/services/*.service — always-installed services (the set passed in
+ *     as `currentServiceFiles` from installServices).
+ *   - deploy/systemd/*.service — opt-in services installed out-of-band by
+ *     setup hooks like setupGitSync(). These are NOT installed by the regular
+ *     deploy path, but they ARE expected to persist across deploys once a
+ *     user has opted in via `bin/deploy <name> setup --git-sync` etc.
+ *
+ * Without counting `deploy/systemd/` here, regular `bin/deploy <name>` silently
+ * uninstalls git-sync.service every run, which orphans git-sync.timer and
+ * breaks vault sync until the healthcheck catches up 10 minutes later.
  */
 async function cleanupStaleServices(server, currentServiceFiles) {
   const deployPath = server.deployPath;
+
+  // Expand the "don't remove" set to also include opt-in units from
+  // deploy/systemd/, so regular deploys preserve them.
+  const optionalServicesDir = path.join(PROJECT_ROOT, 'deploy', 'systemd');
+  const optionalServiceFiles = fs.existsSync(optionalServicesDir)
+    ? fs.readdirSync(optionalServicesDir).filter(f => f.endsWith('.service'))
+    : [];
+  const knownServiceFiles = [...currentServiceFiles, ...optionalServiceFiles];
 
   // Find all .service files on the server that reference our deploy path
   const result = server.sshCmd(
@@ -225,7 +246,7 @@ async function cleanupStaleServices(server, currentServiceFiles) {
 
   if (remoteServices.length === 0) return;
 
-  const staleServices = remoteServices.filter(f => !currentServiceFiles.includes(f));
+  const staleServices = remoteServices.filter(f => !knownServiceFiles.includes(f));
 
   if (staleServices.length === 0) return;
 
