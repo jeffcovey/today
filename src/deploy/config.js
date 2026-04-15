@@ -120,7 +120,9 @@ export function getDeployments() {
         continue;
       }
 
-      const ip = getDeploymentIp(provider, name);
+      // Local deployments don't need an IP — they run on the current
+      // machine. Everything else uses the environment-variable lookup.
+      const ip = provider === 'local' ? 'localhost' : getDeploymentIp(provider, name);
 
       // Parse services config (default all to false for safety)
       const servicesConfig = deploymentConfig.services || {};
@@ -128,7 +130,8 @@ export function getDeployments() {
         scheduler: servicesConfig.scheduler === true,
         'vault-web': servicesConfig['vault-web'] === true,
         'inbox-api': servicesConfig['inbox-api'] === true,
-        'resilio-sync': servicesConfig['resilio-sync'] === true
+        'resilio-sync': servicesConfig['resilio-sync'] === true,
+        'git-sync.timer': servicesConfig['git-sync.timer'] === true
       };
 
       // Parse jobs config (use defaults if not specified)

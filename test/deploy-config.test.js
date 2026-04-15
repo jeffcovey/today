@@ -136,6 +136,28 @@ describe('deploy/config', () => {
       expect(Object.keys(jobs).length).toBe(1);
       expect(jobs['valid']).toBeDefined();
     });
+
+    test('git-sync can be configured as a scheduler job for local deployments', () => {
+      // This is the documented shape for enabling git-sync on a local
+      // deployment; it lives alongside plugin-sync in config.toml under
+      // [deployments.local.<name>.jobs.git-sync].
+      const jobs = parseJobs({
+        'plugin-sync': {
+          schedule: '*/10 * * * *',
+          command: 'bin/plugins sync'
+        },
+        'git-sync': {
+          schedule: '* * * * *',
+          command: 'bin/git-sync',
+          description: 'Pull/rebase/push vault via git'
+        }
+      });
+
+      expect(jobs['git-sync']).toBeDefined();
+      expect(jobs['git-sync'].schedule).toBe('* * * * *');
+      expect(jobs['git-sync'].command).toBe('bin/git-sync');
+      expect(jobs['plugin-sync']).toBeDefined();
+    });
   });
 
   describe('deployment config structure', () => {

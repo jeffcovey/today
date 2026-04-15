@@ -20,6 +20,12 @@ export async function deployCommand(server, args = []) {
     process.exit(1);
   }
 
+  // Local deployments take a very different path: no code sync, no apt,
+  // no systemd, just "write config, (re)start compose services".
+  if (server.provider === 'local') {
+    return deployLocal(server);
+  }
+
   const deployPath = server.deployPath;
 
   // Create directories
@@ -236,6 +242,76 @@ async function cleanupStaleServices(server, currentServiceFiles) {
   server.sshCmd('systemctl daemon-reload');
   server.sshCmd('systemctl reset-failed', { check: false });
   printStatus(`Removed ${staleServices.length} stale service(s)`);
+}
+
+/**
+ * Deploy to a local provider (docker-compose-based).
+ *
+ * Skips all the SSH/systemd/apt/rsync plumbing that doesn't apply on the
+ * current machine. The important bits — writing scheduler-config.json so
+ * the scheduler knows which jobs to run, and bringing compose services up
+ * — still happen.
+ */
+async function deployLocal(server) {
+  const deployPath = server.deployPath;
+
+  // Ensure the .data directory exists for state files
+  printInfo(`Deploying to local deployment at ${deployPath}...`);
+  fs.mkdirSync(path.join(deployPath, '.data'), { recursive: true });
+
+  // Write deployment name file (used for runtime AI config overrides)
+  printInfo(`Setting deployment name: ${server.name}`);
+  fs.writeFileSync(path.join(deployPath, '.data', 'deployment-name'), server.name + '\n');
+
+  // Apply deployment-specific AI overrides to config (only if config is NOT in vault)
+  const { getConfigPath } = await import('../../config.js');
+  const configPath = getConfigPath();
+  const relativeConfigPath = configPath.replace(PROJECT_ROOT + '/', '');
+  const configInVault = relativeConfigPath.startsWith('vault/');
+
+  if (server.ai && !configInVault && PROJECT_ROOT === deployPath) {
+    printInfo('Applying deployment AI configuration...');
+    const { applyDeploymentOverrides } = await import('../../config.js');
+    applyDeploymentOverrides(server.ai, configPath);
+    printStatus('AI configuration applied');
+  } else if (server.ai && configInVault) {
+    printInfo('AI overrides will be applied at runtime (config in vault)');
+  }
+
+  // Write scheduler jobs config from config.toml's [deployments.*.jobs.*]
+  if (server.jobs && Object.keys(server.jobs).length > 0) {
+    printInfo('Writing scheduler jobs config...');
+    const jobsConfigPath = path.join(deployPath, '.data', 'scheduler-config.json');
+    fs.writeFileSync(jobsConfigPath, JSON.stringify(server.jobs, null, 2) + '\n');
+    printStatus(`Configured ${Object.keys(server.jobs).length} scheduled job(s)`);
+  }
+
+  // Bring up enabled compose services. The LocalProvider's systemctl
+  // override translates these into `docker compose up -d <name>` calls.
+  const enabledServices = Object.entries(server.services || {})
+    .filter(([_, enabled]) => enabled)
+    .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
+
+  if (enabledServices.length > 0) {
+    printInfo(`Starting configured services: ${enabledServices.join(', ')}`);
+    for (const service of enabledServices) {
+      // `enable` + `restart` both map to compose commands; restart handles
+      // the "already running, pick up new config" case.
+      server.systemctl('enable', service, { check: false });
+      server.systemctl('restart', service, { check: false });
+    }
+    printStatus(`Started ${enabledServices.length} service(s)`);
+  } else {
+    printInfo('No services configured. Enable in config.toml under [deployments.local.*.services]');
+  }
+
+  printStatus('Local deployment complete!');
+  console.log('');
+  console.log(`  Deploy path: ${deployPath}`);
+  if (enabledServices.length > 0) {
+    console.log(`  Services:    ${enabledServices.join(', ')}`);
+    console.log(`  Logs:        docker compose logs -f <service>`);
+  }
 }
 
 export default deployCommand;

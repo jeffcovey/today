@@ -4,7 +4,7 @@
  * Initial server setup - installs dependencies, configures services
  */
 
-import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { printStatus, printInfo, printError } from '../remote-server.js';
 
 export async function setupCommand(server, args = []) {
   console.log(`🚀 Setting up ${server.name} (${server.provider})...`);
@@ -69,12 +69,15 @@ export async function setupCommand(server, args = []) {
     await server.setupSsl();
   }
 
-  // Optional: Resilio Sync
+  // Optional: Resilio Sync. Providers that don't support it (e.g. local)
+  // should define a setupResilioSync() that prints a clear warning.
   if (withResilio && typeof server.setupResilioSync === 'function') {
     await server.setupResilioSync();
   }
 
-  // Optional: git-sync
+  // Optional: git-sync. On remote providers this installs the systemd
+  // timer; on local providers it prints guidance on adding the job to
+  // config.toml (see LocalProvider.setupGitSync).
   if (withGitSync && typeof server.setupGitSync === 'function') {
     await server.setupGitSync();
   }
