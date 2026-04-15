@@ -1,86 +1,129 @@
-#!/bin/bash
-# Vault git-sync health check.
-#
-# Verifies the git-sync.timer is firing successfully. If the last run failed,
-# or the last successful run was too long ago, surfaces a conflict/failure
-# marker in the vault so it's visible during normal use.
-#
-# Intended to run every 5 minutes via the Today scheduler.
+#!/usr/bin/env node
 
-set -o pipefail
+/**
+ * Vault git-sync health check.
+ *
+ * Verifies that git-sync.timer (systemd) or the equivalent supervisor is
+ * firing successfully. If the last run failed, or the last successful run
+ * was too long ago, writes a marker file into the vault so the failure is
+ * visible during normal vault use. Clears the marker on recovery.
+ *
+ * Intended to run every 5 minutes via the Today scheduler.
+ *
+ * Linux-only for now; relies on `systemctl show git-sync.service`. A macOS
+ * launchd-aware variant will be added when we roll out the Mac side.
+ */
 
-UNIT=git-sync.service
-TIMER=git-sync.timer
-VAULT=/opt/today/vault
-MARKER="$VAULT/.sync-status.md"
-MAX_STALE_SECONDS=600  # 10 minutes — alert if no successful run in this window
+import { execSync } from 'child_process';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { getAbsoluteVaultPath } from '../src/config.js';
 
-# Only check if the timer is enabled
-if ! systemctl is-enabled --quiet "$TIMER" 2>/dev/null; then
-  exit 0
-fi
+const UNIT = 'git-sync.service';
+const TIMER = 'git-sync.timer';
+const MAX_STALE_SECONDS = 600; // 10 minutes — alert if no successful run in this window
 
-# Look at the last run result
-last_result=$(systemctl show "$UNIT" --property=Result --value 2>/dev/null)
-last_exit_status=$(systemctl show "$UNIT" --property=ExecMainStatus --value 2>/dev/null)
-last_exit_ts=$(systemctl show "$UNIT" --property=ExecMainExitTimestampMonotonic --value 2>/dev/null)
+const VAULT = getAbsoluteVaultPath();
+const MARKER = join(VAULT, '.sync-status.md');
 
-# Compute seconds since last exit (monotonic clock)
-now_mono=$(awk '{print int($1 * 1000000)}' /proc/uptime)
-if [ -n "$last_exit_ts" ] && [ "$last_exit_ts" -gt 0 ] 2>/dev/null; then
-  elapsed=$(( (now_mono - last_exit_ts) / 1000000 ))
-else
-  elapsed=-1
-fi
+function systemctlShow(unit, property) {
+  try {
+    return execSync(`systemctl show ${unit} --property=${property} --value`, {
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString().trim();
+  } catch {
+    return '';
+  }
+}
 
-write_marker() {
-  local status="$1"
-  local detail="$2"
-  cat > "$MARKER" << EOF
----
+function isEnabled(unit) {
+  try {
+    execSync(`systemctl is-enabled --quiet ${unit}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function uptimeMicroseconds() {
+  // /proc/uptime first field is seconds since boot (monotonic clock)
+  const uptimeSec = parseFloat(readFileSync('/proc/uptime', 'utf8').split(' ')[0]);
+  return Math.floor(uptimeSec * 1_000_000);
+}
+
+function writeMarker(status, detail, lastResult, lastExitStatus, elapsed) {
+  const body = `---
 tags: [sync, alert]
-updated: $(date -Iseconds)
+updated: ${new Date().toISOString()}
 ---
 # ⚠ Vault sync alert
 
-**Status:** $status
-**Last run result:** $last_result (exit $last_exit_status)
-**Last run:** ${elapsed}s ago
-**Detail:** $detail
+**Status:** ${status}
+**Last run result:** ${lastResult} (exit ${lastExitStatus})
+**Last run:** ${elapsed >= 0 ? elapsed + 's ago' : 'unknown'}
+**Detail:** ${detail}
 
 Investigate with:
 \`\`\`
-systemctl status $UNIT
-journalctl -u $UNIT --since '1 hour ago'
+systemctl status ${UNIT}
+journalctl -u ${UNIT} --since '1 hour ago'
 tail -50 /var/log/git-sync.log
 \`\`\`
 
 Resolve conflicts on the peer where they were introduced, then delete this file.
-EOF
+`;
+  writeFileSync(MARKER, body);
 }
 
-clear_marker() {
-  [ -f "$MARKER" ] && rm -f "$MARKER"
+function clearMarker() {
+  if (existsSync(MARKER)) {
+    try { unlinkSync(MARKER); } catch { /* best-effort */ }
+  }
 }
 
-# Decide status
-if [ "$last_result" = "success" ] && [ "$last_exit_status" = "0" ]; then
-  if [ "$elapsed" -ge 0 ] && [ "$elapsed" -gt "$MAX_STALE_SECONDS" ]; then
-    write_marker "STALE" "Last success was ${elapsed}s ago; timer may be stopped or stuck."
-    exit 1
-  fi
-  clear_marker
-  exit 0
-fi
+// Only check if the timer is enabled (and therefore meant to be running).
+if (!isEnabled(TIMER)) {
+  process.exit(0);
+}
 
-if [ "$last_result" = "exit-code" ]; then
-  case "$last_exit_status" in
-    2) write_marker "PULL FAILED" "git pull --rebase failed — likely a conflict or network error." ;;
-    3) write_marker "PUSH FAILED" "git push failed — likely a non-fast-forward or auth error." ;;
-    *) write_marker "FAILED" "git-sync exited with status $last_exit_status." ;;
-  esac
-  exit 1
-fi
+const lastResult = systemctlShow(UNIT, 'Result');
+const lastExitStatus = systemctlShow(UNIT, 'ExecMainStatus');
+const lastExitMono = systemctlShow(UNIT, 'ExecMainExitTimestampMonotonic');
 
-# Unknown state — don't flap the marker
-exit 0
+let elapsed = -1;
+if (lastExitMono && Number(lastExitMono) > 0) {
+  elapsed = Math.floor((uptimeMicroseconds() - Number(lastExitMono)) / 1_000_000);
+}
+
+if (lastResult === 'success' && lastExitStatus === '0') {
+  if (elapsed >= 0 && elapsed > MAX_STALE_SECONDS) {
+    writeMarker(
+      'STALE',
+      `Last success was ${elapsed}s ago; timer may be stopped or stuck.`,
+      lastResult, lastExitStatus, elapsed
+    );
+    process.exit(1);
+  }
+  clearMarker();
+  process.exit(0);
+}
+
+if (lastResult === 'exit-code') {
+  const detailByStatus = {
+    '2': 'git pull --rebase failed — likely a conflict or network error.',
+    '3': 'git push failed — likely a non-fast-forward or auth error.'
+  };
+  const label = lastExitStatus === '2' ? 'PULL FAILED'
+              : lastExitStatus === '3' ? 'PUSH FAILED'
+              : 'FAILED';
+  writeMarker(
+    label,
+    detailByStatus[lastExitStatus] || `git-sync exited with status ${lastExitStatus}.`,
+    lastResult, lastExitStatus, elapsed
+  );
+  process.exit(1);
+}
+
+// Unknown state (no exit info yet, timer just enabled, etc.) — don't flap.
+process.exit(0);
