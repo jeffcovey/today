@@ -24,7 +24,9 @@
 	"postStartCommand": "bash .devcontainer/devcontainer-startup",
 	"containerEnv": {
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
-		"DEVCONTAINER_PROJECT": "today"
+		"DEVCONTAINER_PROJECT": "today",
+		"HOST_PROJECT_PATH": "${localWorkspaceFolder}",
+		"HOST_HOME": "${localEnv:HOME}"
 	},
 	"remoteEnv": {
 		"PATH": "/home/node/.local/bin:/home/node/.fly/bin:${containerEnv:PATH}"

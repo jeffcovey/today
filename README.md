@@ -370,9 +370,10 @@ bin/deploy macbook logs scheduler
 A few things to know about local deployments:
 
 - **No systemd, no apt.** Service management maps to `docker compose up/stop/restart/ps`; package install is the image's job.
-- **git-sync as a scheduler job.** On remote deployments, `--git-sync` installs a systemd timer out-of-band. On local deployments, git-sync runs as a regular cron entry inside the scheduler container — add it to `[deployments.local.<name>.jobs.git-sync]` as in the example above. Running `bin/deploy <name> setup --git-sync` on a local deployment prints a reminder rather than installing anything.
+- **git-sync as a scheduler job.** On remote deployments, `--git-sync` installs a systemd timer out-of-band. On local deployments, git-sync runs as a regular cron entry inside the scheduler container — enable it via `bin/today configure` → Deployments → your deployment's jobs list, or add it to `[deployments.local.<name>.jobs.git-sync]` directly as in the example above. Running `bin/deploy <name> setup --git-sync` on a local deployment prints a reminder rather than installing anything.
 - **Resilio Sync is not supported** on local deployments (`--resilio` emits a warning and exits).
 - **Git push credentials inside the container**: the compose file bind-mounts `~/.ssh` read-only, so SSH URLs just work. If your vault remote is HTTPS, switch it: `cd <vault> && git remote set-url origin git@github.com:<user>/<vault>.git`. macOS Keychain credential helpers don't work inside a Linux container.
+- **Running `bin/deploy` from inside the devcontainer works**. The devcontainer installs the Docker CLI + Compose plugin and bind-mounts `/var/run/docker.sock` from the host, so `docker compose` commands from inside the devcontainer talk to the host's Docker daemon. The root `docker-compose.yml` uses `${HOST_PROJECT_PATH}` and `${HOST_HOME}` (set via `containerEnv` in `.devcontainer/devcontainer.json`) so bind mounts resolve against the real host filesystem rather than `/workspaces/today`. If Docker CLI isn't available in your shell, `bin/deploy` fails loudly with a copy-pasteable set of `docker compose` commands to run from a host terminal instead.
 
 ### Services & Jobs
 

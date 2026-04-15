@@ -1,5 +1,19 @@
 version: '3.3'
 
+# NOTE ON BIND-MOUNT PATHS
+#
+# `HOST_PROJECT_PATH` lets this compose file work both (a) from a shell on
+# the host, where `.` already resolves to the project root, and (b) from
+# inside the devcontainer, where `.` would resolve to /workspaces/today —
+# a path that only exists INSIDE the container, not on the host daemon
+# that actually creates the bind mounts. When run from inside the
+# devcontainer, `.devcontainer/devcontainer.json` sets HOST_PROJECT_PATH
+# from VS Code's ${localWorkspaceFolder}, so bind mounts get the real
+# host path the daemon can see. From a host shell, HOST_PROJECT_PATH is
+# unset and the `.` fallback works as before.
+#
+# Same pattern applies to `HOST_HOME` for ~/.ssh and ~/.config/claude.
+
 services:
   today:
     build: .
@@ -10,15 +24,15 @@ services:
       - OLLAMA_HOST=http://ollama:11434
     volumes:
       # Mount the entire project directory
-      - .:/app
+      - ${HOST_PROJECT_PATH:-.}:/app
       # Use named volumes for caches to persist between container rebuilds
       - calendar-cache:/app/.calendar-cache
       # Override node_modules to use container's version
       - /app/node_modules
       # Mount SSH directory for git operations (read-only)
-      - ~/.ssh:/root/.ssh:ro
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
       # Mount Claude CLI config directory for authentication persistence
-      - ~/.config/claude:/root/.config/claude
+      - ${HOST_HOME:-~}/.config/claude:/root/.config/claude
     stdin_open: true
     tty: true
     depends_on:
@@ -42,10 +56,10 @@ services:
       - SKIP_DEP_CHECK=true
       - OLLAMA_HOST=http://ollama:11434
     volumes:
-      - .:/app
+      - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
-      - ~/.ssh:/root/.ssh:ro
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
     restart: unless-stopped
     depends_on:
       - ollama

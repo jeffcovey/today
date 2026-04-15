@@ -292,15 +292,52 @@ async function deployLocal(server) {
     .filter(([_, enabled]) => enabled)
     .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
 
+  const startedServices = [];
+  const failedServices = [];
+
   if (enabledServices.length > 0) {
+    // Pre-flight: make sure docker is actually available on this machine.
+    // If it isn't (common when running `bin/deploy` from inside a
+    // devcontainer without docker CLI installed), we fail loudly instead
+    // of pretending the services started.
+    const dockerCheck = server.sshCmd('command -v docker >/dev/null 2>&1', { check: false });
+    if (dockerCheck.returncode !== 0) {
+      printError('Docker CLI not found — cannot bring up compose services from this shell.');
+      console.log('');
+      console.log('The scheduler-config.json and deployment-name files have been written,');
+      console.log('but services were not started. Run these from a shell that has docker:');
+      console.log('');
+      console.log(`  cd ${deployPath}`);
+      for (const service of enabledServices) {
+        const bare = service === 'today-scheduler' ? 'scheduler' : service;
+        console.log(`  docker compose up -d ${bare}`);
+      }
+      console.log('');
+      console.log('If you are inside a devcontainer, either run this from the host shell, or');
+      console.log('rebuild the devcontainer with Docker CLI installed and /var/run/docker.sock mounted.');
+      process.exit(1);
+    }
+
     printInfo(`Starting configured services: ${enabledServices.join(', ')}`);
     for (const service of enabledServices) {
       // `enable` + `restart` both map to compose commands; restart handles
       // the "already running, pick up new config" case.
-      server.systemctl('enable', service, { check: false });
-      server.systemctl('restart', service, { check: false });
+      const enableResult = server.systemctl('enable', service, { check: false });
+      const restartResult = server.systemctl('restart', service, { check: false });
+      if (enableResult.returncode === 0 && restartResult.returncode === 0) {
+        startedServices.push(service);
+      } else {
+        failedServices.push(service);
+      }
     }
-    printStatus(`Started ${enabledServices.length} service(s)`);
+    if (startedServices.length > 0) {
+      printStatus(`Started ${startedServices.length} service(s): ${startedServices.join(', ')}`);
+    }
+    if (failedServices.length > 0) {
+      printError(`Failed to start ${failedServices.length} service(s): ${failedServices.join(', ')}`);
+      console.log('  Investigate with: docker compose logs <service>');
+      process.exit(1);
+    }
   } else {
     printInfo('No services configured. Enable in config.toml under [deployments.local.*.services]');
   }
@@ -308,8 +345,8 @@ async function deployLocal(server) {
   printStatus('Local deployment complete!');
   console.log('');
   console.log(`  Deploy path: ${deployPath}`);
-  if (enabledServices.length > 0) {
-    console.log(`  Services:    ${enabledServices.join(', ')}`);
+  if (startedServices.length > 0) {
+    console.log(`  Services:    ${startedServices.join(', ')}`);
     console.log(`  Logs:        docker compose logs -f <service>`);
   }
 }
