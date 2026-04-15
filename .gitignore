@@ -59,6 +59,10 @@ __pycache__/
 # =============================================================================
 .devcontainer/mounts.local
 .devcontainer/docker-compose.override.yml
+# Root-level docker-compose override is auto-generated from
+# .devcontainer/mounts.local by generate-compose-override.sh and points
+# the local-deployment compose services at the user's real vault.
+/docker-compose.override.yml
 
 # =============================================================================
 # OS Files
