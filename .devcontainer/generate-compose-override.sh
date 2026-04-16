@@ -22,8 +22,12 @@ OVERRIDE_FILE="$SCRIPT_DIR/docker-compose.override.yml"
 ROOT_OVERRIDE_FILE="$PROJECT_ROOT/docker-compose.override.yml"
 
 if [ ! -f "$MOUNTS_FILE" ]; then
-    echo "No mounts.local found - skipping override generation"
-    rm -f "$OVERRIDE_FILE" "$ROOT_OVERRIDE_FILE"
+    echo "No mounts.local found - generating empty override"
+    cat > "$OVERRIDE_FILE" << 'EMPTY'
+# Auto-generated - no mounts.local found
+services: {}
+EMPTY
+    rm -f "$ROOT_OVERRIDE_FILE"
     exit 0
 fi
 
