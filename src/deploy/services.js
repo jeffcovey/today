@@ -63,6 +63,13 @@ export const SERVICES = [
     systemdUnit: 'git-sync.timer',
     composeService: null,
   },
+  {
+    key: 'unison-sync',
+    label: 'Unison Sync',
+    description: 'Bidirectional working-tree sync via Unison over SSH',
+    systemdUnit: 'unison-sync.service',
+    composeService: 'unison-sync',
+  },
 ];
 
 /**

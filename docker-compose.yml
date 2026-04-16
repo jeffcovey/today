@@ -115,6 +115,22 @@ services:
       - "3333:3333"
     restart: unless-stopped
 
+  # Bidirectional working-tree sync via Unison over SSH.
+  # Uses its own Dockerfile (not the base image) so Unison is only
+  # installed when the user enables this service. Requires a matching
+  # Unison version on the remote end (installed by setupUnison()).
+  unison-sync:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.unison-sync
+    container_name: today-unison-sync
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
