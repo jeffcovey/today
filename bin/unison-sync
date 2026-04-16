@@ -41,6 +41,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = dirname(__dirname);
 
+// ── SSH key resolution ───────────────────────────────────────────────
+
+function resolveSSHKey(deployment) {
+  if (deployment.sshKeyPath) return deployment.sshKeyPath;
+  const home = process.env.HOME || '/root';
+  const candidates = [
+    join(home, '.ssh', 'do_deploy_key'),
+    join(home, '.ssh', 'deploy_key'),
+    join(home, '.ssh', 'id_ed25519'),
+    join(home, '.ssh', 'id_rsa'),
+  ];
+  for (const key of candidates) {
+    if (existsSync(key)) return key;
+  }
+  return candidates[0]; // fallback to do_deploy_key even if missing — SSH will give a clear error
+}
+
 // ── Built-in excludes ───────────────────────────────────────────────
 
 const BUILTIN_EXCLUDES = [
@@ -117,7 +134,7 @@ const args = [
   '-batch',          // non-interactive
   '-auto',           // accept non-conflicting changes automatically
   '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
-  '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=accept-new`,
+  '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
 ];
 
 // Add selective paths (if any)
