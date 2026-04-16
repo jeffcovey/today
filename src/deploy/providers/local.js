@@ -27,28 +27,14 @@
  */
 
 import { RemoteServer, printStatus, printInfo, printWarning } from '../remote-server.js';
+import { getSystemdToComposeMap } from '../services.js';
 import { execSync, spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-/**
- * Map a systemd service name to its docker-compose service name.
- *
- * The Today codebase uses systemd-style names everywhere (today-scheduler,
- * vault-watcher, etc.). When running locally via docker-compose, those map
- * to simpler compose service names.
- */
-const SYSTEMD_TO_COMPOSE = {
-  'today-scheduler': 'scheduler',
-  'scheduler': 'scheduler',
-  'vault-watcher': 'vault-watcher',
-  'vault-web': 'vault-web',
-  'inbox-api': 'inbox-api',
-  'today': 'today'
-};
+const SYSTEMD_TO_COMPOSE = getSystemdToComposeMap();
 
 function toComposeService(service) {
-  // Drop .timer / .service suffixes systemd uses.
   const bare = service.replace(/\.(service|timer)$/, '');
   return SYSTEMD_TO_COMPOSE[bare] || bare;
 }
@@ -170,7 +156,10 @@ export class LocalProvider extends RemoteServer {
     switch (action) {
       case 'start':
       case 'enable':
-        cmd = `docker compose up -d ${svc}`;
+        // Always pass --build so Dockerfile changes (new apk packages,
+        // new binaries, etc.) are picked up automatically. Docker caches
+        // unchanged layers, so this is fast when nothing changed.
+        cmd = `docker compose up -d --build ${svc}`;
         break;
       case 'stop':
       case 'disable':

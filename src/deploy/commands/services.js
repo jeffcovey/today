@@ -5,15 +5,9 @@
  */
 
 import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { getSystemdUnitNames } from '../services.js';
 
-const SERVICES = [
-  'today-scheduler',
-  'vault-watcher',
-  'vault-web',
-  'inbox-api',
-  'resilio-sync',
-  'git-sync.timer'
-];
+const SERVICES = getSystemdUnitNames();
 
 export async function servicesCommand(server, args = []) {
   if (!server.validate()) {

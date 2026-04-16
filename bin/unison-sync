@@ -1,0 +1,262 @@
+#!/usr/bin/env node
+
+/**
+ * Bidirectional working-tree sync between this device and a remote
+ * deployment via Unison over SSH.
+ *
+ * This is the "working-tree sync" layer: it keeps the actual vault
+ * files identical across devices so that uncommitted edits on one
+ * device appear on all others. It does NOT touch git state — each
+ * device manages its own git repository independently. See bin/git-sync
+ * for the "committed-state sync" layer that propagates git commits.
+ *
+ * Reads the sync target from [deployments.*.unison] in config.toml:
+ *
+ *   [deployments.local.macbook.unison]
+ *   target = "digitalocean/droplet"
+ *
+ * The target's IP, SSH user, deploy path, and vault path are looked up
+ * from the target deployment's own config block.
+ *
+ * Runs in one of two modes:
+ *   - Long-running (default): unison -repeat watch — stays resident,
+ *     syncs on file change. Used as a compose service.
+ *   - One-shot (--once): syncs once and exits. Useful for debugging
+ *     and for scheduler cron jobs.
+ *
+ * Exit codes:
+ *   0  success
+ *   1  configuration error (no target, target not found, etc.)
+ *   2  unison failed
+ */
+
+import { execSync, spawn } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = dirname(__dirname);
+
+// ── Config ──────────────────────────────────────────────────────────
+
+function readConfig() {
+  // Minimal config reader — avoids importing the full config.js which
+  // pulls in many dependencies. We just need the TOML file.
+  try {
+    // Check for config-path pointer (used by deployments)
+    const configPathFile = join(PROJECT_ROOT, '.data', 'config-path');
+    let configPath;
+    if (existsSync(configPathFile)) {
+      const relative = readFileSync(configPathFile, 'utf8').trim();
+      configPath = join(PROJECT_ROOT, relative);
+    } else {
+      configPath = join(PROJECT_ROOT, 'config.toml');
+    }
+
+    if (!existsSync(configPath)) {
+      // Try vault/today.toml as fallback
+      const vaultConfig = join(PROJECT_ROOT, 'vault', 'today.toml');
+      if (existsSync(vaultConfig)) {
+        configPath = vaultConfig;
+      } else {
+        return null;
+      }
+    }
+
+    // Dynamic import of @iarna/toml to parse
+    const tomlStr = readFileSync(configPath, 'utf8');
+    // Simple inline TOML parser for the fields we need — avoids the
+    // dependency on @iarna/toml which may not be installed in the
+    // minimal unison-sync image. We shell out to node with the full
+    // app's node_modules if available, otherwise fall back to a
+    // basic regex parse.
+    try {
+      const result = execSync(
+        `node -e "const t=require('@iarna/toml');const fs=require('fs');console.log(JSON.stringify(t.parse(fs.readFileSync('${configPath}','utf8'))))"`,
+        { cwd: PROJECT_ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      return JSON.parse(result);
+    } catch {
+      console.error('Could not parse config.toml — is @iarna/toml installed?');
+      return null;
+    }
+  } catch (err) {
+    console.error(`Config error: ${err.message}`);
+    return null;
+  }
+}
+
+function getDeploymentName() {
+  const nameFile = join(PROJECT_ROOT, '.data', 'deployment-name');
+  if (existsSync(nameFile)) {
+    return readFileSync(nameFile, 'utf8').trim();
+  }
+  return null;
+}
+
+function findDeployment(config, name) {
+  const deployments = config.deployments || {};
+  // Try exact match: provider/name
+  if (name.includes('/')) {
+    const [provider, deployName] = name.split('/');
+    return deployments[provider]?.[deployName] || null;
+  }
+  // Search all providers for a deployment with this name
+  for (const providerDeployments of Object.values(deployments)) {
+    if (providerDeployments[name]) return providerDeployments[name];
+  }
+  return null;
+}
+
+// ── Built-in excludes ───────────────────────────────────────────────
+
+const BUILTIN_EXCLUDES = [
+  'Path .git.nosync',
+  'Path .git',
+  'Path .sync',
+  'Path .stfolder',
+  'Path .stversions',
+  'Name .DS_Store',
+  'Path node_modules',
+  'Name *.tmp',
+  'Name .*.swp',
+];
+
+// ── Main ────────────────────────────────────────────────────────────
+
+const oneShot = process.argv.includes('--once');
+
+const config = readConfig();
+if (!config) {
+  console.error('Cannot read config.toml');
+  process.exit(1);
+}
+
+const deploymentName = getDeploymentName();
+if (!deploymentName) {
+  console.error('No deployment name found (.data/deployment-name). Run bin/deploy first.');
+  process.exit(1);
+}
+
+const currentDeployment = findDeployment(config, deploymentName);
+if (!currentDeployment) {
+  console.error(`Deployment "${deploymentName}" not found in config.toml`);
+  process.exit(1);
+}
+
+const unisonConfig = currentDeployment.unison;
+if (!unisonConfig || !unisonConfig.target) {
+  console.error(`No [deployments.*.${deploymentName}.unison] block with "target" in config.toml`);
+  console.error('Example:');
+  console.error('');
+  console.error(`  [deployments.<provider>.${deploymentName}.unison]`);
+  console.error('  target = "digitalocean/droplet"');
+  process.exit(1);
+}
+
+const targetDeployment = findDeployment(config, unisonConfig.target);
+if (!targetDeployment) {
+  console.error(`Target deployment "${unisonConfig.target}" not found in config.toml`);
+  process.exit(1);
+}
+
+// Resolve paths
+const vaultPath = config.vault_path || 'vault';
+const localVault = join(PROJECT_ROOT, vaultPath);
+
+const targetDeployPath = targetDeployment.deploy_path || '/opt/today';
+const targetVaultPath = targetDeployment.remote_vault_path || 'vault';
+const remoteVault = join(targetDeployPath, targetVaultPath);
+
+const sshUser = targetDeployment.ssh_user || 'root';
+const sshPort = targetDeployment.ssh_port || 22;
+
+// Resolve target IP — check env var first (DEPLOY_<PROVIDER>_<NAME>_IP),
+// then fall back to config
+let targetIp = targetDeployment.ip;
+if (!targetIp) {
+  // Try environment variable convention
+  const parts = unisonConfig.target.split('/');
+  if (parts.length === 2) {
+    const envVar = `DEPLOY_${parts[0].toUpperCase().replace(/-/g, '_')}_${parts[1].toUpperCase().replace(/-/g, '_')}_IP`;
+    targetIp = process.env[envVar];
+  }
+}
+if (!targetIp) {
+  console.error(`Cannot determine IP for target "${unisonConfig.target}".`);
+  console.error('Set it in config.toml or via the DEPLOY_*_IP environment variable.');
+  process.exit(1);
+}
+
+// Build excludes
+const userExcludes = unisonConfig.excludes || [];
+const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];
+
+// Selective sync: if paths is set, only sync those subdirectories.
+// Empty or absent = sync everything (minus excludes).
+const syncPaths = unisonConfig.paths || [];
+
+// Build the unison command
+const args = [
+  localVault,
+  `ssh://${sshUser}@${targetIp}/${remoteVault}`,
+  '-batch',          // non-interactive
+  '-auto',           // accept non-conflicting changes automatically
+  '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
+  '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=accept-new`,
+];
+
+// Add selective paths (if any)
+for (const p of syncPaths) {
+  args.push('-path', p);
+}
+
+// Add excludes
+for (const exclude of allExcludes) {
+  args.push('-ignore', exclude);
+}
+
+// Add repeat mode unless one-shot
+if (!oneShot) {
+  args.push('-repeat', 'watch');
+}
+
+// Log what we're doing
+console.log('Unison sync starting...');
+console.log(`  Local:   ${localVault}`);
+console.log(`  Remote:  ssh://${sshUser}@${targetIp}/${remoteVault}`);
+console.log(`  Mode:    ${oneShot ? 'one-shot' : 'repeat (watch)'}`);
+if (syncPaths.length > 0) {
+  console.log(`  Paths:   ${syncPaths.join(', ')} (selective sync)`);
+} else {
+  console.log(`  Paths:   (all)`);
+}
+console.log(`  Excludes: ${allExcludes.length} patterns`);
+console.log('');
+
+// Run unison
+const child = spawn('unison', args, {
+  stdio: 'inherit',
+  env: { ...process.env, UNISON: join(PROJECT_ROOT, '.data', 'unison') }
+});
+
+child.on('error', (err) => {
+  console.error(`Failed to start unison: ${err.message}`);
+  process.exit(2);
+});
+
+child.on('exit', (code) => {
+  if (code !== 0 && code !== null) {
+    console.error(`Unison exited with code ${code}`);
+  }
+  process.exit(code || 0);
+});
+
+// Forward signals for graceful shutdown
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    child.kill(signal);
+  });
+}

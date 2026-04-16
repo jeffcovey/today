@@ -139,12 +139,15 @@ Many file-based plugins look for a "vault" directory and follow some [Obsidian](
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution. Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
 
-For multi-device sync, Today supports two built-in options on remote deployments (see `bin/deploy <name> setup --git-sync` or `--resilio`):
+Multi-device vault sync has two distinct layers:
 
-- **git-sync** (recommended): a systemd timer pulls/rebases/pushes the vault against its git remote every ~60s. No background daemon, no opaque state — conflicts surface as normal git rebase failures and get resolved on whichever peer introduced them. Requires the vault to be a git checkout with push credentials configured.
-- **Resilio Sync**: peer-to-peer sync via the Resilio daemon. Realtime and requires no git setup, but introduces a stateful daemon with its own sync metadata. Make sure `.git`, `.git.nosync`, and `node_modules` are in the share's IgnoreList before adding the folder — unignored git directories will flood the daemon.
+**Working-tree sync** (the files themselves) keeps the vault's actual file contents identical across devices. When you edit a file on one device, the change appears on all other devices — uncommitted, unstaged, just the raw bytes. Use any file-level sync tool you prefer: Resilio Sync, Syncthing, iCloud, Dropbox, Unison, etc. Make sure `.git`, `.git.nosync`, and `node_modules` are excluded from the sync — unignored git directories will flood most sync daemons with inotify events.
 
-You can also use any external sync you already run (Syncthing, iCloud, Dropbox, etc.); those don't need integration with Today.
+**Committed-state sync** (git history) keeps each device's git repository in sync so that commits made on one device are available on all others. This is separate from working-tree sync — git can only push and pull *commits*, not uncommitted changes:
+
+- **git-sync**: a timer (systemd on remote deployments, scheduler cron on local) that runs `git pull --rebase --autostash && git push` every ~60s. When you commit on one device, git-sync pushes the commit to GitHub; on other devices, git-sync pulls it and fast-forwards HEAD. Working-tree content doesn't change (it was already in sync via the file-sync layer), but the git log and staging area update to reflect the new commit. Install via `bin/deploy <name> setup --git-sync` (remote) or add it as a scheduler job in `bin/today configure` (local).
+
+**Important:** git-sync does NOT create commits and does NOT sync uncommitted changes. Commits are always manual. If you only set up git-sync without a working-tree sync tool, files edited on one device will not appear on other devices until you commit and push.
 
 ---
 

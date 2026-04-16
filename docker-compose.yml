@@ -65,6 +65,9 @@ services:
     restart: unless-stopped
 
   # Runs node src/web-server.js — the vault web UI.
+  # No port mapping here — WEB_PORT is user-configured (encrypted in .env,
+  # decrypted by dotenvx at runtime) so compose can't know it at parse time.
+  # VS Code auto-forwards the port when it detects the server listening.
   vault-web:
     build: .
     container_name: today-vault-web
@@ -77,8 +80,6 @@ services:
       - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
-    ports:
-      - "8082:8082"
     restart: unless-stopped
 
   # Runs node src/vault-watcher.js — real-time file change watcher.
@@ -112,6 +113,22 @@ services:
       - /app/node_modules
     ports:
       - "3333:3333"
+    restart: unless-stopped
+
+  # Bidirectional working-tree sync via Unison over SSH.
+  # Uses its own Dockerfile (not the base image) so Unison is only
+  # installed when the user enables this service. Requires a matching
+  # Unison version on the remote end (installed by setupUnison()).
+  unison-sync:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.unison-sync
+    container_name: today-unison-sync
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
     restart: unless-stopped
 
   ollama:
