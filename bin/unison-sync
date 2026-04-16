@@ -165,10 +165,16 @@ if (syncPaths.length > 0) {
 console.log(`  Excludes: ${allExcludes.length} patterns`);
 console.log('');
 
-// Run unison
+// Run unison. UNISONLOCALHOSTNAME must be stable per-deployment so the
+// archive persists across container recreations AND is distinct between
+// different machines (e.g. macbook vs mini) syncing to the same target.
 const child = spawn('unison', args, {
   stdio: 'inherit',
-  env: { ...process.env, UNISON: join(PROJECT_ROOT, '.data', 'unison') }
+  env: {
+    ...process.env,
+    UNISON: join(PROJECT_ROOT, '.data', 'unison'),
+    UNISONLOCALHOSTNAME: `today-${deploymentName}`,
+  }
 });
 
 child.on('error', (err) => {
