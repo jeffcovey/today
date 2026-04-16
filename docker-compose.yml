@@ -51,6 +51,7 @@ services:
   # which bin/deploy writes from [deployments.local.<name>.jobs.*].
   scheduler:
     build: .
+    image: today-app:latest
     container_name: today-scheduler
     command: ["npx", "dotenvx", "run", "--", "node", "src/scheduler.js"]
     environment:
@@ -69,7 +70,7 @@ services:
   # decrypted by dotenvx at runtime) so compose can't know it at parse time.
   # VS Code auto-forwards the port when it detects the server listening.
   vault-web:
-    build: .
+    image: today-app:latest
     container_name: today-vault-web
     command: ["npx", "dotenvx", "run", "--", "node", "src/web-server.js"]
     environment:
@@ -84,7 +85,7 @@ services:
 
   # Runs node src/vault-watcher.js — real-time file change watcher.
   vault-watcher:
-    build: .
+    image: today-app:latest
     container_name: today-vault-watcher
     command: ["npx", "dotenvx", "run", "--", "node", "src/vault-watcher.js"]
     environment:
@@ -99,7 +100,7 @@ services:
 
   # Runs node src/inbox-api.js — HTTPS upload endpoint for mobile apps.
   inbox-api:
-    build: .
+    image: today-app:latest
     container_name: today-inbox-api
     command: ["node", "src/inbox-api.js"]
     environment:
