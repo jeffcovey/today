@@ -128,6 +128,7 @@ export function getDeployments() {
       const servicesConfig = deploymentConfig.services || {};
       const services = {
         scheduler: servicesConfig.scheduler === true,
+        'vault-watcher': servicesConfig['vault-watcher'] === true,
         'vault-web': servicesConfig['vault-web'] === true,
         'inbox-api': servicesConfig['inbox-api'] === true,
         'resilio-sync': servicesConfig['resilio-sync'] === true,
