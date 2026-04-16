@@ -5,6 +5,7 @@
  */
 
 import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { configKeyToSystemdName } from '../services.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -155,7 +156,7 @@ JOBS_EOF`);
   // Enable and start configured services
   const enabledServices = Object.entries(server.services || {})
     .filter(([_, enabled]) => enabled)
-    .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
+    .map(([name]) => configKeyToSystemdName(name));
 
   if (enabledServices.length > 0) {
     printInfo(`Enabling configured services: ${enabledServices.join(', ')}`);
@@ -311,7 +312,7 @@ async function deployLocal(server) {
   // override translates these into `docker compose up -d <name>` calls.
   const enabledServices = Object.entries(server.services || {})
     .filter(([_, enabled]) => enabled)
-    .map(([name]) => name === 'scheduler' ? 'today-scheduler' : name);
+    .map(([name]) => configKeyToSystemdName(name));
 
   const startedServices = [];
   const failedServices = [];

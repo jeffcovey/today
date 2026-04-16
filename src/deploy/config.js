@@ -7,6 +7,7 @@
 
 import { execSync } from 'child_process';
 import { getFullConfig } from '../config.js';
+import { parseServicesConfig } from './services.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -125,15 +126,7 @@ export function getDeployments() {
       const ip = provider === 'local' ? 'localhost' : getDeploymentIp(provider, name);
 
       // Parse services config (default all to false for safety)
-      const servicesConfig = deploymentConfig.services || {};
-      const services = {
-        scheduler: servicesConfig.scheduler === true,
-        'vault-watcher': servicesConfig['vault-watcher'] === true,
-        'vault-web': servicesConfig['vault-web'] === true,
-        'inbox-api': servicesConfig['inbox-api'] === true,
-        'resilio-sync': servicesConfig['resilio-sync'] === true,
-        'git-sync.timer': servicesConfig['git-sync.timer'] === true
-      };
+      const services = parseServicesConfig(deploymentConfig.services);
 
       // Parse jobs config (use defaults if not specified)
       const jobsConfig = deploymentConfig.jobs || DEFAULT_JOBS;

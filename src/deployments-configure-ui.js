@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import { TextInput, Select } from '@inkjs/ui';
+import { getServiceEntries } from './deploy/services.js';
 import htm from 'htm';
 import fs from 'fs';
 import path from 'path';
@@ -266,7 +267,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
     // Services mode
     if (mode === 'services') {
-      const serviceKeys = ['scheduler', 'vault-watcher', 'inbox-api', 'vault-web', '__back__'];
+      const serviceKeys = [...getServiceEntries().map(s => s.key), '__back__'];
       if (key.escape || input === 'q') {
         setMode('edit');
         setServiceIndex(0);
@@ -665,12 +666,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
   if (mode === 'edit' && selected) {
     // Get current services config
     const services = selected.services || {};
-    const servicesList = [
-      { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'vault-watcher', label: 'Vault Watcher', desc: 'Auto-commit vault changes as they happen' },
-      { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
-      { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
-    ];
+    const servicesList = getServiceEntries();
 
     // Get current jobs
     const jobs = selected.jobs || {};
@@ -764,12 +760,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
   if (mode === 'services' && selected) {
     const services = selected.services || {};
-    const servicesList = [
-      { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'vault-watcher', label: 'Vault Watcher', desc: 'Auto-commit vault changes as they happen' },
-      { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
-      { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
-    ];
+    const servicesList = getServiceEntries();
 
     const serviceRows = servicesList.map((s, i) => {
       const isSelected = i === serviceIndex;
