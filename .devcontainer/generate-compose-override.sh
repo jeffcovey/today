@@ -107,6 +107,9 @@ services:
   inbox-api:
     volumes:
       - "$VAULT_SRC:/app/vault:cached"
+  unison-sync:
+    volumes:
+      - "$VAULT_SRC:/app/vault:cached"
 EOF
     echo "Root override file generated: $ROOT_OVERRIDE_FILE (vault -> $VAULT_SRC)"
 else
