@@ -134,6 +134,8 @@ const args = [
   '-batch',          // non-interactive
   '-auto',           // accept non-conflicting changes automatically
   '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
+  '-perms', '0',     // ignore permission differences (macOS vs Linux)
+  '-dontchmod',      // don't try to set permissions on the remote
   '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
 ];
 
