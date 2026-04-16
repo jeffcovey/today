@@ -133,10 +133,6 @@ services:
     command: ["npx", "dotenvx", "run", "--overload", "--", "sh", "-c", ".devcontainer/setup-ssh-keys.sh && node bin/unison-sync"]
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
-      # Stable hostname so Unison's archive persists across container recreations.
-      # Without this, each new container gets a random hostname and Unison treats
-      # every restart as a first sync.
-      - UNISONLOCALHOSTNAME=today-unison
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
     restart: unless-stopped
