@@ -65,6 +65,9 @@ services:
     restart: unless-stopped
 
   # Runs node src/web-server.js — the vault web UI.
+  # No port mapping here — WEB_PORT is user-configured (encrypted in .env,
+  # decrypted by dotenvx at runtime) so compose can't know it at parse time.
+  # VS Code auto-forwards the port when it detects the server listening.
   vault-web:
     build: .
     container_name: today-vault-web
@@ -77,8 +80,6 @@ services:
       - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
-    ports:
-      - "8082:8082"
     restart: unless-stopped
 
   # Runs node src/vault-watcher.js — real-time file change watcher.

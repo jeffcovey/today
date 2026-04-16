@@ -170,7 +170,10 @@ export class LocalProvider extends RemoteServer {
     switch (action) {
       case 'start':
       case 'enable':
-        cmd = `docker compose up -d ${svc}`;
+        // Always pass --build so Dockerfile changes (new apk packages,
+        // new binaries, etc.) are picked up automatically. Docker caches
+        // unchanged layers, so this is fast when nothing changed.
+        cmd = `docker compose up -d --build ${svc}`;
         break;
       case 'stop':
       case 'disable':
