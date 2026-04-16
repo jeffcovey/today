@@ -18,6 +18,7 @@ export async function setupCommand(server, args = []) {
   const withOllama = args.includes('--ollama');
   const withResilio = args.includes('--resilio');
   const withGitSync = args.includes('--git-sync');
+  const withUnison = args.includes('--unison');
 
   if (withResilio && withGitSync) {
     printError('--resilio and --git-sync are mutually exclusive; pick one vault sync method.');
@@ -40,6 +41,9 @@ export async function setupCommand(server, args = []) {
     }
     if (withGitSync) {
       console.log('  • Install git-sync for vault synchronization via GitHub');
+    }
+    if (withUnison) {
+      console.log('  • Install Unison for bidirectional file sync');
     }
     console.log('');
 
@@ -80,6 +84,13 @@ export async function setupCommand(server, args = []) {
   // config.toml (see LocalProvider.setupGitSync).
   if (withGitSync && typeof server.setupGitSync === 'function') {
     await server.setupGitSync();
+  }
+
+  // Optional: Unison. On remote providers this installs the unison binary
+  // so the server can be a sync target. On local providers it prints
+  // guidance (the compose service handles the local end).
+  if (withUnison && typeof server.setupUnison === 'function') {
+    await server.setupUnison();
   }
 
   // Optional: Ollama
