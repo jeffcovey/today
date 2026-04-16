@@ -124,6 +124,7 @@ services:
       context: .
       dockerfile: deploy/docker/Dockerfile.unison-sync
     container_name: today-unison-sync
+    command: ["npx", "dotenvx", "run", "--", "node", "bin/unison-sync"]
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
     volumes:
