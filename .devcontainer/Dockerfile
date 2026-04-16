@@ -4,14 +4,10 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:20
 # Note: python3 is required for node-gyp to compile native modules like better-sqlite3
 RUN apt-get update && apt-get install -y python3 make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
 
-# Install Turso CLI manually (avoid auto-auth issues)
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then ARCH="x86_64"; fi && \
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then ARCH="arm64"; fi && \
-    curl -sSfL "https://github.com/tursodatabase/turso-cli/releases/latest/download/turso-cli_Linux_$ARCH.tar.gz" | \
-    tar -xz -C /tmp && \
-    mv /tmp/turso /usr/local/bin/turso && \
-    chmod +x /usr/local/bin/turso
+# Docker CLI + Compose plugin are installed by the docker-outside-of-docker
+# devcontainer feature (see .devcontainer/devcontainer.json). The feature also
+# handles /var/run/docker.sock group permissions correctly, which a manual
+# Dockerfile install does not. Don't duplicate it here.
 
 # Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless)
 RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev && rm -rf /var/lib/apt/lists/*

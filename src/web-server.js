@@ -65,7 +65,7 @@ const __dirname = dirname(__filename);
 const DEBUG = process.env.DEBUG === 'true';
 const debug = (...args) => DEBUG && console.log('[DEBUG]', ...args);
 
-// Web server only needs read-only access, disable Turso sync for faster startup
+// Web server only needs read-only access, disable auto-sync for faster startup
 const getReadOnlyDatabase = () => getDatabase('.data/today.db', { autoSync: false });
 
 const app = express();

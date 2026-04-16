@@ -4,7 +4,7 @@
  * Initial server setup - installs dependencies, configures services
  */
 
-import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { printStatus, printInfo, printError } from '../remote-server.js';
 
 export async function setupCommand(server, args = []) {
   console.log(`🚀 Setting up ${server.name} (${server.provider})...`);
@@ -18,6 +18,7 @@ export async function setupCommand(server, args = []) {
   const withOllama = args.includes('--ollama');
   const withResilio = args.includes('--resilio');
   const withGitSync = args.includes('--git-sync');
+  const withUnison = args.includes('--unison');
 
   if (withResilio && withGitSync) {
     printError('--resilio and --git-sync are mutually exclusive; pick one vault sync method.');
@@ -40,6 +41,9 @@ export async function setupCommand(server, args = []) {
     }
     if (withGitSync) {
       console.log('  • Install git-sync for vault synchronization via GitHub');
+    }
+    if (withUnison) {
+      console.log('  • Install Unison for bidirectional file sync');
     }
     console.log('');
 
@@ -69,14 +73,24 @@ export async function setupCommand(server, args = []) {
     await server.setupSsl();
   }
 
-  // Optional: Resilio Sync
+  // Optional: Resilio Sync. Providers that don't support it (e.g. local)
+  // should define a setupResilioSync() that prints a clear warning.
   if (withResilio && typeof server.setupResilioSync === 'function') {
     await server.setupResilioSync();
   }
 
-  // Optional: git-sync
+  // Optional: git-sync. On remote providers this installs the systemd
+  // timer; on local providers it prints guidance on adding the job to
+  // config.toml (see LocalProvider.setupGitSync).
   if (withGitSync && typeof server.setupGitSync === 'function') {
     await server.setupGitSync();
+  }
+
+  // Optional: Unison. On remote providers this installs the unison binary
+  // so the server can be a sync target. On local providers it prints
+  // guidance (the compose service handles the local end).
+  if (withUnison && typeof server.setupUnison === 'function') {
+    await server.setupUnison();
   }
 
   // Optional: Ollama

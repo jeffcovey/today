@@ -1,0 +1,23 @@
+# Extends the base Today image with Unison for bidirectional file sync.
+#
+# Only built when the user enables the unison-sync service — not part of
+# the base image. Both ends of the sync must run the same Unison version;
+# Alpine 3.21's community repo ships 2.53.7, and we pin the droplet to
+# the same version via setupUnison().
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Unison from Alpine community repo (2.53.7). Also need openssh-client
+# for the SSH transport and bash for bin/unison-sync.
+RUN apk add --no-cache unison openssh-client bash
+
+# Copy only what the sync script needs — not the full app.
+COPY bin/unison-sync ./bin/unison-sync
+COPY src/config.js ./src/config.js
+COPY src/deploy/services.js ./src/deploy/services.js
+
+RUN chmod +x ./bin/unison-sync
+
+CMD ["bin/unison-sync"]

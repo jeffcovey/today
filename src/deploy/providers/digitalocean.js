@@ -291,6 +291,53 @@ ${timerUnit}TIMER
   }
 
   /**
+   * Install Unison on the remote host so it can serve as the target
+   * for unison-sync connections from local deployments.
+   *
+   * Downloads the same version (2.53.7) that Alpine ships in its
+   * community repo, so the Mac container and the droplet are
+   * guaranteed to match. Unison refuses to connect on version mismatch.
+   */
+  async setupUnison() {
+    printInfo('Setting up Unison...');
+
+    this.sshScript(`
+      set -e
+
+      if command -v unison &>/dev/null; then
+        echo "Unison already installed: $(unison -version 2>&1 | head -1)"
+        exit 0
+      fi
+
+      echo "Installing Unison 2.53.7 (static binary)..."
+      ARCH=$(uname -m)
+      if [ "$ARCH" = "x86_64" ]; then
+        URL="https://github.com/bcpierce00/unison/releases/download/v2.53.7/unison-2.53.7-ubuntu-x86_64-static.tar.gz"
+      elif [ "$ARCH" = "aarch64" ]; then
+        # No official ARM64 static binary; try apt
+        apt-get update && apt-get install -y unison
+        echo "✓ Unison installed via apt: $(unison -version 2>&1 | head -1)"
+        exit 0
+      else
+        echo "Unsupported architecture: $ARCH"
+        exit 1
+      fi
+
+      # The tarball contains bin/unison inside it, so extract to /usr/local
+      # (not /usr/local/bin) so it lands at /usr/local/bin/unison.
+      curl -sL "$URL" | tar -xz -C /usr/local --strip-components=0
+      chmod +x /usr/local/bin/unison /usr/local/bin/unison-fsmonitor 2>/dev/null || true
+      # Clean up non-binary files the tarball extracts to /usr/local
+      rm -f /usr/local/CONTRIBUTING.md /usr/local/INSTALL.md /usr/local/LICENSE /usr/local/NEWS.md /usr/local/README.md 2>/dev/null || true
+
+      echo ""
+      echo "✓ Unison installed: $(unison -version 2>&1 | head -1)"
+    `);
+
+    printStatus('Unison setup complete');
+  }
+
+  /**
    * Setup Ollama for local LLM support
    */
   async setupOllama() {

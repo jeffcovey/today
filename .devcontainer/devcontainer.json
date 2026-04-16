@@ -11,6 +11,18 @@
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/sshd:1": {
 			"version": "latest"
+		},
+		// Installs Docker CLI + Compose plugin in the container and mounts
+		// /var/run/docker.sock from the host with correct group permissions.
+		// This is the standard "docker-outside-of-docker" pattern, which
+		// lets `bin/deploy <local-name>` and `docker compose` commands work
+		// from inside the devcontainer by talking to the HOST's Docker
+		// daemon. See the note at the top of root docker-compose.yml for
+		// how HOST_PROJECT_PATH / HOST_HOME make bind-mount paths resolve
+		// correctly when run from inside the devcontainer.
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"moby": false,
+			"installDockerComposeSwitch": true
 		}
 	},
 	"customizations": {
@@ -24,7 +36,9 @@
 	"postStartCommand": "bash .devcontainer/devcontainer-startup",
 	"containerEnv": {
 		"DEVCONTAINER_HOST_MACHINE": "${localEnv:HOSTNAME}${localEnv:COMPUTERNAME}",
-		"DEVCONTAINER_PROJECT": "today"
+		"DEVCONTAINER_PROJECT": "today",
+		"HOST_PROJECT_PATH": "${localWorkspaceFolder}",
+		"HOST_HOME": "${localEnv:HOME}"
 	},
 	"remoteEnv": {
 		"PATH": "/home/node/.local/bin:/home/node/.fly/bin:${containerEnv:PATH}"

@@ -1,11 +1,20 @@
 #!/usr/bin/env node
 
 /**
- * Sync the vault with its git remote via pull --rebase + push.
+ * Sync COMMITTED git state between this device and the vault's remote.
  *
- * Designed to run from a systemd timer (Linux) or launchd agent (macOS)
- * every ~60s. Exits non-zero on error so the supervisor reports failure;
- * the next scheduled run retries automatically.
+ * This script handles the "committed-state" layer of vault sync:
+ *   - Pulls new commits from origin (via rebase, so local commits replay cleanly)
+ *   - Pushes any local commits to origin
+ *
+ * It does NOT create commits. It does NOT sync uncommitted working-tree
+ * changes. Commits are always a manual, deliberate act by the user.
+ * Uncommitted file-level sync between devices is handled separately by
+ * a working-tree sync tool (Unison, Resilio, iCloud, etc.).
+ *
+ * Designed to run from a systemd timer (Linux) or as a scheduler cron
+ * job (local/Docker deployments) every ~60s. Exits non-zero on error so
+ * the supervisor reports failure; the next scheduled run retries.
  *
  * The vault path is read from config.toml via getAbsoluteVaultPath().
  * The log path can be overridden with GIT_SYNC_LOG; default is
