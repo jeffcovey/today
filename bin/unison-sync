@@ -30,10 +30,11 @@
  *   2  unison failed
  */
 
-import { execSync, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getFullConfig } from '../src/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,46 +43,8 @@ const PROJECT_ROOT = dirname(__dirname);
 // ── Config ──────────────────────────────────────────────────────────
 
 function readConfig() {
-  // Minimal config reader — avoids importing the full config.js which
-  // pulls in many dependencies. We just need the TOML file.
   try {
-    // Check for config-path pointer (used by deployments)
-    const configPathFile = join(PROJECT_ROOT, '.data', 'config-path');
-    let configPath;
-    if (existsSync(configPathFile)) {
-      const relative = readFileSync(configPathFile, 'utf8').trim();
-      configPath = join(PROJECT_ROOT, relative);
-    } else {
-      configPath = join(PROJECT_ROOT, 'config.toml');
-    }
-
-    if (!existsSync(configPath)) {
-      // Try vault/today.toml as fallback
-      const vaultConfig = join(PROJECT_ROOT, 'vault', 'today.toml');
-      if (existsSync(vaultConfig)) {
-        configPath = vaultConfig;
-      } else {
-        return null;
-      }
-    }
-
-    // Dynamic import of @iarna/toml to parse
-    const tomlStr = readFileSync(configPath, 'utf8');
-    // Simple inline TOML parser for the fields we need — avoids the
-    // dependency on @iarna/toml which may not be installed in the
-    // minimal unison-sync image. We shell out to node with the full
-    // app's node_modules if available, otherwise fall back to a
-    // basic regex parse.
-    try {
-      const result = execSync(
-        `node -e "const t=require('@iarna/toml');const fs=require('fs');console.log(JSON.stringify(t.parse(fs.readFileSync('${configPath}','utf8'))))"`,
-        { cwd: PROJECT_ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-      return JSON.parse(result);
-    } catch {
-      console.error('Could not parse config.toml — is @iarna/toml installed?');
-      return null;
-    }
+    return getFullConfig();
   } catch (err) {
     console.error(`Config error: ${err.message}`);
     return null;
@@ -98,12 +61,10 @@ function getDeploymentName() {
 
 function findDeployment(config, name) {
   const deployments = config.deployments || {};
-  // Try exact match: provider/name
   if (name.includes('/')) {
     const [provider, deployName] = name.split('/');
     return deployments[provider]?.[deployName] || null;
   }
-  // Search all providers for a deployment with this name
   for (const providerDeployments of Object.values(deployments)) {
     if (providerDeployments[name]) return providerDeployments[name];
   }

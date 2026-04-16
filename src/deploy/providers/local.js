@@ -34,9 +34,14 @@ import path from 'path';
 
 const SYSTEMD_TO_COMPOSE = getSystemdToComposeMap();
 
+/**
+ * Map a systemd service name to its compose equivalent, or null if the
+ * service has no compose representation (e.g. git-sync.timer runs as a
+ * scheduler cron job, not a compose service).
+ */
 function toComposeService(service) {
   const bare = service.replace(/\.(service|timer)$/, '');
-  return SYSTEMD_TO_COMPOSE[bare] || bare;
+  return SYSTEMD_TO_COMPOSE[bare] || null;
 }
 
 export class LocalProvider extends RemoteServer {
@@ -152,6 +157,14 @@ export class LocalProvider extends RemoteServer {
   systemctl(action, service, options = {}) {
     const svc = toComposeService(service);
     const { check = false } = options;
+
+    // Services without a compose equivalent (e.g. git-sync.timer, which
+    // runs as a scheduler cron job on local deployments) are silently
+    // skipped — there's no compose service to start/stop.
+    if (!svc) {
+      return { returncode: 0 };
+    }
+
     let cmd;
     switch (action) {
       case 'start':
