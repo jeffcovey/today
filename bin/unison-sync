@@ -34,44 +34,12 @@ import { spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getFullConfig } from '../src/config.js';
+import { getFullConfig, getDeploymentName as getDeployName } from '../src/config.js';
+import { getDeployment } from '../src/deploy/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = dirname(__dirname);
-
-// ── Config ──────────────────────────────────────────────────────────
-
-function readConfig() {
-  try {
-    return getFullConfig();
-  } catch (err) {
-    console.error(`Config error: ${err.message}`);
-    return null;
-  }
-}
-
-function getDeploymentName() {
-  const nameFile = join(PROJECT_ROOT, '.data', 'deployment-name');
-  if (existsSync(nameFile)) {
-    return readFileSync(nameFile, 'utf8').trim();
-  }
-  return null;
-}
-
-function findDeployment(config, name) {
-  const deployments = config.deployments || {};
-  // Try exact match: provider/name
-  if (name.includes('/')) {
-    const [provider, deployName] = name.split('/');
-    return deployments[provider]?.[deployName] || null;
-  }
-  // Search all providers for a deployment with this name
-  for (const providerDeployments of Object.values(deployments)) {
-    if (providerDeployments[name]) return providerDeployments[name];
-  }
-  return null;
-}
 
 // ── Built-in excludes ───────────────────────────────────────────────
 
@@ -91,19 +59,15 @@ const BUILTIN_EXCLUDES = [
 
 const oneShot = process.argv.includes('--once');
 
-const config = readConfig();
-if (!config) {
-  console.error('Cannot read config.toml');
-  process.exit(1);
-}
-
-const deploymentName = getDeploymentName();
+// Use the deploy config module for fully-resolved deployments (with IPs
+// from env vars, including legacy naming like DO_DROPLET_IP).
+const deploymentName = getDeployName();
 if (!deploymentName) {
   console.error('No deployment name found (.data/deployment-name). Run bin/deploy first.');
   process.exit(1);
 }
 
-const currentDeployment = findDeployment(config, deploymentName);
+const currentDeployment = getDeployment(deploymentName);
 if (!currentDeployment) {
   console.error(`Deployment "${deploymentName}" not found in config.toml`);
   process.exit(1);
@@ -111,47 +75,32 @@ if (!currentDeployment) {
 
 const unisonConfig = currentDeployment.unison;
 if (!unisonConfig || !unisonConfig.target) {
-  console.error(`No [deployments.*.${deploymentName}.unison] block with "target" in config.toml`);
-  console.error('Example:');
-  console.error('');
-  console.error(`  [deployments.<provider>.${deploymentName}.unison]`);
-  console.error('  target = "digitalocean/droplet"');
+  console.error(`No [deployments.*.unison] block with "target" for "${deploymentName}" in config.toml`);
+  console.error('Configure it in bin/today configure → Deployments → Unison Target');
   process.exit(1);
 }
 
-const targetDeployment = findDeployment(config, unisonConfig.target);
+const targetDeployment = getDeployment(unisonConfig.target);
 if (!targetDeployment) {
   console.error(`Target deployment "${unisonConfig.target}" not found in config.toml`);
   process.exit(1);
 }
 
-// Resolve paths
-const vaultPath = config.vault_path || 'vault';
-const localVault = join(PROJECT_ROOT, vaultPath);
-
-const targetDeployPath = targetDeployment.deploy_path || '/opt/today';
-const targetVaultPath = targetDeployment.remote_vault_path || 'vault';
-const remoteVault = join(targetDeployPath, targetVaultPath);
-
-const sshUser = targetDeployment.ssh_user || 'root';
-const sshPort = targetDeployment.ssh_port || 22;
-
-// Resolve target IP — check env var first (DEPLOY_<PROVIDER>_<NAME>_IP),
-// then fall back to config
-let targetIp = targetDeployment.ip;
-if (!targetIp) {
-  // Try environment variable convention
-  const parts = unisonConfig.target.split('/');
-  if (parts.length === 2) {
-    const envVar = `DEPLOY_${parts[0].toUpperCase().replace(/-/g, '_')}_${parts[1].toUpperCase().replace(/-/g, '_')}_IP`;
-    targetIp = process.env[envVar];
-  }
-}
-if (!targetIp) {
+if (!targetDeployment.ip) {
   console.error(`Cannot determine IP for target "${unisonConfig.target}".`);
   console.error('Set it in config.toml or via the DEPLOY_*_IP environment variable.');
   process.exit(1);
 }
+
+// Resolve paths
+const config = getFullConfig();
+const vaultPath = config.vault_path || 'vault';
+const localVault = join(PROJECT_ROOT, vaultPath);
+
+const remoteVault = join(targetDeployment.deployPath, targetDeployment.remoteVaultPath);
+const sshUser = targetDeployment.sshUser;
+const sshPort = targetDeployment.sshPort;
+const targetIp = targetDeployment.ip;
 
 // Build excludes
 const userExcludes = unisonConfig.excludes || [];
