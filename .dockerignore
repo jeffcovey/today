@@ -1,6 +1,7 @@
 node_modules
 npm-debug.log
 .git
+.git.nosync
 .gitignore
 README.md
 Dockerfile
@@ -11,3 +12,13 @@ Dockerfile
 .env.keys
 .DS_Store
 *.log
+
+# Large directories not needed in the build image (bind-mounted at runtime)
+vault/
+.devcontainer/
+deploy/
+test/
+docs/
+.worktrees/
+.claude/
+.obsidian/
