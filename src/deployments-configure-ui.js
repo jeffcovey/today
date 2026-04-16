@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import { TextInput, Select } from '@inkjs/ui';
+import { getServiceEntries } from './deploy/services.js';
 import htm from 'htm';
 import fs from 'fs';
 import path from 'path';
@@ -36,6 +37,13 @@ const PREDEFINED_JOBS = [
     description: 'Sync all plugins every 10 minutes',
     schedule: '*/10 * * * *',
     command: 'bin/plugins sync'
+  },
+  {
+    key: 'git-sync',
+    label: 'Git Sync (vault)',
+    description: 'Pull/rebase/push the vault via git every minute (for local deployments)',
+    schedule: '* * * * *',
+    command: 'bin/git-sync'
   }
 ];
 
@@ -220,6 +228,8 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
         { key: 'ssh_port', type: 'text' },
         { key: '__services__', type: 'submenu' },
         { key: '__jobs__', type: 'submenu' },
+        { key: 'unison_target', type: 'text', label: 'Unison Target', nested: 'unison.target' },
+        { key: 'unison_paths', type: 'text', label: 'Unison Paths (comma-separated)', nested: 'unison.paths' },
         { key: '__delete__', type: 'action' },
       ];
       const fieldIdx = typeof editField === 'number' ? editField : 0;
@@ -251,7 +261,15 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
         } else if (field.type === 'encrypted') {
           setEditValue('');
         } else {
-          setEditValue(String(selected[field.key] || ''));
+          // Read value, handling nested dotted paths like 'unison.target'
+          let val;
+          if (field.nested) {
+            val = field.nested.split('.').reduce((obj, k) => obj?.[k], selected);
+            if (Array.isArray(val)) val = val.join(', ');
+          } else {
+            val = selected[field.key];
+          }
+          setEditValue(String(val || ''));
         }
       }
       return;
@@ -259,7 +277,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
     // Services mode
     if (mode === 'services') {
-      const serviceKeys = ['scheduler', 'inbox-api', 'vault-web', '__back__'];
+      const serviceKeys = [...getServiceEntries().map(s => s.key), '__back__'];
       if (key.escape || input === 'q') {
         setMode('edit');
         setServiceIndex(0);
@@ -456,16 +474,35 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
   };
 
   // Save a deployment setting
-  const saveDeploymentSetting = (provider, name, key, value) => {
+  const saveDeploymentSetting = (provider, name, key, value, nested) => {
     const config = readConfig();
     if (!config.deployments) config.deployments = {};
     if (!config.deployments[provider]) config.deployments[provider] = {};
     if (!config.deployments[provider][name]) config.deployments[provider][name] = {};
 
-    if (value === '' || value === null) {
-      delete config.deployments[provider][name][key];
+    if (nested) {
+      // Handle dotted paths like 'unison.target' → config.deployments[p][n].unison.target
+      const parts = nested.split('.');
+      let obj = config.deployments[provider][name];
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!obj[parts[i]]) obj[parts[i]] = {};
+        obj = obj[parts[i]];
+      }
+      const leafKey = parts[parts.length - 1];
+      if (value === '' || value === null) {
+        delete obj[leafKey];
+      } else if (leafKey === 'paths') {
+        // Store paths as an array, split on commas
+        obj[leafKey] = value.split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        obj[leafKey] = value;
+      }
     } else {
-      config.deployments[provider][name][key] = value;
+      if (value === '' || value === null) {
+        delete config.deployments[provider][name][key];
+      } else {
+        config.deployments[provider][name][key] = value;
+      }
     }
 
     writeConfig(config);
@@ -658,17 +695,16 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
   if (mode === 'edit' && selected) {
     // Get current services config
     const services = selected.services || {};
-    const servicesList = [
-      { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
-      { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
-    ];
+    const servicesList = getServiceEntries();
 
     // Get current jobs
     const jobs = selected.jobs || {};
     const jobCount = Object.keys(jobs).length;
 
     const enabledServiceNames = servicesList.filter(s => services[s.key]).map(s => s.label).join(', ') || 'None';
+
+    const unisonTarget = selected.unison?.target || '';
+    const unisonPaths = selected.unison?.paths || [];
 
     const fields = [
       { key: 'enabled', label: 'Enabled', value: selected.enabled !== false, type: 'boolean' },
@@ -680,6 +716,8 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
       { key: 'ssh_port', label: 'SSH Port', value: String(selected.ssh_port || 22), type: 'text' },
       { key: '__services__', label: 'Services', value: enabledServiceNames, type: 'submenu' },
       { key: '__jobs__', label: 'Jobs', value: `${jobCount} configured`, type: 'submenu' },
+      { key: 'unison_target', label: 'Unison Target', value: unisonTarget || '(not set)', type: 'text', nested: 'unison.target' },
+      { key: 'unison_paths', label: 'Unison Paths', value: unisonPaths.length > 0 ? unisonPaths.join(', ') : '(all)', type: 'text', nested: 'unison.paths' },
       { key: '__delete__', label: '🗑️  Delete this deployment', value: '', type: 'action' },
     ];
 
@@ -731,7 +769,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
                 if (field?.type === 'encrypted' && field?.envVar) {
                   if (value) setEnvVar(field.envVar, value);
                 } else {
-                  saveDeploymentSetting(selected.provider, selected.name, field.key, value);
+                  saveDeploymentSetting(selected.provider, selected.name, field.key, value, field?.nested);
                 }
                 refreshDeployments();
                 setEditValue(null);
@@ -756,11 +794,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
   if (mode === 'services' && selected) {
     const services = selected.services || {};
-    const servicesList = [
-      { key: 'scheduler', label: 'Scheduler', desc: 'Run scheduled jobs' },
-      { key: 'inbox-api', label: 'Inbox API', desc: 'Receive uploads from mobile' },
-      { key: 'vault-web', label: 'Vault Web', desc: 'Serve vault as static site' },
-    ];
+    const servicesList = getServiceEntries();
 
     const serviceRows = servicesList.map((s, i) => {
       const isSelected = i === serviceIndex;

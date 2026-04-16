@@ -7,6 +7,7 @@
 import { DigitalOceanProvider } from './digitalocean.js';
 import { HetznerProvider } from './hetzner.js';
 import { GenericVpsProvider } from './generic-vps.js';
+import { LocalProvider } from './local.js';
 
 export const providers = {
   'digitalocean': DigitalOceanProvider,
@@ -14,6 +15,7 @@ export const providers = {
   'generic-vps': GenericVpsProvider,
   'generic': GenericVpsProvider,  // alias
   'vps': GenericVpsProvider,      // alias
+  'local': LocalProvider,
 };
 
 /**
@@ -43,6 +45,7 @@ export function listProviders() {
     { name: 'digitalocean', label: 'DigitalOcean', description: 'DigitalOcean Droplets' },
     { name: 'hetzner', label: 'Hetzner', description: 'Hetzner Cloud servers' },
     { name: 'generic-vps', label: 'Generic VPS', description: 'Any Linux VPS with SSH access' },
+    { name: 'local', label: 'Local', description: 'The current machine (Mac, dev laptop) via docker-compose' },
   ];
 }
 

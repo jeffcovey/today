@@ -1,28 +1,135 @@
-version: '3.3'
+# NOTE ON BIND-MOUNT PATHS
+#
+# `HOST_PROJECT_PATH` lets this compose file work both (a) from a shell on
+# the host, where `.` already resolves to the project root, and (b) from
+# inside the devcontainer, where `.` would resolve to /workspaces/today —
+# a path that only exists INSIDE the container, not on the host daemon
+# that actually creates the bind mounts. When run from inside the
+# devcontainer, `.devcontainer/devcontainer.json` sets HOST_PROJECT_PATH
+# from VS Code's ${localWorkspaceFolder}, so bind mounts get the real
+# host path the daemon can see. From a host shell, HOST_PROJECT_PATH is
+# unset and the `.` fallback works as before.
+#
+# Same pattern applies to `HOST_HOME` for ~/.ssh and ~/.config/claude.
 
 services:
   today:
     build: .
     container_name: today
     environment:
-      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY}
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
       - SKIP_DEP_CHECK=${SKIP_DEP_CHECK:-false}
       - OLLAMA_HOST=http://ollama:11434
     volumes:
       # Mount the entire project directory
-      - .:/app
+      - ${HOST_PROJECT_PATH:-.}:/app
       # Use named volumes for caches to persist between container rebuilds
       - calendar-cache:/app/.calendar-cache
       # Override node_modules to use container's version
       - /app/node_modules
       # Mount SSH directory for git operations (read-only)
-      - ~/.ssh:/root/.ssh:ro
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
       # Mount Claude CLI config directory for authentication persistence
-      - ~/.config/claude:/root/.config/claude
+      - ${HOST_HOME:-~}/.config/claude:/root/.config/claude
     stdin_open: true
     tty: true
     depends_on:
       - ollama
+
+  # Long-running Today services for local deployments.
+  #
+  # These mirror the systemd services that run on remote droplets (see
+  # config/services/*.service). Enable them per-deployment via
+  # [deployments.local.<name>.services] in config.toml; bin/deploy brings
+  # them up via `docker compose up -d <name>`.
+  #
+  # None of these depend on ollama — users who want a local LLM can still
+  # `docker compose up -d ollama` explicitly, but the sync-oriented services
+  # don't need it and shouldn't pull a multi-gigabyte image just to start.
+
+  # Runs node src/scheduler.js. Reads jobs from .data/scheduler-config.json
+  # which bin/deploy writes from [deployments.local.<name>.jobs.*].
+  scheduler:
+    build: .
+    container_name: today-scheduler
+    command: ["npx", "dotenvx", "run", "--", "node", "src/scheduler.js"]
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      - SKIP_DEP_CHECK=true
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - calendar-cache:/app/.calendar-cache
+      - /app/node_modules
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+    restart: unless-stopped
+
+  # Runs node src/web-server.js — the vault web UI.
+  # No port mapping here — WEB_PORT is user-configured (encrypted in .env,
+  # decrypted by dotenvx at runtime) so compose can't know it at parse time.
+  # VS Code auto-forwards the port when it detects the server listening.
+  vault-web:
+    build: .
+    container_name: today-vault-web
+    command: ["npx", "dotenvx", "run", "--", "node", "src/web-server.js"]
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      - SKIP_DEP_CHECK=true
+      - NODE_ENV=production
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - calendar-cache:/app/.calendar-cache
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Runs node src/vault-watcher.js — real-time file change watcher.
+  vault-watcher:
+    build: .
+    container_name: today-vault-watcher
+    command: ["npx", "dotenvx", "run", "--", "node", "src/vault-watcher.js"]
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      - SKIP_DEP_CHECK=true
+      - NODE_ENV=production
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - calendar-cache:/app/.calendar-cache
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Runs node src/inbox-api.js — HTTPS upload endpoint for mobile apps.
+  inbox-api:
+    build: .
+    container_name: today-inbox-api
+    command: ["node", "src/inbox-api.js"]
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      - SKIP_DEP_CHECK=true
+      - NODE_ENV=production
+      - INBOX_API_PORT=3333
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - calendar-cache:/app/.calendar-cache
+      - /app/node_modules
+    ports:
+      - "3333:3333"
+    restart: unless-stopped
+
+  # Bidirectional working-tree sync via Unison over SSH.
+  # Uses its own Dockerfile (not the base image) so Unison is only
+  # installed when the user enables this service. Requires a matching
+  # Unison version on the remote end (installed by setupUnison()).
+  unison-sync:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.unison-sync
+    container_name: today-unison-sync
+    environment:
+      - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+    restart: unless-stopped
 
   ollama:
     image: ollama/ollama:latest

@@ -139,12 +139,15 @@ Many file-based plugins look for a "vault" directory and follow some [Obsidian](
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution. Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
 
-For multi-device sync, Today supports two built-in options on remote deployments (see `bin/deploy <name> setup --git-sync` or `--resilio`):
+Multi-device vault sync has two distinct layers:
 
-- **git-sync** (recommended): a systemd timer pulls/rebases/pushes the vault against its git remote every ~60s. No background daemon, no opaque state — conflicts surface as normal git rebase failures and get resolved on whichever peer introduced them. Requires the vault to be a git checkout with push credentials configured.
-- **Resilio Sync**: peer-to-peer sync via the Resilio daemon. Realtime and requires no git setup, but introduces a stateful daemon with its own sync metadata. Make sure `.git`, `.git.nosync`, and `node_modules` are in the share's IgnoreList before adding the folder — unignored git directories will flood the daemon.
+**Working-tree sync** (the files themselves) keeps the vault's actual file contents identical across devices. When you edit a file on one device, the change appears on all other devices — uncommitted, unstaged, just the raw bytes. Use any file-level sync tool you prefer: Resilio Sync, Syncthing, iCloud, Dropbox, Unison, etc. Make sure `.git`, `.git.nosync`, and `node_modules` are excluded from the sync — unignored git directories will flood most sync daemons with inotify events.
 
-You can also use any external sync you already run (Syncthing, iCloud, Dropbox, etc.); those don't need integration with Today.
+**Committed-state sync** (git history) keeps each device's git repository in sync so that commits made on one device are available on all others. This is separate from working-tree sync — git can only push and pull *commits*, not uncommitted changes:
+
+- **git-sync**: a timer (systemd on remote deployments, scheduler cron on local) that runs `git pull --rebase --autostash && git push` every ~60s. When you commit on one device, git-sync pushes the commit to GitHub; on other devices, git-sync pulls it and fast-forwards HEAD. Working-tree content doesn't change (it was already in sync via the file-sync layer), but the git log and staging area update to reflect the new commit. Install via `bin/deploy <name> setup --git-sync` (remote) or add it as a scheduler job in `bin/today configure` (local).
+
+**Important:** git-sync does NOT create commits and does NOT sync uncommitted changes. Commits are always manual. If you only set up git-sync without a working-tree sync tool, files edited on one device will not appear on other devices until you commit and push.
 
 ---
 
@@ -332,6 +335,49 @@ Deployment copies your **local configuration** to the remote server, making the 
 | `digitalocean` | DigitalOcean Droplets with automated setup |
 | `hetzner` | Hetzner Cloud servers |
 | `generic` | Any VPS with SSH access |
+| `local` | The current machine, managed via docker-compose (e.g. running Today on a Mac) |
+
+### Local deployments (running Today on a Mac via Docker)
+
+A `local` deployment configures the machine you're on instead of SSHing to a remote. It's designed for running the Today containers via docker-compose on a Mac (or a Linux dev machine) while still using the same `config.toml` → `bin/deploy` → scheduler model as the remote droplets.
+
+Example config.toml entry for a Mac:
+
+```toml
+[deployments.local.macbook]
+deploy_path = "/Users/you/today"
+enabled = true
+
+[deployments.local.macbook.services]
+scheduler = true
+
+[deployments.local.macbook.jobs.plugin-sync]
+schedule = "*/10 * * * *"
+command = "bin/plugins sync"
+
+[deployments.local.macbook.jobs.git-sync]
+schedule = "* * * * *"
+command = "bin/git-sync"
+description = "Pull/rebase/push vault via git"
+```
+
+Then on the Mac:
+
+```bash
+bin/deploy macbook setup       # one-time: docker compose build
+bin/deploy macbook              # write scheduler-config.json and `docker compose up -d scheduler`
+bin/deploy macbook services     # show compose service status
+bin/deploy macbook logs scheduler
+```
+
+A few things to know about local deployments:
+
+- **No systemd, no apt.** Service management maps to `docker compose up/stop/restart/ps`; package install is the image's job.
+- **git-sync as a scheduler job.** On remote deployments, `--git-sync` installs a systemd timer out-of-band. On local deployments, git-sync runs as a regular cron entry inside the scheduler container — enable it via `bin/today configure` → Deployments → your deployment's jobs list, or add it to `[deployments.local.<name>.jobs.git-sync]` directly as in the example above. Running `bin/deploy <name> setup --git-sync` on a local deployment prints a reminder rather than installing anything.
+- **Resilio Sync is not supported** on local deployments (`--resilio` emits a warning and exits).
+- **Git push credentials inside the container**: the compose file bind-mounts `~/.ssh` read-only, so SSH URLs just work. If your vault remote is HTTPS, switch it: `cd <vault> && git remote set-url origin git@github.com:<user>/<vault>.git`. macOS Keychain credential helpers don't work inside a Linux container.
+- **Running `bin/deploy` from inside the devcontainer works**. The devcontainer uses the official `docker-outside-of-docker` feature to install Docker CLI + Compose plugin and wire up `/var/run/docker.sock` with correct group permissions, so `docker compose` commands from inside the devcontainer talk to the host's Docker daemon. The root `docker-compose.yml` uses `${HOST_PROJECT_PATH}` and `${HOST_HOME}` (set via `containerEnv` in `.devcontainer/devcontainer.json`) so bind mounts resolve against the real host filesystem rather than `/workspaces/today`. If Docker CLI isn't available in your shell, `bin/deploy` fails loudly with a copy-pasteable set of `docker compose` commands to run from a host terminal instead. Rebuild the devcontainer ("Dev Containers: Rebuild Container") after pulling these changes so the feature gets installed.
+- **Services available locally**: `scheduler`, `vault-web`, `vault-watcher`, and `inbox-api` are all defined as compose services in the root `docker-compose.yml` and can be toggled per-deployment under `[deployments.local.<name>.services]`. None of them depend on `ollama` — if you want a local LLM, bring it up explicitly with `docker compose up -d ollama`.
 
 ### Services & Jobs
 
