@@ -323,8 +323,12 @@ ${timerUnit}TIMER
         exit 1
       fi
 
-      curl -sL "$URL" | tar -xz -C /usr/local/bin
+      # The tarball contains bin/unison inside it, so extract to /usr/local
+      # (not /usr/local/bin) so it lands at /usr/local/bin/unison.
+      curl -sL "$URL" | tar -xz -C /usr/local --strip-components=0
       chmod +x /usr/local/bin/unison /usr/local/bin/unison-fsmonitor 2>/dev/null || true
+      # Clean up non-binary files the tarball extracts to /usr/local
+      rm -f /usr/local/CONTRIBUTING.md /usr/local/INSTALL.md /usr/local/LICENSE /usr/local/NEWS.md /usr/local/README.md 2>/dev/null || true
 
       echo ""
       echo "✓ Unison installed: $(unison -version 2>&1 | head -1)"
