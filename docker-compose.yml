@@ -124,12 +124,16 @@ services:
       context: .
       dockerfile: deploy/docker/Dockerfile.unison-sync
     container_name: today-unison-sync
-    command: ["npx", "dotenvx", "run", "--", "node", "bin/unison-sync"]
+    # Run setup-ssh-keys.sh first to decrypt the deploy key from .env,
+    # then start unison-sync. Both run under dotenvx so encrypted env
+    # vars (DO_DEPLOY_KEY_PRIVATE, DO_DROPLET_IP, etc.) are available.
+    # No host SSH mount needed — the key comes from .env, same as the
+    # devcontainer's postCreateCommand.
+    command: ["npx", "dotenvx", "run", "--overload", "--", "sh", "-c", ".devcontainer/setup-ssh-keys.sh && node bin/unison-sync"]
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
-      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
     restart: unless-stopped
 
   ollama:
