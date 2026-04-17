@@ -1,0 +1,20 @@
+#!/bin/bash
+# Personal devcontainer startup — runs on every container start.
+#
+# Copy this file to personal-startup.sh (which is gitignored) and customize.
+# Use this for long-running personal services. For one-time tool installation,
+# use personal-setup.sh instead (runs only on create/rebuild).
+#
+# Example — VS Code remote tunnel with persistent auth and auto-restart:
+#
+# nohup bash -c '
+#   while true; do
+#     code tunnel --accept-server-license-terms --cli-data-dir /app/.data/vscode-cli
+#     echo "$(date): Code tunnel exited, restarting in 5s..." >> /tmp/code-tunnel.log
+#     sleep 5
+#   done
+# ' > /tmp/code-tunnel.log 2>&1 &
+# echo "  Code tunnel started (log: /tmp/code-tunnel.log)"
+#
+# --cli-data-dir on the bind-mounted /app/.data/ persists auth across rebuilds.
+# The restart loop recovers from crashes when you're away.
