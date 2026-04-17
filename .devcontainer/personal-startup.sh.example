@@ -7,14 +7,18 @@
 #
 # Example — VS Code remote tunnel with persistent auth and auto-restart:
 #
-# nohup bash -c '
+# TUNNEL_NAME=$(cat /app/.data/deployment-name 2>/dev/null || echo "today")
+# CODE=/usr/local/bin/code  # NOT the devcontainer's remote-cli 'code' which opens files
+# nohup bash -c "
 #   while true; do
-#     code tunnel --accept-server-license-terms --cli-data-dir /app/.data/vscode-cli
-#     echo "$(date): Code tunnel exited, restarting in 5s..." >> /tmp/code-tunnel.log
+#     $CODE tunnel --accept-server-license-terms --cli-data-dir /app/.data/vscode-cli --name $TUNNEL_NAME
+#     echo \"\$(date): Code tunnel exited, restarting in 5s...\" >> /tmp/code-tunnel.log
 #     sleep 5
 #   done
-# ' > /tmp/code-tunnel.log 2>&1 &
-# echo "  Code tunnel started (log: /tmp/code-tunnel.log)"
+# " > /tmp/code-tunnel.log 2>&1 &
+# echo "  Code tunnel '$TUNNEL_NAME' started (log: /tmp/code-tunnel.log)"
 #
+# Requires the standalone VS Code CLI installed via personal-setup.sh (see example).
 # --cli-data-dir on the bind-mounted /app/.data/ persists auth across rebuilds.
+# --name uses the deployment name so tunnels are distinguishable (e.g. "macbook", "mini").
 # The restart loop recovers from crashes when you're away.
