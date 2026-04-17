@@ -30,7 +30,7 @@
  *   2  unison failed
  */
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -119,6 +119,16 @@ const sshUser = targetDeployment.sshUser;
 const sshPort = targetDeployment.sshPort;
 const targetIp = targetDeployment.ip;
 
+// Clean up stale lock files on the remote before starting. These get left
+// behind when a container crashes mid-sync and prevent all future runs.
+const sshKey = resolveSSHKey(targetDeployment);
+const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${sshKey} ${sshUser}@${targetIp}`;
+try {
+  execSync(`${sshCmd} 'rm -f ~/.unison/lk*'`, { stdio: 'pipe' });
+} catch {
+  // Best-effort — if SSH fails here, unison will report the real error
+}
+
 // Build excludes
 const userExcludes = unisonConfig.excludes || [];
 const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];
@@ -136,6 +146,7 @@ const args = [
   '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
   '-perms', '0',     // ignore permission differences (macOS vs Linux)
   '-dontchmod',      // don't try to set permissions on the remote
+  '-retry', '3',     // retry on transient failures (stale locks, network blips)
   '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
 ];
 
