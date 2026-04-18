@@ -58,6 +58,8 @@ __pycache__/
 # DevContainer Local Config
 # =============================================================================
 .devcontainer/mounts.local
+.devcontainer/personal-setup.sh
+.devcontainer/personal-startup.sh
 .devcontainer/docker-compose.override.yml
 # Root-level docker-compose override is auto-generated from
 # .devcontainer/mounts.local by generate-compose-override.sh and points

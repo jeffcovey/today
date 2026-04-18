@@ -1,0 +1,31 @@
+#!/bin/bash
+# Personal devcontainer startup — runs on every container start.
+#
+# Copy this file to personal-startup.sh (which is gitignored) and customize.
+# Use this for long-running personal services. For one-time tool installation,
+# use personal-setup.sh instead (runs only on create/rebuild).
+#
+# Example — VS Code remote tunnel with persistent auth and auto-restart:
+#
+# TUNNEL_NAME=$(cat "$(pwd)/.data/deployment-name" 2>/dev/null || echo "today")
+# CODE=/usr/local/bin/code  # NOT the devcontainer's remote-cli 'code' which opens files
+# CLI_DATA="$(pwd)/.data/vscode-cli"
+#
+# # Ensure data dir exists and is writable (.data/ may be owned by root)
+# sudo mkdir -p "$CLI_DATA"
+# sudo chown "$(whoami)" "$CLI_DATA"
+#
+# nohup bash -c "
+#   while true; do
+#     $CODE tunnel --accept-server-license-terms --cli-data-dir $CLI_DATA --name $TUNNEL_NAME
+#     echo \"\$(date): Code tunnel exited, restarting in 5s...\" >> /tmp/code-tunnel.log
+#     sleep 5
+#   done
+# " > /tmp/code-tunnel.log 2>&1 &
+# echo "  Code tunnel '$TUNNEL_NAME' started (log: /tmp/code-tunnel.log)"
+#
+# Requires the standalone VS Code CLI installed via personal-setup.sh (see example).
+# --cli-data-dir persists auth in the bind-mounted .data/ so it survives rebuilds.
+# --name uses the deployment name so tunnels are distinguishable (e.g. "macbook", "mini").
+# The restart loop recovers from crashes when you're away.
+# First run requires interactive auth; subsequent starts are automatic.

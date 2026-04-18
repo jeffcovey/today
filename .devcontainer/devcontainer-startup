@@ -20,5 +20,14 @@ else
 fi
 
 echo ""
+
+# Run personal startup script if present (for per-user long-running
+# services like code tunnel). Separate from personal-setup.sh which
+# runs only on create; this runs on every start.
+if [ -f .devcontainer/personal-startup.sh ]; then
+    echo "Running personal startup..."
+    bash .devcontainer/personal-startup.sh
+fi
+
 echo "DevContainer startup complete!"
 echo "Run 'bin/today' to start an interactive session."

@@ -1,0 +1,28 @@
+#!/bin/bash
+# Personal devcontainer setup — install your preferred tools here.
+#
+# Copy this file to personal-setup.sh (which is gitignored) and customize.
+# It runs automatically after each container create/rebuild via postCreateCommand.
+# The devcontainer runs as the 'node' user, so use sudo for system changes.
+#
+# Example:
+
+# sudo apt-get update && sudo apt-get install -y fish tmux
+# sudo chsh -s /usr/bin/fish node
+
+# VS Code standalone CLI (for 'code tunnel' — different from the devcontainer's
+# built-in 'code' which opens files). Only needed if using personal-startup.sh
+# to run a tunnel.
+#
+# if ! /usr/local/bin/code tunnel --help > /dev/null 2>&1; then
+#   ARCH=$(uname -m)
+#   if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+#     CLI_URL="https://update.code.visualstudio.com/latest/cli-alpine-arm64/stable"
+#   else
+#     CLI_URL="https://update.code.visualstudio.com/latest/cli-alpine-x64/stable"
+#   fi
+#   curl -sL "$CLI_URL" -o /tmp/code-cli.tar.gz
+#   sudo tar xzf /tmp/code-cli.tar.gz -C /usr/local/bin/
+#   rm /tmp/code-cli.tar.gz
+#   echo "VS Code CLI installed for tunneling"
+# fi
