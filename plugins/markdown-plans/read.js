@@ -3445,9 +3445,22 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
   const fields = fieldMap[planType];
   if (!fields) return false;
 
-  // Update frontmatter
-  frontmatter[fields.theme] = theme;
-  frontmatter[fields.goals] = goals;
+  // Only update fields that are currently empty — don't overwrite user-entered content
+  const existingTheme = frontmatter[fields.theme];
+  const existingGoals = frontmatter[fields.goals];
+
+  const themeEmpty = !existingTheme || existingTheme.trim() === '';
+  const goalsEmpty = !existingGoals || !Array.isArray(existingGoals) ||
+    existingGoals.length === 0 ||
+    existingGoals.every(g => {
+      const trimmed = g ? g.trim() : '';
+      return trimmed === '' || trimmed === '-';
+    });
+
+  if (!themeEmpty && !goalsEmpty) return false;
+
+  if (themeEmpty) frontmatter[fields.theme] = theme;
+  if (goalsEmpty) frontmatter[fields.goals] = goals;
 
   // Rebuild the file
   const yamlContent = Object.entries(frontmatter)
@@ -3758,6 +3771,12 @@ function updatePlanWithSummary(planPath, planType, summary) {
 
   const summaryField = fieldMap[planType];
   if (!summaryField) return false;
+
+  // Don't overwrite a summary the user has already written
+  const existingSummary = frontmatter[summaryField];
+  const trimmedSummary = existingSummary ? existingSummary.trim() : '';
+  const isEmpty = trimmedSummary === '' || trimmedSummary === 'No daily summaries available for this week';
+  if (!isEmpty) return false;
 
   // Escape quotes in summary for YAML
   const escapedSummary = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
