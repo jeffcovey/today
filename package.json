@@ -20,10 +20,10 @@
     "@ai-sdk/anthropic": "^3.0.71",
     "@ai-sdk/google": "^3.0.64",
     "@ai-sdk/openai": "^3.0.53",
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@clack/prompts": "^1.2.0",
     "@date-fns/tz": "^1.4.1",
-    "@dotenvx/dotenvx": "^1.61.1",
+    "@dotenvx/dotenvx": "^1.63.0",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^6.0.168",
@@ -56,7 +56,7 @@
     "ollama-ai-provider-v2": "^3.5.0",
     "pdf-lib": "^1.17.1",
     "picocolors": "^1.1.1",
-    "puppeteer": "^24.41.0",
+    "puppeteer": "^24.42.0",
     "react": "^19.2.5",
     "smol-toml": "^1.6.1",
     "tsdav": "^2.1.8",
@@ -72,7 +72,7 @@
     "@types/jest": "^30.0.0",
     "jest": "^30.3.0",
     "lefthook": "^2.1.6",
-    "markdownlint-cli2": "^0.22.0"
+    "markdownlint-cli2": "^0.22.1"
   },
   "overrides": {
     "nodemailer": "^7.0.11"
