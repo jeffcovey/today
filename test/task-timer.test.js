@@ -1,8 +1,8 @@
 /**
  * Task Timer Logic Tests
  *
- * Tests the deduplication and seenIds-skip logic that prevents tasks from
- * appearing multiple times during a timer session.
+ * Tests the deduplication, seenIds-skip, and validity-check logic that prevents
+ * tasks from appearing multiple times or after they have been completed.
  */
 
 // ── Inline replicas of the patched logic (kept in sync with web-server.js) ──
@@ -23,13 +23,18 @@ function deduplicateAndShuffle(items) {
 }
 
 /**
- * Advance index past the next already-seen item.
- * Mirrors the while loop added to advanceTimerIfNeeded() and the skip endpoint.
+ * Advance index past items that are already seen or no longer valid.
+ * Mirrors the while loop in advanceTimerIfNeeded() and the skip endpoint.
+ *
+ * @param {Array}    items        - Full item list
+ * @param {number}   currentIndex - Index to start advancing from (exclusive; we increment first)
+ * @param {Set}      seenIds      - IDs already shown this session
+ * @param {Function} isValid      - Predicate; returns false for items to skip
  */
-function advancePastSeen(items, currentIndex, seenIds) {
+function advancePastSeen(items, currentIndex, seenIds, isValid = () => true) {
   let idx = currentIndex;
   idx++;
-  while (idx < items.length && seenIds.has(items[idx].id)) {
+  while (idx < items.length && (seenIds.has(items[idx].id) || !isValid(items[idx]))) {
     idx++;
   }
   return idx;
@@ -130,3 +135,53 @@ describe('timer advancement – skip already-seen items', () => {
     expect(advancePastSeen(items, 0, seenIds)).toBe(1); // past the end
   });
 });
+
+describe('timer advancement – skip invalid (completed/reviewed) items', () => {
+  // isValid returns false for items whose IDs are in the "completed" set
+  const makeIsValid = (completedIds) => (item) => !completedIds.has(item.id);
+
+  test('advances normally when the next item is still valid', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const seenIds = new Set(['a']);
+    const isValid = makeIsValid(new Set()); // nothing completed
+    expect(advancePastSeen(items, 0, seenIds, isValid)).toBe(1);
+  });
+
+  test('skips an item that has been completed externally', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const seenIds = new Set(['a']);
+    const isValid = makeIsValid(new Set(['b'])); // b was completed
+    // b is invalid, so advancement should land on c (index 2)
+    expect(advancePastSeen(items, 0, seenIds, isValid)).toBe(2);
+  });
+
+  test('skips multiple consecutive invalid items', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+    const seenIds = new Set(['a']);
+    const isValid = makeIsValid(new Set(['b', 'c'])); // b and c completed
+    expect(advancePastSeen(items, 0, seenIds, isValid)).toBe(3); // lands on d
+  });
+
+  test('skips a mix of seen-ids and invalid items', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+    const seenIds = new Set(['a', 'b']); // b already seen
+    const isValid = makeIsValid(new Set(['c'])); // c completed externally
+    // b skipped (seen), c skipped (invalid), lands on d
+    expect(advancePastSeen(items, 0, seenIds, isValid)).toBe(3);
+  });
+
+  test('returns items.length when all remaining items are invalid', () => {
+    const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const seenIds = new Set(['a']);
+    const isValid = makeIsValid(new Set(['b', 'c']));
+    expect(advancePastSeen(items, 0, seenIds, isValid)).toBe(3);
+  });
+
+  test('does not skip items when isValid always returns true (unknown-type fallback)', () => {
+    const items = [{ id: 'a' }, { id: 'b' }];
+    const seenIds = new Set(['a']);
+    // isValid always returns true (mirrors "return true" for unknown types in isItemStillValid)
+    expect(advancePastSeen(items, 0, seenIds, () => true)).toBe(1);
+  });
+});
+

@@ -722,6 +722,41 @@ async function getTodayTaskTimerItems() {
   return dedupedItems;
 }
 
+// Check whether a task-timer item is still actionable (not yet completed / still needs review).
+// Used before starting a timer on any item so that tasks completed externally (e.g. in Obsidian)
+// or projects that have just been reviewed are silently skipped rather than presented to the user.
+function isItemStillValid(item) {
+  const db = getDatabase();
+  if (item.type === 'task') {
+    const taskId = item.id.replace(/^task-/, '');
+    return !!db.prepare(`SELECT id FROM tasks WHERE id = ? AND status = 'open'`).get(taskId);
+  } else if (item.type === 'habit') {
+    const habitId = item.id.replace(/^habit-/, '');
+    const today = getTodayDate();
+    return !!db.prepare(
+      `SELECT habit_id FROM habits WHERE habit_id = ? AND date = ? AND status = 'pending'`
+    ).get(habitId, today);
+  } else if (item.type === 'project') {
+    const projectId = item.id.replace(/^project-/, '');
+    const today = getTodayDate();
+    return !!db.prepare(`
+      SELECT id FROM projects
+      WHERE id = @projectId
+        AND status IN ('active', 'planning')
+        AND review_frequency IS NOT NULL
+        AND (
+          last_reviewed IS NULL
+          OR (review_frequency = 'daily'     AND julianday(@today) - julianday(last_reviewed) >= 1)
+          OR (review_frequency = 'weekly'    AND julianday(@today) - julianday(last_reviewed) >= 7)
+          OR (review_frequency = 'monthly'   AND julianday(@today) - julianday(last_reviewed) >= 30)
+          OR (review_frequency = 'quarterly' AND julianday(@today) - julianday(last_reviewed) >= 90)
+          OR (review_frequency = 'yearly'    AND julianday(@today) - julianday(last_reviewed) >= 365)
+        )
+    `).get({ projectId, today });
+  }
+  return true; // unknown type – assume valid
+}
+
 // Get current task timer state
 let taskTimerState = {
   isRunning: false,
@@ -798,15 +833,15 @@ function advanceTimerIfNeeded() {
   if (taskTimerState.phase === 'rest' && now - new Date(taskTimerState.startTime).getTime() >= restMs) {
     // Rest expired → advance to next item
     if (!applySyncedItems()) {
-      // Advance past any items already seen (defensive: prevents repeats if the list has
-      // items whose IDs are already in seenIds, e.g. duplicate entries from multiple sources)
       taskTimerState.currentIndex++;
-      while (
-        taskTimerState.currentIndex < taskTimerState.items.length &&
-        taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id)
-      ) {
-        taskTimerState.currentIndex++;
-      }
+    }
+    // Skip items that are already seen OR are no longer valid (e.g. completed externally)
+    while (
+      taskTimerState.currentIndex < taskTimerState.items.length &&
+      (taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id) ||
+       !isItemStillValid(taskTimerState.items[taskTimerState.currentIndex]))
+    ) {
+      taskTimerState.currentIndex++;
     }
 
     if (taskTimerState.currentIndex >= taskTimerState.items.length) {
@@ -7274,15 +7309,15 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
 
     // Use synced items if background sync completed, otherwise advance in current list
     if (!applySyncedItems()) {
-      // Advance past any items already seen (defensive: prevents repeats if the list has
-      // items whose IDs are already in seenIds, e.g. duplicate entries from multiple sources)
       taskTimerState.currentIndex++;
-      while (
-        taskTimerState.currentIndex < taskTimerState.items.length &&
-        taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id)
-      ) {
-        taskTimerState.currentIndex++;
-      }
+    }
+    // Skip items that are already seen OR are no longer valid (e.g. completed externally)
+    while (
+      taskTimerState.currentIndex < taskTimerState.items.length &&
+      (taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id) ||
+       !isItemStillValid(taskTimerState.items[taskTimerState.currentIndex]))
+    ) {
+      taskTimerState.currentIndex++;
     }
 
     // If we've exhausted the list, re-fetch from DB (filtering out seen items)
