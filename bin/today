@@ -228,6 +228,7 @@ async function main() {
 
   const fs = await import('fs');
   const path = await import('path');
+  const os = await import('os');
   const { execSync, spawnSync } = await import('child_process');
   const readline = await import('readline');
 
@@ -654,23 +655,30 @@ ${contextSection}`;
       // Non-interactive mode: use AI provider directly or Claude CLI
       log('🤖 Running in non-interactive mode...');
       if (useClaudeCLI) {
-        const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', prompt], {
-          stdio: quiet ? ['pipe', 'pipe', 'pipe'] : 'inherit',
-          timeout: 600000 // 10 minutes in milliseconds
-        });
-        if (result.error) {
-          if (result.error.code === 'ETIMEDOUT') {
-            console.error('ERROR: Command timed out after 10 minutes');
-          } else {
-            console.error(`ERROR: ${result.error.message}`);
+        const promptFile = path.join(os.tmpdir(), `today-prompt-${process.pid}.txt`);
+        fs.writeFileSync(promptFile, prompt);
+        const userMessage = directRequest || 'What should I focus on right now?';
+        try {
+          const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', '--append-system-prompt-file', promptFile, userMessage], {
+            stdio: quiet ? ['pipe', 'pipe', 'pipe'] : 'inherit',
+            timeout: 600000 // 10 minutes in milliseconds
+          });
+          if (result.error) {
+            if (result.error.code === 'ETIMEDOUT') {
+              console.error('ERROR: Command timed out after 10 minutes');
+            } else {
+              console.error(`ERROR: ${result.error.message}`);
+            }
+            process.exit(1);
           }
-          process.exit(1);
-        }
-        if (quiet && result.stdout) {
-          console.log(result.stdout.toString());
-        }
-        if (result.status !== 0) {
-          process.exit(result.status || 1);
+          if (quiet && result.stdout) {
+            console.log(result.stdout.toString());
+          }
+          if (result.status !== 0) {
+            process.exit(result.status || 1);
+          }
+        } finally {
+          try { fs.unlinkSync(promptFile); } catch {}
         }
       } else {
         // Use AI provider directly for non-interactive
@@ -697,7 +705,22 @@ ${contextSection}`;
       } else {
         log('🤖 Starting daily review...');
       }
-      spawnSync('claude', ['--model', model, prompt], { stdio: 'inherit' });
+      const promptFile = path.join(os.tmpdir(), `today-prompt-${process.pid}.txt`);
+      fs.writeFileSync(promptFile, prompt);
+      const userMessage = directRequest || 'What should I focus on right now?';
+      try {
+        const claudeResult = spawnSync('claude', ['--model', model, '--append-system-prompt-file', promptFile, userMessage], { stdio: 'inherit' });
+        if (claudeResult.error) {
+          console.error(`ERROR: failed to launch claude: ${claudeResult.error.message}`);
+          process.exit(1);
+        }
+        if (claudeResult.status !== 0) {
+          console.error(`ERROR: claude exited with status ${claudeResult.status}${claudeResult.signal ? ` (signal ${claudeResult.signal})` : ''}`);
+          process.exit(claudeResult.status || 1);
+        }
+      } finally {
+        try { fs.unlinkSync(promptFile); } catch {}
+      }
     } else {
       // Interactive mode with built-in REPL (for Ollama, OpenAI, Gemini, etc.)
       if (directRequest) {

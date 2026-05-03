@@ -88,8 +88,8 @@ async function getOllamaModel(modelName, options = {}) {
 
 // Default models for each provider
 const DEFAULT_MODELS = {
-  anthropic: 'claude-sonnet-4-20250514',
-  'anthropic-api': 'claude-sonnet-4-20250514',
+  anthropic: 'claude-sonnet-4-6',
+  'anthropic-api': 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   google: 'gemini-1.5-flash',
   ollama: 'llama3.2',

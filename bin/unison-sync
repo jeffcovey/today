@@ -129,6 +129,35 @@ try {
   // Best-effort — if SSH fails here, unison will report the real error
 }
 
+// Clean up stale lock files locally too. The .data/unison directory is
+// volume-mounted, so locks survive container restarts; without this, a
+// crash mid-sync wedges all future runs until manually cleared.
+const localUnisonDir = join(PROJECT_ROOT, '.data', 'unison');
+try {
+  execSync(`rm -f ${localUnisonDir}/lk*`, { stdio: 'pipe' });
+} catch {
+  // Best-effort
+}
+
+// Rotate the unison log if it's grown too large. Repeated lock errors or
+// a long uptime can grow this to gigabytes; truncate when it crosses the
+// threshold to prevent disk-fill.
+const LOG_ROTATE_THRESHOLD = 100 * 1024 * 1024; // 100 MB
+const logPath = join(localUnisonDir, 'unison.log');
+try {
+  if (existsSync(logPath)) {
+    const { statSync, truncateSync, renameSync } = await import('fs');
+    const size = statSync(logPath).size;
+    if (size > LOG_ROTATE_THRESHOLD) {
+      const rotated = `${logPath}.1`;
+      try { renameSync(logPath, rotated); } catch { truncateSync(logPath, 0); }
+      console.log(`Rotated unison.log (was ${(size / 1024 / 1024).toFixed(0)} MB)`);
+    }
+  }
+} catch (err) {
+  console.warn(`Log rotation skipped: ${err.message}`);
+}
+
 // Build excludes
 const userExcludes = unisonConfig.excludes || [];
 const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];

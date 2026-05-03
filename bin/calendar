@@ -78,7 +78,7 @@ async function getDefaultWritableSource() {
 }
 
 // Quiet sync - ensures database is current before read operations
-function ensureSync(db) {
+async function ensureSync(db) {
   await ensureSyncForType(db, 'events');
 }
 
@@ -215,7 +215,7 @@ function parseEventArgs(args) {
 
 // Date command - show events for a specific date
 async function cmdDate(db, targetDate) {
-  ensureSync(db);
+  await ensureSync(db);
 
   // Parse target date with timezone awareness
   const targetDateObj = new Date(targetDate + 'T12:00:00'); // Use noon to avoid DST issues
@@ -241,7 +241,7 @@ async function cmdDate(db, targetDate) {
 
 // Commands
 async function cmdToday(db) {
-  ensureSync(db);
+  await ensureSync(db);
 
   // Use timezone-aware day boundaries
   const today = getStartOfDay(new Date(), TIMEZONE);
@@ -274,7 +274,7 @@ async function cmdToday(db) {
 }
 
 async function cmdWeek(db) {
-  ensureSync(db);
+  await ensureSync(db);
 
   // Use timezone-aware day boundaries
   const weekStart = getStartOfDay(new Date(), TIMEZONE);
