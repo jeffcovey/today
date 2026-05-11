@@ -15,17 +15,41 @@
 # sudo mkdir -p "$CLI_DATA"
 # sudo chown "$(whoami)" "$CLI_DATA"
 #
-# nohup bash -c "
+# : > /tmp/code-tunnel.log
+# setsid nohup bash -c "
 #   while true; do
 #     $CODE tunnel --accept-server-license-terms --cli-data-dir $CLI_DATA --name $TUNNEL_NAME
 #     echo \"\$(date): Code tunnel exited, restarting in 5s...\" >> /tmp/code-tunnel.log
 #     sleep 5
 #   done
-# " > /tmp/code-tunnel.log 2>&1 &
+# " </dev/null >>/tmp/code-tunnel.log 2>&1 &
+# disown
 # echo "  Code tunnel '$TUNNEL_NAME' started (log: /tmp/code-tunnel.log)"
+#
+# # Surface the tunnel URL or a re-auth prompt in the devcontainer startup output.
+# for _ in $(seq 1 15); do
+#   sleep 1
+#   if grep -q 'vscode.dev/tunnel/' /tmp/code-tunnel.log 2>/dev/null; then
+#     URL=$(grep -o 'https://vscode.dev/tunnel/[^ ]*' /tmp/code-tunnel.log | tail -1)
+#     echo ""
+#     echo "  ✅ Tunnel ready: $URL"
+#     break
+#   fi
+#   if grep -q 'github.com/login/device' /tmp/code-tunnel.log 2>/dev/null; then
+#     CODE_VAL=$(grep -o 'use code [A-Z0-9-]*' /tmp/code-tunnel.log | tail -1 | awk '{print $3}')
+#     echo ""
+#     echo "  ⚠️  Tunnel '$TUNNEL_NAME' needs GitHub re-auth"
+#     echo "     Open: https://github.com/login/device"
+#     echo "     Code: $CODE_VAL"
+#     break
+#   fi
+# done
 #
 # Requires the standalone VS Code CLI installed via personal-setup.sh (see example).
 # --cli-data-dir persists auth in the bind-mounted .data/ so it survives rebuilds.
 # --name uses the deployment name so tunnels are distinguishable (e.g. "macbook", "mini").
 # The restart loop recovers from crashes when you're away.
-# First run requires interactive auth; subsequent starts are automatic.
+# setsid + </dev/null + disown fully detach the supervisor from the postStartCommand
+# exec session, which otherwise reaps backgrounded children when it exits.
+# First run requires interactive auth; subsequent starts are automatic until the
+# token expires, at which point the re-auth prompt appears in the startup output.
