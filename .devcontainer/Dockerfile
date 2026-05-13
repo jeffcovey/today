@@ -26,6 +26,21 @@ RUN ln -s /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true && \
 RUN su node -c "curl -fsSL https://claude.ai/install.sh | bash"
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 
+# Install standalone VS Code CLI for `code tunnel` (separate from the
+# devcontainer's remote-cli wrapper at /usr/local/bin/code).
+# Used by .devcontainer/personal-startup.sh.
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) VSCODE_ARCH=cli-linux-x64 ;; \
+      arm64) VSCODE_ARCH=cli-linux-arm64 ;; \
+      *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://update.code.visualstudio.com/latest/${VSCODE_ARCH}/stable" -o /tmp/vscode-cli.tar.gz && \
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp && \
+    mv /tmp/code /usr/local/lib/vscode-cli && \
+    chmod +x /usr/local/lib/vscode-cli && \
+    rm /tmp/vscode-cli.tar.gz
+
 # Install mdless (Ruby gem for markdown viewing)
 RUN gem install mdless --no-document
 
