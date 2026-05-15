@@ -37,6 +37,7 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
+import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -101,7 +102,12 @@ async function loadTemplate(name) {
 
 function renderTemplate(template, data = {}) {
   let result = template;
-  for (const [key, value] of Object.entries(data)) {
+  const templateData = {
+    themeToggleButton: getThemeToggleButtonHtml(),
+    themeBootstrapScript: getThemeBootstrapScript(),
+    ...data,
+  };
+  for (const [key, value] of Object.entries(templateData)) {
     result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value ?? '');
   }
   return result;
@@ -352,6 +358,7 @@ app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAg
 const pageStyle = `
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${getThemeBootstrapScript()}
 <!-- Font Awesome -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
 <!-- Google Fonts -->
@@ -375,40 +382,6 @@ const pageScriptsWithMarked = `
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 ${pageScripts}
 `;
-
-// Helper to get navbar
-function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
-  const { showSearch = true, searchValue = '' } = options;
-
-  const searchForm = showSearch ? `
-          <form class="d-flex" onsubmit="performSearch(event)">
-            <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${searchValue.replace(/"/g, '&quot;')}"` : ''} style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>` : '';
-
-  return `<!-- Loading Spinner Overlay -->
-      <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-      </div>
-      <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/">
-            <i class="fas ${icon} me-2"></i>${title}
-          </a>
-          <button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme" aria-label="Toggle theme mode">
-            <i class="fas fa-circle-half-stroke" id="themeToggleIcon"></i>
-          </button>
-          <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
-            <i class="fas fa-code-branch"></i>
-          </a>${showSearch ? `<div class="ms-2">${searchForm}</div>` : ''}
-        </div>
-      </nav>`;
-}
 
 // Helper to get breadcrumb navigation
 function getBreadcrumb(filePath) {
