@@ -29,7 +29,7 @@ export function getThemeToggleButtonHtml() {
 export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
   const { showSearch = true, searchValue = '' } = options;
   const searchForm = showSearch ? `
-          <form class="d-flex ms-2" onsubmit="performSearch(event)">
+          <form class="d-flex" onsubmit="performSearch(event)">
             <div class="input-group">
               <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${escapeSearchValue(searchValue)}"` : ''} style="max-width: 250px;">
               <button class="btn btn-light btn-sm" type="submit">
@@ -52,7 +52,7 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
             <i class="fas fa-code-branch"></i>
           </a>
-          ${searchForm}
+          ${showSearch ? `<div class="ms-2">${searchForm}</div>` : ''}
         </div>
       </nav>`;
 }
