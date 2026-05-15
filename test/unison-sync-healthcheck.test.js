@@ -190,4 +190,3 @@ describe('bin/unison-sync-healthcheck', () => {
     });
   });
 });
-
