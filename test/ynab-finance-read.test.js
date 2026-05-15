@@ -52,7 +52,8 @@ function runReadPlugin(projectRoot, pluginConfig = {}) {
 }
 
 function parsePluginOutput(result) {
-  return JSON.parse(result.stdout);
+  const output = (result.stdout || result.stderr || '').trim();
+  return JSON.parse(output);
 }
 
 describe('ynab-finance read plugin ZIP handling', () => {

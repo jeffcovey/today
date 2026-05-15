@@ -451,7 +451,7 @@ try {
 
 const ynabZipFiles = zipExtraction.zipFiles;
 const ynabFiles = findYnabFiles(logsDir);
-const latestZip = ynabZipFiles[0];
+const latestZip = ynabZipFiles.length > 0 ? ynabZipFiles[0] : null;
 const latestRegisterFile = latestZip
   ? ynabFiles.register.find(file => file.budgetName === latestZip.budgetName && file.timestamp === latestZip.timestamp) || null
   : ynabFiles.register[0] || null;
@@ -463,7 +463,7 @@ if (latestZip && (!latestRegisterFile || !latestPlanFile)) {
   console.log(JSON.stringify({
     entries: [],
     metadata: {
-      error: `Expected Register.csv and Plan.csv for latest ZIP ${latestZip.filename}`,
+      error: `Failed to extract YNAB ZIP export: ${latestZip.filename} did not contain both Register.csv and Plan.csv files`,
       extracted_from_zip: zipExtraction.extractedFiles
     }
   }));
