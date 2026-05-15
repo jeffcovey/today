@@ -36,6 +36,12 @@ const MAINTENANCE_JOBS = [
     schedule: '*/30 * * * *', // Every 30 minutes
     command: 'bin/prerender',
     description: 'Pre-render vault markdown files to disk HTML cache'
+  },
+  {
+    name: 'unison-sync-healthcheck',
+    schedule: '*/5 * * * *', // Every 5 minutes
+    command: 'bin/unison-sync-healthcheck',
+    description: 'Check Unison sync is running and surface failures in the vault'
   }
 ];
 

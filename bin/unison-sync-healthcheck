@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+
+/**
+ * Unison sync health check.
+ *
+ * Reads the status file written by bin/unison-sync and flags staleness or
+ * repeated failure. If sync looks unhealthy, writes a marker file into the
+ * vault so the problem is visible during normal vault use. Clears the marker
+ * on recovery.
+ *
+ * bin/unison-sync writes .data/unison/sync-status.json:
+ *   - --once mode: on every exit (success or failure)
+ *   - watch mode:  every 5 minutes after the process has been running
+ *     stably for > 60 seconds (so a rapid restart loop keeps the file stale)
+ *
+ * Intended to run every 5 minutes via the Today scheduler.
+ */
+
+import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { getAbsoluteVaultPath } from '../src/config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = dirname(__dirname);
+
+// Alert after this many seconds without a successful sync. 6 hours gives
+// plenty of lead time to detect a problem within the 24-hour goal.
+const MAX_STALE_SECONDS = 6 * 60 * 60; // 6 hours
+
+// Alert if sync has never succeeded and the last attempt was more than this
+// long ago (gives time for an initial sync to complete before alerting).
+const MAX_NO_SUCCESS_SECONDS = 15 * 60; // 15 minutes
+
+const STATUS_FILE = join(PROJECT_ROOT, '.data', 'unison', 'sync-status.json');
+
+const VAULT = getAbsoluteVaultPath();
+const MARKER = join(VAULT, '.unison-sync-status.md');
+
+function readStatusFile() {
+  try {
+    if (existsSync(STATUS_FILE)) {
+      return JSON.parse(readFileSync(STATUS_FILE, 'utf8'));
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+function secondsSince(isoTimestamp) {
+  if (!isoTimestamp) return Infinity;
+  return (Date.now() - new Date(isoTimestamp).getTime()) / 1000;
+}
+
+function formatElapsed(seconds) {
+  if (!isFinite(seconds)) return 'never';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m ago`;
+  return `${m}m ago`;
+}
+
+function writeMarker(status, detail, lastSuccessAt, lastExitCode) {
+  const elapsed = secondsSince(lastSuccessAt);
+  const lastSuccessDisplay = lastSuccessAt
+    ? `${formatElapsed(elapsed)} (${new Date(lastSuccessAt).toISOString()})`
+    : 'never';
+  const body = `---
+tags: [sync, alert]
+updated: ${new Date().toISOString()}
+---
+# ⚠ Unison sync alert
+
+**Status:** ${status}
+**Last successful sync:** ${lastSuccessDisplay}
+**Last exit code:** ${lastExitCode ?? 'unknown'}
+**Detail:** ${detail}
+
+Investigate with:
+\`\`\`
+docker logs today-unison-sync
+tail -50 .data/unison/unison.log
+\`\`\`
+
+Common causes:
+- SSH key changed or expired
+- Remote disk full
+- Remote Unison version mismatch
+- Network connectivity issue
+
+After resolving, delete this file.
+`;
+  writeFileSync(MARKER, body);
+}
+
+function clearMarker() {
+  if (existsSync(MARKER)) {
+    try { unlinkSync(MARKER); } catch { /* best-effort */ }
+  }
+}
+
+// ── Main ────────────────────────────────────────────────────────────
+
+const status = readStatusFile();
+
+// No status file → unison has never run on this deployment; nothing to check.
+if (!status) {
+  process.exit(0);
+}
+
+const staleSince = secondsSince(status.lastSuccessAt);
+const attemptSince = secondsSince(status.lastAttemptAt);
+
+// Case 1: never had a successful sync and last attempt was recent enough
+// that it could still be in progress — don't flap.
+if (!status.lastSuccessAt && attemptSince < MAX_NO_SUCCESS_SECONDS) {
+  clearMarker();
+  process.exit(0);
+}
+
+// Case 2: last exit was a failure AND the last success is stale (or missing)
+if (status.lastExitCode !== 0 && staleSince > MAX_STALE_SECONDS) {
+  writeMarker(
+    'FAILED',
+    `Unison exited with code ${status.lastExitCode} and last success was ${formatElapsed(staleSince)}.`,
+    status.lastSuccessAt,
+    status.lastExitCode
+  );
+  process.exit(1);
+}
+
+// Case 3: last success was too long ago (includes never-succeeded case)
+if (staleSince > MAX_STALE_SECONDS) {
+  writeMarker(
+    'STALE',
+    `No successful Unison sync in the last ${Math.round(staleSince / 3600)}h.`,
+    status.lastSuccessAt,
+    status.lastExitCode
+  );
+  process.exit(1);
+}
+
+// Healthy — clear any existing marker.
+clearMarker();
+process.exit(0);
