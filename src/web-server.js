@@ -400,7 +400,7 @@ function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
           <a class="navbar-brand" href="/">
             <i class="fas ${icon} me-2"></i>${title}
           </a>
-          <button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme">
+          <button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme" aria-label="Toggle theme mode">
             <i class="fas fa-circle-half-stroke" id="themeToggleIcon"></i>
           </button>
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
