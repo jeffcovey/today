@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import AdmZip from 'adm-zip';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
@@ -28,6 +29,8 @@ try {
 const logsDirectory = config.logs_directory || 'vault/logs';
 const cleanupOldFiles = config.cleanup_old_files !== false; // Default true
 const retentionDays = config.retention_days || 365;
+const ynabCsvPattern = /^(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2}) - (Register|Plan)\.csv$/;
+const ynabZipPattern = /^(?:YNAB Export - )?(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2})\.zip$/;
 
 const logsDir = path.join(projectRoot, logsDirectory);
 
@@ -51,37 +54,27 @@ function findYnabFiles(dir) {
     const entries = fs.readdirSync(dir);
 
     for (const entry of entries) {
-      // Match Register files: "Budget Name as of YYYY-MM-DD HH-MM - Register.csv"
-      const registerMatch = entry.match(/^(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2}) - Register\.csv$/);
-      // Match Plan files: "Budget Name as of YYYY-MM-DD HH-MM - Plan.csv"
-      const planMatch = entry.match(/^(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2}) - Plan\.csv$/);
+      const csvMatch = entry.match(ynabCsvPattern);
+      if (!csvMatch) {
+        continue;
+      }
 
-      if (registerMatch) {
-        const [, budgetName, timestamp] = registerMatch;
-        const fullPath = path.join(dir, entry);
-        const stats = fs.statSync(fullPath);
+      const [, budgetName, timestamp, fileType] = csvMatch;
+      const fullPath = path.join(dir, entry);
+      const stats = fs.statSync(fullPath);
+      const fileInfo = {
+        path: fullPath,
+        budgetName,
+        timestamp,
+        filename: entry,
+        mtime: stats.mtime,
+        type: fileType.toLowerCase()
+      };
 
-        files.register.push({
-          path: fullPath,
-          budgetName,
-          timestamp,
-          filename: entry,
-          mtime: stats.mtime,
-          type: 'register'
-        });
-      } else if (planMatch) {
-        const [, budgetName, timestamp] = planMatch;
-        const fullPath = path.join(dir, entry);
-        const stats = fs.statSync(fullPath);
-
-        files.plan.push({
-          path: fullPath,
-          budgetName,
-          timestamp,
-          filename: entry,
-          mtime: stats.mtime,
-          type: 'plan'
-        });
+      if (fileType === 'Register') {
+        files.register.push(fileInfo);
+      } else if (fileType === 'Plan') {
+        files.plan.push(fileInfo);
       }
     }
   } catch (error) {
@@ -93,6 +86,77 @@ function findYnabFiles(dir) {
   files.plan.sort((a, b) => b.mtime - a.mtime);
 
   return files;
+}
+
+// Find YNAB ZIP exports
+function findYnabZipFiles(dir) {
+  const zipFiles = [];
+
+  try {
+    const entries = fs.readdirSync(dir);
+
+    for (const entry of entries) {
+      const zipMatch = entry.match(ynabZipPattern);
+      if (!zipMatch) {
+        continue;
+      }
+
+      const [, budgetName, timestamp] = zipMatch;
+      const fullPath = path.join(dir, entry);
+      const stats = fs.statSync(fullPath);
+
+      zipFiles.push({
+        path: fullPath,
+        budgetName,
+        timestamp,
+        filename: entry,
+        mtime: stats.mtime,
+        type: 'zip'
+      });
+    }
+  } catch (error) {
+    console.error(`Error reading directory ${dir}: ${error.message}`);
+  }
+
+  zipFiles.sort((a, b) => b.mtime - a.mtime);
+  return zipFiles;
+}
+
+// Extract latest YNAB ZIP export (if present)
+function extractLatestYnabZip(dir) {
+  const zipFiles = findYnabZipFiles(dir);
+  if (zipFiles.length === 0) {
+    return { zipFiles, extractedFiles: [] };
+  }
+
+  const latestZip = zipFiles[0];
+  const zip = new AdmZip(latestZip.path);
+  const zipEntries = zip.getEntries();
+  const extractedFiles = [];
+
+  for (const zipEntry of zipEntries) {
+    if (zipEntry.isDirectory) {
+      continue;
+    }
+
+    const entryName = path.basename(zipEntry.entryName);
+    const csvMatch = entryName.match(ynabCsvPattern);
+    if (!csvMatch) {
+      continue;
+    }
+
+    const outputPath = path.join(dir, entryName);
+    fs.writeFileSync(outputPath, zipEntry.getData());
+    extractedFiles.push(entryName);
+  }
+
+  const hasRegister = extractedFiles.some(name => name.endsWith(' - Register.csv'));
+  const hasPlan = extractedFiles.some(name => name.endsWith(' - Plan.csv'));
+  if (!hasRegister || !hasPlan) {
+    throw new Error(`ZIP ${latestZip.filename} did not contain both Register.csv and Plan.csv files`);
+  }
+
+  return { zipFiles, extractedFiles, latestZip };
 }
 
 // Parse CSV content (simple CSV parser for YNAB format)
@@ -343,7 +407,21 @@ function convertTransaction(ynabTx, filePath, rowIndex) {
   };
 }
 
-// Process files
+// Extract latest ZIP export first (if present), then process CSV files
+let zipExtraction = { zipFiles: [], extractedFiles: [] };
+try {
+  zipExtraction = extractLatestYnabZip(logsDir);
+} catch (error) {
+  console.log(JSON.stringify({
+    entries: [],
+    metadata: {
+      error: `Failed to extract YNAB ZIP export: ${error.message}`
+    }
+  }));
+  process.exit(1);
+}
+
+const ynabZipFiles = zipExtraction.zipFiles;
 const ynabFiles = findYnabFiles(logsDir);
 
 if (ynabFiles.register.length === 0 && ynabFiles.plan.length === 0) {
@@ -458,7 +536,11 @@ if (ynabFiles.plan.length > 0) {
 
 // Cleanup old files if enabled
 if (cleanupOldFiles) {
-  const filesToDelete = [...ynabFiles.register.slice(1), ...ynabFiles.plan.slice(1)]; // All except the latest of each type
+  const filesToDelete = [
+    ...ynabFiles.register.slice(1),
+    ...ynabFiles.plan.slice(1),
+    ...ynabZipFiles.slice(1)
+  ]; // All except the latest of each type
   const deletedFiles = [];
 
   for (const file of filesToDelete) {
@@ -531,6 +613,14 @@ if (ynabFiles.plan.length > 0) {
   metadata.latest_plan_file = ynabFiles.plan[0].filename;
   metadata.plan_budget_name = ynabFiles.plan[0].budgetName;
   metadata.plan_timestamp = ynabFiles.plan[0].timestamp;
+}
+if (ynabZipFiles.length > 0) {
+  metadata.latest_zip_file = ynabZipFiles[0].filename;
+  metadata.zip_budget_name = ynabZipFiles[0].budgetName;
+  metadata.zip_timestamp = ynabZipFiles[0].timestamp;
+}
+if (zipExtraction.extractedFiles.length > 0) {
+  metadata.extracted_from_zip = zipExtraction.extractedFiles;
 }
 
 // Output results (transactions go through normal plugin flow)

@@ -26,6 +26,7 @@
     "@dotenvx/dotenvx": "^1.63.0",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "adm-zip": "^0.5.17",
     "ai": "^6.0.168",
     "better-sqlite3": "^12.9.0",
     "better-sqlite3-session-store": "^0.1.0",
