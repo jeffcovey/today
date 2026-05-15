@@ -170,6 +170,23 @@ function parseFrontmatter(content) {
 }
 
 /**
+ * A plan file is "intact" when it still has a parseable, non-empty YAML
+ * frontmatter block. A 0-byte file, or one whose frontmatter was stripped by a
+ * concurrent or file-sync-service corruption, is NOT intact.
+ *
+ * Automated writers must refuse to touch a non-intact file: rebuilding
+ * frontmatter on it forges a brand-new block and silently drops every real
+ * field, and recreating it from a template destroys a file that may just be
+ * mid-restore. Freshly templated plans always have frontmatter (every template
+ * starts with a `---` block), so normal operation is unaffected.
+ */
+function planFileIsIntact(content) {
+  if (!content || content.trim() === '') return false;
+  const { frontmatter } = parseFrontmatter(content);
+  return Object.keys(frontmatter).length > 0;
+}
+
+/**
  * Clean content by removing Obsidian-specific syntax
  */
 function cleanContent(content) {
@@ -507,6 +524,13 @@ function getYearlyTemplateVariables(date) {
  */
 function ensureDailyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -534,6 +558,13 @@ function ensureDailyPlan(planInfo, date) {
  */
 function ensureWeeklyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -561,6 +592,13 @@ function ensureWeeklyPlan(planInfo, date) {
  */
 function ensureMonthlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -588,6 +626,13 @@ function ensureMonthlyPlan(planInfo, date) {
  */
 function ensureQuarterlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -615,6 +660,13 @@ function ensureQuarterlyPlan(planInfo, date) {
  */
 function ensureYearlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -2208,6 +2260,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
   const projects = getProjectsForReview(dateStr);
 
   let content = fs.readFileSync(dailyPlanPath, 'utf-8');
+  // Don't cement corruption: skip a file that lost its frontmatter rather
+  // than write our section into it.
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
 
   const startMarker = '<!-- REVIEW_PROJECTS:START -->';
   const endMarker = '<!-- REVIEW_PROJECTS:END -->';
@@ -2349,6 +2404,7 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
 
   const formattedProjects = formatProjectsForWeek(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2471,6 +2527,7 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(monthlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
 
   const formattedProjects = formatProjectsForMonth(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2725,6 +2782,7 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
   }
 
   let content = fs.readFileSync(quarterlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
 
   const formattedProjects = formatProjectsForQuarter(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -2936,6 +2994,7 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(yearlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
 
   const formattedProjects = formatProjectsForYear(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -3434,6 +3493,9 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
   if (!fs.existsSync(planPath)) return false;
 
   let content = fs.readFileSync(planPath, 'utf-8');
+  // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
+  // return {} for it and we'd forge a new block, dropping every real field.
+  if (!planFileIsIntact(content)) return false;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3761,6 +3823,9 @@ function updatePlanWithSummary(planPath, planType, summary) {
   if (!fs.existsSync(planPath)) return false;
 
   let content = fs.readFileSync(planPath, 'utf-8');
+  // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
+  // return {} for it and we'd forge a new block, dropping every real field.
+  if (!planFileIsIntact(content)) return false;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3929,12 +3994,15 @@ async function main() {
     diary_notes_updated: null,
     habit_stats_updated: null,
     missing_weekly_plans_created: [],
+    plans_corrupt: [],
   };
 
   // Ensure today's daily plan exists
   const dailyResult = ensureDailyPlan(planPaths.day, today);
   if (dailyResult.created) {
     metadata.plans_created.push({ type: 'day', file: dailyResult.file });
+  } else if (dailyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'day', file: dailyResult.file });
   }
 
   // Update today's daily plan with projects needing review
@@ -3948,24 +4016,32 @@ async function main() {
   const weeklyResult = ensureWeeklyPlan(planPaths.week, today);
   if (weeklyResult.created) {
     metadata.plans_created.push({ type: 'week', file: weeklyResult.file });
+  } else if (weeklyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'week', file: weeklyResult.file });
   }
 
   // Ensure this month's monthly plan exists
   const monthlyResult = ensureMonthlyPlan(planPaths.month, today);
   if (monthlyResult.created) {
     metadata.plans_created.push({ type: 'month', file: monthlyResult.file });
+  } else if (monthlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'month', file: monthlyResult.file });
   }
 
   // Ensure this quarter's quarterly plan exists
   const quarterlyResult = ensureQuarterlyPlan(planPaths.quarter, today);
   if (quarterlyResult.created) {
     metadata.plans_created.push({ type: 'quarter', file: quarterlyResult.file });
+  } else if (quarterlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'quarter', file: quarterlyResult.file });
   }
 
   // Ensure this year's yearly plan exists
   const yearlyResult = ensureYearlyPlan(planPaths.year, today);
   if (yearlyResult.created) {
     metadata.plans_created.push({ type: 'year', file: yearlyResult.file });
+  } else if (yearlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'year', file: yearlyResult.file });
   }
 
   // Create any missing weekly plans from earliest daily plan to today
@@ -4138,6 +4214,8 @@ async function main() {
   const tomorrowResult = ensureDailyPlan(tomorrowPaths.day, tomorrow);
   if (tomorrowResult.created) {
     metadata.plans_created.push({ type: 'day', file: tomorrowResult.file });
+  } else if (tomorrowResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'day', file: tomorrowResult.file });
   }
 
   // Update tomorrow's daily plan with projects needing review
