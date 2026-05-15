@@ -23,6 +23,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
+import { writeFileAtomic } from '../../src/fs-atomic.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
@@ -523,7 +524,7 @@ function ensureDailyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -550,7 +551,7 @@ function ensureWeeklyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -577,7 +578,7 @@ function ensureMonthlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -604,7 +605,7 @@ function ensureQuarterlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -631,7 +632,7 @@ function ensureYearlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -762,7 +763,7 @@ function migrateNavigationToWidget(filePath) {
     content = content.replace(/\n{3,}/g, '\n\n');
 
     if (content !== originalContent) {
-      fs.writeFileSync(filePath, content, 'utf-8');
+      writeFileAtomic(filePath, content, 'utf-8');
       return true;
     }
     return false;
@@ -787,7 +788,7 @@ function migrateNavigationToWidget(filePath) {
   content = content.replace(/\n{3,}/g, '\n\n');
 
   if (content !== originalContent) {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    writeFileAtomic(filePath, content, 'utf-8');
     return true;
   }
 
@@ -927,7 +928,7 @@ function addSummaryToFile(filePath, summary) {
     );
   }
 
-  fs.writeFileSync(filePath, content, 'utf-8');
+  writeFileAtomic(filePath, content, 'utf-8');
 }
 
 /**
@@ -958,7 +959,7 @@ function addSummaryCalloutToPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       added.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1030,7 +1031,7 @@ function fixDoneTodayInPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       fixed.push({
         file: path.basename(planInfo.day.path),
         date: dateStr,
@@ -1067,7 +1068,7 @@ function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1107,7 +1108,7 @@ function removeEmptyReflectionFromPastFiles(today, maxDaysBack = 7) {
     const newContent = content.replace(emptyReflectionPattern, '');
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1457,7 +1458,7 @@ function updateTomorrowPlan(filePath, suggestions) {
   }
 
   if (modified) {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    writeFileAtomic(filePath, content, 'utf-8');
   }
 
   return modified;
@@ -1542,7 +1543,7 @@ function linkPlanToDailyNote(planPath, date) {
   }
 
   // Write immediately after read-modify
-  fs.writeFileSync(dailyNotePath, content, 'utf-8');
+  writeFileAtomic(dailyNotePath, content, 'utf-8');
   return { linked: true, path: dailyNotePath };
 }
 
@@ -1828,7 +1829,7 @@ function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2110,7 +2111,7 @@ function updateWeeklyPlanWithHabitStats(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2222,7 +2223,7 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
       const after = content.substring(endIndex + endMarker.length);
       // Remove any trailing newlines from the removed section
       content = before.trimEnd() + '\n\n' + after.trimStart();
-      fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+      writeFileAtomic(dailyPlanPath, content, 'utf-8');
       return { updated: true, removed: true, count: 0 };
     }
     return { updated: false, reason: 'no projects', count: 0 };
@@ -2263,7 +2264,7 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
     }
   }
 
-  fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+  writeFileAtomic(dailyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2386,7 +2387,7 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2505,7 +2506,7 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(monthlyPlanPath, content, 'utf-8');
+  writeFileAtomic(monthlyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2763,7 +2764,7 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
     }
   }
 
-  fs.writeFileSync(quarterlyPlanPath, content, 'utf-8');
+  writeFileAtomic(quarterlyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2977,7 +2978,7 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(yearlyPlanPath, content, 'utf-8');
+  writeFileAtomic(yearlyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -3479,7 +3480,7 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  fs.writeFileSync(planPath, content, 'utf-8');
+  writeFileAtomic(planPath, content, 'utf-8');
 
   return true;
 }
@@ -3799,7 +3800,7 @@ function updatePlanWithSummary(planPath, planType, summary) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  fs.writeFileSync(planPath, content, 'utf-8');
+  writeFileAtomic(planPath, content, 'utf-8');
 
   return true;
 }
