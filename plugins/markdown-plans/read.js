@@ -23,7 +23,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
-import { writeFileAtomic } from '../../src/fs-atomic.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
@@ -2263,6 +2263,7 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
   // Don't cement corruption: skip a file that lost its frontmatter rather
   // than write our section into it.
   if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const startMarker = '<!-- REVIEW_PROJECTS:START -->';
   const endMarker = '<!-- REVIEW_PROJECTS:END -->';
@@ -2278,7 +2279,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
       const after = content.substring(endIndex + endMarker.length);
       // Remove any trailing newlines from the removed section
       content = before.trimEnd() + '\n\n' + after.trimStart();
-      writeFileAtomic(dailyPlanPath, content, 'utf-8');
+      if (writeFileAtomicCAS(dailyPlanPath, content, baseContent, 'utf-8').conflict) {
+        return { updated: false, reason: 'concurrent update' };
+      }
       return { updated: true, removed: true, count: 0 };
     }
     return { updated: false, reason: 'no projects', count: 0 };
@@ -2319,7 +2322,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
     }
   }
 
-  writeFileAtomic(dailyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(dailyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2405,6 +2410,7 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
 
   let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
   if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForWeek(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2443,7 +2449,9 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(weeklyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2528,6 +2536,7 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
 
   let content = fs.readFileSync(monthlyPlanPath, 'utf-8');
   if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForMonth(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2563,7 +2572,9 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
     }
   }
 
-  writeFileAtomic(monthlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(monthlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2783,6 +2794,7 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
 
   let content = fs.readFileSync(quarterlyPlanPath, 'utf-8');
   if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForQuarter(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -2822,7 +2834,9 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
     }
   }
 
-  writeFileAtomic(quarterlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(quarterlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2995,6 +3009,7 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
 
   let content = fs.readFileSync(yearlyPlanPath, 'utf-8');
   if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForYear(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -3037,7 +3052,9 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
     }
   }
 
-  writeFileAtomic(yearlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(yearlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -3496,6 +3513,7 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
   // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
   // return {} for it and we'd forge a new block, dropping every real field.
   if (!planFileIsIntact(content)) return false;
+  const baseContent = content;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3542,7 +3560,9 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  writeFileAtomic(planPath, content, 'utf-8');
+  if (writeFileAtomicCAS(planPath, content, baseContent, 'utf-8').conflict) {
+    return false;
+  }
 
   return true;
 }
@@ -3826,6 +3846,7 @@ function updatePlanWithSummary(planPath, planType, summary) {
   // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
   // return {} for it and we'd forge a new block, dropping every real field.
   if (!planFileIsIntact(content)) return false;
+  const baseContent = content;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3865,7 +3886,9 @@ function updatePlanWithSummary(planPath, planType, summary) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  writeFileAtomic(planPath, content, 'utf-8');
+  if (writeFileAtomicCAS(planPath, content, baseContent, 'utf-8').conflict) {
+    return false;
+  }
 
   return true;
 }
