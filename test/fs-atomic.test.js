@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { writeFileAtomic } from '../src/fs-atomic.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../src/fs-atomic.js';
 
 describe('writeFileAtomic', () => {
   let dir;
@@ -73,5 +73,60 @@ describe('writeFileAtomic', () => {
     expect(fs.readFileSync(file, 'utf-8')).toBe('original');
     const leftovers = fs.readdirSync(dir).filter((n) => n.includes('.tmp-'));
     expect(leftovers).toEqual([]);
+  });
+});
+
+describe('writeFileAtomicCAS', () => {
+  let dir;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-cas-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('swaps when on-disk bytes still match what the caller read', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'base');
+
+    const res = writeFileAtomicCAS(file, 'next', 'base');
+
+    expect(res).toEqual({ written: true, conflict: false });
+    expect(fs.readFileSync(file, 'utf-8')).toBe('next');
+  });
+
+  test('aborts without writing when another instance changed the file', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'base');
+
+    // Caller read "base", but a concurrent instance already wrote "other".
+    fs.writeFileSync(file, 'other');
+    const res = writeFileAtomicCAS(file, 'next', 'base');
+
+    expect(res).toEqual({ written: false, conflict: true });
+    // The concurrent write must be preserved, not clobbered with stale data.
+    expect(fs.readFileSync(file, 'utf-8')).toBe('other');
+  });
+
+  test('skips as unchanged (no conflict) when nothing actually changed', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'same');
+    const mtimeBefore = fs.statSync(file).mtimeMs;
+
+    const res = writeFileAtomicCAS(file, 'same', 'same');
+
+    expect(res).toEqual({ written: false, conflict: false });
+    expect(fs.statSync(file).mtimeMs).toBe(mtimeBefore);
+  });
+
+  test('treats a file deleted since the caller read it as a conflict', () => {
+    const file = path.join(dir, 'plan.md');
+    // Caller read "base"; the file has since been removed (e.g. sync conflict).
+    const res = writeFileAtomicCAS(file, 'next', 'base');
+
+    expect(res).toEqual({ written: false, conflict: true });
+    expect(fs.existsSync(file)).toBe(false);
   });
 });
