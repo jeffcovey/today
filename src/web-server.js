@@ -381,7 +381,7 @@ function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
   const { showSearch = true, searchValue = '' } = options;
 
   const searchForm = showSearch ? `
-          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+          <form class="d-flex" onsubmit="performSearch(event)">
             <div class="input-group">
               <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${searchValue.replace(/"/g, '&quot;')}"` : ''} style="max-width: 250px;">
               <button class="btn btn-light btn-sm" type="submit">
@@ -400,9 +400,12 @@ function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
           <a class="navbar-brand" href="/">
             <i class="fas ${icon} me-2"></i>${title}
           </a>
+          <button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme">
+            <i class="fas fa-circle-half-stroke" id="themeToggleIcon"></i>
+          </button>
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
             <i class="fas fa-code-branch"></i>
-          </a>${searchForm}
+          </a>${showSearch ? `<div class="ms-2">${searchForm}</div>` : ''}
         </div>
       </nav>`;
 }

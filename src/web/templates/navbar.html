@@ -4,7 +4,10 @@
     <a class="navbar-brand" href="/">
       <i class="fas fa-folder-open me-2"></i>Today
     </a>
-    <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+    <button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme">
+      <i class="fas fa-circle-half-stroke" id="themeToggleIcon"></i>
+    </button>
+    <form class="d-flex ms-2" onsubmit="performSearch(event)">
       <div class="input-group">
         <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
         <button class="btn btn-light btn-sm" type="submit">
