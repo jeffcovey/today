@@ -126,13 +126,28 @@ function findYnabZipFiles(dir) {
 function extractLatestYnabZip(dir) {
   const zipFiles = findYnabZipFiles(dir);
   if (zipFiles.length === 0) {
-    return { zipFiles, extractedFiles: [] };
+    return { zipFiles, extractedFiles: [], extractionSkipped: false };
   }
 
   const latestZip = zipFiles[0];
+  const expectedRegisterFile = `${latestZip.budgetName} as of ${latestZip.timestamp} - Register.csv`;
+  const expectedPlanFile = `${latestZip.budgetName} as of ${latestZip.timestamp} - Plan.csv`;
+  const expectedRegisterPath = path.join(dir, expectedRegisterFile);
+  const expectedPlanPath = path.join(dir, expectedPlanFile);
+
+  if (fs.existsSync(expectedRegisterPath) && fs.existsSync(expectedPlanPath)) {
+    return {
+      zipFiles,
+      extractedFiles: [],
+      latestZip,
+      extractionSkipped: true
+    };
+  }
+
   const zip = new AdmZip(latestZip.path);
   const zipEntries = zip.getEntries();
-  const extractedFiles = [];
+  let registerEntry;
+  let planEntry;
 
   for (const zipEntry of zipEntries) {
     if (zipEntry.isDirectory) {
@@ -145,18 +160,31 @@ function extractLatestYnabZip(dir) {
       continue;
     }
 
-    const outputPath = path.join(dir, entryName);
-    fs.writeFileSync(outputPath, zipEntry.getData());
-    extractedFiles.push(entryName);
+    const [, budgetName, timestamp, fileType] = csvMatch;
+    if (budgetName !== latestZip.budgetName || timestamp !== latestZip.timestamp) {
+      continue;
+    }
+
+    if (fileType === 'Register') {
+      registerEntry = zipEntry;
+    } else if (fileType === 'Plan') {
+      planEntry = zipEntry;
+    }
   }
 
-  const hasRegister = extractedFiles.some(name => name.endsWith(' - Register.csv'));
-  const hasPlan = extractedFiles.some(name => name.endsWith(' - Plan.csv'));
-  if (!hasRegister || !hasPlan) {
+  if (!registerEntry || !planEntry) {
     throw new Error(`ZIP ${latestZip.filename} did not contain both Register.csv and Plan.csv files`);
   }
 
-  return { zipFiles, extractedFiles, latestZip };
+  fs.writeFileSync(expectedRegisterPath, registerEntry.getData());
+  fs.writeFileSync(expectedPlanPath, planEntry.getData());
+
+  return {
+    zipFiles,
+    extractedFiles: [expectedRegisterFile, expectedPlanFile],
+    latestZip,
+    extractionSkipped: false
+  };
 }
 
 // Parse CSV content (simple CSV parser for YNAB format)
@@ -423,6 +451,24 @@ try {
 
 const ynabZipFiles = zipExtraction.zipFiles;
 const ynabFiles = findYnabFiles(logsDir);
+const latestZip = ynabZipFiles[0];
+const latestRegisterFile = latestZip
+  ? ynabFiles.register.find(file => file.budgetName === latestZip.budgetName && file.timestamp === latestZip.timestamp) || null
+  : ynabFiles.register[0] || null;
+const latestPlanFile = latestZip
+  ? ynabFiles.plan.find(file => file.budgetName === latestZip.budgetName && file.timestamp === latestZip.timestamp) || null
+  : ynabFiles.plan[0] || null;
+
+if (latestZip && (!latestRegisterFile || !latestPlanFile)) {
+  console.log(JSON.stringify({
+    entries: [],
+    metadata: {
+      error: `Expected Register.csv and Plan.csv for latest ZIP ${latestZip.filename}`,
+      extracted_from_zip: zipExtraction.extractedFiles
+    }
+  }));
+  process.exit(1);
+}
 
 if (ynabFiles.register.length === 0 && ynabFiles.plan.length === 0) {
   console.log(JSON.stringify({
@@ -441,9 +487,7 @@ const budgetEntries = [];
 let filesProcessed = [];
 
 // Process Register.csv files (transactions)
-if (ynabFiles.register.length > 0) {
-  const latestRegisterFile = ynabFiles.register[0];
-
+if (latestRegisterFile) {
   try {
     const content = fs.readFileSync(latestRegisterFile.path, 'utf8');
     const rows = parseCSV(content);
@@ -488,9 +532,7 @@ if (ynabFiles.register.length > 0) {
 }
 
 // Process Plan.csv files (budget allocations)
-if (ynabFiles.plan.length > 0) {
-  const latestPlanFile = ynabFiles.plan[0];
-
+if (latestPlanFile) {
   try {
     const content = fs.readFileSync(latestPlanFile.path, 'utf8');
     const rows = parseCSV(content);
@@ -604,20 +646,21 @@ const metadata = {
 };
 
 // Add file info for processed files
-if (ynabFiles.register.length > 0) {
-  metadata.latest_register_file = ynabFiles.register[0].filename;
-  metadata.register_budget_name = ynabFiles.register[0].budgetName;
-  metadata.register_timestamp = ynabFiles.register[0].timestamp;
+if (latestRegisterFile) {
+  metadata.latest_register_file = latestRegisterFile.filename;
+  metadata.register_budget_name = latestRegisterFile.budgetName;
+  metadata.register_timestamp = latestRegisterFile.timestamp;
 }
-if (ynabFiles.plan.length > 0) {
-  metadata.latest_plan_file = ynabFiles.plan[0].filename;
-  metadata.plan_budget_name = ynabFiles.plan[0].budgetName;
-  metadata.plan_timestamp = ynabFiles.plan[0].timestamp;
+if (latestPlanFile) {
+  metadata.latest_plan_file = latestPlanFile.filename;
+  metadata.plan_budget_name = latestPlanFile.budgetName;
+  metadata.plan_timestamp = latestPlanFile.timestamp;
 }
 if (ynabZipFiles.length > 0) {
   metadata.latest_zip_file = ynabZipFiles[0].filename;
   metadata.zip_budget_name = ynabZipFiles[0].budgetName;
   metadata.zip_timestamp = ynabZipFiles[0].timestamp;
+  metadata.zip_extraction_skipped = zipExtraction.extractionSkipped;
 }
 if (zipExtraction.extractedFiles.length > 0) {
   metadata.extracted_from_zip = zipExtraction.extractedFiles;

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { execFileSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 
@@ -24,15 +24,20 @@ function makePlanCsv() {
   ].join('\n');
 }
 
-function createYnabZip(logsDir, zipFilename, budgetName, timestamp, payee) {
+function createYnabZip(logsDir, zipFilename, budgetName, timestamp, payee, options = {}) {
+  const { includeRegister = true, includePlan = true } = options;
   const zip = new AdmZip();
-  zip.addFile(`${budgetName} as of ${timestamp} - Register.csv`, Buffer.from(makeRegisterCsv(payee), 'utf8'));
-  zip.addFile(`${budgetName} as of ${timestamp} - Plan.csv`, Buffer.from(makePlanCsv(), 'utf8'));
+  if (includeRegister) {
+    zip.addFile(`${budgetName} as of ${timestamp} - Register.csv`, Buffer.from(makeRegisterCsv(payee), 'utf8'));
+  }
+  if (includePlan) {
+    zip.addFile(`${budgetName} as of ${timestamp} - Plan.csv`, Buffer.from(makePlanCsv(), 'utf8'));
+  }
   zip.writeZip(path.join(logsDir, zipFilename));
 }
 
 function runReadPlugin(projectRoot, pluginConfig = {}) {
-  return JSON.parse(execFileSync('node', [readScript], {
+  return spawnSync('node', [readScript], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -43,7 +48,11 @@ function runReadPlugin(projectRoot, pluginConfig = {}) {
         ...pluginConfig
       })
     }
-  }));
+  });
+}
+
+function parsePluginOutput(result) {
+  return JSON.parse(result.stdout);
 }
 
 describe('ynab-finance read plugin ZIP handling', () => {
@@ -81,7 +90,9 @@ describe('ynab-finance read plugin ZIP handling', () => {
       'From Zip'
     );
 
-    const result = runReadPlugin(tempRoot, { cleanup_old_files: false });
+    const run = runReadPlugin(tempRoot, { cleanup_old_files: false });
+    expect(run.status).toBe(0);
+    const result = parsePluginOutput(run);
 
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].payee).toBe('From Zip');
@@ -108,9 +119,54 @@ describe('ynab-finance read plugin ZIP handling', () => {
 
     createYnabZip(logsDir, newZip, budgetName, newTimestamp, 'New Zip');
 
-    runReadPlugin(tempRoot, { cleanup_old_files: true });
+    const run = runReadPlugin(tempRoot, { cleanup_old_files: true });
+    expect(run.status).toBe(0);
 
     expect(fs.existsSync(path.join(logsDir, oldZip))).toBe(false);
     expect(fs.existsSync(path.join(logsDir, newZip))).toBe(true);
+  });
+
+  test('fails on ZIP missing Plan.csv without leaving orphan extracted files', () => {
+    const budgetName = 'Broken Budget';
+    const timestamp = '2026-05-04 08-00';
+    const zipName = `YNAB Export - ${budgetName} as of ${timestamp}.zip`;
+    const expectedRegisterPath = path.join(logsDir, `${budgetName} as of ${timestamp} - Register.csv`);
+
+    createYnabZip(logsDir, zipName, budgetName, timestamp, 'From Broken Zip', { includePlan: false });
+
+    const run = runReadPlugin(tempRoot, { cleanup_old_files: false });
+    expect(run.status).toBe(1);
+
+    const result = parsePluginOutput(run);
+    expect(result.metadata.error).toContain('Failed to extract YNAB ZIP export');
+    expect(fs.existsSync(expectedRegisterPath)).toBe(false);
+  });
+
+  test('uses latest ZIP contents even when newer standalone CSVs exist', () => {
+    const budgetName = 'Priority Budget';
+    const zipTimestamp = '2026-05-05 07-00';
+    const newerCsvTimestamp = '2026-05-06 07-00';
+    const zipName = `YNAB Export - ${budgetName} as of ${zipTimestamp}.zip`;
+
+    createYnabZip(logsDir, zipName, budgetName, zipTimestamp, 'From Zip');
+
+    const standaloneRegister = path.join(logsDir, `${budgetName} as of ${newerCsvTimestamp} - Register.csv`);
+    const standalonePlan = path.join(logsDir, `${budgetName} as of ${newerCsvTimestamp} - Plan.csv`);
+    fs.writeFileSync(standaloneRegister, makeRegisterCsv('Standalone Newer'));
+    fs.writeFileSync(standalonePlan, makePlanCsv());
+
+    const run = runReadPlugin(tempRoot, { cleanup_old_files: false });
+    expect(run.status).toBe(0);
+
+    const result = parsePluginOutput(run);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].payee).toBe('From Zip');
+    expect(result.metadata.latest_register_file).toBe(`${budgetName} as of ${zipTimestamp} - Register.csv`);
+    expect(result.metadata.latest_plan_file).toBe(`${budgetName} as of ${zipTimestamp} - Plan.csv`);
+
+    const secondRun = runReadPlugin(tempRoot, { cleanup_old_files: false });
+    expect(secondRun.status).toBe(0);
+    const secondResult = parsePluginOutput(secondRun);
+    expect(secondResult.metadata.zip_extraction_skipped).toBe(true);
   });
 });
