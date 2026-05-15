@@ -9,11 +9,25 @@
  * on recovery.
  *
  * bin/unison-sync writes .data/unison/sync-status.json:
- *   - --once mode: on every exit (success or failure)
- *   - watch mode:  every 5 minutes after the process has been running
- *     stably for > 60 seconds (so a rapid restart loop keeps the file stale)
+ *   - --once mode: on every exit (success or failure); `lastSuccessAt` is set
+ *     only on a clean exit
+ *   - watch mode:  `lastHeartbeatAt` is written every 5 minutes after the
+ *     process has been running stably for > 60 seconds (so a rapid restart
+ *     loop keeps the file stale). Individual sync completions are not tracked
+ *     in watch mode because they require parsing unison's output.
+ *
+ * Staleness thresholds:
+ *   - Watch mode: alert when `lastHeartbeatAt` (process liveness) is > 6 h stale
+ *   - Once mode:  alert when `lastSuccessAt` (actual sync success) is > 6 h stale
+ *
+ * The marker file (.unison-sync-status.md) is excluded from Unison sync via
+ * BUILTIN_EXCLUDES in bin/unison-sync, so it never propagates to the remote.
  *
  * Intended to run every 5 minutes via the Today scheduler.
+ *
+ * Environment overrides (for testing):
+ *   UNISON_STATUS_FILE  — override the path to sync-status.json
+ *   UNISON_VAULT_PATH   — override the vault directory (marker written here)
  */
 
 import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'fs';
@@ -26,7 +40,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = dirname(__dirname);
 
-// Alert after this many seconds without a successful sync. 6 hours gives
+// Alert after this many seconds without a liveness signal. 6 hours gives
 // plenty of lead time to detect a problem within the 24-hour goal.
 const MAX_STALE_SECONDS = 6 * 60 * 60; // 6 hours
 
@@ -34,9 +48,11 @@ const MAX_STALE_SECONDS = 6 * 60 * 60; // 6 hours
 // long ago (gives time for an initial sync to complete before alerting).
 const MAX_NO_SUCCESS_SECONDS = 15 * 60; // 15 minutes
 
-const STATUS_FILE = join(PROJECT_ROOT, '.data', 'unison', 'sync-status.json');
+// Allow test/CI overrides so tests never touch the real project filesystem.
+const STATUS_FILE = process.env.UNISON_STATUS_FILE
+  || join(PROJECT_ROOT, '.data', 'unison', 'sync-status.json');
 
-const VAULT = getAbsoluteVaultPath();
+const VAULT = process.env.UNISON_VAULT_PATH || getAbsoluteVaultPath();
 const MARKER = join(VAULT, '.unison-sync-status.md');
 
 function readStatusFile() {
@@ -52,7 +68,9 @@ function readStatusFile() {
 
 function secondsSince(isoTimestamp) {
   if (!isoTimestamp) return Infinity;
-  return (Date.now() - new Date(isoTimestamp).getTime()) / 1000;
+  const ts = new Date(isoTimestamp).getTime();
+  if (isNaN(ts)) return Infinity;
+  return (Date.now() - ts) / 1000;
 }
 
 function formatElapsed(seconds) {
@@ -63,10 +81,10 @@ function formatElapsed(seconds) {
   return `${m}m ago`;
 }
 
-function writeMarker(status, detail, lastSuccessAt, lastExitCode) {
-  const elapsed = secondsSince(lastSuccessAt);
-  const lastSuccessDisplay = lastSuccessAt
-    ? `${formatElapsed(elapsed)} (${new Date(lastSuccessAt).toISOString()})`
+function writeMarker(alertStatus, detail, livenessLabel, livenessTimestamp, lastExitCode) {
+  const elapsed = secondsSince(livenessTimestamp);
+  const livenessDisplay = livenessTimestamp
+    ? `${formatElapsed(elapsed)} (${new Date(livenessTimestamp).toISOString()})`
     : 'never';
   const body = `---
 tags: [sync, alert]
@@ -74,8 +92,8 @@ updated: ${new Date().toISOString()}
 ---
 # ⚠ Unison sync alert
 
-**Status:** ${status}
-**Last successful sync:** ${lastSuccessDisplay}
+**Status:** ${alertStatus}
+**${livenessLabel}:** ${livenessDisplay}
 **Last exit code:** ${lastExitCode ?? 'unknown'}
 **Detail:** ${detail}
 
@@ -111,33 +129,47 @@ if (!status) {
   process.exit(0);
 }
 
-const staleSince = secondsSince(status.lastSuccessAt);
+const isWatchMode = status.mode === 'watch';
+
+// In watch mode: staleness is measured from lastHeartbeatAt (process liveness).
+// In once mode: staleness is measured from lastSuccessAt (actual sync success).
+// Fall back to the other field for compatibility with old status files that
+// predate the heartbeat rename.
+const livenessTimestamp = isWatchMode
+  ? (status.lastHeartbeatAt || status.lastSuccessAt)
+  : (status.lastSuccessAt || status.lastHeartbeatAt);
+
+const livenessLabel = isWatchMode ? 'Last heartbeat' : 'Last successful sync';
+
+const staleSince = secondsSince(livenessTimestamp);
 const attemptSince = secondsSince(status.lastAttemptAt);
 
-// Case 1: never had a successful sync and last attempt was recent enough
+// Case 1: never had a liveness signal and last attempt was recent enough
 // that it could still be in progress — don't flap.
-if (!status.lastSuccessAt && attemptSince < MAX_NO_SUCCESS_SECONDS) {
+if (!livenessTimestamp && attemptSince < MAX_NO_SUCCESS_SECONDS) {
   clearMarker();
   process.exit(0);
 }
 
-// Case 2: last exit was a failure AND the last success is stale (or missing)
-if (status.lastExitCode !== 0 && staleSince > MAX_STALE_SECONDS) {
+// Case 2: last exit was a failure AND the liveness signal is stale (or missing)
+if (status.lastExitCode != null && status.lastExitCode !== 0 && staleSince > MAX_STALE_SECONDS) {
   writeMarker(
     'FAILED',
-    `Unison exited with code ${status.lastExitCode} and last success was ${formatElapsed(staleSince)}.`,
-    status.lastSuccessAt,
+    `Unison exited with code ${status.lastExitCode} and ${livenessLabel.toLowerCase()} was ${formatElapsed(staleSince)}.`,
+    livenessLabel,
+    livenessTimestamp,
     status.lastExitCode
   );
   process.exit(1);
 }
 
-// Case 3: last success was too long ago (includes never-succeeded case)
+// Case 3: liveness signal is too stale (includes never-signalled case)
 if (staleSince > MAX_STALE_SECONDS) {
   writeMarker(
     'STALE',
-    `No successful Unison sync in the last ${Math.round(staleSince / 3600)}h.`,
-    status.lastSuccessAt,
+    `No Unison ${isWatchMode ? 'heartbeat' : 'successful sync'} in the last ${Math.round(staleSince / 3600)}h.`,
+    livenessLabel,
+    livenessTimestamp,
     status.lastExitCode
   );
   process.exit(1);

@@ -70,6 +70,10 @@ const BUILTIN_EXCLUDES = [
   'Path node_modules',
   'Name *.tmp',
   'Name .*.swp',
+  // Health-check marker — written locally by bin/unison-sync-healthcheck;
+  // must not be propagated to the remote or it will cause spurious conflicts
+  // and churn on every sync recovery.
+  'Name .unison-sync-status.md',
 ];
 
 // ── Main ────────────────────────────────────────────────────────────
@@ -251,17 +255,23 @@ const child = spawn('unison', args, {
 // been running stably for at least 60 seconds. If the container is caught
 // in a rapid restart loop (unison exits before 60s), this timer never fires
 // so the heartbeat stays stale — exactly what the healthcheck looks for.
+//
+// Note: the heartbeat records process liveness only, not individual sync
+// completions (which can't be tracked without parsing unison's output). The
+// healthcheck uses `lastHeartbeatAt` for watch-mode staleness checks and
+// labels it accordingly in the vault marker.
 let heartbeatInterval = null;
 if (!oneShot) {
   const HEARTBEAT_DELAY_MS = 60 * 1000;      // wait 60s before first write
   const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // then every 5 minutes
   const writeHeartbeat = () => writeStatusFile({
     mode: 'watch',
-    lastSuccessAt: new Date().toISOString(),
+    lastHeartbeatAt: new Date().toISOString(),
   });
   const startupTimer = setTimeout(() => {
     writeHeartbeat();
     heartbeatInterval = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
+    heartbeatInterval.unref();
   }, HEARTBEAT_DELAY_MS);
   // Suppress Node warning about unref'd timers on fast exit
   startupTimer.unref();
