@@ -57,13 +57,6 @@ export const SERVICES = [
     composeService: null,
   },
   {
-    key: 'git-sync.timer',
-    label: 'Git Sync',
-    description: 'Sync committed git state via GitHub',
-    systemdUnit: 'git-sync.timer',
-    composeService: null,
-  },
-  {
     key: 'unison-sync',
     label: 'Unison Sync',
     description: 'Bidirectional working-tree sync via Unison over SSH',
