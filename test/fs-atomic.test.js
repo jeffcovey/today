@@ -121,6 +121,19 @@ describe('writeFileAtomicCAS', () => {
     expect(fs.statSync(file).mtimeMs).toBe(mtimeBefore);
   });
 
+  test('skips as unchanged (no conflict) when another writer already wrote desired bytes', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'base');
+
+    // Caller read "base", then another instance already wrote the same "next"
+    // content this caller computed.
+    fs.writeFileSync(file, 'next');
+    const res = writeFileAtomicCAS(file, 'next', 'base');
+
+    expect(res).toEqual({ written: false, conflict: false });
+    expect(fs.readFileSync(file, 'utf-8')).toBe('next');
+  });
+
   test('treats a file deleted since the caller read it as a conflict', () => {
     const file = path.join(dir, 'plan.md');
     // Caller read "base"; the file has since been removed (e.g. sync conflict).

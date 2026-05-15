@@ -123,14 +123,16 @@ export function writeFileAtomicCAS(filePath, content, expectedContent, encoding 
     current = null;
   }
 
+  // If the target already has the caller's desired bytes, treat it as an
+  // unchanged no-op even if expectedContent is stale (another instance may
+  // have already written the same result).
+  if (current === content) {
+    return { written: false, conflict: false };
+  }
+
   // Concurrent change since the caller read: abort, let the next sync retry.
   if (current !== expectedContent) {
     return { written: false, conflict: true };
-  }
-
-  // Nothing actually changed — skip the write (no file-sync churn).
-  if (current === content) {
-    return { written: false, conflict: false };
   }
 
   atomicReplace(filePath, content, encoding);
