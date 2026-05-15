@@ -215,13 +215,13 @@ async function installServices(server) {
  *   - config/services/*.service — always-installed services (the set passed in
  *     as `currentServiceFiles` from installServices).
  *   - deploy/systemd/*.service — opt-in services installed out-of-band by
- *     setup hooks like setupGitSync(). These are NOT installed by the regular
- *     deploy path, but they ARE expected to persist across deploys once a
- *     user has opted in via `bin/deploy <name> setup --git-sync` etc.
+ *     provider setup hooks. These are NOT installed by the regular deploy
+ *     path, but they ARE expected to persist across deploys once a user has
+ *     opted into them.
  *
- * Without counting `deploy/systemd/` here, regular `bin/deploy <name>` silently
- * uninstalls git-sync.service every run, which orphans git-sync.timer and
- * breaks vault sync until the healthcheck catches up 10 minutes later.
+ * Without counting `deploy/systemd/` here, regular `bin/deploy <name>` would
+ * silently uninstall any opt-in unit every run, breaking whatever it provides
+ * until the next setup run reinstalls it.
  */
 async function cleanupStaleServices(server, currentServiceFiles) {
   const deployPath = server.deployPath;

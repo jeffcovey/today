@@ -143,11 +143,9 @@ Multi-device vault sync has two distinct layers:
 
 **Working-tree sync** (the files themselves) keeps the vault's actual file contents identical across devices. When you edit a file on one device, the change appears on all other devices — uncommitted, unstaged, just the raw bytes. Use any file-level sync tool you prefer: Resilio Sync, Syncthing, iCloud, Dropbox, Unison, etc. Make sure `.git`, `.git.nosync`, and `node_modules` are excluded from the sync — unignored git directories will flood most sync daemons with inotify events.
 
-**Committed-state sync** (git history) keeps each device's git repository in sync so that commits made on one device are available on all others. This is separate from working-tree sync — git can only push and pull *commits*, not uncommitted changes:
+**Committed-state sync** (git history) keeps each device's git repository in sync so that commits made on one device are available on all others. This is separate from working-tree sync — git can only push and pull *commits*, not uncommitted changes. Manage this with your own git workflow on the vault repository (manual `git pull --rebase` / `git push`, or your preferred git automation).
 
-- **git-sync**: a timer (systemd on remote deployments, scheduler cron on local) that runs `git pull --rebase --autostash && git push` every ~60s. When you commit on one device, git-sync pushes the commit to GitHub; on other devices, git-sync pulls it and fast-forwards HEAD. Working-tree content doesn't change (it was already in sync via the file-sync layer), but the git log and staging area update to reflect the new commit. Install via `bin/deploy <name> setup --git-sync` (remote) or add it as a scheduler job in `bin/today configure` (local).
-
-**Important:** git-sync does NOT create commits and does NOT sync uncommitted changes. Commits are always manual. If you only set up git-sync without a working-tree sync tool, files edited on one device will not appear on other devices until you commit and push.
+**Important:** committed-state sync does NOT create commits and does NOT sync uncommitted changes. Commits are always manual. Working-tree sync (above) is what carries uncommitted edits between devices.
 
 ---
 
@@ -354,11 +352,6 @@ scheduler = true
 [deployments.local.macbook.jobs.plugin-sync]
 schedule = "*/10 * * * *"
 command = "bin/plugins sync"
-
-[deployments.local.macbook.jobs.git-sync]
-schedule = "* * * * *"
-command = "bin/git-sync"
-description = "Pull/rebase/push vault via git"
 ```
 
 Then on the Mac:
@@ -373,7 +366,7 @@ bin/deploy macbook logs scheduler
 A few things to know about local deployments:
 
 - **No systemd, no apt.** Service management maps to `docker compose up/stop/restart/ps`; package install is the image's job.
-- **git-sync as a scheduler job.** On remote deployments, `--git-sync` installs a systemd timer out-of-band. On local deployments, git-sync runs as a regular cron entry inside the scheduler container — enable it via `bin/today configure` → Deployments → your deployment's jobs list, or add it to `[deployments.local.<name>.jobs.git-sync]` directly as in the example above. Running `bin/deploy <name> setup --git-sync` on a local deployment prints a reminder rather than installing anything.
+- **Vault sync is the user's own git workflow.** Committed-state sync (pushing/pulling vault commits between devices) is managed with your preferred git automation on the vault repo, not by a built-in timer. Working-tree sync (uncommitted edits) uses a file-sync tool — Unison is supported via `bin/deploy <name> setup --unison`.
 - **Resilio Sync is not supported** on local deployments (`--resilio` emits a warning and exits).
 - **Git push credentials inside the container**: the compose file bind-mounts `~/.ssh` read-only, so SSH URLs just work. If your vault remote is HTTPS, switch it: `cd <vault> && git remote set-url origin git@github.com:<user>/<vault>.git`. macOS Keychain credential helpers don't work inside a Linux container.
 - **Running `bin/deploy` from inside the devcontainer works**. The devcontainer uses the official `docker-outside-of-docker` feature to install Docker CLI + Compose plugin and wire up `/var/run/docker.sock` with correct group permissions, so `docker compose` commands from inside the devcontainer talk to the host's Docker daemon. The root `docker-compose.yml` uses `${HOST_PROJECT_PATH}` and `${HOST_HOME}` (set via `containerEnv` in `.devcontainer/devcontainer.json`) so bind mounts resolve against the real host filesystem rather than `/workspaces/today`. If Docker CLI isn't available in your shell, `bin/deploy` fails loudly with a copy-pasteable set of `docker compose` commands to run from a host terminal instead. Rebuild the devcontainer ("Dev Containers: Rebuild Container") after pulling these changes so the feature gets installed.
