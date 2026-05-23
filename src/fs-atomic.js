@@ -30,6 +30,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { promises as fsp } from 'fs';
 
 /**
  * Temp-file + fsync + rename over `filePath`. Atomic within a filesystem.
@@ -71,6 +72,39 @@ function atomicReplace(filePath, content, encoding) {
 }
 
 /**
+ * Async variant of atomicReplace() with the same guarantees.
+ * @returns {Promise<true>}
+ */
+async function atomicReplaceAsync(filePath, content, encoding) {
+  const dir = path.dirname(filePath);
+  await fsp.mkdir(dir, { recursive: true });
+
+  const tmpPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
+
+  try {
+    const fileHandle = await fsp.open(tmpPath, 'w');
+    try {
+      await fileHandle.writeFile(content, { encoding });
+      await fileHandle.sync();
+    } finally {
+      await fileHandle.close();
+    }
+    await fsp.rename(tmpPath, filePath);
+    return true;
+  } catch (err) {
+    try {
+      await fsp.unlink(tmpPath);
+    } catch {
+      // Temp file already gone or never created.
+    }
+    throw err;
+  }
+}
+
+/**
  * Write `content` to `filePath` atomically via a same-directory temp file
  * plus rename. Skips the write if the target already holds identical bytes.
  *
@@ -96,6 +130,27 @@ export function writeFileAtomic(filePath, content, encoding = 'utf-8') {
   }
 
   return atomicReplace(filePath, content, encoding);
+}
+
+/**
+ * Async writeFileAtomic() with identical semantics.
+ *
+ * @param {string} filePath
+ * @param {string|Buffer} content
+ * @param {string} [encoding='utf-8']
+ * @returns {Promise<boolean>} true if bytes were written, false if unchanged.
+ */
+export async function writeFileAtomicAsync(filePath, content, encoding = 'utf-8') {
+  try {
+    const existing = await fsp.readFile(filePath, encoding);
+    if (existing === content) {
+      return false;
+    }
+  } catch {
+    // Target missing or unreadable — proceed to write.
+  }
+
+  return atomicReplaceAsync(filePath, content, encoding);
 }
 
 /**
@@ -136,5 +191,34 @@ export function writeFileAtomicCAS(filePath, content, expectedContent, encoding 
   }
 
   atomicReplace(filePath, content, encoding);
+  return { written: true, conflict: false };
+}
+
+/**
+ * Async writeFileAtomicCAS() with identical semantics.
+ *
+ * @param {string} filePath
+ * @param {string} content
+ * @param {string|null} expectedContent
+ * @param {string} [encoding='utf-8']
+ * @returns {Promise<{written: boolean, conflict: boolean}>}
+ */
+export async function writeFileAtomicCASAsync(filePath, content, expectedContent, encoding = 'utf-8') {
+  let current;
+  try {
+    current = await fsp.readFile(filePath, encoding);
+  } catch {
+    current = null;
+  }
+
+  if (current === content) {
+    return { written: false, conflict: false };
+  }
+
+  if (current !== expectedContent) {
+    return { written: false, conflict: true };
+  }
+
+  await atomicReplaceAsync(filePath, content, encoding);
   return { written: true, conflict: false };
 }
