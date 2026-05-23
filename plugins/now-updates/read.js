@@ -211,8 +211,8 @@ function writeUpdates(updates, filePath, expectedContent, fileExists) {
   }
 
   if (!fileExists) {
-    writeFileAtomic(filePath, content);
-    return { conflict: false };
+    const written = writeFileAtomic(filePath, content);
+    return { written, conflict: false };
   }
 
   return writeFileAtomicCAS(filePath, content, expectedContent);
