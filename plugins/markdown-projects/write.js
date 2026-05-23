@@ -5,12 +5,27 @@
 
 import fs from 'fs';
 import path from 'path';
+import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const args = JSON.parse(process.env.PLUGIN_WRITE_ARGS || '{}');
 
 function output(result) {
   console.log(JSON.stringify(result));
+}
+
+// Wrap CAS write so each handler returns a conflict result on collision.
+function casWrite(filePath, newContent, expectedContent, successPayload) {
+  const { conflict } = writeFileAtomicCAS(filePath, newContent, expectedContent);
+  if (conflict) {
+    return output({
+      success: false,
+      error: 'Concurrent update to project file; retry',
+      concurrent_update: true,
+      file: filePath
+    });
+  }
+  return output(successPayload);
 }
 
 // Parse YAML frontmatter from markdown content
@@ -127,9 +142,7 @@ function handleSetDates() {
 
   // Write back the file
   const newContent = `---\n${updatedRaw}\n---${body}`;
-  fs.writeFileSync(fullPath, newContent, 'utf8');
-
-  return output({
+  return casWrite(fullPath, newContent, content, {
     success: true,
     updated: {
       file: filePath,
@@ -185,9 +198,7 @@ function handleSetPriority() {
 
   // Write back the file
   const newContent = `---\n${updatedRaw}\n---${body}`;
-  fs.writeFileSync(fullPath, newContent, 'utf8');
-
-  return output({
+  return casWrite(fullPath, newContent, content, {
     success: true,
     updated: {
       file: filePath,
@@ -242,9 +253,7 @@ function handleSetStatus() {
 
   // Write back the file
   const newContent = `---\n${updatedRaw}\n---${body}`;
-  fs.writeFileSync(fullPath, newContent, 'utf8');
-
-  return output({
+  return casWrite(fullPath, newContent, content, {
     success: true,
     updated: {
       file: filePath,
@@ -299,9 +308,7 @@ function handleSetStage() {
 
   // Write back the file
   const newContent = `---\n${updatedRaw}\n---${body}`;
-  fs.writeFileSync(fullPath, newContent, 'utf8');
-
-  return output({
+  return casWrite(fullPath, newContent, content, {
     success: true,
     updated: {
       file: filePath,
@@ -384,9 +391,7 @@ function handleSetReviewDate() {
 
   // Write back the file
   const newContent = `---\n${updatedRaw}\n---${body}`;
-  fs.writeFileSync(fullPath, newContent, 'utf8');
-
-  return output({
+  return casWrite(fullPath, newContent, content, {
     success: true,
     updated: {
       file: filePath,

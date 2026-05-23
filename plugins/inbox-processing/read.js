@@ -16,6 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { format } from 'date-fns';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,7 +153,7 @@ date: ${dateStr}
 ---
 
 `;
-    fs.writeFileSync(filePath, content, 'utf-8');
+    writeFileAtomic(filePath, content);
   }
 
   return filePath;
@@ -160,12 +161,12 @@ date: ${dateStr}
 
 /**
  * Apply a modification to a section in a diary file.
- * Re-reads the file immediately before writing to minimize race conditions
- * when multiple processes (e.g., local + remote deployments) may be syncing.
+ * CAS-protected against concurrent writes from other instances (e.g., local +
+ * remote deployments) — returns {written, conflict} so callers can react.
  */
 function modifyDiarySection(filePath, sectionName, modifyFn) {
-  // Re-read file immediately before modification to get freshest content
-  let fileContent = fs.readFileSync(filePath, 'utf-8');
+  const originalContent = fs.readFileSync(filePath, 'utf-8');
+  let fileContent = originalContent;
 
   const sectionHeader = `## ${sectionName}`;
 
@@ -190,8 +191,7 @@ function modifyDiarySection(filePath, sectionName, modifyFn) {
   const newSectionContent = modifyFn(sectionContent);
   fileContent = beforeSection + newSectionContent + restContent;
 
-  // Write immediately after read-modify
-  fs.writeFileSync(filePath, fileContent, 'utf-8');
+  return writeFileAtomicCAS(filePath, fileContent, originalContent);
 }
 
 /**
@@ -345,12 +345,24 @@ function processTaskOnlyFile(filePath, content, basename) {
     const existing = fs.readFileSync(tasksPath, 'utf-8');
     if (existing.includes('# Archive')) {
       const parts = existing.split('# Archive');
-      fs.writeFileSync(tasksPath, `${parts[0].trimEnd()}\n\n${content}\n\n# Archive${parts[1] || ''}`, 'utf-8');
+      const newContent = `${parts[0].trimEnd()}\n\n${content}\n\n# Archive${parts[1] || ''}`;
+      const { conflict } = writeFileAtomicCAS(tasksPath, newContent, existing);
+      if (conflict) {
+        // Bail out without moving the source file to trash so the next sync retries.
+        return {
+          action: 'deferred',
+          type: 'tasks',
+          reason: 'concurrent update to tasks file',
+          file: basename
+        };
+      }
     } else {
+      // Short append (<PIPE_BUF on POSIX) is atomic at the syscall level, so
+      // concurrent appends can't tear bytes; leave as appendFileSync.
       fs.appendFileSync(tasksPath, `\n${content}\n`);
     }
   } else {
-    fs.writeFileSync(tasksPath, content, 'utf-8');
+    writeFileAtomic(tasksPath, content);
   }
 
   const taskCount = (content.match(/^-\s*\[[x ]\]/gm) || []).length;
@@ -412,8 +424,15 @@ function addSessionsToTimeLog(sessions) {
         return new Date(timeA) - new Date(timeB);
       });
 
-      // Write sorted content back
-      fs.writeFileSync(logFile, entries.join('\n') + '\n', 'utf-8');
+      // Write sorted content back. CAS so a concurrent writer doesn't lose
+      // either side's session. On conflict we drop this session; the next
+      // sync will pick it back up.
+      const newContent = entries.join('\n') + '\n';
+      if (content === '') {
+        writeFileAtomic(logFile, newContent);
+      } else {
+        writeFileAtomicCAS(logFile, newContent, content);
+      }
     }
   }
 }

@@ -10,6 +10,7 @@ import { exec, execSync, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
+import { writeFileAtomic, writeFileAtomicCAS } from './fs-atomic.js';
 import { marked } from 'marked';
 import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
 import { markedHighlight } from 'marked-highlight';
@@ -6111,9 +6112,12 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    // Write the file
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
+    // Write the file. AI-edit endpoints don't carry an expected-content
+    // basis from the client, so we use atomic-only writes (no CAS): readers
+    // can't observe a torn file mid-write, but a true write-write race
+    // between two AI-edit requests still favors the last writer.
+    writeFileAtomic(fullPath, content);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error editing file:', error);
@@ -6787,11 +6791,11 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
     }
     
     // Read the file
-    let content = await fs.readFile(fullPath, 'utf-8');
+    const originalContent = await fs.readFile(fullPath, 'utf-8');
     const { lineNumber, taskId: providedTaskId, checked } = req.body;
-    
+
     // Split into lines
-    const lines = content.split('\n');
+    const lines = originalContent.split('\n');
     
     // Find the line to toggle - prioritize task ID if provided
     let targetLineNumber = lineNumber;
@@ -6825,10 +6829,13 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
         lines[targetLineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
       }
       
-      // Write back to file
-      content = lines.join('\n');
-      await fs.writeFile(fullPath, content, 'utf-8');
-      
+      // Write back to file (CAS so another writer can't clobber this toggle)
+      const newContent = lines.join('\n');
+      const { conflict } = writeFileAtomicCAS(fullPath, newContent, originalContent);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+
       // Task updates are now handled directly in markdown files
       // No database update needed with Obsidian Tasks approach
       
@@ -7012,7 +7019,12 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       lines.splice(line, 0, newTaskLine); // Insert at position line (after line-1)
     }
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+    {
+      const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
 
     // Clear the task query cache so the next page load reflects the change
     taskQueryCache.clear();
@@ -7139,7 +7151,12 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
     const updatedLine = parts.join(' ');
     lines[line - 1] = updatedLine;
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+    {
+      const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
 
     // Keep query cache in sync
     taskQueryCache.clear();
@@ -7192,10 +7209,13 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
       return res.status(400).send('Can only save markdown and TOML files');
     }
     
-    // Write the content
+    // Write the content. The save endpoint doesn't carry an expected-content
+    // basis from the client, so atomic-only — readers can't observe a torn
+    // file mid-write, but a true write-write race still favors the last
+    // writer. Threading CAS through would require a client-side contract change.
     const { content } = req.body;
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
+    writeFileAtomic(fullPath, content);
+
     console.log(`File saved: ${fullPath}`);
     res.json({ success: true, message: 'File saved successfully' });
   } catch (error) {

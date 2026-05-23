@@ -17,6 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -233,7 +234,8 @@ function updateDiarySection(filePath, sectionName, content) {
   const startMarker = `<!-- TODAY:${sectionName}:START -->`;
   const endMarker = `<!-- TODAY:${sectionName}:END -->`;
 
-  let fileContent = fs.readFileSync(filePath, 'utf8');
+  const originalContent = fs.readFileSync(filePath, 'utf8');
+  let fileContent = originalContent;
 
   const newSection = content ? `${startMarker}\n${content}\n${endMarker}` : '';
 
@@ -259,8 +261,10 @@ function updateDiarySection(filePath, sectionName, content) {
     }
   }
 
-  fs.writeFileSync(filePath, fileContent, 'utf8');
-  return true;
+  const { conflict } = writeFileAtomicCAS(filePath, fileContent, originalContent);
+  // Conflict means another instance wrote between our read and our rename;
+  // skip this round and let the next sync converge.
+  return !conflict;
 }
 
 /**
@@ -282,7 +286,7 @@ obsidianUIMode: preview
 ---
 
 `;
-    fs.writeFileSync(filePath, content, 'utf8');
+    writeFileAtomic(filePath, content);
   }
 
   // Add or update dynamic sections based on enabled plugins
@@ -408,7 +412,11 @@ function removeTodaySectionsFromOldFiles() {
 
       // Only write if content actually changed
       if (cleanedContent !== content) {
-        fs.writeFileSync(filePath, cleanedContent, 'utf8');
+        const { conflict } = writeFileAtomicCAS(filePath, cleanedContent, content);
+        if (conflict) {
+          skipped.push({ file, reason: 'concurrent update; skipped this round' });
+          continue;
+        }
         const newSize = Buffer.byteLength(cleanedContent, 'utf8');
 
         cleaned.push({

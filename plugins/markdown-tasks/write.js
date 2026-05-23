@@ -12,6 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -184,16 +185,33 @@ try {
 
     // Read existing content
     let content = '';
+    let fileExists = true;
     try {
       content = fs.readFileSync(taskFile, 'utf8');
     } catch {
       // File doesn't exist yet
+      fileExists = false;
     }
 
     // Append task
     const lines = content.split('\n').filter(l => l.trim());
     lines.push(taskLine);
-    fs.writeFileSync(taskFile, lines.join('\n') + '\n');
+    const newContent = lines.join('\n') + '\n';
+
+    if (fileExists) {
+      const { conflict } = writeFileAtomicCAS(taskFile, newContent, content);
+      if (conflict) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'Concurrent update to task file; retry',
+          concurrent_update: true,
+          file: taskFile
+        }));
+        process.exit(1);
+      }
+    } else {
+      writeFileAtomic(taskFile, newContent);
+    }
 
     console.log(JSON.stringify({
       success: true,
@@ -290,7 +308,16 @@ try {
 
     const originalLine = lines[lineIndex];
     lines[lineIndex] = markCompleted(originalLine);
-    fs.writeFileSync(filePath, lines.join('\n'));
+    const { conflict: completeConflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+    if (completeConflict) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Concurrent update to task file; retry',
+        concurrent_update: true,
+        file: filePath
+      }));
+      process.exit(1);
+    }
 
     console.log(JSON.stringify({
       success: true,
@@ -379,7 +406,16 @@ try {
     }
 
     lines[lineIndex] = newLine;
-    fs.writeFileSync(filePath, lines.join('\n'));
+    const { conflict: updateConflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+    if (updateConflict) {
+      console.log(JSON.stringify({
+        success: false,
+        error: 'Concurrent update to task file; retry',
+        concurrent_update: true,
+        file: filePath
+      }));
+      process.exit(1);
+    }
 
     console.log(JSON.stringify({
       success: true,
@@ -429,6 +465,7 @@ try {
 
     let totalClassified = 0;
     const filesModified = [];
+    const filesSkippedDueToConflict = [];
 
     for (const [filePath, fileTasks] of tasksByFile) {
       if (!fs.existsSync(filePath)) continue;
@@ -544,8 +581,12 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       }
 
       if (modified) {
-        fs.writeFileSync(filePath, lines.join('\n'));
-        filesModified.push(path.relative(projectRoot, filePath));
+        const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+        if (conflict) {
+          filesSkippedDueToConflict.push(path.relative(projectRoot, filePath));
+        } else {
+          filesModified.push(path.relative(projectRoot, filePath));
+        }
       }
     }
 
@@ -554,6 +595,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       action: 'classify-stages',
       classified: totalClassified,
       files_modified: filesModified,
+      files_skipped_due_to_conflict: filesSkippedDueToConflict,
       used_ai: claudeAvailable,
       needs_sync: filesModified.length > 0
     }));
@@ -581,6 +623,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
 
     let totalAdded = 0;
     const filesModified = [];
+    const filesSkippedDueToConflict = [];
     const today = getTodayDate();
 
     for (const [filePath, fileTasks] of tasksByFile) {
@@ -615,8 +658,12 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       }
 
       if (modified) {
-        fs.writeFileSync(filePath, lines.join('\n'));
-        filesModified.push(path.relative(projectRoot, filePath));
+        const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+        if (conflict) {
+          filesSkippedDueToConflict.push(path.relative(projectRoot, filePath));
+        } else {
+          filesModified.push(path.relative(projectRoot, filePath));
+        }
       }
     }
 
@@ -625,6 +672,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       action: 'add-date-created',
       added: totalAdded,
       files_modified: filesModified,
+      files_skipped_due_to_conflict: filesSkippedDueToConflict,
       needs_sync: filesModified.length > 0
     }));
 
@@ -663,6 +711,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
 
     let totalPrioritized = 0;
     const filesModified = [];
+    const filesSkippedDueToConflict = [];
 
     for (const [filePath, fileTasks] of tasksByFile) {
       if (!fs.existsSync(filePath)) continue;
@@ -776,8 +825,12 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       }
 
       if (modified) {
-        fs.writeFileSync(filePath, lines.join('\n'));
-        filesModified.push(path.relative(projectRoot, filePath));
+        const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+        if (conflict) {
+          filesSkippedDueToConflict.push(path.relative(projectRoot, filePath));
+        } else {
+          filesModified.push(path.relative(projectRoot, filePath));
+        }
       }
     }
 
@@ -786,6 +839,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       action: 'add-priority',
       prioritized: totalPrioritized,
       files_modified: filesModified,
+      files_skipped_due_to_conflict: filesSkippedDueToConflict,
       used_ai: claudeAvailable,
       needs_sync: filesModified.length > 0
     }));
@@ -809,10 +863,12 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
 
     // Read current archive file
     let archiveContent = '';
+    let archiveExisted = true;
     try {
       archiveContent = fs.readFileSync(archiveFile, 'utf8');
     } catch {
       // Archive file doesn't exist yet
+      archiveExisted = false;
     }
 
     let archiveTasks = archiveContent.split('\n').filter(line => line.trim());
@@ -846,6 +902,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
     }
 
     const filesModified = new Set();
+    const filesSkippedDueToConflict = [];
 
     // Process each task file - archive completed tasks
     for (const filePath of taskFiles) {
@@ -865,7 +922,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       for (const line of lines) {
         if (line.match(/^- \[x\]/i)) {
           completedTasks.push(line);
-          totalArchived++;
         } else if (line.trim()) {
           remainingLines.push(line);
         }
@@ -873,17 +929,45 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
 
       // Add completed tasks to archive
       if (completedTasks.length > 0) {
+        // CAS source-file first; only commit to the archive accumulator on success.
+        const { conflict } = writeFileAtomicCAS(filePath, remainingLines.join('\n') + '\n', content);
+        if (conflict) {
+          filesSkippedDueToConflict.push(path.relative(projectRoot, filePath));
+          continue;
+        }
         archiveTasks = archiveTasks.concat(completedTasks);
-
-        // Write back remaining tasks
-        fs.writeFileSync(filePath, remainingLines.join('\n') + '\n');
+        totalArchived += completedTasks.length;
         filesModified.add(path.relative(projectRoot, filePath));
       }
     }
 
     if (totalArchived > 0) {
-      // Write updated archive file
-      fs.writeFileSync(archiveFile, archiveTasks.join('\n') + '\n');
+      // Write updated archive file.
+      // - First-create: plain atomic. CAS would falsely report conflict here
+      //   because the on-disk null doesn't match our empty-string snapshot.
+      // - Existing file: CAS against the snapshot we read at start so a
+      //   concurrent archiver doesn't lose the other's appended entries.
+      const archiveBytes = archiveTasks.join('\n') + '\n';
+      let archiveConflict = false;
+      if (archiveExisted) {
+        archiveConflict = writeFileAtomicCAS(archiveFile, archiveBytes, archiveContent).conflict;
+      } else {
+        writeFileAtomic(archiveFile, archiveBytes);
+      }
+      if (archiveConflict) {
+        // Couldn't atomically update the archive — the source files have already been
+        // truncated above, so those entries are now orphaned in `archiveTasks` and not
+        // on disk anywhere. Surface this loudly so the caller can re-run.
+        console.log(JSON.stringify({
+          success: false,
+          error: 'Concurrent update to archive file; archived entries may be lost. Retry.',
+          concurrent_update: true,
+          file: archiveFile,
+          files_modified: Array.from(filesModified),
+          files_skipped_due_to_conflict: filesSkippedDueToConflict
+        }));
+        process.exit(1);
+      }
       filesModified.add(path.relative(projectRoot, archiveFile));
     }
 
@@ -978,10 +1062,13 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
           }
         }
 
-        // Write all files with new distribution
+        // Write all files with new distribution. These targets were just unlinked
+        // above (or are the main task file being overwritten with a fresh chunk),
+        // so CAS isn't meaningful — atomic write is enough to keep readers from
+        // observing a torn file mid-rebalance.
         const distributionInfo = [];
         for (const fileInfo of filesToWrite) {
-          fs.writeFileSync(fileInfo.path, fileInfo.tasks.join('\n') + '\n');
+          writeFileAtomic(fileInfo.path, fileInfo.tasks.join('\n') + '\n');
           filesModified.add(path.relative(projectRoot, fileInfo.path));
 
           distributionInfo.push({
@@ -1006,6 +1093,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       rebalanced,
       rebalance_info: rebalanceInfo,
       files_modified: Array.from(filesModified),
+      files_skipped_due_to_conflict: filesSkippedDueToConflict,
       needs_sync: filesModified.size > 0
     }));
 
