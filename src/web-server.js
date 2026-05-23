@@ -5828,11 +5828,11 @@ app.get('/_git', authMiddleware, async (req, res) => {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split('\n\n');
+            const events = buffer.split('\\n\\n');
             buffer = events.pop() || '';
 
             for (const eventText of events) {
-              const lines = eventText.split('\n');
+              const lines = eventText.split('\\n');
               for (const line of lines) {
                 if (!line.startsWith('data:')) continue;
                 const payload = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
