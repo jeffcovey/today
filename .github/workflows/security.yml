@@ -1,6 +1,13 @@
 name: Security Audit
 
 on:
+  # `npm audit` is a required status check in branch protection, so it must
+  # run on every PR and on pushes to main — otherwise PRs are permanently
+  # blocked waiting for a check that never reports.
+  pull_request:
+  push:
+    branches:
+      - main
   schedule:
     # Run weekly on Monday at 9am UTC to catch new vulnerabilities
     - cron: '0 9 * * 1'
@@ -51,7 +58,9 @@ jobs:
           exit $audit_exit
 
       - name: Open issue on failure
-        if: failure()
+        # On a PR the failing check is signal enough; only file a tracking
+        # issue for scheduled/main runs so PRs don't spam duplicate issues.
+        if: failure() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
