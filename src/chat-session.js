@@ -2,7 +2,7 @@
  * Chat Session - Manages conversation state and REPL loop
  */
 
-import { writeFileSync } from 'fs';
+import { writeFileAtomic } from './fs-atomic.js';
 import { join } from 'path';
 import { streamCompletion, getEffectiveContextLimit } from './ai-provider.js';
 import {
@@ -98,7 +98,7 @@ ${instructions.join('\n')}
 
   const refPath = join(process.cwd(), '.data', 'query-reference.md');
   try {
-    writeFileSync(refPath, content);
+    writeFileAtomic(refPath, content);
     return refPath;
   } catch {
     return null;

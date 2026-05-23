@@ -1,5 +1,6 @@
 // Configuration helper for JavaScript modules
-import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { writeFileAtomic } from './fs-atomic.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { parse, stringify } from 'smol-toml';
@@ -69,7 +70,7 @@ export function setConfigPath(configPath) {
       // Ignore if file doesn't exist
     }
   } else {
-    writeFileSync(CONFIG_PATH_FILE, configPath.trim() + '\n');
+    writeFileAtomic(CONFIG_PATH_FILE, configPath.trim() + '\n');
   }
 }
 
@@ -327,5 +328,5 @@ export function applyDeploymentOverrides(aiOverrides, outputPath) {
     }
   }
 
-  writeFileSync(outputPath, stringify(config));
+  writeFileAtomic(outputPath, stringify(config));
 }

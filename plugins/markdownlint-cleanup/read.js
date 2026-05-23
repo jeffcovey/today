@@ -17,6 +17,7 @@ import { glob } from 'glob';
 import { lint, readConfig } from 'markdownlint/sync';
 import { applyFixes } from 'markdownlint';
 import { getChangedFilePaths, updateBaseline, getBaselineStatus } from '../../src/vault-changes.js';
+import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,8 +51,12 @@ function lintAndFix(files) {
     const content = fs.readFileSync(file, 'utf8');
     const fixed = applyFixes(content, issues);
     if (fixed !== content) {
-      fs.writeFileSync(file, fixed, 'utf8');
-      fixedCount++;
+      const { conflict } = writeFileAtomicCAS(file, fixed, content);
+      // On conflict another process wrote in between — skip this file; the
+      // next sync will re-lint against fresh content.
+      if (!conflict) {
+        fixedCount++;
+      }
     }
   }
 
