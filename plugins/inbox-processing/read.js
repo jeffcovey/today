@@ -191,7 +191,8 @@ function modifyDiarySection(filePath, sectionName, modifyFn) {
   const newSectionContent = modifyFn(sectionContent);
   fileContent = beforeSection + newSectionContent + restContent;
 
-  return writeFileAtomicCAS(filePath, fileContent, originalContent);
+  const { conflict } = writeFileAtomicCAS(filePath, fileContent, originalContent);
+  return { written: !conflict, conflict };
 }
 
 /**
@@ -201,11 +202,11 @@ function addToDiary(dateStr, sectionName, timestamp, content) {
   const filePath = getDiaryFile(dateStr);
   const newEntry = `\n\n### ${timestamp}\n${content}`;
 
-  modifyDiarySection(filePath, sectionName, (sectionContent) => {
+  const result = modifyDiarySection(filePath, sectionName, (sectionContent) => {
     return sectionContent.trimEnd() + newEntry + '\n';
   });
 
-  return filePath;
+  return { filePath, ...result };
 }
 
 /**
@@ -215,11 +216,11 @@ function addBulletsToDiary(dateStr, sectionName, bullets) {
   const filePath = getDiaryFile(dateStr);
   const bulletText = bullets.map(b => `- ${b}`).join('\n');
 
-  modifyDiarySection(filePath, sectionName, (sectionContent) => {
+  const result = modifyDiarySection(filePath, sectionName, (sectionContent) => {
     return sectionContent.trimEnd() + '\n' + bulletText + '\n';
   });
 
-  return filePath;
+  return { filePath, ...result };
 }
 
 /**
@@ -253,7 +254,17 @@ function processGratitudeNote(filePath, content, basename) {
   }
 
   // Add to diary under "I'm grateful for..." section
-  const diaryFile = addBulletsToDiary(parsed.formatted, "I'm grateful for...", bullets);
+  const { filePath: diaryFile, conflict } = addBulletsToDiary(parsed.formatted, "I'm grateful for...", bullets);
+
+  if (conflict) {
+    return {
+      action: 'deferred',
+      type: 'gratitude',
+      reason: 'concurrent update to diary file',
+      destination: path.basename(diaryFile),
+      file: basename
+    };
+  }
 
   // Move to trash
   moveToTrash(filePath);
@@ -286,7 +297,17 @@ function processProgressNote(filePath, content, basename) {
   const cleanedContent = cleanedLines.join('\n').trim();
 
   // Add to diary
-  const diaryFile = addToDiary(parsed.formatted, 'Progress', parsed.timestamp, cleanedContent);
+  const { filePath: diaryFile, conflict } = addToDiary(parsed.formatted, 'Progress', parsed.timestamp, cleanedContent);
+
+  if (conflict) {
+    return {
+      action: 'deferred',
+      type: 'progress',
+      reason: 'concurrent update to diary file',
+      destination: path.basename(diaryFile),
+      file: basename
+    };
+  }
 
   // Move to trash
   moveToTrash(filePath);
@@ -318,7 +339,17 @@ function processConcernNote(filePath, content, basename) {
   const cleanedContent = cleanedLines.join('\n').trim();
 
   // Add to diary
-  const diaryFile = addToDiary(parsed.formatted, 'Concern', parsed.timestamp, cleanedContent);
+  const { filePath: diaryFile, conflict } = addToDiary(parsed.formatted, 'Concern', parsed.timestamp, cleanedContent);
+
+  if (conflict) {
+    return {
+      action: 'deferred',
+      type: 'concern',
+      reason: 'concurrent update to diary file',
+      destination: path.basename(diaryFile),
+      file: basename
+    };
+  }
 
   // Move to trash
   moveToTrash(filePath);
@@ -398,8 +429,9 @@ function addSessionsToTimeLog(sessions) {
     const entry = `${session.startTime}|${session.endTime}|${session.description}`;
 
     // Read existing content or create new
+    const fileExists = fs.existsSync(logFile);
     let content = '';
-    if (fs.existsSync(logFile)) {
+    if (fileExists) {
       content = fs.readFileSync(logFile, 'utf-8');
     }
 
@@ -428,13 +460,17 @@ function addSessionsToTimeLog(sessions) {
       // either side's session. On conflict we drop this session; the next
       // sync will pick it back up.
       const newContent = entries.join('\n') + '\n';
-      if (content === '') {
+      if (!fileExists) {
         writeFileAtomic(logFile, newContent);
       } else {
-        writeFileAtomicCAS(logFile, newContent, content);
+        const { conflict } = writeFileAtomicCAS(logFile, newContent, content);
+        if (conflict) {
+          return { conflict: true };
+        }
       }
     }
   }
+  return { conflict: false };
 }
 
 /**
@@ -538,7 +574,10 @@ function processTimeTrackingMarkers(files) {
 
   // Add sessions to time tracking log
   if (sessions.length > 0) {
-    addSessionsToTimeLog(sessions);
+    const { conflict } = addSessionsToTimeLog(sessions);
+    if (conflict) {
+      return { processed: 0, sessions: 0, conflict: true };
+    }
   }
 
   // Check for Start markers that match existing sessions in the log

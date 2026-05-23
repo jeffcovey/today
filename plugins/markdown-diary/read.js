@@ -262,7 +262,7 @@ function updateDiarySection(filePath, sectionName, content) {
   }
 
   const { conflict } = writeFileAtomicCAS(filePath, fileContent, originalContent);
-  // Conflict means another instance wrote between our read and our rename;
+  // Conflict means another instance wrote between our read and our atomic replace;
   // skip this round and let the next sync converge.
   return !conflict;
 }

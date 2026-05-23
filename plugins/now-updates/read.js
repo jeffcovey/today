@@ -202,7 +202,7 @@ function generateUpdate(now) {
  * the caller originally read; if the file changed between then and now we
  * skip the write rather than clobber a concurrent edit.
  */
-function writeUpdates(updates, filePath, expectedContent) {
+function writeUpdates(updates, filePath, expectedContent, fileExists) {
   const content = updates.map(u => u.content).join(DIVIDER);
 
   const dir = path.dirname(filePath);
@@ -210,11 +210,12 @@ function writeUpdates(updates, filePath, expectedContent) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  if (expectedContent === '') {
+  if (!fileExists) {
     writeFileAtomic(filePath, content);
-  } else {
-    writeFileAtomicCAS(filePath, content, expectedContent);
+    return { conflict: false };
   }
+
+  return writeFileAtomicCAS(filePath, content, expectedContent);
 }
 
 /**
@@ -232,8 +233,9 @@ async function main() {
   };
 
   // Read existing content
+  const fileExists = fs.existsSync(filePath);
   let existingContent = '';
-  if (fs.existsSync(filePath)) {
+  if (fileExists) {
     existingContent = fs.readFileSync(filePath, 'utf-8');
   }
 
@@ -269,7 +271,6 @@ async function main() {
 
   if (newUpdate) {
     updates.unshift({ timestamp: now, content: newUpdate });
-    metadata.updateGenerated = true;
   }
 
   // Prune old updates
@@ -277,8 +278,13 @@ async function main() {
 
   // Write back
   if (newUpdate) {
-    writeUpdates(updates, filePath, existingContent);
-    context = updates.map(u => u.content).join(DIVIDER);
+    const { conflict } = writeUpdates(updates, filePath, existingContent, fileExists);
+    if (!conflict) {
+      metadata.updateGenerated = true;
+      context = updates.map(u => u.content).join(DIVIDER);
+    } else {
+      metadata.reason = 'concurrent update';
+    }
   }
 
   console.log(JSON.stringify({ context, metadata }));

@@ -10,7 +10,10 @@ import { exec, execSync, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
-import { writeFileAtomic, writeFileAtomicCAS } from './fs-atomic.js';
+import {
+  writeFileAtomicAsync,
+  writeFileAtomicCASAsync
+} from './fs-atomic.js';
 import { marked } from 'marked';
 import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
 import { markedHighlight } from 'marked-highlight';
@@ -6116,7 +6119,7 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
     // basis from the client, so we use atomic-only writes (no CAS): readers
     // can't observe a torn file mid-write, but a true write-write race
     // between two AI-edit requests still favors the last writer.
-    writeFileAtomic(fullPath, content);
+    await writeFileAtomicAsync(fullPath, content);
 
     res.json({ success: true });
   } catch (error) {
@@ -6831,7 +6834,7 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
       
       // Write back to file (CAS so another writer can't clobber this toggle)
       const newContent = lines.join('\n');
-      const { conflict } = writeFileAtomicCAS(fullPath, newContent, originalContent);
+      const { conflict } = await writeFileAtomicCASAsync(fullPath, newContent, originalContent);
       if (conflict) {
         return res.status(409).json({ error: 'Concurrent update; retry' });
       }
@@ -7020,7 +7023,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     }
 
     {
-      const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
       if (conflict) {
         return res.status(409).json({ error: 'Concurrent update; retry' });
       }
@@ -7152,7 +7155,7 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
     lines[line - 1] = updatedLine;
 
     {
-      const { conflict } = writeFileAtomicCAS(filePath, lines.join('\n'), content);
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
       if (conflict) {
         return res.status(409).json({ error: 'Concurrent update; retry' });
       }
@@ -7214,7 +7217,7 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
     // file mid-write, but a true write-write race still favors the last
     // writer. Threading CAS through would require a client-side contract change.
     const { content } = req.body;
-    writeFileAtomic(fullPath, content);
+    await writeFileAtomicAsync(fullPath, content);
 
     console.log(`File saved: ${fullPath}`);
     res.json({ success: true, message: 'File saved successfully' });

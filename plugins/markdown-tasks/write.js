@@ -210,7 +210,27 @@ try {
         process.exit(1);
       }
     } else {
-      writeFileAtomic(taskFile, newContent);
+      try {
+        fs.writeFileSync(taskFile, newContent, { encoding: 'utf8', flag: 'wx' });
+      } catch (err) {
+        if (err.code !== 'EEXIST') {
+          throw err;
+        }
+        // Another instance created the file first; re-read and CAS append.
+        const fresh = fs.readFileSync(taskFile, 'utf8');
+        const freshLines = fresh.split('\n').filter(l => l.trim());
+        freshLines.push(taskLine);
+        const { conflict } = writeFileAtomicCAS(taskFile, freshLines.join('\n') + '\n', fresh);
+        if (conflict) {
+          console.log(JSON.stringify({
+            success: false,
+            error: 'Concurrent update to task file; retry',
+            concurrent_update: true,
+            file: taskFile
+          }));
+          process.exit(1);
+        }
+      }
     }
 
     console.log(JSON.stringify({
@@ -904,7 +924,10 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
     const filesModified = new Set();
     const filesSkippedDueToConflict = [];
 
-    // Process each task file - archive completed tasks
+    const sourceUpdates = [];
+    let pendingArchiveTasks = [];
+
+    // First pass: collect completed tasks + source truncation plans in memory.
     for (const filePath of taskFiles) {
       let content;
       try {
@@ -927,26 +950,21 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         }
       }
 
-      // Add completed tasks to archive
+      // Stage completed tasks for archive write.
       if (completedTasks.length > 0) {
-        // CAS source-file first; only commit to the archive accumulator on success.
-        const { conflict } = writeFileAtomicCAS(filePath, remainingLines.join('\n') + '\n', content);
-        if (conflict) {
-          filesSkippedDueToConflict.push(path.relative(projectRoot, filePath));
-          continue;
-        }
-        archiveTasks = archiveTasks.concat(completedTasks);
-        totalArchived += completedTasks.length;
-        filesModified.add(path.relative(projectRoot, filePath));
+        sourceUpdates.push({
+          filePath,
+          originalContent: content,
+          remainingContent: remainingLines.join('\n') + '\n'
+        });
+        pendingArchiveTasks = pendingArchiveTasks.concat(completedTasks);
       }
     }
 
-    if (totalArchived > 0) {
-      // Write updated archive file.
-      // - First-create: plain atomic. CAS would falsely report conflict here
-      //   because the on-disk null doesn't match our empty-string snapshot.
-      // - Existing file: CAS against the snapshot we read at start so a
-      //   concurrent archiver doesn't lose the other's appended entries.
+    if (pendingArchiveTasks.length > 0) {
+      // Write archive first so we never lose completed tasks.
+      archiveTasks = archiveTasks.concat(pendingArchiveTasks);
+      totalArchived = pendingArchiveTasks.length;
       const archiveBytes = archiveTasks.join('\n') + '\n';
       let archiveConflict = false;
       if (archiveExisted) {
@@ -955,20 +973,32 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         writeFileAtomic(archiveFile, archiveBytes);
       }
       if (archiveConflict) {
-        // Couldn't atomically update the archive — the source files have already been
-        // truncated above, so those entries are now orphaned in `archiveTasks` and not
-        // on disk anywhere. Surface this loudly so the caller can re-run.
         console.log(JSON.stringify({
           success: false,
-          error: 'Concurrent update to archive file; archived entries may be lost. Retry.',
+          error: 'Concurrent update to archive file; retry',
           concurrent_update: true,
           file: archiveFile,
-          files_modified: Array.from(filesModified),
+          files_modified: [],
           files_skipped_due_to_conflict: filesSkippedDueToConflict
         }));
         process.exit(1);
       }
       filesModified.add(path.relative(projectRoot, archiveFile));
+
+      // Second pass: CAS-truncate source files. Conflicts here leave benign
+      // duplicates (still-completed source lines + archived copy), never loss.
+      for (const update of sourceUpdates) {
+        const { conflict } = writeFileAtomicCAS(
+          update.filePath,
+          update.remainingContent,
+          update.originalContent
+        );
+        if (conflict) {
+          filesSkippedDueToConflict.push(path.relative(projectRoot, update.filePath));
+          continue;
+        }
+        filesModified.add(path.relative(projectRoot, update.filePath));
+      }
     }
 
     // Now rebalance ALL task files (main + numbered) if any exceed max tasks
