@@ -22,7 +22,7 @@ import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
-import { streamCompletion, isAIAvailable } from './ai-provider.js';
+import { streamCompletion, isAIAvailable, getProviderName } from './ai-provider.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -6074,6 +6074,7 @@ app.post('/_git/push', authMiddleware, (req, res) => {
 });
 
 app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
+  let isAborted = false;
   try {
     const available = await isAIAvailable();
     if (!available) {
@@ -6091,8 +6092,10 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'No staged changes to generate a message for.' });
     }
 
-    // Truncate very large diffs to avoid exceeding context limits
-    const maxDiffLength = 5000;
+    // Truncate very large diffs to avoid exceeding context limits.
+    // Use a lower cap for local Ollama to reduce prefill latency.
+    const provider = getProviderName();
+    const maxDiffLength = provider === 'ollama' ? 5000 : 15000;
     if (diff.length > maxDiffLength) {
       diff = diff.slice(0, maxDiffLength) + '\n\n[... diff truncated ...]';
     }
@@ -6101,12 +6104,14 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*'
     });
 
-    let isAborted = false;
+    const streamAbortController = new AbortController();
     req.on('close', () => {
       isAborted = true;
+      if (!streamAbortController.signal.aborted) {
+        streamAbortController.abort();
+      }
     });
 
     const streamResult = await streamCompletion({
@@ -6114,6 +6119,7 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
       messages: [{ role: 'user', content: diff }],
       maxTokens: 100,
       temperature: 0,
+      abortSignal: streamAbortController.signal,
     });
 
     let fullMessage = '';
@@ -6141,6 +6147,8 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
     })}\n\n`);
     res.end();
   } catch (err) {
+    if (err?.name === 'AbortError') return;
+    if (isAborted) return;
     console.error('Error generating AI commit message:', err);
     if (res.headersSent) {
       res.write(`data: ${JSON.stringify({
