@@ -204,6 +204,8 @@ function parseEventArgs(args) {
       event.timezone = args[++i];
     } else if (arg === '--calendar' || arg === '-c') {
       event.sourceArg = args[++i];
+    } else if (arg === '--reminder' || arg === '-r') {
+      event.reminder_minutes = parseInt(args[++i], 10);
     } else if (!event.title) {
       event.title = arg;
     }
@@ -369,7 +371,8 @@ async function cmdAdd(args) {
     end_date: eventDetails.end_date,
     location: eventDetails.location,
     description: eventDetails.description,
-    timezone: eventDetails.timezone
+    timezone: eventDetails.timezone,
+    reminder_minutes: eventDetails.reminder_minutes
   });
 
   if (result.success) {
@@ -759,7 +762,8 @@ program
   .option('--description <desc>', 'Event description')
   .option('--tz, --timezone <tz>', `Timezone (default: ${TIMEZONE})`)
   .option('-c, --calendar <source>', 'Calendar source name')
-  .allowUnknownOption() // Allow positional title and time arguments
+  .allowUnknownOption()
+  .allowExcessArguments(true)
   .action(async (options, cmd) => {
     // Pass all raw args to parseEventArgs for backward compatibility
     const args = process.argv.slice(3);

@@ -36,8 +36,7 @@ const SYSTEMD_TO_COMPOSE = getSystemdToComposeMap();
 
 /**
  * Map a systemd service name to its compose equivalent, or null if the
- * service has no compose representation (e.g. git-sync.timer runs as a
- * scheduler cron job, not a compose service).
+ * service has no compose representation.
  */
 function toComposeService(service) {
   const bare = service.replace(/\.(service|timer)$/, '');
@@ -158,9 +157,8 @@ export class LocalProvider extends RemoteServer {
     const svc = toComposeService(service);
     const { check = false } = options;
 
-    // Services without a compose equivalent (e.g. git-sync.timer, which
-    // runs as a scheduler cron job on local deployments) are silently
-    // skipped — there's no compose service to start/stop.
+    // Services without a compose equivalent are silently skipped —
+    // there's no compose service to start/stop.
     if (!svc) {
       return { returncode: 0 };
     }
@@ -257,43 +255,18 @@ export class LocalProvider extends RemoteServer {
     console.log(`  1. bin/deploy ${this.name}            # Apply config and start services`);
     console.log('');
     console.log('Vault sync:');
-    console.log('  For local deployments, configure git-sync as a scheduler job in config.toml:');
+    console.log('  For local deployments, use Unison for bidirectional vault sync:');
     console.log('');
-    console.log(`    [deployments.local.${this.name}.jobs.git-sync]`);
-    console.log('    schedule = "* * * * *"');
-    console.log('    command = "bin/git-sync"');
-    console.log('');
-    console.log('  And make sure your vault remote is SSH so the container can push without a credential helper:');
-    console.log('    cd <your-vault>');
-    console.log('    git remote set-url origin git@github.com:<user>/<vault-repo>.git');
+    console.log(`    bin/deploy ${this.name} setup --unison`);
   }
 
   /**
    * Resilio Sync is systemd-based and not supported on local deployments.
-   * The setup command catches this and tells the user to use git-sync.
+   * The setup command catches this and tells the user to use Unison.
    */
   async setupResilioSync() {
     printWarning('Resilio Sync is not supported on local deployments.');
-    console.log('  Use git-sync instead: add a git-sync job to your config.toml under');
-    console.log(`    [deployments.local.${this.name}.jobs.git-sync]`);
-  }
-
-  /**
-   * For local deployments git-sync is a scheduler job rather than an
-   * out-of-band systemd timer, so there's no separate install step. We
-   * print guidance and exit without modifying anything.
-   */
-  async setupGitSync() {
-    printInfo('Local deployments run git-sync as a scheduler job, not a systemd timer.');
-    console.log('');
-    console.log('Add this to your config.toml under the deployment block:');
-    console.log('');
-    console.log(`  [deployments.local.${this.name}.jobs.git-sync]`);
-    console.log('  schedule = "* * * * *"');
-    console.log('  command = "bin/git-sync"');
-    console.log('  description = "Pull/rebase/push vault via git"');
-    console.log('');
-    console.log(`Then: bin/deploy ${this.name}`);
+    console.log(`  Use Unison instead: bin/deploy ${this.name} setup --unison`);
   }
 }
 
