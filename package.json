@@ -56,7 +56,7 @@
     "ollama-ai-provider-v2": "^3.5.1",
     "pdf-lib": "^1.17.1",
     "picocolors": "^1.1.1",
-    "puppeteer": "^24.42.0",
+    "puppeteer": "^25.0.4",
     "react": "^19.2.6",
     "smol-toml": "^1.6.1",
     "tsdav": "^2.2.2",
