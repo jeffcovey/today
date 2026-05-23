@@ -18,8 +18,9 @@ async function withServer(handler, run) {
   const app = express();
   app.post('/_git/ai-commit-message', handler);
 
-  const server = await new Promise((resolve) => {
+  const server = await new Promise((resolve, reject) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    s.once('error', reject);
   });
 
   const address = server.address();
