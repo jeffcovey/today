@@ -2,7 +2,12 @@ import { jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { writeFileAtomic, writeFileAtomicCAS } from '../src/fs-atomic.js';
+import {
+  writeFileAtomic,
+  writeFileAtomicAsync,
+  writeFileAtomicCAS,
+  writeFileAtomicCASAsync
+} from '../src/fs-atomic.js';
 
 describe('writeFileAtomic', () => {
   let dir;
@@ -81,6 +86,47 @@ describe('writeFileAtomicCAS', () => {
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-cas-'));
+  });
+
+  describe('async fs-atomic variants', () => {
+    let dir;
+
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fs-atomic-async-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test('writeFileAtomicAsync writes and skips unchanged content', async () => {
+      const file = path.join(dir, 'plan.md');
+      const wrote = await writeFileAtomicAsync(file, 'hello');
+      expect(wrote).toBe(true);
+
+      const wroteAgain = await writeFileAtomicAsync(file, 'hello');
+      expect(wroteAgain).toBe(false);
+      expect(fs.readFileSync(file, 'utf-8')).toBe('hello');
+    });
+
+    test('writeFileAtomicCASAsync reports conflict when content changed', async () => {
+      const file = path.join(dir, 'plan.md');
+      fs.writeFileSync(file, 'base');
+
+      fs.writeFileSync(file, 'other');
+      const res = await writeFileAtomicCASAsync(file, 'next', 'base');
+      expect(res).toEqual({ written: false, conflict: true });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('other');
+    });
+
+    test('writeFileAtomicCASAsync swaps when expected content matches', async () => {
+      const file = path.join(dir, 'plan.md');
+      fs.writeFileSync(file, 'base');
+
+      const res = await writeFileAtomicCASAsync(file, 'next', 'base');
+      expect(res).toEqual({ written: true, conflict: false });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('next');
+    });
   });
 
   afterEach(() => {
