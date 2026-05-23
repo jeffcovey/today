@@ -33,3 +33,4 @@ read = "./read.js"
 plans_directory = { type = "string", default = "vault/plans", description = "Directory containing plan files" }
 templates_directory = { type = "string", default = "vault/plans/templates", description = "Directory containing plan templates" }
 link_daily_notes = { type = "boolean", default = true, description = "Add link to today's plan at top of Obsidian daily note" }
+max_ai_calls_per_run = { type = "number", default = 5, description = "Cap on AI generation calls per invocation. Backlog drains across multiple runs instead of blocking on one giant queue." }
