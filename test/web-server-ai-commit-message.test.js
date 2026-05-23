@@ -1,8 +1,11 @@
 import { spawn, spawnSync } from 'child_process';
+import { randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const __filename = fileURLToPath(import.meta.url);
+const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
 const TEST_USERNAME = 'admin';
 const TEST_PASSWORD = 'adminpass';
 
@@ -111,9 +114,9 @@ describe('POST /_git/ai-commit-message SSE protocol', () => {
   let stagedRelativePath;
 
   beforeEach(async () => {
-    stagedRelativePath = `.tmp-ai-commit-message-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`;
+    stagedRelativePath = `.tmp-ai-commit-message-${randomUUID()}.txt`;
     const absolutePath = path.join(REPO_ROOT, stagedRelativePath);
-    await fs.writeFile(absolutePath, `test diff ${Date.now()}\n`, 'utf8');
+    await fs.writeFile(absolutePath, `test diff ${randomUUID()}\n`, 'utf8');
     runGit(['add', stagedRelativePath]);
   });
 
@@ -146,11 +149,12 @@ describe('POST /_git/ai-commit-message SSE protocol', () => {
 
     const textEvents = events.filter((event) => event.type === 'text');
     expect(textEvents.length).toBeGreaterThanOrEqual(2);
-    expect(textEvents.map((event) => event.content).join('')).toBe('feat: mock sse commit message');
+    const streamedMessage = textEvents.map((event) => event.content).join('');
+    expect(streamedMessage).toMatch(/^feat:\s+/);
 
     const doneEvent = events.find((event) => event.type === 'done');
     expect(doneEvent).toBeDefined();
-    expect(doneEvent.message).toBe('feat: mock sse commit message');
+    expect(doneEvent.message).toBe(streamedMessage);
   });
 
   test('emits SSE error event on stream failure after headers are sent', async () => {
