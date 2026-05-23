@@ -5824,23 +5824,27 @@ app.get('/_git', authMiddleware, async (req, res) => {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split(String.fromCharCode(10));
-            buffer = lines.pop();
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
 
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              let data = null;
-              try {
-                data = JSON.parse(line.slice(6));
-              } catch {
-                continue;
-              }
-              if (data.type === 'text') {
-                commitMsgEl.value += data.content || '';
-              } else if (data.type === 'done') {
-                commitMsgEl.value = data.message ?? commitMsgEl.value;
-              } else if (data.type === 'error') {
-                throw new Error(data.message || 'Failed to generate commit message');
+            for (const eventText of events) {
+              const lines = eventText.split('\n');
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
+                let data = null;
+                try {
+                  data = JSON.parse(payload);
+                } catch {
+                  continue;
+                }
+                if (data.type === 'text') {
+                  commitMsgEl.value += data.content || '';
+                } else if (data.type === 'done') {
+                  commitMsgEl.value = data.message || commitMsgEl.value;
+                } else if (data.type === 'error') {
+                  throw new Error(data.message || 'Failed to generate commit message');
+                }
               }
             }
           }
@@ -6076,9 +6080,12 @@ app.post('/_git/push', authMiddleware, (req, res) => {
 app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
   let isAborted = false;
   try {
-    const available = await isAIAvailable();
-    if (!available) {
-      return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
+    const testStreamMode = process.env.NODE_ENV === 'test' ? process.env.TODAY_TEST_AI_COMMIT_STREAM_MODE : null;
+    if (!testStreamMode) {
+      const available = await isAIAvailable();
+      if (!available) {
+        return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
+      }
     }
 
     let diff = '';
@@ -6114,13 +6121,25 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
       }
     });
 
-    const streamResult = await streamCompletion({
-      system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
-      messages: [{ role: 'user', content: diff }],
-      maxTokens: 100,
-      temperature: 0,
-      abortSignal: streamAbortController.signal,
-    });
+    let streamResult;
+    if (testStreamMode === 'success') {
+      streamResult = {
+        textStream: (async function* () {
+          yield 'feat: ';
+          yield 'mock sse commit message';
+        })(),
+      };
+    } else if (testStreamMode === 'error') {
+      throw new Error('Simulated test stream failure');
+    } else {
+      streamResult = await streamCompletion({
+        system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
+        messages: [{ role: 'user', content: diff }],
+        maxTokens: 100,
+        temperature: 0,
+        abortSignal: streamAbortController.signal,
+      });
+    }
 
     let fullMessage = '';
     for await (const chunk of streamResult.textStream) {
