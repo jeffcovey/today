@@ -40,7 +40,7 @@ function makeLockDb() {
       sync_locked_at TEXT,
       sync_locked_by TEXT,
       last_synced_at TEXT,
-      files_processed TEXT,
+      last_sync_files TEXT,
       entries_count INTEGER,
       extra_data TEXT
     )

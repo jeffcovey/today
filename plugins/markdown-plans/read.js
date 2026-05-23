@@ -38,9 +38,12 @@ const contextOnly = process.env.CONTEXT_ONLY === 'true' || isWatcherRun;
 // Per-run AI call budget. Bounds backlog-drain runs so dozens of missing
 // summaries get processed across multiple invocations instead of one giant queue
 // that blocks the model for hours on local CPU Ollama.
-const maxAiCallsPerRun = Number(
-  process.env.MARKDOWN_PLANS_MAX_AI_CALLS ?? config.max_ai_calls_per_run ?? 5
+const parsedMaxAiCallsPerRun = Number(
+  process.env.MARKDOWN_PLANS_MAX_AI_CALLS ?? config.max_ai_calls_per_run
 );
+const maxAiCallsPerRun = Number.isFinite(parsedMaxAiCallsPerRun) && parsedMaxAiCallsPerRun >= 0
+  ? Math.floor(parsedMaxAiCallsPerRun)
+  : 5;
 let aiCallsThisRun = 0;
 let aiCallsDeferred = 0;
 function aiBudgetExhausted() {
@@ -893,7 +896,7 @@ function migrateAllNavigationToWidget() {
  * Generate AI summary for a specific date
  * Uses bin/today dry-run --date to get the full context for that date
  */
-async function generateDailySummary(dateStr, planFilePath) {
+async function generateDailySummary(dateStr, planFilePath, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -949,6 +952,7 @@ Write ONLY the 2-3 sentence summary for ${dateStr}, nothing else:`;
 
   // Call AI provider
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 300,
@@ -1409,7 +1413,7 @@ function needsPriorities(filePath) {
 /**
  * Generate AI suggestions for tomorrow's plan
  */
-async function generateTomorrowSuggestions(tomorrowStr, planFilePath) {
+async function generateTomorrowSuggestions(tomorrowStr, planFilePath, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -1480,6 +1484,7 @@ Keep it concise and actionable. Tasks should be specific and achievable.`;
 
   // Call AI provider
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 500,
@@ -3310,7 +3315,7 @@ function getPlanThemeGoalsStatus(planPath, planType) {
 /**
  * Generate suggested theme and goals for a plan using AI
  */
-async function suggestThemeAndGoals(planPath, planType, startDate, endDate) {
+async function suggestThemeAndGoals(planPath, planType, startDate, endDate, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -3495,6 +3500,7 @@ ${goalsFieldName.toUpperCase()}:
 Make the theme distinctive to THIS period. Make ${goalsFieldName} specific and achievable.`;
 
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 400,
@@ -3655,8 +3661,7 @@ async function suggestMissingThemesAndGoals(today) {
     }
 
     // Generate suggestions
-    recordAiCall();
-    const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate);
+    const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate, recordAiCall);
 
     if (suggestion && suggestion.theme && suggestion.goals && suggestion.goals.length > 0) {
       // Only update if we have good suggestions
@@ -3710,7 +3715,7 @@ function getPlanSummaryStatus(planPath, planType) {
 /**
  * Generate a summary for a past plan period using AI
  */
-async function generatePlanSummary(planPath, planType, startDate, endDate) {
+async function generatePlanSummary(planPath, planType, startDate, endDate, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -3856,6 +3861,7 @@ ${context}
 Write ONLY the summary, ${sentenceCount} sentences, nothing else. Be specific and personal, not generic.`;
 
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 400,
@@ -3987,8 +3993,7 @@ async function suggestMissingSummaries(today) {
     }
 
     // Generate summary
-    recordAiCall();
-    const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate);
+    const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate, recordAiCall);
 
     if (summary) {
       const updated = updatePlanWithSummary(filePath, planType, summary);
@@ -4320,8 +4325,7 @@ async function main() {
     const daysNeedingSummaries = getPastDaysNeedingSummaries(today, 7);
     for (const dayInfo of daysNeedingSummaries) {
       if (aiBudgetExhausted()) break;
-      recordAiCall();
-      const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path);
+      const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path, recordAiCall);
       if (summary) {
         addSummaryToFile(dayInfo.path, summary);
         metadata.summaries_generated.push({
@@ -4333,8 +4337,7 @@ async function main() {
 
     // Generate suggestions for tomorrow's plan if needed
     if (needsPriorities(tomorrowPaths.day.path) && !aiBudgetExhausted()) {
-      recordAiCall();
-      const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path);
+      const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path, recordAiCall);
       if (suggestions && updateTomorrowPlan(tomorrowPaths.day.path, suggestions)) {
         metadata.tomorrow_updated = true;
       }
