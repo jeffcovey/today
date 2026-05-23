@@ -6147,8 +6147,7 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
     })}\n\n`);
     res.end();
   } catch (err) {
-    if (err?.name === 'AbortError') return;
-    if (isAborted) return;
+    if (err?.name === 'AbortError' || isAborted) return;
     console.error('Error generating AI commit message:', err);
     if (res.headersSent) {
       res.write(`data: ${JSON.stringify({
