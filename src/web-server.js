@@ -5824,16 +5824,21 @@ app.get('/_git', authMiddleware, async (req, res) => {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\\n');
+            const lines = buffer.split(String.fromCharCode(10));
             buffer = lines.pop();
 
             for (const line of lines) {
               if (!line.startsWith('data: ')) continue;
-              const data = JSON.parse(line.slice(6));
+              let data = null;
+              try {
+                data = JSON.parse(line.slice(6));
+              } catch {
+                continue;
+              }
               if (data.type === 'text') {
                 commitMsgEl.value += data.content || '';
               } else if (data.type === 'done') {
-                commitMsgEl.value = data.message || commitMsgEl.value;
+                commitMsgEl.value = data.message ?? commitMsgEl.value;
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Failed to generate commit message');
               }
@@ -6113,7 +6118,10 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
 
     let fullMessage = '';
     for await (const chunk of streamResult.textStream) {
-      if (isAborted) return;
+      if (isAborted) {
+        if (!res.writableEnded) res.end();
+        return;
+      }
       if (!chunk) continue;
       fullMessage += chunk;
       res.write(`data: ${JSON.stringify({
@@ -6122,7 +6130,10 @@ app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
       })}\n\n`);
     }
 
-    if (isAborted) return;
+    if (isAborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
 
     res.write(`data: ${JSON.stringify({
       type: 'done',
