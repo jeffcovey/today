@@ -22,7 +22,7 @@ import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
-import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
+import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -5811,9 +5811,48 @@ app.get('/_git', authMiddleware, async (req, res) => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
       try {
         const resp = await fetch('/_git/ai-commit-message', { method: 'POST' });
-        const data = await resp.json();
-        if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
-        document.getElementById('commitMsg').value = data.message;
+        const commitMsgEl = document.getElementById('commitMsg');
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('text/event-stream') && resp.body) {
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          commitMsgEl.value = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
+
+            for (const eventText of events) {
+              const lines = eventText.split('\n');
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
+                let data = null;
+                try {
+                  data = JSON.parse(payload);
+                } catch {
+                  continue;
+                }
+                if (data.type === 'text') {
+                  commitMsgEl.value += data.content || '';
+                } else if (data.type === 'done') {
+                  commitMsgEl.value = data.message || commitMsgEl.value;
+                } else if (data.type === 'error') {
+                  throw new Error(data.message || 'Failed to generate commit message');
+                }
+              }
+            }
+          }
+        } else {
+          const data = await resp.json();
+          if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
+          commitMsgEl.value = data.message;
+        }
       } catch (err) {
         alert('Failed to generate commit message: ' + err.message);
       } finally {
@@ -6038,43 +6077,7 @@ app.post('/_git/push', authMiddleware, (req, res) => {
   }
 });
 
-app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
-  try {
-    const available = await isAIAvailable();
-    if (!available) {
-      return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
-    }
-
-    let diff = '';
-    try {
-      diff = gitExec(['diff', '--cached']);
-    } catch (err) {
-      diff = '';
-    }
-
-    if (!diff.trim()) {
-      return res.status(400).json({ error: 'No staged changes to generate a message for.' });
-    }
-
-    // Truncate very large diffs to avoid exceeding context limits
-    const maxDiffLength = 15000;
-    if (diff.length > maxDiffLength) {
-      diff = diff.slice(0, maxDiffLength) + '\n\n[... diff truncated ...]';
-    }
-
-    const message = await createCompletion({
-      system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
-      messages: [{ role: 'user', content: diff }],
-      maxTokens: 100,
-      temperature: 0,
-    });
-
-    res.json({ message: message.trim() });
-  } catch (err) {
-    console.error('Error generating AI commit message:', err);
-    res.status(500).json({ error: 'Failed to generate commit message: ' + (err.message || 'Unknown error') });
-  }
-});
+app.post('/_git/ai-commit-message', authMiddleware, createAiCommitMessageHandler({ gitExecFn: gitExec }));
 
 app.post('/_git/discard', authMiddleware, async (req, res) => {
   try {
