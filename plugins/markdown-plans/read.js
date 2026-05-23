@@ -27,7 +27,32 @@ import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
-const contextOnly = process.env.CONTEXT_ONLY === 'true'; // Skip expensive AI operations
+
+// FILE_FILTER is set by vault-watcher when a small set of files changed.
+// Watcher-triggered runs skip the AI backlog drain; that work belongs on
+// manual `bin/plugins sync markdown-plans` or a scheduled run, not on every edit.
+const fileFilter = process.env.FILE_FILTER || '';
+const isWatcherRun = fileFilter.length > 0;
+const contextOnly = process.env.CONTEXT_ONLY === 'true' || isWatcherRun;
+
+// Per-run AI call budget. Bounds backlog-drain runs so dozens of missing
+// summaries get processed across multiple invocations instead of one giant queue
+// that blocks the model for hours on local CPU Ollama.
+const maxAiCallsPerRun = Number(
+  process.env.MARKDOWN_PLANS_MAX_AI_CALLS ?? config.max_ai_calls_per_run ?? 5
+);
+let aiCallsThisRun = 0;
+let aiCallsDeferred = 0;
+function aiBudgetExhausted() {
+  if (aiCallsThisRun >= maxAiCallsPerRun) {
+    aiCallsDeferred++;
+    return true;
+  }
+  return false;
+}
+function recordAiCall() {
+  aiCallsThisRun++;
+}
 
 const plansDirectory = config.plans_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans` : 'vault/plans');
 const templatesDirectory = config.templates_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans/templates` : 'vault/plans/templates');
@@ -3624,7 +3649,13 @@ async function suggestMissingThemesAndGoals(today) {
     // Skip if both are already filled
     if (!status.themeEmpty && !status.goalsEmpty) continue;
 
+    if (aiBudgetExhausted()) {
+      results.skipped.push({ file, type: planType, reason: 'ai_budget_exhausted' });
+      continue;
+    }
+
     // Generate suggestions
+    recordAiCall();
     const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate);
 
     if (suggestion && suggestion.theme && suggestion.goals && suggestion.goals.length > 0) {
@@ -3950,7 +3981,13 @@ async function suggestMissingSummaries(today) {
     const status = getPlanSummaryStatus(filePath, planType);
     if (!status || !status.isEmpty) continue;
 
+    if (aiBudgetExhausted()) {
+      results.skipped.push({ file, type: planType, reason: 'ai_budget_exhausted' });
+      continue;
+    }
+
     // Generate summary
+    recordAiCall();
     const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate);
 
     if (summary) {
@@ -4282,6 +4319,8 @@ async function main() {
   if (!contextOnly) {
     const daysNeedingSummaries = getPastDaysNeedingSummaries(today, 7);
     for (const dayInfo of daysNeedingSummaries) {
+      if (aiBudgetExhausted()) break;
+      recordAiCall();
       const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path);
       if (summary) {
         addSummaryToFile(dayInfo.path, summary);
@@ -4293,7 +4332,8 @@ async function main() {
     }
 
     // Generate suggestions for tomorrow's plan if needed
-    if (needsPriorities(tomorrowPaths.day.path)) {
+    if (needsPriorities(tomorrowPaths.day.path) && !aiBudgetExhausted()) {
+      recordAiCall();
       const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path);
       if (suggestions && updateTomorrowPlan(tomorrowPaths.day.path, suggestions)) {
         metadata.tomorrow_updated = true;
@@ -4345,6 +4385,14 @@ When the user asks what to work on, consider both their immediate daily prioriti
     context = `${guidance}\n\n${contextParts.join('\n\n---\n\n')}`;
   } else {
     context = 'No plan files found for the current period.';
+  }
+
+  if (aiCallsThisRun > 0 || aiCallsDeferred > 0) {
+    metadata.ai_calls = {
+      made: aiCallsThisRun,
+      deferred: aiCallsDeferred,
+      budget: maxAiCallsPerRun,
+    };
   }
 
   console.log(JSON.stringify({

@@ -607,12 +607,15 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
 }
 
 const SYNC_LOCK_STALE_MINUTES = 5;
+// Refresh interval must comfortably fit within SYNC_LOCK_STALE_MINUTES so a
+// missed cycle doesn't cause the lock to be reclaimed by another caller.
+const SYNC_LOCK_HEARTBEAT_MS = 60 * 1000;
 
 /**
  * Try to acquire a sync lock for a source. Uses atomic UPDATE ... WHERE as a cross-process CAS.
  * Returns true if lock was acquired, false if another process holds it.
  */
-function tryAcquireSyncLock(db, sourceId, lockedBy) {
+export function tryAcquireSyncLock(db, sourceId, lockedBy) {
   // Ensure the row exists
   db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
 
@@ -630,12 +633,44 @@ function tryAcquireSyncLock(db, sourceId, lockedBy) {
 /**
  * Release a sync lock. Only releases if lockedBy matches to prevent releasing another process's lock.
  */
-function releaseSyncLock(db, sourceId, lockedBy) {
+export function releaseSyncLock(db, sourceId, lockedBy) {
   db.prepare(`
     UPDATE sync_metadata
     SET sync_locked_at = NULL, sync_locked_by = NULL
     WHERE source = ? AND sync_locked_by = ?
   `).run(sourceId, lockedBy);
+}
+
+/**
+ * Refresh a held lock's timestamp. Only updates if lockedBy still matches.
+ * Used to keep legitimately long-running syncs from being treated as stale.
+ */
+export function refreshSyncLock(db, sourceId, lockedBy) {
+  db.prepare(`
+    UPDATE sync_metadata
+    SET sync_locked_at = datetime('now')
+    WHERE source = ? AND sync_locked_by = ?
+  `).run(sourceId, lockedBy);
+}
+
+/**
+ * Start a heartbeat that refreshes the sync lock periodically. Returns a
+ * handle whose .stop() must be called in a finally block. Errors inside the
+ * interval are swallowed so a transient DB issue doesn't surface as an
+ * unhandled exception — the stale-lock recovery in tryAcquireSyncLock acts
+ * as the safety net.
+ */
+export function startSyncLockHeartbeat(db, sourceId, lockedBy) {
+  const handle = setInterval(() => {
+    try {
+      refreshSyncLock(db, sourceId, lockedBy);
+    } catch {
+      // Best-effort; stale-lock recovery will reclaim if heartbeats stop.
+    }
+  }, SYNC_LOCK_HEARTBEAT_MS);
+  // Don't keep the event loop alive just for the heartbeat.
+  if (typeof handle.unref === 'function') handle.unref();
+  return { stop: () => clearInterval(handle) };
 }
 
 /**
@@ -662,9 +697,11 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
     };
   }
 
+  const heartbeat = startSyncLockHeartbeat(db, sourceId, lockedBy);
   try {
     return await _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId);
   } finally {
+    heartbeat.stop();
     releaseSyncLock(db, sourceId, lockedBy);
   }
 }
