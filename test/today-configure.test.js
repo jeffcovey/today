@@ -4,6 +4,7 @@
 
 import { jest } from '@jest/globals';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
@@ -13,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 
 // Test config path (use a temp file)
-const TEST_CONFIG_PATH = path.join(projectRoot, '.data', 'test-config.toml');
+const TEST_CONFIG_PATH = path.join(os.tmpdir(), `today-test-config-${process.pid}.toml`);
 
 describe('Today Configure', () => {
   beforeEach(() => {
