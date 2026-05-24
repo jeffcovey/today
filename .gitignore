@@ -28,10 +28,12 @@ Resilio Sync.btskey
 .last-dep-check
 
 # =============================================================================
-# Vault (synced separately, top-level only)
+# Vault (synced separately; vault/scripts/task-timer.js is tracked below)
 # =============================================================================
-/vault
-/vault/
+/vault/*
+!/vault/scripts/
+/vault/scripts/*
+!/vault/scripts/task-timer.js
 
 # =============================================================================
 # Build & Dependencies
