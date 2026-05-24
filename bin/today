@@ -635,7 +635,8 @@ ${contextSection}`;
     const model = getInteractiveModel();
 
     // Check if this provider requires a binary and if it's installed
-    const { available, requirement } = checkProviderBinarySync(interactiveProvider, spawnSync);
+    const { available, requirement, binaryPath } = checkProviderBinarySync(interactiveProvider, spawnSync);
+    const claudeBinary = binaryPath || 'claude';
 
     if (!available && requirement) {
       console.error(`❌ ${requirement.name} not found.`);
@@ -659,7 +660,7 @@ ${contextSection}`;
         fs.writeFileSync(promptFile, prompt);
         const userMessage = directRequest || 'What should I focus on right now?';
         try {
-          const result = spawnSync('claude', ['--model', model, '--print', '--dangerously-skip-permissions', '--append-system-prompt-file', promptFile, userMessage], {
+          const result = spawnSync(claudeBinary, ['--model', model, '--print', '--dangerously-skip-permissions', '--append-system-prompt-file', promptFile, userMessage], {
             stdio: quiet ? ['pipe', 'pipe', 'pipe'] : 'inherit',
             timeout: 600000 // 10 minutes in milliseconds
           });
@@ -709,7 +710,7 @@ ${contextSection}`;
       fs.writeFileSync(promptFile, prompt);
       const userMessage = directRequest || 'What should I focus on right now?';
       try {
-        const claudeResult = spawnSync('claude', ['--model', model, '--append-system-prompt-file', promptFile, userMessage], { stdio: 'inherit' });
+        const claudeResult = spawnSync(claudeBinary, ['--model', model, '--append-system-prompt-file', promptFile, userMessage], { stdio: 'inherit' });
         if (claudeResult.error) {
           console.error(`ERROR: failed to launch claude: ${claudeResult.error.message}`);
           process.exit(1);
