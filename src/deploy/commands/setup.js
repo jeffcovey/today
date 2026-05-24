@@ -4,7 +4,7 @@
  * Initial server setup - installs dependencies, configures services
  */
 
-import { printStatus, printInfo, printWarning, printError } from '../remote-server.js';
+import { printStatus, printInfo, printError } from '../remote-server.js';
 
 export async function setupCommand(server, args = []) {
   console.log(`🚀 Setting up ${server.name} (${server.provider})...`);
@@ -17,6 +17,7 @@ export async function setupCommand(server, args = []) {
   const skipConfirm = args.includes('--yes') || args.includes('-y');
   const withOllama = args.includes('--ollama');
   const withResilio = args.includes('--resilio');
+  const withUnison = args.includes('--unison');
 
   if (!skipConfirm && process.stdin.isTTY) {
     console.log('');
@@ -31,6 +32,9 @@ export async function setupCommand(server, args = []) {
     }
     if (withResilio) {
       console.log('  • Install Resilio Sync for vault synchronization');
+    }
+    if (withUnison) {
+      console.log('  • Install Unison for bidirectional file sync');
     }
     console.log('');
 
@@ -60,9 +64,17 @@ export async function setupCommand(server, args = []) {
     await server.setupSsl();
   }
 
-  // Optional: Resilio Sync
+  // Optional: Resilio Sync. Providers that don't support it (e.g. local)
+  // should define a setupResilioSync() that prints a clear warning.
   if (withResilio && typeof server.setupResilioSync === 'function') {
     await server.setupResilioSync();
+  }
+
+  // Optional: Unison. On remote providers this installs the unison binary
+  // so the server can be a sync target. On local providers it prints
+  // guidance (the compose service handles the local end).
+  if (withUnison && typeof server.setupUnison === 'function') {
+    await server.setupUnison();
   }
 
   // Optional: Ollama
@@ -75,8 +87,10 @@ export async function setupCommand(server, args = []) {
   console.log('Next steps:');
   console.log(`  1. bin/deploy ${server.name} secrets    # Upload encrypted secrets`);
   console.log(`  2. bin/deploy ${server.name}            # Deploy code`);
-  if (!withResilio) {
-    console.log(`  3. bin/deploy ${server.name} setup --resilio  # Optional: Setup vault sync`);
+  if (!withResilio && !withUnison) {
+    console.log('  3. Pick a vault sync method:');
+    console.log(`       bin/deploy ${server.name} setup --resilio    # Sync via Resilio Sync`);
+    console.log(`       bin/deploy ${server.name} setup --unison     # Bidirectional sync via Unison`);
   }
 }
 

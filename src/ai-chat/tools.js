@@ -121,12 +121,13 @@ function getAvailableTables() {
  */
 export function createEditFileTool(filePath) {
   return tool({
-    description: `Edit the markdown file currently being discussed using search-and-replace. The file is located at: ${filePath}. Find the exact text to change and replace it with new text.`,
+    description: `Edit the markdown file currently being discussed using search-and-replace. The file is located at: ${filePath}. Find the exact text to change and replace it with new text. Use replaceAll parameter if you want to replace multiple occurrences.`,
     inputSchema: z.object({
       oldText: z.string().describe('The exact text to find and replace. Must match exactly (including whitespace and newlines). Include enough context to make the match unique.'),
       newText: z.string().describe('The new text to replace it with. Can be empty string to delete the old text.'),
+      replaceAll: z.boolean().optional().describe('If true, replace all occurrences of the text. If false or omitted, will fail if multiple occurrences are found.'),
     }),
-    execute: async ({ oldText, newText }) => {
+    execute: async ({ oldText, newText, replaceAll = false }) => {
       try {
         // Verify the file exists and is within the vault
         const vaultPath = getAbsoluteVaultPath();
@@ -150,23 +151,30 @@ export function createEditFileTool(filePath) {
 
         // Check if oldText appears multiple times
         const occurrences = currentContent.split(oldText).length - 1;
-        if (occurrences > 1) {
+        if (occurrences > 1 && !replaceAll) {
           return {
             success: false,
-            error: `The text appears ${occurrences} times in the file. Include more surrounding context to make it unique.`,
+            error: `The text appears ${occurrences} times in the file. Include more surrounding context to make it unique, or set replaceAll to true to replace all occurrences.`,
           };
         }
 
         // Perform the replacement
-        const newContent = currentContent.replace(oldText, newText);
+        const newContent = replaceAll ? currentContent.replaceAll(oldText, newText) : currentContent.replace(oldText, newText);
 
         // Write the updated content
         await fs.writeFile(resolvedPath, newContent, 'utf-8');
 
+        // Verify the change was made
+        const verificationContent = await fs.readFile(resolvedPath, 'utf-8');
+        const actualOccurrences = verificationContent.split(oldText).length - 1;
+        const replacementsMade = replaceAll ? occurrences : 1;
+
         return {
           success: true,
           message: `File updated successfully: ${path.relative(vaultPath, resolvedPath)}`,
-          bytesChanged: Math.abs(newText.length - oldText.length),
+          replacementsMade,
+          bytesChanged: (newText.length - oldText.length) * replacementsMade,
+          verificationPassed: actualOccurrences === 0, // Should be 0 if all replacements were successful
         };
       } catch (error) {
         return { success: false, error: error.message };

@@ -29,6 +29,7 @@ export const colors = {
   cyan: pc.cyan,
   magenta: pc.magenta,
   white: pc.white,
+  black: pc.black,
   gray: pc.gray,
 
   // Modifiers

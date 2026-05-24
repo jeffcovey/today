@@ -15,6 +15,7 @@ import path from 'path';
 import https from 'https';
 import http from 'http';
 import Database from 'better-sqlite3';
+import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 // Get plugin configuration from environment
 const configStr = process.env.PLUGIN_CONFIG || '{}';
@@ -360,7 +361,11 @@ function updatePropertyStatus(sourceKey, newStatus) {
       return beforeStatus + `status = "${newStatus}"`;
     });
 
-    fs.writeFileSync(configPath, updatedContent, 'utf-8');
+    const { conflict } = writeFileAtomicCAS(configPath, updatedContent, configContent);
+    if (conflict) {
+      console.error('Failed to update status: concurrent change to config.toml; retry');
+      return false;
+    }
     return true;
   } catch (error) {
     console.error(`Failed to update status: ${error.message}`);

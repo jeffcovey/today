@@ -3,6 +3,7 @@
  */
 
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
+import { parseServicesConfig, SERVICES, getServiceEntries, getSystemdUnitNames, getSystemdToComposeMap, configKeyToSystemdName } from '../src/deploy/services.js';
 
 // We'll test the config parsing logic directly by examining the output
 // Since the actual module has dependencies on external services (dotenvx),
@@ -32,16 +33,8 @@ describe('deploy/config', () => {
   });
 
   describe('services config parsing', () => {
-    // Test the services parsing logic
-    function parseServices(servicesConfig) {
-      const config = servicesConfig || {};
-      return {
-        scheduler: config.scheduler === true,
-        'vault-web': config['vault-web'] === true,
-        'inbox-api': config['inbox-api'] === true,
-        'resilio-sync': config['resilio-sync'] === true
-      };
-    }
+    // Use the real parseServicesConfig from the shared module
+    const parseServices = parseServicesConfig;
 
     test('parses enabled services', () => {
       const services = parseServices({
@@ -72,6 +65,64 @@ describe('deploy/config', () => {
       });
       expect(services.scheduler).toBe(false);
       expect(services['vault-web']).toBe(false);
+    });
+
+    test('includes vault-watcher in parsed output', () => {
+      const services = parseServices({ 'vault-watcher': true });
+      expect(services['vault-watcher']).toBe(true);
+    });
+  });
+
+  describe('services module (single source of truth)', () => {
+    test('SERVICES array contains all expected services', () => {
+      const keys = SERVICES.map(s => s.key);
+      expect(keys).toContain('scheduler');
+      expect(keys).toContain('vault-watcher');
+      expect(keys).toContain('vault-web');
+      expect(keys).toContain('inbox-api');
+      expect(keys).toContain('resilio-sync');
+      expect(keys).toContain('unison-sync');
+    });
+
+    test('every service has required fields', () => {
+      for (const s of SERVICES) {
+        expect(s.key).toBeTruthy();
+        expect(s.label).toBeTruthy();
+        expect(s.description).toBeTruthy();
+        expect(s.systemdUnit).toBeTruthy();
+      }
+    });
+
+    test('getServiceEntries returns entries with key/label/desc', () => {
+      const entries = getServiceEntries();
+      expect(entries.length).toBe(SERVICES.length);
+      for (const e of entries) {
+        expect(e).toHaveProperty('key');
+        expect(e).toHaveProperty('label');
+        expect(e).toHaveProperty('desc');
+      }
+    });
+
+    test('getSystemdUnitNames returns all unit names', () => {
+      const names = getSystemdUnitNames();
+      expect(names).toContain('today-scheduler.service');
+      expect(names).toContain('vault-watcher.service');
+      expect(names).toContain('unison-sync.service');
+    });
+
+    test('getSystemdToComposeMap maps both bare names and config keys', () => {
+      const map = getSystemdToComposeMap();
+      expect(map['today-scheduler']).toBe('scheduler');
+      expect(map['scheduler']).toBe('scheduler');
+      expect(map['vault-watcher']).toBe('vault-watcher');
+      expect(map['vault-web']).toBe('vault-web');
+    });
+
+    test('configKeyToSystemdName handles scheduler special case', () => {
+      expect(configKeyToSystemdName('scheduler')).toBe('today-scheduler');
+      expect(configKeyToSystemdName('vault-web')).toBe('vault-web');
+      expect(configKeyToSystemdName('unison-sync')).toBe('unison-sync');
+      expect(configKeyToSystemdName('unknown')).toBe('unknown');
     });
   });
 
@@ -134,6 +185,27 @@ describe('deploy/config', () => {
 
       expect(Object.keys(jobs).length).toBe(1);
       expect(jobs['valid']).toBeDefined();
+    });
+
+    test('custom jobs can be configured alongside predefined ones', () => {
+      // Arbitrary user-defined jobs in config.toml under
+      // [deployments.local.<name>.jobs.<name>] parse alongside plugin-sync.
+      const jobs = parseJobs({
+        'plugin-sync': {
+          schedule: '*/10 * * * *',
+          command: 'bin/plugins sync'
+        },
+        'custom-backup': {
+          schedule: '0 3 * * *',
+          command: 'bin/backup',
+          description: 'Nightly backup'
+        }
+      });
+
+      expect(jobs['custom-backup']).toBeDefined();
+      expect(jobs['custom-backup'].schedule).toBe('0 3 * * *');
+      expect(jobs['custom-backup'].command).toBe('bin/backup');
+      expect(jobs['plugin-sync']).toBeDefined();
     });
   });
 

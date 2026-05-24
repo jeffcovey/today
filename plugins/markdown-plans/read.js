@@ -23,10 +23,39 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
-const contextOnly = process.env.CONTEXT_ONLY === 'true'; // Skip expensive AI operations
+
+// FILE_FILTER is set by vault-watcher when a small set of files changed.
+// Watcher-triggered runs skip the AI backlog drain; that work belongs on
+// manual `bin/plugins sync markdown-plans` or a scheduled run, not on every edit.
+const fileFilter = process.env.FILE_FILTER || '';
+const isWatcherRun = fileFilter.length > 0;
+const contextOnly = process.env.CONTEXT_ONLY === 'true' || isWatcherRun;
+
+// Per-run AI call budget. Bounds backlog-drain runs so dozens of missing
+// summaries get processed across multiple invocations instead of one giant queue
+// that blocks the model for hours on local CPU Ollama.
+const parsedMaxAiCallsPerRun = Number(
+  process.env.MARKDOWN_PLANS_MAX_AI_CALLS ?? config.max_ai_calls_per_run
+);
+const maxAiCallsPerRun = Number.isFinite(parsedMaxAiCallsPerRun) && parsedMaxAiCallsPerRun >= 0
+  ? Math.floor(parsedMaxAiCallsPerRun)
+  : 5;
+let aiCallsThisRun = 0;
+let aiCallsDeferred = 0;
+function aiBudgetExhausted() {
+  if (aiCallsThisRun >= maxAiCallsPerRun) {
+    aiCallsDeferred++;
+    return true;
+  }
+  return false;
+}
+function recordAiCall() {
+  aiCallsThisRun++;
+}
 
 const plansDirectory = config.plans_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans` : 'vault/plans');
 const templatesDirectory = config.templates_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/plans/templates` : 'vault/plans/templates');
@@ -166,6 +195,23 @@ function parseFrontmatter(content) {
   }
 
   return { frontmatter, body };
+}
+
+/**
+ * A plan file is "intact" when it still has a parseable, non-empty YAML
+ * frontmatter block. A 0-byte file, or one whose frontmatter was stripped by a
+ * concurrent or file-sync-service corruption, is NOT intact.
+ *
+ * Automated writers must refuse to touch a non-intact file: rebuilding
+ * frontmatter on it forges a brand-new block and silently drops every real
+ * field, and recreating it from a template destroys a file that may just be
+ * mid-restore. Freshly templated plans always have frontmatter (every template
+ * starts with a `---` block), so normal operation is unaffected.
+ */
+function planFileIsIntact(content) {
+  if (!content || content.trim() === '') return false;
+  const { frontmatter } = parseFrontmatter(content);
+  return Object.keys(frontmatter).length > 0;
 }
 
 /**
@@ -506,6 +552,13 @@ function getYearlyTemplateVariables(date) {
  */
 function ensureDailyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -523,7 +576,7 @@ function ensureDailyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -533,6 +586,13 @@ function ensureDailyPlan(planInfo, date) {
  */
 function ensureWeeklyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -550,7 +610,7 @@ function ensureWeeklyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -560,6 +620,13 @@ function ensureWeeklyPlan(planInfo, date) {
  */
 function ensureMonthlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -577,7 +644,7 @@ function ensureMonthlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -587,6 +654,13 @@ function ensureMonthlyPlan(planInfo, date) {
  */
 function ensureQuarterlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -604,7 +678,7 @@ function ensureQuarterlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -614,6 +688,13 @@ function ensureQuarterlyPlan(planInfo, date) {
  */
 function ensureYearlyPlan(planInfo, date) {
   if (fs.existsSync(planInfo.path)) {
+    // A present-but-corrupt file (0-byte, or frontmatter stripped by a
+    // file-sync conflict) must NOT be rebuilt from the template — that would
+    // destroy a file that may just be mid-restore. Surface it instead.
+    const existing = fs.readFileSync(planInfo.path, 'utf-8');
+    if (!planFileIsIntact(existing)) {
+      return { corrupt: true, file: path.basename(planInfo.path) };
+    }
     return { existed: true };
   }
 
@@ -631,7 +712,7 @@ function ensureYearlyPlan(planInfo, date) {
   }
 
   fs.mkdirSync(plansDir, { recursive: true });
-  fs.writeFileSync(planInfo.path, content, 'utf-8');
+  writeFileAtomic(planInfo.path, content, 'utf-8');
 
   return { created: true, file: path.basename(planInfo.path) };
 }
@@ -762,7 +843,7 @@ function migrateNavigationToWidget(filePath) {
     content = content.replace(/\n{3,}/g, '\n\n');
 
     if (content !== originalContent) {
-      fs.writeFileSync(filePath, content, 'utf-8');
+      writeFileAtomic(filePath, content, 'utf-8');
       return true;
     }
     return false;
@@ -787,7 +868,7 @@ function migrateNavigationToWidget(filePath) {
   content = content.replace(/\n{3,}/g, '\n\n');
 
   if (content !== originalContent) {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    writeFileAtomic(filePath, content, 'utf-8');
     return true;
   }
 
@@ -815,7 +896,7 @@ function migrateAllNavigationToWidget() {
  * Generate AI summary for a specific date
  * Uses bin/today dry-run --date to get the full context for that date
  */
-async function generateDailySummary(dateStr, planFilePath) {
+async function generateDailySummary(dateStr, planFilePath, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -871,6 +952,7 @@ Write ONLY the 2-3 sentence summary for ${dateStr}, nothing else:`;
 
   // Call AI provider
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 300,
@@ -927,7 +1009,7 @@ function addSummaryToFile(filePath, summary) {
     );
   }
 
-  fs.writeFileSync(filePath, content, 'utf-8');
+  writeFileAtomic(filePath, content, 'utf-8');
 }
 
 /**
@@ -958,7 +1040,7 @@ function addSummaryCalloutToPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       added.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1030,7 +1112,7 @@ function fixDoneTodayInPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       fixed.push({
         file: path.basename(planInfo.day.path),
         date: dateStr,
@@ -1067,7 +1149,7 @@ function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
     );
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1107,7 +1189,7 @@ function removeEmptyReflectionFromPastFiles(today, maxDaysBack = 7) {
     const newContent = content.replace(emptyReflectionPattern, '');
 
     if (newContent !== content) {
-      fs.writeFileSync(planInfo.day.path, newContent, 'utf-8');
+      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1331,7 +1413,7 @@ function needsPriorities(filePath) {
 /**
  * Generate AI suggestions for tomorrow's plan
  */
-async function generateTomorrowSuggestions(tomorrowStr, planFilePath) {
+async function generateTomorrowSuggestions(tomorrowStr, planFilePath, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -1402,6 +1484,7 @@ Keep it concise and actionable. Tasks should be specific and achievable.`;
 
   // Call AI provider
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 500,
@@ -1457,7 +1540,7 @@ function updateTomorrowPlan(filePath, suggestions) {
   }
 
   if (modified) {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    writeFileAtomic(filePath, content, 'utf-8');
   }
 
   return modified;
@@ -1542,7 +1625,7 @@ function linkPlanToDailyNote(planPath, date) {
   }
 
   // Write immediately after read-modify
-  fs.writeFileSync(dailyNotePath, content, 'utf-8');
+  writeFileAtomic(dailyNotePath, content, 'utf-8');
   return { linked: true, path: dailyNotePath };
 }
 
@@ -1828,7 +1911,7 @@ function updateWeeklyPlanWithDiaryNotes(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2110,7 +2193,7 @@ function updateWeeklyPlanWithHabitStats(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  writeFileAtomic(weeklyPlanPath, content, 'utf-8');
 
   return {
     updated: true,
@@ -2207,6 +2290,10 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
   const projects = getProjectsForReview(dateStr);
 
   let content = fs.readFileSync(dailyPlanPath, 'utf-8');
+  // Don't cement corruption: skip a file that lost its frontmatter rather
+  // than write our section into it.
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const startMarker = '<!-- REVIEW_PROJECTS:START -->';
   const endMarker = '<!-- REVIEW_PROJECTS:END -->';
@@ -2222,7 +2309,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
       const after = content.substring(endIndex + endMarker.length);
       // Remove any trailing newlines from the removed section
       content = before.trimEnd() + '\n\n' + after.trimStart();
-      fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+      if (writeFileAtomicCAS(dailyPlanPath, content, baseContent, 'utf-8').conflict) {
+        return { updated: false, reason: 'concurrent update' };
+      }
       return { updated: true, removed: true, count: 0 };
     }
     return { updated: false, reason: 'no projects', count: 0 };
@@ -2263,7 +2352,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
     }
   }
 
-  fs.writeFileSync(dailyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(dailyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2348,6 +2439,8 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(weeklyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForWeek(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2386,7 +2479,9 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(weeklyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(weeklyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2470,6 +2565,8 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(monthlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForMonth(projects, startDate, endDate);
   const startMarker = '<!-- PROJECTS:START -->';
@@ -2505,7 +2602,9 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(monthlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(monthlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2724,6 +2823,8 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
   }
 
   let content = fs.readFileSync(quarterlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForQuarter(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -2763,7 +2864,9 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
     }
   }
 
-  fs.writeFileSync(quarterlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(quarterlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -2935,6 +3038,8 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
   }
 
   let content = fs.readFileSync(yearlyPlanPath, 'utf-8');
+  if (!planFileIsIntact(content)) return { updated: false, reason: 'corrupt' };
+  const baseContent = content;
 
   const formattedProjects = formatProjectsForYear(projects, startDate, endDate);
   if (!formattedProjects) {
@@ -2977,7 +3082,9 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
     }
   }
 
-  fs.writeFileSync(yearlyPlanPath, content, 'utf-8');
+  if (writeFileAtomicCAS(yearlyPlanPath, content, baseContent, 'utf-8').conflict) {
+    return { updated: false, reason: 'concurrent update' };
+  }
 
   return {
     updated: true,
@@ -3208,7 +3315,7 @@ function getPlanThemeGoalsStatus(planPath, planType) {
 /**
  * Generate suggested theme and goals for a plan using AI
  */
-async function suggestThemeAndGoals(planPath, planType, startDate, endDate) {
+async function suggestThemeAndGoals(planPath, planType, startDate, endDate, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -3393,6 +3500,7 @@ ${goalsFieldName.toUpperCase()}:
 Make the theme distinctive to THIS period. Make ${goalsFieldName} specific and achievable.`;
 
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 400,
@@ -3433,6 +3541,10 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
   if (!fs.existsSync(planPath)) return false;
 
   let content = fs.readFileSync(planPath, 'utf-8');
+  // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
+  // return {} for it and we'd forge a new block, dropping every real field.
+  if (!planFileIsIntact(content)) return false;
+  const baseContent = content;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3445,9 +3557,22 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
   const fields = fieldMap[planType];
   if (!fields) return false;
 
-  // Update frontmatter
-  frontmatter[fields.theme] = theme;
-  frontmatter[fields.goals] = goals;
+  // Only update fields that are currently empty — don't overwrite user-entered content
+  const existingTheme = frontmatter[fields.theme];
+  const existingGoals = frontmatter[fields.goals];
+
+  const themeEmpty = !existingTheme || existingTheme.trim() === '';
+  const goalsEmpty = !existingGoals || !Array.isArray(existingGoals) ||
+    existingGoals.length === 0 ||
+    existingGoals.every(g => {
+      const trimmed = g ? g.trim() : '';
+      return trimmed === '' || trimmed === '-';
+    });
+
+  if (!themeEmpty && !goalsEmpty) return false;
+
+  if (themeEmpty) frontmatter[fields.theme] = theme;
+  if (goalsEmpty) frontmatter[fields.goals] = goals;
 
   // Rebuild the file
   const yamlContent = Object.entries(frontmatter)
@@ -3466,7 +3591,9 @@ function updatePlanWithThemeGoals(planPath, planType, theme, goals) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  fs.writeFileSync(planPath, content, 'utf-8');
+  if (writeFileAtomicCAS(planPath, content, baseContent, 'utf-8').conflict) {
+    return false;
+  }
 
   return true;
 }
@@ -3528,8 +3655,13 @@ async function suggestMissingThemesAndGoals(today) {
     // Skip if both are already filled
     if (!status.themeEmpty && !status.goalsEmpty) continue;
 
+    if (aiBudgetExhausted()) {
+      results.skipped.push({ file, type: planType, reason: 'ai_budget_exhausted' });
+      continue;
+    }
+
     // Generate suggestions
-    const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate);
+    const suggestion = await suggestThemeAndGoals(filePath, planType, dates.startDate, dates.endDate, recordAiCall);
 
     if (suggestion && suggestion.theme && suggestion.goals && suggestion.goals.length > 0) {
       // Only update if we have good suggestions
@@ -3583,7 +3715,7 @@ function getPlanSummaryStatus(planPath, planType) {
 /**
  * Generate a summary for a past plan period using AI
  */
-async function generatePlanSummary(planPath, planType, startDate, endDate) {
+async function generatePlanSummary(planPath, planType, startDate, endDate, onAiCall) {
   // Check if AI is available
   if (!(await isAIAvailable())) {
     return null;
@@ -3729,6 +3861,7 @@ ${context}
 Write ONLY the summary, ${sentenceCount} sentences, nothing else. Be specific and personal, not generic.`;
 
   try {
+    if (onAiCall) onAiCall();
     const response = await createCompletion({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 400,
@@ -3747,6 +3880,10 @@ function updatePlanWithSummary(planPath, planType, summary) {
   if (!fs.existsSync(planPath)) return false;
 
   let content = fs.readFileSync(planPath, 'utf-8');
+  // Never rebuild frontmatter on a corrupt file — parseFrontmatter would
+  // return {} for it and we'd forge a new block, dropping every real field.
+  if (!planFileIsIntact(content)) return false;
+  const baseContent = content;
   const { frontmatter, body } = parseFrontmatter(content);
 
   const fieldMap = {
@@ -3758,6 +3895,12 @@ function updatePlanWithSummary(planPath, planType, summary) {
 
   const summaryField = fieldMap[planType];
   if (!summaryField) return false;
+
+  // Don't overwrite a summary the user has already written
+  const existingSummary = frontmatter[summaryField];
+  const trimmedSummary = existingSummary ? existingSummary.trim() : '';
+  const isEmpty = trimmedSummary === '' || trimmedSummary === 'No daily summaries available for this week';
+  if (!isEmpty) return false;
 
   // Escape quotes in summary for YAML
   const escapedSummary = summary.replace(/"/g, '\\"').replace(/\n/g, ' ');
@@ -3780,7 +3923,9 @@ function updatePlanWithSummary(planPath, planType, summary) {
     .join('\n');
 
   content = `---\n${yamlContent}\n---\n${body}`;
-  fs.writeFileSync(planPath, content, 'utf-8');
+  if (writeFileAtomicCAS(planPath, content, baseContent, 'utf-8').conflict) {
+    return false;
+  }
 
   return true;
 }
@@ -3842,8 +3987,13 @@ async function suggestMissingSummaries(today) {
     const status = getPlanSummaryStatus(filePath, planType);
     if (!status || !status.isEmpty) continue;
 
+    if (aiBudgetExhausted()) {
+      results.skipped.push({ file, type: planType, reason: 'ai_budget_exhausted' });
+      continue;
+    }
+
     // Generate summary
-    const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate);
+    const summary = await generatePlanSummary(filePath, planType, dates.startDate, dates.endDate, recordAiCall);
 
     if (summary) {
       const updated = updatePlanWithSummary(filePath, planType, summary);
@@ -3909,12 +4059,15 @@ async function main() {
     diary_notes_updated: null,
     habit_stats_updated: null,
     missing_weekly_plans_created: [],
+    plans_corrupt: [],
   };
 
   // Ensure today's daily plan exists
   const dailyResult = ensureDailyPlan(planPaths.day, today);
   if (dailyResult.created) {
     metadata.plans_created.push({ type: 'day', file: dailyResult.file });
+  } else if (dailyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'day', file: dailyResult.file });
   }
 
   // Update today's daily plan with projects needing review
@@ -3928,24 +4081,32 @@ async function main() {
   const weeklyResult = ensureWeeklyPlan(planPaths.week, today);
   if (weeklyResult.created) {
     metadata.plans_created.push({ type: 'week', file: weeklyResult.file });
+  } else if (weeklyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'week', file: weeklyResult.file });
   }
 
   // Ensure this month's monthly plan exists
   const monthlyResult = ensureMonthlyPlan(planPaths.month, today);
   if (monthlyResult.created) {
     metadata.plans_created.push({ type: 'month', file: monthlyResult.file });
+  } else if (monthlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'month', file: monthlyResult.file });
   }
 
   // Ensure this quarter's quarterly plan exists
   const quarterlyResult = ensureQuarterlyPlan(planPaths.quarter, today);
   if (quarterlyResult.created) {
     metadata.plans_created.push({ type: 'quarter', file: quarterlyResult.file });
+  } else if (quarterlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'quarter', file: quarterlyResult.file });
   }
 
   // Ensure this year's yearly plan exists
   const yearlyResult = ensureYearlyPlan(planPaths.year, today);
   if (yearlyResult.created) {
     metadata.plans_created.push({ type: 'year', file: yearlyResult.file });
+  } else if (yearlyResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'year', file: yearlyResult.file });
   }
 
   // Create any missing weekly plans from earliest daily plan to today
@@ -4118,6 +4279,8 @@ async function main() {
   const tomorrowResult = ensureDailyPlan(tomorrowPaths.day, tomorrow);
   if (tomorrowResult.created) {
     metadata.plans_created.push({ type: 'day', file: tomorrowResult.file });
+  } else if (tomorrowResult.corrupt) {
+    metadata.plans_corrupt.push({ type: 'day', file: tomorrowResult.file });
   }
 
   // Update tomorrow's daily plan with projects needing review
@@ -4161,7 +4324,8 @@ async function main() {
   if (!contextOnly) {
     const daysNeedingSummaries = getPastDaysNeedingSummaries(today, 7);
     for (const dayInfo of daysNeedingSummaries) {
-      const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path);
+      if (aiBudgetExhausted()) break;
+      const summary = await generateDailySummary(dayInfo.dateStr, dayInfo.path, recordAiCall);
       if (summary) {
         addSummaryToFile(dayInfo.path, summary);
         metadata.summaries_generated.push({
@@ -4172,8 +4336,8 @@ async function main() {
     }
 
     // Generate suggestions for tomorrow's plan if needed
-    if (needsPriorities(tomorrowPaths.day.path)) {
-      const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path);
+    if (needsPriorities(tomorrowPaths.day.path) && !aiBudgetExhausted()) {
+      const suggestions = await generateTomorrowSuggestions(tomorrowStr, tomorrowPaths.day.path, recordAiCall);
       if (suggestions && updateTomorrowPlan(tomorrowPaths.day.path, suggestions)) {
         metadata.tomorrow_updated = true;
       }
@@ -4224,6 +4388,14 @@ When the user asks what to work on, consider both their immediate daily prioriti
     context = `${guidance}\n\n${contextParts.join('\n\n---\n\n')}`;
   } else {
     context = 'No plan files found for the current period.';
+  }
+
+  if (aiCallsThisRun > 0 || aiCallsDeferred > 0) {
+    metadata.ai_calls = {
+      made: aiCallsThisRun,
+      deferred: aiCallsDeferred,
+      budget: maxAiCallsPerRun,
+    };
   }
 
   console.log(JSON.stringify({

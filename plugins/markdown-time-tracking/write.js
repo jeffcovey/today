@@ -8,6 +8,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { writeFileAtomic } from '../../src/fs-atomic.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -53,7 +54,7 @@ try {
   if (!entry.end_time) {
     // START TIMER: Write to current-timer.md
     // Format: description on line 1, start_time on line 2
-    fs.writeFileSync(currentTimerFile, `${entry.description}\n${entry.start_time}`);
+    writeFileAtomic(currentTimerFile, `${entry.description}\n${entry.start_time}`);
 
     console.log(JSON.stringify({
       success: true,
@@ -70,10 +71,14 @@ try {
     const monthFile = getMonthFile(entry.start_time);
     const line = `${entry.start_time}|${entry.end_time}|${entry.description}\n`;
 
+    // appendFileSync is left as-is: POSIX appends of <PIPE_BUF bytes (4096) are
+    // atomic at the syscall level, so a single short log line cannot be torn by
+    // concurrent appends. Switching to read-modify-write here would *introduce*
+    // a clobber race instead of preventing one.
     fs.appendFileSync(monthFile, line);
 
     // Clear current-timer.md (keep file but empty for Apple Shortcuts compatibility)
-    fs.writeFileSync(currentTimerFile, '');
+    writeFileAtomic(currentTimerFile, '');
 
     console.log(JSON.stringify({
       success: true,

@@ -1,0 +1,239 @@
+#!/usr/bin/env node
+
+/**
+ * Bidirectional working-tree sync between this device and a remote
+ * deployment via Unison over SSH.
+ *
+ * This is the "working-tree sync" layer: it keeps the actual vault
+ * files identical across devices so that uncommitted edits on one
+ * device appear on all others. It does NOT touch git state — each
+ * device manages its own git repository independently. See bin/git-sync
+ * for the "committed-state sync" layer that propagates git commits.
+ *
+ * Reads the sync target from [deployments.*.unison] in config.toml:
+ *
+ *   [deployments.local.macbook.unison]
+ *   target = "digitalocean/droplet"
+ *
+ * The target's IP, SSH user, deploy path, and vault path are looked up
+ * from the target deployment's own config block.
+ *
+ * Runs in one of two modes:
+ *   - Long-running (default): unison -repeat watch — stays resident,
+ *     syncs on file change. Used as a compose service.
+ *   - One-shot (--once): syncs once and exits. Useful for debugging
+ *     and for scheduler cron jobs.
+ *
+ * Exit codes:
+ *   0  success
+ *   1  configuration error (no target, target not found, etc.)
+ *   2  unison failed
+ */
+
+import { spawn, execSync } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { getFullConfig, getDeploymentName as getDeployName } from '../src/config.js';
+import { getDeployment } from '../src/deploy/config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = dirname(__dirname);
+
+// ── SSH key resolution ───────────────────────────────────────────────
+
+function resolveSSHKey(deployment) {
+  if (deployment.sshKeyPath) return deployment.sshKeyPath;
+  const home = process.env.HOME || '/root';
+  const candidates = [
+    join(home, '.ssh', 'do_deploy_key'),
+    join(home, '.ssh', 'deploy_key'),
+    join(home, '.ssh', 'id_ed25519'),
+    join(home, '.ssh', 'id_rsa'),
+  ];
+  for (const key of candidates) {
+    if (existsSync(key)) return key;
+  }
+  return candidates[0]; // fallback to do_deploy_key even if missing — SSH will give a clear error
+}
+
+// ── Built-in excludes ───────────────────────────────────────────────
+
+const BUILTIN_EXCLUDES = [
+  'Path .git.nosync',
+  'Path .git',
+  'Path .sync',
+  'Path .stfolder',
+  'Path .stversions',
+  'Name .DS_Store',
+  'Path node_modules',
+  'Name *.tmp',
+  'Name .*.swp',
+];
+
+// ── Main ────────────────────────────────────────────────────────────
+
+const oneShot = process.argv.includes('--once');
+
+// Use the deploy config module for fully-resolved deployments (with IPs
+// from env vars, including legacy naming like DO_DROPLET_IP).
+const deploymentName = getDeployName();
+if (!deploymentName) {
+  console.error('No deployment name found (.data/deployment-name). Run bin/deploy first.');
+  process.exit(1);
+}
+
+const currentDeployment = getDeployment(deploymentName);
+if (!currentDeployment) {
+  console.error(`Deployment "${deploymentName}" not found in config.toml`);
+  process.exit(1);
+}
+
+const unisonConfig = currentDeployment.unison;
+if (!unisonConfig || !unisonConfig.target) {
+  console.error(`No [deployments.*.unison] block with "target" for "${deploymentName}" in config.toml`);
+  console.error('Configure it in bin/today configure → Deployments → Unison Target');
+  process.exit(1);
+}
+
+const targetDeployment = getDeployment(unisonConfig.target);
+if (!targetDeployment) {
+  console.error(`Target deployment "${unisonConfig.target}" not found in config.toml`);
+  process.exit(1);
+}
+
+if (!targetDeployment.ip) {
+  console.error(`Cannot determine IP for target "${unisonConfig.target}".`);
+  console.error('Set it in config.toml or via the DEPLOY_*_IP environment variable.');
+  process.exit(1);
+}
+
+// Resolve paths
+const config = getFullConfig();
+const vaultPath = config.vault_path || 'vault';
+const localVault = join(PROJECT_ROOT, vaultPath);
+
+const remoteVault = join(targetDeployment.deployPath, targetDeployment.remoteVaultPath);
+const sshUser = targetDeployment.sshUser;
+const sshPort = targetDeployment.sshPort;
+const targetIp = targetDeployment.ip;
+
+// Clean up stale lock files on the remote before starting. These get left
+// behind when a container crashes mid-sync and prevent all future runs.
+const sshKey = resolveSSHKey(targetDeployment);
+const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${sshKey} ${sshUser}@${targetIp}`;
+try {
+  execSync(`${sshCmd} 'rm -f ~/.unison/lk*'`, { stdio: 'pipe' });
+} catch {
+  // Best-effort — if SSH fails here, unison will report the real error
+}
+
+// Clean up stale lock files locally too. The .data/unison directory is
+// volume-mounted, so locks survive container restarts; without this, a
+// crash mid-sync wedges all future runs until manually cleared.
+const localUnisonDir = join(PROJECT_ROOT, '.data', 'unison');
+try {
+  execSync(`rm -f ${localUnisonDir}/lk*`, { stdio: 'pipe' });
+} catch {
+  // Best-effort
+}
+
+// Rotate the unison log if it's grown too large. Repeated lock errors or
+// a long uptime can grow this to gigabytes; truncate when it crosses the
+// threshold to prevent disk-fill.
+const LOG_ROTATE_THRESHOLD = 100 * 1024 * 1024; // 100 MB
+const logPath = join(localUnisonDir, 'unison.log');
+try {
+  if (existsSync(logPath)) {
+    const { statSync, truncateSync, renameSync } = await import('fs');
+    const size = statSync(logPath).size;
+    if (size > LOG_ROTATE_THRESHOLD) {
+      const rotated = `${logPath}.1`;
+      try { renameSync(logPath, rotated); } catch { truncateSync(logPath, 0); }
+      console.log(`Rotated unison.log (was ${(size / 1024 / 1024).toFixed(0)} MB)`);
+    }
+  }
+} catch (err) {
+  console.warn(`Log rotation skipped: ${err.message}`);
+}
+
+// Build excludes
+const userExcludes = unisonConfig.excludes || [];
+const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];
+
+// Selective sync: if paths is set, only sync those subdirectories.
+// Empty or absent = sync everything (minus excludes).
+const syncPaths = unisonConfig.paths || [];
+
+// Build the unison command
+const args = [
+  localVault,
+  `ssh://${sshUser}@${targetIp}/${remoteVault}`,
+  '-batch',          // non-interactive
+  '-auto',           // accept non-conflicting changes automatically
+  '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
+  '-perms', '0',     // ignore permission differences (macOS vs Linux)
+  '-dontchmod',      // don't try to set permissions on the remote
+  '-retry', '3',     // retry on transient failures (stale locks, network blips)
+  '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
+];
+
+// Add selective paths (if any)
+for (const p of syncPaths) {
+  args.push('-path', p);
+}
+
+// Add excludes
+for (const exclude of allExcludes) {
+  args.push('-ignore', exclude);
+}
+
+// Add repeat mode unless one-shot
+if (!oneShot) {
+  args.push('-repeat', 'watch');
+}
+
+// Log what we're doing
+console.log('Unison sync starting...');
+console.log(`  Local:   ${localVault}`);
+console.log(`  Remote:  ssh://${sshUser}@${targetIp}/${remoteVault}`);
+console.log(`  Mode:    ${oneShot ? 'one-shot' : 'repeat (watch)'}`);
+if (syncPaths.length > 0) {
+  console.log(`  Paths:   ${syncPaths.join(', ')} (selective sync)`);
+} else {
+  console.log(`  Paths:   (all)`);
+}
+console.log(`  Excludes: ${allExcludes.length} patterns`);
+console.log('');
+
+// Run unison. UNISONLOCALHOSTNAME must be stable per-deployment so the
+// archive persists across container recreations AND is distinct between
+// different machines (e.g. macbook vs mini) syncing to the same target.
+const child = spawn('unison', args, {
+  stdio: 'inherit',
+  env: {
+    ...process.env,
+    UNISON: join(PROJECT_ROOT, '.data', 'unison'),
+    UNISONLOCALHOSTNAME: `today-${deploymentName}`,
+  }
+});
+
+child.on('error', (err) => {
+  console.error(`Failed to start unison: ${err.message}`);
+  process.exit(2);
+});
+
+child.on('exit', (code) => {
+  if (code !== 0 && code !== null) {
+    console.error(`Unison exited with code ${code}`);
+  }
+  process.exit(code || 0);
+});
+
+// Forward signals for graceful shutdown
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    child.kill(signal);
+  });
+}

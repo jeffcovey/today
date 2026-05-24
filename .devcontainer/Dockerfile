@@ -4,14 +4,10 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:20
 # Note: python3 is required for node-gyp to compile native modules like better-sqlite3
 RUN apt-get update && apt-get install -y python3 make g++ sqlite3 curl && rm -rf /var/lib/apt/lists/*
 
-# Install Turso CLI manually (avoid auto-auth issues)
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then ARCH="x86_64"; fi && \
-    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then ARCH="arm64"; fi && \
-    curl -sSfL "https://github.com/tursodatabase/turso-cli/releases/latest/download/turso-cli_Linux_$ARCH.tar.gz" | \
-    tar -xz -C /tmp && \
-    mv /tmp/turso /usr/local/bin/turso && \
-    chmod +x /usr/local/bin/turso
+# Docker CLI + Compose plugin are installed by the docker-outside-of-docker
+# devcontainer feature (see .devcontainer/devcontainer.json). The feature also
+# handles /var/run/docker.sock group permissions correctly, which a manual
+# Dockerfile install does not. Don't duplicate it here.
 
 # Install CLI tools: ripgrep, fd-find, bat, ruby (for mdless)
 RUN apt-get update && apt-get install -y ripgrep fd-find bat ruby ruby-dev && rm -rf /var/lib/apt/lists/*
@@ -29,6 +25,21 @@ RUN ln -s /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true && \
 # Install Claude Code to user home directory via official installer
 RUN su node -c "curl -fsSL https://claude.ai/install.sh | bash"
 RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# Install standalone VS Code CLI for `code tunnel` (separate from the
+# devcontainer's remote-cli wrapper at /usr/local/bin/code).
+# Used by .devcontainer/personal-startup.sh.
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+      amd64) VSCODE_ARCH=cli-linux-x64 ;; \
+      arm64) VSCODE_ARCH=cli-linux-arm64 ;; \
+      *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://update.code.visualstudio.com/latest/${VSCODE_ARCH}/stable" -o /tmp/vscode-cli.tar.gz && \
+    tar -xzf /tmp/vscode-cli.tar.gz -C /tmp && \
+    mv /tmp/code /usr/local/lib/vscode-cli && \
+    chmod +x /usr/local/lib/vscode-cli && \
+    rm /tmp/vscode-cli.tar.gz
 
 # Install mdless (Ruby gem for markdown viewing)
 RUN gem install mdless --no-document
