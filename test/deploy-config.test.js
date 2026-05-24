@@ -81,7 +81,7 @@ describe('deploy/config', () => {
       expect(keys).toContain('vault-web');
       expect(keys).toContain('inbox-api');
       expect(keys).toContain('resilio-sync');
-      expect(keys).toContain('git-sync.timer');
+      expect(keys).toContain('unison-sync');
     });
 
     test('every service has required fields', () => {
@@ -107,7 +107,7 @@ describe('deploy/config', () => {
       const names = getSystemdUnitNames();
       expect(names).toContain('today-scheduler.service');
       expect(names).toContain('vault-watcher.service');
-      expect(names).toContain('git-sync.timer');
+      expect(names).toContain('unison-sync.service');
     });
 
     test('getSystemdToComposeMap maps both bare names and config keys', () => {
@@ -121,7 +121,7 @@ describe('deploy/config', () => {
     test('configKeyToSystemdName handles scheduler special case', () => {
       expect(configKeyToSystemdName('scheduler')).toBe('today-scheduler');
       expect(configKeyToSystemdName('vault-web')).toBe('vault-web');
-      expect(configKeyToSystemdName('git-sync.timer')).toBe('git-sync');
+      expect(configKeyToSystemdName('unison-sync')).toBe('unison-sync');
       expect(configKeyToSystemdName('unknown')).toBe('unknown');
     });
   });
@@ -187,25 +187,24 @@ describe('deploy/config', () => {
       expect(jobs['valid']).toBeDefined();
     });
 
-    test('git-sync can be configured as a scheduler job for local deployments', () => {
-      // This is the documented shape for enabling git-sync on a local
-      // deployment; it lives alongside plugin-sync in config.toml under
-      // [deployments.local.<name>.jobs.git-sync].
+    test('custom jobs can be configured alongside predefined ones', () => {
+      // Arbitrary user-defined jobs in config.toml under
+      // [deployments.local.<name>.jobs.<name>] parse alongside plugin-sync.
       const jobs = parseJobs({
         'plugin-sync': {
           schedule: '*/10 * * * *',
           command: 'bin/plugins sync'
         },
-        'git-sync': {
-          schedule: '* * * * *',
-          command: 'bin/git-sync',
-          description: 'Pull/rebase/push vault via git'
+        'custom-backup': {
+          schedule: '0 3 * * *',
+          command: 'bin/backup',
+          description: 'Nightly backup'
         }
       });
 
-      expect(jobs['git-sync']).toBeDefined();
-      expect(jobs['git-sync'].schedule).toBe('* * * * *');
-      expect(jobs['git-sync'].command).toBe('bin/git-sync');
+      expect(jobs['custom-backup']).toBeDefined();
+      expect(jobs['custom-backup'].schedule).toBe('0 3 * * *');
+      expect(jobs['custom-backup'].command).toBe('bin/backup');
       expect(jobs['plugin-sync']).toBeDefined();
     });
   });

@@ -379,6 +379,7 @@ function getMessagesCharCount(messages, system) {
  * @param {Object} [options.tools] - Tool definitions for the AI to use
  * @param {number} [options.maxSteps=5] - Maximum tool use iterations
  * @param {Function} [options.onStepFinish] - Callback when a step (text or tool) finishes
+ * @param {AbortSignal} [options.abortSignal] - Abort signal for cancellation
  * @returns {Promise<object>} - Stream result with textStream and fullStream properties
  */
 export async function streamCompletion(options) {
@@ -408,6 +409,9 @@ export async function streamCompletion(options) {
   // Add step finish callback if provided
   if (options.onStepFinish) {
     streamOptions.onStepFinish = options.onStepFinish;
+  }
+  if (options.abortSignal) {
+    streamOptions.abortSignal = options.abortSignal;
   }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)

@@ -10,6 +10,10 @@ import { exec, execSync, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
+import {
+  writeFileAtomicAsync,
+  writeFileAtomicCASAsync
+} from './fs-atomic.js';
 import { marked } from 'marked';
 import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
 import { markedHighlight } from 'marked-highlight';
@@ -22,7 +26,7 @@ import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
-import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
+import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -5811,9 +5815,48 @@ app.get('/_git', authMiddleware, async (req, res) => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
       try {
         const resp = await fetch('/_git/ai-commit-message', { method: 'POST' });
-        const data = await resp.json();
-        if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
-        document.getElementById('commitMsg').value = data.message;
+        const commitMsgEl = document.getElementById('commitMsg');
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('text/event-stream') && resp.body) {
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          commitMsgEl.value = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\\n\\n');
+            buffer = events.pop() || '';
+
+            for (const eventText of events) {
+              const lines = eventText.split('\\n');
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
+                let data = null;
+                try {
+                  data = JSON.parse(payload);
+                } catch {
+                  continue;
+                }
+                if (data.type === 'text') {
+                  commitMsgEl.value += data.content || '';
+                } else if (data.type === 'done') {
+                  commitMsgEl.value = data.message || commitMsgEl.value;
+                } else if (data.type === 'error') {
+                  throw new Error(data.message || 'Failed to generate commit message');
+                }
+              }
+            }
+          }
+        } else {
+          const data = await resp.json();
+          if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
+          commitMsgEl.value = data.message;
+        }
       } catch (err) {
         alert('Failed to generate commit message: ' + err.message);
       } finally {
@@ -6038,43 +6081,7 @@ app.post('/_git/push', authMiddleware, (req, res) => {
   }
 });
 
-app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
-  try {
-    const available = await isAIAvailable();
-    if (!available) {
-      return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
-    }
-
-    let diff = '';
-    try {
-      diff = gitExec(['diff', '--cached']);
-    } catch (err) {
-      diff = '';
-    }
-
-    if (!diff.trim()) {
-      return res.status(400).json({ error: 'No staged changes to generate a message for.' });
-    }
-
-    // Truncate very large diffs to avoid exceeding context limits
-    const maxDiffLength = 15000;
-    if (diff.length > maxDiffLength) {
-      diff = diff.slice(0, maxDiffLength) + '\n\n[... diff truncated ...]';
-    }
-
-    const message = await createCompletion({
-      system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
-      messages: [{ role: 'user', content: diff }],
-      maxTokens: 100,
-      temperature: 0,
-    });
-
-    res.json({ message: message.trim() });
-  } catch (err) {
-    console.error('Error generating AI commit message:', err);
-    res.status(500).json({ error: 'Failed to generate commit message: ' + (err.message || 'Unknown error') });
-  }
-});
+app.post('/_git/ai-commit-message', authMiddleware, createAiCommitMessageHandler({ gitExecFn: gitExec }));
 
 app.post('/_git/discard', authMiddleware, async (req, res) => {
   try {
@@ -6111,9 +6118,12 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    // Write the file
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
+    // Write the file. AI-edit endpoints don't carry an expected-content
+    // basis from the client, so we use atomic-only writes (no CAS): readers
+    // can't observe a torn file mid-write, but a true write-write race
+    // between two AI-edit requests still favors the last writer.
+    await writeFileAtomicAsync(fullPath, content);
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error editing file:', error);
@@ -6787,11 +6797,11 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
     }
     
     // Read the file
-    let content = await fs.readFile(fullPath, 'utf-8');
+    const originalContent = await fs.readFile(fullPath, 'utf-8');
     const { lineNumber, taskId: providedTaskId, checked } = req.body;
-    
+
     // Split into lines
-    const lines = content.split('\n');
+    const lines = originalContent.split('\n');
     
     // Find the line to toggle - prioritize task ID if provided
     let targetLineNumber = lineNumber;
@@ -6825,10 +6835,13 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
         lines[targetLineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
       }
       
-      // Write back to file
-      content = lines.join('\n');
-      await fs.writeFile(fullPath, content, 'utf-8');
-      
+      // Write back to file (CAS so another writer can't clobber this toggle)
+      const newContent = lines.join('\n');
+      const { conflict } = await writeFileAtomicCASAsync(fullPath, newContent, originalContent);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+
       // Task updates are now handled directly in markdown files
       // No database update needed with Obsidian Tasks approach
       
@@ -7012,7 +7025,12 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       lines.splice(line, 0, newTaskLine); // Insert at position line (after line-1)
     }
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+    {
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
 
     // Clear the task query cache so the next page load reflects the change
     taskQueryCache.clear();
@@ -7139,7 +7157,12 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
     const updatedLine = parts.join(' ');
     lines[line - 1] = updatedLine;
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+    {
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
 
     // Keep query cache in sync
     taskQueryCache.clear();
@@ -7192,10 +7215,13 @@ app.post('/save/*path', authMiddleware, async (req, res) => {
       return res.status(400).send('Can only save markdown and TOML files');
     }
     
-    // Write the content
+    // Write the content. The save endpoint doesn't carry an expected-content
+    // basis from the client, so atomic-only — readers can't observe a torn
+    // file mid-write, but a true write-write race still favors the last
+    // writer. Threading CAS through would require a client-side contract change.
     const { content } = req.body;
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
+    await writeFileAtomicAsync(fullPath, content);
+
     console.log(`File saved: ${fullPath}`);
     res.json({ success: true, message: 'File saved successfully' });
   } catch (error) {

@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseRecurrence, getCurrentPeriodStart, getNextPeriodStart, formatDate } from '../../src/recurrence-parser.js';
 import { TZDate } from '@date-fns/tz';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -374,7 +375,11 @@ function processRoutine(filePath, today) {
       history: newHistory
     };
     const newContent = serializeFrontMatter(newFrontMatter) + '\n\n' + newBody;
-    fs.writeFileSync(filePath, newContent, 'utf8');
+    // CAS against the snapshot read at the top of processRoutine. A concurrent
+    // edit (e.g. user-edited the routine in Obsidian while another instance
+    // was rolling the period) aborts this write and lets the next sync redo
+    // the work against fresh state.
+    writeFileAtomicCAS(filePath, newContent, content);
   }
 
   // Re-read tasks after potential reset
@@ -558,7 +563,7 @@ if (filterFiles) {
 if (!isIncremental && files.length === 0) {
   const todayStr = formatDate(getToday());
   const samplePath = path.join(routinesDir, 'morning.md');
-  fs.writeFileSync(samplePath, getSampleMorningRoutine(todayStr), 'utf8');
+  writeFileAtomic(samplePath, getSampleMorningRoutine(todayStr));
   files = [samplePath];
   // Store relative path from project root for user display
   createdSample = path.join(routinesDirectory, 'morning.md');

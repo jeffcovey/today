@@ -20,7 +20,7 @@
 		// daemon. See the note at the top of root docker-compose.yml for
 		// how HOST_PROJECT_PATH / HOST_HOME make bind-mount paths resolve
 		// correctly when run from inside the devcontainer.
-		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:": {
 			"moby": false,
 			"installDockerComposeSwitch": true
 		}
