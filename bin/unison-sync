@@ -31,11 +31,12 @@
  */
 
 import { spawn, execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getFullConfig, getDeploymentName as getDeployName } from '../src/config.js';
 import { getDeployment } from '../src/deploy/config.js';
+import { writeFileAtomicCAS } from '../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -182,9 +183,22 @@ function readStatusFile() {
 function writeStatusFile(fields) {
   try {
     mkdirSync(localUnisonDir, { recursive: true });
-    const existing = readStatusFile();
-    const updated = { ...existing, ...fields };
-    writeFileSync(STATUS_FILE, JSON.stringify(updated, null, 2) + '\n');
+    // Read raw bytes so we can CAS: if a concurrent write landed between our
+    // read and our rename, writeFileAtomicCAS aborts the swap and we skip this
+    // update (the next heartbeat / sync-exit will retry and converge).
+    let rawContent = null;
+    let existing = {};
+    if (existsSync(STATUS_FILE)) {
+      try {
+        rawContent = readFileSync(STATUS_FILE, 'utf8');
+        existing = JSON.parse(rawContent);
+      } catch {
+        // Half-written or corrupt — rawContent holds whatever bytes are on disk.
+        // CAS will compare against those bytes and overwrite them, fixing the file.
+      }
+    }
+    const newContent = JSON.stringify({ ...existing, ...fields }, null, 2) + '\n';
+    writeFileAtomicCAS(STATUS_FILE, newContent, rawContent);
   } catch (err) {
     console.warn(`Status file write skipped: ${err.message}`);
   }

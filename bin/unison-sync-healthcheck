@@ -31,9 +31,8 @@
  */
 
 import { writeFileSync, unlinkSync, existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { getAbsoluteVaultPath } from '../src/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,14 +55,18 @@ const VAULT = process.env.UNISON_VAULT_PATH || getAbsoluteVaultPath();
 const MARKER = join(VAULT, '.unison-sync-status.md');
 
 function readStatusFile() {
-  try {
-    if (existsSync(STATUS_FILE)) {
-      return JSON.parse(readFileSync(STATUS_FILE, 'utf8'));
-    }
-  } catch {
-    // Ignore parse errors
+  if (!existsSync(STATUS_FILE)) {
+    // File absent → Unison has never run on this deployment; nothing to check.
+    return null;
   }
-  return null;
+  try {
+    return JSON.parse(readFileSync(STATUS_FILE, 'utf8'));
+  } catch {
+    // File exists but is corrupt (e.g. caught mid-write before the atomic
+    // rename). Return an empty object so staleness checks fire rather than
+    // silently treating a broken file as "unison not configured".
+    return {};
+  }
 }
 
 function secondsSince(isoTimestamp) {

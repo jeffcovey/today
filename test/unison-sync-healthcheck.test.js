@@ -192,7 +192,20 @@ describe('bin/unison-sync-healthcheck', () => {
     });
   });
 
-  describe('corrupt timestamp guard', () => {
+  describe('corrupt status file', () => {
+    test('exits 1 (not silent no-op) when status file contains partial JSON', () => {
+      // Simulate a truncated write — the file exists but JSON is unparseable.
+      // This must NOT be treated as "unison not configured" (exit 0 with no
+      // marker), which would silently disable monitoring on the very condition
+      // it is designed to catch.
+      fs.writeFileSync(TMP_STATUS_FILE, '{"lastSuccessAt": "2026-01-');
+
+      const result = runHealthcheck();
+
+      expect(result.exitCode).toBe(1);
+      expect(fs.existsSync(TMP_MARKER)).toBe(true);
+    });
+
     test('exits 1 (stale, not silently healthy) when timestamp is malformed', () => {
       writeStatus({ lastSuccessAt: 'not-a-date', lastExitCode: 0, mode: 'once' });
 
