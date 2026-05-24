@@ -31,11 +31,12 @@
  */
 
 import { spawn, execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getFullConfig, getDeploymentName as getDeployName } from '../src/config.js';
 import { getDeployment } from '../src/deploy/config.js';
+import { writeFileAtomicCAS } from '../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -70,6 +71,10 @@ const BUILTIN_EXCLUDES = [
   'Path node_modules',
   'Name *.tmp',
   'Name .*.swp',
+  // Health-check marker — written locally by bin/unison-sync-healthcheck;
+  // must not be propagated to the remote or it will cause spurious conflicts
+  // and churn on every sync recovery.
+  'Name .unison-sync-status.md',
 ];
 
 // ── Main ────────────────────────────────────────────────────────────
@@ -158,6 +163,47 @@ try {
   console.warn(`Log rotation skipped: ${err.message}`);
 }
 
+// ── Sync status file ────────────────────────────────────────────────
+// Written on every completed sync (--once mode) or every 5 minutes in
+// watch mode, so bin/unison-sync-healthcheck can detect stale/broken sync.
+
+const STATUS_FILE = join(localUnisonDir, 'sync-status.json');
+
+function readStatusFile() {
+  try {
+    if (existsSync(STATUS_FILE)) {
+      return JSON.parse(readFileSync(STATUS_FILE, 'utf8'));
+    }
+  } catch {
+    // Ignore parse errors — file may be half-written
+  }
+  return {};
+}
+
+function writeStatusFile(fields) {
+  try {
+    mkdirSync(localUnisonDir, { recursive: true });
+    // Read raw bytes so we can CAS: if a concurrent write landed between our
+    // read and our rename, writeFileAtomicCAS aborts the swap and we skip this
+    // update (the next heartbeat / sync-exit will retry and converge).
+    let rawContent = null;
+    let existing = {};
+    if (existsSync(STATUS_FILE)) {
+      try {
+        rawContent = readFileSync(STATUS_FILE, 'utf8');
+        existing = JSON.parse(rawContent);
+      } catch {
+        // Half-written or corrupt — rawContent holds whatever bytes are on disk.
+        // CAS will compare against those bytes and overwrite them, fixing the file.
+      }
+    }
+    const newContent = JSON.stringify({ ...existing, ...fields }, null, 2) + '\n';
+    writeFileAtomicCAS(STATUS_FILE, newContent, rawContent);
+  } catch (err) {
+    console.warn(`Status file write skipped: ${err.message}`);
+  }
+}
+
 // Build excludes
 const userExcludes = unisonConfig.excludes || [];
 const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];
@@ -219,12 +265,46 @@ const child = spawn('unison', args, {
   }
 });
 
+// In watch mode, write a heartbeat every 5 minutes after the process has
+// been running stably for at least 60 seconds. If the container is caught
+// in a rapid restart loop (unison exits before 60s), this timer never fires
+// so the heartbeat stays stale — exactly what the healthcheck looks for.
+//
+// Note: the heartbeat records process liveness only, not individual sync
+// completions (which can't be tracked without parsing unison's output). The
+// healthcheck uses `lastHeartbeatAt` for watch-mode staleness checks and
+// labels it accordingly in the vault marker.
+let heartbeatInterval = null;
+if (!oneShot) {
+  const HEARTBEAT_DELAY_MS = 60 * 1000;      // wait 60s before first write
+  const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // then every 5 minutes
+  const writeHeartbeat = () => writeStatusFile({
+    mode: 'watch',
+    lastHeartbeatAt: new Date().toISOString(),
+  });
+  const startupTimer = setTimeout(() => {
+    writeHeartbeat();
+    heartbeatInterval = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
+    heartbeatInterval.unref();
+  }, HEARTBEAT_DELAY_MS);
+  // Suppress Node warning about unref'd timers on fast exit
+  startupTimer.unref();
+}
+
 child.on('error', (err) => {
   console.error(`Failed to start unison: ${err.message}`);
+  writeStatusFile({ lastAttemptAt: new Date().toISOString(), lastExitCode: 2, mode: oneShot ? 'once' : 'watch' });
   process.exit(2);
 });
 
 child.on('exit', (code) => {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  const now = new Date().toISOString();
+  if (code === 0) {
+    writeStatusFile({ lastAttemptAt: now, lastExitCode: 0, lastSuccessAt: now, mode: oneShot ? 'once' : 'watch' });
+  } else {
+    writeStatusFile({ lastAttemptAt: now, lastExitCode: code ?? 1, mode: oneShot ? 'once' : 'watch' });
+  }
   if (code !== 0 && code !== null) {
     console.error(`Unison exited with code ${code}`);
   }
