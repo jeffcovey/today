@@ -36,6 +36,17 @@ const MAINTENANCE_JOBS = [
     schedule: '*/30 * * * *', // Every 30 minutes
     command: 'bin/prerender',
     description: 'Pre-render vault markdown files to disk HTML cache'
+  },
+  {
+    name: 'unison-sync-healthcheck',
+    schedule: '*/5 * * * *', // Every 5 minutes
+    command: 'bin/unison-sync-healthcheck',
+    // Placed in MAINTENANCE_JOBS (always-on) rather than SERVICE_MAINTENANCE_JOBS
+    // because Unison runs as a Docker container, not a systemd service, so the
+    // `systemctl is-active` gate used for resilio-sync doesn't apply. The
+    // no-status-file guard inside the script makes it a safe no-op on any
+    // deployment that has never run unison-sync.
+    description: 'Check Unison sync is running and surface failures in the vault'
   }
 ];
 
