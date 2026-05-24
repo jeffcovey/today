@@ -25,6 +25,11 @@ function runToday(args = '', options = {}) {
         SKIP_DB_HEALTH: 'true',
         // Skip slow context gathering for faster tests
         SKIP_CONTEXT: 'true',
+        // Skip the interactive update-check prompt — when the local checkout
+        // is behind origin/main (e.g., after a Dependabot merge) bin/today
+        // would otherwise block on readline and the assertions would fail
+        // against the prompt output instead of the help text.
+        SKIP_UPDATE_CHECK: 'true',
       },
       ...options,
     });
