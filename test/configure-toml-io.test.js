@@ -136,7 +136,6 @@ describe('configure-toml-io', () => {
       expect(joined).toContain('today.toml changed externally');
       expect(joined).toContain('/tmp/today.toml');
       expect(joined).toContain('configure');
-      expect(joined).toMatch(/changed externally/i);
       errSpy.mockRestore();
     });
   });
