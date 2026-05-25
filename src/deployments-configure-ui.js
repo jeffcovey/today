@@ -14,17 +14,20 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { listProviders } from './deploy/providers/index.js';
 import { getIpEnvVarName } from './deploy/config.js';
 import { getConfigPath } from './config.js';
+import {
+  readConfigToml,
+  writeConfigToml,
+  reportConfigConflict as reportTomlConflict,
+} from './configure-toml-io.js';
 
 const html = htm.bind(React.createElement);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
-const CONFIG_PATH = getConfigPath();
 
 // ============================================================================
 // Predefined jobs that can be toggled on/off
@@ -44,39 +47,9 @@ const PREDEFINED_JOBS = [
 // Config helpers
 // ============================================================================
 
-function readConfig() {
-  try {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return parseToml(content);
-  } catch {
-    return {};
-  }
-}
-
-function writeConfig(config) {
-  // Preserve multiline strings
-  let tomlOutput = stringifyToml(config);
-
-  tomlOutput = tomlOutput.replace(
-    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
-    (match, prefix, content) => {
-      if (!content.includes('\\n')) return match;
-      const unescaped = content
-        .replace(/\\n/g, '\n')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .trimEnd();
-      return `${prefix}"""\n${unescaped}\n"""`;
-    }
-  );
-
-  const header = `# Configuration for Today system
-# Edit this file when your situation changes (e.g., when traveling)
-
-`;
-
-  fs.writeFileSync(CONFIG_PATH, header + tomlOutput);
-}
+const readConfig = () => readConfigToml(getConfigPath());
+const writeConfig = (config, originalRaw) => writeConfigToml(getConfigPath(), config, originalRaw);
+const reportConfigConflict = () => reportTomlConflict(getConfigPath(), 'deployments configure');
 
 function getEnvVar(key) {
   try {
@@ -116,7 +89,7 @@ function setEnvVar(key, value) {
 // ============================================================================
 
 function getDeploymentsFromConfig() {
-  const config = readConfig();
+  const { config } = readConfig();
   const deploymentsConfig = config.deployments || {};
   const deployments = [];
 
@@ -145,6 +118,17 @@ function getDeploymentsFromConfig() {
 function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
   const { exit } = useApp();
   const [deployments, setDeployments] = useState(() => getDeploymentsFromConfig());
+
+  // CAS-protected save. Each handler is a short, synchronous read-modify-write,
+  // so call readConfig() right before mutating to keep the baseline tight.
+  const persistConfig = (config, originalRaw) => {
+    const { conflict } = writeConfig(config, originalRaw);
+    if (conflict) {
+      reportConfigConflict();
+      exit();
+      process.exit(1);
+    }
+  };
 
   // Determine initial state based on props
   const getInitialState = () => {
@@ -286,14 +270,14 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
           setMode('edit');
           setServiceIndex(0);
         } else {
-          const config = readConfig();
+          const { config, raw } = readConfig();
           if (config.deployments?.[selected.provider]?.[selected.name]) {
             if (!config.deployments[selected.provider][selected.name].services) {
               config.deployments[selected.provider][selected.name].services = {};
             }
             const current = config.deployments[selected.provider][selected.name].services[serviceKey] === true;
             config.deployments[selected.provider][selected.name].services[serviceKey] = !current;
-            writeConfig(config);
+            persistConfig(config, raw);
             refreshDeployments();
           }
         }
@@ -323,7 +307,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
         if (jobIndex < PREDEFINED_JOBS.length) {
           // Toggle predefined job
           const predefinedJob = PREDEFINED_JOBS[jobIndex];
-          const config = readConfig();
+          const { config, raw } = readConfig();
           if (config.deployments?.[selected.provider]?.[selected.name]) {
             if (!config.deployments[selected.provider][selected.name].jobs) {
               config.deployments[selected.provider][selected.name].jobs = {};
@@ -338,7 +322,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
                 description: predefinedJob.description
               };
             }
-            writeConfig(config);
+            persistConfig(config, raw);
             refreshDeployments();
           }
         } else if (jobIndex < PREDEFINED_JOBS.length + customJobEntries.length) {
@@ -437,7 +421,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
         } else if (field.key === '__save__') {
           // Validate and save
           if (newDeployment.jobName && newDeployment.command) {
-            const config = readConfig();
+            const { config, raw } = readConfig();
             if (config.deployments?.[selected.provider]?.[selected.name]) {
               if (!config.deployments[selected.provider][selected.name].jobs) {
                 config.deployments[selected.provider][selected.name].jobs = {};
@@ -447,7 +431,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
                 command: newDeployment.command,
                 description: newDeployment.jobName
               };
-              writeConfig(config);
+              persistConfig(config, raw);
               refreshDeployments();
             }
             setMode('jobs');
@@ -468,7 +452,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
   // Save a deployment setting
   const saveDeploymentSetting = (provider, name, key, value, nested) => {
-    const config = readConfig();
+    const { config, raw } = readConfig();
     if (!config.deployments) config.deployments = {};
     if (!config.deployments[provider]) config.deployments[provider] = {};
     if (!config.deployments[provider][name]) config.deployments[provider][name] = {};
@@ -498,13 +482,13 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
       }
     }
 
-    writeConfig(config);
+    persistConfig(config, raw);
     refreshDeployments();
   };
 
   // Create a new deployment
   const createDeployment = (provider, name) => {
-    const config = readConfig();
+    const { config, raw } = readConfig();
     if (!config.deployments) config.deployments = {};
     if (!config.deployments[provider]) config.deployments[provider] = {};
 
@@ -513,7 +497,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
       deploy_path: '/opt/today'
     };
 
-    writeConfig(config);
+    persistConfig(config, raw);
     refreshDeployments();
     setSelectedIndex(deployments.length); // Select the new one
     setMode('edit');
@@ -522,14 +506,14 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
   // Delete a deployment
   const deleteDeployment = (provider, name) => {
-    const config = readConfig();
+    const { config, raw } = readConfig();
     if (config.deployments?.[provider]?.[name]) {
       delete config.deployments[provider][name];
       if (Object.keys(config.deployments[provider]).length === 0) {
         delete config.deployments[provider];
       }
     }
-    writeConfig(config);
+    persistConfig(config, raw);
     refreshDeployments();
     setSelectedIndex(Math.max(0, selectedIndex - 1));
     setMode('list');
@@ -663,13 +647,13 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
             onChange=${(value) => {
               if (value === 'yes') {
                 // Delete the job
-                const config = readConfig();
+                const { config, raw } = readConfig();
                 if (config.deployments?.[selected.provider]?.[selected.name]?.jobs?.[editingJob.originalName]) {
                   delete config.deployments[selected.provider][selected.name].jobs[editingJob.originalName];
                   if (Object.keys(config.deployments[selected.provider][selected.name].jobs).length === 0) {
                     delete config.deployments[selected.provider][selected.name].jobs;
                   }
-                  writeConfig(config);
+                  persistConfig(config, raw);
                   refreshDeployments();
                   setJobIndex(i => Math.max(0, i - 1));
                 }
@@ -924,10 +908,10 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
                   // Update the editingJob state
                   setEditingJob(j => ({ ...j, [field.key]: value.trim() }));
                   // Save to config
-                  const config = readConfig();
+                  const { config, raw } = readConfig();
                   if (config.deployments?.[selected.provider]?.[selected.name]?.jobs?.[editingJob.originalName]) {
                     config.deployments[selected.provider][selected.name].jobs[editingJob.originalName][field.key] = value.trim();
-                    writeConfig(config);
+                    persistConfig(config, raw);
                     refreshDeployments();
                   }
                 }
