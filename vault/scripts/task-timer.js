@@ -116,7 +116,7 @@ for (const habit of habits) {
 
 if (process.argv.includes('--text')) {
   for (const item of items) {
-    const tag = item.type === 'habit' ? '[habit]' : '[task]';
+    const tag = item.type === 'habit' ? '[habit]' : '[task] ';
     console.log(`${tag} ${item.displayText}`);
   }
 } else {
