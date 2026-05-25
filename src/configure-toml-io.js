@@ -8,6 +8,7 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { writeFileAtomicCAS } from './fs-atomic.js';
 
@@ -27,9 +28,30 @@ export function readConfigToml(configPath) {
   try {
     const raw = fs.readFileSync(configPath, 'utf8');
     return { config: parseToml(raw), raw };
-  } catch {
-    return { config: {}, raw: null };
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return { config: {}, raw: null };
+    }
+    throw error;
   }
+}
+
+function getConfigFileLabel(configPath) {
+  return path.basename(configPath) || configPath;
+}
+
+/**
+ * Print a user-facing message explaining why a CAS write was refused.
+ * `source` is the human-readable name of the TUI that hit the conflict.
+ */
+export function reportConfigConflict(configPath, source) {
+  const configFileLabel = getConfigFileLabel(configPath);
+  console.error('');
+  console.error(`❌ ${configFileLabel} changed externally while ${source} was open.`);
+  console.error('   Your edits were NOT saved — refusing to overwrite newer content.');
+  console.error(`   File: ${configPath}`);
+  console.error('   Reopen configure to pick up the external changes and retry.');
+  console.error('');
 }
 
 /**
@@ -57,17 +79,4 @@ export function writeConfigToml(configPath, config, originalRaw) {
   const newContent = CONFIG_HEADER + tomlOutput;
   const { conflict } = writeFileAtomicCAS(configPath, newContent, originalRaw);
   return { content: newContent, conflict };
-}
-
-/**
- * Print a user-facing message explaining why a CAS write was refused.
- * `source` is the human-readable name of the TUI that hit the conflict.
- */
-export function reportConfigConflict(configPath, source) {
-  console.error('');
-  console.error(`❌ config.toml changed externally while ${source} was open.`);
-  console.error('   Your edits were NOT saved — refusing to overwrite newer content.');
-  console.error(`   File: ${configPath}`);
-  console.error('   Reopen configure to pick up the external changes and retry.');
-  console.error('');
 }

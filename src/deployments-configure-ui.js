@@ -28,7 +28,6 @@ const html = htm.bind(React.createElement);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
-const CONFIG_PATH = getConfigPath();
 
 // ============================================================================
 // Predefined jobs that can be toggled on/off
@@ -48,9 +47,9 @@ const PREDEFINED_JOBS = [
 // Config helpers
 // ============================================================================
 
-const readConfig = () => readConfigToml(CONFIG_PATH);
-const writeConfig = (config, originalRaw) => writeConfigToml(CONFIG_PATH, config, originalRaw);
-const reportConfigConflict = () => reportTomlConflict(CONFIG_PATH, 'deployments configure');
+const readConfig = () => readConfigToml(getConfigPath());
+const writeConfig = (config, originalRaw) => writeConfigToml(getConfigPath(), config, originalRaw);
+const reportConfigConflict = () => reportTomlConflict(getConfigPath(), 'deployments configure');
 
 function getEnvVar(key) {
   try {

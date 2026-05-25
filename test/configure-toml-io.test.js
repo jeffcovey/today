@@ -48,6 +48,11 @@ describe('configure-toml-io', () => {
       expect(config.profile.name).toBe('Test');
       expect(raw).toBe(content);
     });
+
+    test('rethrows parse errors for invalid TOML content', () => {
+      fs.writeFileSync(configPath, 'timezone = "UTC"\nbroken = [\n');
+      expect(() => readConfigToml(configPath)).toThrow();
+    });
   });
 
   describe('writeConfigToml', () => {
@@ -124,11 +129,12 @@ describe('configure-toml-io', () => {
   });
 
   describe('reportConfigConflict', () => {
-    test('writes a clear message to stderr including the path and source', () => {
+    test('uses the config filename in the conflict line and includes full path + source', () => {
       const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      reportConfigConflict('/tmp/example.toml', 'configure');
+      reportConfigConflict('/tmp/today.toml', 'configure');
       const joined = errSpy.mock.calls.map(args => args.join(' ')).join('\n');
-      expect(joined).toContain('/tmp/example.toml');
+      expect(joined).toContain('today.toml changed externally');
+      expect(joined).toContain('/tmp/today.toml');
       expect(joined).toContain('configure');
       expect(joined).toMatch(/changed externally/i);
       errSpy.mockRestore();
