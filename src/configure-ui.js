@@ -13,7 +13,6 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { discoverPlugins } from './plugin-loader.js';
 import { runPluginsConfigure } from './plugins-configure-ui.js';
 import { runDeploymentsConfigure } from './deployments-configure-ui.js';
@@ -25,6 +24,11 @@ import {
   getModelOptionsForProvider,
 } from './ai-settings-shared.js';
 import { getConfigPath, setConfigPath } from './config.js';
+import {
+  readConfigToml,
+  writeConfigToml,
+  reportConfigConflict as reportTomlConflict,
+} from './configure-toml-io.js';
 
 // Bind htm to React.createElement
 const html = htm.bind(React.createElement);
@@ -249,45 +253,9 @@ const CONFIG_SECTIONS = [
   },
 ];
 
-/**
- * Read config from file
- */
-function readConfig() {
-  try {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return parseToml(content);
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Write config to file
- */
-function writeConfig(config) {
-  let tomlOutput = stringifyToml(config);
-
-  // Convert ai_instructions to multi-line strings
-  tomlOutput = tomlOutput.replace(
-    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
-    (match, prefix, content) => {
-      if (!content.includes('\\n')) return match;
-      const unescaped = content
-        .replace(/\\n/g, '\n')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .trimEnd(); // Remove trailing whitespace to prevent accumulation
-      return `${prefix}"""\n${unescaped}\n"""`;
-    }
-  );
-
-  const header = `# Configuration for Today system
-# Edit this file when your situation changes (e.g., when traveling)
-
-`;
-
-  fs.writeFileSync(CONFIG_PATH, header + tomlOutput);
-}
+const readConfig = () => readConfigToml(CONFIG_PATH);
+const writeConfig = (config, originalRaw) => writeConfigToml(CONFIG_PATH, config, originalRaw);
+const reportConfigConflict = () => reportTomlConflict(CONFIG_PATH, 'configure');
 
 /**
  * Get a value from config using a path array
@@ -324,7 +292,18 @@ function setConfigValue(config, pathArr, value) {
  */
 function ConfigApp({ onAction, initialSection = 0 }) {
   const { exit } = useApp();
-  const [config, setConfig] = useState(() => readConfig());
+  const [configState, setConfigState] = useState(() => readConfig());
+  const { config, raw: originalRaw } = configState;
+
+  const persistConfig = (newConfig) => {
+    const { content, conflict } = writeConfig(newConfig, originalRaw);
+    if (conflict) {
+      reportConfigConflict();
+      exit();
+      process.exit(1);
+    }
+    setConfigState({ config: newConfig, raw: content });
+  };
   const [sectionIndex, setSectionIndex] = useState(initialSection);
   const [fieldIndex, setFieldIndex] = useState(0);
   const [mode, setMode] = useState('navigate'); // 'navigate', 'edit', 'select'
@@ -443,8 +422,8 @@ function ConfigApp({ onAction, initialSection = 0 }) {
     } else if (field.type === 'config-path') {
       // Save config path to .data/config-path
       setConfigPath(value);
-      // Re-read config from new location
-      setConfig(readConfig());
+      // Re-read config from new location (resets CAS baseline)
+      setConfigState(readConfig());
       setMode('navigate');
     } else {
       const newConfig = JSON.parse(JSON.stringify(config)); // Deep clone
@@ -457,8 +436,7 @@ function ConfigApp({ onAction, initialSection = 0 }) {
         setConfigValue(newConfig, ['ai', 'interactive_model'], '');
       }
 
-      writeConfig(newConfig);
-      setConfig(readConfig());
+      persistConfig(newConfig);
       setMode('navigate');
     }
   };
@@ -644,7 +622,7 @@ function ConfigApp({ onAction, initialSection = 0 }) {
  * Set a value in config using a path array (for use by runConfigure)
  */
 function setConfigValueAndSave(pathArr, value) {
-  const config = readConfig();
+  const { config, raw } = readConfig();
   let obj = config;
   for (let i = 0; i < pathArr.length - 1; i++) {
     const key = pathArr[i];
@@ -658,7 +636,11 @@ function setConfigValueAndSave(pathArr, value) {
   } else {
     obj[pathArr[pathArr.length - 1]] = value;
   }
-  writeConfig(config);
+  const { conflict } = writeConfig(config, raw);
+  if (conflict) {
+    reportConfigConflict();
+    process.exit(1);
+  }
 }
 
 export async function runConfigure() {
