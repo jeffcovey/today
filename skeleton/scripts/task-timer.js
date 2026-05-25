@@ -20,6 +20,7 @@
 
 import { getDatabase } from '../../src/database-service.js';
 import { getTodayDate } from '../../src/date-utils.js';
+import { getConfig, getVaultPath } from '../../src/config.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -43,8 +44,8 @@ let currentSyncId = 0;
 // Fetch today's tasks from the database
 function getTodayTasks(db) {
   const today = getTodayDate();
-  return db.prepare(`
-    SELECT title, priority
+  const tasks = db.prepare(`
+    SELECT id, title, priority, source
     FROM tasks
     WHERE status = 'open'
       AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
@@ -59,22 +60,34 @@ function getTodayTasks(db) {
       END,
       due_date NULLS LAST
   `).all(today, today);
+
+  // Filter out tasks from excluded files (vault-relative paths)
+  const excludeFiles = getConfig('task_timer.exclude_files') || [];
+  const vaultPrefix = getVaultPath() + '/';
+  return excludeFiles.length > 0
+    ? tasks.filter(task => !excludeFiles.some(f => task.id.includes(vaultPrefix + f)))
+    : tasks;
 }
 
 // Fetch today's pending habits from the database
 function getPendingHabits(db) {
   const today = getTodayDate();
-  return db.prepare(`
-    SELECT title, category
+  const habits = db.prepare(`
+    SELECT habit_id, title, category
     FROM habits
     WHERE date = ?
       AND status = 'pending'
       AND (goal_type IS NULL OR goal_type != 'limit')
       AND (json_extract(metadata, '$.recurrence') IS NULL
            OR json_extract(metadata, '$.recurrence') = 'daily')
-      AND habit_id != 'evening'
     ORDER BY category, title
   `).all(today);
+
+  // Filter out habits with excluded habit IDs (replaces any hardcoded exclusions)
+  const excludeHabits = getConfig('task_timer.exclude_habits') || [];
+  return excludeHabits.length > 0
+    ? habits.filter(habit => !excludeHabits.includes(habit.habit_id))
+    : habits;
 }
 
 // Fetch projects needing review from the database
