@@ -4,6 +4,7 @@
   <title>{{title}}</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {{themeBootstrapScript}}
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
   <!-- Google Fonts -->
@@ -21,7 +22,8 @@
       <a class="navbar-brand" href="/">
         <i class="fas fa-folder-open me-2"></i>Today
       </a>
-      <form class="d-flex ms-auto" onsubmit="performSearch(event)">
+      {{themeToggleButton}}
+      <form class="d-flex ms-2" onsubmit="performSearch(event)">
         <div class="input-group">
           <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput" style="max-width: 250px;">
           <button class="btn btn-light btn-sm" type="submit">
