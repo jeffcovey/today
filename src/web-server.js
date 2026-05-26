@@ -42,6 +42,7 @@ import {
   buildMessages,
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
+import { createSaveHandler } from './save-route.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -1791,6 +1792,12 @@ Contents:
 async function renderEditor(filePath, urlPath) {
   const content = await fs.readFile(filePath, 'utf-8');
   const fileName = path.basename(urlPath);
+
+  // SHA-256 of the content at render time. The editor sends this back
+  // on save as X-If-Match-Sha256 so the /save handler can refuse the
+  // write if the file changed under us (concurrent edit, sync-in from
+  // another box, etc.). See issue #293.
+  const originalSha256 = crypto.createHash('sha256').update(content).digest('hex');
   
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
@@ -1856,36 +1863,63 @@ async function renderEditor(filePath, urlPath) {
       ${pageScripts}
 
       <script>
+        // SHA-256 of the file content as it was read at render time. Sent on
+        // save as X-If-Match-Sha256 so the server can refuse a stale-baseline
+        // write (see #293). If this is ever updated mid-session (eg. after a
+        // successful save), reassign window.__editorOriginalSha256 to the
+        // hash of the just-saved content.
+        window.__editorOriginalSha256 = ${JSON.stringify(originalSha256)};
+
+        async function sha256Hex(text) {
+          const bytes = new TextEncoder().encode(text);
+          const digest = await crypto.subtle.digest('SHA-256', bytes);
+          return Array.from(new Uint8Array(digest))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+
         // Page-specific functions (performSearch is in common.js)
-        function saveFile() {
+        async function saveFile() {
           const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
 
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
           saveStatus.className = 'text-primary small me-3';
 
-          fetch('/save/${urlPath}', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: content })
-          })
-          .then(response => {
-            if (response.ok) {
-              saveStatus.innerHTML = '<i class="fas fa-check me-1"></i>Saved successfully!';
-              saveStatus.className = 'text-success small me-3';
-              setTimeout(() => {
-                saveStatus.innerHTML = '';
-              }, 3000);
-            } else {
+          try {
+            const response = await fetch('/save/${urlPath}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-If-Match-Sha256': window.__editorOriginalSha256 || '',
+              },
+              body: JSON.stringify({ content: content })
+            });
+
+            if (response.status === 409) {
+              const body = await response.json().catch(() => ({}));
+              saveStatus.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>This file changed externally since you opened it. Copy your edits, then reload to see the latest version.';
+              saveStatus.className = 'text-warning small me-3';
+              console.warn('Save conflict:', body);
+              return;
+            }
+
+            if (!response.ok) {
               throw new Error('Save failed');
             }
-          })
-          .catch(error => {
+
+            // Successful save: the just-saved content is now the on-disk
+            // baseline, so refresh the If-Match hash for the next save.
+            window.__editorOriginalSha256 = await sha256Hex(content);
+            saveStatus.innerHTML = '<i class="fas fa-check me-1"></i>Saved successfully!';
+            saveStatus.className = 'text-success small me-3';
+            setTimeout(() => {
+              saveStatus.innerHTML = '';
+            }, 3000);
+          } catch (error) {
             saveStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Save failed!';
             saveStatus.className = 'text-danger small me-3';
-          });
+          }
         }
 
         // Auto-save on Ctrl+S / Cmd+S
@@ -7190,44 +7224,14 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/save/*path', authMiddleware, async (req, res) => {
-  try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    let fullPath = path.join(VAULT_PATH, urlPath);
-
-    // Security: prevent directory traversal
-    if (!fullPath.startsWith(VAULT_PATH)) {
-      return res.status(403).send('Access denied');
-    }
-
-    // If path has no extension, try adding .md (Obsidian-style URLs)
-    if (!path.extname(urlPath)) {
-      fullPath = fullPath + '.md';
-      if (!fullPath.startsWith(VAULT_PATH)) {
-        return res.status(403).send('Access denied');
-      }
-    }
-
-    // Check if file exists and is a markdown or TOML file
-    const stats = await fs.stat(fullPath);
-    if (!stats.isFile() || (!fullPath.endsWith('.md') && !fullPath.endsWith('.toml'))) {
-      return res.status(400).send('Can only save markdown and TOML files');
-    }
-    
-    // Write the content. The save endpoint doesn't carry an expected-content
-    // basis from the client, so atomic-only — readers can't observe a torn
-    // file mid-write, but a true write-write race still favors the last
-    // writer. Threading CAS through would require a client-side contract change.
-    const { content } = req.body;
-    await writeFileAtomicAsync(fullPath, content);
-
-    console.log(`File saved: ${fullPath}`);
-    res.json({ success: true, message: 'File saved successfully' });
-  } catch (error) {
-    console.error('Error saving file:', error);
-    res.status(500).json({ success: false, message: 'Failed to save file' });
-  }
-});
+app.post(
+  '/save/*path',
+  authMiddleware,
+  createSaveHandler({
+    vaultPath: VAULT_PATH,
+    postWriteHook: (filePath) => { console.log(`File saved: ${filePath}`); },
+  })
+);
 
 // Start time tracking timer
 app.post('/api/track/start', authMiddleware, express.json(), async (req, res) => {
