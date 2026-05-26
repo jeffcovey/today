@@ -66,6 +66,22 @@ marked.use({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Cache-busting version stamp for /static URLs. Computed once at startup
+// from the git HEAD short sha so each deploy invalidates browser caches
+// even though express.static still sends a long max-age. Falls back to a
+// boot timestamp if git is unavailable (eg. detached source dir).
+const STATIC_VERSION = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || Date.now().toString(36);
+  } catch {
+    return Date.now().toString(36);
+  }
+})();
+
 // Debug logging - set DEBUG=true in environment to enable verbose logging
 const DEBUG = process.env.DEBUG === 'true';
 const debug = (...args) => DEBUG && console.log('[DEBUG]', ...args);
@@ -109,6 +125,7 @@ function renderTemplate(template, data = {}) {
   const templateData = {
     themeToggleButton: getThemeToggleButtonHtml(),
     themeBootstrapScript: getThemeBootstrapScript(),
+    staticVersion: STATIC_VERSION,
     ...data,
   };
   for (const [key, value] of Object.entries(templateData)) {
@@ -372,13 +389,13 @@ ${getThemeBootstrapScript()}
 <!-- Highlight.js theme for code blocks -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" rel="stylesheet"/>
 <!-- Custom styles -->
-<link href="/static/css/style.css" rel="stylesheet"/>
+<link href="/static/css/style.css?v=${STATIC_VERSION}" rel="stylesheet"/>
 `;
 
 // Common scripts for all pages
 const pageScripts = `
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-<script src="/static/js/common.js"></script>
+<script src="/static/js/common.js?v=${STATIC_VERSION}"></script>
 `;
 
 // Scripts for pages with chat (includes marked.js for markdown)
