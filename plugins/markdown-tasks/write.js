@@ -1110,9 +1110,11 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         }
 
         const distributionInfo = [];
+        const writtenPaths = [];
         try {
           for (const fileInfo of filesToWrite) {
             writeFileAtomic(fileInfo.path, fileInfo.tasks.join('\n') + '\n');
+            writtenPaths.push(fileInfo.path);
             filesModified.add(path.relative(projectRoot, fileInfo.path));
 
             distributionInfo.push({
@@ -1121,8 +1123,23 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
             });
           }
         } catch (writeError) {
-          // Roll back: restore originals from backups before re-throwing.
+          // Roll back: remove any newly written distribution files, then restore
+          // originals from backups before re-throwing. Without removing the
+          // successful writes first, a later failure can leave brand-new
+          // numbered files behind beside the restored originals.
+          for (const filePath of writtenPaths) {
+            try {
+              if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            } catch {
+              // Best effort cleanup before backup restore.
+            }
+          }
           for (const { original, backup } of backups) {
+            try {
+              if (fs.existsSync(original)) fs.unlinkSync(original);
+            } catch {
+              // Best effort cleanup before backup restore.
+            }
             try { fs.renameSync(backup, original); } catch { /* best effort */ }
           }
           throw writeError;

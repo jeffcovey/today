@@ -191,4 +191,30 @@ describe('markdown-tasks/write.js (fs-atomic rollout)', () => {
     expect(result.success).toBe(true);
     expect(fs.existsSync(overflowPath)).toBe(true);
   });
+
+  test('archive-completed rollback removes partial writes before restoring backups', () => {
+    fs.mkdirSync(path.dirname(tasksFile), { recursive: true });
+    fs.writeFileSync(tasksFile, '- [ ] Bravo\n- [ ] Alpha\n- [ ] Echo\n');
+    const overflowPath = path.join(path.dirname(tasksFile), 'tasks-1.md');
+    fs.writeFileSync(overflowPath, '- [ ] Delta\n- [ ] Charlie\n');
+
+    // Force the final write in the rebalance to fail after earlier files have
+    // already been rewritten.
+    const blockedPath = path.join(path.dirname(tasksFile), 'tasks-2.md');
+    fs.mkdirSync(blockedPath);
+
+    const beforeMain = fs.readFileSync(tasksFile, 'utf8');
+    const beforeOverflow = fs.readFileSync(overflowPath, 'utf8');
+
+    const result = runWrite(
+      { action: 'archive-completed', max_tasks_per_file: 2 },
+      { vaultPath }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Failed to write');
+    expect(fs.readFileSync(tasksFile, 'utf8')).toBe(beforeMain);
+    expect(fs.readFileSync(overflowPath, 'utf8')).toBe(beforeOverflow);
+    expect(fs.readdirSync(path.dirname(tasksFile)).filter(f => f.includes('.rebalance-bak-'))).toEqual([]);
+  });
 });
