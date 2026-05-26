@@ -125,4 +125,70 @@ describe('markdown-tasks/write.js (fs-atomic rollout)', () => {
     // New field added by the rollout — present even when nothing conflicted.
     expect(Array.isArray(result.files_skipped_due_to_conflict)).toBe(true);
   });
+
+  // Regression coverage for #289 — the rebalance used to auto-consolidate
+  // every numbered file into the main file whenever total tasks fit there,
+  // silently deleting tasks-1.md (and other numbered siblings) multiple
+  // times a day on busy vaults. It also did the deletion via an unguarded
+  // fs.unlinkSync before writing the new distribution, leaving a window
+  // where a crash mid-rebalance lost the deleted content entirely.
+  test('archive-completed does NOT delete tasks-1.md when underflow could consolidate', () => {
+    // Set up: main file has 1 task, tasks-1.md has 1 task. Together they
+    // fit easily inside the default max_tasks_per_file (50), so the old
+    // code would have consolidated and deleted tasks-1.md.
+    fs.mkdirSync(path.dirname(tasksFile), { recursive: true });
+    fs.writeFileSync(tasksFile, '- [ ] Main task\n');
+    const overflowPath = path.join(path.dirname(tasksFile), 'tasks-1.md');
+    fs.writeFileSync(overflowPath, '- [ ] Overflow task\n');
+
+    const result = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(result.success).toBe(true);
+    expect(result.rebalanced).toBe(false);
+    expect(fs.existsSync(overflowPath)).toBe(true);
+    expect(fs.readFileSync(overflowPath, 'utf8')).toContain('- [ ] Overflow task');
+  });
+
+  test('archive-completed splits forward when main file overflows', () => {
+    fs.mkdirSync(path.dirname(tasksFile), { recursive: true });
+    // 5 tasks with max_tasks_per_file = 2 => 3 files needed (main + 2 numbered).
+    const overflowTasks = Array.from({ length: 5 }, (_, i) => `- [ ] Task ${i + 1}`).join('\n') + '\n';
+    fs.writeFileSync(tasksFile, overflowTasks);
+
+    const result = runWrite(
+      { action: 'archive-completed', max_tasks_per_file: 2 },
+      { vaultPath }
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.rebalanced).toBe(true);
+
+    // Main file and at least one new numbered file should now exist, and
+    // every file should be within the max.
+    const tasksDir = path.dirname(tasksFile);
+    const taskFiles = fs.readdirSync(tasksDir).filter(f => /^tasks(-\d+)?\.md$/.test(f));
+    expect(taskFiles.length).toBeGreaterThanOrEqual(2);
+    for (const f of taskFiles) {
+      const lineCount = fs.readFileSync(path.join(tasksDir, f), 'utf8').split('\n').filter(line => line.trim()).length;
+      expect(lineCount).toBeLessThanOrEqual(2);
+    }
+
+    // No backup files left over after a successful rebalance.
+    const backups = fs.readdirSync(tasksDir).filter(f => f.includes('.rebalance-bak-'));
+    expect(backups).toEqual([]);
+  });
+
+  test('archive-completed preserves existing numbered files when no overflow', () => {
+    // Pre-create an empty tasks-1.md — a no-overflow run should leave it
+    // alone rather than deleting it.
+    fs.mkdirSync(path.dirname(tasksFile), { recursive: true });
+    fs.writeFileSync(tasksFile, '- [ ] Single task\n');
+    const overflowPath = path.join(path.dirname(tasksFile), 'tasks-1.md');
+    fs.writeFileSync(overflowPath, '');
+
+    const result = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(overflowPath)).toBe(true);
+  });
 });
