@@ -154,6 +154,36 @@ describe('createSaveHandler (issue #293)', () => {
     });
   });
 
+  test('vault-prefix sibling bypass is refused', async () => {
+    // vaultPath is e.g. /tmp/save-route-XXXXXX; this constructs a sibling
+    // directory that shares the same prefix (e.g. /tmp/save-route-XXXXXXsibling).
+    // A naive startsWith(vaultPath) check would allow escaping into it.
+    const siblingPath = vaultPath + 'sibling';
+    fsSync.mkdirSync(siblingPath, { recursive: true });
+    fsSync.writeFileSync(path.join(siblingPath, 'evil.md'), 'original\n');
+
+    const handler = createSaveHandler({ vaultPath });
+
+    try {
+      await withServer(handler, async (base) => {
+        // Craft a URL that resolves to siblingPath/evil.md via ../sibling/evil.md
+        const vaultBasename = path.basename(vaultPath);
+        const escapedUrl = `../${vaultBasename}sibling/evil.md`;
+        const res = await fetch(`${base}/save/${encodeURIComponent(escapedUrl)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'should not land\n' }),
+        });
+
+        expect(res.status).toBe(403);
+        // Confirm the sibling file was not overwritten
+        expect(fsSync.readFileSync(path.join(siblingPath, 'evil.md'), 'utf-8')).toBe('original\n');
+      });
+    } finally {
+      fsSync.rmSync(siblingPath, { recursive: true, force: true });
+    }
+  });
+
   test('non-markdown/toml file rejected', async () => {
     fsSync.writeFileSync(path.join(vaultPath, 'notes.txt'), 'plain text\n');
     const handler = createSaveHandler({ vaultPath });

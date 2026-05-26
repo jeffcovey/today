@@ -13,7 +13,7 @@ import { writeFileAtomicCASAsync } from './fs-atomic.js';
 /**
  * @param {object} opts
  * @param {string} opts.vaultPath - Absolute path to the vault root.
- * @param {(filePath: string) => Promise<{ok: true, file: string} | {ok: false, reason: string}>} [opts.postWriteHook]
+ * @param {(filePath: string) => (void | Promise<void>)} [opts.postWriteHook]
  *   Optional hook fired after a successful write — used by the live server to
  *   log; tests can pass a recorder.
  */
@@ -25,17 +25,22 @@ export function createSaveHandler({ vaultPath, postWriteHook } = {}) {
       const urlPath = Array.isArray(req.params.path)
         ? req.params.path.join('/')
         : req.params.path;
-      let fullPath = path.join(vaultPath, urlPath);
+      // Resolve the full path and ensure it is contained within the vault.
+      // Using path.resolve (rather than path.join) collapses any `..` segments
+      // before the check, and requiring the sep suffix prevents the
+      // vault-prefix sibling bypass (e.g. /tmp/vault2 vs /tmp/vault).
+      let fullPath = path.resolve(vaultPath, urlPath);
+      const vaultRoot = vaultPath.endsWith(path.sep) ? vaultPath : vaultPath + path.sep;
 
       // Security: prevent directory traversal
-      if (!fullPath.startsWith(vaultPath)) {
+      if (fullPath !== vaultPath && !fullPath.startsWith(vaultRoot)) {
         return res.status(403).send('Access denied');
       }
 
       // If path has no extension, try adding .md (Obsidian-style URLs)
       if (!path.extname(urlPath)) {
         fullPath = fullPath + '.md';
-        if (!fullPath.startsWith(vaultPath)) {
+        if (fullPath !== vaultPath && !fullPath.startsWith(vaultRoot)) {
           return res.status(403).send('Access denied');
         }
       }
