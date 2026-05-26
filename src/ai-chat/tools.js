@@ -12,6 +12,7 @@ import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
+import { writeFileAtomicCASAsync } from '../fs-atomic.js';
 import { getAbsoluteVaultPath, getFullConfig } from '../config.js';
 import { schemas, getTableName } from '../plugin-schemas.js';
 
@@ -161,8 +162,17 @@ export function createEditFileTool(filePath) {
         // Perform the replacement
         const newContent = replaceAll ? currentContent.replaceAll(oldText, newText) : currentContent.replace(oldText, newText);
 
-        // Write the updated content
-        await fs.writeFile(resolvedPath, newContent, 'utf-8');
+        // Compare-and-swap write so a concurrent edit (another tool call, the
+        // file save endpoint, or a vault sync writing in from another box)
+        // between our read and our write doesn't get silently clobbered.
+        const { conflict } = await writeFileAtomicCASAsync(resolvedPath, newContent, currentContent);
+        if (conflict) {
+          return {
+            success: false,
+            conflict: true,
+            error: 'The file changed under us between read and write. Re-read the file and retry the edit against the fresh content.',
+          };
+        }
 
         // Verify the change was made
         const verificationContent = await fs.readFile(resolvedPath, 'utf-8');
