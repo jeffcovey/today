@@ -9,6 +9,7 @@
 // - complete: Mark a task as completed
 // - update: Update a task's properties
 
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -1096,15 +1097,21 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         // but-unreplaced files. unlinkSync was the previous behavior — it left
         // a window where an interrupted run could lose data.
         const backups = [];
-        const rebalanceTs = Date.now();
+        const rebalanceSuffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
         for (const fileInfo of filesToWrite) {
           if (fs.existsSync(fileInfo.path)) {
-            const backupPath = `${fileInfo.path}.rebalance-bak-${rebalanceTs}`;
+            const backupPath = `${fileInfo.path}.rebalance-bak-${rebalanceSuffix}`;
             try {
               fs.renameSync(fileInfo.path, backupPath);
               backups.push({ original: fileInfo.path, backup: backupPath });
-            } catch {
-              // File vanished between exists() and rename(); skip.
+            } catch (renameError) {
+              if (renameError.code === 'ENOENT') {
+                // File vanished between exists() and rename(); safe to skip.
+              } else {
+                // Permission error, destination collision, etc. — abort the
+                // entire rebalance so we never write a file we can't roll back.
+                throw renameError;
+              }
             }
           }
         }
