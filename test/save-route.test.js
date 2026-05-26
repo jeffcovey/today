@@ -15,6 +15,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import os from 'os';
 import path from 'path';
+import { jest } from '@jest/globals';
 
 import { createSaveHandler } from '../src/save-route.js';
 
@@ -110,6 +111,33 @@ describe('createSaveHandler (issue #293)', () => {
       expect(res.status).toBe(200);
       expect(await fs.readFile(filePath, 'utf-8')).toBe('no-header write\n');
     });
+  });
+
+  test('If-Match save still succeeds when file is deleted between stat() and readFile()', async () => {
+    const handler = createSaveHandler({ vaultPath });
+    const ifMatch = sha256('original baseline\n');
+    const readSpy = jest.spyOn(fs, 'readFile').mockImplementationOnce(async () => {
+      await fs.unlink(filePath);
+      throw new Error('simulated ENOENT between stat and read');
+    });
+
+    try {
+      await withServer(handler, async (base) => {
+        const res = await fetch(`${base}/save/plan.md`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-If-Match-Sha256': ifMatch,
+          },
+          body: JSON.stringify({ content: 'recreated after delete\n' }),
+        });
+
+        expect(res.status).toBe(200);
+        expect(await fs.readFile(filePath, 'utf-8')).toBe('recreated after delete\n');
+      });
+    } finally {
+      readSpy.mockRestore();
+    }
   });
 
   test('directory traversal is refused', async () => {

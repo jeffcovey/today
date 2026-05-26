@@ -61,10 +61,8 @@ export function createSaveHandler({ vaultPath, postWriteHook } = {}) {
         // and will conflict if the file is recreated under us.
       }
 
-      if (ifMatch) {
-        const actualSha256 = currentContent === null
-          ? null
-          : crypto.createHash('sha256').update(currentContent).digest('hex');
+      if (ifMatch && currentContent !== null) {
+        const actualSha256 = crypto.createHash('sha256').update(currentContent).digest('hex');
         if (actualSha256 !== ifMatch) {
           return res.status(409).json({
             success: false,
