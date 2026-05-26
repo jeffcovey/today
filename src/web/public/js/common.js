@@ -2,6 +2,81 @@
  * Common JavaScript for Today web interface
  */
 
+// Theme functionality
+const THEME_STORAGE_KEY = 'todayThemeMode';
+let themeMediaQuery = null;
+
+function getThemeMode() {
+  return localStorage.getItem(THEME_STORAGE_KEY) || 'system';
+}
+
+function getEffectiveTheme(mode) {
+  if (mode === 'dark' || mode === 'light') {
+    return mode;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function updateThemeToggle(mode, effectiveTheme) {
+  const toggle = document.getElementById('themeToggleBtn');
+  const icon = document.getElementById('themeToggleIcon');
+  if (!toggle || !icon) return;
+
+  if (mode === 'system') {
+    icon.className = 'fas fa-circle-half-stroke';
+    toggle.title = `Theme: System (${effectiveTheme})`;
+    return;
+  }
+
+  if (mode === 'dark') {
+    icon.className = 'fas fa-moon';
+    toggle.title = 'Theme: Dark';
+    return;
+  }
+
+  icon.className = 'fas fa-sun';
+  toggle.title = 'Theme: Light';
+}
+
+function applyTheme(mode = getThemeMode()) {
+  const effectiveTheme = getEffectiveTheme(mode);
+  document.documentElement.setAttribute('data-theme', effectiveTheme);
+  updateThemeToggle(mode, effectiveTheme);
+}
+
+function getNextThemeMode(mode) {
+  if (mode === 'system') return 'dark';
+  if (mode === 'dark') return 'light';
+  return 'system';
+}
+
+function cycleThemeMode() {
+  const current = getThemeMode();
+  const next = getNextThemeMode(current);
+  localStorage.setItem(THEME_STORAGE_KEY, next);
+  applyTheme(next);
+}
+
+function initializeTheme() {
+  const mode = getThemeMode();
+  const effectiveTheme = getEffectiveTheme(mode);
+  if (!document.documentElement.dataset.theme) {
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+  }
+  updateThemeToggle(mode, effectiveTheme);
+
+  themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleSystemThemeChange = () => {
+    if (getThemeMode() === 'system') {
+      applyTheme('system');
+    }
+  };
+
+  if (typeof themeMediaQuery.addEventListener === 'function') {
+    themeMediaQuery.addEventListener('change', handleSystemThemeChange);
+  }
+}
+
 // Search functionality
 function performSearch(event) {
   event.preventDefault();
@@ -214,6 +289,7 @@ function initializeLoadingSpinner() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+  initializeTheme();
   initializeAIAssistant();
   restoreCollapseStates();
   initializeLoadingSpinner();
