@@ -1135,11 +1135,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
             }
           }
           for (const { original, backup } of backups) {
-            try {
-              if (fs.existsSync(original)) fs.unlinkSync(original);
-            } catch {
-              // Best effort cleanup before backup restore.
-            }
             try { fs.renameSync(backup, original); } catch { /* best effort */ }
           }
           throw writeError;
