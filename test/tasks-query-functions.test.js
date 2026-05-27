@@ -6,7 +6,14 @@ import {
 
 describe('tasks query function helpers', () => {
   test('supports Obsidian-style filter by function statements', () => {
-    const filterCode = 'const match = task.file.filename.match(/(\\d{4})_Q\\d+_(\\d{2})_W\\d+_(\\d{2})\\.md/); if (!match) return false; const fileDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3])); const today = new Date(); today.setHours(0, 0, 0, 0); return fileDate <= today;';
+    const filterCode = `
+      const match = task.file.filename.match(/(\\d{4})_Q\\d+_(\\d{2})_W\\d+_(\\d{2})\\.md/);
+      if (!match) return false;
+      const fileDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return fileDate <= today;
+    `;
 
     const eligibleTask = { file: { filename: '2000_Q1_01_W1_01.md' } };
     const futureTask = { file: { filename: '2999_Q1_01_W1_01.md' } };

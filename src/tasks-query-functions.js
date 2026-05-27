@@ -1,9 +1,5 @@
 import path from 'path';
 
-function normalizeFunctionBody(code) {
-  return /\breturn\b/.test(code) ? code : `return (${code});`;
-}
-
 export function buildTasksQueryContext(urlPath = '') {
   const normalizedPath = String(urlPath).replace(/\\/g, '/');
   const folder = path.posix.dirname(normalizedPath).replace(/^\/+/, '');
@@ -15,9 +11,22 @@ export function buildTasksQueryContext(urlPath = '') {
 }
 
 export function runTasksFilterFunction(task, code, query = {}) {
+  const source = String(code || '').trim();
+  if (!source) return false;
+
   try {
-    const fn = new Function('task', 'query', normalizeFunctionBody(code));
-    return !!fn(task, query);
+    const statementFn = new Function('task', 'query', source);
+    const statementResult = statementFn(task, query);
+    if (statementResult !== undefined) {
+      return !!statementResult;
+    }
+  } catch {
+    // Fall back to expression evaluation below
+  }
+
+  try {
+    const expressionFn = new Function('task', 'query', `return (${source});`);
+    return !!expressionFn(task, query);
   } catch {
     return false;
   }
