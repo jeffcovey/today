@@ -279,20 +279,22 @@ export function createCreateFileTool() {
           return { success: false, error: 'Cannot create files outside the vault' };
         }
 
-        // Check if file already exists
-        try {
-          await fs.access(resolvedPath);
-          return { success: false, error: `File already exists: ${normalizedPath}. Use edit_file to modify existing files.` };
-        } catch {
-          // File doesn't exist, good to proceed
-        }
-
         // Create parent directories if they don't exist
         const parentDir = path.dirname(resolvedPath);
         await fs.mkdir(parentDir, { recursive: true });
 
-        // Write the file
-        await fs.writeFile(resolvedPath, content, 'utf-8');
+        // Compare-and-swap write expecting the file NOT to exist (baseline
+        // = null). Closes the TOCTOU window between a separate fs.access
+        // existence check and the write — if the file gets created in
+        // between, the CAS fails and we report a useful error instead of
+        // silently overwriting somebody else's content.
+        const { conflict } = await writeFileAtomicCASAsync(resolvedPath, content, null);
+        if (conflict) {
+          return {
+            success: false,
+            error: `File already exists: ${normalizedPath}. Use edit_file to modify existing files.`,
+          };
+        }
 
         return {
           success: true,

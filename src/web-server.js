@@ -3175,9 +3175,15 @@ class DataviewAPI {
     return {
       vault: {
         adapter: {
+          // Atomic write via temp-file + rename. We can't do CAS here because
+          // Obsidian's adapter.write() contract is a blind overwrite and
+          // vault scripts (eg. time-tracking-widget.js) pass through their
+          // own read-modify-write state — they'd need to thread the baseline
+          // to us before we could check it. The atomic-rename at least keeps
+          // readers from observing a torn file mid-write.
           async write(filePath, content) {
             const fullPath = path.join(self.vaultPath, filePath);
-            await fs.writeFile(fullPath, content, 'utf-8');
+            await writeFileAtomicAsync(fullPath, content);
           }
         }
       }
@@ -6144,18 +6150,34 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
-    const { content } = req.body;
-    
+    const { content, expectedContent } = req.body;
+
     // Security check
     if (!fullPath.startsWith(VAULT_PATH)) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
-    // Write the file. AI-edit endpoints don't carry an expected-content
-    // basis from the client, so we use atomic-only writes (no CAS): readers
-    // can't observe a torn file mid-write, but a true write-write race
-    // between two AI-edit requests still favors the last writer.
-    await writeFileAtomicAsync(fullPath, content);
+
+    // Compare-and-swap against the bytes the caller saw. If the client
+    // supplied `expectedContent` (the version it last read), use that as
+    // the baseline so we refuse to overwrite a newer concurrent edit.
+    // Otherwise fall back to a snapshot taken just before the write —
+    // narrower window than atomic-only but still catches simultaneous
+    // writers that arrive after our read.
+    let baseline = expectedContent;
+    if (baseline === undefined) {
+      try {
+        baseline = await fs.readFile(fullPath, 'utf-8');
+      } catch (err) {
+        baseline = err && err.code === 'ENOENT' ? null : '';
+      }
+    }
+
+    const { conflict } = await writeFileAtomicCASAsync(fullPath, content, baseline);
+    if (conflict) {
+      return res.status(409).json({
+        error: 'File changed since it was read. Refresh and retry.',
+      });
+    }
 
     res.json({ success: true });
   } catch (error) {
