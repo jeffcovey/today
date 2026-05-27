@@ -27,6 +27,11 @@ import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
+import {
+  buildTasksQueryContext,
+  runTasksFilterFunction,
+  runTasksGroupFunction
+} from './tasks-query-functions.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -3738,7 +3743,7 @@ const taskQueryCache = new LRUMap(200);
 const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
 
 // Execute Obsidian Tasks query and return matching tasks
-async function executeTasksQuery(query) {
+async function executeTasksQuery(query, queryContext = {}) {
   const db = getReadOnlyDatabase();
 
   // Remove blockquote markers (>) from query lines
@@ -3748,11 +3753,15 @@ async function executeTasksQuery(query) {
 
   // Parse query components
   let filters = [];
+  let functionFilters = [];
   let sortDirectives = [];
   let groupBy = null;
 
   for (const line of lines) {
-    if (line.startsWith('sort by function ')) {
+    if (line.startsWith('filter by function ')) {
+      const code = line.replace('filter by function ', '').trim();
+      functionFilters.push(code);
+    } else if (line.startsWith('sort by function ')) {
       const expr = line.replace('sort by function ', '').trim();
       sortDirectives.push({ type: 'function', expr });
     } else if (line.startsWith('sort by')) {
@@ -3773,7 +3782,7 @@ async function executeTasksQuery(query) {
   let sortReverse = fieldSort ? fieldSort.reverse : false;
 
   // Check cache first
-  const cacheKey = JSON.stringify({ filters, sortDirectives, groupBy });
+  const cacheKey = JSON.stringify({ filters, functionFilters, sortDirectives, groupBy, queryContext });
   const cached = taskQueryCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < TASK_QUERY_CACHE_TTL)) {
     debug(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
@@ -3889,7 +3898,10 @@ async function executeTasksQuery(query) {
       source: row.source,
       filePath: filePath,
       lineNumber: lineNumber,
-      file: { path: filePath }
+      file: {
+        path: filePath,
+        filename: filePath ? path.basename(filePath) : ''
+      }
     };
   });
 
@@ -3907,6 +3919,10 @@ async function executeTasksQuery(query) {
       const pathPattern = filter.replace('path does not include ', '').trim();
       filtered = filtered.filter(t => !t.filePath || !t.filePath.includes(pathPattern));
     }
+  }
+
+  for (const filterCode of functionFilters) {
+    filtered = filtered.filter(task => runTasksFilterFunction(task, filterCode, queryContext));
   }
 
   // Sort - apply directives in order (first = primary, last = least significant)
@@ -3966,24 +3982,20 @@ async function executeTasksQuery(query) {
     const result = { grouped: sortedGroups };
     taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
     return result;
-  } else if (groupBy && groupBy.includes('task.file.path')) {
-    // Handle "group by function task.file.path..." - group by file path
+  } else if (groupBy && groupBy.startsWith('function ')) {
+    const groupExpr = groupBy.replace(/^function\s+/, '').trim();
     const grouped = new Map();
     for (const task of filtered) {
-      const key = task.filePath || 'Unknown file';
+      const key = runTasksGroupFunction(task, groupExpr, queryContext) || 'Unknown file';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(task);
     }
 
-    // Sort groups: non-routines first (alphabetically), then routines (reverse alphabetically)
     const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
-      const aIsRoutine = a[0].includes('routines/');
-      const bIsRoutine = b[0].includes('routines/');
-      if (aIsRoutine !== bIsRoutine) return aIsRoutine ? 1 : -1;
-      return aIsRoutine ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]);
+      return a[0].localeCompare(b[0]);
     });
 
-    const result = { grouped: sortedGroups };
+    const result = { grouped: sortedGroups, groupType: 'custom' };
     taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
     return result;
   }
@@ -4283,7 +4295,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
       debug(`Processing Obsidian callout with tasks query`);
 
       // Execute the tasks query
-      const queryResult = await executeTasksQuery(query);
+      const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
 
       // Build the tasks HTML
       let tasksHtml = '';
@@ -4427,7 +4439,7 @@ ${cleanContent}
     }
 
     for (const { fullMatch, query } of matches) {
-      const queryResult = await executeTasksQuery(query);
+      const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
 
       let replacement = '<div class="tasks-query-result">\n';
 
