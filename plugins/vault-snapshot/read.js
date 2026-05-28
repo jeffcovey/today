@@ -12,6 +12,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
@@ -100,14 +101,22 @@ function updateLatestSymlink(newSnapshotName) {
 }
 
 /**
+ * Compute which snapshots (by name) should be removed to stay within `keep`.
+ * `snapshots` is the list of existing snapshot names BEFORE the new one is added.
+ * Returns the oldest names that exceed the limit (may be empty).
+ *
+ * Exported for unit testing.
+ */
+export function computePruneList(snapshots, keep) {
+  const excess = snapshots.length + 1 - keep;
+  return excess > 0 ? snapshots.slice(0, excess) : [];
+}
+
+/**
  * Remove old snapshots beyond the `keep` limit.
  */
 function pruneOldSnapshots(snapshots) {
-  // snapshots is the list BEFORE the new snapshot was created.
-  // After adding the new one the total is snapshots.length + 1.
-  // We want at most `keep` snapshots total, so remove the oldest ones.
-  const excess = snapshots.length + 1 - keep;
-  const toRemove = excess > 0 ? snapshots.slice(0, excess) : [];
+  const toRemove = computePruneList(snapshots, keep);
   for (const name of toRemove) {
     const dir = path.join(snapshotDir, name);
     fs.rmSync(dir, { recursive: true, force: true });
@@ -153,7 +162,7 @@ function sync() {
 
   const isIncremental = linkDest !== null;
   console.log(JSON.stringify({
-    cleaned: removed.length,
+    cleaned: 1,
     message: isIncremental
       ? `Incremental snapshot created: ${timestamp} (${totalSnapshots} total, ${removed.length} pruned)`
       : `Full snapshot created: ${timestamp}`,
@@ -164,4 +173,7 @@ function sync() {
   }));
 }
 
-sync();
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  sync();
+}
