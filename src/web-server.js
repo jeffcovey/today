@@ -3789,7 +3789,7 @@ async function executeTasksQuery(query, queryContext = {}) {
 
   // Check cache first
   const queryContextHash = crypto
-    .createHash('sha1')
+    .createHash('sha256')
     .update(JSON.stringify(queryContext || {}))
     .digest('hex');
   const cacheKey = JSON.stringify({ filters, functionFilters, sortDirectives, groupBy, queryContextHash });
@@ -3994,7 +3994,7 @@ async function executeTasksQuery(query, queryContext = {}) {
     return result;
   } else if (groupBy && groupBy.startsWith('function ')) {
     const groupExpr = groupBy.replace(/^function\s+/, '').trim();
-    const usesLegacyTaskPathOrdering = groupExpr.includes('task.file.path');
+    const usesLegacyTaskPathOrdering = /\btask\.file\.path\b/.test(groupExpr);
     const isRoutineGroup = (groupKey) => String(groupKey || '').toLowerCase().includes('routines/');
     const grouped = new Map();
     for (const task of filtered) {
