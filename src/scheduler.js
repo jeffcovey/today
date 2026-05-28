@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getTimezone } from './config.js';
+import { getTimezone, getConfig } from './config.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +30,23 @@ const MAINTENANCE_JOBS = [
     schedule: '0 */6 * * *', // Every 6 hours
     command: 'bin/deploy maintenance --local || true',
     description: 'System maintenance (cleanup logs, check disk, database)'
+  },
+  {
+    name: 'prerender-markdown',
+    schedule: '*/30 * * * *', // Every 30 minutes
+    command: 'bin/prerender',
+    description: 'Pre-render vault markdown files to disk HTML cache'
+  },
+  {
+    name: 'unison-sync-healthcheck',
+    schedule: '*/5 * * * *', // Every 5 minutes
+    command: 'bin/unison-sync-healthcheck',
+    // Placed in MAINTENANCE_JOBS (always-on) rather than SERVICE_MAINTENANCE_JOBS
+    // because Unison runs as a Docker container, not a systemd service, so the
+    // `systemctl is-active` gate used for resilio-sync doesn't apply. The
+    // no-status-file guard inside the script makes it a safe no-op on any
+    // deployment that has never run unison-sync.
+    description: 'Check Unison sync is running and surface failures in the vault'
   }
 ];
 
@@ -135,6 +152,11 @@ function loadJobs() {
   return jobs;
 }
 
+// Max jitter in milliseconds added before each job to avoid thundering herd
+// when multiple machines run the same schedule. 15s default keeps jobs within
+// their cron window while spreading them out enough to avoid iCloud conflicts.
+const JITTER_MS = (getConfig('scheduler_jitter_seconds') || 15) * 1000;
+
 async function runCommand(command, description) {
   // Check if sync is disabled due to missing data
   if (fs.existsSync(path.join(PROJECT_ROOT, 'SYNC_DISABLED')) && command.includes('sync')) {
@@ -142,6 +164,12 @@ async function runCommand(command, description) {
     console.log(`\n[${timestamp}] SKIPPED: ${description}`);
     console.log(`⚠️  Sync is disabled to prevent data loss. Check GitHub repository.`);
     return;
+  }
+
+  // Random jitter to avoid multiple machines firing the same job simultaneously
+  if (JITTER_MS > 0) {
+    const delay = Math.floor(Math.random() * JITTER_MS);
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
 
   const timestamp = new Date().toISOString();

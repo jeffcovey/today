@@ -11,7 +11,7 @@ Syncs financial transaction data and budget allocations from YNAB (You Need A Bu
 
 Setup:
 1. Export your YNAB data by going to Budget Settings > Export Budget Data
-2. Save both "Register.csv" and "Plan.csv" files to your vault/logs directory
+2. Save the YNAB ZIP export (or extracted "Register.csv" and "Plan.csv" files) to your vault/logs directory
 3. The plugin will automatically detect and process both YNAB export files
 
 YNAB exports two types of files:
@@ -19,6 +19,7 @@ YNAB exports two types of files:
 - Plan.csv: Budget allocation data (processed into budget_allocations table)
 
 Export files are named: "Budget Name as of YYYY-MM-DD HH-MM - Register.csv" and "Budget Name as of YYYY-MM-DD HH-MM - Plan.csv"
+YNAB ZIP exports are named: "YNAB Export - Budget Name as of YYYY-MM-DD HH-MM.zip" (or older "Budget Name as of YYYY-MM-DD HH-MM.zip")
 
 Features:
 - Processes transactions from the latest Register.csv export
@@ -64,5 +65,5 @@ read = "./read.js"
 
 [settings]
 logs_directory = { type = "string", default = "vault/logs", description = "Directory containing YNAB CSV export files" }
-cleanup_old_files = { type = "boolean", default = true, description = "Delete all YNAB export files except the latest Register.csv after reading" }
+cleanup_old_files = { type = "boolean", default = true, description = "Delete all older YNAB CSV/ZIP export files after reading the latest export" }
 retention_days = { type = "number", default = 365, description = "Days of transaction data to retain in database" }

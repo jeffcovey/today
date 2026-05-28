@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
   getTimezone, getAbsoluteVaultPath, getConfig, getVaultPath,
-  getConfigPath, clearConfigCache
+  getConfigPath, clearConfigCache, getDeploymentName
 } from './config.js';
 import { getDatabase } from './database-service.js';
 import { ensureHealthyDatabase } from './db-health.js';
@@ -249,10 +249,17 @@ async function runSync() {
   }
 }
 
+// Per-deployment jitter added to the debounce so multiple machines don't
+// process the same file change at the exact same instant. Uses a simple
+// hash of the deployment name to produce a consistent offset (0-2000ms).
+const deployName = getDeploymentName() || '';
+const watcherJitter = [...deployName].reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+const WATCHER_JITTER_MS = Math.abs(watcherJitter % 2000);
+
 function scheduleSync(filePath) {
   pendingChanges.add(filePath);
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(runSync, watcherConfig.debounce);
+  debounceTimer = setTimeout(runSync, watcherConfig.debounce + WATCHER_JITTER_MS);
 }
 
 // Build chokidar ignored patterns from config

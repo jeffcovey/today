@@ -2,12 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules, curl, sqlite, bash, git, and GitHub CLI
-RUN apk add --no-cache python3 make g++ curl sqlite bash git github-cli
-
-# Install Turso CLI
-RUN curl -sSfL https://get.tur.so/install.sh | bash && \
-    mv /root/.turso/bin/turso /usr/local/bin/turso
+# Install build dependencies for native modules, curl, sqlite, bash, git, GitHub CLI,
+# openssh-client (needed by git for SSH remotes — git-sync pushes to git@github.com:...),
+# and the Cairo/Pango/etc stack required by the `canvas` package (used by the
+# data-graphing plugin). pkgconfig + *-dev packages are needed because we build
+# canvas from source in the next layer — prebuilt binaries aren't published for
+# Alpine/musl on ARM64.
+RUN apk add --no-cache \
+    python3 make g++ pkgconfig \
+    curl sqlite bash git openssh-client github-cli \
+    cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
 
 # Copy package files
 COPY package*.json ./

@@ -26,6 +26,9 @@
 globalThis.AI_SDK_LOG_WARNINGS = false;
 
 import { generateText, streamText } from 'ai';
+import { existsSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { getFullConfig } from './config.js';
 
 // Provider imports - these are loaded dynamically to avoid issues if not configured
@@ -88,8 +91,8 @@ async function getOllamaModel(modelName, options = {}) {
 
 // Default models for each provider
 const DEFAULT_MODELS = {
-  anthropic: 'claude-sonnet-4-20250514',
-  'anthropic-api': 'claude-sonnet-4-20250514',
+  anthropic: 'claude-sonnet-4-6',
+  'anthropic-api': 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   google: 'gemini-1.5-flash',
   ollama: 'llama3.2',
@@ -379,6 +382,7 @@ function getMessagesCharCount(messages, system) {
  * @param {Object} [options.tools] - Tool definitions for the AI to use
  * @param {number} [options.maxSteps=5] - Maximum tool use iterations
  * @param {Function} [options.onStepFinish] - Callback when a step (text or tool) finishes
+ * @param {AbortSignal} [options.abortSignal] - Abort signal for cancellation
  * @returns {Promise<object>} - Stream result with textStream and fullStream properties
  */
 export async function streamCompletion(options) {
@@ -408,6 +412,9 @@ export async function streamCompletion(options) {
   // Add step finish callback if provided
   if (options.onStepFinish) {
     streamOptions.onStepFinish = options.onStepFinish;
+  }
+  if (options.abortSignal) {
+    streamOptions.abortSignal = options.abortSignal;
   }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)
@@ -605,7 +612,7 @@ export function getInteractiveProviderRequirements() {
  * Check if a provider's binary requirements are met (sync version for CLI use)
  * @param {string} providerName - The provider to check
  * @param {function} spawnSync - The spawnSync function to use
- * @returns {{ available: boolean, requirement?: object }}
+ * @returns {{ available: boolean, requirement?: object, binaryPath?: string }}
  */
 export function checkProviderBinarySync(providerName, spawnSync) {
   const requirement = INTERACTIVE_PROVIDER_REQUIREMENTS[providerName];
@@ -616,7 +623,18 @@ export function checkProviderBinarySync(providerName, spawnSync) {
   }
 
   const which = spawnSync('which', [requirement.binary], { encoding: 'utf8' });
-  const available = which.status === 0;
+  if (which.status === 0) {
+    const binaryPath = (which.stdout || '').trim() || requirement.binary;
+    return { available: true, requirement, binaryPath };
+  }
 
-  return { available, requirement };
+  // Fallback: ~/.local/bin is commonly missing from non-login PATHs
+  // (systemd units, cron, minimal SSH) but holds user-scoped installs
+  // like Claude Code's default location.
+  const localBinPath = join(homedir(), '.local', 'bin', requirement.binary);
+  if (existsSync(localBinPath)) {
+    return { available: true, requirement, binaryPath: localBinPath };
+  }
+
+  return { available: false, requirement };
 }

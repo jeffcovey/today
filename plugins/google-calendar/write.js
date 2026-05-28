@@ -155,8 +155,14 @@ function buildGoogleEvent(event) {
     }
   }
 
-  // Use calendar's default notifications
-  googleEvent.reminders = { useDefault: true };
+  if (event.reminder_minutes != null) {
+    googleEvent.reminders = {
+      useDefault: false,
+      overrides: [{ method: 'popup', minutes: event.reminder_minutes }]
+    };
+  } else {
+    googleEvent.reminders = { useDefault: true };
+  }
 
   return googleEvent;
 }

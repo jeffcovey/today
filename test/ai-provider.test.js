@@ -14,7 +14,12 @@ const {
   getInteractiveProviderName,
   getInteractiveModel,
   getConfiguredModelName,
+  checkProviderBinarySync,
 } = await import('../src/ai-provider.js');
+
+const { existsSync } = await import('fs');
+const { homedir } = await import('os');
+const { join } = await import('path');
 
 describe('AI Provider (Vercel AI SDK)', () => {
   beforeEach(() => {
@@ -81,7 +86,7 @@ describe('AI Provider (Vercel AI SDK)', () => {
     test('returns default interactive model based on provider', () => {
       getFullConfig.mockReturnValue({});
 
-      expect(getInteractiveModel()).toBe('claude-sonnet-4-20250514');
+      expect(getInteractiveModel()).toBe('claude-sonnet-4-6');
     });
 
     test('returns default model for anthropic-api provider', () => {
@@ -89,7 +94,7 @@ describe('AI Provider (Vercel AI SDK)', () => {
         ai: { interactive_provider: 'anthropic-api' }
       });
 
-      expect(getInteractiveModel()).toBe('claude-sonnet-4-20250514');
+      expect(getInteractiveModel()).toBe('claude-sonnet-4-6');
     });
 
     test('returns default model for ollama provider', () => {
@@ -123,7 +128,7 @@ describe('AI Provider (Vercel AI SDK)', () => {
         ai: { provider: 'anthropic' }
       });
 
-      expect(getConfiguredModelName()).toBe('claude-sonnet-4-20250514');
+      expect(getConfiguredModelName()).toBe('claude-sonnet-4-6');
     });
 
     test('returns default model for openai', () => {
@@ -238,6 +243,50 @@ describe('AI Provider (Vercel AI SDK)', () => {
   describe('clearProviderCache', () => {
     test('can be called without error', () => {
       expect(() => clearProviderCache()).not.toThrow();
+    });
+  });
+
+  describe('checkProviderBinarySync', () => {
+    test('returns available with no requirement for API-only providers', () => {
+      const spawnSync = jest.fn();
+      const result = checkProviderBinarySync('anthropic-api', spawnSync);
+      expect(result).toEqual({ available: true });
+      expect(spawnSync).not.toHaveBeenCalled();
+    });
+
+    test('returns resolved path when `which` finds the binary', () => {
+      const spawnSync = jest.fn().mockReturnValue({ status: 0, stdout: '/usr/local/bin/claude\n' });
+      const result = checkProviderBinarySync('anthropic', spawnSync);
+      expect(result.available).toBe(true);
+      expect(result.binaryPath).toBe('/usr/local/bin/claude');
+      expect(result.requirement.binary).toBe('claude');
+    });
+
+    test('falls back to ~/.local/bin when `which` fails but binary exists there', () => {
+      const localBinPath = join(homedir(), '.local', 'bin', 'claude');
+      const exists = existsSync(localBinPath);
+      const spawnSync = jest.fn().mockReturnValue({ status: 1, stdout: '' });
+      const result = checkProviderBinarySync('anthropic', spawnSync);
+      if (exists) {
+        expect(result.available).toBe(true);
+        expect(result.binaryPath).toBe(localBinPath);
+      } else {
+        expect(result.available).toBe(false);
+        expect(result.binaryPath).toBeUndefined();
+      }
+      expect(result.requirement.binary).toBe('claude');
+    });
+
+    test('returns unavailable when binary is missing everywhere', () => {
+      const spawnSync = jest.fn().mockReturnValue({ status: 1, stdout: '' });
+      const result = checkProviderBinarySync('ollama', spawnSync);
+      // ollama is unlikely to be at ~/.local/bin/ollama in CI; assert shape either way
+      const localBinPath = join(homedir(), '.local', 'bin', 'ollama');
+      if (!existsSync(localBinPath)) {
+        expect(result.available).toBe(false);
+        expect(result.binaryPath).toBeUndefined();
+      }
+      expect(result.requirement.binary).toBe('ollama');
     });
   });
 });

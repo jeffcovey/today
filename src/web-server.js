@@ -2,13 +2,18 @@
 
 import express from 'express';
 import session from 'express-session';
-import connectSqlite3 from 'connect-sqlite3';
+import Database from 'better-sqlite3';
+import betterSqliteSessionStore from 'better-sqlite3-session-store';
 import path from 'path';
 import crypto from "crypto";
 import { exec, execSync, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
+import {
+  writeFileAtomicAsync,
+  writeFileAtomicCASAsync
+} from './fs-atomic.js';
 import { marked } from 'marked';
 import { gfmHeadingId, getHeadingList } from 'marked-gfm-heading-id';
 import { markedHighlight } from 'marked-highlight';
@@ -20,8 +25,8 @@ import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { getTodayDate } from './date-utils.js';
-import { isPluginConfigured, getEnabledPlugins, syncPluginSource } from './plugin-loader.js';
-import { createCompletion, streamCompletion, isAIAvailable } from './ai-provider.js';
+import { isPluginConfigured } from './plugin-loader.js';
+import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import yaml from 'js-yaml';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
@@ -36,6 +41,8 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
+import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
+import { createSaveHandler } from './save-route.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -60,11 +67,27 @@ marked.use({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Cache-busting version stamp for /static URLs. Computed once at startup
+// from the git HEAD short sha so each deploy invalidates browser caches
+// even though express.static still sends a long max-age. Falls back to a
+// boot timestamp if git is unavailable (eg. detached source dir).
+const STATIC_VERSION = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || Date.now().toString(36);
+  } catch {
+    return Date.now().toString(36);
+  }
+})();
+
 // Debug logging - set DEBUG=true in environment to enable verbose logging
 const DEBUG = process.env.DEBUG === 'true';
 const debug = (...args) => DEBUG && console.log('[DEBUG]', ...args);
 
-// Web server only needs read-only access, disable Turso sync for faster startup
+// Web server only needs read-only access, disable auto-sync for faster startup
 const getReadOnlyDatabase = () => getDatabase('.data/today.db', { autoSync: false });
 
 const app = express();
@@ -100,10 +123,35 @@ async function loadTemplate(name) {
 
 function renderTemplate(template, data = {}) {
   let result = template;
-  for (const [key, value] of Object.entries(data)) {
+  const templateData = {
+    themeToggleButton: getThemeToggleButtonHtml(),
+    themeBootstrapScript: getThemeBootstrapScript(),
+    staticVersion: STATIC_VERSION,
+    ...data,
+  };
+  for (const [key, value] of Object.entries(templateData)) {
     result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value ?? '');
   }
   return result;
+}
+
+// HTML-escape a string to prevent XSS when interpolating user data into templates
+function escapeHtmlEntities(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Render a user-facing error page using the error.html template
+async function renderError(errorCode, errorMessage) {
+  const template = await loadTemplate('error');
+  if (!template) {
+    return `<html><body><h1>${errorCode}</h1><p>${errorMessage}</p></body></html>`;
+  }
+  return renderTemplate(template, { errorCode: String(errorCode), errorMessage });
 }
 
 // Track pending markdown regenerations
@@ -152,20 +200,107 @@ const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 
+// Disk-based HTML cache (persists across server restarts)
+const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
+
+/**
+ * Returns true when rendered HTML contains content that changes independently
+ * of the source file's mtime (task query results, dataview results).
+ * Such pages are excluded from the persistent disk cache.
+ */
+function containsDynamicContent(html) {
+  return html.includes('tasks-query-result') ||
+    html.includes('dataview-table') ||
+    html.includes('dataview-list');
+}
+
+/**
+ * Resolve and validate disk cache paths for a given URL path.
+ * Returns null when the resolved path would escape DISK_CACHE_DIR (path traversal guard).
+ */
+function getDiskCachePaths(urlPath) {
+  const safePath = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath;
+  // Normalise to remove any ".." segments before joining with DISK_CACHE_DIR
+  const normalised = path.normalize(safePath);
+  const htmlPath = path.join(DISK_CACHE_DIR, normalised + '.html');
+  const metaPath = path.join(DISK_CACHE_DIR, normalised + '.meta.json');
+  // Reject any path that escapes the cache directory or equals it (must be a file inside it).
+  // Both derived paths share the same normalised prefix so checking htmlPath is sufficient,
+  // but we verify metaPath as well for defence in depth.
+  const cachePrefix = DISK_CACHE_DIR + path.sep;
+  if (!htmlPath.startsWith(cachePrefix) || !metaPath.startsWith(cachePrefix)) {
+    return null;
+  }
+  return { html: htmlPath, meta: metaPath };
+}
+
+async function readFromDiskCache(urlPath, sourceMtime) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return null;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try {
+    const metaRaw = await fs.readFile(metaPath, 'utf-8');
+    const meta = JSON.parse(metaRaw);
+    if (meta.mtime !== sourceMtime) return null; // stale
+    const html = await fs.readFile(htmlPath, 'utf-8');
+    return html;
+  } catch {
+    return null;
+  }
+}
+
+async function writeToDiskCache(urlPath, html, sourceMtime) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try {
+    await fs.mkdir(path.dirname(htmlPath), { recursive: true });
+    await fs.writeFile(htmlPath, html, 'utf-8');
+    await fs.writeFile(metaPath, JSON.stringify({ mtime: sourceMtime, timestamp: Date.now() }), 'utf-8');
+  } catch (err) {
+    debug('Failed to write disk cache:', err.message);
+  }
+}
+
+async function deleteDiskCache(urlPath) {
+  const paths = getDiskCachePaths(urlPath);
+  if (!paths) return;
+  const { html: htmlPath, meta: metaPath } = paths;
+  try { await fs.unlink(htmlPath); } catch { /* ignore */ }
+  try { await fs.unlink(metaPath); } catch { /* ignore */ }
+}
+
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Set up SQLite session store
-const SQLiteStore = connectSqlite3(session);
+const SQLiteStore = betterSqliteSessionStore(session);
+const sessionDb = new Database(path.join(__dirname, '..', '.data', 'sessions.db'));
+// Drop any legacy `sessions` table left over from connect-sqlite3, whose
+// schema used an `expired` column instead of `expire`. Safe to drop — it
+// just forces a one-time re-login after the upgrade.
+{
+  const legacy = sessionDb
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+    .get();
+  if (legacy) {
+    const hasExpire = sessionDb
+      .prepare("PRAGMA table_info(sessions)")
+      .all()
+      .some(col => col.name === 'expire');
+    if (!hasExpire) sessionDb.exec('DROP TABLE sessions');
+  }
+}
 
 // Session middleware - must come before auth
 app.use(session({
   store: new SQLiteStore({
-    db: 'sessions.db',
-    dir: path.join(__dirname, '..', '.data'),
-    table: 'sessions',
-    concurrentDB: true
+    client: sessionDb,
+    expired: {
+      clear: true,
+      intervalMs: 15 * 60 * 1000
+    }
   }),
   secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"),
   resave: false,
@@ -245,6 +380,7 @@ app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAg
 const pageStyle = `
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${getThemeBootstrapScript()}
 <!-- Font Awesome -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
 <!-- Google Fonts -->
@@ -254,13 +390,13 @@ const pageStyle = `
 <!-- Highlight.js theme for code blocks -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" rel="stylesheet"/>
 <!-- Custom styles -->
-<link href="/static/css/style.css" rel="stylesheet"/>
+<link href="/static/css/style.css?v=${STATIC_VERSION}" rel="stylesheet"/>
 `;
 
 // Common scripts for all pages
 const pageScripts = `
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/7.1.0/mdb.umd.min.js"></script>
-<script src="/static/js/common.js"></script>
+<script src="/static/js/common.js?v=${STATIC_VERSION}"></script>
 `;
 
 // Scripts for pages with chat (includes marked.js for markdown)
@@ -268,37 +404,6 @@ const pageScriptsWithMarked = `
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 ${pageScripts}
 `;
-
-// Helper to get navbar
-function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
-  const { showSearch = true, searchValue = '' } = options;
-
-  const searchForm = showSearch ? `
-          <form class="d-flex ms-auto" onsubmit="performSearch(event)">
-            <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${searchValue.replace(/"/g, '&quot;')}"` : ''} style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
-              </button>
-            </div>
-          </form>` : '';
-
-  return `<!-- Loading Spinner Overlay -->
-      <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-      </div>
-      <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="/">
-            <i class="fas ${icon} me-2"></i>${title}
-          </a>
-          <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
-            <i class="fas fa-code-branch"></i>
-          </a>${searchForm}
-        </div>
-      </nav>`;
-}
 
 // Helper to get breadcrumb navigation
 function getBreadcrumb(filePath) {
@@ -415,13 +520,7 @@ function getTimerWidget(timer) {
 
 // Get configured timezone
 function getConfiguredTimezone() {
-  try {
-    const { execSync } = require('child_process');
-    const result = execSync('bin/get-config timezone', { encoding: 'utf8' }).trim();
-    return result || 'America/New_York';
-  } catch {
-    return 'America/New_York';
-  }
+  return getConfig('timezone') || 'America/New_York';
 }
 
 // Helper function to get current time tracking timer info
@@ -535,6 +634,12 @@ async function getTodayTaskTimerItems() {
     ? tasks.filter(task => !excludeFiles.some(f => task.id.includes(vaultPrefix + f)))
     : tasks;
 
+  // Filter out habits with excluded habit IDs
+  const excludeHabits = getConfig('task_timer.exclude_habits') || [];
+  const filteredHabits = excludeHabits.length > 0
+    ? habits.filter(habit => !excludeHabits.includes(habit.habit_id))
+    : habits;
+
   const items = [];
 
   // Add tasks with completion capability
@@ -569,7 +674,7 @@ async function getTodayTaskTimerItems() {
   }
 
   // Add habits with completion capability
-  for (const habit of habits) {
+  for (const habit of filteredHabits) {
     items.push({
       id: `habit-${habit.habit_id}`,
       type: 'habit',
@@ -604,13 +709,56 @@ async function getTodayTaskTimerItems() {
     });
   }
 
+  // Deduplicate items by ID (e.g., habits with same habit_id from multiple sources)
+  const seenItemIds = new Set();
+  const dedupedItems = items.filter(item => {
+    if (seenItemIds.has(item.id)) return false;
+    seenItemIds.add(item.id);
+    return true;
+  });
+
   // Shuffle the items
-  for (let i = items.length - 1; i > 0; i--) {
+  for (let i = dedupedItems.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
+    [dedupedItems[i], dedupedItems[j]] = [dedupedItems[j], dedupedItems[i]];
   }
 
-  return items;
+  return dedupedItems;
+}
+
+// Check whether a task-timer item is still actionable (not yet completed / still needs review).
+// Used before starting a timer on any item so that tasks completed externally (e.g. in Obsidian)
+// or projects that have just been reviewed are silently skipped rather than presented to the user.
+function isItemStillValid(item) {
+  const db = getDatabase();
+  if (item.type === 'task') {
+    const taskId = item.id.replace(/^task-/, '');
+    return !!db.prepare(`SELECT id FROM tasks WHERE id = ? AND status = 'open'`).get(taskId);
+  } else if (item.type === 'habit') {
+    const habitId = item.id.replace(/^habit-/, '');
+    const today = getTodayDate();
+    return !!db.prepare(
+      `SELECT habit_id FROM habits WHERE habit_id = ? AND date = ? AND status = 'pending'`
+    ).get(habitId, today);
+  } else if (item.type === 'project') {
+    const projectId = item.id.replace(/^project-/, '');
+    const today = getTodayDate();
+    return !!db.prepare(`
+      SELECT id FROM projects
+      WHERE id = @projectId
+        AND status IN ('active', 'planning')
+        AND review_frequency IS NOT NULL
+        AND (
+          last_reviewed IS NULL
+          OR (review_frequency = 'daily'     AND julianday(@today) - julianday(last_reviewed) >= 1)
+          OR (review_frequency = 'weekly'    AND julianday(@today) - julianday(last_reviewed) >= 7)
+          OR (review_frequency = 'monthly'   AND julianday(@today) - julianday(last_reviewed) >= 30)
+          OR (review_frequency = 'quarterly' AND julianday(@today) - julianday(last_reviewed) >= 90)
+          OR (review_frequency = 'yearly'    AND julianday(@today) - julianday(last_reviewed) >= 365)
+        )
+    `).get({ projectId, today });
+  }
+  return true; // unknown type – assume valid
 }
 
 // Get current task timer state
@@ -638,27 +786,18 @@ function triggerTaskTimerSync() {
   // Guard against concurrent syncs
   if (taskTimerSyncInProgress) return;
   taskTimerSyncInProgress = true;
-  // Intentionally not awaited — runs in background
+  // Intentionally not awaited — runs in background.
+  // Re-running all plugin syncs here would execute external scripts and then call
+  // insertEntries() synchronously via better-sqlite3, blocking the Node.js event
+  // loop for every plugin source and making the web server unresponsive during
+  // those windows.  Instead, we just re-query the already-up-to-date database
+  // (kept fresh by the vault-watcher) so we can surface any newly-added or
+  // newly-completed items without the blocking overhead.
   (async () => {
     try {
-      const db = getDatabase();
-      const vaultPath = getAbsoluteVaultPath();
-      const context = { db, vaultPath };
-      const enabledPlugins = await getEnabledPlugins();
-      const targetTypes = new Set(['tasks', 'habits', 'projects']);
-
-      for (const { plugin, sources } of enabledPlugins) {
-        if (!plugin.commands?.read || !targetTypes.has(plugin.type)) continue;
-        for (const { sourceName, config } of sources) {
-          if (!taskTimerSyncInProgress) return; // cancelled
-          await syncPluginSource(plugin, sourceName, config, context, { _caller: 'task-timer' });
-        }
-      }
-      if (taskTimerSyncInProgress) {
-        taskTimerSyncedItems = await getTodayTaskTimerItems();
-      }
+      taskTimerSyncedItems = await getTodayTaskTimerItems();
     } catch (e) {
-      // Sync failed or was cancelled, keep current items
+      // Sync failed, keep current items
     } finally {
       taskTimerSyncInProgress = false;
     }
@@ -700,6 +839,14 @@ function advanceTimerIfNeeded() {
     if (!applySyncedItems()) {
       taskTimerState.currentIndex++;
     }
+    // Skip items that are already seen OR are no longer valid (e.g. completed externally)
+    while (
+      taskTimerState.currentIndex < taskTimerState.items.length &&
+      (taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id) ||
+       !isItemStillValid(taskTimerState.items[taskTimerState.currentIndex]))
+    ) {
+      taskTimerState.currentIndex++;
+    }
 
     if (taskTimerState.currentIndex >= taskTimerState.items.length) {
       // Exhausted the list — stop the timer
@@ -720,18 +867,8 @@ function advanceTimerIfNeeded() {
   }
 }
 
-function getTaskTimerWidget(items) {
+async function getTaskTimerWidget() {
   advanceTimerIfNeeded();
-
-  if (!items || items.length === 0) {
-    return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          No tasks, habits, or project reviews due today.
-        </div>
-      </div>`;
-  }
 
   if (taskTimerState.isRunning && taskTimerState.currentItem) {
     const item = taskTimerState.currentItem;
@@ -827,6 +964,17 @@ function getTaskTimerWidget(items) {
         </div>
       </div>`;
   } else {
+    // Timer is not running — fetch items only now (avoids DB queries on every page load when running)
+    const items = await getTodayTaskTimerItems();
+    if (!items || items.length === 0) {
+      return `
+      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+        <i class="fas fa-tasks me-2"></i>
+        <div class="flex-grow-1">
+          No tasks, habits, or project reviews due today.
+        </div>
+      </div>`;
+    }
     return `
       <div class="alert alert-primary d-flex align-items-center mb-3" role="alert">
         <i class="fas fa-tasks me-2"></i>
@@ -1051,32 +1199,7 @@ async function renderDirectory(dirPath, urlPath) {
     }
   });
 
-  let html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>Vault: ${urlPath || '/'}</title>
-      ${pageStyle}
-    </head>
-    <body>
-      ${getNavbar()}
-
-      <!-- Main content with chat -->
-      <div class="container-fluid mt-3">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            ${breadcrumbHtml}
-          </ol>
-        </nav>
-
-        <!-- Timer Widgets -->
-        <!--TIMER_WIDGETS_PLACEHOLDER-->
-
-        <div class="row">
-          <!-- Content column (order-2 on mobile so AI chat appears first) -->
-          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
-  `;
+  let contentHtml = '';
 
   // Special homepage content
   if (!urlPath) {
@@ -1114,11 +1237,11 @@ async function renderDirectory(dirPath, urlPath) {
     const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format for diary
 
     // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
-    html += `<div class="row">`;
+    contentHtml += `<div class="row">`;
 
     // Add Today's Plan/Diary button based on enabled plugins
     if (diaryEnabled) {
-      html += `
+      contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary text-white h-100">
@@ -1135,7 +1258,7 @@ async function renderDirectory(dirPath, urlPath) {
               </div>`;
     } else if (plansEnabled) {
       const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
-      html += `
+      contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white h-100">
@@ -1153,7 +1276,7 @@ async function renderDirectory(dirPath, urlPath) {
     }
 
     // Add Today's Tasks button
-    html += `
+    contentHtml += `
               <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
                 <div class="card shadow-sm h-100">
                   <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white h-100">
@@ -1172,7 +1295,7 @@ async function renderDirectory(dirPath, urlPath) {
                 </div>
               </div>`;
 
-    html += `</div>`;
+    contentHtml += `</div>`;
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
@@ -1187,7 +1310,7 @@ async function renderDirectory(dirPath, urlPath) {
       const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
       const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
 
-      html += `
+      contentHtml += `
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1199,42 +1322,42 @@ async function renderDirectory(dirPath, urlPath) {
                 <div class="list-group list-group-flush">`;
 
       if (weekPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-week text-info me-3"></i>
                     Week ${week}
                   </a>`;
       }
       if (monthPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar text-success me-3"></i>
                     ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
                   </a>`;
       }
       if (quarterPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-business-time text-warning me-3"></i>
                     Quarter ${quarter.slice(1)} - ${year}
                   </a>`;
       }
       if (yearPlanExists) {
-        html += `
+        contentHtml += `
                   <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-check text-danger me-3"></i>
                     Year ${year}
                   </a>`;
       }
 
-      html += `
+      contentHtml += `
                 </div>
               </div>
             </div>`;
     }
     
     // Add Recents section (collapsed) - placeholder for now
-    html += `
+    contentHtml += `
             <div class="card shadow-sm mb-3">
               <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
                 <div class="d-flex justify-content-between align-items-center">
@@ -1252,7 +1375,7 @@ async function renderDirectory(dirPath, urlPath) {
             </div>`;
   }
   
-  html += `
+  contentHtml += `
             <div class="card shadow-sm h-100">
               <div class="list-group list-group-flush">
   `;
@@ -1260,7 +1383,7 @@ async function renderDirectory(dirPath, urlPath) {
   // Add parent directory link if not at root
   if (urlPath) {
     const parentPath = path.dirname(urlPath);
-    html += `
+    contentHtml += `
       <a href="/${parentPath === '.' ? '' : parentPath}" class="list-group-item list-group-item-action">
         <i class="fas fa-level-up-alt text-muted me-3"></i>
         <span class="text-muted">..</span>
@@ -1271,7 +1394,7 @@ async function renderDirectory(dirPath, urlPath) {
   for (const item of items) {
     if (item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
-      html += `
+      contentHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action">
           <i class="fas fa-folder text-warning me-3"></i>
           <strong>${item.name}/</strong>
@@ -1353,29 +1476,16 @@ async function renderDirectory(dirPath, urlPath) {
           </div>`;
       }
 
-      html += `
+      contentHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
         </a>`;
     }
   }
   
-  html += `
-          </div>
-        </div>
-      </div>
-
-    <!-- Chat column (order-1 on mobile so it appears first) -->
-    <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
-      ${getAIAssistantPanel('Ask questions about this directory and its contents')}
-    </div>
-  </div>
-
-      ${getFloatingToggleBtn()}
-
-      ${pageScriptsWithMarked}
-
-      <script>
+  // Build page using directory template
+  const dirTemplate = await loadTemplate('directory');
+  const dirInlineScript = `<script>
         // Page-specific data for AI context
         const directoryPath = '${urlPath || '/'}';
         const directoryContents = ${JSON.stringify(items.map(item => ({
@@ -1653,21 +1763,25 @@ Contents:
             recentsList.innerHTML = recentsHtml;
           }
         }
-      </script>
-    </body>
-    </html>
-  `;
+      </script>`;
+  const html = renderTemplate(dirTemplate, {
+    title: `Vault: ${urlPath || '/'}`,
+    navbar: getNavbar(),
+    breadcrumb: breadcrumbHtml,
+    content: contentHtml,
+    sidebar: getAIAssistantPanel('Ask questions about this directory and its contents'),
+    floatingToggle: getFloatingToggleBtn(),
+    inlineScript: dirInlineScript,
+  });
 
   // Inject timer widgets
-  const taskTimerItems = await getTodayTaskTimerItems();
-
   const widgetsHtml = `
     <div class="row g-3 mb-3">
       <div class="col-12 col-lg-6">
         ${getTimerWidget(currentTimer)}
       </div>
       <div class="col-12 col-lg-6">
-        ${getTaskTimerWidget(taskTimerItems)}
+        ${await getTaskTimerWidget()}
       </div>
     </div>`;
 
@@ -1678,6 +1792,12 @@ Contents:
 async function renderEditor(filePath, urlPath) {
   const content = await fs.readFile(filePath, 'utf-8');
   const fileName = path.basename(urlPath);
+
+  // SHA-256 of the content at render time. The editor sends this back
+  // on save as X-If-Match-Sha256 so the /save handler can refuse the
+  // write if the file changed under us (concurrent edit, sync-in from
+  // another box, etc.). See issue #293.
+  const originalSha256 = crypto.createHash('sha256').update(content).digest('hex');
   
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
@@ -1743,36 +1863,63 @@ async function renderEditor(filePath, urlPath) {
       ${pageScripts}
 
       <script>
+        // SHA-256 of the file content as it was read at render time. Sent on
+        // save as X-If-Match-Sha256 so the server can refuse a stale-baseline
+        // write (see #293). If this is ever updated mid-session (eg. after a
+        // successful save), reassign window.__editorOriginalSha256 to the
+        // hash of the just-saved content.
+        window.__editorOriginalSha256 = ${JSON.stringify(originalSha256)};
+
+        async function sha256Hex(text) {
+          const bytes = new TextEncoder().encode(text);
+          const digest = await crypto.subtle.digest('SHA-256', bytes);
+          return Array.from(new Uint8Array(digest))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+
         // Page-specific functions (performSearch is in common.js)
-        function saveFile() {
+        async function saveFile() {
           const content = document.getElementById('editor').value;
           const saveStatus = document.getElementById('save-status');
 
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
           saveStatus.className = 'text-primary small me-3';
 
-          fetch('/save/${urlPath}', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: content })
-          })
-          .then(response => {
-            if (response.ok) {
-              saveStatus.innerHTML = '<i class="fas fa-check me-1"></i>Saved successfully!';
-              saveStatus.className = 'text-success small me-3';
-              setTimeout(() => {
-                saveStatus.innerHTML = '';
-              }, 3000);
-            } else {
+          try {
+            const response = await fetch('/save/${urlPath}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-If-Match-Sha256': window.__editorOriginalSha256 || '',
+              },
+              body: JSON.stringify({ content: content })
+            });
+
+            if (response.status === 409) {
+              const body = await response.json().catch(() => ({}));
+              saveStatus.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>This file changed externally since you opened it. Copy your edits, then reload to see the latest version.';
+              saveStatus.className = 'text-warning small me-3';
+              console.warn('Save conflict:', body);
+              return;
+            }
+
+            if (!response.ok) {
               throw new Error('Save failed');
             }
-          })
-          .catch(error => {
+
+            // Successful save: the just-saved content is now the on-disk
+            // baseline, so refresh the If-Match hash for the next save.
+            window.__editorOriginalSha256 = await sha256Hex(content);
+            saveStatus.innerHTML = '<i class="fas fa-check me-1"></i>Saved successfully!';
+            saveStatus.className = 'text-success small me-3';
+            setTimeout(() => {
+              saveStatus.innerHTML = '';
+            }, 3000);
+          } catch (error) {
             saveStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Save failed!';
             saveStatus.className = 'text-danger small me-3';
-          });
+          }
         }
 
         // Auto-save on Ctrl+S / Cmd+S
@@ -2418,12 +2565,24 @@ async function getCachedRender(filePath, urlPath) {
       }
     }
 
+    // On memory-cache miss, check disk cache before doing a full render
+    const diskHtml = await readFromDiskCache(urlPath, mtime);
+    if (diskHtml) {
+      debug(`[DISK CACHE HIT] ${urlPath}`);
+      const hasDynamicContent = containsDynamicContent(diskHtml);
+      renderCache.set(cacheKey, { html: diskHtml, timestamp: Date.now(), hits: 1, hasDynamicContent });
+      fileStatsCache.set(cacheKey, { mtime, size });
+      return diskHtml;
+    }
+
     // Render and cache the result
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
     const rendered = await renderMarkdownUncached(filePath, urlPath);
     
-    // Store in cache (flag pages with tasks queries for shorter time-based expiry)
-    const hasDynamicContent = rendered.includes('tasks-query-result');
+    // Flag pages with dynamic content (task queries or dataview blocks) — these are
+    // excluded from the disk cache because their content changes independently of
+    // the source file's mtime.
+    const hasDynamicContent = containsDynamicContent(rendered);
     renderCache.set(cacheKey, {
       html: rendered,
       timestamp: Date.now(),
@@ -2435,7 +2594,14 @@ async function getCachedRender(filePath, urlPath) {
       mtime: mtime,
       size: size
     });
-    
+
+    // Persist to disk cache for non-dynamic files (survives server restarts)
+    if (!hasDynamicContent) {
+      writeToDiskCache(urlPath, rendered, mtime).catch(err => {
+        debug('Disk cache write error:', err.message);
+      });
+    }
+
     // Cleanup old entries periodically
     if (Math.random() < 0.1) { // 10% chance to cleanup
       cleanupCache();
@@ -3009,9 +3175,15 @@ class DataviewAPI {
     return {
       vault: {
         adapter: {
+          // Atomic write via temp-file + rename. We can't do CAS here because
+          // Obsidian's adapter.write() contract is a blind overwrite and
+          // vault scripts (eg. time-tracking-widget.js) pass through their
+          // own read-modify-write state — they'd need to thread the baseline
+          // to us before we could check it. The atomic-rename at least keeps
+          // readers from observing a torn file mid-write.
           async write(filePath, content) {
             const fullPath = path.join(self.vaultPath, filePath);
-            await fs.writeFile(fullPath, content, 'utf-8');
+            await writeFileAtomicAsync(fullPath, content);
           }
         }
       }
@@ -3654,6 +3826,10 @@ async function executeTasksQuery(query) {
     } else if (filter === 'done today') {
       sqlWhere.push(`status = 'completed'`);
       sqlWhere.push(`DATE(completed_at) = '${todayStr}'`);
+    } else if (/^done on \d{4}-\d{2}-\d{2}$/.test(filter)) {
+      const doneOnDate = filter.replace('done on ', '').trim();
+      sqlWhere.push(`status = 'completed'`);
+      sqlWhere.push(`DATE(completed_at) = '${doneOnDate}'`);
     } else if (filter.includes('OR') && filter.includes('before tomorrow')) {
       // Handle "(scheduled before tomorrow) OR (due before tomorrow)"
       sqlWhere.push(`(due_date <= '${todayStr}' OR json_extract(metadata, '$.scheduled_date') <= '${todayStr}')`);
@@ -4552,60 +4728,9 @@ ${cleanContent}
     }
   });
   
-  const html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <title>${fileName}</title>
-      ${pageStyle}
-    </head>
-    <body>
-      ${getNavbar(fileName, 'fa-file-alt')}
-
-      <!-- Main content with chat -->
-      <div class="container-fluid mt-3">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            ${breadcrumbHtml}
-          </ol>
-        </nav>
-
-        <!-- Timer Widgets -->
-        <!--TIMER_WIDGETS_PLACEHOLDER-->
-
-        <div class="row">
-          <!-- Content column (order-2 on mobile so AI chat appears first) -->
-          <div class="col-12 col-md-7 mb-3 order-2 order-md-1">
-            <div class="card shadow-sm">
-              <div class="card-header bg-white border-bottom">
-                <div class="d-flex justify-content-between align-items-center">
-                  <h5 class="mb-0">${pageTitle || fileName}</h5>
-                  <a href="/edit/${urlPath}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-edit me-1"></i>Edit
-                  </a>
-                </div>
-                ${toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : ''}
-              </div>
-              <div class="card-body markdown-content">
-                ${renderProperties(properties)}
-                ${htmlContent}
-              </div>
-            </div>
-          </div>
-          
-          <!-- Chat column (order-1 on mobile so it appears first) -->
-          <div class="col-12 col-md-5 mb-3 order-1 order-md-2">
-            ${getAIAssistantPanel('Start a conversation about this document')}
-          </div>
-        </div>
-      </div>
-
-      ${getFloatingToggleBtn()}
-
-      ${pageScriptsWithMarked}
-
-      <script>
+  // Build page using markdown template
+  const mdTemplate = await loadTemplate('markdown');
+  const inlineScript = `<script>
         // Page-specific: Chat functionality
         checkChatVersion(); // Page will reload if version changed
 
@@ -5216,10 +5341,20 @@ ${cleanContent}
 
           localStorage.setItem('recentPages', JSON.stringify(recentPages));
         }
-      </script>
-    </body>
-    </html>
-  `;
+      </script>`;
+  const html = renderTemplate(mdTemplate, {
+    title: fileName,
+    navbar: getNavbar(fileName, 'fa-file-alt'),
+    breadcrumb: breadcrumbHtml,
+    pageTitle: pageTitle || fileName,
+    editUrl: `/edit/${urlPath}`,
+    toc: toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : '',
+    properties: renderProperties(properties),
+    content: htmlContent,
+    aiPanel: getAIAssistantPanel('Start a conversation about this document'),
+    floatingToggle: getFloatingToggleBtn(),
+    inlineScript,
+  });
 
   debug('HTML includes chatMessages:', html.includes('chatMessages'));
   return html;
@@ -5230,7 +5365,6 @@ async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-  const taskTimerItems = await getTodayTaskTimerItems();
 
   const widgetsHtml = `
     <div class="row g-3 mb-3">
@@ -5238,7 +5372,7 @@ async function renderMarkdown(filePath, urlPath) {
         ${getTimerWidget(currentTimer)}
       </div>
       <div class="col-12 col-lg-6">
-        ${getTaskTimerWidget(taskTimerItems)}
+        ${await getTaskTimerWidget()}
       </div>
     </div>`;
 
@@ -5272,15 +5406,89 @@ app.get('/_cache/status', sessionAuth, (req, res) => {
 });
 
 // Clear cache endpoint
-app.post('/_cache/clear', sessionAuth, (req, res) => {
+app.post('/_cache/clear', sessionAuth, async (req, res) => {
   const previousSize = renderCache.size;
   renderCache.clear();
   fileStatsCache.clear();
-  
+
+  // Also clear disk cache directory (await so response reflects completed state)
+  try {
+    await fs.rm(DISK_CACHE_DIR, { recursive: true, force: true });
+  } catch (err) {
+    debug('Failed to clear disk cache dir:', err.message);
+  }
+
   res.json({
     success: true,
     message: `Cache cleared. Removed ${previousSize} entries.`
   });
+});
+
+// Warm cache endpoint — walks the vault and pre-renders all stale static markdown files.
+// Restricted to localhost so no session auth is required (safe for cron jobs).
+let cacheWarmInProgress = false;
+app.post('/_cache/warm', async (req, res) => {
+  // Use the raw socket address (not req.ip) to bypass trust-proxy header spoofing.
+  // This endpoint must only be reachable from the local machine.
+  const ip = req.socket?.remoteAddress || '';
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (!isLocal) {
+    return res.status(403).json({ error: 'Forbidden - localhost only' });
+  }
+
+  if (cacheWarmInProgress) {
+    return res.json({ success: true, message: 'Cache warm already in progress, skipping' });
+  }
+
+  // Run asynchronously so the response returns immediately
+  res.json({ success: true, message: 'Cache warm started in background' });
+  cacheWarmInProgress = true;
+
+  (async () => {
+    let checked = 0, rendered = 0, skipped = 0, errors = 0;
+    const startTime = Date.now();
+
+    async function walkVault(dir) {
+      let entries;
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue;
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walkVault(fullPath);
+        } else if (entry.name.endsWith('.md')) {
+          checked++;
+          try {
+            const stats = await fs.stat(fullPath);
+            const mtime = stats.mtime.getTime();
+            const urlPath = '/' + path.relative(VAULT_PATH, fullPath);
+
+            const diskHtml = await readFromDiskCache(urlPath, mtime);
+            if (diskHtml) {
+              skipped++;
+              continue; // disk cache is fresh — nothing to do
+            }
+
+            // Render and save to disk cache (getCachedRender handles the write)
+            await getCachedRender(fullPath, urlPath);
+            rendered++;
+          } catch (err) {
+            debug(`[WARM] Error processing ${fullPath}:`, err.message);
+            errors++;
+          }
+        }
+      }
+    }
+
+    await walkVault(VAULT_PATH);
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[/_cache/warm] Done: checked=${checked} rendered=${rendered} skipped=${skipped} errors=${errors} time=${elapsed}s`);
+  })().catch(err => console.error('[/_cache/warm] Unexpected error:', err.message))
+    .finally(() => { cacheWarmInProgress = false; });
 });
 
 // ── Git helpers ──────────────────────────────────────────────────────────────
@@ -5646,9 +5854,48 @@ app.get('/_git', authMiddleware, async (req, res) => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
       try {
         const resp = await fetch('/_git/ai-commit-message', { method: 'POST' });
-        const data = await resp.json();
-        if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
-        document.getElementById('commitMsg').value = data.message;
+        const commitMsgEl = document.getElementById('commitMsg');
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('text/event-stream') && resp.body) {
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          commitMsgEl.value = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\\n\\n');
+            buffer = events.pop() || '';
+
+            for (const eventText of events) {
+              const lines = eventText.split('\\n');
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const payload = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
+                let data = null;
+                try {
+                  data = JSON.parse(payload);
+                } catch {
+                  continue;
+                }
+                if (data.type === 'text') {
+                  commitMsgEl.value += data.content || '';
+                } else if (data.type === 'done') {
+                  commitMsgEl.value = data.message || commitMsgEl.value;
+                } else if (data.type === 'error') {
+                  throw new Error(data.message || 'Failed to generate commit message');
+                }
+              }
+            }
+          }
+        } else {
+          const data = await resp.json();
+          if (!resp.ok || data.error) { alert(data.error || 'Failed to generate commit message'); return; }
+          commitMsgEl.value = data.message;
+        }
       } catch (err) {
         alert('Failed to generate commit message: ' + err.message);
       } finally {
@@ -5873,43 +6120,7 @@ app.post('/_git/push', authMiddleware, (req, res) => {
   }
 });
 
-app.post('/_git/ai-commit-message', authMiddleware, async (req, res) => {
-  try {
-    const available = await isAIAvailable();
-    if (!available) {
-      return res.status(400).json({ error: 'No AI provider configured. Check your config.toml [ai] section.' });
-    }
-
-    let diff = '';
-    try {
-      diff = gitExec(['diff', '--cached']);
-    } catch (err) {
-      diff = '';
-    }
-
-    if (!diff.trim()) {
-      return res.status(400).json({ error: 'No staged changes to generate a message for.' });
-    }
-
-    // Truncate very large diffs to avoid exceeding context limits
-    const maxDiffLength = 15000;
-    if (diff.length > maxDiffLength) {
-      diff = diff.slice(0, maxDiffLength) + '\n\n[... diff truncated ...]';
-    }
-
-    const message = await createCompletion({
-      system: 'You are a helpful assistant that writes concise git commit messages. Write a single conventional commit message (type: description) for the given diff. Use lowercase type. Keep the description under 72 characters. Do not include a body or footer. Output only the commit message, nothing else.',
-      messages: [{ role: 'user', content: diff }],
-      maxTokens: 100,
-      temperature: 0,
-    });
-
-    res.json({ message: message.trim() });
-  } catch (err) {
-    console.error('Error generating AI commit message:', err);
-    res.status(500).json({ error: 'Failed to generate commit message: ' + (err.message || 'Unknown error') });
-  }
-});
+app.post('/_git/ai-commit-message', authMiddleware, createAiCommitMessageHandler({ gitExecFn: gitExec }));
 
 app.post('/_git/discard', authMiddleware, async (req, res) => {
   try {
@@ -5939,16 +6150,35 @@ app.post('/ai-edit/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
     const fullPath = path.join(VAULT_PATH, urlPath);
-    const { content } = req.body;
-    
+    const { content, expectedContent } = req.body;
+
     // Security check
     if (!fullPath.startsWith(VAULT_PATH)) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
-    // Write the file
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
+
+    // Compare-and-swap against the bytes the caller saw. If the client
+    // supplied `expectedContent` (the version it last read), use that as
+    // the baseline so we refuse to overwrite a newer concurrent edit.
+    // Otherwise fall back to a snapshot taken just before the write —
+    // narrower window than atomic-only but still catches simultaneous
+    // writers that arrive after our read.
+    let baseline = expectedContent;
+    if (baseline === undefined) {
+      try {
+        baseline = await fs.readFile(fullPath, 'utf-8');
+      } catch (err) {
+        baseline = err && err.code === 'ENOENT' ? null : '';
+      }
+    }
+
+    const { conflict } = await writeFileAtomicCASAsync(fullPath, content, baseline);
+    if (conflict) {
+      return res.status(409).json({
+        error: 'File changed since it was read. Refresh and retry.',
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error editing file:', error);
@@ -6461,7 +6691,8 @@ app.get('/search', authMiddleware, async (req, res) => {
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
-    
+    const searchTemplate = await loadTemplate('search');
+
     try {
       // Search in file contents (excluding hidden directories)
       const { stdout: contentResults } = await execAsync(
@@ -6524,101 +6755,44 @@ app.get('/search', authMiddleware, async (req, res) => {
         return a.fileName.localeCompare(b.fileName);
       });
       
-      // Render search results page
-      const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <title>Search: ${searchQuery}</title>
-          ${pageStyle}
-        </head>
-        <body>
-          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
-          
-          <div class="container-fluid mt-3">
-            <div class="row">
-              <div class="col">
-                <div class="card shadow-sm">
-                  <div class="card-header">
-                    <h5 class="mb-0">
-                      <i class="fas fa-search me-2"></i>
-                      Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${searchQuery}"
-                    </h5>
-                  </div>
-                  <div class="list-group list-group-flush">
-                    ${results.length === 0 ? `
-                      <div class="list-group-item text-muted text-center py-4">
-                        No results found. Try a different search term.
-                      </div>
-                    ` : results.map(result => `
-                      <a href="/${result.path}" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                          <h6 class="mb-1">
-                            <i class="fas fa-file-alt text-info me-2"></i>
-                            ${result.fileName}
-                          </h6>
-                        </div>
-                        <p class="mb-1 text-muted small">${result.path}</p>
-                        ${result.snippet ? `
-                          <small class="text-muted">
-                            ...${result.snippet}...
-                          </small>
-                        ` : ''}
-                      </a>
-                    `).join('')}
-                  </div>
-                </div>
-              </div>
+      // Render search results page using template
+      const safeQuery = escapeHtmlEntities(searchQuery);
+      const resultsHtml = results.length === 0
+        ? '<div class="list-group-item text-muted text-center py-4">No results found. Try a different search term.</div>'
+        : results.map(result => `
+          <a href="/${escapeHtmlEntities(result.path)}" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">
+                <i class="fas fa-file-alt text-info me-2"></i>
+                ${escapeHtmlEntities(result.fileName)}
+              </h6>
             </div>
-          </div>
-          
-          ${pageScripts}
-        </body>
-        </html>
-      `;
+            <p class="mb-1 text-muted small">${escapeHtmlEntities(result.path)}</p>
+            ${result.snippet ? `<small class="text-muted">...${escapeHtmlEntities(result.snippet)}...</small>` : ''}
+          </a>
+        `).join('');
+      const html = renderTemplate(searchTemplate, {
+        query: safeQuery,
+        navbar: getNavbar('Search Results', 'fa-search', { searchValue: searchQuery }),
+        heading: `Found ${results.length} result${results.length !== 1 ? 's' : ''} for &ldquo;${safeQuery}&rdquo;`,
+        resultsHtml,
+      });
 
       res.send(html);
       
     } catch (error) {
       console.error('Search error:', error);
       
-      // Return empty results on error
-      const html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <title>Search: ${searchQuery}</title>
-          ${pageStyle}
-        </head>
-        <body>
-          ${getNavbar('Search Results', 'fa-search', { searchValue: searchQuery })}
-          
-          <div class="container-fluid mt-3">
-            <div class="row">
-              <div class="col">
-                <div class="card shadow-sm">
-                  <div class="card-header">
-                    <h5 class="mb-0">
-                      <i class="fas fa-search me-2"></i>
-                      Search Results for "${searchQuery}"
-                    </h5>
-                  </div>
-                  <div class="list-group list-group-flush">
-                    <div class="list-group-item text-muted text-center py-4">
-                      An error occurred while searching. Please try again.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          ${pageScripts}
-        </body>
-        </html>
-      `;
+      // Return empty results on error using template
+      const safeQuery = escapeHtmlEntities(searchQuery);
+      const errorResultHtml = renderTemplate(searchTemplate, {
+        query: safeQuery,
+        navbar: getNavbar('Search Results', 'fa-search', { searchValue: searchQuery }),
+        heading: `Search Results for &ldquo;${safeQuery}&rdquo;`,
+        resultsHtml: '<div class="list-group-item text-muted text-center py-4">An error occurred while searching. Please try again.</div>',
+      });
 
-      res.send(html);
+      res.send(errorResultHtml);
     }
     
   } catch (error) {
@@ -6678,11 +6852,11 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
     }
     
     // Read the file
-    let content = await fs.readFile(fullPath, 'utf-8');
+    const originalContent = await fs.readFile(fullPath, 'utf-8');
     const { lineNumber, taskId: providedTaskId, checked } = req.body;
-    
+
     // Split into lines
-    const lines = content.split('\n');
+    const lines = originalContent.split('\n');
     
     // Find the line to toggle - prioritize task ID if provided
     let targetLineNumber = lineNumber;
@@ -6716,10 +6890,13 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
         lines[targetLineNumber] = line.replace(/^(\s*)-\s*\[[xX]\]\s*/, '$1- [ ] ');
       }
       
-      // Write back to file
-      content = lines.join('\n');
-      await fs.writeFile(fullPath, content, 'utf-8');
-      
+      // Write back to file (CAS so another writer can't clobber this toggle)
+      const newContent = lines.join('\n');
+      const { conflict } = await writeFileAtomicCASAsync(fullPath, newContent, originalContent);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+
       // Task updates are now handled directly in markdown files
       // No database update needed with Obsidian Tasks approach
       
@@ -6903,7 +7080,12 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       lines.splice(line, 0, newTaskLine); // Insert at position line (after line-1)
     }
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8');
+    {
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
 
     // Clear the task query cache so the next page load reflects the change
     taskQueryCache.clear();
@@ -6943,41 +7125,135 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/save/*path', authMiddleware, async (req, res) => {
+app.post('/task/edit', authMiddleware, async (req, res) => {
   try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    let fullPath = path.join(VAULT_PATH, urlPath);
+    const { filePath: file, lineNumber: line, title, priority, dueDate, scheduledDate, startDate, tags, completed } = req.body;
+    debug(`[TASK] Editing task - file: ${file}, line: ${line}`);
 
-    // Security: prevent directory traversal
-    if (!fullPath.startsWith(VAULT_PATH)) {
-      return res.status(403).send('Access denied');
+    if (!file || !line) {
+      return res.status(400).json({ error: 'Missing file path or line number' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Task title is required' });
     }
 
-    // If path has no extension, try adding .md (Obsidian-style URLs)
-    if (!path.extname(urlPath)) {
-      fullPath = fullPath + '.md';
-      if (!fullPath.startsWith(VAULT_PATH)) {
-        return res.status(403).send('Access denied');
+    const filePath = path.join(VAULT_PATH, file);
+
+    // Security: prevent directory traversal
+    if (!path.resolve(filePath).startsWith(VAULT_PATH)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const taskLine = lines[line - 1];
+
+    if (!taskLine) {
+      return res.status(400).json({ error: 'Task line not found' });
+    }
+
+    if (!taskLine.match(/^(?:\s*>)*\s*- \[[ xX]\]/)) {
+      return res.status(400).json({ error: 'Not a task line' });
+    }
+
+    // Preserve leading whitespace / blockquote prefix
+    const prefixMatch = taskLine.match(/^((?:\s*>)*\s*)/);
+    const prefix = prefixMatch ? prefixMatch[1] : '';
+
+    const checkbox = completed === true || completed === 'true' ? '[x]' : '[ ]';
+
+    const priorityEmojis = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' };
+    const priorityEmoji = priority && priorityEmojis[priority] ? priorityEmojis[priority] : '';
+
+    // Preserve recurrence pattern from original line (stop at next date emoji or end)
+    const recurringMatch = taskLine.match(/🔁\s+[^⏳📅🛫✅➕\n]+/);
+    const recurrence = recurringMatch ? recurringMatch[0].trim() : '';
+
+    // Preserve creation date from original line
+    const creationMatch = taskLine.match(/➕\s*(\d{4}-\d{2}-\d{2})/);
+    const creationDate = creationMatch ? `➕ ${creationMatch[1]}` : '';
+
+    // Handle completion date
+    let completionDate = '';
+    const isCompleted = completed === true || completed === 'true';
+    if (isCompleted) {
+      const existingCompletion = taskLine.match(/✅\s*(\d{4}-\d{2}-\d{2})/);
+      if (existingCompletion) {
+        completionDate = `✅ ${existingCompletion[1]}`;
+      } else {
+        completionDate = `✅ ${new Date().toISOString().split('T')[0]}`;
       }
     }
 
-    // Check if file exists and is a markdown or TOML file
-    const stats = await fs.stat(fullPath);
-    if (!stats.isFile() || (!fullPath.endsWith('.md') && !fullPath.endsWith('.toml'))) {
-      return res.status(400).send('Can only save markdown and TOML files');
+    // Normalise tags input (array or comma/space-separated string)
+    let tagList = [];
+    if (Array.isArray(tags)) {
+      tagList = tags;
+    } else if (typeof tags === 'string' && tags.trim()) {
+      tagList = tags.trim().split(/[\s,]+/);
     }
-    
-    // Write the content
-    const { content } = req.body;
-    await fs.writeFile(fullPath, content, 'utf-8');
-    
-    console.log(`File saved: ${fullPath}`);
-    res.json({ success: true, message: 'File saved successfully' });
+    const tagStr = tagList
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(t => (t.startsWith('#') ? t : `#${t}`))
+      .join(' ');
+
+    // Reconstruct the task line
+    const parts = [`${prefix}- ${checkbox} ${title.trim()}`];
+    if (priorityEmoji) parts.push(priorityEmoji);
+    if (startDate) parts.push(`🛫 ${startDate}`);
+    if (scheduledDate) parts.push(`⏳ ${scheduledDate}`);
+    if (dueDate) parts.push(`📅 ${dueDate}`);
+    if (tagStr) parts.push(tagStr);
+    if (recurrence) parts.push(recurrence);
+    if (creationDate) parts.push(creationDate);
+    if (completionDate) parts.push(completionDate);
+
+    const updatedLine = parts.join(' ');
+    lines[line - 1] = updatedLine;
+
+    {
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
+
+    // Keep query cache in sync
+    taskQueryCache.clear();
+
+    // Update database status
+    try {
+      const db = getReadOnlyDatabase();
+      const dbFilePath = path.join('vault', file);
+      const taskId = `markdown-tasks/local:${dbFilePath}:${line}`;
+      const newStatus = isCompleted ? 'done' : 'open';
+      if (isCompleted) {
+        const today = new Date().toISOString().split('T')[0];
+        db.prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?').run(newStatus, today, taskId);
+      } else {
+        db.prepare('UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ?').run(newStatus, taskId);
+      }
+    } catch (dbError) {
+      console.error('[TASK] Failed to update database after edit:', dbError.message);
+    }
+
+    debug(`[TASK] Successfully edited task at line ${line}`);
+    res.json({ success: true, updatedLine });
   } catch (error) {
-    console.error('Error saving file:', error);
-    res.status(500).json({ success: false, message: 'Failed to save file' });
+    console.error('Error editing task:', error);
+    res.status(500).json({ error: 'Failed to edit task', details: error.message });
   }
 });
+
+app.post(
+  '/save/*path',
+  authMiddleware,
+  createSaveHandler({
+    vaultPath: VAULT_PATH,
+    postWriteHook: (filePath) => { console.log(`File saved: ${filePath}`); },
+  })
+);
 
 // Start time tracking timer
 app.post('/api/track/start', authMiddleware, express.json(), async (req, res) => {
@@ -7086,6 +7362,14 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     if (!applySyncedItems()) {
       taskTimerState.currentIndex++;
     }
+    // Skip items that are already seen OR are no longer valid (e.g. completed externally)
+    while (
+      taskTimerState.currentIndex < taskTimerState.items.length &&
+      (taskTimerState.seenIds.has(taskTimerState.items[taskTimerState.currentIndex].id) ||
+       !isItemStillValid(taskTimerState.items[taskTimerState.currentIndex]))
+    ) {
+      taskTimerState.currentIndex++;
+    }
 
     // If we've exhausted the list, re-fetch from DB (filtering out seen items)
     if (taskTimerState.currentIndex >= taskTimerState.items.length) {
@@ -7146,8 +7430,16 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     // Get task from tasks table
     let task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
 
-    // If not in database, try to parse from file (for inline markdown tasks)
-    if (!task && taskId.startsWith('markdown-tasks/local:')) {
+    // Extra fields parsed from the raw markdown line
+    let rawDueDate = null;
+    let rawScheduledDate = null;
+    let rawStartDate = null;
+    let rawTags = [];
+
+    // For markdown tasks, always parse the raw line from the file so the edit form
+    // reflects the current on-disk state (dates/tags may have been edited since the
+    // last database sync).
+    if (taskId.startsWith('markdown-tasks/local:')) {
       // Parse task ID format: markdown-tasks/local:vault/path/file.md:lineNumber
       const match = taskId.match(/^markdown-tasks\/local:(.+):(\d+)$/);
       if (match) {
@@ -7161,39 +7453,55 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
           const taskLine = lines[lineNumber - 1];
 
           if (taskLine && /^\s*- \[[ xX-]\]/.test(taskLine)) {
-            // Extract task text (remove checkbox and metadata)
-            let title = taskLine
-              .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
-              .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
-              .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
-              .replace(/#[\w/-]+/g, '')            // Remove tags
-              .trim();
+            // Extract dates (always needed so the edit form shows current values)
+            const dueDateMatch = taskLine.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+            const scheduledDateMatch = taskLine.match(/⏳\s*(\d{4}-\d{2}-\d{2})/);
+            const startDateMatch = taskLine.match(/🛫\s*(\d{4}-\d{2}-\d{2})/);
+            rawDueDate = dueDateMatch ? dueDateMatch[1] : null;
+            rawScheduledDate = scheduledDateMatch ? scheduledDateMatch[1] : null;
+            rawStartDate = startDateMatch ? startDateMatch[1] : null;
 
-            // Check completion status
-            const isCompleted = /^\s*- \[[xX]\]/.test(taskLine);
+            // Extract tags
+            const tagMatches = taskLine.match(/#[\w/-]+/g);
+            rawTags = tagMatches || [];
 
-            // Extract priority
-            let priority = null;
-            if (taskLine.includes('🔺')) priority = 'highest';
-            else if (taskLine.includes('⏫')) priority = 'high';
-            else if (taskLine.includes('🔼')) priority = 'medium';
-            else if (taskLine.includes('🔽')) priority = 'low';
-            else if (taskLine.includes('⏬')) priority = 'lowest';
+            // If not in database, build a full task object from the file
+            if (!task) {
+              // Extract task text (remove checkbox and metadata)
+              let title = taskLine
+                .replace(/^\s*- \[[ xX-]\]\s*/, '')  // Remove checkbox
+                .replace(/[⏫🔼🔽⏬🔺]\s*/g, '')     // Remove priority icons
+                .replace(/[➕⏳📅🛫✅]\s*\d{4}-\d{2}-\d{2}/g, '')  // Remove dates
+                .replace(/🔁\s+\S+(?:\s+\S+)*/g, '')  // Remove recurrence
+                .replace(/#[\w/-]+/g, '')            // Remove tags
+                .trim();
 
-            // Build task object from file
-            task = {
-              id: taskId,
-              title: title || '(empty task)',
-              status: isCompleted ? 'done' : 'open',
-              priority,
-              source: 'markdown-tasks/local',
-              description: null,
-              due_date: null,
-              created_at: null,
-              updated_at: null,
-              completed_at: null,
-              metadata: JSON.stringify({ filePath, lineNumber, fromFile: true })
-            };
+              // Check completion status
+              const isCompleted = /^\s*- \[[xX]\]/.test(taskLine);
+
+              // Extract priority
+              let priority = null;
+              if (taskLine.includes('🔺')) priority = 'highest';
+              else if (taskLine.includes('⏫')) priority = 'high';
+              else if (taskLine.includes('🔼')) priority = 'medium';
+              else if (taskLine.includes('🔽')) priority = 'low';
+              else if (taskLine.includes('⏬')) priority = 'lowest';
+
+              // Build task object from file
+              task = {
+                id: taskId,
+                title: title || '(empty task)',
+                status: isCompleted ? 'done' : 'open',
+                priority,
+                source: 'markdown-tasks/local',
+                description: null,
+                due_date: rawDueDate,
+                created_at: null,
+                updated_at: null,
+                completed_at: null,
+                metadata: JSON.stringify({ filePath, lineNumber, fromFile: true })
+              };
+            }
           }
         } catch (fileError) {
           // File doesn't exist or can't be read
@@ -7207,117 +7515,161 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
     }
 
     const metadata = task.metadata ? JSON.parse(task.metadata) : {};
-    const priorityEmoji = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' }[task.priority] || '';
+    const isMarkdownTask = task.source === 'markdown-tasks/local' && (metadata.filePath || metadata.file_path) && (metadata.lineNumber || metadata.line_number);
+    const editFilePath = metadata.filePath || metadata.file_path || null;
+    const editLineNumber = metadata.lineNumber || metadata.line_number || null;
+    const editFileRelPath = editFilePath ? editFilePath.replace(/^vault\//, '') : null;
 
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <title>Task: ${task.title.substring(0, 50)}...</title>
-        ${pageStyle}
-      </head>
-      <body>
-        ${getNavbar('Task Details', 'fa-tasks', { showSearch: false })}
+    // For DB tasks without raw dates, fall back to task.due_date
+    if (!rawDueDate && task.due_date) rawDueDate = task.due_date;
 
-        <div class="container mt-4">
-          <div class="row justify-content-center">
-            <div class="col-md-10 col-lg-8">
-              <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                  <h4 class="mb-0">
-                    <i class="fas fa-check-circle me-2"></i>Task Details
-                  </h4>
-                </div>
-                <div class="card-body">
-                  <!-- Task Text -->
-                  <div class="mb-4">
-                    <h5 class="text-muted mb-2">Task</h5>
-                    <p class="fs-5">${priorityEmoji} ${task.title}</p>
-                  </div>
+    const esc = escapeHtmlEntities;
 
-                  <!-- Status -->
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Status</h6>
-                    <span class="badge ${task.status === 'completed' ? 'bg-success' : 'bg-primary'}">${task.status}</span>
-                    ${task.priority ? `<span class="badge bg-secondary ms-2">${task.priority}</span>` : ''}
-                  </div>
+    // Build body content based on whether this is an editable markdown task
+    let bodyContent;
+    if (isMarkdownTask) {
+      bodyContent = `
+        <form id="editForm">
+          <input type="hidden" name="filePath" value="${esc(editFileRelPath)}">
+          <input type="hidden" name="lineNumber" value="${esc(String(editLineNumber))}">
 
-                  ${task.due_date ? `
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Due Date</h6>
-                    <div><i class="fas fa-calendar me-2"></i>${task.due_date}</div>
-                  </div>
-                  ` : ''}
+          <!-- Title -->
+          <div class="mb-3">
+            <label for="taskTitle" class="form-label fw-semibold">Task</label>
+            <input type="text" class="form-control" id="taskTitle" name="title" value="${esc(task.title)}" required>
+          </div>
 
-                  ${task.description ? `
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Description</h6>
-                    <p>${task.description}</p>
-                  </div>
-                  ` : ''}
-
-                  <!-- Source -->
-                  <div class="mb-4">
-                    <h6 class="text-muted mb-2">Source</h6>
-                    <div><i class="fas fa-plug me-2"></i>${task.source}</div>
-                    ${(metadata.filePath || metadata.file_path) ? `<div class="mt-1"><a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${metadata.filePath || metadata.file_path}</a></div>` : ''}
-                  </div>
-
-                  <!-- Actions -->
-                  <div class="d-flex gap-2 flex-wrap">
-                    <button class="btn btn-success" onclick="startTimer()">
-                      <i class="fas fa-play me-2"></i>Start Timer
-                    </button>
-                    ${(metadata.filePath || metadata.file_path) ? `<a href="/${(metadata.filePath || metadata.file_path).replace(/^vault\//, '')}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
-                    <button class="btn btn-outline-secondary" onclick="window.history.back()">
-                      <i class="fas fa-arrow-left me-2"></i>Back
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Task Metadata -->
-              <div class="card mt-3 shadow-sm">
-                <div class="card-body">
-                  <small class="text-muted">
-                    <div class="mb-2"><strong>Task ID:</strong> ${task.id}</div>
-                    <div class="mb-2"><strong>Created:</strong> ${task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A'}</div>
-                    <div class="mb-2"><strong>Updated:</strong> ${task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A'}</div>
-                    ${task.completed_at ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>` : ''}
-                  </small>
-                </div>
-              </div>
+          <!-- Status -->
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="taskCompleted" name="completed" value="true" ${task.status === 'done' ? 'checked' : ''}>
+              <label class="form-check-label fw-semibold" for="taskCompleted">Completed</label>
             </div>
           </div>
+
+          <!-- Priority -->
+          <div class="mb-3">
+            <label for="taskPriority" class="form-label fw-semibold">Priority</label>
+            <select class="form-select" id="taskPriority" name="priority">
+              <option value="" ${!task.priority ? 'selected' : ''}>(none)</option>
+              <option value="highest" ${task.priority === 'highest' ? 'selected' : ''}>🔺 Highest</option>
+              <option value="high" ${task.priority === 'high' ? 'selected' : ''}>⏫ High</option>
+              <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>🔼 Medium</option>
+              <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🔽 Low</option>
+              <option value="lowest" ${task.priority === 'lowest' ? 'selected' : ''}>⏬ Lowest</option>
+            </select>
+          </div>
+
+          <!-- Dates row -->
+          <div class="row g-3 mb-3">
+            <div class="col-sm-4">
+              <label for="taskStartDate" class="form-label fw-semibold">🛫 Start Date</label>
+              <input type="date" class="form-control" id="taskStartDate" name="startDate" value="${esc(rawStartDate || '')}">
+            </div>
+            <div class="col-sm-4">
+              <label for="taskScheduledDate" class="form-label fw-semibold">⏳ Scheduled</label>
+              <input type="date" class="form-control" id="taskScheduledDate" name="scheduledDate" value="${esc(rawScheduledDate || '')}">
+            </div>
+            <div class="col-sm-4">
+              <label for="taskDueDate" class="form-label fw-semibold">📅 Due Date</label>
+              <input type="date" class="form-control" id="taskDueDate" name="dueDate" value="${esc(rawDueDate || '')}">
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div class="mb-4">
+            <label for="taskTags" class="form-label fw-semibold">Tags</label>
+            <input type="text" class="form-control" id="taskTags" name="tags" value="${esc(rawTags.join(' '))}" placeholder="#tag1 #tag2">
+            <div class="form-text">Space-separated tags (# prefix optional)</div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+            <a href="/${esc(editFileRelPath)}" class="btn btn-outline-secondary">
+              <i class="fas fa-file-alt me-2"></i>Open File
+            </a>
+            <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+              <i class="fas fa-arrow-left me-2"></i>Back
+            </button>
+          </div>
+        </form>`;
+    } else {
+      bodyContent = `
+        <!-- Read-only view for non-markdown tasks -->
+        <div class="mb-4">
+          <h5 class="text-muted mb-2">Task</h5>
+          <p class="fs-5">${esc(task.title)}</p>
         </div>
+        <div class="mb-4">
+          <h6 class="text-muted mb-2">Status</h6>
+          <span class="badge ${task.status === 'done' || task.status === 'completed' ? 'bg-success' : 'bg-primary'}">${esc(task.status)}</span>
+          ${task.priority ? `<span class="badge bg-secondary ms-2">${esc(task.priority)}</span>` : ''}
+        </div>
+        ${task.due_date ? `<div class="mb-4"><h6 class="text-muted mb-2">Due Date</h6><div><i class="fas fa-calendar me-2"></i>${esc(task.due_date)}</div></div>` : ''}
+        <div class="mb-4">
+          <h6 class="text-muted mb-2">Source</h6>
+          <div><i class="fas fa-plug me-2"></i>${esc(task.source)}</div>
+          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          ${editFileRelPath ? `<a href="/${esc(editFileRelPath)}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
+          <button class="btn btn-outline-secondary" onclick="window.history.back()">
+            <i class="fas fa-arrow-left me-2"></i>Back
+          </button>
+        </div>`;
+    }
 
-        <script>
-          function startTimer() {
-            const taskText = ${JSON.stringify(task.title)};
-            fetch('/api/track/start', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({description: taskText})
-            })
-            .then(response => response.json())
-            .then(data => {
-              if (data.success) {
-                alert('Timer started: ' + taskText);
-                window.location.href = '/';
-              } else {
-                alert('Failed to start timer: ' + data.message);
-              }
-            })
-            .catch(error => {
-              alert('Error starting timer: ' + error.message);
-            });
+    // Build edit form script for markdown tasks
+    const editFormScript = isMarkdownTask ? `
+      document.getElementById('editForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+          filePath: form.filePath.value,
+          lineNumber: parseInt(form.lineNumber.value, 10),
+          title: form.title.value.trim(),
+          priority: form.priority.value || null,
+          dueDate: form.dueDate.value || null,
+          scheduledDate: form.scheduledDate.value || null,
+          startDate: form.startDate.value || null,
+          tags: form.tags.value.trim() || null,
+          completed: form.completed.checked
+        };
+        try {
+          const resp = await fetch('/task/edit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+          });
+          const result = await resp.json();
+          if (result.success) {
+            window.location.reload();
+          } else {
+            alert('Save failed: ' + (result.error || 'Unknown error'));
           }
-        </script>
+        } catch (err) {
+          alert('Error saving task: ' + err.message);
+        }
+      });` : '';
 
-        ${pageScripts}
-      </body>
-      </html>
-    `;
+    const taskTemplate = await loadTemplate('task-detail');
+    const html = renderTemplate(taskTemplate, {
+      taskTitle: esc(task.title.substring(0, 50)),
+      navbar: getNavbar('Edit Task', 'fa-tasks', { showSearch: false }),
+      heading: isMarkdownTask ? 'Edit Task' : 'Task Details',
+      bodyContent,
+      taskId: esc(task.id),
+      createdAt: task.created_at ? new Date(task.created_at).toLocaleString() : 'N/A',
+      updatedAt: task.updated_at ? new Date(task.updated_at).toLocaleString() : 'N/A',
+      completedAtSection: task.completed_at
+        ? `<div class="mb-2"><strong>Completed:</strong> ${new Date(task.completed_at).toLocaleString()}</div>`
+        : '',
+      taskTitleJson: JSON.stringify(task.title),
+      editFormScript,
+    });
 
     res.send(html);
   } catch (error) {
@@ -7401,7 +7753,6 @@ app.get('/*path', authMiddleware, async (req, res) => {
           : await getCachedRender(fullPath, urlPath);
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-        const taskTimerItems = await getTodayTaskTimerItems();
 
         const widgetsHtml = `
           <div class="row g-3 mb-3">
@@ -7409,7 +7760,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
               ${getTimerWidget(currentTimer)}
             </div>
             <div class="col-12 col-lg-6">
-              ${getTaskTimerWidget(taskTimerItems)}
+              ${await getTaskTimerWidget()}
             </div>
           </div>`;
 
@@ -7425,13 +7776,15 @@ app.get('/*path', authMiddleware, async (req, res) => {
     }
   } catch (error) {
     if (error.code === 'ENOENT') {
-      res.status(404).send('File not found');
+      const html = await renderError(404, 'File not found');
+      res.status(404).send(html);
     } else {
       console.error('=== SERVER ERROR ===');
       console.error('Path:', req.path);
       console.error('Error:', error.message);
       console.error('Stack:', error.stack);
-      res.status(500).send('Server error');
+      const html = await renderError(500, 'An unexpected error occurred. Please try again.');
+      res.status(500).send(html);
     }
   }
 });

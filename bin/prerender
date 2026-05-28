@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+/**
+ * Pre-render vault markdown files to the disk HTML cache.
+ * See src/prerender-markdown.js for details.
+ */
+
+import '../src/prerender-markdown.js';
