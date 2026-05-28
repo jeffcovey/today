@@ -3864,7 +3864,7 @@ async function executeTasksQuery(query) {
   try {
     const whereClause = sqlWhere.length > 0 ? `WHERE ${sqlWhere.join(' AND ')}` : '';
     const sql = `
-      SELECT id, title, status, priority, due_date, completed_at, created_at, metadata, source
+      SELECT id, title, status, priority, due_date, completed_at, metadata, source
       FROM tasks
       ${whereClause}
     `;
@@ -3884,7 +3884,7 @@ async function executeTasksQuery(query) {
     const scheduledDate = metadata.scheduled_date ? new Date(metadata.scheduled_date + 'T00:00:00') : null;
     const dueDate = row.due_date ? new Date(row.due_date + 'T00:00:00') : null;
     const doneDate = row.completed_at ? new Date(row.completed_at) : null;
-    const createdDate = metadata.created_date || null;
+    const createdDate = metadata.created_date ? new Date(metadata.created_date + 'T00:00:00') : null;
 
     // Get file path from metadata (strip 'vault/' prefix if present for consistent matching)
     const filePath = metadata.file_path ? metadata.file_path.replace(/^vault\//, '') : null;
@@ -3986,7 +3986,9 @@ async function executeTasksQuery(query) {
   } else if (groupBy && groupBy.startsWith('created')) {
     const grouped = new Map();
     for (const task of filtered) {
-      const key = task.createdDate || 'No date';
+      const key = task.createdDate
+        ? `${task.createdDate.getFullYear()}-${String(task.createdDate.getMonth() + 1).padStart(2, '0')}-${String(task.createdDate.getDate()).padStart(2, '0')}`
+        : 'No date';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(task);
     }
