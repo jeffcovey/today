@@ -36,4 +36,22 @@ describe('tasks query function helpers', () => {
     expect(buildTasksQueryContext('/tasks/plans.md')).toEqual({ file: { folder: 'tasks' } });
     expect(buildTasksQueryContext('/plans.md')).toEqual({ file: { folder: '' } });
   });
+
+  test('logs filter by function evaluation errors', () => {
+    const debugLogs = [];
+    const result = runTasksFilterFunction({}, 'if (', {}, message => debugLogs.push(message));
+
+    expect(result).toBe(false);
+    expect(debugLogs.length).toBeGreaterThan(0);
+    expect(debugLogs[0]).toContain('Error evaluating filter-by-function');
+  });
+
+  test('logs group by function evaluation errors', () => {
+    const debugLogs = [];
+    const result = runTasksGroupFunction({ file: { path: 'plans/test.md' } }, '(', {}, message => debugLogs.push(message));
+
+    expect(result).toBe('plans/test.md');
+    expect(debugLogs.length).toBe(1);
+    expect(debugLogs[0]).toContain('Error evaluating group-by-function');
+  });
 });

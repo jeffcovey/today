@@ -3788,7 +3788,11 @@ async function executeTasksQuery(query, queryContext = {}) {
   let sortReverse = fieldSort ? fieldSort.reverse : false;
 
   // Check cache first
-  const cacheKey = JSON.stringify({ filters, functionFilters, sortDirectives, groupBy, queryContext });
+  const queryContextHash = crypto
+    .createHash('sha1')
+    .update(JSON.stringify(queryContext || {}))
+    .digest('hex');
+  const cacheKey = JSON.stringify({ filters, functionFilters, sortDirectives, groupBy, queryContextHash });
   const cached = taskQueryCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < TASK_QUERY_CACHE_TTL)) {
     debug(`[TASK QUERY CACHE HIT] ${filters.join(', ')}`);
@@ -3928,7 +3932,7 @@ async function executeTasksQuery(query, queryContext = {}) {
   }
 
   for (const filterCode of functionFilters) {
-    filtered = filtered.filter(task => runTasksFilterFunction(task, filterCode, queryContext));
+    filtered = filtered.filter(task => runTasksFilterFunction(task, filterCode, queryContext, debug));
   }
 
   // Sort - apply directives in order (first = primary, last = least significant)
@@ -3990,14 +3994,22 @@ async function executeTasksQuery(query, queryContext = {}) {
     return result;
   } else if (groupBy && groupBy.startsWith('function ')) {
     const groupExpr = groupBy.replace(/^function\s+/, '').trim();
+    const usesLegacyTaskPathOrdering = groupExpr.includes('task.file.path');
+    const isRoutineGroup = (groupKey) => String(groupKey || '').toLowerCase().includes('routines/');
     const grouped = new Map();
     for (const task of filtered) {
-      const key = runTasksGroupFunction(task, groupExpr, queryContext) || 'Unknown file';
+      const key = runTasksGroupFunction(task, groupExpr, queryContext, debug) || 'Unknown file';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(task);
     }
 
     const sortedGroups = Array.from(grouped.entries()).sort((a, b) => {
+      if (usesLegacyTaskPathOrdering) {
+        const aIsRoutine = isRoutineGroup(a[0]);
+        const bIsRoutine = isRoutineGroup(b[0]);
+        if (aIsRoutine !== bIsRoutine) return aIsRoutine ? 1 : -1;
+        if (aIsRoutine && bIsRoutine) return b[0].localeCompare(a[0]);
+      }
       return a[0].localeCompare(b[0]);
     });
 
