@@ -3817,12 +3817,14 @@ async function executeTasksQuery(query) {
 
   // Build SQL query for the tasks table
   let sqlWhere = [];
+  let sqlParams = [];
 
   // Analyze filters to build SQL WHERE clauses
   for (const filter of filters) {
     const createdAfterDate = parseCreatedAfterDate(filter, tz);
     if (createdAfterDate) {
-      sqlWhere.push(`json_extract(metadata, '$.created_date') > '${createdAfterDate}'`);
+      sqlWhere.push(`json_extract(metadata, '$.created_date') > ?`);
+      sqlParams.push(createdAfterDate);
       continue;
     }
 
@@ -3866,7 +3868,7 @@ async function executeTasksQuery(query) {
       FROM tasks
       ${whereClause}
     `;
-    taskRows = db.prepare(sql).all();
+    taskRows = db.prepare(sql).all(...sqlParams);
     debug(`SQL filtered: ${taskRows.length} tasks from tasks table`);
   } catch (error) {
     debug('Error querying tasks table:', error.message);
