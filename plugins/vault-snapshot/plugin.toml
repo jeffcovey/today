@@ -40,4 +40,3 @@ read = "./read.js"
 [settings]
 snapshot_dir = { type = "string", default = "~/vault-snapshots", description = "Directory where snapshots are stored" }
 keep = { type = "number", default = 30, description = "Number of snapshots to retain" }
-vault_directory = { type = "string", default = "vault", description = "Vault subdirectory (relative to project root) to snapshot" }

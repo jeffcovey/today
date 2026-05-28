@@ -25,9 +25,10 @@ const snapshotDir = rawSnapshotDir.startsWith('~')
 
 const keep = Number(config.keep ?? 30);
 
-// Source directory to snapshot
-const vaultDirectory = config.vault_directory || 'vault';
-const sourceDir = path.join(projectRoot, vaultDirectory);
+// Source directory to snapshot — use the system-wide VAULT_PATH env var
+// (injected by the plugin-loader from config.vault_path) so there is one
+// authoritative place to configure the vault location.
+const sourceDir = path.join(projectRoot, process.env.VAULT_PATH || 'vault');
 
 /**
  * List existing snapshot directories sorted oldest-first.
