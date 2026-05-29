@@ -43,6 +43,7 @@ import {
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
+import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -3816,9 +3817,17 @@ async function executeTasksQuery(query) {
 
   // Build SQL query for the tasks table
   let sqlWhere = [];
+  let sqlParams = [];
 
   // Analyze filters to build SQL WHERE clauses
   for (const filter of filters) {
+    const createdAfterDate = parseCreatedAfterDate(filter, tz);
+    if (createdAfterDate) {
+      sqlWhere.push(`json_extract(metadata, '$.created_date') > ?`);
+      sqlParams.push(createdAfterDate);
+      continue;
+    }
+
     if (filter === 'done') {
       sqlWhere.push(`status = 'completed'`);
     } else if (filter === 'not done') {
@@ -3859,7 +3868,7 @@ async function executeTasksQuery(query) {
       FROM tasks
       ${whereClause}
     `;
-    taskRows = db.prepare(sql).all();
+    taskRows = db.prepare(sql).all(...sqlParams);
     debug(`SQL filtered: ${taskRows.length} tasks from tasks table`);
   } catch (error) {
     debug('Error querying tasks table:', error.message);
@@ -3875,6 +3884,7 @@ async function executeTasksQuery(query) {
     const scheduledDate = metadata.scheduled_date ? new Date(metadata.scheduled_date + 'T00:00:00') : null;
     const dueDate = row.due_date ? new Date(row.due_date + 'T00:00:00') : null;
     const doneDate = row.completed_at ? new Date(row.completed_at) : null;
+    const createdDate = metadata.created_date ? new Date(metadata.created_date + 'T00:00:00') : null;
 
     // Get file path from metadata (strip 'vault/' prefix if present for consistent matching)
     const filePath = metadata.file_path ? metadata.file_path.replace(/^vault\//, '') : null;
@@ -3892,6 +3902,7 @@ async function executeTasksQuery(query) {
       priority: priorityMap[row.priority] || 0,
       priorityText: row.priority,
       happens: scheduledDate || dueDate,
+      createdDate,
       source: row.source,
       filePath: filePath,
       lineNumber: lineNumber,
@@ -3968,6 +3979,22 @@ async function executeTasksQuery(query) {
       if (b[0] === 'No date') return -1;
       return a[0].localeCompare(b[0]);
     });
+
+    const result = { grouped: sortedGroups };
+    taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
+    return result;
+  } else if (groupBy && groupBy.startsWith('created')) {
+    const grouped = new Map();
+    for (const task of filtered) {
+      const key = task.createdDate
+        ? `${task.createdDate.getFullYear()}-${String(task.createdDate.getMonth() + 1).padStart(2, '0')}-${String(task.createdDate.getDate()).padStart(2, '0')}`
+        : 'No date';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(task);
+    }
+
+    const reverse = groupBy.endsWith(' reverse');
+    const sortedGroups = sortCreatedGroups(Array.from(grouped.entries()), reverse);
 
     const result = { grouped: sortedGroups };
     taskQueryCache.set(cacheKey, { result, timestamp: Date.now() });
