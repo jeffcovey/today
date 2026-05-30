@@ -40,6 +40,14 @@ function advancePastSeen(items, currentIndex, seenIds, isValid = () => true) {
   return idx;
 }
 
+/**
+ * Mirrors paused-habit filtering in web-server task timer SQL:
+ * COALESCE(json_extract(metadata, '$.paused'), 0) = 0
+ */
+function includeHabitInTimer(habit) {
+  return habit.metadata?.paused !== true;
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('getTodayTaskTimerItems – deduplication', () => {
@@ -185,3 +193,17 @@ describe('timer advancement – skip invalid (completed/reviewed) items', () => 
   });
 });
 
+describe('habit filtering – exclude paused habits', () => {
+  test('includes habits without paused metadata', () => {
+    expect(includeHabitInTimer({ metadata: {} })).toBe(true);
+    expect(includeHabitInTimer({})).toBe(true);
+  });
+
+  test('includes habits where paused is false', () => {
+    expect(includeHabitInTimer({ metadata: { paused: false } })).toBe(true);
+  });
+
+  test('excludes habits where paused is true', () => {
+    expect(includeHabitInTimer({ metadata: { paused: true } })).toBe(false);
+  });
+});
