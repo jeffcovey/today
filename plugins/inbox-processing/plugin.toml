@@ -27,3 +27,5 @@ inbox_directory = { type = "string", default = "vault/inbox", description = "Dir
 diary_directory = { type = "string", default = "vault/diary", description = "Directory for diary files" }
 tasks_file = { type = "string", default = "vault/tasks/tasks.md", description = "Path to tasks file" }
 trash_retention_days = { type = "number", default = 7, description = "Days to keep processed files in trash before deletion" }
+dedup_window_seconds = { type = "number", default = 30, description = "Collapse same-activity Start/Stop markers fired within this many seconds (multi-device duplicates)" }
+max_unpaired_start_age_hours = { type = "number", default = 48, description = "Trash unpaired Start markers older than this many hours (0 disables aging)" }
