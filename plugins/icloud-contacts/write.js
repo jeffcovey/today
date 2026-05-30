@@ -301,12 +301,20 @@ async function deleteContact(search) {
   };
 }
 
-// Basic vCard parser for merging
+// Basic vCard parser for merging — mirrors read.js parseVCard so round-trips are lossless
 function parseVCardBasic(vCardText) {
   const contact = {};
   const lines = vCardText.split(/\r?\n/);
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Handle line folding (continued lines start with SP or HT)
+    while (i + 1 < lines.length && (lines[i + 1].startsWith(' ') || lines[i + 1].startsWith('\t'))) {
+      line += lines[i + 1].substring(1);
+      i++;
+    }
+
     const colonIndex = line.indexOf(':');
     if (colonIndex <= 0) continue;
 
@@ -322,15 +330,26 @@ function parseVCardBasic(vCardText) {
       contact.last_name = parts[0]?.trim() || '';
       contact.first_name = parts[1]?.trim() || '';
     }
-    else if (key.startsWith('EMAIL')) contact.primary_email = value.trim();
-    else if (key.startsWith('TEL')) {
+    else if (key.startsWith('EMAIL') || key.includes('.EMAIL')) contact.primary_email = value.trim();
+    else if (key.startsWith('TEL') || key.includes('.TEL')) {
       if (!contact._phones) contact._phones = [];
       contact._phones.push(value.trim());
       if (!contact.primary_phone) contact.primary_phone = value.trim();
     }
-    else if (key.startsWith('ORG')) contact.organization = value.trim();
-    else if (key.startsWith('TITLE')) contact.job_title = value.trim();
-    else if (key.startsWith('BDAY')) contact.birthday = value.trim();
+    else if (key.startsWith('ORG') || key.includes('.ORG')) contact.organization = value.trim();
+    else if (key.startsWith('TITLE') || key.includes('.TITLE')) contact.job_title = value.trim();
+    else if (key.startsWith('BDAY') || key.includes('.BDAY')) contact.birthday = value.trim();
+    else if (key.startsWith('ADR') || key.includes('.ADR')) {
+      // ADR format: PO box;ext;street;city;state;postal;country
+      const parts = value.split(';');
+      if (parts.length >= 4) {
+        contact.street = parts[2]?.trim() || '';
+        contact.location_city = parts[3]?.trim() || '';
+        contact.location_state = parts[4]?.trim() || '';
+        contact.postal_code = parts[5]?.trim() || '';
+        contact.location_country = parts[6]?.trim() || '';
+      }
+    }
   }
 
   // Preserve multiple phones in metadata
