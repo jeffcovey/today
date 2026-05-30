@@ -67,6 +67,51 @@ function serializeInstructions(instructionsByType) {
   return out;
 }
 
+function stableSortObject(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableSortObject);
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) {
+      out[key] = stableSortObject(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Snapshot enabled source configs used by context gathering.
+ * Captures config-only changes that should invalidate cached context.
+ * @param {Map} instructionsByType
+ * @returns {Array}
+ */
+function serializeSourceConfigs(instructionsByType) {
+  const sourceIds = new Set();
+  for (const data of instructionsByType.values()) {
+    for (const sourceId of (data.sources || [])) {
+      sourceIds.add(sourceId);
+    }
+  }
+
+  const serialized = [];
+  for (const sourceId of sourceIds) {
+    const [pluginName, sourceName] = sourceId.split('/');
+    let config = null;
+    try {
+      const sources = getPluginSources(pluginName);
+      config = sources.find(s => s.sourceName === sourceName)?.config ?? null;
+    } catch {
+      config = null;
+    }
+    serialized.push([sourceId, stableSortObject(config)]);
+  }
+
+  serialized.sort((a, b) => a[0].localeCompare(b[0]));
+  return serialized;
+}
+
 /**
  * Compute the cache key for the current context. All inputs are cheap (a config
  * read plus one indexed query) — no plugin commands run.
@@ -83,6 +128,7 @@ export function computeContextCacheKey({ db, instructionsByType, dayKey, targetD
     targetDate: targetDate || null,
     dayKey,
     instructions: serializeInstructions(instructionsByType),
+    sourceConfigs: serializeSourceConfigs(instructionsByType),
     sync: getSyncSnapshot(db)
   };
   return crypto.createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');

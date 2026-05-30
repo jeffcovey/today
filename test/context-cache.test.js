@@ -37,6 +37,8 @@ describe('context cache', () => {
     db = new Database(':memory:');
     await new MigrationManager(db, { verbose: false }).runMigrations();
     getAIInstructionsByType.mockReset();
+    getPluginSources.mockReset();
+    getPluginSources.mockReturnValue([]);
     getAIInstructionsByType.mockResolvedValue(makeInstructions());
     delete process.env.SKIP_CONTEXT;
     delete process.env.SKIP_CONTEXT_CACHE;
@@ -100,6 +102,25 @@ describe('context cache', () => {
           ['tasks', { sources: ['gh/today'], instructions: [{ sourceId: 'gh/today', text: 'be brief' }] }],
         ]),
       });
+      expect(a).not.toBe(b);
+    });
+
+    test('changes when enabled source config changes', () => {
+      const params = {
+        ...base(),
+        instructionsByType: makeInstructions([['context', { sources: ['notes/main'], instructions: [] }]]),
+      };
+
+      getPluginSources.mockImplementation((pluginName) => pluginName === 'notes'
+        ? [{ sourceName: 'main', config: { folder: 'inbox' } }]
+        : []);
+      const a = computeContextCacheKey(params);
+
+      getPluginSources.mockImplementation((pluginName) => pluginName === 'notes'
+        ? [{ sourceName: 'main', config: { folder: 'archive' } }]
+        : []);
+      const b = computeContextCacheKey(params);
+
       expect(a).not.toBe(b);
     });
 
