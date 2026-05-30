@@ -20,13 +20,18 @@ import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
+const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '../..');
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const inboxDirectory = config.inbox_directory || `${process.env.VAULT_PATH}/inbox`;
 const diaryDirectory = config.diary_directory || `${process.env.VAULT_PATH}/diary`;
 const tasksFile = config.tasks_file || `${process.env.VAULT_PATH}/tasks/tasks.md`;
 const trashRetentionDays = parseInt(config.trash_retention_days || '7', 10);
+// Multi-device sync sometimes fires the same Start/Stop within a few seconds;
+// collapse those, and age out Starts that never got a Stop. Both are tunable
+// (use ?? so an explicit 0 is honored — 0 disables the respective behavior).
+const dedupWindowSeconds = Number(config.dedup_window_seconds ?? 30);
+const maxUnpairedStartAgeHours = Number(config.max_unpaired_start_age_hours ?? 48);
 
 // Resolve paths relative to project root
 const inboxDir = path.join(PROJECT_ROOT, inboxDirectory);
@@ -522,27 +527,39 @@ function processTimeTrackingMarkers(files) {
   // Sort by timestamp
   markers.sort((a, b) => a.parsedTime - b.parsedTime);
 
-  // Collapse duplicate markers (same action within 30 seconds)
+  // Collapse near-duplicate markers. The Apple-Shortcuts workflow sometimes
+  // fires the same Start/Stop from multiple devices within a few seconds. Group
+  // by action AND description (so distinct activities are never merged), keep
+  // one representative (earliest Start / latest Stop), and remember the dropped
+  // copies so they get trashed instead of orphaning in the inbox.
   const collapsedMarkers = [];
+  const duplicateMarkerFiles = [];
 
   for (const marker of markers) {
-    const existingSameAction = collapsedMarkers.filter(m =>
+    const existing = collapsedMarkers.find(m =>
       m.action === marker.action &&
-      Math.abs(m.parsedTime - marker.parsedTime) / 1000 <= 30
+      m.description === marker.description &&
+      Math.abs(m.parsedTime - marker.parsedTime) / 1000 <= dedupWindowSeconds
     );
 
-    if (existingSameAction.length > 0) {
-      // Update existing marker with earliest start or latest stop
-      const existing = existingSameAction[0];
-      if (marker.action === 'Start' && marker.parsedTime < existing.parsedTime) {
-        existing.timestamp = marker.timestamp;
-        existing.parsedTime = marker.parsedTime;
-      } else if (marker.action === 'Stop' && marker.parsedTime > existing.parsedTime) {
-        existing.timestamp = marker.timestamp;
-        existing.parsedTime = marker.parsedTime;
-      }
-    } else {
+    if (!existing) {
       collapsedMarkers.push({ ...marker });
+      continue;
+    }
+
+    // Duplicate of an already-seen marker. Keep the better timestamp/file
+    // (earliest for Start, latest for Stop) and trash the other copy.
+    const preferNew =
+      (marker.action === 'Start' && marker.parsedTime < existing.parsedTime) ||
+      (marker.action === 'Stop' && marker.parsedTime > existing.parsedTime);
+
+    if (preferNew) {
+      duplicateMarkerFiles.push(existing.filePath);
+      existing.filePath = marker.filePath;
+      existing.timestamp = marker.timestamp;
+      existing.parsedTime = marker.parsedTime;
+    } else {
+      duplicateMarkerFiles.push(marker.filePath);
     }
   }
 
@@ -553,6 +570,11 @@ function processTimeTrackingMarkers(files) {
   const sessions = [];
   const startStack = [];
   const usedMarkers = new Set(); // Track which markers were used in sessions
+
+  // Collapsed-away duplicate copies are redundant; trash them with the rest.
+  for (const filePath of duplicateMarkerFiles) {
+    usedMarkers.add(filePath);
+  }
 
   for (const marker of collapsedMarkers) {
     if (marker.action === 'Start') {
@@ -600,10 +622,11 @@ function processTimeTrackingMarkers(files) {
   // Mark duplicate Start markers (Start markers that match existing logged sessions)
   for (const marker of collapsedMarkers) {
     if (marker.action === 'Start' && !usedMarkers.has(marker.filePath)) {
-      // Check if this Start marker matches an existing session (within 30 seconds)
+      // Check if this Start marker matches an existing session (same window we
+      // use to collapse multi-device duplicates).
       const matchesExisting = existingSessions.some(session => {
-        const timeDiff = Math.abs(marker.parsedTime - session.startTime);
-        return timeDiff < 30000; // Within 30 seconds
+        const timeDiff = Math.abs(marker.parsedTime - session.startTime) / 1000;
+        return timeDiff <= dedupWindowSeconds;
       });
 
       if (matchesExisting) {
@@ -621,8 +644,23 @@ function processTimeTrackingMarkers(files) {
     }
   }
 
-  // Only delete marker files that were used in complete sessions or cleaned up as orphaned
-  // Keep unpaired Start markers in inbox for future Stop markers
+  // Age out unpaired Start markers that are too old to ever pair. A Start that
+  // has sat in the inbox past the cutoff is unrecoverable — the activity is long
+  // over and no Stop is coming — so stop preserving it forever.
+  if (maxUnpairedStartAgeHours > 0) {
+    const maxAgeMs = maxUnpairedStartAgeHours * 60 * 60 * 1000;
+    const nowMs = Date.now();
+    for (const marker of collapsedMarkers) {
+      if (marker.action === 'Start' && !usedMarkers.has(marker.filePath) &&
+          nowMs - marker.parsedTime.getTime() > maxAgeMs) {
+        usedMarkers.add(marker.filePath);
+      }
+    }
+  }
+
+  // Trash markers used in complete sessions, collapsed duplicates, orphaned
+  // Stops, and aged-out unpaired Starts. Recent unpaired Starts stay in the
+  // inbox to await a future Stop.
   for (const marker of markers) {
     if (usedMarkers.has(marker.filePath)) {
       moveToTrash(marker.filePath);
