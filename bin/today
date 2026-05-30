@@ -662,7 +662,11 @@ ${contextSection}`;
         try {
           const result = spawnSync(claudeBinary, ['--model', model, '--print', '--dangerously-skip-permissions', '--append-system-prompt-file', promptFile, userMessage], {
             stdio: quiet ? ['pipe', 'pipe', 'pipe'] : 'inherit',
-            timeout: 600000 // 10 minutes in milliseconds
+            timeout: 600000, // 10 minutes in milliseconds
+            // The claude CLI refuses --dangerously-skip-permissions under root unless
+            // IS_SANDBOX is set. Non-interactive runs (e.g. the now-updates plugin) are
+            // headless and can't answer permission prompts, so opt into sandbox mode.
+            env: { ...process.env, IS_SANDBOX: '1' }
           });
           if (result.error) {
             if (result.error.code === 'ETIMEDOUT') {
