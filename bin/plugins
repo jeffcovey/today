@@ -26,6 +26,7 @@ import { exportUpcomingEvents } from '../src/export-calendar-events.js';
 import { getAbsoluteVaultPath, getConfigPath } from '../src/config.js';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
+import { getDataContextCached } from '../src/context-cache.js';
 import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -553,6 +554,13 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
       const db = getDatabase();
       const context = { db, vaultPath };
       await runSyncOperation(context, pluginName, sourceName, options);
+      // Warm the context cache so the next interactive startup is an instant hit.
+      // Best-effort: sync must never fail because of cache warming.
+      try {
+        await getDataContextCached({ db, projectRoot: PROJECT_ROOT, bypass: true });
+      } catch {
+        // Ignore cache-warming failures
+      }
       return; // Success - exit the retry loop
     } catch (error) {
       if (isDatabaseCorruptionError(error) && retryCount < maxRetries) {

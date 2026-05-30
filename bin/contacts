@@ -369,6 +369,7 @@ async function cmdAdd(options) {
   if (options.address) entry.street = options.address;
   if (options.city) entry.location_city = options.city;
   if (options.state) entry.location_state = options.state;
+  if (options.postalCode) entry.postal_code = options.postalCode;
   if (options.country) entry.location_country = options.country;
   if (options.birthday) entry.birthday = options.birthday;
   if (options.notes) entry.notes = options.notes;
@@ -457,6 +458,7 @@ async function cmdEdit(nameOrSearch, options) {
   if (options.address) updates.street = options.address;
   if (options.city) updates.location_city = options.city;
   if (options.state) updates.location_state = options.state;
+  if (options.postalCode) updates.postal_code = options.postalCode;
   if (options.country) updates.location_country = options.country;
   if (options.birthday) updates.birthday = options.birthday;
   if (options.notes) updates.notes = options.notes;
@@ -664,6 +666,7 @@ program
   .option('--address <address>', 'Street address')
   .option('--city <city>', 'City')
   .option('--state <state>', 'State/region')
+  .option('--postal-code <postalCode>', 'Postal/ZIP code')
   .option('--country <country>', 'Country')
   .option('--birthday <date>', 'Birthday (YYYY-MM-DD)')
   .option('--notes <notes>', 'Notes about the contact')
@@ -687,6 +690,7 @@ program
   .option('--address <address>', 'Update street address')
   .option('--city <city>', 'Update city')
   .option('--state <state>', 'Update state/region')
+  .option('--postal-code <postalCode>', 'Update postal/ZIP code')
   .option('--country <country>', 'Update country')
   .option('--birthday <date>', 'Update birthday (YYYY-MM-DD)')
   .option('--notes <notes>', 'Update notes')

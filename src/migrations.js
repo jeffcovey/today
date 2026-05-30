@@ -75,6 +75,19 @@ const systemMigrations = [
       db.exec(`ALTER TABLE sync_metadata ADD COLUMN sync_locked_at DATETIME`);
       db.exec(`ALTER TABLE sync_metadata ADD COLUMN sync_locked_by TEXT`);
     }
+  },
+  {
+    version: 105,
+    description: 'Create context_cache table for caching gathered AI context',
+    fn: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS context_cache (
+          cache_key TEXT PRIMARY KEY,
+          content TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
   }
 ];
 
