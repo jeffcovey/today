@@ -9,16 +9,18 @@ import { execSync } from 'child_process';
 
 // AI provider to env var mapping
 export const AI_PROVIDER_ENV_VARS = {
-  anthropic: { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
+  anthropic: null, // Uses the local Claude CLI, no key needed
   'anthropic-api': { key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' },
   openai: { key: 'OPENAI_API_KEY', label: 'OpenAI API Key' },
   gemini: { key: 'GOOGLE_API_KEY', label: 'Google API Key' },
   ollama: null, // Local, no key needed
 };
 
-// Background provider options (no Claude CLI option - background tasks use API)
+// Background provider options. 'anthropic' uses the local Claude CLI (no key,
+// text-only for web chat); 'anthropic-api' uses the Anthropic API.
 export const BACKGROUND_PROVIDER_OPTIONS = [
-  { value: 'anthropic', label: 'Anthropic Claude' },
+  { value: 'anthropic', label: 'Anthropic Claude (uses Claude CLI)' },
+  { value: 'anthropic-api', label: 'Anthropic Claude (uses API key)' },
   { value: 'openai', label: 'OpenAI (GPT-4, etc.)' },
   { value: 'ollama', label: 'Ollama (Local models)' },
   { value: 'gemini', label: 'Google Gemini' },
