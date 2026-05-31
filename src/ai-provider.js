@@ -27,6 +27,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 
 import { generateText, streamText } from 'ai';
 import { spawnSync, spawn } from 'child_process';
+import { randomBytes } from 'crypto';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join } from 'path';
@@ -279,8 +280,10 @@ function buildCliInvocation(options) {
 
   let promptFile = null;
   if (options.system) {
-    promptFile = join(tmpdir(), `today-ai-sys-${process.pid}-${cliTempCounter++}.txt`);
-    writeFileSync(promptFile, options.system);
+    promptFile = join(tmpdir(), `today-ai-sys-${process.pid}-${cliTempCounter++}-${randomBytes(8).toString('hex')}.txt`);
+    // mode 0o600 keeps the prompt readable only by us; flag 'wx' refuses to
+    // follow a pre-created symlink or clobber an existing file at the path.
+    writeFileSync(promptFile, options.system, { mode: 0o600, flag: 'wx' });
     args.push('--append-system-prompt-file', promptFile);
   }
 
