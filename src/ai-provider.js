@@ -26,8 +26,10 @@
 globalThis.AI_SDK_LOG_WARNINGS = false;
 
 import { generateText, streamText } from 'ai';
-import { existsSync } from 'fs';
-import { homedir } from 'os';
+import { spawnSync, spawn } from 'child_process';
+import { randomBytes } from 'crypto';
+import { existsSync, writeFileSync, unlinkSync } from 'fs';
+import { homedir, tmpdir } from 'os';
 import { join } from 'path';
 import { getFullConfig } from './config.js';
 
@@ -182,6 +184,234 @@ function modelMatchesProvider(modelName, providerName) {
   return pattern.test(modelName);
 }
 
+// =============================================================================
+// Local Claude CLI provider
+//
+// When `provider === 'anthropic'` we drive the local `claude` CLI instead of
+// the Anthropic API (which is what `anthropic-api` selects). This needs no API
+// key — it reuses the same unlimited CLI the interactive sessions use.
+//
+// `--allowed-tools ""` keeps the CLI in pure text-generation mode: no agentic
+// tool use, and therefore no permission prompt, so it runs under root without
+// `--dangerously-skip-permissions`. The CLI runs in a separate process and so
+// cannot drive the app's in-process chat tools (DB queries, document edits);
+// callers that pass `tools` get a text-only response. See issue #312 (MCP
+// bridge) for restoring tool execution via the CLI.
+// =============================================================================
+
+// Providers that route through the local `claude` CLI rather than an SDK/API.
+const CLI_PROVIDERS = new Set(['anthropic']);
+
+function isCliProvider(providerName) {
+  return CLI_PROVIDERS.has(providerName);
+}
+
+let cachedClaudeBinary = null;
+let warnedCliToolsUnsupported = false;
+let cliTempCounter = 0;
+
+/**
+ * Resolve the `claude` binary path (cached). Throws a helpful error if missing.
+ */
+function resolveClaudeBinary() {
+  if (cachedClaudeBinary) return cachedClaudeBinary;
+  const { available, binaryPath } = checkProviderBinarySync('anthropic', spawnSync);
+  if (!available) {
+    throw new Error(
+      'The "anthropic" provider needs the Claude CLI, which was not found. ' +
+      'Install it with: npm install -g @anthropic-ai/claude-code — ' +
+      'or set ai.provider = "anthropic-api" with an API key, or ai.provider = "ollama".'
+    );
+  }
+  cachedClaudeBinary = binaryPath || 'claude';
+  return cachedClaudeBinary;
+}
+
+/**
+ * Resolve the model name to pass to the CLI, falling back to the anthropic default.
+ */
+function resolveCliModel(options, aiConfig) {
+  let modelName = options.model || aiConfig.model || DEFAULT_MODELS.anthropic;
+  if (modelName && !modelMatchesProvider(modelName, 'anthropic')) {
+    modelName = DEFAULT_MODELS.anthropic;
+  }
+  return modelName;
+}
+
+/**
+ * Flatten a messages array into a single prompt string for the CLI.
+ * Single user turns pass through verbatim; multi-turn history is role-labelled.
+ */
+function serializeMessagesForCli(messages = []) {
+  const toText = (content) =>
+    typeof content === 'string' ? content : JSON.stringify(content);
+
+  if (messages.length === 1 && messages[0].role === 'user') {
+    return toText(messages[0].content);
+  }
+
+  return messages
+    .map((m) => {
+      const label = m.role === 'assistant' ? 'Assistant' : m.role === 'system' ? 'System' : 'Human';
+      return `${label}: ${toText(m.content)}`;
+    })
+    .join('\n\n');
+}
+
+function warnCliToolsUnsupported() {
+  if (warnedCliToolsUnsupported) return;
+  warnedCliToolsUnsupported = true;
+  console.warn(
+    '[AI Provider] The "anthropic" (Claude CLI) provider cannot execute in-process tools; ' +
+    'responding with text only. Use provider "anthropic-api" or "ollama" for tool-enabled chat, ' +
+    'or see issue #312 (MCP bridge).'
+  );
+}
+
+/**
+ * Build the CLI argv + stdin for a completion request.
+ * Writes the system prompt to a temp file (it can be large); caller must unlink it.
+ */
+function buildCliInvocation(options) {
+  const aiConfig = getFullConfig().ai || {};
+  const model = resolveCliModel(options, aiConfig);
+
+  const args = ['-p', '--model', model];
+
+  let promptFile = null;
+  if (options.system) {
+    promptFile = join(tmpdir(), `today-ai-sys-${process.pid}-${cliTempCounter++}-${randomBytes(8).toString('hex')}.txt`);
+    // mode 0o600 keeps the prompt readable only by us; flag 'wx' refuses to
+    // follow a pre-created symlink or clobber an existing file at the path.
+    writeFileSync(promptFile, options.system, { mode: 0o600, flag: 'wx' });
+    args.push('--append-system-prompt-file', promptFile);
+  }
+
+  // Keep `--allowed-tools ""` last: it is variadic, and a trailing empty value
+  // followed by no further args reliably disables all tools.
+  args.push('--allowed-tools', '');
+
+  const stdin = serializeMessagesForCli(options.messages);
+  return { args, stdin, promptFile };
+}
+
+/**
+ * Non-streaming completion via the local `claude` CLI.
+ * @returns {Promise<string>}
+ */
+async function cliCompletion(options) {
+  if (options.tools) warnCliToolsUnsupported();
+  const binary = resolveClaudeBinary();
+  const { args, stdin, promptFile } = buildCliInvocation(options);
+
+  try {
+    const result = spawnSync(binary, args, {
+      input: stdin,
+      encoding: 'utf8',
+      timeout: options.timeoutMs || 180000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+
+    if (result.error) {
+      if (result.error.code === 'ETIMEDOUT') {
+        throw new Error('Claude CLI timed out');
+      }
+      throw new Error(`Claude CLI failed: ${result.error.message}`);
+    }
+    if (result.status !== 0) {
+      throw new Error(`Claude CLI exited with status ${result.status}: ${(result.stderr || '').trim()}`);
+    }
+    return (result.stdout || '').trim();
+  } finally {
+    if (promptFile) {
+      try { unlinkSync(promptFile); } catch { /* best effort */ }
+    }
+  }
+}
+
+/**
+ * Streaming completion via the local `claude` CLI. Returns an object with
+ * `textStream` (yields text chunks) and `fullStream` (yields {type:'text-delta', text})
+ * to match the shape consumers expect from the SDK streamText() result. Because
+ * the CLI cannot drive in-process tools, no tool-call/tool-result parts are emitted.
+ */
+function cliStreamCompletion(options) {
+  if (options.tools) warnCliToolsUnsupported();
+  const binary = resolveClaudeBinary();
+  const { args, stdin, promptFile } = buildCliInvocation(options);
+
+  const chunks = [];
+  const waiters = [];
+  let finished = false;
+  let error = null;
+
+  const wake = () => { while (waiters.length) waiters.shift()(); };
+  const cleanup = () => {
+    if (promptFile) {
+      try { unlinkSync(promptFile); } catch { /* best effort */ }
+    }
+  };
+
+  const child = spawn(binary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  let stderr = '';
+
+  const timer = setTimeout(() => {
+    error = new Error('Claude CLI timed out');
+    try { child.kill('SIGTERM'); } catch { /* already gone */ }
+  }, options.timeoutMs || 180000);
+
+  if (options.abortSignal) {
+    const onAbort = () => { try { child.kill('SIGTERM'); } catch { /* already gone */ } };
+    if (options.abortSignal.aborted) onAbort();
+    else options.abortSignal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  child.stdout.on('data', (d) => { chunks.push(d.toString()); wake(); });
+  child.stderr.on('data', (d) => { stderr += d.toString(); });
+  child.on('error', (e) => { error = error || e; finished = true; clearTimeout(timer); cleanup(); wake(); });
+  child.on('close', (code) => {
+    clearTimeout(timer);
+    if (!error && code && code !== 0) {
+      error = new Error(`Claude CLI exited with status ${code}: ${stderr.trim()}`);
+    }
+    finished = true;
+    cleanup();
+    wake();
+  });
+
+  if (stdin != null) {
+    child.stdin.write(stdin);
+    child.stdin.end();
+  }
+
+  // Each call replays from index 0 over the shared `chunks` buffer, so the
+  // textStream and fullStream views can be iterated independently.
+  async function* rawChunks() {
+    let i = 0;
+    while (true) {
+      if (i < chunks.length) { yield chunks[i++]; continue; }
+      if (finished) {
+        if (error) throw error;
+        return;
+      }
+      await new Promise((resolve) => waiters.push(resolve));
+    }
+  }
+
+  return {
+    get textStream() {
+      return rawChunks();
+    },
+    get fullStream() {
+      return (async function* () {
+        for await (const chunk of rawChunks()) {
+          yield { type: 'text-delta', text: chunk };
+        }
+      })();
+    },
+  };
+}
+
 /**
  * Get the configured model for a given provider
  * @param {object} options - Options to override config
@@ -238,6 +468,11 @@ async function getConfiguredModel(options = {}) {
 export async function createCompletion(options) {
   const config = getFullConfig();
   const providerName = options.provider || config.ai?.provider || 'anthropic';
+
+  // The 'anthropic' provider drives the local Claude CLI (no API key needed).
+  if (isCliProvider(providerName)) {
+    return cliCompletion(options);
+  }
 
   const model = await getConfiguredModel({
     provider: options.provider,
@@ -389,6 +624,11 @@ export async function streamCompletion(options) {
   const config = getFullConfig();
   const providerName = options.provider || config.ai?.provider || 'anthropic';
 
+  // The 'anthropic' provider drives the local Claude CLI (no API key needed).
+  if (isCliProvider(providerName)) {
+    return cliStreamCompletion(options);
+  }
+
   const model = await getConfiguredModel({
     provider: options.provider,
     model: options.model,
@@ -450,6 +690,8 @@ export async function isAIAvailable() {
   try {
     switch (providerName) {
       case 'anthropic':
+        // CLI provider: available if the `claude` binary is installed.
+        return checkProviderBinarySync('anthropic', spawnSync).available;
       case 'anthropic-api':
         return !!(process.env.ANTHROPIC_API_KEY || process.env.TODAY_ANTHROPIC_KEY);
       case 'openai':
@@ -522,6 +764,8 @@ export function clearProviderCache() {
   openaiProvider = null;
   googleProvider = null;
   ollamaProvider = null;
+  cachedClaudeBinary = null;
+  warnedCliToolsUnsupported = false;
   ollamaModelInfoCache.clear();
 }
 

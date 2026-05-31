@@ -20,6 +20,7 @@ const {
 const { existsSync } = await import('fs');
 const { homedir } = await import('os');
 const { join } = await import('path');
+const { spawnSync } = await import('child_process');
 
 describe('AI Provider (Vercel AI SDK)', () => {
   beforeEach(() => {
@@ -157,30 +158,41 @@ describe('AI Provider (Vercel AI SDK)', () => {
   });
 
   describe('isAIAvailable', () => {
-    test('returns true when Anthropic API key is set via TODAY_ANTHROPIC_KEY', async () => {
+    test('anthropic-api: returns true when API key is set via TODAY_ANTHROPIC_KEY', async () => {
       process.env.TODAY_ANTHROPIC_KEY = 'test-key';
-      getFullConfig.mockReturnValue({});
+      getFullConfig.mockReturnValue({ ai: { provider: 'anthropic-api' } });
 
-      const available = await isAIAvailable();
-
-      expect(available).toBe(true);
+      expect(await isAIAvailable()).toBe(true);
     });
 
-    test('returns true when Anthropic API key is set via ANTHROPIC_API_KEY', async () => {
+    test('anthropic-api: returns true when API key is set via ANTHROPIC_API_KEY', async () => {
       process.env.ANTHROPIC_API_KEY = 'test-key';
-      getFullConfig.mockReturnValue({});
+      getFullConfig.mockReturnValue({ ai: { provider: 'anthropic-api' } });
 
-      const available = await isAIAvailable();
-
-      expect(available).toBe(true);
+      expect(await isAIAvailable()).toBe(true);
     });
 
-    test('returns false when no API key is set for Anthropic', async () => {
+    test('anthropic-api: returns false when no API key is set', async () => {
+      getFullConfig.mockReturnValue({ ai: { provider: 'anthropic-api' } });
+
+      expect(await isAIAvailable()).toBe(false);
+    });
+
+    test('anthropic (CLI): availability tracks the claude binary, not an API key', async () => {
+      // The default provider is 'anthropic', which runs the local Claude CLI.
       getFullConfig.mockReturnValue({});
+      const expected = checkProviderBinarySync('anthropic', spawnSync).available;
 
-      const available = await isAIAvailable();
+      expect(await isAIAvailable()).toBe(expected);
+    });
 
-      expect(available).toBe(false);
+    test('anthropic (CLI): an API key does not grant availability without the binary', async () => {
+      process.env.TODAY_ANTHROPIC_KEY = 'test-key';
+      getFullConfig.mockReturnValue({ ai: { provider: 'anthropic' } });
+      const expected = checkProviderBinarySync('anthropic', spawnSync).available;
+
+      // Result follows the binary check regardless of the API key being present.
+      expect(await isAIAvailable()).toBe(expected);
     });
 
     test('returns true when OpenAI API key is set', async () => {
