@@ -184,11 +184,10 @@ export async function writeFileAtomicAsync(filePath, content, encoding = 'utf-8'
  * Compare-and-swap atomic write for read-modify-write callers.
  *
  * `expectedContent` is the exact bytes the caller read before computing
- * `content`. CAS operations for a given file are serialized via a lock file;
- * inside that critical section we compare the current bytes and abort WITHOUT
- * writing if they no longer match `expectedContent` (the caller's update is
- * stale; the next sync recomputes from fresh state and converges). Identical
- * content is skipped as unchanged, exactly like writeFileAtomic.
+ * `content`. We compare the current bytes and abort WITHOUT writing if they no
+ * longer match `expectedContent` (the caller's update is stale; the next sync
+ * recomputes from fresh state and converges). Identical content is skipped as
+ * unchanged, exactly like writeFileAtomic.
  *
  * @param {string} filePath - Target file.
  * @param {string} content - New content the caller computed.
