@@ -137,21 +137,6 @@ describe('writeFileAtomicCAS', () => {
       expect(fs.readFileSync(file, 'utf-8')).toBe('existing');
     });
 
-    test('writeFileAtomicCASAsync serializes concurrent CAS writers per file', async () => {
-      const file = path.join(dir, 'plan.md');
-      fs.writeFileSync(file, 'base');
-
-      const [a, b] = await Promise.all([
-        writeFileAtomicCASAsync(file, 'next-a', 'base'),
-        writeFileAtomicCASAsync(file, 'next-b', 'base'),
-      ]);
-
-      const outcomes = [a, b];
-      expect(outcomes.filter((x) => x.written).length).toBe(1);
-      expect(outcomes.filter((x) => x.conflict).length).toBe(1);
-      const finalContent = fs.readFileSync(file, 'utf-8');
-      expect(['next-a', 'next-b']).toContain(finalContent);
-    });
   });
 
   afterEach(() => {

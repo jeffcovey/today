@@ -19,85 +19,21 @@
  *
  * writeFileAtomicCAS adds compare-and-swap for the genuine-change race: a
  * read-modify-write caller passes the bytes it originally read, and the write
- * is aborted if the on-disk bytes no longer match. CAS callers are serialized
- * per target through a sidecar lock file so the compare and replace remain one
- * critical section. expectedContent === null means "create only if absent" and
- * uses O_EXCL for kernel-level create-if-missing semantics.
+ * is aborted if the on-disk bytes no longer match (another instance wrote in
+ * between). A lockfile is deliberately NOT used: instances have separate DBs
+ * and the vault may be backed by a file-sync service, so a lockfile placed in
+ * the vault would itself sync between machines and become a stale, conflicting
+ * artifact. CAS needs no shared state, tolerates the sync service, and shrinks
+ * the race window from the whole read-modify-write down to compare->rename. A
+ * lost update is simply retried on the next sync and converges.
+ *
+ * expectedContent === null means "create only if absent" and uses O_EXCL for
+ * kernel-level create-if-missing semantics.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { promises as fsp } from 'fs';
-
-const LOCK_RETRY_MS = 5;
-
-function sleepSync(ms) {
-  const signal = new Int32Array(new SharedArrayBuffer(4));
-  Atomics.wait(signal, 0, 0, ms);
-}
-
-function lockPathFor(filePath) {
-  const dir = path.dirname(filePath);
-  return path.join(dir, `.${path.basename(filePath)}.lock`);
-}
-
-function withFileLock(filePath, fn) {
-  const dir = path.dirname(filePath);
-  fs.mkdirSync(dir, { recursive: true });
-  const lockPath = lockPathFor(filePath);
-
-  while (true) {
-    try {
-      const lockFd = fs.openSync(lockPath, 'wx');
-      fs.closeSync(lockFd);
-      break;
-    } catch (err) {
-      if (err?.code !== 'EEXIST') {
-        throw err;
-      }
-      sleepSync(LOCK_RETRY_MS);
-    }
-  }
-
-  try {
-    return fn();
-  } finally {
-    try {
-      fs.unlinkSync(lockPath);
-    } catch {
-      // Lock may already be gone.
-    }
-  }
-}
-
-async function withFileLockAsync(filePath, fn) {
-  const dir = path.dirname(filePath);
-  await fsp.mkdir(dir, { recursive: true });
-  const lockPath = lockPathFor(filePath);
-
-  while (true) {
-    try {
-      const lockFile = await fsp.open(lockPath, 'wx');
-      await lockFile.close();
-      break;
-    } catch (err) {
-      if (err?.code !== 'EEXIST') {
-        throw err;
-      }
-      await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
-    }
-  }
-
-  try {
-    return await fn();
-  } finally {
-    try {
-      await fsp.unlink(lockPath);
-    } catch {
-      // Lock may already be gone.
-    }
-  }
-}
 
 function writeFileExclusive(filePath, content, encoding) {
   const dir = path.dirname(filePath);
@@ -262,44 +198,42 @@ export async function writeFileAtomicAsync(filePath, content, encoding = 'utf-8'
  *   happened; conflict=true if it was aborted due to a concurrent change.
  */
 export function writeFileAtomicCAS(filePath, content, expectedContent, encoding = 'utf-8') {
-  return withFileLock(filePath, () => {
-    let current;
-    try {
-      current = fs.readFileSync(filePath, encoding);
-    } catch {
-      current = null;
-    }
+  let current;
+  try {
+    current = fs.readFileSync(filePath, encoding);
+  } catch {
+    current = null;
+  }
 
-    if (expectedContent === null) {
-      if (current !== null) {
-        return { written: false, conflict: true };
-      }
-      try {
-        writeFileExclusive(filePath, content, encoding);
-      } catch (err) {
-        if (err?.code === 'EEXIST') {
-          return { written: false, conflict: true };
-        }
-        throw err;
-      }
-      return { written: true, conflict: false };
-    }
-
-    // If the target already has the caller's desired bytes, treat it as an
-    // unchanged no-op even if expectedContent is stale (another instance may
-    // have already written the same result).
-    if (current === content) {
-      return { written: false, conflict: false };
-    }
-
-    // Concurrent change since the caller read: abort, let the next sync retry.
-    if (current !== expectedContent) {
+  if (expectedContent === null) {
+    if (current !== null) {
       return { written: false, conflict: true };
     }
-
-    atomicReplace(filePath, content, encoding);
+    try {
+      writeFileExclusive(filePath, content, encoding);
+    } catch (err) {
+      if (err?.code === 'EEXIST') {
+        return { written: false, conflict: true };
+      }
+      throw err;
+    }
     return { written: true, conflict: false };
-  });
+  }
+
+  // If the target already has the caller's desired bytes, treat it as an
+  // unchanged no-op even if expectedContent is stale (another instance may
+  // have already written the same result).
+  if (current === content) {
+    return { written: false, conflict: false };
+  }
+
+  // Concurrent change since the caller read: abort, let the next sync retry.
+  if (current !== expectedContent) {
+    return { written: false, conflict: true };
+  }
+
+  atomicReplace(filePath, content, encoding);
+  return { written: true, conflict: false };
 }
 
 /**
@@ -312,38 +246,36 @@ export function writeFileAtomicCAS(filePath, content, expectedContent, encoding 
  * @returns {Promise<{written: boolean, conflict: boolean}>}
  */
 export async function writeFileAtomicCASAsync(filePath, content, expectedContent, encoding = 'utf-8') {
-  return withFileLockAsync(filePath, async () => {
-    let current;
-    try {
-      current = await fsp.readFile(filePath, encoding);
-    } catch {
-      current = null;
-    }
+  let current;
+  try {
+    current = await fsp.readFile(filePath, encoding);
+  } catch {
+    current = null;
+  }
 
-    if (expectedContent === null) {
-      if (current !== null) {
-        return { written: false, conflict: true };
-      }
-      try {
-        await writeFileExclusiveAsync(filePath, content, encoding);
-      } catch (err) {
-        if (err?.code === 'EEXIST') {
-          return { written: false, conflict: true };
-        }
-        throw err;
-      }
-      return { written: true, conflict: false };
-    }
-
-    if (current === content) {
-      return { written: false, conflict: false };
-    }
-
-    if (current !== expectedContent) {
+  if (expectedContent === null) {
+    if (current !== null) {
       return { written: false, conflict: true };
     }
-
-    await atomicReplaceAsync(filePath, content, encoding);
+    try {
+      await writeFileExclusiveAsync(filePath, content, encoding);
+    } catch (err) {
+      if (err?.code === 'EEXIST') {
+        return { written: false, conflict: true };
+      }
+      throw err;
+    }
     return { written: true, conflict: false };
-  });
+  }
+
+  if (current === content) {
+    return { written: false, conflict: false };
+  }
+
+  if (current !== expectedContent) {
+    return { written: false, conflict: true };
+  }
+
+  await atomicReplaceAsync(filePath, content, encoding);
+  return { written: true, conflict: false };
 }
