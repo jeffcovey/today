@@ -9,7 +9,9 @@ import {
 describe('ai-settings-shared', () => {
   describe('AI_PROVIDER_ENV_VARS', () => {
     test('contains entries for known providers', () => {
-      expect(AI_PROVIDER_ENV_VARS.anthropic).toEqual({ key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' });
+      // 'anthropic' runs the local Claude CLI and needs no key; 'anthropic-api' uses the API key.
+      expect(AI_PROVIDER_ENV_VARS.anthropic).toBeNull();
+      expect(AI_PROVIDER_ENV_VARS['anthropic-api']).toEqual({ key: 'TODAY_ANTHROPIC_KEY', label: 'Anthropic API Key' });
       expect(AI_PROVIDER_ENV_VARS.openai).toEqual({ key: 'OPENAI_API_KEY', label: 'OpenAI API Key' });
       expect(AI_PROVIDER_ENV_VARS.gemini).toEqual({ key: 'GOOGLE_API_KEY', label: 'Google API Key' });
     });

@@ -326,7 +326,7 @@ function ConfigApp({ onAction, initialSection = 0 }) {
   const getFieldInfo = (f) => {
     if (f.type === 'encrypted' && f.dynamic) {
       if (!providerEnvVar) {
-        return { label: 'API Key (not needed for Ollama)', envVar: null, hidden: true };
+        return { label: 'API Key (not required for this provider)', envVar: null, hidden: true };
       }
       return { label: providerEnvVar.label, envVar: providerEnvVar.key, hidden: false };
     }
