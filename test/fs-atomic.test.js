@@ -127,6 +127,31 @@ describe('writeFileAtomicCAS', () => {
       expect(res).toEqual({ written: true, conflict: false });
       expect(fs.readFileSync(file, 'utf-8')).toBe('next');
     });
+
+    test('writeFileAtomicCASAsync treats expected=null as create-if-absent', async () => {
+      const file = path.join(dir, 'plan.md');
+      fs.writeFileSync(file, 'existing');
+
+      const res = await writeFileAtomicCASAsync(file, 'existing', null);
+      expect(res).toEqual({ written: false, conflict: true });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('existing');
+    });
+
+    test('writeFileAtomicCASAsync serializes concurrent CAS writers per file', async () => {
+      const file = path.join(dir, 'plan.md');
+      fs.writeFileSync(file, 'base');
+
+      const [a, b] = await Promise.all([
+        writeFileAtomicCASAsync(file, 'next-a', 'base'),
+        writeFileAtomicCASAsync(file, 'next-b', 'base'),
+      ]);
+
+      const outcomes = [a, b];
+      expect(outcomes.filter((x) => x.written).length).toBe(1);
+      expect(outcomes.filter((x) => x.conflict).length).toBe(1);
+      const finalContent = fs.readFileSync(file, 'utf-8');
+      expect(['next-a', 'next-b']).toContain(finalContent);
+    });
   });
 
   afterEach(() => {
@@ -187,5 +212,15 @@ describe('writeFileAtomicCAS', () => {
 
     expect(res).toEqual({ written: false, conflict: true });
     expect(fs.existsSync(file)).toBe(false);
+  });
+
+  test('treats expected=null as create-if-absent for sync CAS', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'existing');
+
+    const res = writeFileAtomicCAS(file, 'existing', null);
+
+    expect(res).toEqual({ written: false, conflict: true });
+    expect(fs.readFileSync(file, 'utf-8')).toBe('existing');
   });
 });

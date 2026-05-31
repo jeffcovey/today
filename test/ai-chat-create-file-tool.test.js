@@ -62,6 +62,20 @@ describe('create_file tool CAS behavior', () => {
     expect(await fs.readFile(existing, 'utf-8')).toBe('pre-existing content\n');
   });
 
+  test('refuses to create when the same content already exists', async () => {
+    const existing = path.join(tempVault, 'notes.md');
+    await fs.writeFile(existing, 'same content\n');
+
+    const result = await createCreateFileTool().execute({
+      filePath: 'notes.md',
+      content: 'same content\n',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('already exists');
+    expect(await fs.readFile(existing, 'utf-8')).toBe('same content\n');
+  });
+
   test('rejects paths that escape the vault', async () => {
     const result = await createCreateFileTool().execute({
       filePath: '../outside.md',
