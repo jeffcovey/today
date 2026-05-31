@@ -213,6 +213,7 @@ for (const task of data.tasks || []) {
 
   // Skip archived habits (st: "A" = archived, "N" = normal/active)
   if (task.st === 'A') continue;
+  const isPaused = task.st === 'P' || task.pa === true;
 
   const icon = task.i;
   const categoryIds = task.cat || [];
@@ -268,7 +269,8 @@ for (const task of data.tasks || []) {
         target_type: targetType,
         target_value: targetValue,
         current_streak: currentStreak,
-        entry_count: dayData.entries.length
+        entry_count: dayData.entries.length,
+        paused: isPaused
       })
     });
   }
@@ -291,7 +293,8 @@ for (const task of data.tasks || []) {
         target_type: targetType,
         target_value: targetValue,
         current_streak: currentStreak,
-        entry_count: 0
+        entry_count: 0,
+        paused: isPaused
       })
     });
   }

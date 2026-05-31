@@ -607,6 +607,7 @@ async function getTodayTaskTimerItems() {
     WHERE date = ?
       AND status = 'pending'
       AND (goal_type IS NULL OR goal_type != 'limit')
+      AND COALESCE(json_extract(metadata, '$.paused'), 0) = 0
       AND (json_extract(metadata, '$.recurrence') IS NULL
            OR json_extract(metadata, '$.recurrence') = 'daily')
     ORDER BY category, title
@@ -744,7 +745,9 @@ function isItemStillValid(item) {
     const habitId = item.id.replace(/^habit-/, '');
     const today = getTodayDate();
     return !!db.prepare(
-      `SELECT habit_id FROM habits WHERE habit_id = ? AND date = ? AND status = 'pending'`
+      `SELECT habit_id FROM habits
+       WHERE habit_id = ? AND date = ? AND status = 'pending'
+         AND COALESCE(json_extract(metadata, '$.paused'), 0) = 0`
     ).get(habitId, today);
   } else if (item.type === 'project') {
     const projectId = item.id.replace(/^project-/, '');
