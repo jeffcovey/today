@@ -27,8 +27,9 @@
  * the race window from the whole read-modify-write down to compare->rename. A
  * lost update is simply retried on the next sync and converges.
  *
- * expectedContent === null means "create only if absent" and uses O_EXCL for
- * kernel-level create-if-missing semantics.
+ * expectedContent === null means "create only if absent" and uses a tempfile +
+ * hard link for kernel-level create-if-missing semantics with no partial-file
+ * visibility.
  */
 
 import fs from 'fs';
@@ -38,24 +39,50 @@ import { promises as fsp } from 'fs';
 function writeFileExclusive(filePath, content, encoding) {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
-  const fd = fs.openSync(filePath, 'wx');
+  const tmpPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.create-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
   try {
-    fs.writeFileSync(fd, content, { encoding });
-    fs.fsyncSync(fd);
+    const fd = fs.openSync(tmpPath, 'w');
+    try {
+      fs.writeFileSync(fd, content, { encoding });
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.linkSync(tmpPath, filePath);
   } finally {
-    fs.closeSync(fd);
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // Temp file already gone or never created.
+    }
   }
 }
 
 async function writeFileExclusiveAsync(filePath, content, encoding) {
   const dir = path.dirname(filePath);
   await fsp.mkdir(dir, { recursive: true });
-  const fh = await fsp.open(filePath, 'wx');
+  const tmpPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.create-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
   try {
-    await fh.writeFile(content, { encoding });
-    await fh.sync();
+    const fileHandle = await fsp.open(tmpPath, 'w');
+    try {
+      await fileHandle.writeFile(content, { encoding });
+      await fileHandle.sync();
+    } finally {
+      await fileHandle.close();
+    }
+    await fsp.link(tmpPath, filePath);
   } finally {
-    await fh.close();
+    try {
+      await fsp.unlink(tmpPath);
+    } catch {
+      // Temp file already gone or never created.
+    }
   }
 }
 
