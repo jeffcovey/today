@@ -127,6 +127,27 @@ describe('writeFileAtomicCAS', () => {
       expect(res).toEqual({ written: true, conflict: false });
       expect(fs.readFileSync(file, 'utf-8')).toBe('next');
     });
+
+    test('writeFileAtomicCASAsync treats expected=null as create-if-absent', async () => {
+      const file = path.join(dir, 'plan.md');
+      fs.writeFileSync(file, 'existing');
+
+      const res = await writeFileAtomicCASAsync(file, 'existing', null);
+      expect(res).toEqual({ written: false, conflict: true });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('existing');
+    });
+
+    test('writeFileAtomicCASAsync creates populated file with no create-temp leftovers', async () => {
+      const file = path.join(dir, 'plan.md');
+
+      const res = await writeFileAtomicCASAsync(file, 'created', null);
+
+      expect(res).toEqual({ written: true, conflict: false });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('created');
+      const leftovers = fs.readdirSync(dir).filter((n) => n.includes('.create-'));
+      expect(leftovers).toEqual([]);
+    });
+
   });
 
   afterEach(() => {
@@ -187,5 +208,26 @@ describe('writeFileAtomicCAS', () => {
 
     expect(res).toEqual({ written: false, conflict: true });
     expect(fs.existsSync(file)).toBe(false);
+  });
+
+  test('treats expected=null as create-if-absent for sync CAS', () => {
+    const file = path.join(dir, 'plan.md');
+    fs.writeFileSync(file, 'existing');
+
+    const res = writeFileAtomicCAS(file, 'existing', null);
+
+    expect(res).toEqual({ written: false, conflict: true });
+    expect(fs.readFileSync(file, 'utf-8')).toBe('existing');
+  });
+
+  test('creates populated file with no create-temp leftovers for sync CAS', () => {
+    const file = path.join(dir, 'plan.md');
+
+    const res = writeFileAtomicCAS(file, 'created', null);
+
+    expect(res).toEqual({ written: true, conflict: false });
+    expect(fs.readFileSync(file, 'utf-8')).toBe('created');
+    const leftovers = fs.readdirSync(dir).filter((n) => n.includes('.create-'));
+    expect(leftovers).toEqual([]);
   });
 });

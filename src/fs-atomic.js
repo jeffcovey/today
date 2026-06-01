@@ -18,7 +18,7 @@
  * (no write means no conflict).
  *
  * writeFileAtomicCAS adds compare-and-swap for the genuine-change race: a
- * read-modify-write caller passes the bytes it originally read, and the swap
+ * read-modify-write caller passes the bytes it originally read, and the write
  * is aborted if the on-disk bytes no longer match (another instance wrote in
  * between). A lockfile is deliberately NOT used: instances have separate DBs
  * and the vault may be backed by a file-sync service, so a lockfile placed in
@@ -26,11 +26,65 @@
  * artifact. CAS needs no shared state, tolerates the sync service, and shrinks
  * the race window from the whole read-modify-write down to compare->rename. A
  * lost update is simply retried on the next sync and converges.
+ *
+ * expectedContent === null means "create only if absent" and uses a tempfile +
+ * hard link for kernel-level create-if-missing semantics with no partial-file
+ * visibility.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { promises as fsp } from 'fs';
+
+function writeFileExclusive(filePath, content, encoding) {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmpPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.create-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
+  try {
+    const fd = fs.openSync(tmpPath, 'w');
+    try {
+      fs.writeFileSync(fd, content, { encoding });
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.linkSync(tmpPath, filePath);
+  } finally {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // Temp file already gone or never created.
+    }
+  }
+}
+
+async function writeFileExclusiveAsync(filePath, content, encoding) {
+  const dir = path.dirname(filePath);
+  await fsp.mkdir(dir, { recursive: true });
+  const tmpPath = path.join(
+    dir,
+    `.${path.basename(filePath)}.create-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
+  try {
+    const fileHandle = await fsp.open(tmpPath, 'w');
+    try {
+      await fileHandle.writeFile(content, { encoding });
+      await fileHandle.sync();
+    } finally {
+      await fileHandle.close();
+    }
+    await fsp.link(tmpPath, filePath);
+  } finally {
+    try {
+      await fsp.unlink(tmpPath);
+    } catch {
+      // Temp file already gone or never created.
+    }
+  }
+}
 
 /**
  * Temp-file + fsync + rename over `filePath`. Atomic within a filesystem.
@@ -157,9 +211,8 @@ export async function writeFileAtomicAsync(filePath, content, encoding = 'utf-8'
  * Compare-and-swap atomic write for read-modify-write callers.
  *
  * `expectedContent` is the exact bytes the caller read before computing
- * `content`. Immediately before the rename we re-read the file: if it no
- * longer matches `expectedContent`, another instance changed it in between, so
- * we abort WITHOUT writing (the caller's update is stale; the next sync
+ * `content`. We compare the current bytes and abort WITHOUT writing if they no
+ * longer match `expectedContent` (the caller's update is stale; the next sync
  * recomputes from fresh state and converges). Identical content is skipped as
  * unchanged, exactly like writeFileAtomic.
  *
@@ -176,6 +229,21 @@ export function writeFileAtomicCAS(filePath, content, expectedContent, encoding 
     current = fs.readFileSync(filePath, encoding);
   } catch {
     current = null;
+  }
+
+  if (expectedContent === null) {
+    if (current !== null) {
+      return { written: false, conflict: true };
+    }
+    try {
+      writeFileExclusive(filePath, content, encoding);
+    } catch (err) {
+      if (err?.code === 'EEXIST') {
+        return { written: false, conflict: true };
+      }
+      throw err;
+    }
+    return { written: true, conflict: false };
   }
 
   // If the target already has the caller's desired bytes, treat it as an
@@ -209,6 +277,21 @@ export async function writeFileAtomicCASAsync(filePath, content, expectedContent
     current = await fsp.readFile(filePath, encoding);
   } catch {
     current = null;
+  }
+
+  if (expectedContent === null) {
+    if (current !== null) {
+      return { written: false, conflict: true };
+    }
+    try {
+      await writeFileExclusiveAsync(filePath, content, encoding);
+    } catch (err) {
+      if (err?.code === 'EEXIST') {
+        return { written: false, conflict: true };
+      }
+      throw err;
+    }
+    return { written: true, conflict: false };
   }
 
   if (current === content) {
