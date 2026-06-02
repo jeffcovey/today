@@ -24,13 +24,25 @@ const VAULT_DIR = getAbsoluteVaultPath();
 const DEFAULT_DEBOUNCE = 3000;
 const DEFAULT_IGNORE = ['.stfolder', '.stversions', '.backups', '.DS_Store'];
 
-// Plugins that scan the entire vault and are too expensive for real-time watching.
-// These run on the scheduler's 10-minute cron instead.
+// Plugins that must NOT be driven by the file-watcher. Two reasons:
+//
+//   1. Too expensive for real-time watching (full-vault scans).
+//   2. Generative — they WRITE into the same vault directory they watch, so
+//      watching them creates a feedback loop: the plugin's own write fires a
+//      change event, which re-runs the plugin, which writes again. With the
+//      vault Unison-synced across machines (-prefer newer), that storm spawns
+//      conflict copies and, during transient mid-sync absences, regenerates
+//      plan files from their template — clobbering hand-entered content.
+//
+// All of these run on the scheduler's 10-minute cron instead.
 const DEFAULT_EXCLUDE_PLUGINS = [
   'markdownlint-cleanup',
   'icloud-conflict-cleanup',
   'resilio-conflict-cleanup',
-  'vault-changes'
+  'vault-changes',
+  // Generative: rewrites/creates files under vault/plans, which it also
+  // watches. See https://github.com/jeffcovey/today/issues/323.
+  'markdown-plans'
 ];
 
 function loadWatcherConfig() {
