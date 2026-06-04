@@ -780,12 +780,43 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  // If no entries and incremental, nothing changed
+  // Reconcile deletions for targeted (fileFilter) syncs of file-based plugins.
+  // A deleted file is requested in the fileFilter but never appears in
+  // files_processed — the plugin skips paths that no longer exist — so its rows
+  // would otherwise be orphaned in the DB and keep surfacing (e.g. in the task
+  // timer). Emptied-but-existing files already reconcile via files_processed.
+  let reconciledDeletions = 0;
+  if (fileFilter && (plugin.type === 'tasks' || plugin.type === 'time-logs')) {
+    const reconcileTable = getTableNameForType(plugin.type);
+    if (reconcileTable) {
+      const processed = new Set(filesProcessed || []);
+      const deletedFiles = fileFilter
+        .split(',')
+        .map(f => f.trim())
+        .filter(f => f && !processed.has(f));
+      if (deletedFiles.length > 0) {
+        // Escape LIKE wildcards (% _ \) in the file path so e.g. a filename with
+        // underscores can't match unrelated rows.
+        const escapeLike = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+        const deleteStmt = db.prepare(
+          `DELETE FROM ${reconcileTable} WHERE source = ? AND id LIKE ? ESCAPE '\\'`
+        );
+        for (const file of deletedFiles) {
+          reconciledDeletions += deleteStmt.run(sourceId, `${sourceId}:${escapeLike(file)}:%`).changes;
+        }
+      }
+    }
+  }
+
+  // If no entries and incremental, nothing changed (unless we just reconciled
+  // away rows for a deleted file).
   if (entries.length === 0 && isIncremental) {
     return {
       success: true,
       count: 0,
-      message: `No changes since last sync`
+      message: reconciledDeletions > 0
+        ? `Removed ${reconciledDeletions} row(s) for deleted file(s)`
+        : `No changes since last sync`
     };
   }
 
