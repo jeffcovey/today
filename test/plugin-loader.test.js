@@ -1,5 +1,7 @@
 import { jest } from '@jest/globals';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,8 +30,10 @@ const {
   tryAcquireSyncLock,
   releaseSyncLock,
   refreshSyncLock,
-  startSyncLockHeartbeat
+  startSyncLockHeartbeat,
+  syncPluginSource
 } = await import('../src/plugin-loader.js');
+const { getSqlColumns } = await import('../src/plugin-schemas.js');
 const Database = (await import('better-sqlite3')).default;
 
 function makeLockDb() {
@@ -269,6 +273,117 @@ describe('Plugin Loader', () => {
       expect(enabled[0].plugin.name).toBe('markdown-time-tracking');
       expect(enabled[0].sources).toHaveLength(1);
       expect(enabled[0].sources[0].sourceName).toBe('local');
+    });
+  });
+
+  // Regression for #325: deleting a markdown file must remove its task rows.
+  // A deleted file is present in the targeted-sync fileFilter but never in the
+  // plugin's files_processed (the plugin skips paths that no longer exist), so
+  // before the fix its rows were orphaned and kept showing in the task timer.
+  describe('deleted-file reconciliation (targeted sync)', () => {
+    let pluginDir;
+    let plugin;
+
+    beforeAll(() => {
+      // Stub 'read' command: files whose path contains "exists" are treated as
+      // present (returned with a task + listed in files_processed); every other
+      // filtered file is treated as deleted (skipped, mirroring fs.existsSync).
+      pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tasks-stub-'));
+      const readPath = path.join(pluginDir, 'read.js');
+      fs.writeFileSync(readPath, `#!/usr/bin/env node
+const filter = (process.env.FILE_FILTER || '').split(',').map(s => s.trim()).filter(Boolean);
+const entries = [];
+const files_processed = [];
+for (const f of filter) {
+  if (f.includes('exists')) {
+    files_processed.push(f);
+    entries.push({ id: f + ':1', title: 'kept task', status: 'open' });
+  }
+}
+console.log(JSON.stringify({ entries, files_processed, incremental: true }));
+`);
+      fs.chmodSync(readPath, 0o755);
+      plugin = {
+        name: 'tasks-stub',
+        type: 'tasks',
+        _path: pluginDir,
+        commands: { read: 'read.js' }
+      };
+    });
+
+    afterAll(() => {
+      fs.rmSync(pluginDir, { recursive: true, force: true });
+    });
+
+    function makeTasksDb() {
+      const db = new Database(':memory:');
+      db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+      db.exec(`
+        CREATE TABLE sync_metadata (
+          source TEXT PRIMARY KEY,
+          sync_locked_at TEXT,
+          sync_locked_by TEXT,
+          last_synced_at TEXT,
+          last_sync_files TEXT,
+          entries_count INTEGER,
+          extra_data TEXT
+        )
+      `);
+      return db;
+    }
+
+    const sourceId = 'tasks-stub/default';
+    const insertTask = (db, id, title) =>
+      db.prepare(`INSERT INTO tasks (id, source, title, status) VALUES (?, ?, ?, 'open')`)
+        .run(`${sourceId}:${id}`, sourceId, title);
+    const ids = (db) => db.prepare(`SELECT id FROM tasks ORDER BY id`).all().map(r => r.id);
+
+    test('removes rows for a deleted file while preserving unfiltered and updating existing files', async () => {
+      const db = makeTasksDb();
+      insertTask(db, 'vault/deleted.md:20', 'orphan');     // in filter, file gone -> delete
+      insertTask(db, 'vault/exists.md:1', 'old title');    // in filter, file present -> update
+      insertTask(db, 'vault/untouched.md:5', 'safe');      // not in filter -> keep
+
+      const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
+        fileFilter: 'vault/deleted.md,vault/exists.md',
+        _caller: 'test'
+      });
+
+      expect(result.success).toBe(true);
+      expect(ids(db)).toEqual([
+        `${sourceId}:vault/exists.md:1`,
+        `${sourceId}:vault/untouched.md:5`
+      ]);
+      expect(
+        db.prepare(`SELECT title FROM tasks WHERE id = ?`).get(`${sourceId}:vault/exists.md:1`).title
+      ).toBe('kept task');
+    });
+
+    test('reconciles a pure deletion (no entries returned) past the empty-incremental short-circuit', async () => {
+      const db = makeTasksDb();
+      insertTask(db, 'vault/deleted.md:20', 'orphan');
+
+      const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
+        fileFilter: 'vault/deleted.md',
+        _caller: 'test'
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/Removed 1 row/);
+      expect(ids(db)).toEqual([]);
+    });
+
+    test('escapes LIKE wildcards so an underscore filename cannot delete unrelated rows', async () => {
+      const db = makeTasksDb();
+      insertTask(db, 'vault/a_b.md:1', 'underscore file');  // deleted target
+      insertTask(db, 'vault/axb.md:1', 'lookalike');        // must NOT be deleted
+
+      await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
+        fileFilter: 'vault/a_b.md',
+        _caller: 'test'
+      });
+
+      expect(ids(db)).toEqual([`${sourceId}:vault/axb.md:1`]);
     });
   });
 });
