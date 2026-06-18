@@ -1732,22 +1732,6 @@ Contents:
         // Load chat history on page load
         loadChatHistory();
         
-        // Toggle collapse sections
-        window.toggleCollapse = function(sectionId) {
-          const section = document.getElementById(sectionId);
-          const chevron = document.getElementById(sectionId.replace('Section', 'Chevron'));
-          
-          if (section.classList.contains('show')) {
-            section.classList.remove('show');
-            chevron.classList.remove('fa-chevron-up');
-            chevron.classList.add('fa-chevron-down');
-          } else {
-            section.classList.add('show');
-            chevron.classList.remove('fa-chevron-down');
-            chevron.classList.add('fa-chevron-up');
-          }
-        }
-        
         // Track page visits for recents
         const currentPath = window.location.pathname;
         if (currentPath !== '/' && currentPath !== '') {

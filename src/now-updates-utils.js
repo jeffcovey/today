@@ -7,7 +7,7 @@ export function extractMostRecentNowEntry(content) {
   if (!trimmed) return null;
 
   const sections = trimmed
-    .split(/\n\s*---\s*\n/g)
+    .split('\n\n---\n\n')
     .map(section => section.trim())
     .filter(Boolean);
 
