@@ -49,6 +49,7 @@ import {
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
+import { extractMostRecentNowEntry } from './now-updates-utils.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -1243,6 +1244,7 @@ async function renderDirectory(dirPath, urlPath) {
     // Determine "Today" link: diary if markdown-diary enabled, else plan if markdown-plans enabled
     const diaryEnabled = isPluginConfigured('markdown-diary');
     const plansEnabled = isPluginConfigured('markdown-plans');
+    const nowUpdatesEnabled = isPluginConfigured('now-updates');
     const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format for diary
 
     // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
@@ -1305,6 +1307,37 @@ async function renderDirectory(dirPath, urlPath) {
               </div>`;
 
     contentHtml += `</div>`;
+
+    if (nowUpdatesEnabled) {
+      const nowPath = path.join(dirPath, 'now.md');
+      const nowExists = await fs.access(nowPath).then(() => true).catch(() => false);
+      let nowEntryHtml = '<p class="text-muted mb-0"><small>No now updates yet.</small></p>';
+
+      if (nowExists) {
+        const nowContent = await fs.readFile(nowPath, 'utf8');
+        const latestNowEntry = extractMostRecentNowEntry(nowContent);
+        if (latestNowEntry) {
+          const renderedNow = marked.parse(convertWikiLinks(latestNowEntry), { breaks: true });
+          nowEntryHtml = `<div>${convertEmojisToIcons(renderedNow)}</div>`;
+        }
+      }
+
+      contentHtml += `
+            <div class="card shadow-sm mb-3">
+              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('nowSection')">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-bolt me-2"></i> Now</span>
+                  <i class="fas fa-chevron-down" id="nowChevron"></i>
+                </div>
+              </div>
+              <div class="collapse" id="nowSection">
+                <div class="card-body">
+                  ${nowEntryHtml}
+                  <a href="/now.md" class="btn btn-sm btn-outline-primary mt-2">View full now.md</a>
+                </div>
+              </div>
+            </div>`;
+    }
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
