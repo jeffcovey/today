@@ -1309,7 +1309,7 @@ async function renderDirectory(dirPath, urlPath) {
     contentHtml += `</div>`;
 
     if (nowUpdatesEnabled) {
-      const nowPath = path.join(dirPath, 'now.md');
+      const nowPath = path.join(VAULT_PATH, 'now.md');
       const nowExists = await fs.access(nowPath).then(() => true).catch(() => false);
       let nowEntryHtml = '<p class="text-muted mb-0"><small>No now updates yet.</small></p>';
 
