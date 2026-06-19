@@ -210,13 +210,24 @@ function updateTaskTimerCountdown() {
 // Collapse/expand functionality for sections
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
-  if (section) {
-    if (section.classList.contains('show')) {
-      section.classList.remove('show');
-      localStorage.setItem('collapse_' + sectionId, 'collapsed');
-    } else {
-      section.classList.add('show');
-      localStorage.setItem('collapse_' + sectionId, 'expanded');
+  if (!section) return;
+
+  const chevron = document.getElementById(sectionId.replace('Section', 'Chevron'));
+  const isExpanded = section.classList.contains('show');
+
+  if (isExpanded) {
+    section.classList.remove('show');
+    localStorage.setItem('collapse_' + sectionId, 'collapsed');
+    if (chevron) {
+      chevron.classList.remove('fa-chevron-up');
+      chevron.classList.add('fa-chevron-down');
+    }
+  } else {
+    section.classList.add('show');
+    localStorage.setItem('collapse_' + sectionId, 'expanded');
+    if (chevron) {
+      chevron.classList.remove('fa-chevron-down');
+      chevron.classList.add('fa-chevron-up');
     }
   }
 }
@@ -225,10 +236,20 @@ function toggleCollapse(sectionId) {
 function restoreCollapseStates() {
   document.querySelectorAll('.collapse').forEach(section => {
     const state = localStorage.getItem('collapse_' + section.id);
+    const chevron = document.getElementById(section.id.replace('Section', 'Chevron'));
+
     if (state === 'expanded') {
       section.classList.add('show');
+      if (chevron) {
+        chevron.classList.remove('fa-chevron-down');
+        chevron.classList.add('fa-chevron-up');
+      }
     } else if (state === 'collapsed') {
       section.classList.remove('show');
+      if (chevron) {
+        chevron.classList.remove('fa-chevron-up');
+        chevron.classList.add('fa-chevron-down');
+      }
     }
   });
 }
