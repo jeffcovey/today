@@ -76,6 +76,6 @@
     "markdownlint-cli2": "^0.22.1"
   },
   "overrides": {
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^9.0.1"
   }
 }
