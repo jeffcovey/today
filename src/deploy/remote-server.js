@@ -72,10 +72,14 @@ export class RemoteServer {
    * Get default SSH key path
    */
   getDefaultSshKeyPath() {
-    // Check for deployment-specific key first
+    // Check for deployment-specific keys first
     const deployKey = path.join(os.homedir(), '.ssh', 'deploy_key');
     if (fs.existsSync(deployKey)) {
       return deployKey;
+    }
+    const doDeployKey = path.join(os.homedir(), '.ssh', 'do_deploy_key');
+    if (fs.existsSync(doDeployKey)) {
+      return doDeployKey;
     }
     // Fall back to default SSH key
     return path.join(os.homedir(), '.ssh', 'id_rsa');

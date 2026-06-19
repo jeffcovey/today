@@ -69,6 +69,10 @@ const BUILTIN_EXCLUDES = [
   'Path .stversions',
   'Name .DS_Store',
   'Path node_modules',
+  // `Path node_modules` only matches a top-level node_modules; `Name` matches
+  // it at any depth (e.g. archived projects under inbox/archive) so nested
+  // dependency trees don't get synced.
+  'Name node_modules',
   'Name *.tmp',
   'Name .*.swp',
   // Health-check marker — written locally by bin/unison-sync-healthcheck;
