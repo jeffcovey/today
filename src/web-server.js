@@ -49,6 +49,7 @@ import {
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
+import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 
 // Configure marked extensions
@@ -2041,7 +2042,7 @@ async function renderToml(filePath, urlPath) {
                   <h5 class="mb-0">
                     <i class="fas fa-cog me-2 text-secondary"></i>${fileName}
                   </h5>
-                  <a href="/edit/${urlPath}" class="btn btn-primary btn-sm">
+                  <a href="/edit/${urlPath.replace(/^\/+/, '')}" class="btn btn-primary btn-sm">
                     <i class="fas fa-edit me-1"></i>Edit
                   </a>
                 </div>
@@ -3788,14 +3789,9 @@ async function executeTasksQuery(query, queryContext = {}) {
     if (line.startsWith('filter by function ')) {
       const code = line.replace('filter by function ', '').trim();
       functionFilters.push(code);
-    } else if (line.startsWith('sort by function ')) {
-      const expr = line.replace('sort by function ', '').trim();
-      sortDirectives.push({ type: 'function', expr });
     } else if (line.startsWith('sort by')) {
-      const sortMatch = line.match(/sort by (\w+)( reverse)?/);
-      if (sortMatch) {
-        sortDirectives.push({ type: 'field', field: sortMatch[1], reverse: !!sortMatch[2] });
-      }
+      const directive = parseSortLine(line);
+      if (directive) sortDirectives.push(directive);
     } else if (line.startsWith('group by')) {
       groupBy = line.replace('group by ', '').trim();
     } else {
@@ -3967,41 +3963,7 @@ async function executeTasksQuery(query, queryContext = {}) {
   }
 
   // Sort - apply directives in order (first = primary, last = least significant)
-  // We reverse the directives and use stable sort so the first directive has final precedence
-  const evalSortFunction = (task, expr) => {
-    try {
-      return new Function('task', `return (${expr})`)(task);
-    } catch (e) {
-      debug(`Error evaluating sort function: ${e.message}`);
-      return '';
-    }
-  };
-
-  const compareByDirective = (a, b, directive) => {
-    if (directive.type === 'function') {
-      const aVal = evalSortFunction(a, directive.expr);
-      const bVal = evalSortFunction(b, directive.expr);
-      if (typeof aVal === 'string' && typeof bVal === 'string') return aVal.localeCompare(bVal);
-      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-    } else if (directive.field === 'priority') {
-      return directive.reverse ? a.priority - b.priority : b.priority - a.priority;
-    } else if (directive.field === 'done') {
-      const aTime = a.doneDate ? a.doneDate.getTime() : 0;
-      const bTime = b.doneDate ? b.doneDate.getTime() : 0;
-      return directive.reverse ? bTime - aTime : aTime - bTime;
-    }
-    return 0;
-  };
-
-  if (sortDirectives.length > 0) {
-    filtered.sort((a, b) => {
-      for (const directive of sortDirectives) {
-        const cmp = compareByDirective(a, b, directive);
-        if (cmp !== 0) return cmp;
-      }
-      return 0;
-    });
-  }
+  sortTasks(filtered, sortDirectives, debug);
 
   // Group
   if (groupBy === 'happens') {
@@ -5418,7 +5380,7 @@ ${cleanContent}
     navbar: getNavbar(fileName, 'fa-file-alt'),
     breadcrumb: breadcrumbHtml,
     pageTitle: pageTitle || fileName,
-    editUrl: `/edit/${urlPath}`,
+    editUrl: `/edit/${urlPath.replace(/^\/+/, '')}`,
     toc: toc ? `<div class="mt-2 pt-2 border-top">${toc}</div>` : '',
     properties: renderProperties(properties),
     content: htmlContent,
@@ -5536,7 +5498,10 @@ app.post('/_cache/warm', async (req, res) => {
           try {
             const stats = await fs.stat(fullPath);
             const mtime = stats.mtime.getTime();
-            const urlPath = '/' + path.relative(VAULT_PATH, fullPath);
+            // Use the same vault-relative, no-leading-slash convention as the
+            // request route (app.get('/*path')) so the warmer and live requests
+            // share cache keys and bake identical (correct) /edit/ links.
+            const urlPath = path.relative(VAULT_PATH, fullPath);
 
             const diskHtml = await readFromDiskCache(urlPath, mtime);
             if (diskHtml) {

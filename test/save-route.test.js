@@ -184,6 +184,24 @@ describe('createSaveHandler (issue #293)', () => {
     }
   });
 
+  test('leading slash in splat (double-slash URL) resolves vault-relative, not 403', async () => {
+    // Reproduces the "Save failed" bug: a /edit//notes/x URL embeds a
+    // leading-slash path into the save call (/save//plan.md). Without
+    // normalization, path.resolve treats it as absolute and escapes the vault.
+    const handler = createSaveHandler({ vaultPath });
+
+    await withServer(handler, async (base) => {
+      const res = await fetch(`${base}/save//plan.md`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'double-slash write\n' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(await fs.readFile(filePath, 'utf-8')).toBe('double-slash write\n');
+    });
+  });
+
   test('non-markdown/toml file rejected', async () => {
     fsSync.writeFileSync(path.join(vaultPath, 'notes.txt'), 'plain text\n');
     const handler = createSaveHandler({ vaultPath });
