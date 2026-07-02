@@ -51,6 +51,7 @@ import { createSaveHandler } from './save-route.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
+import { normalizeUrlPath } from './url-path.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -5501,7 +5502,7 @@ app.post('/_cache/warm', async (req, res) => {
             // Use the same vault-relative, no-leading-slash convention as the
             // request route (app.get('/*path')) so the warmer and live requests
             // share cache keys and bake identical (correct) /edit/ links.
-            const urlPath = path.relative(VAULT_PATH, fullPath);
+            const urlPath = normalizeUrlPath(path.relative(VAULT_PATH, fullPath));
 
             const diskHtml = await readFromDiskCache(urlPath, mtime);
             if (diskHtml) {
@@ -6840,18 +6841,18 @@ app.get('/search', authMiddleware, async (req, res) => {
 // Edit route handler
 app.get('/edit/*path', authMiddleware, async (req, res) => {
   try {
-    const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
-    let fullPath = path.join(VAULT_PATH, urlPath);
+    const urlPath = normalizeUrlPath(req.params.path); // Get the wildcard path
+    let fullPath = safeVaultPath(urlPath);
 
     // Security: prevent directory traversal
-    if (!fullPath.startsWith(VAULT_PATH)) {
+    if (!fullPath) {
       return res.status(403).send('Access denied');
     }
 
     // If path has no extension, try adding .md (Obsidian-style URLs)
     if (!path.extname(urlPath)) {
-      fullPath = fullPath + '.md';
-      if (!fullPath.startsWith(VAULT_PATH)) {
+      fullPath = safeVaultPath(`${urlPath}.md`);
+      if (!fullPath) {
         return res.status(403).send('Access denied');
       }
     }
