@@ -22,9 +22,14 @@ export function createSaveHandler({ vaultPath, postWriteHook } = {}) {
 
   return async function saveHandler(req, res) {
     try {
-      const urlPath = Array.isArray(req.params.path)
+      const rawPath = Array.isArray(req.params.path)
         ? req.params.path.join('/')
         : req.params.path;
+      // Strip leading slashes so the splat is always treated as a
+      // vault-relative path. Without this, a leading slash (e.g. from a
+      // double-slash URL like /edit//notes/x) makes path.resolve below treat
+      // the arg as absolute and escape the vault, yielding a spurious 403.
+      const urlPath = rawPath.replace(/^\/+/, '');
       // Resolve the full path and ensure it is contained within the vault.
       // Using path.resolve (rather than path.join) collapses any `..` segments
       // before the check, and requiring the sep suffix prevents the
