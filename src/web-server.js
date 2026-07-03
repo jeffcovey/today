@@ -5861,6 +5861,19 @@ app.get('/_git', authMiddleware, async (req, res) => {
           const ui = new Diff2HtmlUI(diffEl, data.diff, config);
           ui.draw();
           ui.highlightCode();
+          // Make diff2html's filename header link to the file's page on the site.
+          diffEl.querySelectorAll('.d2h-file-name').forEach((nameEl) => {
+            if (nameEl.querySelector('a')) return;
+            const href = '/' + file.split('/').map(encodeURIComponent).join('/');
+            const link = document.createElement('a');
+            link.href = href;
+            link.textContent = nameEl.textContent;
+            // Stop propagation so clicking the filename doesn't toggle
+            // diff2html's collapse/Viewed state before navigating.
+            link.addEventListener('click', (e) => e.stopPropagation());
+            nameEl.textContent = '';
+            nameEl.appendChild(link);
+          });
         } else {
           diffEl.innerHTML = '<div class="p-3 text-muted">No diff available (empty or binary file)</div>';
         }
