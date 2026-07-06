@@ -2798,10 +2798,15 @@ function coerceYamlScalar(value) {
   return value;
 }
 
+// Keys that would pollute Object.prototype if assigned; skipped by the
+// lenient parser since it handles untrusted/malformed frontmatter.
+const UNSAFE_FRONTMATTER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 // Best-effort frontmatter parser used only when strict YAML parsing fails
 // (e.g. an AI-written summary containing an unquoted "key: value" colon).
 // Handles the flat "key: value" + simple "- item" list shape our frontmatter
-// uses, treating every value as raw text so stray colons can't break it.
+// uses, taking values as raw text (with light numeric coercion) so stray
+// colons can't break it.
 function parseFrontmatterLenient(yamlText) {
   const properties = {};
   let currentArrayKey = null;
@@ -2818,6 +2823,10 @@ function parseFrontmatterLenient(yamlText) {
     const keyValue = rawLine.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (keyValue) {
       const [, key, value] = keyValue;
+      if (UNSAFE_FRONTMATTER_KEYS.has(key)) {
+        currentArrayKey = null;
+        continue;
+      }
       if (value === '') {
         // Blank value: start of a list (or a nested block we can't recover).
         currentArrayKey = key;
