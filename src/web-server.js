@@ -3493,11 +3493,20 @@ async function executeDQLQuery(query, vaultPath, currentFilePath, properties, al
 }
 
 // Render a single frontmatter list item as text.
-// YAML parses an unquoted "- key: value" bullet as a mapping (object) rather
-// than a string, so String(item) would yield "[object Object]". Reconstruct
-// the original "key: value" text in that case.
+// YAML parses an unquoted "- key: value" bullet as a mapping (a plain object)
+// rather than a string, so String(item) would yield "[object Object]".
+// Reconstruct the original "key: value" text in that case. Restrict this to
+// plain objects only: other object types js-yaml can produce (e.g. Date from a
+// YAML timestamp) have no useful Object.entries() and must fall through to
+// String(item), which renders them correctly.
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 function formatListItem(item) {
-  if (item && typeof item === 'object' && !Array.isArray(item)) {
+  if (isPlainObject(item)) {
     return Object.entries(item)
       .map(([k, v]) => `${k}: ${v}`)
       .join(', ');
