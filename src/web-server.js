@@ -2991,7 +2991,7 @@ class DataviewAPI {
   list(items) {
     let html = '<ul class="dataview-list">\n';
     for (const item of items) {
-      html += `<li>${item}</li>\n`;
+      html += `<li>${formatListItem(item)}</li>\n`;
     }
     html += '</ul>';
     return html;
@@ -3492,6 +3492,28 @@ async function executeDQLQuery(query, vaultPath, currentFilePath, properties, al
   return `<div class="alert alert-info"><small>Unsupported Dataview query</small></div>`;
 }
 
+// Render a single frontmatter list item as text.
+// YAML parses an unquoted "- key: value" bullet as a mapping (a plain object)
+// rather than a string, so String(item) would yield "[object Object]".
+// Reconstruct the original "key: value" text in that case. Restrict this to
+// plain objects only: other object types js-yaml can produce (e.g. Date from a
+// YAML timestamp) have no useful Object.entries() and must fall through to
+// String(item), which renders them correctly.
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function formatListItem(item) {
+  if (isPlainObject(item)) {
+    return Object.entries(item)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ');
+  }
+  return String(item);
+}
+
 // Execute a DQL LIST query
 async function executeDQLList(lines, vaultPath, currentFilePath, properties, allFiles) {
   const joinedQuery = lines.join(' ');
@@ -3508,7 +3530,7 @@ async function executeDQLList(lines, vaultPath, currentFilePath, properties, all
 
     let html = '<ul>\n';
     for (const item of items) {
-      html += `<li>${String(item)}</li>\n`;
+      html += `<li>${formatListItem(item)}</li>\n`;
     }
     html += '</ul>\n';
     return html;
