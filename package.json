@@ -17,7 +17,7 @@
     "lint": "npm run lint:md"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.85",
+    "@ai-sdk/anthropic": "^4.0.8",
     "@ai-sdk/google": "^3.0.83",
     "@ai-sdk/openai": "^3.0.73",
     "@anthropic-ai/sdk": "^0.110.0",
