@@ -32,7 +32,10 @@ import {
   runTasksFilterFunction,
   runTasksGroupFunction
 } from './tasks-query-functions.js';
-import yaml from 'js-yaml';
+// Namespace import: js-yaml v5 is native ESM with no default export, so
+// `import yaml from 'js-yaml'` throws at startup. Works on both v4 and v5.
+import * as yaml from 'js-yaml';
+import { parseFrontmatter } from './frontmatter.js';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
 import {
@@ -2781,26 +2784,6 @@ function generateTableOfContents() {
 // Convert markdown links [text](url) to HTML <a> tags in task display text
 function renderMarkdownLinks(text) {
   return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-}
-
-// Parse YAML frontmatter from markdown content
-function parseFrontmatter(content) {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-  const match = content.match(frontmatterRegex);
-
-  if (!match) {
-    return { properties: null, contentWithoutFrontmatter: content };
-  }
-
-  try {
-    const properties = yaml.load(match[1]);
-    const contentWithoutFrontmatter = content.replace(frontmatterRegex, '');
-    return { properties, contentWithoutFrontmatter };
-  } catch (error) {
-    // Just log the message, not the full error object (too verbose for vault scanning)
-    console.error('Error parsing YAML frontmatter:', error.message || error);
-    return { properties: null, contentWithoutFrontmatter: content };
-  }
 }
 
 // Render properties as a nice HTML card
