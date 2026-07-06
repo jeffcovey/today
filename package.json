@@ -27,7 +27,7 @@
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "adm-zip": "^0.5.18",
-    "ai": "^6.0.208",
+    "ai": "^7.0.15",
     "better-sqlite3": "^12.11.1",
     "better-sqlite3-session-store": "^0.1.0",
     "canvas": "^3.2.3",
