@@ -5,7 +5,10 @@
 // helpers parse valid frontmatter strictly and fall back to a lenient,
 // best-effort recovery so a single bad character never dumps raw frontmatter
 // into the page or breaks the Properties section / =this.* lookups.
-import yaml from 'js-yaml';
+// Namespace import: js-yaml v5 ships native ESM with named exports and no
+// default export, so `import yaml from 'js-yaml'` would throw. This form works
+// on both v4 and v5.
+import * as yaml from 'js-yaml';
 
 // Strip surrounding quotes from a lenient-parsed scalar value.
 export function stripYamlQuotes(value) {

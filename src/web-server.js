@@ -32,7 +32,9 @@ import {
   runTasksFilterFunction,
   runTasksGroupFunction
 } from './tasks-query-functions.js';
-import yaml from 'js-yaml';
+// Namespace import: js-yaml v5 is native ESM with no default export, so
+// `import yaml from 'js-yaml'` throws at startup. Works on both v4 and v5.
+import * as yaml from 'js-yaml';
 import { parseFrontmatter } from './frontmatter.js';
 import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
