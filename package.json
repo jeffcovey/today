@@ -46,7 +46,7 @@
     "htm": "^3.1.1",
     "imapflow": "^1.4.3",
     "ink": "^7.1.0",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^5.2.1",
     "mailparser": "^3.9.12",
     "markdownlint": "^0.41.0",
     "marked": "^18.0.5",
