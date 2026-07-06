@@ -2991,7 +2991,7 @@ class DataviewAPI {
   list(items) {
     let html = '<ul class="dataview-list">\n';
     for (const item of items) {
-      html += `<li>${item}</li>\n`;
+      html += `<li>${formatListItem(item)}</li>\n`;
     }
     html += '</ul>';
     return html;
@@ -3492,6 +3492,19 @@ async function executeDQLQuery(query, vaultPath, currentFilePath, properties, al
   return `<div class="alert alert-info"><small>Unsupported Dataview query</small></div>`;
 }
 
+// Render a single frontmatter list item as text.
+// YAML parses an unquoted "- key: value" bullet as a mapping (object) rather
+// than a string, so String(item) would yield "[object Object]". Reconstruct
+// the original "key: value" text in that case.
+function formatListItem(item) {
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    return Object.entries(item)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ');
+  }
+  return String(item);
+}
+
 // Execute a DQL LIST query
 async function executeDQLList(lines, vaultPath, currentFilePath, properties, allFiles) {
   const joinedQuery = lines.join(' ');
@@ -3508,7 +3521,7 @@ async function executeDQLList(lines, vaultPath, currentFilePath, properties, all
 
     let html = '<ul>\n';
     for (const item of items) {
-      html += `<li>${String(item)}</li>\n`;
+      html += `<li>${formatListItem(item)}</li>\n`;
     }
     html += '</ul>\n';
     return html;
