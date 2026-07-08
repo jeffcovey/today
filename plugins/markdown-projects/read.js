@@ -82,6 +82,10 @@ function findProjectFiles(dir, relativeTo = dir) {
       }
 
       if (entry.isDirectory()) {
+        // Skip attachment directories (a dir whose name matches a sibling .md project file)
+        if (fs.existsSync(path.join(dir, entry.name + '.md'))) {
+          continue;
+        }
         // Recurse into subdirectories
         files.push(...findProjectFiles(fullPath, relativeTo));
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
