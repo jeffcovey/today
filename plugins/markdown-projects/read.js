@@ -72,6 +72,12 @@ function findProjectFiles(dir, relativeTo = dir) {
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
+    // Build a set of .md basenames in this directory so attachment-dir checks
+    // are O(1) in-memory lookups rather than per-entry existsSync calls.
+    const mdBasenames = new Set(
+      entries.filter(e => e.isFile() && e.name.endsWith('.md')).map(e => e.name.slice(0, -3))
+    );
+
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       const relativePath = path.relative(relativeTo, fullPath);
@@ -82,6 +88,10 @@ function findProjectFiles(dir, relativeTo = dir) {
       }
 
       if (entry.isDirectory()) {
+        // Skip attachment directories (a dir whose name matches a sibling .md project file)
+        if (mdBasenames.has(entry.name)) {
+          continue;
+        }
         // Recurse into subdirectories
         files.push(...findProjectFiles(fullPath, relativeTo));
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
