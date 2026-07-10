@@ -6972,6 +6972,13 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 });
 
 // Save route handler
+// Obsidian Tasks date/metadata emoji that terminate a 🔁 recurrence rule.
+// Kept in one place so the /task/toggle (parse) and /task/edit (preserve)
+// routes can't drift on which tokens end the rule — a mismatch here silently
+// breaks recurring-task regeneration (see issue #358). Alternation, not a
+// character class, so multi-code-unit emoji (📅 🛫) match correctly.
+const RECURRENCE_TERMINATOR_TOKENS = ['⏳', '📅', '🛫', '✅', '➕'];
+
 // Helper function to calculate next recurrence date
 function calculateNextRecurrence(pattern, fromDate) {
   // Parse patterns like:
@@ -7065,11 +7072,13 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     // Note: markdown_tasks cache was removed - proceeding with file version directly
     debug(`[TASK] Processing task from file: "${taskLine}"`);
 
-    // Check if this is a recurring task (has 🔁 pattern)
-    // Stop capturing at the next date token OR a #tag — a tag placed between
-    // the rule and the date would otherwise be swept into the pattern and
-    // break calculateNextRecurrence (matches plugins/markdown-tasks/read.js).
-    const recurringMatch = taskLine.match(/🔁\s+(.+?)(?:\s+(?:⏳|📅|➕|#)|$)/);
+    // Check if this is a recurring task (has 🔁 pattern).
+    // Stop capturing at the next date token (RECURRENCE_TERMINATOR_TOKENS) OR a
+    // #tag — anything placed between the rule and a date would otherwise be
+    // swept into the pattern and break calculateNextRecurrence (issue #358).
+    const recurringMatch = taskLine.match(
+      new RegExp(`🔁\\s+(.+?)(?:\\s+(?:${RECURRENCE_TERMINATOR_TOKENS.join('|')}|#)|$)`)
+    );
     const isRecurring = !!recurringMatch;
     let newTaskLine = null;
 
@@ -7224,7 +7233,9 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
     const priorityEmoji = priority && priorityEmojis[priority] ? priorityEmojis[priority] : '';
 
     // Preserve recurrence pattern from original line (stop at next date emoji or end)
-    const recurringMatch = taskLine.match(/🔁\s+[^⏳📅🛫✅➕\n]+/);
+    const recurringMatch = taskLine.match(
+      new RegExp(`🔁\\s+[^${RECURRENCE_TERMINATOR_TOKENS.join('')}\\n]+`)
+    );
     const recurrence = recurringMatch ? recurringMatch[0].trim() : '';
 
     // Preserve creation date from original line
