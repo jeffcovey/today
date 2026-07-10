@@ -7066,7 +7066,10 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     debug(`[TASK] Processing task from file: "${taskLine}"`);
 
     // Check if this is a recurring task (has 🔁 pattern)
-    const recurringMatch = taskLine.match(/🔁\s+(.+?)(?:\s+(?:⏳|📅|➕)|$)/);
+    // Stop capturing at the next date token OR a #tag — a tag placed between
+    // the rule and the date would otherwise be swept into the pattern and
+    // break calculateNextRecurrence (matches plugins/markdown-tasks/read.js).
+    const recurringMatch = taskLine.match(/🔁\s+(.+?)(?:\s+(?:⏳|📅|➕|#)|$)/);
     const isRecurring = !!recurringMatch;
     let newTaskLine = null;
 

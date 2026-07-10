@@ -15,6 +15,7 @@ const VAULT_PATH = 'test/fixtures'; // Tests expect server to use this as VAULT_
 const TEST_FILE = 'task-toggle-fixture.md';
 const TEST_FILE_PATH = path.join(VAULT_PATH, TEST_FILE);
 const TEST_LINE = 8; // "Test task for toggle testing" - stable fixture line
+const RECUR_TAG_LINE = 10; // recurring task with a #tag between the 🔁 rule and the ⏳ date
 
 // Original fixture content for reset
 const FIXTURE_CONTENT = `# Test Tasks
@@ -26,6 +27,7 @@ Do not modify manually.
 
 - [ ] Test task for toggle testing #test ⏳ 2099-12-31 ➕ 2025-01-01
 - [ ] Another test task #test
+- [ ] Recurring with tag before date 🔁 every 6 months when done #test ⏳ 2099-01-01 ➕ 2025-01-01
 `;
 
 // Reset fixture to clean state
@@ -349,6 +351,43 @@ describe('Task Toggle - Edge Cases', () => {
     if (hasScheduledDate) expect(result.updatedLine).toContain('⏳');
     if (hasCreatedDate) expect(result.updatedLine).toContain('➕');
     if (hasPriority) expect(result.updatedLine).toMatch(/⏫|🔼/);
+  });
+
+  // Regression: a #tag placed between the 🔁 rule and the date used to get
+  // swept into the recurrence pattern, breaking parsing so no new occurrence
+  // was created. See issue #358.
+  test('should regenerate a recurring task with a #tag between the rule and the date', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    // Complete the recurring task
+    const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: RECUR_TAG_LINE,
+        completed: true
+      })
+    });
+
+    expect(response.ok).toBe(true);
+    const result = await response.json();
+    expect(result.updatedLine).toMatch(/- \[x\]/);
+
+    // The file should now contain BOTH the completed occurrence and a freshly
+    // generated, unchecked next occurrence.
+    const content = await fs.readFile(TEST_FILE_PATH, 'utf-8');
+    const lines = content.split('\n');
+    const matching = lines.filter(l => l.includes('Recurring with tag before date'));
+    const completed = matching.filter(l => /- \[x\]/.test(l));
+    const regenerated = matching.filter(l => /- \[ \]/.test(l));
+
+    expect(completed).toHaveLength(1);
+    expect(regenerated).toHaveLength(1);
+    expect(regenerated[0]).toContain('🔁 every 6 months');
+    expect(regenerated[0]).toContain('⏳');
+    expect(regenerated[0]).not.toContain('✅');
   });
 });
 
