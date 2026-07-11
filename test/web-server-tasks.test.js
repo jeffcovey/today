@@ -550,6 +550,34 @@ describe('Task Edit API', () => {
       expect(result.updatedLine).toContain('➕ 2025-01-01');
     });
 
+    test('should preserve recurrence without duplicating a tag when editing a recurring task with #tag before date', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: RECUR_TAG_LINE,
+          title: 'Recurring with tag before date (edited)',
+          scheduledDate: '2099-01-01',
+          tags: ['#test'],
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.success).toBe(true);
+      expect(result.updatedLine).toContain('🔁 every 6 months when done');
+      expect(result.updatedLine.match(/#test/g)).toHaveLength(1);
+
+      const taskLine = await readTaskLine(RECUR_TAG_LINE);
+      expect(taskLine).toContain('🔁 every 6 months when done');
+      expect(taskLine.match(/#test/g)).toHaveLength(1);
+    });
+
     test('should return 400 for missing title', async () => {
       const running = await isServerConfiguredForTests();
       if (!running) return;

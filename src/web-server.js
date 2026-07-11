@@ -6978,6 +6978,7 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 // breaks recurring-task regeneration (see issue #358). Alternation, not a
 // character class, so multi-code-unit emoji (📅 🛫) match correctly.
 const RECURRENCE_TERMINATOR_TOKENS = ['⏳', '📅', '🛫', '✅', '➕'];
+const RECURRENCE_TERMINATOR_PATTERN = `${RECURRENCE_TERMINATOR_TOKENS.join('|')}|#`;
 
 // Helper function to calculate next recurrence date
 function calculateNextRecurrence(pattern, fromDate) {
@@ -7077,7 +7078,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     // #tag — anything placed between the rule and a date would otherwise be
     // swept into the pattern and break calculateNextRecurrence (issue #358).
     const recurringMatch = taskLine.match(
-      new RegExp(`🔁\\s+(.+?)(?:\\s+(?:${RECURRENCE_TERMINATOR_TOKENS.join('|')}|#)|$)`)
+      new RegExp(`🔁\\s+(.+?)(?:\\s+(?:${RECURRENCE_TERMINATOR_PATTERN})|$)`)
     );
     const isRecurring = !!recurringMatch;
     let newTaskLine = null;
@@ -7232,11 +7233,11 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
     const priorityEmojis = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' };
     const priorityEmoji = priority && priorityEmojis[priority] ? priorityEmojis[priority] : '';
 
-    // Preserve recurrence pattern from original line (stop at next date emoji or end)
+    // Preserve recurrence pattern from original line (stop at next date token, #tag, or end)
     const recurringMatch = taskLine.match(
-      new RegExp(`🔁\\s+[^${RECURRENCE_TERMINATOR_TOKENS.join('')}\\n]+`)
+      new RegExp(`🔁\\s+(.+?)(?:\\s+(?:${RECURRENCE_TERMINATOR_PATTERN})|$)`)
     );
-    const recurrence = recurringMatch ? recurringMatch[0].trim() : '';
+    const recurrence = recurringMatch ? `🔁 ${recurringMatch[1].trim()}` : '';
 
     // Preserve creation date from original line
     const creationMatch = taskLine.match(/➕\s*(\d{4}-\d{2}-\d{2})/);
