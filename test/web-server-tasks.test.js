@@ -15,6 +15,8 @@ const VAULT_PATH = 'test/fixtures'; // Tests expect server to use this as VAULT_
 const TEST_FILE = 'task-toggle-fixture.md';
 const TEST_FILE_PATH = path.join(VAULT_PATH, TEST_FILE);
 const TEST_LINE = 8; // "Test task for toggle testing" - stable fixture line
+const RECUR_TAG_LINE = 10; // recurring task with a #tag between the 🔁 rule and the ⏳ date
+const RECUR_START_LINE = 11; // recurring task with a 🛫 start date immediately after the rule
 
 // Original fixture content for reset
 const FIXTURE_CONTENT = `# Test Tasks
@@ -26,6 +28,8 @@ Do not modify manually.
 
 - [ ] Test task for toggle testing #test ⏳ 2099-12-31 ➕ 2025-01-01
 - [ ] Another test task #test
+- [ ] Recurring with tag before date 🔁 every 6 months when done #test ⏳ 2099-01-01 ➕ 2025-01-01
+- [ ] Recurring with start date after rule 🔁 every week 🛫 2099-01-01 ⏳ 2099-01-08 ➕ 2025-01-01
 `;
 
 // Reset fixture to clean state
@@ -350,6 +354,77 @@ describe('Task Toggle - Edge Cases', () => {
     if (hasCreatedDate) expect(result.updatedLine).toContain('➕');
     if (hasPriority) expect(result.updatedLine).toMatch(/⏫|🔼/);
   });
+
+  // Regression: a #tag placed between the 🔁 rule and the date used to get
+  // swept into the recurrence pattern, breaking parsing so no new occurrence
+  // was created. See issue #358.
+  test('should regenerate a recurring task with a #tag between the rule and the date', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    // Complete the recurring task
+    const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: RECUR_TAG_LINE,
+        completed: true
+      })
+    });
+
+    expect(response.ok).toBe(true);
+    const result = await response.json();
+    expect(result.success).toBe(true);
+    expect(result.updatedLine).toMatch(/- \[x\]/);
+
+    // The file should now contain BOTH the completed occurrence and a freshly
+    // generated, unchecked next occurrence.
+    const content = await fs.readFile(TEST_FILE_PATH, 'utf-8');
+    const lines = content.split('\n');
+    const matching = lines.filter(l => l.includes('Recurring with tag before date'));
+    const completed = matching.filter(l => /- \[x\]/.test(l));
+    const regenerated = matching.filter(l => /- \[ \]/.test(l));
+
+    expect(completed).toHaveLength(1);
+    expect(regenerated).toHaveLength(1);
+    expect(regenerated[0]).toContain('🔁 every 6 months');
+    expect(regenerated[0]).toContain('⏳');
+    expect(regenerated[0]).not.toContain('✅');
+  });
+
+  // Regression: a 🛫 start-date token immediately after the 🔁 rule used to be
+  // swept into the recurrence pattern (🛫 is a date token but wasn't a stop),
+  // breaking parsing so no new occurrence was created. See issue #358.
+  test('should regenerate a recurring task with a 🛫 start date after the rule', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: RECUR_START_LINE,
+        completed: true
+      })
+    });
+
+    expect(response.ok).toBe(true);
+    const result = await response.json();
+    expect(result.success).toBe(true);
+    expect(result.updatedLine).toMatch(/- \[x\]/);
+
+    const content = await fs.readFile(TEST_FILE_PATH, 'utf-8');
+    const lines = content.split('\n');
+    const matching = lines.filter(l => l.includes('Recurring with start date after rule'));
+    const regenerated = matching.filter(l => /- \[ \]/.test(l));
+
+    expect(matching.filter(l => /- \[x\]/.test(l))).toHaveLength(1);
+    expect(regenerated).toHaveLength(1);
+    expect(regenerated[0]).toContain('🔁 every week');
+    expect(regenerated[0]).not.toContain('✅');
+  });
 });
 
 describe('Task Edit API', () => {
@@ -473,6 +548,34 @@ describe('Task Edit API', () => {
       const result = await response.json();
       // Original fixture has ➕ 2025-01-01
       expect(result.updatedLine).toContain('➕ 2025-01-01');
+    });
+
+    test('should preserve recurrence without duplicating a tag when editing a recurring task with #tag before date', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: TEST_FILE,
+          lineNumber: RECUR_TAG_LINE,
+          title: 'Recurring with tag before date (edited)',
+          scheduledDate: '2099-01-01',
+          tags: ['#test'],
+          completed: false
+        })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.success).toBe(true);
+      expect(result.updatedLine).toContain('🔁 every 6 months when done');
+      expect(result.updatedLine.match(/#test/g)).toHaveLength(1);
+
+      const taskLine = await readTaskLine(RECUR_TAG_LINE);
+      expect(taskLine).toContain('🔁 every 6 months when done');
+      expect(taskLine.match(/#test/g)).toHaveLength(1);
     });
 
     test('should return 400 for missing title', async () => {
