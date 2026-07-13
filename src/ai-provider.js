@@ -25,7 +25,7 @@
 // Suppress AI SDK compatibility warnings (e.g., ollama v2 specification mode)
 globalThis.AI_SDK_LOG_WARNINGS = false;
 
-import { generateText, streamText } from 'ai';
+import { generateText, streamText, stepCountIs } from 'ai';
 import { spawnSync, spawn } from 'child_process';
 import { randomBytes } from 'crypto';
 import { existsSync, writeFileSync, unlinkSync } from 'fs';
@@ -483,15 +483,16 @@ export async function createCompletion(options) {
     model,
     system: options.system,
     messages: options.messages || [],
-    maxTokens: options.maxTokens || 1000,
+    maxOutputTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
   };
 
   // Add tools if provided
   if (options.tools) {
+    const maxSteps = options.maxSteps || 5;
     genOptions.tools = options.tools;
-    genOptions.maxSteps = options.maxSteps || 5;
-    console.log('[AI Provider] createCompletion with tools:', Object.keys(options.tools), 'maxSteps:', genOptions.maxSteps);
+    genOptions.stopWhen = stepCountIs(maxSteps);
+    console.log('[AI Provider] createCompletion with tools:', Object.keys(options.tools), 'maxSteps:', maxSteps);
   }
 
   // For Ollama, dynamically set context window based on prompt size (with cap)
@@ -638,15 +639,16 @@ export async function streamCompletion(options) {
     model,
     system: options.system,
     messages: options.messages || [],
-    maxTokens: options.maxTokens || 1000,
+    maxOutputTokens: options.maxTokens || 1000,
     temperature: options.temperature ?? 0,
   };
 
   // Add tools if provided
   if (options.tools) {
+    const maxSteps = options.maxSteps || 5;
     streamOptions.tools = options.tools;
-    streamOptions.maxSteps = options.maxSteps || 5;
-    console.log('[AI Provider] Tools enabled, maxSteps:', streamOptions.maxSteps, 'tool count:', Object.keys(options.tools).length);
+    streamOptions.stopWhen = stepCountIs(maxSteps);
+    console.log('[AI Provider] Tools enabled, maxSteps:', maxSteps, 'tool count:', Object.keys(options.tools).length);
   }
 
   // Add step finish callback if provided
