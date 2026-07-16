@@ -5661,7 +5661,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
 <head>
   <title>Git Changes</title>
   ${pageStyle}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+  <link rel="stylesheet" href="/static/vendor/diff2html/diff2html.min.css?v=${STATIC_VERSION}" />
   <style>
     .file-item.active { background-color: var(--mdb-primary); color: #fff !important; }
     .file-item.active span { color: #fff !important; }
@@ -5796,7 +5796,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
   </div>
 
   ${pageScripts}
-  <script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui-slim.min.js"></script>
+  <script src="/static/vendor/diff2html/diff2html-ui-slim.min.js?v=${STATIC_VERSION}"></script>
   <script>
     let currentFile = null;
     let currentSection = null;
@@ -5829,6 +5829,9 @@ app.get('/_git', authMiddleware, async (req, res) => {
             highlight: true,
             fileListToggle: false,
           };
+          if (typeof Diff2HtmlUI === 'undefined') {
+            throw new Error('the diff2html script failed to load — try a hard reload (empty caches)');
+          }
           const ui = new Diff2HtmlUI(diffEl, data.diff, config);
           ui.draw();
           ui.highlightCode();
