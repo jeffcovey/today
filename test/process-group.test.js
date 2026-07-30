@@ -81,12 +81,24 @@ describe('execGroup', () => {
     expect(childPgid).not.toBe(ownPgid);
   });
 
-  it('truncates output beyond maxBuffer instead of failing', async () => {
-    const { stdout } = await execGroup('for i in $(seq 1 500); do echo aaaaaaaaaa; done', {
-      timeoutMs: 5000,
-      maxBuffer: 100
-    });
-    expect(stdout.length).toBeLessThanOrEqual(100);
+  // Callers JSON.parse stdout, so a clipped document would fail with a
+  // misleading syntax error. Overflow has to be named.
+  it('rejects rather than truncating when output exceeds maxBuffer', async () => {
+    expect.assertions(2);
+    try {
+      await execGroup('for i in $(seq 1 500); do echo aaaaaaaaaa; done', {
+        timeoutMs: 5000,
+        maxBuffer: 100
+      });
+    } catch (error) {
+      expect(error.overflowed).toBe(true);
+      expect(error.message).toMatch(/maxBuffer/);
+    }
+  });
+
+  it('does not treat output below maxBuffer as overflow', async () => {
+    const { stdout } = await execGroup('echo small', { timeoutMs: 5000, maxBuffer: 1024 });
+    expect(stdout.trim()).toBe('small');
   });
 
   it('reports spawn handles so callers can tear the group down', async () => {

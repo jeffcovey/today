@@ -73,15 +73,32 @@ export function execGroup(command, options) {
       if (escalateTimer) clearTimeout(escalateTimer);
     };
 
-    // Truncate rather than reject on overflow: a chatty plugin shouldn't fail a
-    // sync that otherwise succeeded, and callers only ever read the tail.
-    const capture = (chunk, target) => {
-      const next = target + chunk;
-      return next.length > maxBuffer ? next.slice(next.length - maxBuffer) : next;
+    // Overflow is an error, not a silent truncation. Callers parse stdout as
+    // JSON, so handing back a clipped document would surface as a confusing
+    // syntax error instead of the real cause. This matches what exec's
+    // maxBuffer did before.
+    let overflowed = false;
+    const overflow = () => {
+      if (overflowed) return;
+      overflowed = true;
+      cleanup();
+      killGroup('SIGKILL');
+      const error = new Error(`Command output exceeded maxBuffer of ${maxBuffer} bytes`);
+      error.overflowed = true;
+      reject(error);
     };
 
-    child.stdout.on('data', (chunk) => { stdout = capture(chunk, stdout); });
-    child.stderr.on('data', (chunk) => { stderr = capture(chunk, stderr); });
+    child.stdout.on('data', (chunk) => {
+      if (overflowed) return;
+      stdout += chunk;
+      if (stdout.length > maxBuffer) overflow();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      if (overflowed) return;
+      stderr += chunk;
+      if (stderr.length > maxBuffer) overflow();
+    });
 
     child.on('error', (error) => {
       cleanup();
