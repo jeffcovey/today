@@ -13,6 +13,7 @@ import { execGroup, installProcessGroupShutdownHandlers } from './process-group.
 // so keep them bounded below the scheduler's 10-minute timeout so stuck runs
 // still report an actionable plugin error while the parent is alive. See #383.
 const PLUGIN_COMMAND_TIMEOUT_MS = 8 * 60 * 1000;
+const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -327,7 +328,10 @@ export function isPluginConfigured(pluginName) {
  * @returns {{success: boolean, data?: any, error?: string}}
  */
 async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
-  installProcessGroupShutdownHandlers();
+  installProcessGroupShutdownHandlers({
+    killGraceMs: PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS,
+    escalateToSigkill: true
+  });
 
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
