@@ -1,15 +1,19 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync, spawnSync, exec as execCb } from 'child_process';
-import { promisify } from 'util';
+import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
+import { execGroup } from './process-group.js';
 
-const execAsync = promisify(execCb);
+// Plugin reads were previously unbounded, so a wedged read — typically one
+// blocked on an AI call — ran forever. Bound them below the scheduler's
+// 10-minute job timeout so a stuck read surfaces as a plugin error while its
+// parent is still alive to report it. See issue #383.
+const PLUGIN_READ_TIMEOUT_MS = 8 * 60 * 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -362,14 +366,27 @@ async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, so
       PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
       ...extraEnv
     },
-    maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
+    maxBuffer: 50 * 1024 * 1024, // 50MB for large syncs
+    timeoutMs: PLUGIN_READ_TIMEOUT_MS
   };
 
   let stdout;
   try {
-    const result = await execAsync(fullPath, execOpts);
+    // execGroup, not exec: plugin reads spawn their own children (markdown-plans
+    // shells out to the claude CLI), and those have to die with the read.
+    const result = await execGroup(fullPath, execOpts);
     stdout = result.stdout;
   } catch (error) {
+    // A timeout is the one failure an operator most needs named, and a wedged
+    // plugin's stderr is full of progress noise that would otherwise win the
+    // "last error line" heuristic below. Report it directly.
+    if (error.timedOut) {
+      return {
+        success: false,
+        error: `Plugin read timed out after ${Math.round(PLUGIN_READ_TIMEOUT_MS / 60000)} minutes`
+      };
+    }
+
     // exec error - command exited with non-zero status
     // First, try to parse stdout for structured JSON error from plugin
     if (error.stdout) {

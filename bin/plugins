@@ -316,14 +316,21 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
       for (const { sourceName: src, config } of sources) {
         const sourceId = `${plugin.name}/${src}`;
 
-        // Check staleness if --if-stale is specified
-        if (staleMinutes !== null) {
+        // Skip sources whose data is still fresh. Two inputs, whichever is
+        // stricter: the --if-stale flag, and a per-source floor on how often
+        // the source may sync at all. The latter lets an expensive AI-backed
+        // plugin (markdown-plans shells out to the claude CLI) sit on the same
+        // 10-minute cron as everything else without running every tick.
+        const minInterval = Number(config?.min_sync_interval_minutes) || 0;
+        const freshnessWindow = Math.max(staleMinutes ?? 0, minInterval);
+
+        if (freshnessWindow > 0) {
           const syncMeta = getSyncMetadata(db, sourceId);
           if (syncMeta?.last_synced_at) {
             const lastSync = new Date(syncMeta.last_synced_at + 'Z');
             const ageMs = Date.now() - lastSync.getTime();
             const ageMinutes = ageMs / 1000 / 60;
-            if (ageMinutes < staleMinutes) {
+            if (ageMinutes < freshnessWindow) {
               skippedCount++;
               continue; // Skip - data is fresh
             }
@@ -341,8 +348,8 @@ async function runSyncOperation(context, pluginName, sourceName, options) {
       }
     }
 
-    if (skippedCount > 0 && staleMinutes !== null) {
-      console.log(colors.gray(`  (${skippedCount} source(s) skipped - synced within ${staleMinutes} minutes)`));
+    if (skippedCount > 0) {
+      console.log(colors.gray(`  (${skippedCount} source(s) skipped - data still fresh)`));
     }
   }
 

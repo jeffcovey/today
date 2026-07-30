@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import cron from 'node-cron';
-import { exec, execSync } from 'child_process';
-import { promisify } from 'util';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimezone, getConfig } from './config.js';
+import { execGroup } from './process-group.js';
 
-const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
@@ -157,6 +156,20 @@ function loadJobs() {
 // their cron window while spreading them out enough to avoid iCloud conflicts.
 const JITTER_MS = (getConfig('scheduler_jitter_seconds') || 15) * 1000;
 
+// How long a job may run before the scheduler tears down its process group.
+const JOB_TIMEOUT_MS = 10 * 60 * 1000;
+
+// Jobs currently in flight. A cron tick for a job that is still running is
+// skipped rather than stacked on top: overlapping `bin/plugins sync` runs
+// contend for the same per-source locks and multiply the number of concurrent
+// AI subprocesses. See issue #383. Held by job object rather than by name so a
+// user-configured job that reuses a built-in name can't block it.
+const runningJobs = new Set();
+
+// Live process groups, so shutdown can take them with us instead of leaving
+// orphans behind.
+const activeGroups = new Set();
+
 async function runCommand(command, description) {
   // Check if sync is disabled due to missing data
   if (fs.existsSync(path.join(PROJECT_ROOT, 'SYNC_DISABLED')) && command.includes('sync')) {
@@ -175,12 +188,16 @@ async function runCommand(command, description) {
   const timestamp = new Date().toISOString();
   console.log(`\n[${timestamp}] Running: ${description}`);
 
+  let group = null;
   try {
-    const { stdout, stderr } = await execAsync(command, {
+    const { stdout, stderr } = await execGroup(command, {
       cwd: PROJECT_ROOT,
       env: process.env,
-      shell: '/bin/sh',
-      timeout: 10 * 60 * 1000 // 10 minute timeout
+      timeoutMs: JOB_TIMEOUT_MS,
+      onSpawn: (handle) => {
+        group = handle;
+        activeGroups.add(handle);
+      }
     });
 
     if (stdout) {
@@ -194,6 +211,8 @@ async function runCommand(command, description) {
     }
   } catch (error) {
     console.error(`❌ ${description} failed:`, error.message);
+  } finally {
+    if (group) activeGroups.delete(group);
   }
 }
 
@@ -214,19 +233,32 @@ jobs.forEach(job => {
   console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
 
   cron.schedule(job.schedule, () => {
-    runCommand(job.command, job.description);
+    if (runningJobs.has(job)) {
+      const timestamp = new Date().toISOString();
+      console.log(`\n[${timestamp}] SKIPPED: ${job.description}`);
+      console.log('⏭️  Previous run is still in progress.');
+      return;
+    }
+
+    runningJobs.add(job);
+    runCommand(job.command, job.description).finally(() => {
+      runningJobs.delete(job);
+    });
   });
 });
 
 console.log(`\n✨ Scheduler running with ${jobs.length} job(s)`);
 console.log('Press Ctrl+C to stop\n');
 
-process.on('SIGTERM', () => {
-  console.log('\n👋 Scheduler shutting down gracefully...');
+// Detached children outlive their parent by design, so shutdown has to signal
+// them explicitly or a scheduler restart leaves the previous run's tree behind.
+function shutdown(message) {
+  console.log(`\n👋 ${message}`);
+  for (const group of activeGroups) {
+    group.kill('SIGTERM');
+  }
   process.exit(0);
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('\n👋 Scheduler interrupted, shutting down...');
-  process.exit(0);
-});
+process.on('SIGTERM', () => shutdown('Scheduler shutting down gracefully...'));
+process.on('SIGINT', () => shutdown('Scheduler interrupted, shutting down...'));
