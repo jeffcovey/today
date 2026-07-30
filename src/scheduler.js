@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimezone, getConfig } from './config.js';
-import { execGroup } from './process-group.js';
+import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,9 +166,9 @@ const JOB_TIMEOUT_MS = 10 * 60 * 1000;
 // user-configured job that reuses a built-in name can't block it.
 const runningJobs = new Set();
 
-// Live process groups, so shutdown can take them with us instead of leaving
-// orphans behind.
-const activeGroups = new Set();
+// Keep this well under systemd TimeoutStopSec so escalation can run before
+// systemd force-kills the service.
+const SCHEDULER_SHUTDOWN_KILL_GRACE_MS = 2_000;
 
 async function runCommand(command, description) {
   // Check if sync is disabled due to missing data
@@ -188,16 +188,11 @@ async function runCommand(command, description) {
   const timestamp = new Date().toISOString();
   console.log(`\n[${timestamp}] Running: ${description}`);
 
-  let group = null;
   try {
     const { stdout, stderr } = await execGroup(command, {
       cwd: PROJECT_ROOT,
       env: process.env,
-      timeoutMs: JOB_TIMEOUT_MS,
-      onSpawn: (handle) => {
-        group = handle;
-        activeGroups.add(handle);
-      }
+      timeoutMs: JOB_TIMEOUT_MS
     });
 
     if (stdout) {
@@ -211,8 +206,6 @@ async function runCommand(command, description) {
     }
   } catch (error) {
     console.error(`❌ ${description} failed:`, error.message);
-  } finally {
-    if (group) activeGroups.delete(group);
   }
 }
 
@@ -250,15 +243,13 @@ jobs.forEach(job => {
 console.log(`\n✨ Scheduler running with ${jobs.length} job(s)`);
 console.log('Press Ctrl+C to stop\n');
 
-// Detached children outlive their parent by design, so shutdown has to signal
-// them explicitly or a scheduler restart leaves the previous run's tree behind.
-function shutdown(message) {
-  console.log(`\n👋 ${message}`);
-  for (const group of activeGroups) {
-    group.kill('SIGTERM');
+installProcessGroupShutdownHandlers({
+  killGraceMs: SCHEDULER_SHUTDOWN_KILL_GRACE_MS,
+  escalateToSigkill: true,
+  onSignal: (signal) => {
+    const message = signal === 'SIGINT'
+      ? 'Scheduler interrupted, shutting down...'
+      : 'Scheduler shutting down gracefully...';
+    console.log(`\n👋 ${message}`);
   }
-  process.exit(0);
-}
-
-process.on('SIGTERM', () => shutdown('Scheduler shutting down gracefully...'));
-process.on('SIGINT', () => shutdown('Scheduler interrupted, shutting down...'));
+});

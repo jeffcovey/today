@@ -7,13 +7,12 @@ import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
-import { execGroup } from './process-group.js';
+import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
-// Plugin reads were previously unbounded, so a wedged read — typically one
-// blocked on an AI call — ran forever. Bound them below the scheduler's
-// 10-minute job timeout so a stuck read surfaces as a plugin error while its
-// parent is still alive to report it. See issue #383.
-const PLUGIN_READ_TIMEOUT_MS = 8 * 60 * 1000;
+// Plugin commands can spawn long-running subprocess trees (including AI calls),
+// so keep them bounded below the scheduler's 10-minute timeout so stuck runs
+// still report an actionable plugin error while the parent is alive. See #383.
+const PLUGIN_COMMAND_TIMEOUT_MS = 8 * 60 * 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -328,6 +327,8 @@ export function isPluginConfigured(pluginName) {
  * @returns {{success: boolean, data?: any, error?: string}}
  */
 async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
+  installProcessGroupShutdownHandlers();
+
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
     return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
@@ -367,7 +368,7 @@ async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, so
       ...extraEnv
     },
     maxBuffer: 50 * 1024 * 1024, // 50MB for large syncs
-    timeoutMs: PLUGIN_READ_TIMEOUT_MS
+    timeoutMs: PLUGIN_COMMAND_TIMEOUT_MS
   };
 
   let stdout;
@@ -383,7 +384,7 @@ async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, so
     if (error.timedOut) {
       return {
         success: false,
-        error: `Plugin read timed out after ${Math.round(PLUGIN_READ_TIMEOUT_MS / 60000)} minutes`
+        error: `Plugin ${command} timed out after ${Math.round(PLUGIN_COMMAND_TIMEOUT_MS / 60000)} minutes`
       };
     }
 
