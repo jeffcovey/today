@@ -37,20 +37,44 @@ jobs:
         id: audit
         run: |
           set +e
-          audit_output=$(npm audit --audit-level=high 2>&1)
+          # The gate covers runtime dependencies only. Dev-only advisories are
+          # reported below but do not fail the build: some are unfixable without
+          # breaking the toolchain. brace-expansion is the standing example —
+          # every version up to 5.0.7 is vulnerable, the patched 5.x line
+          # exports an object rather than a callable from `require()`, and
+          # minimatch/glob/jest all call it as a function. Overriding it breaks
+          # the test runner; not overriding it leaves an advisory that no
+          # dependency bump can clear. Gating on it blocks every PR
+          # indefinitely for a DoS in code that never ships.
+          audit_output=$(npm audit --omit=dev --audit-level=high 2>&1)
           audit_exit=$?
+
+          dev_output=$(npm audit --audit-level=high 2>&1)
+          dev_exit=$?
           set -e
 
           echo "$audit_output"
 
           {
             echo "## Security Audit Results"
+            echo ""
+            echo "### Runtime dependencies (gating)"
             if [ $audit_exit -eq 0 ]; then
               echo "No high or critical vulnerabilities found"
             else
-              echo "### Vulnerabilities Found"
               echo '```'
               echo "$audit_output"
+              echo '```'
+            fi
+
+            echo ""
+            echo "### Including dev dependencies (informational)"
+            if [ $dev_exit -eq 0 ]; then
+              echo "No high or critical vulnerabilities found"
+            else
+              echo "Not gating — see the note in \`.github/workflows/security.yml\`."
+              echo '```'
+              echo "$dev_output"
               echo '```'
             fi
           } >> $GITHUB_STEP_SUMMARY
@@ -64,7 +88,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          title="Security audit found high/critical vulnerabilities"
+          title="Security audit found high/critical vulnerabilities in runtime dependencies"
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             echo "Issue #$existing already open, skipping"

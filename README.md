@@ -274,6 +274,24 @@ crontab -e
 0 */2 * * * cd /path/to/today && bin/today update
 ```
 
+#### Pacing expensive plugins
+
+`bin/plugins sync` syncs every enabled source on each run. Some plugins are far
+more expensive than others — `markdown-plans`, for instance, shells out to the
+`claude` CLI to generate plan summaries. To keep such a plugin on the shared
+sync schedule without running it every tick, set a per-source floor on how often
+it may sync:
+
+```toml
+[plugins.markdown-plans.default]
+min_sync_interval_minutes = 120
+```
+
+The source is then skipped on any run where its last successful sync is more
+recent than that, regardless of how often the cron fires. `--if-stale <minutes>`
+applies the same check across all sources ad hoc; when both are set, the
+stricter of the two wins.
+
 ### Important: Version Control Your Vault
 
 **The scheduler modifies files automatically without asking.** It will update daily plans, archive tasks, and sync data. To track these changes and recover if needed:
