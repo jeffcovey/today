@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 import cron from 'node-cron';
-import { exec, execSync } from 'child_process';
-import { promisify } from 'util';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimezone, getConfig } from './config.js';
+import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
-const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.dirname(__dirname);
@@ -157,6 +156,20 @@ function loadJobs() {
 // their cron window while spreading them out enough to avoid iCloud conflicts.
 const JITTER_MS = (getConfig('scheduler_jitter_seconds') || 15) * 1000;
 
+// How long a job may run before the scheduler tears down its process group.
+const JOB_TIMEOUT_MS = 10 * 60 * 1000;
+
+// Jobs currently in flight. A cron tick for a job that is still running is
+// skipped rather than stacked on top: overlapping `bin/plugins sync` runs
+// contend for the same per-source locks and multiply the number of concurrent
+// AI subprocesses. See issue #383. Held by job object rather than by name so a
+// user-configured job that reuses a built-in name can't block it.
+const runningJobs = new Set();
+
+// Keep this well under systemd TimeoutStopSec so escalation can run before
+// systemd force-kills the service.
+const SCHEDULER_SHUTDOWN_KILL_GRACE_MS = 2_000;
+
 async function runCommand(command, description) {
   // Check if sync is disabled due to missing data
   if (fs.existsSync(path.join(PROJECT_ROOT, 'SYNC_DISABLED')) && command.includes('sync')) {
@@ -176,11 +189,10 @@ async function runCommand(command, description) {
   console.log(`\n[${timestamp}] Running: ${description}`);
 
   try {
-    const { stdout, stderr } = await execAsync(command, {
+    const { stdout, stderr } = await execGroup(command, {
       cwd: PROJECT_ROOT,
       env: process.env,
-      shell: '/bin/sh',
-      timeout: 10 * 60 * 1000 // 10 minute timeout
+      timeoutMs: JOB_TIMEOUT_MS
     });
 
     if (stdout) {
@@ -214,19 +226,30 @@ jobs.forEach(job => {
   console.log(`📌 Scheduled: ${job.description} - ${job.schedule}`);
 
   cron.schedule(job.schedule, () => {
-    runCommand(job.command, job.description);
+    if (runningJobs.has(job)) {
+      const timestamp = new Date().toISOString();
+      console.log(`\n[${timestamp}] SKIPPED: ${job.description}`);
+      console.log('⏭️  Previous run is still in progress.');
+      return;
+    }
+
+    runningJobs.add(job);
+    runCommand(job.command, job.description).finally(() => {
+      runningJobs.delete(job);
+    });
   });
 });
 
 console.log(`\n✨ Scheduler running with ${jobs.length} job(s)`);
 console.log('Press Ctrl+C to stop\n');
 
-process.on('SIGTERM', () => {
-  console.log('\n👋 Scheduler shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 Scheduler interrupted, shutting down...');
-  process.exit(0);
+installProcessGroupShutdownHandlers({
+  killGraceMs: SCHEDULER_SHUTDOWN_KILL_GRACE_MS,
+  escalateToSigkill: true,
+  onSignal: (signal) => {
+    const message = signal === 'SIGINT'
+      ? 'Scheduler interrupted, shutting down...'
+      : 'Scheduler shutting down gracefully...';
+    console.log(`\n👋 ${message}`);
+  }
 });

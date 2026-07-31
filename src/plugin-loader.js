@@ -1,15 +1,19 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync, spawnSync, exec as execCb } from 'child_process';
-import { promisify } from 'util';
+import { execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
+import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
-const execAsync = promisify(execCb);
+// Plugin commands can spawn long-running subprocess trees (including AI calls),
+// so keep them bounded below the scheduler's 10-minute timeout so stuck runs
+// still report an actionable plugin error while the parent is alive. See #383.
+const PLUGIN_COMMAND_TIMEOUT_MS = 8 * 60 * 1000;
+const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -324,6 +328,11 @@ export function isPluginConfigured(pluginName) {
  * @returns {{success: boolean, data?: any, error?: string}}
  */
 async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, sourceName = null) {
+  installProcessGroupShutdownHandlers({
+    killGraceMs: PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS,
+    escalateToSigkill: true
+  });
+
   const commandPath = plugin.commands?.[command];
   if (!commandPath) {
     return { success: false, error: `Plugin ${plugin.name} has no '${command}' command` };
@@ -362,14 +371,27 @@ async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, so
       PLUGIN_CONFIG: JSON.stringify(configWithSecrets),
       ...extraEnv
     },
-    maxBuffer: 50 * 1024 * 1024 // 50MB for large syncs
+    maxBuffer: 50 * 1024 * 1024, // 50MB for large syncs
+    timeoutMs: PLUGIN_COMMAND_TIMEOUT_MS
   };
 
   let stdout;
   try {
-    const result = await execAsync(fullPath, execOpts);
+    // execGroup, not exec: plugin reads spawn their own children (markdown-plans
+    // shells out to the claude CLI), and those have to die with the read.
+    const result = await execGroup(fullPath, execOpts);
     stdout = result.stdout;
   } catch (error) {
+    // A timeout is the one failure an operator most needs named, and a wedged
+    // plugin's stderr is full of progress noise that would otherwise win the
+    // "last error line" heuristic below. Report it directly.
+    if (error.timedOut) {
+      return {
+        success: false,
+        error: `Plugin ${command} timed out after ${Math.round(PLUGIN_COMMAND_TIMEOUT_MS / 60000)} minutes`
+      };
+    }
+
     // exec error - command exited with non-zero status
     // First, try to parse stdout for structured JSON error from plugin
     if (error.stdout) {
