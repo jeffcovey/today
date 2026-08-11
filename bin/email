@@ -193,10 +193,14 @@ program
         process.exit(1);
       }
 
-      // Find imap-email sources
+      // Find imap-email sources, applying --source filter if given
       const imapSources = [];
       for (const [sourceName, sourceConfig] of Object.entries(config.plugins?.['imap-email'] || {})) {
         if (sourceConfig.enabled && sourceConfig.host && sourceConfig.username) {
+          if (options.source) {
+            const sourceId = `imap-email/${sourceName}`;
+            if (sourceId !== options.source && sourceName !== options.source) continue;
+          }
           imapSources.push({ sourceName, ...sourceConfig });
         }
       }
@@ -210,9 +214,13 @@ program
       const allResults = [];
       const limit = parseInt(options.limit);
 
-      for (const source of imapSources) {
-        if (allResults.length >= limit) break;
+      // "ALL" is an IMAP criterion meaning every message; anything else is a text search
+      const isAll = query.toUpperCase() === 'ALL';
+      const searchCriteria = isAll
+        ? { all: true }
+        : { or: [{ subject: query }, { from: query }, { body: query }] };
 
+      for (const source of imapSources) {
         const password = process.env[`TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`];
         if (!password) {
           console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`));
@@ -232,20 +240,19 @@ program
         try {
           await client.connect();
           const allFolders = await client.list();
-          const foldersToSearch = allFolders
-            .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
-            .map(f => f.path)
-            .slice(0, 5); // Limit folders for speed
+          // ALL with no text query means list inbox; text queries search across folders
+          const foldersToSearch = isAll
+            ? ['INBOX']
+            : allFolders
+                .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
+                .map(f => f.path)
+                .slice(0, 5);
 
           for (const folder of foldersToSearch) {
-            if (allResults.length >= limit) break;
             try {
               const lock = await client.getMailboxLock(folder);
               try {
-                for await (const msg of client.fetch(
-                  { or: [{ subject: query }, { from: query }, { body: query }] },
-                  { envelope: true, size: true }
-                )) {
+                for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
                   allResults.push({
                     uid: msg.uid,
                     folder,
@@ -254,7 +261,7 @@ program
                     date: msg.envelope?.date,
                     source: source.sourceName
                   });
-                  if (allResults.length >= limit) break;
+                  if (allResults.length >= limit * imapSources.length) break;
                 }
               } finally {
                 lock.release();
