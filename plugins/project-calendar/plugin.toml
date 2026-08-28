@@ -1,0 +1,35 @@
+# Project Calendar Plugin
+# Syncs project start/due dates to a configured calendar as all-day span events
+
+name = "project-calendar"
+displayName = "Project Calendar"
+description = "Sync project start/due dates to a calendar as all-day span events"
+type = "events"
+
+longDescription = """
+Reads active projects from the local database and syncs them to any
+configured read-write calendar source as all-day events spanning each
+project's start_date through due_date.
+
+Uses the target calendar source's existing credentials — no separate
+service account setup required.
+
+Example config.toml:
+
+  [plugins.project-calendar.default]
+  enabled = true
+  calendar_source = "google-calendar/projects"
+"""
+
+aiInstructions = """
+Project calendar events are synced from the projects database table.
+Each active project with a due_date gets one all-day span event in
+the configured calendar. The local events table also stores these
+for context queries.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+calendar_source = { type = "string", required = true, description = "Events source to write to (e.g. google-calendar/projects)" }
