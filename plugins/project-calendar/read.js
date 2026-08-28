@@ -23,7 +23,7 @@ if (!calendarSource) {
 }
 
 try {
-  const out = execSync(`node bin/calendar sync-projects ${calendarSource}`, {
+  const out = execSync('node bin/calendar sync-projects ' + JSON.stringify(calendarSource), {
     cwd: projectRoot,
     encoding: 'utf8',
     stdio: ['inherit', 'pipe', 'pipe'],
@@ -60,7 +60,7 @@ const entries = projects
     calendar_name: 'Projects',
     title: p.title,
     start_date: p.start_date || p.due_date,
-    end_date: p.due_date,
+    end_date: (() => { const d = new Date(p.due_date + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })(),
     start_timezone: null,
     end_timezone: null,
     location: null,

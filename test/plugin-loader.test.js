@@ -386,4 +386,39 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
       expect(ids(db)).toEqual([`${sourceId}:vault/axb.md:1`]);
     });
   });
+
+  describe('data.error surfacing', () => {
+    let pluginDir;
+    let plugin;
+
+    beforeAll(() => {
+      pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'error-stub-'));
+      const readPath = path.join(pluginDir, 'read.js');
+      fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({ entries: [], files_processed: [], incremental: false, error: 'simulated plugin error' }));
+`);
+      fs.chmodSync(readPath, 0o755);
+      plugin = {
+        name: 'error-stub',
+        type: 'tasks',
+        _path: pluginDir,
+        commands: { read: 'read.js' }
+      };
+    });
+
+    afterAll(() => {
+      fs.rmSync(pluginDir, { recursive: true, force: true });
+    });
+
+    test('returns success:false when plugin exits 0 but reports data.error', async () => {
+      const db = new Database(':memory:');
+      db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+      db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+
+      const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/simulated plugin error/);
+    });
+  });
 });
