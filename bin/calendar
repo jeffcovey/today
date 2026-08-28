@@ -6,6 +6,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { execSync } from 'child_process';
+import fs from 'fs';
 import { getDatabase } from '../src/database-service.js';
 import { discoverPlugins, getPluginSources, getPluginAccess, injectDecryptedSettings, ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfiguredTimezone, formatTime, getStartOfDay, getEndOfDay } from '../src/date-utils.js';
@@ -51,10 +52,18 @@ async function getAllCalendarSources() {
 }
 
 // Find a calendar source by name
+// Accepts "source", "plugin/source", or partial match
 async function findCalendarSource(sourceName) {
   const allSources = await getAllCalendarSources();
 
-  // Exact match first
+  // Support "plugin/source" format
+  if (sourceName.includes('/')) {
+    const [pluginPart, sourcePart] = sourceName.split('/');
+    const match = allSources.find(s => s.plugin === pluginPart && s.name === sourcePart);
+    if (match) return match;
+  }
+
+  // Exact match on source name
   let match = allSources.find(s => s.name === sourceName);
   if (match) return match;
 
@@ -553,6 +562,74 @@ async function cmdCleanup(sourceArg, daysToKeep = 0) {
   }
 }
 
+async function cmdSyncProjects(sourceArg) {
+  const source = await findCalendarSource(sourceArg);
+  if (!source) {
+    console.error(`❌ Calendar source "${sourceArg}" not found. Run "bin/calendar list" to see available sources.`);
+    process.exit(1);
+  }
+  if (getPluginAccess(source.pluginMeta) !== 'read-write') {
+    console.error(`❌ Calendar source "${source.name}" does not support write operations.`);
+    process.exit(1);
+  }
+
+  const MANAGED_TAG = '[project-calendar]';
+  const mappingSuffix = sourceArg.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const mappingFile = `.data/project-calendar-${mappingSuffix}.json`;
+
+  let mapping = {};
+  try { mapping = JSON.parse(fs.readFileSync(mappingFile, 'utf8')); } catch { /* first run */ }
+
+  const db = getDatabase();
+  const projects = db.prepare(`
+    SELECT id, title, status, start_date, due_date, url
+    FROM projects
+    WHERE status IN ('active', 'planning')
+      AND due_date IS NOT NULL
+    ORDER BY due_date
+  `).all();
+
+  const activeIds = new Set(projects.map(p => p.id));
+  let created = 0, updated = 0, deleted = 0, failed = 0;
+
+  for (const project of projects) {
+    const startDate = project.start_date || project.due_date;
+    const d = new Date(project.due_date + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    const endDate = d.toISOString().slice(0, 10);
+    const description = project.url ? `${MANAGED_TAG}\n${project.url}` : MANAGED_TAG;
+    const payload = { title: project.title, start_date: startDate, end_date: endDate, description, all_day: true };
+
+    if (mapping[project.id]) {
+      const result = callPluginWrite(source, 'update', { ...payload, id: mapping[project.id] });
+      if (result.success) {
+        updated++;
+      } else {
+        const r2 = callPluginWrite(source, 'create', payload);
+        if (r2.success && r2.event_id) { mapping[project.id] = r2.event_id; created++; }
+        else { console.error(`  ✗ ${project.title}: ${r2.error}`); failed++; }
+      }
+    } else {
+      const result = callPluginWrite(source, 'create', payload);
+      if (result.success && result.event_id) { mapping[project.id] = result.event_id; created++; }
+      else { console.error(`  ✗ ${project.title}: ${result.error}`); failed++; }
+    }
+  }
+
+  for (const [projectId, eventId] of Object.entries(mapping)) {
+    if (activeIds.has(projectId)) continue;
+    callPluginWrite(source, 'delete', { id: eventId });
+    deleted++;
+    delete mapping[projectId];
+  }
+
+  fs.writeFileSync(mappingFile, JSON.stringify(mapping, null, 2));
+
+  const counts = `Created: ${created}  Updated: ${updated}  Deleted: ${deleted}${failed ? `  Failed: ${failed}` : ''}`;
+  console.log(counts);
+  return { created, updated, deleted, failed };
+}
+
 async function cmdSyncTimeTracking(sourceArg, daysBack = 2) {
   const source = await findCalendarSource(sourceArg);
 
@@ -813,6 +890,14 @@ program
   .argument('[days-to-keep]', 'Number of recent days to keep', (val) => parseInt(val, 10), 0)
   .action(async (source, daysToKeep) => {
     await cmdCleanup(source, daysToKeep);
+  });
+
+program
+  .command('sync-projects')
+  .description('Sync active projects to a calendar as all-day span events')
+  .argument('<source>', 'Calendar source to write to (e.g. google-calendar/projects)')
+  .action(async (sourceArg) => {
+    await cmdSyncProjects(sourceArg);
   });
 
 program

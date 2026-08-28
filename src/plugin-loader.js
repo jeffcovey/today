@@ -794,6 +794,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     filesProcessed = result.data.files_processed || null;
     isIncremental = result.data.incremental === true || result.data.metadata?.incremental === true;
     pluginMetadata = result.data.metadata || null;
+    // Surface plugin-reported errors even when the process exited successfully
+    if (result.data.error) {
+      return {
+        success: false,
+        count: entries.length,
+        message: `Error syncing ${sourceId}: ${result.data.error}`
+      };
+    }
   } else {
     return {
       success: false,
