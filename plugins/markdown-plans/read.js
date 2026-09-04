@@ -2321,6 +2321,9 @@ function updateDailyPlanWithReviewProjects(dailyPlanPath, dateStr) {
   const newSection = `${startMarker}\n### 🔍 Projects to Review\n\n${formattedProjects}\n${endMarker}`;
 
   if (startIndex !== -1 && endIndex !== -1) {
+    if (content.substring(startIndex, endIndex + endMarker.length) === newSection) {
+      return { updated: false, reason: 'unchanged', count: projects.length };
+    }
     // Replace existing section
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
@@ -2452,6 +2455,9 @@ function updateWeeklyPlanWithProjects(weeklyPlanPath, startDate, endDate) {
   const endIndex = content.indexOf(endMarker);
 
   if (startIndex !== -1 && endIndex !== -1) {
+    if (content.substring(startIndex, endIndex + endMarker.length) === newSection) {
+      return { updated: false, reason: 'unchanged', count: projects.length };
+    }
     // Replace existing section
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
@@ -2578,6 +2584,9 @@ function updateMonthlyPlanWithProjects(monthlyPlanPath, startDate, endDate) {
   const endIndex = content.indexOf(endMarker);
 
   if (startIndex !== -1 && endIndex !== -1) {
+    if (content.substring(startIndex, endIndex + endMarker.length) === newSection) {
+      return { updated: false, reason: 'unchanged', count: projects.length };
+    }
     // Replace existing section
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
@@ -2840,6 +2849,9 @@ function updateQuarterlyPlanWithProjects(quarterlyPlanPath, startDate, endDate) 
   const endIndex = content.indexOf(endMarker);
 
   if (startIndex !== -1 && endIndex !== -1) {
+    if (content.substring(startIndex, endIndex + endMarker.length) === newSection) {
+      return { updated: false, reason: 'unchanged', count: projects.length };
+    }
     // Replace existing section
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
@@ -3055,6 +3067,9 @@ function updateYearlyPlanWithProjects(yearlyPlanPath, startDate, endDate) {
   const endIndex = content.indexOf(endMarker);
 
   if (startIndex !== -1 && endIndex !== -1) {
+    if (content.substring(startIndex, endIndex + endMarker.length) === newSection) {
+      return { updated: false, reason: 'unchanged', count: projects.length };
+    }
     // Replace existing section
     const before = content.substring(0, startIndex);
     const after = content.substring(endIndex + endMarker.length);
