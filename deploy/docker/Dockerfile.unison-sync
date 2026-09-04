@@ -17,6 +17,7 @@ RUN apk add --no-cache unison openssh-client bash
 COPY bin/unison-sync ./bin/unison-sync
 COPY src/config.js ./src/config.js
 COPY src/deploy/services.js ./src/deploy/services.js
+COPY src/unison-args.js ./src/unison-args.js
 
 RUN chmod +x ./bin/unison-sync
 

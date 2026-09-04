@@ -14,9 +14,13 @@
  *
  *   [deployments.local.macbook.unison]
  *   target = "digitalocean/droplet"
+ *   prefer = "remote"        # optional: newer (default) | older | local | remote
+ *   backups = true           # optional: keep prior versions of overwritten *.md
+ *   max_backups = 5          # optional
  *
  * The target's IP, SSH user, deploy path, and vault path are looked up
- * from the target deployment's own config block.
+ * from the target deployment's own config block. Conflict handling and
+ * backups are documented in src/unison-args.js.
  *
  * Runs in one of two modes:
  *   - Long-running (default): unison -repeat watch — stays resident,
@@ -37,6 +41,7 @@ import { fileURLToPath } from 'url';
 import { getFullConfig, getDeploymentName as getDeployName } from '../src/config.js';
 import { getDeployment } from '../src/deploy/config.js';
 import { writeFileAtomicCAS } from '../src/fs-atomic.js';
+import { buildUnisonArgs, BUILTIN_EXCLUDES } from '../src/unison-args.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -58,28 +63,6 @@ function resolveSSHKey(deployment) {
   }
   return candidates[0]; // fallback to do_deploy_key even if missing — SSH will give a clear error
 }
-
-// ── Built-in excludes ───────────────────────────────────────────────
-
-const BUILTIN_EXCLUDES = [
-  'Path .git.nosync',
-  'Path .git',
-  'Path .sync',
-  'Path .stfolder',
-  'Path .stversions',
-  'Name .DS_Store',
-  'Path node_modules',
-  // `Path node_modules` only matches a top-level node_modules; `Name` matches
-  // it at any depth (e.g. archived projects under inbox/archive) so nested
-  // dependency trees don't get synced.
-  'Name node_modules',
-  'Name *.tmp',
-  'Name .*.swp',
-  // Health-check marker — written locally by bin/unison-sync-healthcheck;
-  // must not be propagated to the remote or it will cause spurious conflicts
-  // and churn on every sync recovery.
-  'Name .unison-sync-status.md',
-];
 
 // ── Main ────────────────────────────────────────────────────────────
 
@@ -208,53 +191,40 @@ function writeStatusFile(fields) {
   }
 }
 
-// Build excludes
-const userExcludes = unisonConfig.excludes || [];
-const allExcludes = [...BUILTIN_EXCLUDES, ...userExcludes];
+// Build the unison command. Conflict policy (`prefer`), conflict copies and
+// backups live in src/unison-args.js — see that file for the config keys.
+const remoteRoot = `ssh://${sshUser}@${targetIp}/${remoteVault}`;
+let args;
+try {
+  args = buildUnisonArgs({
+    localRoot: localVault,
+    remoteRoot,
+    sshArgs: `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
+    unisonConfig,
+    oneShot,
+  });
+} catch (err) {
+  console.error(err.message);
+  console.error('Fix it in config.toml under [deployments.*.unison] (prefer = "newer" | "older" | "local" | "remote")');
+  process.exit(1);
+}
 
-// Selective sync: if paths is set, only sync those subdirectories.
-// Empty or absent = sync everything (minus excludes).
 const syncPaths = unisonConfig.paths || [];
-
-// Build the unison command
-const args = [
-  localVault,
-  `ssh://${sshUser}@${targetIp}/${remoteVault}`,
-  '-batch',          // non-interactive
-  '-auto',           // accept non-conflicting changes automatically
-  '-prefer', 'newer', // for conflicts, prefer the newer version (configurable later)
-  '-perms', '0',     // ignore permission differences (macOS vs Linux)
-  '-dontchmod',      // don't try to set permissions on the remote
-  '-retry', '3',     // retry on transient failures (stale locks, network blips)
-  '-sshargs', `-p ${sshPort} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${resolveSSHKey(targetDeployment)}`,
-];
-
-// Add selective paths (if any)
-for (const p of syncPaths) {
-  args.push('-path', p);
-}
-
-// Add excludes
-for (const exclude of allExcludes) {
-  args.push('-ignore', exclude);
-}
-
-// Add repeat mode unless one-shot
-if (!oneShot) {
-  args.push('-repeat', 'watch');
-}
+const excludeCount = BUILTIN_EXCLUDES.length + (unisonConfig.excludes || []).length;
 
 // Log what we're doing
 console.log('Unison sync starting...');
 console.log(`  Local:   ${localVault}`);
-console.log(`  Remote:  ssh://${sshUser}@${targetIp}/${remoteVault}`);
+console.log(`  Remote:  ${remoteRoot}`);
 console.log(`  Mode:    ${oneShot ? 'one-shot' : 'repeat (watch)'}`);
 if (syncPaths.length > 0) {
   console.log(`  Paths:   ${syncPaths.join(', ')} (selective sync)`);
 } else {
   console.log(`  Paths:   (all)`);
 }
-console.log(`  Excludes: ${allExcludes.length} patterns`);
+console.log(`  Excludes: ${excludeCount} patterns`);
+console.log(`  Conflicts: prefer ${unisonConfig.prefer || 'newer'}; losing side kept as "name (conflict_on_DATE)"`);
+console.log(`  Backups: ${unisonConfig.backups === false ? 'off' : `last ${args[args.indexOf('-maxbackups') + 1]} versions of overwritten *.md (central, per replica)`}`);
 console.log('');
 
 // Run unison. UNISONLOCALHOSTNAME must be stable per-deployment so the

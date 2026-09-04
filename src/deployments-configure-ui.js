@@ -207,6 +207,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
         { key: '__jobs__', type: 'submenu' },
         { key: 'unison_target', type: 'text', label: 'Unison Target', nested: 'unison.target' },
         { key: 'unison_paths', type: 'text', label: 'Unison Paths (comma-separated)', nested: 'unison.paths' },
+        { key: 'unison_prefer', type: 'text', label: 'Unison Conflict Winner (newer, older, local, remote)', nested: 'unison.prefer' },
         { key: '__delete__', type: 'action' },
       ];
       const fieldIdx = typeof editField === 'number' ? editField : 0;
@@ -682,6 +683,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
 
     const unisonTarget = selected.unison?.target || '';
     const unisonPaths = selected.unison?.paths || [];
+    const unisonPrefer = selected.unison?.prefer || '';
 
     const fields = [
       { key: 'enabled', label: 'Enabled', value: selected.enabled !== false, type: 'boolean' },
@@ -695,6 +697,7 @@ function DeploymentsConfigApp({ onExit, initialEdit, addNew }) {
       { key: '__jobs__', label: 'Jobs', value: `${jobCount} configured`, type: 'submenu' },
       { key: 'unison_target', label: 'Unison Target', value: unisonTarget || '(not set)', type: 'text', nested: 'unison.target' },
       { key: 'unison_paths', label: 'Unison Paths', value: unisonPaths.length > 0 ? unisonPaths.join(', ') : '(all)', type: 'text', nested: 'unison.paths' },
+      { key: 'unison_prefer', label: 'Unison Conflict Winner', value: unisonPrefer || 'newer (default)', type: 'text', nested: 'unison.prefer' },
       { key: '__delete__', label: '🗑️  Delete this deployment', value: '', type: 'action' },
     ];
 
