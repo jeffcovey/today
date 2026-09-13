@@ -517,7 +517,7 @@ ${contextSection}`;
       fs.writeFileSync(promptFile, prompt);
       const userMessage = directRequest || 'What should I focus on right now?';
       try {
-        const claudeResult = spawnSync(claudeBinary, ['--model', model, '--append-system-prompt-file', promptFile, userMessage], { stdio: 'inherit' });
+        const claudeResult = spawnSync(claudeBinary, ['--model', model, '--remote-control', '--append-system-prompt-file', promptFile, userMessage], { stdio: 'inherit' });
         if (claudeResult.error) {
           console.error(`ERROR: failed to launch claude: ${claudeResult.error.message}`);
           process.exit(1);
