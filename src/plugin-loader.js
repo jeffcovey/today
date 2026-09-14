@@ -34,9 +34,26 @@ function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
 }
 
 /**
- * Get a decrypted environment variable value using dotenvx
+ * Get a decrypted environment variable value.
+ *
+ * Both the scheduler and bin/today run under `dotenvx run`, which decrypts
+ * every TODAY_* value into process.env at startup — so the common case needs
+ * no work at all. Shelling out costs ~2.46s per key, and with 11 enabled
+ * sources carrying an encrypted setting that was ~27s of CPU on every sync,
+ * re-deriving strings the process already held.
+ *
+ * The subprocess stays as a fallback for plugin scripts invoked outside
+ * `dotenvx run`, where process.env is not populated.
+ *
+ * Note: reading the environment means a rotated secret is picked up on the
+ * next process restart rather than the next sync.
  */
 function getDecryptedEnvVar(key) {
+  const fromEnv = process.env[key];
+  if (fromEnv) {
+    return fromEnv;
+  }
+
   try {
     const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
       cwd: PROJECT_ROOT,
