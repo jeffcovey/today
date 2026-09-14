@@ -18,8 +18,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
 
-// Load environment variables only if .env exists (to avoid warnings)
-if (fs.existsSync(path.join(projectRoot, '.env'))) {
+// Load environment variables only if .env exists (to avoid warnings) and the
+// environment has not already been populated.
+//
+// dotenvx sets DOTENV_PUBLIC_KEY in the environment it hands to a child, so its
+// presence means a parent already decrypted .env and we inherited the result.
+// Re-running config() there costs ~1.4s to re-derive values we already hold —
+// and since every bin/* script imports this module, context gathering paid that
+// in each of its ~20 subprocesses.
+if (!process.env.DOTENV_PUBLIC_KEY && fs.existsSync(path.join(projectRoot, '.env'))) {
   const dotenvx = await import('@dotenvx/dotenvx');
   dotenvx.default.config({ quiet: true });
 }
