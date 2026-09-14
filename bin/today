@@ -229,9 +229,23 @@ async function checkForUpdates(execSync, readline) {
 // =============================================================================
 
 async function main() {
+  // `--help` and `--version` print static text and exit. They need no env vars,
+  // no network, no vault and no database — so decide this first, before anything
+  // has a chance to do work on their behalf.
+  const wantsHelpOrVersion = process.argv
+    .slice(2)
+    .some(arg => arg === '--help' || arg === '-h' || arg === '--version' || arg === '-V');
+
   // Dynamic imports - these resolve at runtime, after deps are installed
   const { autoDotenvx } = await import('./lib/dotenvx-loader.js');
-  autoDotenvx();
+
+  // autoDotenvx() re-executes this entire script under `npx dotenvx run` to get
+  // decrypted env vars, which costs ~3 s: npx resolution, the dotenvx CLI's own
+  // startup, and a second node process running bin/today again. Help and version
+  // read no env vars, so that whole second process is pure waste for them.
+  if (!wantsHelpOrVersion) {
+    autoDotenvx();
+  }
 
   // Load built-ins and the modules every invocation needs, in parallel — they
   // are independent after dotenvx has run.  Sequential awaits here cost ~2.3 s
@@ -265,13 +279,6 @@ async function main() {
   ]);
 
   process.chdir(projectRoot);
-
-  // `--help` and `--version` print static text and exit. Neither needs the
-  // network, the vault, or the database, so skip those phases entirely rather
-  // than making the user wait on them to read the usage string.
-  const wantsHelpOrVersion = process.argv
-    .slice(2)
-    .some(arg => arg === '--help' || arg === '-h' || arg === '--version' || arg === '-V');
 
   // Check for updates (skip in non-interactive mode)
   if (!wantsHelpOrVersion
