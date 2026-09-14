@@ -18,7 +18,10 @@ const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
+const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
+const refreshedEnvVarMtimes = new Map();
 
 // ============================================================================
 // Encrypted settings helpers
@@ -33,17 +36,53 @@ function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
   return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
 }
 
+function getEnvFileMtimeMs() {
+  try {
+    return fs.statSync(ENV_PATH).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Get a decrypted environment variable value using dotenvx
+ * Get a decrypted environment variable value.
+ *
+ * Both the scheduler and bin/today run under `dotenvx run`, which decrypts
+ * every TODAY_* value into process.env at startup — so the common case needs
+ * no work at all. Shelling out costs ~2.46s per key, and with 11 enabled
+ * sources carrying an encrypted setting that was ~27s of CPU on every sync,
+ * re-deriving strings the process already held.
+ *
+ * The subprocess stays as a fallback for plugin scripts invoked outside
+ * `dotenvx run`, where process.env is not populated, and for long-lived
+ * processes after `.env` has changed since startup.
+ *
+ * Once `.env` changes, the next lookup refreshes that key from dotenvx and
+ * updates process.env so later lookups are fast again.
  */
 function getDecryptedEnvVar(key) {
+  const envMtimeMs = getEnvFileMtimeMs();
+  const refreshedAtMtimeMs = refreshedEnvVarMtimes.get(key);
+  const fromEnv = process.env[key];
+  if (fromEnv && (envMtimeMs === PROCESS_ENV_MTIME_MS || refreshedAtMtimeMs === envMtimeMs)) {
+    return fromEnv;
+  }
+
   try {
     const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
       cwd: PROJECT_ROOT,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return result.trim() || null;
+    const value = result.trim() || null;
+    if (value) {
+      process.env[key] = value;
+      refreshedEnvVarMtimes.set(key, envMtimeMs);
+    } else {
+      delete process.env[key];
+      refreshedEnvVarMtimes.delete(key);
+    }
+    return value;
   } catch {
     return null;
   }
