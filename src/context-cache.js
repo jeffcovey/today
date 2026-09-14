@@ -23,22 +23,24 @@ import { getTodayDate } from './date-utils.js';
 
 // Bump when the gather logic below changes in a way that should invalidate
 // every existing cache entry across an upgrade.
-export const CONTEXT_CACHE_VERSION = 1;
+export const CONTEXT_CACHE_VERSION = 2;
 
 // How many cache rows to retain (one per distinct fingerprint: live + a few
 // historical-date lookups). Older rows are pruned on each write.
 const MAX_CACHE_ROWS = 5;
 
 /**
- * Snapshot the per-source sync state. This is the change signal: any sync
- * (manual or background cron) updates last_synced_at, which changes the key.
+ * Snapshot the per-source sync state for cache keying.
+ * Uses entries_count (changes only when row counts change) rather than
+ * last_synced_at (changes on every background sync even when data is identical),
+ * so the cache stays valid across syncs that bring in no new data.
  * @param {object} db
  * @returns {Array<object>}
  */
 function getSyncSnapshot(db) {
   try {
     return db.prepare(
-      'SELECT source, last_synced_at, entries_count FROM sync_metadata ORDER BY source'
+      'SELECT source, entries_count FROM sync_metadata ORDER BY source'
     ).all();
   } catch {
     // Table might not exist yet
