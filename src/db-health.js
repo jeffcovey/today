@@ -19,6 +19,11 @@ const DB_PATH = '.data/today.db';
 const BACKUP_PATH = '.data/today.db.backup';
 const WAL_PATH = '.data/today.db-wal';
 const SHM_PATH = '.data/today.db-shm';
+const INTEGRITY_CHECK_STAMP = '.data/.last-integrity-check';
+
+// How often to run the expensive PRAGMA integrity_check (ms). Between checks
+// we skip it — the "SELECT 1" smoke-test still runs every startup.
+const INTEGRITY_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 // Cleanup configuration
 const MAX_BACKUPS = 5;
@@ -89,24 +94,37 @@ export function checkDatabaseHealth() {
       };
     }
 
-    // Run integrity check
-    try {
-      const integrityResult = db.prepare('PRAGMA integrity_check').get();
-      if (integrityResult?.integrity_check !== 'ok') {
+    // Run integrity check — throttled to once per hour because it reads the
+    // entire 500+ MB database and costs ~1s on every startup otherwise.
+    // The smoke-test above already catches I/O errors; this is a deeper check.
+    const skipIntegrity = (() => {
+      try {
+        if (!fs.existsSync(INTEGRITY_CHECK_STAMP)) return false;
+        return Date.now() - fs.statSync(INTEGRITY_CHECK_STAMP).mtimeMs < INTEGRITY_CHECK_INTERVAL_MS;
+      } catch { return false; }
+    })();
+
+    if (!skipIntegrity) {
+      try {
+        const integrityResult = db.prepare('PRAGMA integrity_check').get();
+        if (integrityResult?.integrity_check !== 'ok') {
+          db.close();
+          return {
+            healthy: false,
+            corrupted: true,
+            reason: `Integrity check failed: ${integrityResult?.integrity_check}`
+          };
+        }
+        // Record successful check so next startup can skip it
+        try { fs.writeFileSync(INTEGRITY_CHECK_STAMP, ''); } catch { /* best-effort */ }
+      } catch (integrityError) {
         db.close();
         return {
           healthy: false,
           corrupted: true,
-          reason: `Integrity check failed: ${integrityResult?.integrity_check}`
+          reason: `Integrity check error: ${integrityError.message}`
         };
       }
-    } catch (integrityError) {
-      db.close();
-      return {
-        healthy: false,
-        corrupted: true,
-        reason: `Integrity check error: ${integrityError.message}`
-      };
     }
 
     // Check if schema_version table exists
