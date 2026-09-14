@@ -8,9 +8,13 @@ const spawnSync = jest.fn();
 const spawn = jest.fn();
 const exec = jest.fn();
 const execFileSync = jest.fn();
+// plugin-loader promisifies execFile for running context plugins; the mock has
+// to provide it or the module fails to link.
+const execFile = jest.fn();
 
 jest.unstable_mockModule('child_process', () => ({
   exec,
+  execFile,
   execFileSync,
   execSync,
   spawn,

@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import { execSync } from 'child_process';
 
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from './plugin-schemas.js';
-import { getAIInstructionsByType, getPluginSources } from './plugin-loader.js';
+import { getAIInstructionsByType, getPluginSources, runContextPlugins } from './plugin-loader.js';
 import { getConfigPath, getTimezone } from './config.js';
 import { getTodayDate } from './date-utils.js';
 
@@ -190,41 +190,30 @@ async function getContextPluginsData(typeData, projectRoot) {
     }
   }
 
-  for (const sourceId of typeData.sources) {
+  const entries = typeData.sources.map(sourceId => {
+    const [pluginName, sourceName] = sourceId.split('/');
+    let config = {};
     try {
-      const [pluginName, sourceName] = sourceId.split('/');
-      const pluginPath = path.join(projectRoot, 'plugins', pluginName);
-      const readScript = path.join(pluginPath, 'read.js');
-
-      if (!fs.existsSync(readScript)) continue;
-
-      const sources = getPluginSources(pluginName);
-      const sourceConfig = sources.find(s => s.sourceName === sourceName)?.config || {};
-
-      if (process.env.TODAY_QUIET !== '1') console.log(`  ⏳ ${pluginName}...`);
-
-      const output = execSync(`node "${readScript}"`, {
-        cwd: projectRoot,
-        encoding: 'utf8',
-        timeout: 30000,
-        env: {
-          ...process.env,
-          PROJECT_ROOT: projectRoot,
-          CONFIG_PATH: getConfigPath(),
-          PLUGIN_CONFIG: JSON.stringify(sourceConfig),
-          SOURCE_ID: sourceId,
-          CONTEXT_ONLY: 'true' // Skip expensive operations during context gathering
-        }
-      });
-
-      const data = JSON.parse(output);
-
-      if (data.context) {
-        lines.push(data.context);
-        lines.push('');
-      }
+      config = getPluginSources(pluginName).find(s => s.sourceName === sourceName)?.config || {};
     } catch {
-      // Silently continue if plugin fails
+      config = {};
+    }
+    return { sourceId, pluginName, config };
+  });
+
+  const quiet = process.env.TODAY_QUIET === '1';
+  const results = await runContextPlugins(
+    entries,
+    projectRoot,
+    quiet ? null : pluginName => console.log(`  ⏳ ${pluginName}...`)
+  );
+
+  // Results arrive in source order, so the gathered context — and therefore
+  // what gets cached — is identical run to run.
+  for (const { data } of results) {
+    if (data?.context) {
+      lines.push(data.context);
+      lines.push('');
     }
   }
 

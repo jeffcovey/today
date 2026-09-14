@@ -1,7 +1,8 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
@@ -18,6 +19,7 @@ const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+const execFileAsync = promisify(execFile);
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
 const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
@@ -1373,6 +1375,69 @@ export async function getSourcesForType(pluginType, sourceFilter = null) {
   }
 
   return { sources: matchingSources, allSources };
+}
+
+/**
+ * Run one context plugin's read.js and return its parsed output.
+ *
+ * Always sets CONTEXT_ONLY=true: these are display/gather reads, and some
+ * context plugins (markdown-plans, now-updates) treat an unset value as
+ * permission to generate content, which means AI calls and vault writes.
+ *
+ * @param {object} entry - { sourceId, pluginName, config }
+ * @param {string} projectRoot
+ * @returns {Promise<{sourceId: string, pluginName: string, data: object|null, error: string|null}>}
+ */
+async function runContextPluginSource({ sourceId, pluginName, config }, projectRoot) {
+  const readScript = path.join(projectRoot, 'plugins', pluginName, 'read.js');
+  const result = { sourceId, pluginName, data: null, error: null };
+
+  if (!fs.existsSync(readScript)) {
+    result.error = 'no read.js';
+    return result;
+  }
+
+  try {
+    const { stdout } = await execFileAsync('node', [readScript], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      timeout: 30000,
+      maxBuffer: 32 * 1024 * 1024,
+      env: {
+        ...process.env,
+        PROJECT_ROOT: projectRoot,
+        CONFIG_PATH: getConfigPath(),
+        PLUGIN_CONFIG: JSON.stringify(config || {}),
+        SOURCE_ID: sourceId,
+        CONTEXT_ONLY: 'true'
+      }
+    });
+
+    // Plugins occasionally emit a dotenvx banner ahead of their JSON.
+    const json = stdout.split('\n').filter(l => !l.includes('[dotenvx')).join('\n').trim();
+    result.data = JSON.parse(json);
+  } catch (error) {
+    result.error = error.message;
+  }
+
+  return result;
+}
+
+/**
+ * Run every given context plugin concurrently, returning results in the order
+ * they were passed rather than the order they finish, so output stays stable
+ * between runs.
+ *
+ * @param {Array<{sourceId: string, pluginName: string, config: object}>} entries
+ * @param {string} projectRoot
+ * @param {function} [onStart] - called with pluginName as each plugin is spawned
+ * @returns {Promise<Array<{sourceId, pluginName, data, error}>>}
+ */
+export async function runContextPlugins(entries, projectRoot, onStart = null) {
+  return Promise.all(entries.map(entry => {
+    if (onStart) onStart(entry.pluginName);
+    return runContextPluginSource(entry, projectRoot);
+  }));
 }
 
 /**
