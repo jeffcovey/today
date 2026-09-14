@@ -237,10 +237,11 @@ async function main() {
   // are independent after dotenvx has run.  Sequential awaits here cost ~2.3 s
   // on a cold run.
   //
-  // Deliberately absent: database-service (better-sqlite3, ~1.2 s), configure-ui
-  // (React + ink, ~0.85 s), context-cache and ai-provider. Each is used by a
-  // single code path and is imported lazily there, so `--help`, `--version`,
-  // `configure`, `web` and `update` no longer pay for them.
+  // Deliberately absent: db-health and database-service (both load
+  // better-sqlite3, ~1.2 s), configure-ui (React + ink, ~0.85 s),
+  // context-cache and ai-provider. Each is used by a single code path and is
+  // imported lazily there, so `--help`, `--version`, `configure`, `web` and
+  // `update` no longer pay for them.
   const [
     fs,
     path,
@@ -250,7 +251,6 @@ async function main() {
     { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath, getFocusPresets, getFocusPreset },
     { checkPluginVaultFileChanges },
     { program },
-    { ensureHealthyDatabase },
     { getCurrentTime, formatFullDateTime },
   ] = await Promise.all([
     import('fs'),
@@ -261,7 +261,6 @@ async function main() {
     import('../src/config.js'),
     import('../src/plugin-loader.js'),
     import('commander'),
-    import('../src/db-health.js'),
     import('../src/date-utils.js'),
   ]);
 
@@ -279,6 +278,14 @@ async function main() {
     && !process.argv.includes('--non-interactive')
     && !process.argv.includes('--skip-update-check')) {
     await checkForUpdates(execSync, readline);
+  }
+
+  let ensureHealthyDatabasePromise;
+
+  async function getEnsureHealthyDatabase() {
+    ensureHealthyDatabasePromise ??= import('../src/db-health.js')
+      .then(({ ensureHealthyDatabase }) => ensureHealthyDatabase);
+    return ensureHealthyDatabasePromise;
   }
 
   // Check for vault file updates (periodically, after main update check)
@@ -332,6 +339,7 @@ async function main() {
 
     const quiet = process.env.TODAY_QUIET === '1';
     if (!quiet) console.log('🔍 Checking database health...');
+    const ensureHealthyDatabase = await getEnsureHealthyDatabase();
     const result = await ensureHealthyDatabase({ verbose: !quiet });
 
     if (!result.success) {
