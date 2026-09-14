@@ -1183,7 +1183,10 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
   });
 
   insertAll();
-  return entries.length;
+  // Return total rows for this source (not just the current batch) so
+  // sync_metadata.entries_count is a stable content signal: it changes only
+  // when rows are added or removed, not on empty syncs or re-syncs of identical data.
+  return db.prepare(`SELECT COUNT(*) as n FROM ${tableName} WHERE source = ?`).get(sourceId).n;
 }
 
 /**
