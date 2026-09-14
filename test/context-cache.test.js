@@ -7,12 +7,15 @@ jest.unstable_mockModule('../src/config.js', () => ({
   getFullConfig: jest.fn().mockReturnValue({}),
 }));
 
-// Mock plugin-loader so context gathering sees no enabled plugins (no execSync).
+// Mock plugin-loader so context gathering sees no enabled plugins and spawns
+// no subprocesses.
 const getAIInstructionsByType = jest.fn();
 const getPluginSources = jest.fn().mockReturnValue([]);
+const runContextPlugins = jest.fn().mockResolvedValue([]);
 jest.unstable_mockModule('../src/plugin-loader.js', () => ({
   getAIInstructionsByType,
   getPluginSources,
+  runContextPlugins,
 }));
 
 const Database = (await import('better-sqlite3')).default;
