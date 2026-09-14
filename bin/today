@@ -16,7 +16,7 @@
 // Everything else uses dynamic import() after deps are verified.
 // =============================================================================
 
-import { existsSync, statSync, utimesSync, openSync } from 'fs';
+import { existsSync, statSync, utimesSync, openSync, closeSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { execSync as execSyncBuiltin } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -88,11 +88,25 @@ async function checkForUpdates(execSync, readline) {
     }
   }
 
+  // Stamp the check *before* fetching, not after. The fetch is a network call
+  // on the startup critical path; if it times out the throttle must still
+  // apply, or every invocation for the rest of the hour pays the timeout again.
   try {
-    // Fetch latest from origin (quick, just updates refs)
+    const dataDir = join(projectRoot, '.data');
+    if (!existsSync(dataDir)) {
+      mkdirSync(dataDir, { recursive: true });
+    }
+    closeSync(openSync(lastCheckFile, 'w'));
+  } catch {
+    // Stamping is best-effort; a failure here must not block startup.
+  }
+
+  try {
+    // Fetch latest from origin (quick, just updates refs). A healthy fetch
+    // measures ~0.3 s, so cap the wait well short of a visible stall.
     execSync('git fetch origin main --quiet 2>/dev/null', {
       cwd: projectRoot,
-      timeout: 5000,
+      timeout: 1500,
       stdio: 'pipe'
     });
 
@@ -106,13 +120,6 @@ async function checkForUpdates(execSync, readline) {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
-
-    // Update the check timestamp
-    const dataDir = join(projectRoot, '.data');
-    if (!existsSync(dataDir)) {
-      execSync(`mkdir -p "${dataDir}"`, { cwd: projectRoot });
-    }
-    execSync(`touch "${lastCheckFile}"`, { cwd: projectRoot });
 
     if (localHead === remoteHead) {
       return; // Already up to date
@@ -226,8 +233,14 @@ async function main() {
   const { autoDotenvx } = await import('./lib/dotenvx-loader.js');
   autoDotenvx();
 
-  // Load built-ins and all project modules in parallel — they are independent
-  // after dotenvx has run.  Sequential awaits here cost ~2.3 s on a cold run.
+  // Load built-ins and the modules every invocation needs, in parallel — they
+  // are independent after dotenvx has run.  Sequential awaits here cost ~2.3 s
+  // on a cold run.
+  //
+  // Deliberately absent: database-service (better-sqlite3, ~1.2 s), configure-ui
+  // (React + ink, ~0.85 s), context-cache and ai-provider. Each is used by a
+  // single code path and is imported lazily there, so `--help`, `--version`,
+  // `configure`, `web` and `update` no longer pay for them.
   const [
     fs,
     path,
@@ -235,14 +248,10 @@ async function main() {
     { execSync, spawnSync },
     readline,
     { getTimezone, getFullConfig, configExists, getAbsoluteVaultPath, getFocusPresets, getFocusPreset },
-    { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync },
     { checkPluginVaultFileChanges },
     { program },
-    { getDatabase },
-    { getDataContextCached },
     { ensureHealthyDatabase },
     { getCurrentTime, formatFullDateTime },
-    { runConfigure },
   ] = await Promise.all([
     import('fs'),
     import('path'),
@@ -250,20 +259,25 @@ async function main() {
     import('child_process'),
     import('readline'),
     import('../src/config.js'),
-    import('../src/ai-provider.js'),
     import('../src/plugin-loader.js'),
     import('commander'),
-    import('../src/database-service.js'),
-    import('../src/context-cache.js'),
     import('../src/db-health.js'),
     import('../src/date-utils.js'),
-    import('../src/configure-ui.js'),
   ]);
 
   process.chdir(projectRoot);
 
+  // `--help` and `--version` print static text and exit. Neither needs the
+  // network, the vault, or the database, so skip those phases entirely rather
+  // than making the user wait on them to read the usage string.
+  const wantsHelpOrVersion = process.argv
+    .slice(2)
+    .some(arg => arg === '--help' || arg === '-h' || arg === '--version' || arg === '-V');
+
   // Check for updates (skip in non-interactive mode)
-  if (!process.argv.includes('--non-interactive') && !process.argv.includes('--skip-update-check')) {
+  if (!wantsHelpOrVersion
+    && !process.argv.includes('--non-interactive')
+    && !process.argv.includes('--skip-update-check')) {
     await checkForUpdates(execSync, readline);
   }
 
@@ -307,7 +321,7 @@ async function main() {
   }
 
   // Run vault file check after update check
-  if (!process.argv.includes('--skip-update-check')) {
+  if (!wantsHelpOrVersion && !process.argv.includes('--skip-update-check')) {
     await checkVaultFileUpdates();
   }
 
@@ -333,6 +347,18 @@ async function main() {
   async function runInteractiveSession(directRequest = null, nonInteractive = false, dryRun = false, targetDate = null, compact = false, quiet = false, refreshContext = false) {
     const log = quiet ? () => {} : console.log.bind(console);
     const timezone = getTimezone();
+
+    // Loaded here rather than at startup: better-sqlite3 and the AI provider
+    // cost ~1.7 s to import and only this path uses them.
+    const [
+      { getDatabase },
+      { getDataContextCached },
+      { getInteractiveModel, getInteractiveProviderName, checkProviderBinarySync },
+    ] = await Promise.all([
+      import('../src/database-service.js'),
+      import('../src/context-cache.js'),
+      import('../src/ai-provider.js'),
+    ]);
 
     const now = getCurrentTime(timezone);
     const currentTime = formatFullDateTime(now, timezone);
@@ -572,6 +598,7 @@ ${contextSection}`;
       console.log('Today needs to be configured before first use.');
       console.log('Opening configuration wizard...');
       console.log();
+      const { runConfigure } = await import('../src/configure-ui.js');
       await runConfigure();
 
       if (!configExists()) {
@@ -730,6 +757,7 @@ ${contextSection}`;
     .command('configure')
     .description('Open configuration UI for system settings')
     .action(async () => {
+      const { runConfigure } = await import('../src/configure-ui.js');
       await runConfigure();
     });
 
