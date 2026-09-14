@@ -18,7 +18,10 @@ const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
+const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
+const refreshedEnvVarMtimes = new Map();
 
 // ============================================================================
 // Encrypted settings helpers
@@ -33,6 +36,14 @@ function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
   return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
 }
 
+function getEnvFileMtimeMs() {
+  try {
+    return fs.statSync(ENV_PATH).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get a decrypted environment variable value.
  *
@@ -43,14 +54,17 @@ function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
  * re-deriving strings the process already held.
  *
  * The subprocess stays as a fallback for plugin scripts invoked outside
- * `dotenvx run`, where process.env is not populated.
+ * `dotenvx run`, where process.env is not populated, and for long-lived
+ * processes after `.env` has changed since startup.
  *
- * Note: reading the environment means a rotated secret is picked up on the
- * next process restart rather than the next sync.
+ * Once `.env` changes, the next lookup refreshes that key from dotenvx and
+ * updates process.env so later lookups are fast again.
  */
 function getDecryptedEnvVar(key) {
+  const envMtimeMs = getEnvFileMtimeMs();
+  const refreshedAtMtimeMs = refreshedEnvVarMtimes.get(key);
   const fromEnv = process.env[key];
-  if (fromEnv) {
+  if (fromEnv && (envMtimeMs === PROCESS_ENV_MTIME_MS || refreshedAtMtimeMs === envMtimeMs)) {
     return fromEnv;
   }
 
@@ -60,7 +74,15 @@ function getDecryptedEnvVar(key) {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return result.trim() || null;
+    const value = result.trim() || null;
+    if (value) {
+      process.env[key] = value;
+      refreshedEnvVarMtimes.set(key, envMtimeMs);
+    } else {
+      delete process.env[key];
+      refreshedEnvVarMtimes.delete(key);
+    }
+    return value;
   } catch {
     return null;
   }
