@@ -132,9 +132,15 @@ describe('context cache', () => {
       const after = computeContextCacheKey(base());
       expect(before).not.toBe(after);
 
-      // A later sync time changes it again.
+      // A later sync time alone does NOT change the key — only entries_count matters.
+      // Background syncs that bring no new rows must not bust the cache.
       db.prepare('UPDATE sync_metadata SET last_synced_at = ? WHERE source = ?')
         .run('2026-05-30 13:00:00', 'gh/today');
+      expect(computeContextCacheKey(base())).toBe(after);
+
+      // But a change to entries_count does bust it.
+      db.prepare('UPDATE sync_metadata SET entries_count = ? WHERE source = ?')
+        .run(4, 'gh/today');
       expect(computeContextCacheKey(base())).not.toBe(after);
     });
 
