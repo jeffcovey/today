@@ -19,6 +19,11 @@ const DB_PATH = '.data/today.db';
 const BACKUP_PATH = '.data/today.db.backup';
 const WAL_PATH = '.data/today.db-wal';
 const SHM_PATH = '.data/today.db-shm';
+const INTEGRITY_CHECK_STAMP = '.data/.last-integrity-check';
+
+// How often to run the expensive PRAGMA integrity_check (ms). Between checks
+// we skip it — the "SELECT 1" smoke-test still runs every startup.
+const INTEGRITY_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 // Cleanup configuration
 const MAX_BACKUPS = 5;
@@ -55,9 +60,12 @@ function cleanOrphanedWalFiles() {
 
 /**
  * Check if the database exists and has the required schema
+ * @param {Object} [opts]
+ * @param {boolean} [opts.skipIntegrityCheck=false] - Skip PRAGMA integrity_check
+ *   (caller is responsible for having already run or deliberately skipped it)
  * @returns {Object} { healthy: boolean, reason?: string, version?: number, corrupted?: boolean }
  */
-export function checkDatabaseHealth() {
+export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
   // Check if database file exists
   if (!fs.existsSync(DB_PATH)) {
     // Clean up orphaned WAL/SHM files if they exist.
@@ -89,24 +97,25 @@ export function checkDatabaseHealth() {
       };
     }
 
-    // Run integrity check
-    try {
-      const integrityResult = db.prepare('PRAGMA integrity_check').get();
-      if (integrityResult?.integrity_check !== 'ok') {
+    if (!skipIntegrityCheck) {
+      try {
+        const integrityResult = db.prepare('PRAGMA integrity_check').get();
+        if (integrityResult?.integrity_check !== 'ok') {
+          db.close();
+          return {
+            healthy: false,
+            corrupted: true,
+            reason: `Integrity check failed: ${integrityResult?.integrity_check}`
+          };
+        }
+      } catch (integrityError) {
         db.close();
         return {
           healthy: false,
           corrupted: true,
-          reason: `Integrity check failed: ${integrityResult?.integrity_check}`
+          reason: `Integrity check error: ${integrityError.message}`
         };
       }
-    } catch (integrityError) {
-      db.close();
-      return {
-        healthy: false,
-        corrupted: true,
-        reason: `Integrity check error: ${integrityError.message}`
-      };
     }
 
     // Check if schema_version table exists
@@ -248,8 +257,37 @@ export async function ensureHealthyDatabase(options = {}) {
   const success = (msg) => { if (verbose) console.log(`✅ ${msg}`); };
   const error = (msg) => { if (verbose) console.error(`❌ ${msg}`); };
 
+  // Decide whether to skip the expensive PRAGMA integrity_check this run.
+  //
+  // Throttle: skip if the stamp is < 1 hour old, meaning a recent successful
+  // run already verified the database.
+  //
+  // Claim-before-check: write the stamp *before* running the pragma so that a
+  // concurrent invocation started a moment later sees a fresh stamp and skips
+  // the check.  Not POSIX-atomic (O_EXCL), but the benign failure mode is two
+  // concurrent checks — never a skipped check on a corrupted database.
+  // On any failure we delete the stamp so the next run tries again.
+  let ranIntegrityCheck = false;
+  let skipIntegrityCheck = false;
+  try {
+    const stampAge = fs.existsSync(INTEGRITY_CHECK_STAMP)
+      ? Date.now() - fs.statSync(INTEGRITY_CHECK_STAMP).mtimeMs
+      : Infinity;
+    if (stampAge < INTEGRITY_CHECK_INTERVAL_MS) {
+      skipIntegrityCheck = true;
+    } else {
+      // Pre-claim: write stamp now so concurrent processes skip the check.
+      fs.writeFileSync(INTEGRITY_CHECK_STAMP, '');
+      ranIntegrityCheck = true;
+    }
+  } catch { /* stamp is best-effort; proceed without throttle */ }
+
+  const clearStamp = () => {
+    try { fs.unlinkSync(INTEGRITY_CHECK_STAMP); } catch { /* ignore */ }
+  };
+
   // Check current health
-  const health = checkDatabaseHealth();
+  const health = checkDatabaseHealth({ skipIntegrityCheck });
 
   if (health.healthy && !forceRecreate) {
     // Database is healthy, but check if there are new migrations to apply
@@ -266,12 +304,18 @@ export async function ensureHealthyDatabase(options = {}) {
       }
     } catch (migrationError) {
       error(`Migration failed: ${migrationError.message}`);
+      // Migration failed after a claimed integrity-check slot — invalidate so
+      // the next startup re-runs both the check and the migration.
+      if (ranIntegrityCheck) clearStamp();
       return { success: false, recreated: false, message: `Migration failed: ${migrationError.message}` };
     }
+    // Everything succeeded — stamp is valid; leave it in place.
     return { success: true, recreated: false, message: 'Database is healthy' };
   }
 
-  // Database needs recreation
+  // Database needs recreation — stamp (if any) is no longer valid.
+  if (ranIntegrityCheck) clearStamp();
+
   const reason = forceRecreate ? 'Force recreate requested' : health.reason;
   warn(`Database needs recreation: ${reason}`);
 
