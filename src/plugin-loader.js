@@ -8,6 +8,7 @@ import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { getEncryptedEnvVarName } from './encrypted-settings.js';
+import { reconcileFinanceSources } from './finance-reconcile.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
@@ -888,10 +889,40 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const warningMsg = Array.isArray(pluginMetadata?.warnings) && pluginMetadata.warnings.length > 0
     ? `\n    Warnings: ${pluginMetadata.warnings.join(' | ')}`
     : '';
+  const runFinanceReconcile = async () => {
+    if (plugin.type !== 'finance') return null;
+    try {
+      return reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
+    } catch (error) {
+      // Reconciliation is a reporting refinement; never fail a sync over it
+      console.error(`Warning: finance reconciliation failed: ${error.message}`);
+      return null;
+    }
+  };
 
   // If no entries and incremental, nothing changed — unless rows were removed
   // outside the loader-managed insert path, in which case sync metadata must
   // still be refreshed so caches see the new row count.
+  // Reconcile finance sources against each other. Must run before the
+  // no-change early return: this source having nothing new does not mean
+  // another source did not change in a way that makes these rows redundant.
+  // Cheap and idempotent — it clears and recomputes every run (#479).
+  let reconcileReport = null;
+  if (plugin.type === 'finance' && entries.length === 0 && isIncremental) {
+    reconcileReport = await runFinanceReconcile();
+  }
+
+  const buildReconcileMsg = (report) => {
+    const reconciledTotal = report
+      ? report.by_key + report.by_window + report.by_scheduled
+      : 0;
+    return reconciledTotal > 0
+      ? `\n    Superseded ${reconciledTotal} duplicate row(s) from lower-precedence sources` +
+          ` (key: ${report.by_key}, window: ${report.by_window}, scheduled: ${report.by_scheduled})`
+      : '';
+  };
+  let reconcileMsg = buildReconcileMsg(reconcileReport);
+
   if (entries.length === 0 && isIncremental) {
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
@@ -902,13 +933,13 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       return {
         success: true,
         count: 0,
-        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}`
+        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}${reconcileMsg}`
       };
     }
     return {
       success: true,
       count: 0,
-      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}`
+      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`
     };
   }
 
@@ -928,6 +959,8 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Insert entries with source identifier
   const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  reconcileReport = await runFinanceReconcile();
+  reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
   updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
@@ -1125,7 +1158,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 
