@@ -949,6 +949,12 @@ SQL: SELECT date, payee, category, amount, account FROM financial_transactions W
         required: false,
         description: 'Cleared status (Cleared, Uncleared, Reconciled)'
       },
+      scheduled: {
+        sqlType: 'INTEGER DEFAULT 0',
+        jsType: 'boolean',
+        required: false,
+        description: 'True for a scheduled/recurring transaction that has not occurred yet — exclude from spending totals'
+      },
       flag: {
         sqlType: 'TEXT',
         jsType: 'string',
