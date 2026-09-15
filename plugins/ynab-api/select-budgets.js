@@ -19,17 +19,13 @@ function matches(budget, rule) {
   return String(budget.name || '').toLowerCase() === rule.toLowerCase();
 }
 
-function parseRules(value, budgets = []) {
+function parseRules(value) {
   const raw = String(value || '').trim();
   if (!raw) return [];
 
   const parseRuleLine = (line) => {
     const trimmed = line.trim();
     if (!trimmed) return [];
-
-    if (!trimmed.includes('"') && budgets.some(b => matches(b, trimmed))) {
-      return [trimmed];
-    }
 
     const rules = [];
     let current = '';
@@ -77,8 +73,8 @@ export function selectBudgets(budgets, { budgetIds = '', excludeBudgetIds = '' }
   const all = Array.isArray(budgets) ? budgets : [];
 
   // "all" is accepted as an explicit no-op for backwards compatibility
-  const include = parseRules(budgetIds, all).filter(r => r.toLowerCase() !== 'all');
-  const exclude = parseRules(excludeBudgetIds, all);
+  const include = parseRules(budgetIds).filter(r => r.toLowerCase() !== 'all');
+  const exclude = parseRules(excludeBudgetIds);
 
   const candidates = include.length > 0
     ? all.filter(b => include.some(r => matches(b, r)))

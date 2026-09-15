@@ -39,11 +39,6 @@ describe('selectBudgets', () => {
       expect(selected).toEqual([CURRENT]);
     });
 
-    test('treats an exact comma-containing budget name as one unquoted rule', () => {
-      const { selected } = selectBudgets([SHARED, CURRENT], { excludeBudgetIds: SHARED.name });
-      expect(selected).toEqual([CURRENT]);
-    });
-
     test('name matching is case-insensitive and whitespace-tolerant', () => {
       const { selected } = selectBudgets([ARCHIVED, CURRENT], {
         excludeBudgetIds: '  my budget (ARCHIVED on 2024-03-03)  '
@@ -129,6 +124,16 @@ describe('selectBudgets', () => {
         excludeBudgetIds: '"Home","Shared"'
       });
       expect(selected).toEqual([SHARED, CURRENT]);
+    });
+
+    test('unquoted comma-containing text remains split when the exact budget name no longer exists', () => {
+      const homeOnly = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', name: 'Home' };
+      const sharedOnly = { id: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff', name: 'Shared' };
+      const { selected, unmatched } = selectBudgets([homeOnly, sharedOnly, CURRENT], {
+        excludeBudgetIds: SHARED.name
+      });
+      expect(selected).toEqual([CURRENT]);
+      expect(unmatched).toEqual({ include: [], exclude: [] });
     });
   });
 
