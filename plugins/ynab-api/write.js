@@ -170,9 +170,14 @@ async function main() {
     update.payee_name = entry.payee;
     changed.push('payee');
   }
-  if (entry.memo !== undefined && entry.memo !== current.memo) {
-    update.memo = entry.memo;
-    changed.push('memo');
+  if (entry.memo !== undefined) {
+    // An empty memo means clear it; YNAB stores an absent memo as null, so
+    // sending "" would leave the row differing from a genuinely empty one.
+    const memo = entry.memo === '' ? null : entry.memo;
+    if (memo !== current.memo) {
+      update.memo = memo;
+      changed.push('memo');
+    }
   }
   if (entry.flag !== undefined && (entry.flag || null) !== current.flag_color) {
     update.flag_color = entry.flag || null;

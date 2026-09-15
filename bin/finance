@@ -353,6 +353,7 @@ program
   .option('--memo <memo>', 'Set the memo')
   .option('--flag <flag>', 'Set the flag colour (red, orange, yellow, green, blue, purple, or "" to clear)')
   .option('--approve', 'Mark the transaction approved')
+  .option('--unapprove', 'Mark the transaction unapproved')
   .option('--dry-run', 'Show what would be sent without writing')
   .action(async (id, options) => {
     const db = getDatabase();
@@ -368,7 +369,8 @@ program
       process.exit(1);
     }
 
-    if (!options.category && options.memo === undefined && options.flag === undefined && !options.approve) {
+    if (!options.category && options.memo === undefined && options.flag === undefined
+        && !options.approve && !options.unapprove) {
       console.error(colors.red('✗') + ' Nothing to change — pass --category, --memo, --flag or --approve');
       process.exit(1);
     }
@@ -380,6 +382,7 @@ program
     if (options.memo !== undefined) entry.memo = options.memo;
     if (options.flag !== undefined) entry.flag = options.flag;
     if (options.approve) entry.approved = true;
+    if (options.unapprove) entry.approved = false;
 
     console.log('');
     console.log(`  ${colors.gray(row.date)} ${formatAmount(row.amount)} ${colors.blue(row.account)}  ${row.payee || ''}`);
