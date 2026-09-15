@@ -423,6 +423,7 @@ npm run test:coverage          # Coverage report
 
 ## Documentation
 
+- [Architecture Guide](docs/ARCHITECTURE.md) - System architecture, data flow, schema, sync, deployment, and API overview
 - [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
 
 ## License
