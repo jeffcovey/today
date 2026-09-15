@@ -2,6 +2,7 @@
 
 // Write handler for github-projects plugin
 // Supports updating project dates by setting date fields on the first item
+const PROJECT_ITEMS_PAGE_SIZE = 50;
 
 import { execSync } from 'child_process';
 
@@ -27,6 +28,27 @@ function graphql(query) {
   } catch (error) {
     throw new Error(`GraphQL error: ${error.message}`);
   }
+}
+
+function escapeGraphQLString(value) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n');
+}
+
+function buildMetadataIssueBody(projectTitle, reviewDate, frequency) {
+  const dayOfWeek = new Date(`${reviewDate}T00:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'long',
+    timeZone: 'UTC'
+  });
+
+  return `This issue tracks review scheduling for the ${projectTitle} project.
+
+**Next Review Date:** ${reviewDate} (${dayOfWeek})
+**Review Frequency:** ${frequency}
+
+This is a metadata issue for project management - not a development task.`;
 }
 
 // Parse project ID to extract owner type, owner, and project number
@@ -88,11 +110,13 @@ async function getProjectDetails(owner, number, ownerType) {
               }
             }
           }
-          items(first: 50) {
+          items(first: ${PROJECT_ITEMS_PAGE_SIZE}) {
+            totalCount
             nodes {
               id
               content {
                 ... on Issue {
+                  id
                   number
                   title
                 }
@@ -123,6 +147,7 @@ async function getProjectDetails(owner, number, ownerType) {
   // Get first item and review metadata item
   const firstItem = project.items.nodes[0];
   const reviewMetadataItem = project.items.nodes.find(item =>
+    item.content?.id &&
     item.content?.title?.includes('[META]') &&
     item.content?.title?.includes('Review Schedule')
   );
@@ -141,6 +166,7 @@ async function getProjectDetails(owner, number, ownerType) {
     nextReviewDateFieldId: nextReviewDateField?.id,
     firstItemId: firstItem?.id,
     reviewMetadataItem: reviewMetadataItem,
+    metadataSearchMayBeIncomplete: !reviewMetadataItem && (project.items.totalCount || 0) > PROJECT_ITEMS_PAGE_SIZE,
   };
 }
 
@@ -285,20 +311,14 @@ function getProjectRepository(owner, number, ownerType) {
 
 // Create metadata issue for review scheduling
 function createMetadataIssue(repoOwner, repoName, projectTitle, reviewDate, frequency) {
-  const dayOfWeek = new Date(reviewDate).toLocaleDateString('en-US', { weekday: 'long' });
-  const body = `This issue tracks review scheduling for the ${projectTitle} project.
-
-**Next Review Date:** ${reviewDate} (${dayOfWeek})
-**Review Frequency:** ${frequency}
-
-This is a metadata issue for project management - not a development task.`;
+  const body = buildMetadataIssueBody(projectTitle, reviewDate, frequency);
 
   const mutation = `
     mutation {
       createIssue(input: {
         repositoryId: "${getRepositoryId(repoOwner, repoName)}"
         title: "[META] ${projectTitle} Review Schedule"
-        body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+        body: "${escapeGraphQLString(body)}"
       }) {
         issue {
           id
@@ -311,6 +331,29 @@ This is a metadata issue for project management - not a development task.`;
 
   const result = graphql(mutation);
   return result.data?.createIssue?.issue;
+}
+
+// Update existing metadata issue for review scheduling
+function updateMetadataIssue(issueId, projectTitle, reviewDate, frequency) {
+  const body = buildMetadataIssueBody(projectTitle, reviewDate, frequency);
+
+  const mutation = `
+    mutation {
+      updateIssue(input: {
+        id: "${issueId}"
+        body: "${escapeGraphQLString(body)}"
+      }) {
+        issue {
+          id
+          number
+          url
+        }
+      }
+    }
+  `;
+
+  const result = graphql(mutation);
+  return result.data?.updateIssue?.issue;
 }
 
 // Get repository ID for creating issues
@@ -653,31 +696,41 @@ async function handleSetReviewDate() {
       }
     }
 
-    // Get repository for creating metadata issue
-    const repo = getProjectRepository(owner, number, type);
-
     // Create or update metadata issue
     let metadataIssue;
+    let metadataItemId;
     const finalFrequency = frequency || 'weekly';
 
     if (details.reviewMetadataItem) {
-      // Update existing metadata issue (close and create new one for simplicity)
-      // TODO: Could implement update logic instead
-      metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
+      metadataIssue = updateMetadataIssue(
+        details.reviewMetadataItem.content.id,
+        details.title,
+        reviewDate,
+        finalFrequency
+      );
+      if (!metadataIssue) {
+        return output({ success: false, error: 'Failed to update metadata issue' });
+      }
+      metadataItemId = details.reviewMetadataItem.id;
+    } else if (details.metadataSearchMayBeIncomplete) {
+      return output({
+        success: false,
+        error: `Unable to safely determine existing metadata issue: project has more than ${PROJECT_ITEMS_PAGE_SIZE} items and metadata issue was not found on the first page.`
+      });
     } else {
       // Create new metadata issue
+      const repo = getProjectRepository(owner, number, type);
       metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
-    }
+      if (!metadataIssue) {
+        return output({ success: false, error: 'Failed to create metadata issue' });
+      }
 
-    if (!metadataIssue) {
-      return output({ success: false, error: 'Failed to create metadata issue' });
-    }
+      // Add metadata issue to project
+      metadataItemId = addIssueToProject(details.projectId, metadataIssue.id);
 
-    // Add metadata issue to project
-    const metadataItemId = addIssueToProject(details.projectId, metadataIssue.id);
-
-    if (!metadataItemId) {
-      return output({ success: false, error: 'Failed to add metadata issue to project' });
+      if (!metadataItemId) {
+        return output({ success: false, error: 'Failed to add metadata issue to project' });
+      }
     }
 
     // Set the review date on the metadata issue
