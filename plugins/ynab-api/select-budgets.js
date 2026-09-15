@@ -26,24 +26,18 @@ function parseRules(value, budgets = []) {
   if (raw.includes('\n')) {
     return raw
       .split(/\r?\n/)
-      .map(s => s.trim())
+      .map(s => s.trim().replace(/,+$/, '').trim())
       .filter(Boolean);
   }
 
-  const split = raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  if (
-    split.length > 1 &&
-    budgets.some(b => matches(b, raw)) &&
-    !split.some(rule => budgets.some(b => matches(b, rule)))
-  ) {
+  if (budgets.some(b => matches(b, raw))) {
     return [raw];
   }
 
-  return split;
+  return raw
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
 /**

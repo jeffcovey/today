@@ -67,6 +67,13 @@ describe('selectBudgets', () => {
       expect(selected).toEqual([CURRENT]);
     });
 
+    test('accepts comma-newline separators without leaving trailing commas in rules', () => {
+      const { selected } = selectBudgets([ARCHIVED, CURRENT], {
+        excludeBudgetIds: `${ARCHIVED.id},\n${CURRENT.id}`
+      });
+      expect(selected).toEqual([]);
+    });
+
     // The whole point of preferring a denylist.
     test('a budget created later is synced without touching config', () => {
       const { selected } = selectBudgets([ARCHIVED, CURRENT, FUTURE], { excludeBudgetIds: ARCHIVED.id });
@@ -100,6 +107,14 @@ describe('selectBudgets', () => {
       const { selected, skippedByAllowlist } = selectBudgets([CURRENT, FUTURE], { budgetIds: CURRENT.id });
       expect(selected).toEqual([CURRENT]);
       expect(skippedByAllowlist).toEqual([{ id: FUTURE.id, name: FUTURE.name }]);
+    });
+
+    test('prefers an exact single-line budget name match even when a split piece also matches', () => {
+      const homeOnly = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', name: 'Home' };
+      const { selected } = selectBudgets([SHARED, homeOnly, CURRENT], {
+        excludeBudgetIds: SHARED.name
+      });
+      expect(selected).toEqual([homeOnly, CURRENT]);
     });
   });
 
