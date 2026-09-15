@@ -1603,7 +1603,32 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
       ? path.relative(PROJECT_ROOT, writeResult.data.file)
       : null;
 
-    await syncPluginSource(source.plugin, source.sourceName, source.config, context, { fileFilter, _caller: 'write-sync' });
+    try {
+      const syncResult = await syncPluginSource(
+        source.plugin,
+        source.sourceName,
+        source.config,
+        context,
+        { fileFilter, _caller: 'write-sync' }
+      );
+      if (!syncResult.success) {
+        return {
+          success: false,
+          error: `Write succeeded, but local sync failed: ${syncResult.message}`,
+          source,
+          writeResult: writeResult.data,
+          partialSuccess: true
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Write succeeded, but local sync failed: ${error.message}`,
+        source,
+        writeResult: writeResult.data,
+        partialSuccess: true
+      };
+    }
   }
 
   return { success: true, source, writeResult: writeResult.data };

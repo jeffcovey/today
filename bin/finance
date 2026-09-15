@@ -408,7 +408,11 @@ program
     });
 
     if (!result.success) {
-      console.error(colors.red('✗') + ` ${result.error}`);
+      const marker = result.partialSuccess ? colors.yellow('⚠') : colors.red('✗');
+      console.error(marker + ` ${result.error}`);
+      if (result.partialSuccess) {
+        console.error(colors.gray('  YNAB was updated; run bin/finance sync to refresh the local cache.'));
+      }
       if (result.writeResult?.hint) console.error(colors.gray(`  ${result.writeResult.hint}`));
       process.exit(1);
     }

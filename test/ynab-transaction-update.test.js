@@ -139,6 +139,11 @@ describe('assertEditable', () => {
     expect(() => assertEditable(split, { category: 'Pharmacy' })).toThrow(/split transaction/);
   });
 
+  test('treats YNAB category_name "Split" as a split signal too', () => {
+    const split = { ...CURRENT, category_name: 'Split', subtransactions: [] };
+    expect(() => assertEditable(split, { category: 'Pharmacy' })).toThrow(/split transaction/);
+  });
+
   test('allows non-category edits on a split transaction', () => {
     const split = { ...CURRENT, subtransactions: [{ id: 's1' }] };
     expect(() => assertEditable(split, { memo: 'fine' })).not.toThrow();
@@ -157,6 +162,18 @@ describe('buildTransactionUpdate', () => {
     const { update } = buildTransactionUpdate(CURRENT, { category: 'Pharmacy' }, 'cat-pharmacy');
     expect(update.memo).toBe('keep me');
     expect(update.cleared).toBe('cleared');
+  });
+
+  test('preserves payee_name and import_id when the caller did not mention them', () => {
+    const imported = {
+      ...CURRENT,
+      payee_id: null,
+      payee_name: 'Imported Payee',
+      import_id: 'YNAB:-2450:2026-09-13:1'
+    };
+    const { update } = buildTransactionUpdate(imported, { category: 'Pharmacy' }, 'cat-pharmacy');
+    expect(update.payee_name).toBe('Imported Payee');
+    expect(update.import_id).toBe('YNAB:-2450:2026-09-13:1');
   });
 
   test('always sends the immutable identity fields', () => {
