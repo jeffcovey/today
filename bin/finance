@@ -77,6 +77,7 @@ program
       SELECT date, account, payee, category, amount, memo, cleared, scheduled
       FROM financial_transactions
       WHERE date >= DATE('now', '-${days} days')
+        AND superseded_by IS NULL
     `;
     const params = [];
 
@@ -146,6 +147,7 @@ program
       SELECT date, account, payee, category, amount, memo, metadata
       FROM financial_transactions
       WHERE IFNULL(scheduled, 0) = 1
+        AND superseded_by IS NULL
         AND date >= DATE('now')
         AND date <= DATE('now', '+${days} days')
     `;
@@ -204,7 +206,7 @@ program
 
     // See the note in `recent`: the window needs both ends, and scheduled rows are
     // future obligations rather than spending that happened (#477).
-    let whereClause = `WHERE date >= DATE('now', '-${days} days')`;
+    let whereClause = `WHERE date >= DATE('now', '-${days} days') AND superseded_by IS NULL`;
     const params = [];
 
     if (!options.scheduled) {
@@ -291,22 +293,22 @@ program
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // superseded_by is always filtered, so it is the base clause and everything
+    // else appends with AND — no rebuilding the query, and --scheduled cannot
+    // accidentally reintroduce rows a higher-precedence source already replaced.
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
       FROM financial_transactions
-      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
+      WHERE superseded_by IS NULL
     `;
     const params = [];
 
-    if (options.scheduled) {
-      sql = `
-        SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
-        FROM financial_transactions
-      `;
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
     }
 
     if (options.source) {
-      sql += options.scheduled ? ` WHERE source LIKE ?` : ` AND source LIKE ?`;
+      sql += ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 
@@ -355,24 +357,21 @@ program
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // Same shape as `categories`: superseded_by is the always-present base clause.
     let sql = `
       SELECT account, COUNT(*) as count, SUM(amount) as balance,
              MIN(date) as first_transaction, MAX(date) as last_transaction
       FROM financial_transactions
-      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
+      WHERE superseded_by IS NULL
     `;
     const params = [];
 
-    if (options.scheduled) {
-      sql = `
-        SELECT account, COUNT(*) as count, SUM(amount) as balance,
-               MIN(date) as first_transaction, MAX(date) as last_transaction
-        FROM financial_transactions
-      `;
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
     }
 
     if (options.source) {
-      sql += options.scheduled ? ` WHERE source LIKE ?` : ` AND source LIKE ?`;
+      sql += ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 

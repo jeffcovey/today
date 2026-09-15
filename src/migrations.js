@@ -104,6 +104,27 @@ const systemMigrations = [
         db.exec(`ALTER TABLE financial_transactions ADD COLUMN scheduled INTEGER DEFAULT 0`);
       }
     }
+  },
+  {
+    version: 107,
+    description: 'Add dedup_key and superseded_by to financial_transactions for cross-source reconciliation',
+    fn: (db) => {
+      // Guarded for the same reason as 106: the table is built from
+      // plugin-schemas.js, so a fresh database already has these columns.
+      const existing = new Set(
+        db.prepare(`PRAGMA table_info(financial_transactions)`).all().map(c => c.name)
+      );
+      if (!existing.has('dedup_key')) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN dedup_key TEXT`);
+      }
+      if (!existing.has('superseded_by')) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN superseded_by TEXT`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_financial_transactions_dedup_key
+               ON financial_transactions(dedup_key)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_financial_transactions_superseded_by
+               ON financial_transactions(superseded_by)`);
+    }
   }
 ];
 
