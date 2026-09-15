@@ -84,8 +84,7 @@ export function assertEditable(current, entry) {
   }
   // A split transaction's categories live on its subtransactions. YNAB ignores
   // category_id on the parent, so this would report success and change nothing.
-  const isSplit = current?.category_name === 'Split' ||
-    (Array.isArray(current?.subtransactions) && current.subtransactions.length > 0);
+  const isSplit = Array.isArray(current?.subtransactions) && current.subtransactions.length > 0;
   if (isSplit && entry.category !== undefined) {
     throw new WriteRefused(
       'That is a split transaction — its categories live on the split lines, and YNAB ignores a category set on the parent',

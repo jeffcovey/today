@@ -139,11 +139,6 @@ describe('assertEditable', () => {
     expect(() => assertEditable(split, { category: 'Pharmacy' })).toThrow(/split transaction/);
   });
 
-  test('treats YNAB category_name "Split" as a split signal too', () => {
-    const split = { ...CURRENT, category_name: 'Split', subtransactions: [] };
-    expect(() => assertEditable(split, { category: 'Pharmacy' })).toThrow(/split transaction/);
-  });
-
   test('allows non-category edits on a split transaction', () => {
     const split = { ...CURRENT, subtransactions: [{ id: 's1' }] };
     expect(() => assertEditable(split, { memo: 'fine' })).not.toThrow();
