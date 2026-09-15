@@ -29,6 +29,13 @@ function graphql(query) {
   }
 }
 
+function escapeGraphQLString(value) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n');
+}
+
 // Parse project ID to extract owner type, owner, and project number
 // Format: "github-projects/source:owner#number" or just "owner#number"
 // ownerTypeHint can be passed from the caller if known (from metadata)
@@ -299,7 +306,7 @@ This is a metadata issue for project management - not a development task.`;
       createIssue(input: {
         repositoryId: "${getRepositoryId(repoOwner, repoName)}"
         title: "[META] ${projectTitle} Review Schedule"
-        body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+        body: "${escapeGraphQLString(body)}"
       }) {
         issue {
           id
@@ -328,7 +335,7 @@ This is a metadata issue for project management - not a development task.`;
     mutation {
       updateIssue(input: {
         id: "${issueId}"
-        body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+        body: "${escapeGraphQLString(body)}"
       }) {
         issue {
           id
@@ -695,6 +702,9 @@ async function handleSetReviewDate() {
         reviewDate,
         finalFrequency
       );
+      if (!metadataIssue) {
+        return output({ success: false, error: 'Failed to update metadata issue' });
+      }
       metadataItemId = details.reviewMetadataItem.id;
     } else {
       // Create new metadata issue
@@ -710,10 +720,6 @@ async function handleSetReviewDate() {
       if (!metadataItemId) {
         return output({ success: false, error: 'Failed to add metadata issue to project' });
       }
-    }
-
-    if (!metadataIssue) {
-      return output({ success: false, error: 'Failed to update metadata issue' });
     }
 
     // Set the review date on the metadata issue
