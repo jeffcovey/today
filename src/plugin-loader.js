@@ -1612,9 +1612,10 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
         { fileFilter, _caller: 'write-sync' }
       );
       if (!syncResult.success) {
+        const syncError = syncResult.message || syncResult.error || 'Unknown sync failure';
         return {
           success: false,
-          error: `Write succeeded, but local sync failed: ${syncResult.message}`,
+          error: `Write succeeded, but local sync failed: ${syncError}`,
           source,
           writeResult: writeResult.data,
           partialSuccess: true
