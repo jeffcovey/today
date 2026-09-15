@@ -1,4 +1,6 @@
 import { execSync } from 'child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -40,6 +42,33 @@ function runToday(args = '', options = {}) {
       stderr: error.stderr || '',
       exitCode: error.status || 1,
     };
+  }
+}
+
+function withEncryptedEnvFiles(callback) {
+  const envPath = path.join(projectRoot, '.env');
+  const envKeysPath = path.join(projectRoot, '.env.keys');
+  const backups = new Map();
+
+  for (const filePath of [envPath, envKeysPath]) {
+    backups.set(filePath, existsSync(filePath) ? readFileSync(filePath, 'utf8') : null);
+  }
+
+  writeFileSync(envPath, 'DOTENV_PUBLIC_KEY=dummy-public-key\n');
+  writeFileSync(envKeysPath, 'DUMMY_DOTENV_PRIVATE_KEY=dummy-private-key\n');
+
+  try {
+    callback();
+  } finally {
+    for (const [filePath, content] of backups.entries()) {
+      if (content === null) {
+        if (existsSync(filePath)) {
+          unlinkSync(filePath);
+        }
+      } else {
+        writeFileSync(filePath, content);
+      }
+    }
   }
 }
 
@@ -141,6 +170,44 @@ describe('bin/today CLI', () => {
 
       // Should either show help or an error, not crash
       expect(result.stdout + (result.stderr || '')).toBeTruthy();
+    });
+  });
+
+  describe('startup optimization', () => {
+    test.each(['--help', '--version'])('%s should skip dotenvx re-exec', (arg) => {
+      const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
+      const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
+      const fakeNpxPath = path.join(fakeBinDir, 'npx');
+
+      writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
+      chmodSync(fakeNpxPath, 0o755);
+
+      try {
+        withEncryptedEnvFiles(() => {
+          const result = runToday(arg, {
+            env: {
+              ...process.env,
+              PATH: `${fakeBinDir}:${process.env.PATH || ''}`,
+              NPX_MARKER: markerPath,
+            },
+          });
+
+          expect(result.exitCode).toBe(0);
+          expect(existsSync(markerPath)).toBe(false);
+        });
+      } finally {
+        rmSync(fakeBinDir, { recursive: true, force: true });
+      }
+    });
+
+    test('should keep common startup imports parallelized with Promise.all', () => {
+      const source = readFileSync(todayBin, 'utf8');
+
+      expect(source).toContain('] = await Promise.all([');
+      expect(source).toContain("import('../src/config.js')");
+      expect(source).toContain("import('../src/plugin-loader.js')");
+      expect(source).toContain("import('commander')");
+      expect(source).toContain("import('../src/date-utils.js')");
     });
   });
 });
