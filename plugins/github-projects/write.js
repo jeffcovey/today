@@ -93,6 +93,7 @@ async function getProjectDetails(owner, number, ownerType) {
               id
               content {
                 ... on Issue {
+                  id
                   number
                   title
                 }
@@ -311,6 +312,35 @@ This is a metadata issue for project management - not a development task.`;
 
   const result = graphql(mutation);
   return result.data?.createIssue?.issue;
+}
+
+// Update existing metadata issue for review scheduling
+function updateMetadataIssue(issueId, projectTitle, reviewDate, frequency) {
+  const dayOfWeek = new Date(reviewDate).toLocaleDateString('en-US', { weekday: 'long' });
+  const body = `This issue tracks review scheduling for the ${projectTitle} project.
+
+**Next Review Date:** ${reviewDate} (${dayOfWeek})
+**Review Frequency:** ${frequency}
+
+This is a metadata issue for project management - not a development task.`;
+
+  const mutation = `
+    mutation {
+      updateIssue(input: {
+        id: "${issueId}"
+        body: "${body.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"
+      }) {
+        issue {
+          id
+          number
+          url
+        }
+      }
+    }
+  `;
+
+  const result = graphql(mutation);
+  return result.data?.updateIssue?.issue;
 }
 
 // Get repository ID for creating issues
@@ -653,31 +683,37 @@ async function handleSetReviewDate() {
       }
     }
 
-    // Get repository for creating metadata issue
-    const repo = getProjectRepository(owner, number, type);
-
     // Create or update metadata issue
     let metadataIssue;
+    let metadataItemId;
     const finalFrequency = frequency || 'weekly';
 
     if (details.reviewMetadataItem) {
-      // Update existing metadata issue (close and create new one for simplicity)
-      // TODO: Could implement update logic instead
-      metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
+      metadataIssue = updateMetadataIssue(
+        details.reviewMetadataItem.content.id,
+        details.title,
+        reviewDate,
+        finalFrequency
+      );
+      metadataItemId = details.reviewMetadataItem.id;
     } else {
       // Create new metadata issue
+      const repo = getProjectRepository(owner, number, type);
       metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
+      if (!metadataIssue) {
+        return output({ success: false, error: 'Failed to create metadata issue' });
+      }
+
+      // Add metadata issue to project
+      metadataItemId = addIssueToProject(details.projectId, metadataIssue.id);
+
+      if (!metadataItemId) {
+        return output({ success: false, error: 'Failed to add metadata issue to project' });
+      }
     }
 
     if (!metadataIssue) {
-      return output({ success: false, error: 'Failed to create metadata issue' });
-    }
-
-    // Add metadata issue to project
-    const metadataItemId = addIssueToProject(details.projectId, metadataIssue.id);
-
-    if (!metadataItemId) {
-      return output({ success: false, error: 'Failed to add metadata issue to project' });
+      return output({ success: false, error: 'Failed to update metadata issue' });
     }
 
     // Set the review date on the metadata issue
