@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { getDatabase } from '../src/database-service.js';
-import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { ensureSyncForType, getSyncStatusMessage, writeEntryAndSync } from '../src/plugin-loader.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getTodayDate, formatDate } from '../src/date-utils.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
@@ -281,6 +283,143 @@ program
     }
 
     console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Uncategorized command - transactions that still need a category
+program
+  .command('uncategorized')
+  .description('List transactions that still need a category')
+  .option('-d, --days <days>', 'How far back to look', '60')
+  .option('--limit <limit>', 'Maximum to show', '40')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    await ensureSyncForType(db, 'finance');
+
+    const days = parseInt(options.days);
+    const limit = parseInt(options.limit);
+
+    // Only rows that can actually be fixed: superseded duplicates and scheduled
+    // rules are not things you categorize.
+    let sql = `
+      SELECT id, date, account, payee, amount, memo, metadata
+      FROM financial_transactions
+      WHERE superseded_by IS NULL
+        AND IFNULL(scheduled, 0) = 0
+        AND date >= DATE('now', '-${days} days')
+        AND date <= DATE('now')
+        AND (category IS NULL OR category = '' OR LOWER(category) = 'uncategorized')
+    `;
+    const params = [];
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+    sql += ` ORDER BY date DESC LIMIT ${limit}`;
+
+    const rows = db.prepare(sql).all(...params);
+
+    if (rows.length === 0) {
+      console.log(colors.green('✓') + ` Nothing uncategorized in the last ${days} days`);
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan(`Uncategorized (last ${days} days)`));
+    console.log('');
+    for (const tx of rows) {
+      let writable = false;
+      try {
+        const m = JSON.parse(tx.metadata || '{}');
+        writable = Boolean(m.budget_id && m.ynab_id);
+      } catch { /* metadata optional */ }
+      const mark = writable ? colors.green('✎') : colors.gray('·');
+      console.log(`${mark} ${colors.gray(tx.date)} ${formatAmount(tx.amount).padEnd(12)} ${colors.blue(tx.account)}`);
+      console.log(`    ${tx.payee || colors.gray('(no payee)')}`);
+      console.log(`    ${colors.gray(tx.id)}`);
+    }
+    console.log('');
+    console.log(colors.gray(`${rows.length} shown. ✎ = writable back to YNAB.`));
+    console.log(colors.gray(`Apply one with: bin/finance categorize <id> --category "Group: Category"`));
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
+// Categorize command - write a category back to the source
+program
+  .command('categorize <id>')
+  .description('Set a transaction\'s category, writing it back to YNAB')
+  .option('--category <category>', 'Category name, optionally "Group: Category"')
+  .option('--memo <memo>', 'Set the memo')
+  .option('--flag <flag>', 'Set the flag colour (red, orange, yellow, green, blue, purple, or "" to clear)')
+  .option('--approve', 'Mark the transaction approved')
+  .option('--dry-run', 'Show what would be sent without writing')
+  .action(async (id, options) => {
+    const db = getDatabase();
+
+    const row = db.prepare(`
+      SELECT id, source, date, account, payee, category, amount, memo, cleared, flag, metadata
+      FROM financial_transactions WHERE id = ?
+    `).get(id);
+
+    if (!row) {
+      console.error(colors.red('✗') + ` No transaction with id: ${id}`);
+      console.error(colors.gray('  List candidates with: bin/finance uncategorized'));
+      process.exit(1);
+    }
+
+    if (!options.category && options.memo === undefined && options.flag === undefined && !options.approve) {
+      console.error(colors.red('✗') + ' Nothing to change — pass --category, --memo, --flag or --approve');
+      process.exit(1);
+    }
+
+    // The plugin identifies the remote transaction from metadata, so pass the row
+    // through rather than reconstructing it.
+    const entry = { metadata: row.metadata };
+    if (options.category) entry.category = options.category;
+    if (options.memo !== undefined) entry.memo = options.memo;
+    if (options.flag !== undefined) entry.flag = options.flag;
+    if (options.approve) entry.approved = true;
+
+    console.log('');
+    console.log(`  ${colors.gray(row.date)} ${formatAmount(row.amount)} ${colors.blue(row.account)}  ${row.payee || ''}`);
+    console.log(`  current category: ${row.category ? colors.yellow(row.category) : colors.gray('(none)')}`);
+    for (const [k, v] of Object.entries(entry)) {
+      if (k === 'metadata') continue;
+      console.log(`  ${k} → ${colors.green(String(v))}`);
+    }
+    console.log('');
+
+    if (options.dryRun) {
+      console.log(colors.blue('ℹ') + ' Dry run — nothing sent');
+      return;
+    }
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const vaultPath = path.join(path.dirname(__dirname), 'vault');
+
+    const result = await writeEntryAndSync('finance', entry, {
+      sourceFilter: options.source,
+      db,
+      vaultPath
+    });
+
+    if (!result.success) {
+      console.error(colors.red('✗') + ` ${result.error}`);
+      if (result.writeResult?.hint) console.error(colors.gray(`  ${result.writeResult.hint}`));
+      process.exit(1);
+    }
+
+    if (result.writeResult?.unchanged) {
+      console.log(colors.blue('ℹ') + ` ${result.writeResult.message}`);
+      return;
+    }
+
+    const updated = result.writeResult?.entry;
+    console.log(colors.green('✓') + ` Updated in YNAB: ${(result.writeResult?.updated_fields || []).join(', ')}`);
+    if (updated) {
+      console.log(`  ${updated.payee || ''} → ${colors.yellow(updated.category || '(none)')}`);
+    }
   });
 
 // Categories command - list all categories

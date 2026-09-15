@@ -80,6 +80,7 @@ Commands: bin/finance recent, bin/finance summary, bin/finance categories, bin/f
 
 [commands]
 read = "./read.js"
+write = "./write.js"
 
 [settings]
 api_token = { type = "string", default = "", description = "YNAB Personal Access Token (from app.ynab.com/settings/developer)", encrypted = true }
