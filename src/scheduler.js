@@ -6,8 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimezone, getConfig } from './config.js';
-import { installProcessGroupShutdownHandlers } from './process-group.js';
-import { runCommand } from './scheduler-job.js';
+import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
+import { formatCommandFailure } from './scheduler-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,6 +171,45 @@ const runningJobs = new Set();
 // systemd force-kills the service.
 const SCHEDULER_SHUTDOWN_KILL_GRACE_MS = 2_000;
 
+async function runCommand(command, description) {
+  // Check if sync is disabled due to missing data
+  if (fs.existsSync(path.join(PROJECT_ROOT, 'SYNC_DISABLED')) && command.includes('sync')) {
+    const timestamp = new Date().toISOString();
+    console.log(`\n[${timestamp}] SKIPPED: ${description}`);
+    console.log('⚠️  Sync is disabled to prevent data loss. Check GitHub repository.');
+    return;
+  }
+
+  // Random jitter to avoid multiple machines firing the same job simultaneously
+  if (JITTER_MS > 0) {
+    const delay = Math.floor(Math.random() * JITTER_MS);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  const timestamp = new Date().toISOString();
+  console.log(`\n[${timestamp}] Running: ${description}`);
+
+  try {
+    const { stdout, stderr } = await execGroup(command, {
+      cwd: PROJECT_ROOT,
+      env: process.env,
+      timeoutMs: JOB_TIMEOUT_MS
+    });
+
+    if (stdout) {
+      console.log(`✅ ${description} completed:`);
+      console.log(stdout.trim().split('\n').slice(-5).join('\n')); // Last 5 lines
+    }
+
+    if (stderr) {
+      console.error(`⚠️ Warnings from ${description}:`);
+      console.error(stderr);
+    }
+  } catch (error) {
+    console.error(formatCommandFailure(description, error));
+  }
+}
+
 // Load and schedule jobs
 const jobs = loadJobs();
 
@@ -196,12 +235,7 @@ jobs.forEach(job => {
     }
 
     runningJobs.add(job);
-    runCommand(job.command, job.description, {
-      projectRoot: PROJECT_ROOT,
-      env: process.env,
-      jitterMs: JITTER_MS,
-      timeoutMs: JOB_TIMEOUT_MS
-    }).finally(() => {
+    runCommand(job.command, job.description).finally(() => {
       runningJobs.delete(job);
     });
   });
