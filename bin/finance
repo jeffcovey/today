@@ -288,16 +288,24 @@ program
   .command('categories')
   .description('List all transaction categories')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // superseded_by is always filtered, so it is the base clause and everything
+    // else appends with AND — no rebuilding the query, and --scheduled cannot
+    // accidentally reintroduce rows a higher-precedence source already replaced.
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
       FROM financial_transactions
       WHERE superseded_by IS NULL
     `;
     const params = [];
+
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
 
     if (options.source) {
       sql += ` AND source LIKE ?`;
@@ -344,10 +352,12 @@ program
   .command('accounts')
   .description('List all accounts')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // Same shape as `categories`: superseded_by is the always-present base clause.
     let sql = `
       SELECT account, COUNT(*) as count, SUM(amount) as balance,
              MIN(date) as first_transaction, MAX(date) as last_transaction
@@ -355,6 +365,10 @@ program
       WHERE superseded_by IS NULL
     `;
     const params = [];
+
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
 
     if (options.source) {
       sql += ` AND source LIKE ?`;
