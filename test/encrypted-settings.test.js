@@ -132,7 +132,7 @@ describe('encrypted settings', () => {
     const source = fs.readFileSync(path.join(projectRoot, 'src', 'plugins-configure-ui.js'), 'utf8');
 
     test('deleteSource clears encrypted settings when deleting a source', () => {
-      expect(source).toContain('clearEncryptedSettings(pluginName, sourceName, pluginSettings)');
+      expect(source).toContain('deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, clearEncryptedSettings)');
       expect(source).toContain('if (!deleteSource(pluginName, selectedSource.sourceName, plugin.settings))');
     });
   });

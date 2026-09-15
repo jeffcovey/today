@@ -23,7 +23,8 @@ import {
   getEnvVar,
   setEnvVar,
   hasEnvVar,
-  clearEncryptedSettings
+  clearEncryptedSettings,
+  deleteSourceConfigWithSecrets
 } from './encrypted-settings.js';
 
 const html = htm.bind(React.createElement);
@@ -113,16 +114,13 @@ function toggleSource(pluginName, sourceName, enabled) {
 
 function deleteSource(pluginName, sourceName, pluginSettings) {
   const config = readConfig();
-  if (config.plugins?.[pluginName]?.[sourceName]) {
-    if (!clearEncryptedSettings(pluginName, sourceName, pluginSettings)) {
-      return false;
-    }
-    delete config.plugins[pluginName][sourceName];
-    if (Object.keys(config.plugins[pluginName]).length === 0) {
-      delete config.plugins[pluginName];
-    }
-    writeConfig(config);
+  if (!config.plugins?.[pluginName]?.[sourceName]) {
+    return true;
   }
+  if (!deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, clearEncryptedSettings)) {
+    return false;
+  }
+  writeConfig(config);
   return true;
 }
 

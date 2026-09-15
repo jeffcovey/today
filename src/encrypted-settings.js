@@ -68,9 +68,18 @@ export function hasEnvVar(key) {
   return getEnvVar(key) !== null;
 }
 
-/** Clear an env var's effective value while keeping the encrypted file valid. */
+/** Delete an env var so old encrypted settings cannot be reused later. */
 export function clearEnvVar(key) {
-  return setEnvVar(key, '') === true;
+  try {
+    execSync(`npx dotenvx del ${key}`, {
+      cwd: projectRoot,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch (error) {
+    console.error(`Failed to clear ${key}:`, error.message);
+    return false;
+  }
 }
 
 /**
@@ -110,4 +119,28 @@ export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
     }
   }
   return allCleared;
+}
+
+/** Remove a source from config only after its encrypted settings are cleared. */
+export function deleteSourceConfigWithSecrets(
+  config,
+  pluginName,
+  sourceName,
+  pluginSettings,
+  clearSettings = clearEncryptedSettings
+) {
+  if (!config.plugins?.[pluginName]?.[sourceName]) {
+    return true;
+  }
+
+  if (!clearSettings(pluginName, sourceName, pluginSettings)) {
+    return false;
+  }
+
+  delete config.plugins[pluginName][sourceName];
+  if (Object.keys(config.plugins[pluginName]).length === 0) {
+    delete config.plugins[pluginName];
+  }
+
+  return true;
 }
