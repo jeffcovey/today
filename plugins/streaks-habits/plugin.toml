@@ -3,43 +3,63 @@
 
 name = "streaks-habits"
 displayName = "Streaks Habits"
-description = "Daily habit tracking from the Streaks iOS app"
+description = "Habit data from the Streaks iOS app backup files"
 type = "habits"
 
 
 longDescription = """
-Syncs habits from Streaks app backup files (.streaks) to the database.
+Provides AI access to habit data exported from the Streaks iOS app
+(https://streaksapp.com).
 
-Streaks is a habit tracking app for iOS (https://streaksapp.com).
-Export your data by going to Settings > Data > Export in the app.
-Save the .streaks file to your vault/logs directory.
+Setup:
+1. Install and use Streaks on your iPhone or iPad
+2. In Streaks, go to Settings > Data > Export
+3. Save the exported `.streaks` backup file into `vault/logs/`
+   (or another configured logs directory)
+4. Run `bin/plugins sync streaks-habits`
 
-The plugin reads the latest .streaks file and extracts:
-- Habit definitions (name, category, target type)
-- Completion history for the last N days (configurable)
-- Current streak calculations
+The plugin reads the latest `.streaks` file and imports:
+- Habit definitions including title, category, and goal type
+- Daily completion status for the retention window
+- Current streak counts for each habit
+- Pending entries for today when a habit has no completion yet
 
-Each database entry represents one habit on one day.
+Archived habits are skipped. Each database row represents one habit on one day.
 """
 
 aiInstructions = """
-Habit data from Streaks shows daily completion status for recurring habits.
+Streaks habit data is stored in the `habits` table with source LIKE
+'streaks-habits/%'. Each row is one habit for one day.
 
 Key fields:
-- title: Habit name
-- date: Which day (YYYY-MM-DD)
+- title: habit name
+- date: day for this entry (YYYY-MM-DD)
 - status: completed, pending, skipped, or partial
-- value: Duration in seconds (for timer-based habits)
-- category: Habit category/group
-- metadata.current_streak: Days in a row completed
+- goal_type: achieve or limit
+- value: numeric progress such as timer seconds
+- category: habit category/group
+- metadata.current_streak: current streak length
+- metadata.target_type: boolean, count, or timer
+- metadata.paused: whether the habit is paused in Streaks
 
-Query today's habits:
-  SELECT title, status, json_extract(metadata, '$.current_streak') as streak
-  FROM habits WHERE date = date('now') ORDER BY status, title
+For limit habits, partial progress can still count toward the current streak even
+when status is `partial`.
 
-Find habits with long streaks:
-  SELECT DISTINCT title, json_extract(metadata, '$.current_streak') as streak
-  FROM habits WHERE date = date('now') ORDER BY streak DESC
+Today's active habits:
+  SELECT title, status, goal_type,
+         json_extract(metadata, '$.current_streak') AS streak
+  FROM habits
+  WHERE source LIKE 'streaks-habits/%'
+    AND date = DATE('now')
+    AND COALESCE(json_extract(metadata, '$.paused'), 0) = 0
+  ORDER BY status, title
+
+Habits with the longest current streaks:
+  SELECT title, json_extract(metadata, '$.current_streak') AS streak
+  FROM habits
+  WHERE source LIKE 'streaks-habits/%'
+    AND date = DATE('now')
+  ORDER BY streak DESC, title
 """
 
 [commands]
