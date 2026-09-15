@@ -1,7 +1,8 @@
 // Plugin loader - discovers and manages plugins
 import fs from 'fs';
 import path from 'path';
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
@@ -18,7 +19,11 @@ const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+const execFileAsync = promisify(execFile);
+const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
+const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
+const refreshedEnvVarMtimes = new Map();
 
 // ============================================================================
 // Encrypted settings helpers
@@ -33,17 +38,53 @@ function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
   return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
 }
 
+function getEnvFileMtimeMs() {
+  try {
+    return fs.statSync(ENV_PATH).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Get a decrypted environment variable value using dotenvx
+ * Get a decrypted environment variable value.
+ *
+ * Both the scheduler and bin/today run under `dotenvx run`, which decrypts
+ * every TODAY_* value into process.env at startup — so the common case needs
+ * no work at all. Shelling out costs ~2.46s per key, and with 11 enabled
+ * sources carrying an encrypted setting that was ~27s of CPU on every sync,
+ * re-deriving strings the process already held.
+ *
+ * The subprocess stays as a fallback for plugin scripts invoked outside
+ * `dotenvx run`, where process.env is not populated, and for long-lived
+ * processes after `.env` has changed since startup.
+ *
+ * Once `.env` changes, the next lookup refreshes that key from dotenvx and
+ * updates process.env so later lookups are fast again.
  */
 function getDecryptedEnvVar(key) {
+  const envMtimeMs = getEnvFileMtimeMs();
+  const refreshedAtMtimeMs = refreshedEnvVarMtimes.get(key);
+  const fromEnv = process.env[key];
+  if (fromEnv && (envMtimeMs === PROCESS_ENV_MTIME_MS || refreshedAtMtimeMs === envMtimeMs)) {
+    return fromEnv;
+  }
+
   try {
     const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
       cwd: PROJECT_ROOT,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe']
     });
-    return result.trim() || null;
+    const value = result.trim() || null;
+    if (value) {
+      process.env[key] = value;
+      refreshedEnvVarMtimes.set(key, envMtimeMs);
+    } else {
+      delete process.env[key];
+      refreshedEnvVarMtimes.delete(key);
+    }
+    return value;
   } catch {
     return null;
   }
@@ -1102,20 +1143,6 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     return 0;
   }
 
-  // Handle deletion strategy based on plugin type and incremental sync
-  if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
-    // For file-based plugins, delete entries from re-processed files before re-inserting
-    // This handles line number shifts when files are edited
-    const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
-    for (const file of filesProcessed) {
-      deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
-    }
-  } else if (!filesProcessed || pluginType === 'events') {
-    // Full sync: delete all entries for this source
-    db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
-  }
-  // For diary/issues with empty filesProcessed array, nothing to delete (incremental)
-
   // Build column list from schema (excluding dbOnly fields like created_at, updated_at)
   const columns = [];
   const fieldNames = [];
@@ -1140,7 +1167,23 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     : schema.fields.start_date ? 'start_date'
     : null;
 
+  // Deletion strategy and inserts are wrapped in one transaction so there is
+  // never a window where the table is empty between the delete and the inserts.
   const insertAll = db.transaction(() => {
+    // Handle deletion strategy based on plugin type and incremental sync
+    if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
+      // For file-based plugins, delete entries from re-processed files before re-inserting
+      // This handles line number shifts when files are edited
+      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
+      for (const file of filesProcessed) {
+        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
+      }
+    } else if (!filesProcessed || pluginType === 'events') {
+      // Full sync: delete all entries for this source
+      db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+    }
+    // For diary/issues with empty filesProcessed array, nothing to delete (incremental)
+
     for (const entry of entries) {
       // Generate ID: use plugin-provided ID or generate from source + fallback field
       let id;
@@ -1183,7 +1226,10 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
   });
 
   insertAll();
-  return entries.length;
+  // Return total rows for this source (not just the current batch) so
+  // sync_metadata.entries_count is a stable content signal: it changes only
+  // when rows are added or removed, not on empty syncs or re-syncs of identical data.
+  return db.prepare(`SELECT COUNT(*) as n FROM ${tableName} WHERE source = ?`).get(sourceId).n;
 }
 
 /**
@@ -1331,6 +1377,69 @@ export async function getSourcesForType(pluginType, sourceFilter = null) {
   }
 
   return { sources: matchingSources, allSources };
+}
+
+/**
+ * Run one context plugin's read.js and return its parsed output.
+ *
+ * Always sets CONTEXT_ONLY=true: these are display/gather reads, and some
+ * context plugins (markdown-plans, now-updates) treat an unset value as
+ * permission to generate content, which means AI calls and vault writes.
+ *
+ * @param {object} entry - { sourceId, pluginName, config }
+ * @param {string} projectRoot
+ * @returns {Promise<{sourceId: string, pluginName: string, data: object|null, error: string|null}>}
+ */
+async function runContextPluginSource({ sourceId, pluginName, config }, projectRoot) {
+  const readScript = path.join(projectRoot, 'plugins', pluginName, 'read.js');
+  const result = { sourceId, pluginName, data: null, error: null };
+
+  if (!fs.existsSync(readScript)) {
+    result.error = 'no read.js';
+    return result;
+  }
+
+  try {
+    const { stdout } = await execFileAsync('node', [readScript], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      timeout: 30000,
+      maxBuffer: 32 * 1024 * 1024,
+      env: {
+        ...process.env,
+        PROJECT_ROOT: projectRoot,
+        CONFIG_PATH: getConfigPath(),
+        PLUGIN_CONFIG: JSON.stringify(config || {}),
+        SOURCE_ID: sourceId,
+        CONTEXT_ONLY: 'true'
+      }
+    });
+
+    // Plugins occasionally emit a dotenvx banner ahead of their JSON.
+    const json = stdout.split('\n').filter(l => !l.includes('[dotenvx')).join('\n').trim();
+    result.data = JSON.parse(json);
+  } catch (error) {
+    result.error = error.message;
+  }
+
+  return result;
+}
+
+/**
+ * Run every given context plugin concurrently, returning results in the order
+ * they were passed rather than the order they finish, so output stays stable
+ * between runs.
+ *
+ * @param {Array<{sourceId: string, pluginName: string, config: object}>} entries
+ * @param {string} projectRoot
+ * @param {function} [onStart] - called with pluginName as each plugin is spawned
+ * @returns {Promise<Array<{sourceId, pluginName, data, error}>>}
+ */
+export async function runContextPlugins(entries, projectRoot, onStart = null) {
+  return Promise.all(entries.map(entry => {
+    if (onStart) onStart(entry.pluginName);
+    return runContextPluginSource(entry, projectRoot);
+  }));
 }
 
 /**

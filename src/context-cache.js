@@ -12,33 +12,68 @@
 // skip the whole loop on a cache hit.
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
-import { execSync } from 'child_process';
+import { execSync, exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from './plugin-schemas.js';
-import { getAIInstructionsByType, getPluginSources } from './plugin-loader.js';
+import { getAIInstructionsByType, getPluginSources, runContextPlugins } from './plugin-loader.js';
 import { getConfigPath, getTimezone } from './config.js';
 import { getTodayDate } from './date-utils.js';
 
 // Bump when the gather logic below changes in a way that should invalidate
 // every existing cache entry across an upgrade.
-export const CONTEXT_CACHE_VERSION = 1;
+export const CONTEXT_CACHE_VERSION = 2;
 
 // How many cache rows to retain (one per distinct fingerprint: live + a few
 // historical-date lookups). Older rows are pruned on each write.
 const MAX_CACHE_ROWS = 5;
 
+// How many plugin-type commands to run at once. These are separate node
+// processes, so the ceiling is cores rather than I/O; measured on a 4-core box,
+// a limit of 4 matched unbounded (5088ms vs 4897ms) while spawning far fewer
+// processes.
+const GATHER_CONCURRENCY = Math.max(2, os.cpus()?.length || 4);
+
 /**
- * Snapshot the per-source sync state. This is the change signal: any sync
- * (manual or background cron) updates last_synced_at, which changes the key.
+ * Map over items with a bounded number in flight, returning results in input
+ * order rather than completion order.
+ */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+
+  const worker = async () => {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker)
+  );
+
+  return results;
+}
+
+/**
+ * Snapshot the per-source sync state for cache keying.
+ * Uses entries_count (changes only when row counts change) rather than
+ * last_synced_at (changes on every background sync even when data is identical),
+ * so the cache stays valid across syncs that bring in no new data.
  * @param {object} db
  * @returns {Array<object>}
  */
 function getSyncSnapshot(db) {
   try {
     return db.prepare(
-      'SELECT source, last_synced_at, entries_count FROM sync_metadata ORDER BY source'
+      'SELECT source, entries_count FROM sync_metadata ORDER BY source'
     ).all();
   } catch {
     // Table might not exist yet
@@ -188,41 +223,30 @@ async function getContextPluginsData(typeData, projectRoot) {
     }
   }
 
-  for (const sourceId of typeData.sources) {
+  const entries = typeData.sources.map(sourceId => {
+    const [pluginName, sourceName] = sourceId.split('/');
+    let config = {};
     try {
-      const [pluginName, sourceName] = sourceId.split('/');
-      const pluginPath = path.join(projectRoot, 'plugins', pluginName);
-      const readScript = path.join(pluginPath, 'read.js');
-
-      if (!fs.existsSync(readScript)) continue;
-
-      const sources = getPluginSources(pluginName);
-      const sourceConfig = sources.find(s => s.sourceName === sourceName)?.config || {};
-
-      if (process.env.TODAY_QUIET !== '1') console.log(`  ⏳ ${pluginName}...`);
-
-      const output = execSync(`node "${readScript}"`, {
-        cwd: projectRoot,
-        encoding: 'utf8',
-        timeout: 30000,
-        env: {
-          ...process.env,
-          PROJECT_ROOT: projectRoot,
-          CONFIG_PATH: getConfigPath(),
-          PLUGIN_CONFIG: JSON.stringify(sourceConfig),
-          SOURCE_ID: sourceId,
-          CONTEXT_ONLY: 'true' // Skip expensive operations during context gathering
-        }
-      });
-
-      const data = JSON.parse(output);
-
-      if (data.context) {
-        lines.push(data.context);
-        lines.push('');
-      }
+      config = getPluginSources(pluginName).find(s => s.sourceName === sourceName)?.config || {};
     } catch {
-      // Silently continue if plugin fails
+      config = {};
+    }
+    return { sourceId, pluginName, config };
+  });
+
+  const quiet = process.env.TODAY_QUIET === '1';
+  const results = await runContextPlugins(
+    entries,
+    projectRoot,
+    quiet ? null : pluginName => console.log(`  ⏳ ${pluginName}...`)
+  );
+
+  // Results arrive in source order, so the gathered context — and therefore
+  // what gets cached — is identical run to run.
+  for (const { data } of results) {
+    if (data?.context) {
+      lines.push(data.context);
+      lines.push('');
     }
   }
 
@@ -243,47 +267,59 @@ async function gatherCurrentDataContext(projectRoot) {
   try {
     const pluginTypes = getPluginTypes();
     const instructionsByType = await getAIInstructionsByType();
-    const sections = [];
 
+    // Collect the work first, in plugin-type order, then run it concurrently.
+    // Every command is read-only here — ensureSyncForType returns early when
+    // CONTEXT_ONLY is set — so there is no write contention between them.
+    const tasks = [];
     for (const pluginType of pluginTypes) {
       const ai = getAIMetadata(pluginType);
       if (!ai) continue;
 
       if (pluginType === 'context') {
-        const contextData = await getContextPluginsData(instructionsByType.get('context'), projectRoot);
-        if (contextData) {
-          sections.push(contextData);
-        }
+        tasks.push({ pluginType, ai, isContext: true });
         continue;
       }
 
       const typeData = instructionsByType.get(pluginType);
       if (!typeData || typeData.sources.length === 0) continue;
 
+      tasks.push({ pluginType, ai, typeData, isContext: false });
+    }
+
+    const quiet = process.env.TODAY_QUIET === '1';
+
+    const results = await mapWithConcurrency(tasks, GATHER_CONCURRENCY, async task => {
+      if (task.isContext) {
+        return getContextPluginsData(instructionsByType.get('context'), projectRoot);
+      }
+
+      if (!quiet) console.log(`  ⏳ ${task.ai.name || task.pluginType}...`);
+
       let currentData = '';
       try {
-        if (process.env.TODAY_QUIET !== '1') console.log(`  ⏳ ${ai.name || pluginType}...`);
-        currentData = execSync(ai.defaultCommand + ' 2>/dev/null', {
+        const { stdout } = await execAsync(task.ai.defaultCommand + ' 2>/dev/null', {
           encoding: 'utf8',
           timeout: 10000,
+          maxBuffer: 32 * 1024 * 1024,
           env: { ...process.env, CONTEXT_ONLY: 'true' }
         });
-        currentData = currentData.split('\n')
+        currentData = stdout.split('\n')
           .filter(line => !line.includes('[dotenvx'))
           .join('\n');
       } catch {
         currentData = '(No data available)';
       }
 
-      const block = generateAIContextBlock(pluginType, {
-        userInstructions: typeData.instructions,
+      return generateAIContextBlock(task.pluginType, {
+        userInstructions: task.typeData.instructions,
         currentData
       });
+    });
 
-      if (block) {
-        sections.push(block);
-      }
-    }
+    // Results stay in plugin-type order regardless of completion order, so the
+    // gathered text — and therefore the cache entry — is identical run to run.
+    const sections = results.filter(Boolean);
 
     if (sections.length === 0) {
       return `# Data Sources

@@ -605,14 +605,18 @@ function formatPropertyContext(property) {
   return lines.join('\n');
 }
 
-// Execute with timeout (for name extraction only now)
+// Execute with timeout (for name extraction only now).
+// The timer must be cleared once the race settles: an armed timer keeps the
+// event loop alive, so without this the process sits idle until it fires even
+// though the work finished in ~150ms.
 const executeWithTimeout = () => {
-  return Promise.race([
-    processProperty(),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Script timeout after 8 seconds')), 8000)
-    )
-  ]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Script timeout after 8 seconds')), 8000);
+  });
+
+  return Promise.race([processProperty(), timeout])
+    .finally(() => clearTimeout(timeoutId));
 };
 
 executeWithTimeout()

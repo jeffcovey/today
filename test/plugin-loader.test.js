@@ -421,4 +421,127 @@ console.log(JSON.stringify({ entries: [], files_processed: [], incremental: fals
       expect(result.message).toMatch(/simulated plugin error/);
     });
   });
+
+  describe('insertEntries atomicity', () => {
+    // Verifies that the delete and the inserts happen inside a single transaction
+    // so a concurrent reader never sees an empty table between the two operations.
+    // We prove atomicity by making the INSERT fail mid-way with a SQLite trigger
+    // and asserting that the pre-existing rows survive (rolled back with the delete).
+
+    let pluginDir;
+    let plugin;
+
+    beforeAll(() => {
+      pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-stub-'));
+      const readPath = path.join(pluginDir, 'read.js');
+      // Returns two entries from one file (incremental, file-based delete path)
+      fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+  entries: [
+    { id: 'vault/file.md:1', title: 'new task 1', status: 'open' },
+    { id: 'vault/file.md:2', title: 'new task 2', status: 'open' }
+  ],
+  files_processed: ['vault/file.md'],
+  incremental: true
+}));
+`);
+      fs.chmodSync(readPath, 0o755);
+      plugin = {
+        name: 'atomic-stub',
+        type: 'tasks',
+        _path: pluginDir,
+        commands: { read: 'read.js' }
+      };
+    });
+
+    afterAll(() => {
+      fs.rmSync(pluginDir, { recursive: true, force: true });
+    });
+
+    function makeDb() {
+      const db = new Database(':memory:');
+      db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+      db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+      return db;
+    }
+
+    test('pre-existing tasks survive when an error aborts the insert mid-transaction', async () => {
+      const sourceId = 'atomic-stub/default';
+      const db = makeDb();
+
+      // Seed a task from the file that will be re-synced
+      db.prepare(`INSERT INTO tasks (id, source, title, status) VALUES (?, ?, ?, 'open')`)
+        .run(`${sourceId}:vault/file.md:1`, sourceId, 'pre-existing task');
+
+      // Install a trigger that aborts on the second INSERT into tasks, simulating
+      // a crash that occurs after the delete but before all inserts complete.
+      db.exec(`
+        CREATE TEMP TABLE _insert_count (n INTEGER DEFAULT 0);
+        INSERT INTO _insert_count VALUES (0);
+        CREATE TEMP TRIGGER abort_second_insert BEFORE INSERT ON tasks
+        BEGIN
+          UPDATE _insert_count SET n = n + 1;
+          SELECT CASE WHEN (SELECT n FROM _insert_count) >= 2
+            THEN RAISE(ABORT, 'simulated mid-insert failure')
+          END;
+        END;
+      `);
+
+      // Sync will throw because the trigger aborts the second insert
+      await expect(
+        syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, { _caller: 'test' })
+      ).rejects.toThrow('simulated mid-insert failure');
+
+      // The pre-existing task must still be present — the delete was rolled back
+      // with the failed insert because both ran inside the same transaction.
+      const rows = db.prepare(`SELECT id FROM tasks WHERE source = ?`).all(sourceId);
+      expect(rows.map(r => r.id)).toContain(`${sourceId}:vault/file.md:1`);
+    });
+
+    test('full-source delete is also atomic with the inserts', async () => {
+      const sourceId = 'atomic-stub/default';
+      const db = makeDb();
+
+      // Seed tasks from a *different* file so a file-filtered sync won't touch them,
+      // but a full sync (filesProcessed: null) would delete everything first.
+      db.prepare(`INSERT INTO tasks (id, source, title, status) VALUES (?, ?, ?, 'open')`)
+        .run(`${sourceId}:vault/other.md:1`, sourceId, 'unrelated task');
+
+      // Use a full-sync plugin (no files_processed) so the full-source delete path runs
+      const fullPluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-full-stub-'));
+      const fullReadPath = path.join(fullPluginDir, 'read.js');
+      fs.writeFileSync(fullReadPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+  entries: [
+    { id: 'vault/file.md:1', title: 'new task 1', status: 'open' },
+    { id: 'vault/file.md:2', title: 'new task 2', status: 'open' }
+  ]
+}));
+`);
+      fs.chmodSync(fullReadPath, 0o755);
+      const fullPlugin = { name: 'atomic-stub', type: 'tasks', _path: fullPluginDir, commands: { read: 'read.js' } };
+
+      db.exec(`
+        CREATE TEMP TABLE _insert_count2 (n INTEGER DEFAULT 0);
+        INSERT INTO _insert_count2 VALUES (0);
+        CREATE TEMP TRIGGER abort_second_insert2 BEFORE INSERT ON tasks
+        BEGIN
+          UPDATE _insert_count2 SET n = n + 1;
+          SELECT CASE WHEN (SELECT n FROM _insert_count2) >= 2
+            THEN RAISE(ABORT, 'simulated mid-insert failure')
+          END;
+        END;
+      `);
+
+      await expect(
+        syncPluginSource(fullPlugin, 'default', {}, { db, vaultPath: 'vault' }, { _caller: 'test' })
+      ).rejects.toThrow('simulated mid-insert failure');
+
+      // The unrelated task must survive — the full-source delete was rolled back
+      const rows = db.prepare(`SELECT id FROM tasks WHERE source = ?`).all(sourceId);
+      expect(rows.map(r => r.id)).toContain(`${sourceId}:vault/other.md:1`);
+
+      fs.rmSync(fullPluginDir, { recursive: true, force: true });
+    });
+  });
 });
