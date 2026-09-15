@@ -23,21 +23,18 @@ function parseRules(value, budgets = []) {
   const raw = String(value || '').trim();
   if (!raw) return [];
 
+  const parseRuleLine = (line) => {
+    const normalized = line.trim().replace(/,+$/, '').trim();
+    if (!normalized) return [];
+    if (budgets.some(b => matches(b, normalized))) return [normalized];
+    return normalized.split(',').map(s => s.trim()).filter(Boolean);
+  };
+
   if (raw.includes('\n')) {
-    return raw
-      .split(/\r?\n/)
-      .map(s => s.trim().replace(/,+$/, '').trim())
-      .filter(Boolean);
+    return raw.split(/\r?\n/).flatMap(parseRuleLine);
   }
 
-  if (budgets.some(b => matches(b, raw))) {
-    return [raw];
-  }
-
-  return raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  return parseRuleLine(raw);
 }
 
 /**

@@ -362,6 +362,9 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
     test('reconciles a pure deletion (no entries returned) past the empty-incremental short-circuit', async () => {
       const db = makeTasksDb();
       insertTask(db, 'vault/deleted.md:20', 'orphan');
+      db.prepare(
+        `INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count) VALUES (?, datetime('now'), '[]', 1)`
+      ).run(sourceId);
 
       const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
         fileFilter: 'vault/deleted.md',
@@ -371,6 +374,9 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
       expect(result.success).toBe(true);
       expect(result.message).toMatch(/Removed 1 row/);
       expect(ids(db)).toEqual([]);
+      expect(
+        db.prepare(`SELECT entries_count FROM sync_metadata WHERE source = ?`).get(sourceId).entries_count
+      ).toBe(0);
     });
 
     test('escapes LIKE wildcards so an underscore filename cannot delete unrelated rows', async () => {

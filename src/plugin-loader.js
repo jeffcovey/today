@@ -871,15 +871,39 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     }
   }
 
-  // If no entries and incremental, nothing changed (unless we just reconciled
-  // away rows for a deleted file).
+  // Get the standardized table name for this plugin type
+  const tableName = getTableNameForType(plugin.type);
+  if (!tableName) {
+    return {
+      success: false,
+      count: 0,
+      message: `Unknown plugin type: ${plugin.type}`
+    };
+  }
+
+  const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
+  const pluginPurgedRows = Number(pluginMetadata?.rows_purged_for_dropped_budgets || 0);
+
+  // If no entries and incremental, nothing changed — unless rows were removed
+  // outside the loader-managed insert path, in which case sync metadata must
+  // still be refreshed so caches see the new row count.
   if (entries.length === 0 && isIncremental) {
+    if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
+      const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
+      const messages = [];
+      if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted file(s)`);
+      if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
+      return {
+        success: true,
+        count: 0,
+        message: messages.join('; ')
+      };
+    }
     return {
       success: true,
       count: 0,
-      message: reconciledDeletions > 0
-        ? `Removed ${reconciledDeletions} row(s) for deleted file(s)`
-        : `No changes since last sync`
+      message: `No changes since last sync`
     };
   }
 
@@ -897,21 +921,10 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  // Get the standardized table name for this plugin type
-  const tableName = getTableNameForType(plugin.type);
-  if (!tableName) {
-    return {
-      success: false,
-      count: 0,
-      message: `Unknown plugin type: ${plugin.type}`
-    };
-  }
-
   // Insert entries with source identifier
   const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
   updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
 
   // Run auto-tagger if enabled (never fails the sync)
