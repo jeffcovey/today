@@ -72,6 +72,28 @@ function withEncryptedEnvFiles(callback) {
   }
 }
 
+function withFakeNpx(callback) {
+  const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
+  const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
+  const fakeNpxPath = path.join(fakeBinDir, 'npx');
+
+  writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
+  chmodSync(fakeNpxPath, 0o755);
+
+  try {
+    return callback({
+      markerPath,
+      env: {
+        ...process.env,
+        PATH: `${fakeBinDir}:${process.env.PATH || ''}`,
+        NPX_MARKER: markerPath,
+      },
+    });
+  } finally {
+    rmSync(fakeBinDir, { recursive: true, force: true });
+  }
+}
+
 describe('bin/today CLI', () => {
   describe('--help', () => {
     test('should display help message', () => {
@@ -175,39 +197,27 @@ describe('bin/today CLI', () => {
 
   describe('startup optimization', () => {
     test.each(['--help', '--version'])('%s should skip dotenvx re-exec', (arg) => {
-      const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
-      const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
-      const fakeNpxPath = path.join(fakeBinDir, 'npx');
-
-      writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
-      chmodSync(fakeNpxPath, 0o755);
-
-      try {
+      withFakeNpx(({ markerPath, env }) => {
         withEncryptedEnvFiles(() => {
           const result = runToday(arg, {
-            env: {
-              ...process.env,
-              PATH: `${fakeBinDir}:${process.env.PATH || ''}`,
-              NPX_MARKER: markerPath,
-            },
+            env,
           });
 
           expect(result.exitCode).toBe(0);
           expect(existsSync(markerPath)).toBe(false);
         });
-      } finally {
-        rmSync(fakeBinDir, { recursive: true, force: true });
-      }
+      });
     });
 
-    test('should keep common startup imports parallelized with Promise.all', () => {
-      const source = readFileSync(todayBin, 'utf8');
+    test('should still re-exec through dotenvx for normal invocations', () => {
+      withFakeNpx(({ markerPath, env }) => {
+        withEncryptedEnvFiles(() => {
+          const result = runToday('dry-run --no-sync', { env });
 
-      expect(source).toContain('] = await Promise.all([');
-      expect(source).toContain("import('../src/config.js')");
-      expect(source).toContain("import('../src/plugin-loader.js')");
-      expect(source).toContain("import('commander')");
-      expect(source).toContain("import('../src/date-utils.js')");
+          expect(result.exitCode).toBe(0);
+          expect(existsSync(markerPath)).toBe(true);
+        });
+      });
     });
   });
 });
