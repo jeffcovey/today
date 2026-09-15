@@ -1,0 +1,83 @@
+# User Scripts Plugin
+# Runs user-provided executable scripts from a vault directory on every sync
+
+name = "user-scripts"
+displayName = "User Scripts"
+description = "Run your own executable scripts from the vault on every plugin sync"
+type = "utility"
+
+longDescription = """
+Runs every executable file found in a configured vault directory, in
+alphabetical order, each time this plugin is synced.
+
+⚠️  POWERFUL AND WHOLLY AT YOUR DISCRETION
+
+Scripts run with the same user account and permissions as the `today`
+process itself. They can read and write any file, modify the database,
+make network requests, or run shell commands. Only put scripts here that
+you have written or fully trust.
+
+⚠️  RUNS ON EVERY SYNC — SCRIPTS MUST BE IDEMPOTENT
+
+This plugin syncs on the normal plugin schedule (and whenever you run
+`bin/plugins sync`). Your scripts will be called every time. They are
+responsible for:
+
+  - Checking whether they actually need to do anything before doing it
+  - Avoiding duplicate writes, duplicate notifications, or duplicate side effects
+  - Handling the case where they are called multiple times per day
+
+Scripts receive these environment variables:
+  PROJECT_ROOT      Absolute path to the today project root
+  VAULT_PATH        Absolute path to the vault directory
+  LAST_SYNC_TIME    ISO timestamp of the last sync (empty on first run)
+  SOURCE_ID         Full source identifier (e.g. user-scripts/default)
+
+Scripts may be written in any language (Node.js, Python, Bash, Ruby, …)
+as long as the file has a valid shebang line and is executable. The
+plugin will chmod +x each file before running it, so sync tools that
+strip permissions (e.g. Obsidian Sync) will not break your scripts.
+
+stdout and stderr from each script are captured and shown in the sync
+output. A non-zero exit code marks that script as failed.
+
+Scripts are not run when CONTEXT_ONLY is set (i.e. during AI context
+gathering). They only run on explicit syncs.
+
+SETUP
+
+1. Place executable scripts in the configured directory (default:
+   vault/scripts/user-scripts/).
+2. Add a shebang line at the top (e.g. #!/usr/bin/env node).
+3. Make the plugin source enabled = true in config.toml.
+4. Run `bin/plugins sync user-scripts` to test.
+
+EXAMPLE — advance a rolling jazz piano tracker
+
+  #!/usr/bin/env node
+  // Stamps today's ⏳ date on the first unchecked session in the project,
+  // so it surfaces in `bin/tasks today`. Idempotent: re-running is safe.
+  import { readFileSync, writeFileSync } from 'fs';
+  const today = new Date().toLocaleDateString('en-CA');
+  const FILE = process.env.PROJECT_ROOT + '/vault/projects/jazz-piano-14-days.md';
+  const lines = readFileSync(FILE, 'utf8').split('\\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\\s*- \\[ \\]/.test(lines[i])) continue;
+    const cleaned = lines[i].replace(/⏳ \\d{4}-\\d{2}-\\d{2}\\s*/g, '').trimEnd();
+    const tagPos = cleaned.search(/#\\S/);
+    lines[i] = tagPos >= 0
+      ? cleaned.slice(0, tagPos).trimEnd() + ' ⏳ ' + today + ' ' + cleaned.slice(tagPos)
+      : cleaned + ' ⏳ ' + today;
+    break;
+  }
+  writeFileSync(FILE, lines.join('\\n'));
+"""
+
+aiInstructions = ""
+
+[commands]
+read = "./read.js"
+
+[settings]
+scripts_directory = { type = "string", default = "vault/scripts/user-scripts", description = "Directory containing user scripts to run (relative to project root)" }
+timeout_seconds = { type = "number", default = 30, description = "Maximum seconds to wait for each script" }
