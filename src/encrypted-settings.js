@@ -110,11 +110,6 @@ export function getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings) 
   return names;
 }
 
-/** Clear all encrypted settings for a plugin source so old secrets cannot be reused. */
-export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
-  return clearEncryptedSettingEnvVars(pluginName, sourceName, pluginSettings).length === 0;
-}
-
 /** Clear encrypted env vars and report any names that could not be removed. */
 export function clearEncryptedSettingEnvVars(
   pluginName,

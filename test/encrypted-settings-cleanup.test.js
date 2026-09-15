@@ -8,7 +8,6 @@ jest.unstable_mockModule('child_process', () => ({
 
 const {
   clearEnvVar,
-  clearEncryptedSettings,
   clearEncryptedSettingEnvVars,
   deleteSourceConfig,
   rollbackEncryptedSettingBackups,
@@ -37,7 +36,7 @@ describe('encrypted settings cleanup', () => {
     );
   });
 
-  test('clearEncryptedSettings attempts every encrypted key and reports failures', () => {
+  test('clearEncryptedSettingEnvVars attempts every encrypted key and reports failures', () => {
     execSync.mockImplementation((command) => {
       if (command.includes('TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN')) {
         throw new Error('boom');
@@ -45,26 +44,15 @@ describe('encrypted settings cleanup', () => {
       return '';
     });
 
-    expect(clearEncryptedSettings('test-plugin', 'default', {
+    expect(clearEncryptedSettingEnvVars('test-plugin', 'default', {
       api_token: { encrypted: true },
       password: { encrypted: true },
       base_url: { encrypted: false }
-    })).toBe(false);
+    })).toEqual(['TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN']);
 
     expect(execSync).toHaveBeenCalledTimes(2);
     expect(execSync.mock.calls[0][0]).toContain('TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN');
     expect(execSync.mock.calls[1][0]).toContain('TODAY_TEST_PLUGIN_DEFAULT_PASSWORD');
-  });
-
-  test('clearEncryptedSettingEnvVars returns the env vars that could not be removed', () => {
-    const clear = jest.fn((envVarName) => envVarName !== 'TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN');
-
-    expect(clearEncryptedSettingEnvVars('test-plugin', 'default', {
-      api_token: { encrypted: true },
-      password: { encrypted: true }
-    }, clear)).toEqual(['TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN']);
-
-    expect(clear).toHaveBeenCalledTimes(2);
   });
 
   test('deleteSourceConfigWithSecrets removes the source after persist and cleanup succeed', () => {
