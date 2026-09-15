@@ -17,6 +17,23 @@ Setup:
 3. Enter your Personal Access Token when prompted
 4. Run: bin/plugins sync ynab-api
 
+Choosing which budgets to sync:
+By default every budget in the account is synced. To leave one out — an archived
+budget, say — set exclude_budget_ids. Entries may be budget IDs or budget names:
+
+  exclude_budget_ids = "My Budget (Archived on 2024-03-03)"
+
+Prefer this over budget_ids. An allowlist has the wrong failure mode: pin it to
+today's budget and a budget you create next year is silently omitted. With a
+denylist, new budgets are picked up automatically and only what you name is left
+out. budget_ids still works if you genuinely want a fixed set.
+
+Every sync reports all_budgets (everything the account has) alongside what was
+synced and excluded, so a newly appearing budget is visible rather than absent.
+An exclusion rule matching nothing is warned about — it usually means a typo or a
+renamed budget. Excluding a budget also removes its rows from the database, so
+stale transactions do not linger.
+
 How it works:
 - On first sync, all transactions for each budget are fetched
 - On subsequent syncs, only changed records are fetched via YNAB's server_knowledge
@@ -63,5 +80,6 @@ read = "./read.js"
 
 [settings]
 api_token = { type = "string", default = "", description = "YNAB Personal Access Token (from app.ynab.com/settings/developer)", encrypted = true }
-budget_ids = { type = "string", default = "", description = "Comma-separated YNAB budget IDs to sync (leave blank to sync all budgets)" }
+budget_ids = { type = "string", default = "", description = "Only sync these budgets (comma-separated IDs or names; blank = all). Prefer exclude_budget_ids so new budgets are picked up automatically" }
+exclude_budget_ids = { type = "string", default = "", description = "Never sync these budgets (comma-separated IDs or names), e.g. an archived budget" }
 retention_days = { type = "number", default = 365, description = "Days of transaction history to keep in the database" }
