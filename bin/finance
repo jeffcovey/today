@@ -286,6 +286,7 @@ program
   .command('categories')
   .description('List all transaction categories')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
@@ -293,11 +294,19 @@ program
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
       FROM financial_transactions
+      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
     `;
     const params = [];
 
+    if (options.scheduled) {
+      sql = `
+        SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
+        FROM financial_transactions
+      `;
+    }
+
     if (options.source) {
-      sql += ` WHERE source LIKE ?`;
+      sql += options.scheduled ? ` WHERE source LIKE ?` : ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 
@@ -341,6 +350,7 @@ program
   .command('accounts')
   .description('List all accounts')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
@@ -349,11 +359,20 @@ program
       SELECT account, COUNT(*) as count, SUM(amount) as balance,
              MIN(date) as first_transaction, MAX(date) as last_transaction
       FROM financial_transactions
+      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
     `;
     const params = [];
 
+    if (options.scheduled) {
+      sql = `
+        SELECT account, COUNT(*) as count, SUM(amount) as balance,
+               MIN(date) as first_transaction, MAX(date) as last_transaction
+        FROM financial_transactions
+      `;
+    }
+
     if (options.source) {
-      sql += ` WHERE source LIKE ?`;
+      sql += options.scheduled ? ` WHERE source LIKE ?` : ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 

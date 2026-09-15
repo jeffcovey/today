@@ -154,4 +154,37 @@ describe('scheduled rows must not contaminate spending totals', () => {
     `).get();
     expect(row.n).toBe(3);
   });
+
+  test('category totals exclude scheduled rows by default', () => {
+    db.prepare(`UPDATE financial_transactions SET category = 'Bills', category_group = 'Fixed' WHERE id IN ('a', 'c')`).run();
+    db.prepare(`UPDATE financial_transactions SET category = 'Food', category_group = 'Living' WHERE id = 'b'`).run();
+
+    const rows = db.prepare(`
+      SELECT category, SUM(amount) total, COUNT(*) count
+      FROM financial_transactions
+      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
+      GROUP BY category
+      ORDER BY category
+    `).all();
+
+    expect(rows).toEqual([
+      { category: 'Bills', total: -100, count: 1 },
+      { category: 'Food', total: -50, count: 1 }
+    ]);
+  });
+
+  test('account balances exclude scheduled rows by default', () => {
+    const row = db.prepare(`
+      SELECT account, SUM(amount) balance, COUNT(*) count
+      FROM financial_transactions
+      WHERE date <= DATE('now') AND IFNULL(scheduled, 0) = 0
+      GROUP BY account
+    `).get();
+
+    expect(row).toEqual({
+      account: 'Checking',
+      balance: -150,
+      count: 2
+    });
+  });
 });
