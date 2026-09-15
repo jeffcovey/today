@@ -88,6 +88,22 @@ const systemMigrations = [
         )
       `);
     }
+  },
+  {
+    version: 106,
+    description: 'Add scheduled column to financial_transactions',
+    fn: (db) => {
+      // financial_transactions is built from plugin-schemas.js, so a database
+      // created after the field was added already has this column and a bare
+      // ALTER would fail with "duplicate column name". The unguarded ALTERs at
+      // 101 and 104 are safe only because sync_metadata is created without them.
+      const hasColumn = db.prepare(`PRAGMA table_info(financial_transactions)`)
+        .all()
+        .some(col => col.name === 'scheduled');
+      if (!hasColumn) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN scheduled INTEGER DEFAULT 0`);
+      }
+    }
   }
 ];
 
