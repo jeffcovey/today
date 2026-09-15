@@ -103,6 +103,11 @@ export function getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings) 
 
 /** Clear all encrypted settings for a plugin source so old secrets cannot be reused. */
 export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
-  return getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings)
-    .every(envVarName => clearEnvVar(envVarName));
+  let allCleared = true;
+  for (const envVarName of getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings)) {
+    if (!clearEnvVar(envVarName)) {
+      allCleared = false;
+    }
+  }
+  return allCleared;
 }
