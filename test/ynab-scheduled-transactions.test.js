@@ -171,6 +171,18 @@ describe('scheduled rows must not contaminate spending totals', () => {
       { category: 'Bills', total: -100, count: 1 },
       { category: 'Food', total: -50, count: 1 }
     ]);
+
+    const withScheduled = db.prepare(`
+      SELECT category, SUM(amount) total, COUNT(*) count
+      FROM financial_transactions
+      GROUP BY category
+      ORDER BY category
+    `).all();
+
+    expect(withScheduled).toEqual([
+      { category: 'Bills', total: -10468.54, count: 2 },
+      { category: 'Food', total: -50, count: 1 }
+    ]);
   });
 
   test('account balances exclude scheduled rows by default', () => {
@@ -185,6 +197,18 @@ describe('scheduled rows must not contaminate spending totals', () => {
       account: 'Checking',
       balance: -150,
       count: 2
+    });
+
+    const withScheduled = db.prepare(`
+      SELECT account, SUM(amount) balance, COUNT(*) count
+      FROM financial_transactions
+      GROUP BY account
+    `).get();
+
+    expect(withScheduled).toEqual({
+      account: 'Checking',
+      balance: -10518.54,
+      count: 3
     });
   });
 });
