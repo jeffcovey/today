@@ -1143,20 +1143,6 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     return 0;
   }
 
-  // Handle deletion strategy based on plugin type and incremental sync
-  if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
-    // For file-based plugins, delete entries from re-processed files before re-inserting
-    // This handles line number shifts when files are edited
-    const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
-    for (const file of filesProcessed) {
-      deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
-    }
-  } else if (!filesProcessed || pluginType === 'events') {
-    // Full sync: delete all entries for this source
-    db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
-  }
-  // For diary/issues with empty filesProcessed array, nothing to delete (incremental)
-
   // Build column list from schema (excluding dbOnly fields like created_at, updated_at)
   const columns = [];
   const fieldNames = [];
@@ -1181,7 +1167,23 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     : schema.fields.start_date ? 'start_date'
     : null;
 
+  // Deletion strategy and inserts are wrapped in one transaction so there is
+  // never a window where the table is empty between the delete and the inserts.
   const insertAll = db.transaction(() => {
+    // Handle deletion strategy based on plugin type and incremental sync
+    if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
+      // For file-based plugins, delete entries from re-processed files before re-inserting
+      // This handles line number shifts when files are edited
+      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
+      for (const file of filesProcessed) {
+        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
+      }
+    } else if (!filesProcessed || pluginType === 'events') {
+      // Full sync: delete all entries for this source
+      db.prepare(`DELETE FROM ${tableName} WHERE source = ?`).run(sourceId);
+    }
+    // For diary/issues with empty filesProcessed array, nothing to delete (incremental)
+
     for (const entry of entries) {
       // Generate ID: use plugin-provided ID or generate from source + fallback field
       let id;
