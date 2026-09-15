@@ -106,6 +106,8 @@ process.exit(result.status ?? 1);
   writeFileSync(fakeNpxCmdPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
   writeFileSync(fakeNpxCmdUpperPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
   chmodSync(fakeNpxPath, 0o755);
+  chmodSync(fakeNpxCmdPath, 0o755);
+  chmodSync(fakeNpxCmdUpperPath, 0o755);
 
   try {
     return callback({
