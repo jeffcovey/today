@@ -110,15 +110,22 @@ export function getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings) 
   return names;
 }
 
-/** Clear all encrypted settings for a plugin source so old secrets cannot be reused. */
-export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
+/** Clear encrypted env vars and report any names that could not be removed. */
+export function clearEncryptedSettingEnvVars(
+  pluginName,
+  sourceName,
+  pluginSettings,
+  clear = clearEnvVar
+) {
+  const failures = [];
   let allCleared = true;
   for (const envVarName of getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings)) {
-    if (!clearEnvVar(envVarName)) {
+    if (!clear(envVarName)) {
       allCleared = false;
+      failures.push(envVarName);
     }
   }
-  return allCleared;
+  return allCleared ? [] : failures;
 }
 
 /** Restore encrypted env vars after a canceled or failed configuration flow. */
@@ -138,20 +145,10 @@ export function rollbackEncryptedSettingBackups(
   return failures;
 }
 
-/** Remove a source from config only after its encrypted settings are cleared. */
-export function deleteSourceConfigWithSecrets(
-  config,
-  pluginName,
-  sourceName,
-  pluginSettings,
-  clearSettings = clearEncryptedSettings
-) {
+/** Remove a source from config without touching any encrypted settings. */
+export function deleteSourceConfig(config, pluginName, sourceName) {
   if (!config.plugins?.[pluginName]?.[sourceName]) {
     return true;
-  }
-
-  if (!clearSettings(pluginName, sourceName, pluginSettings)) {
-    return false;
   }
 
   delete config.plugins[pluginName][sourceName];
@@ -160,4 +157,38 @@ export function deleteSourceConfigWithSecrets(
   }
 
   return true;
+}
+
+/** Remove a source from config, persist it, then clear any encrypted settings. */
+export function deleteSourceConfigWithSecrets(
+  config,
+  pluginName,
+  sourceName,
+  pluginSettings,
+  {
+    persist = () => true,
+    clear = clearEnvVar
+  } = {}
+) {
+  if (!config.plugins?.[pluginName]?.[sourceName]) {
+    return { ok: true, stage: null, orphanedEnvVars: [] };
+  }
+
+  deleteSourceConfig(config, pluginName, sourceName);
+
+  if (persist(config) !== true) {
+    return { ok: false, stage: 'persist', orphanedEnvVars: [] };
+  }
+
+  const orphanedEnvVars = clearEncryptedSettingEnvVars(
+    pluginName,
+    sourceName,
+    pluginSettings,
+    clear
+  );
+  if (orphanedEnvVars.length > 0) {
+    return { ok: false, stage: 'clear', orphanedEnvVars };
+  }
+
+  return { ok: true, stage: null, orphanedEnvVars: [] };
 }

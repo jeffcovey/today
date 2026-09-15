@@ -117,6 +117,12 @@ describe('encrypted settings', () => {
       expect(bodyOf(fn)).toContain('rollbackEncryptedSettingChanges');
     });
 
+    test.each(['addSource', 'editSource'])('%s rolls back encrypted writes when the config CAS write conflicts', (fn) => {
+      const body = bodyOf(fn);
+      expect(body).toContain('if (!saveSourceConfig(');
+      expect(body).toContain('rollbackEncryptedSettingChanges(encryptedSettingBackups);');
+    });
+
     test('rollbackEncryptedSettingChanges surfaces rollback failures', () => {
       expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('rollbackEncryptedSettingBackups');
       expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('p.log.error');
@@ -133,18 +139,34 @@ describe('encrypted settings', () => {
       }
     });
 
-    test('removeSource clears encrypted settings when deleting a source', () => {
-      expect(bodyOf('removeSource')).toContain('deleteSourceConfigWithSecretsFromFile');
-      expect(bodyOf('removeSource')).toContain('Failed to clear encrypted settings');
+    test('removeSource uses the shared delete helper and reports orphaned secrets', () => {
+      const body = bodyOf('removeSource');
+      expect(body).toContain('deleteSourceConfigWithSecrets(');
+      expect(body).toContain('secret may be left behind:');
+      expect(body).toContain('Check .env.');
+    });
+
+    test('removeSource persists via writeConfigToml before secret cleanup can run', () => {
+      const body = bodyOf('removeSource');
+      expect(body).toContain('persist: (nextConfig) =>');
+      expect(body).toContain('writeConfigToml(');
+      expect(body).toContain("stage === 'clear'");
     });
   });
 
   describe('plugins-configure-ui delete path', () => {
     const source = fs.readFileSync(path.join(projectRoot, 'src', 'plugins-configure-ui.js'), 'utf8');
 
-    test('deleteSource clears encrypted settings when deleting a source', () => {
-      expect(source).toContain('deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, clearEncryptedSettings)');
-      expect(source).toContain('if (!deleteSource(pluginName, selectedSource.sourceName, plugin.settings))');
+    test('deleteSource uses the shared delete helper with a persist callback', () => {
+      expect(source).toContain('deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, {');
+      expect(source).toContain('persist: (nextConfig) => {');
+      expect(source).toContain('const result = deleteSource(pluginName, selectedSource.sourceName, plugin.settings);');
+    });
+
+    test('delete confirmation reports orphaned secrets after a successful persist', () => {
+      expect(source).toContain("result.stage === 'clear'");
+      expect(source).toContain('secret may be left behind:');
+      expect(source).toContain('Check .env.');
     });
   });
 });
