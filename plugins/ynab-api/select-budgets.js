@@ -55,7 +55,10 @@ function parseRules(value) {
   };
 
   if (raw.includes('\n')) {
-    return raw.split(/\r?\n/).flatMap(parseRuleLine);
+    return raw
+      .split(/\r?\n/)
+      .map(line => line.trim().replace(/,+$/, '').trim())
+      .filter(Boolean);
   }
 
   return parseRuleLine(raw);

@@ -62,7 +62,7 @@ describe('selectBudgets', () => {
 
     test('supports newline-separated rules for names that contain commas', () => {
       const { selected } = selectBudgets([SHARED, CURRENT, FUTURE], {
-        excludeBudgetIds: `"${SHARED.name}"\n${FUTURE.name}`
+        excludeBudgetIds: `${SHARED.name}\n${FUTURE.name}`
       });
       expect(selected).toEqual([CURRENT]);
     });
