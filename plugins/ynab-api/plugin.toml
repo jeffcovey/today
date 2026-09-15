@@ -1,0 +1,67 @@
+# YNAB API Finance Plugin
+# Syncs transaction data from the YNAB API with delta sync (server_knowledge)
+
+name = "ynab-api"
+displayName = "YNAB API"
+description = "Financial transaction data from the YNAB API (live sync)"
+type = "finance"
+
+longDescription = """
+Syncs financial transactions directly from the YNAB API using delta sync.
+Works alongside the ynab-finance (CSV export) plugin — they use different
+source identifiers so their data coexists in the same table without conflicts.
+
+Setup:
+1. Go to https://app.ynab.com/settings/developer and create a Personal Access Token
+2. Run: bin/plugins configure ynab-api
+3. Enter your Personal Access Token when prompted
+4. Run: bin/plugins sync ynab-api
+
+How it works:
+- On first sync, all transactions for each budget are fetched
+- On subsequent syncs, only changed records are fetched via YNAB's server_knowledge
+  delta mechanism — fast, low-bandwidth incremental updates
+- Deleted transactions from YNAB are removed from the local database automatically
+- Each transaction has a stable YNAB UUID, so duplicate-free INSERT OR REPLACE
+  reconciliation works across syncs with no collision risk
+
+Each transaction is stored with source = 'ynab-api/<source-name>', keeping it
+separate from any CSV-export data (source = 'ynab-finance/<source-name>').
+"""
+
+aiInstructions = """
+YNAB API data is in the financial_transactions table with source LIKE 'ynab-api/%'.
+
+Transaction amounts: negative for expenses (outflows), positive for income (inflows).
+Categories are organized into category_group / category (e.g., "Housing" / "Rent").
+The metadata JSON includes budget_id, budget_name, ynab_id, import_id, and approved.
+
+Recent spending:
+  SELECT payee, category, amount, date FROM financial_transactions
+  WHERE source LIKE 'ynab-api/%' AND amount < 0
+    AND date > DATE('now', '-30 days')
+  ORDER BY amount ASC LIMIT 20
+
+Uncategorized transactions (needs attention):
+  SELECT date, payee, amount, account FROM financial_transactions
+  WHERE source LIKE 'ynab-api/%' AND (category IS NULL OR category = '')
+  ORDER BY date DESC
+
+Spending by category this month:
+  SELECT category_group, category, SUM(amount) as total
+  FROM financial_transactions
+  WHERE source LIKE 'ynab-api/%' AND amount < 0
+    AND date >= DATE('now', 'start of month')
+  GROUP BY category_group, category
+  ORDER BY total ASC
+
+Commands: bin/finance recent, bin/finance summary, bin/finance categories, bin/finance accounts
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+api_token = { type = "string", default = "", description = "YNAB Personal Access Token (from app.ynab.com/settings/developer)", encrypted = true }
+budget_ids = { type = "string", default = "", description = "Comma-separated YNAB budget IDs to sync (leave blank to sync all budgets)" }
+retention_days = { type = "number", default = 365, description = "Days of transaction history to keep in the database" }
