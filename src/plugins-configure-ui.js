@@ -18,7 +18,13 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { schemas } from './plugin-schemas.js';
 import { getConfigPath } from './config.js';
-import { getEncryptedEnvVarName, getEnvVar, setEnvVar, hasEnvVar } from './encrypted-settings.js';
+import {
+  getEncryptedEnvVarName,
+  getEnvVar,
+  setEnvVar,
+  hasEnvVar,
+  clearEncryptedSettings
+} from './encrypted-settings.js';
 
 const html = htm.bind(React.createElement);
 
@@ -105,9 +111,10 @@ function toggleSource(pluginName, sourceName, enabled) {
   writeConfig(config);
 }
 
-function deleteSource(pluginName, sourceName) {
+function deleteSource(pluginName, sourceName, pluginSettings) {
   const config = readConfig();
   if (config.plugins?.[pluginName]?.[sourceName]) {
+    clearEncryptedSettings(pluginName, sourceName, pluginSettings);
     delete config.plugins[pluginName][sourceName];
     if (Object.keys(config.plugins[pluginName]).length === 0) {
       delete config.plugins[pluginName];
@@ -627,7 +634,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         <${Box} marginTop=${1}>
           <${ConfirmInput}
             onConfirm=${() => {
-              deleteSource(pluginName, selectedSource.sourceName);
+              deleteSource(pluginName, selectedSource.sourceName, plugin.settings);
               refreshSources();
               setSelectedIndex(Math.max(0, selectedIndex - 1));
               setMode('list');

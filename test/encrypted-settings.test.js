@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   getEncryptedEnvVarName,
+  getEncryptedEnvVarNames,
   stripEncryptedSettings
 } from '../src/encrypted-settings.js';
 
@@ -74,6 +75,19 @@ describe('encrypted settings', () => {
     });
   });
 
+  describe('getEncryptedEnvVarNames', () => {
+    test('lists only encrypted setting env vars for a source', () => {
+      expect(getEncryptedEnvVarNames('ynab-api', 'default', {
+        api_token: { encrypted: true },
+        budget_id: { encrypted: false },
+        password: { encrypted: true }
+      })).toEqual([
+        'TODAY_YNAB_API_DEFAULT_API_TOKEN',
+        'TODAY_YNAB_API_DEFAULT_PASSWORD'
+      ]);
+    });
+  });
+
   describe('bin/plugins prompt paths', () => {
     // The original bug: addSource/editSource looped over plugin.settings with no
     // awareness of `encrypted`, so secrets went straight into the config file.
@@ -94,6 +108,10 @@ describe('encrypted settings', () => {
       expect(bodyOf(fn)).toContain('stripEncryptedSettings');
     });
 
+    test.each(['addSource', 'editSource'])('%s rolls back encrypted writes when later prompts abort', (fn) => {
+      expect(bodyOf(fn)).toContain('rollbackEncryptedSettingChanges');
+    });
+
     test('every saveSourceConfig call is guarded by stripEncryptedSettings', () => {
       const calls = source.split('\n').filter(
         l => l.includes('saveSourceConfig(') && !l.includes('function saveSourceConfig')
@@ -102,6 +120,18 @@ describe('encrypted settings', () => {
       for (const call of calls) {
         expect(call).toContain('stripEncryptedSettings');
       }
+    });
+
+    test('removeSource clears encrypted settings when deleting a source', () => {
+      expect(bodyOf('removeSource')).toContain('clearEncryptedSettings');
+    });
+  });
+
+  describe('plugins-configure-ui delete path', () => {
+    const source = fs.readFileSync(path.join(projectRoot, 'src', 'plugins-configure-ui.js'), 'utf8');
+
+    test('deleteSource clears encrypted settings when deleting a source', () => {
+      expect(source).toContain('clearEncryptedSettings(pluginName, sourceName, pluginSettings)');
     });
   });
 });

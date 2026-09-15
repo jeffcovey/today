@@ -68,6 +68,11 @@ export function hasEnvVar(key) {
   return getEnvVar(key) !== null;
 }
 
+/** Clear an env var's effective value while keeping the encrypted file valid. */
+export function clearEnvVar(key) {
+  return setEnvVar(key, '');
+}
+
 /**
  * Strip every `encrypted = true` setting out of a source config object.
  *
@@ -83,4 +88,21 @@ export function stripEncryptedSettings(pluginSettings, sourceConfig) {
     }
   }
   return cleaned;
+}
+
+/** List env vars that back a plugin source's encrypted settings. */
+export function getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings) {
+  const names = [];
+  for (const [key, def] of Object.entries(pluginSettings || {})) {
+    if (def?.encrypted) {
+      names.push(getEncryptedEnvVarName(pluginName, sourceName, key));
+    }
+  }
+  return names;
+}
+
+/** Clear all encrypted settings for a plugin source so old secrets cannot be reused. */
+export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
+  return getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings)
+    .every(envVarName => clearEnvVar(envVarName));
 }

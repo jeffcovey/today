@@ -13,8 +13,10 @@ import { colors } from '../src/cli-utils.js';
 import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
 import {
   getEncryptedEnvVarName,
+  getEnvVar,
   setEnvVar,
-  hasEnvVar,
+  clearEnvVar,
+  clearEncryptedSettings,
   stripEncryptedSettings
 } from '../src/encrypted-settings.js';
 import {
@@ -696,7 +698,7 @@ async function configurePlugin(plugin, pluginName) {
     } else if (action === 'edit') {
       await editSource(plugin, pluginName, allConfiguredSources);
     } else if (action === 'remove') {
-      await removeSource(pluginName, allConfiguredSources);
+      await removeSource(plugin, pluginName, allConfiguredSources);
     }
   }
 }
@@ -743,15 +745,19 @@ async function addSource(plugin, pluginName, existingSources) {
 
   // Collect settings
   const sourceConfig = { enabled: true };
+  const encryptedSettingBackups = new Map();
 
   if (plugin.settings) {
     p.log.info(colors.cyan('Configure plugin settings:'));
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
       if (schema.encrypted) {
-        const ok = await promptForEncryptedSetting(pluginName, sourceName, key, schema);
-        if (p.isCancel(ok)) {
-          p.cancel('Cancelled');
+        const ok = await promptForEncryptedSetting(pluginName, sourceName, key, schema, encryptedSettingBackups);
+        if (ok !== true) {
+          rollbackEncryptedSettingChanges(encryptedSettingBackups);
+          if (p.isCancel(ok)) {
+            p.cancel('Cancelled');
+          }
           return;
         }
         continue; // never stored in the config file
@@ -759,6 +765,7 @@ async function addSource(plugin, pluginName, existingSources) {
 
       const value = await promptForSetting(key, schema, schema.default);
       if (p.isCancel(value)) {
+        rollbackEncryptedSettingChanges(encryptedSettingBackups);
         p.cancel('Cancelled');
         return;
       }
@@ -805,6 +812,7 @@ async function editSource(plugin, pluginName, allSources) {
   if (p.isCancel(enabled)) return;
 
   const sourceConfig = { enabled };
+  const encryptedSettingBackups = new Map();
 
   // Edit settings
   if (plugin.settings) {
@@ -812,9 +820,12 @@ async function editSource(plugin, pluginName, allSources) {
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
       if (schema.encrypted) {
-        const ok = await promptForEncryptedSetting(pluginName, sourceToEdit, key, schema);
-        if (p.isCancel(ok)) {
-          p.cancel('Cancelled');
+        const ok = await promptForEncryptedSetting(pluginName, sourceToEdit, key, schema, encryptedSettingBackups);
+        if (ok !== true) {
+          rollbackEncryptedSettingChanges(encryptedSettingBackups);
+          if (p.isCancel(ok)) {
+            p.cancel('Cancelled');
+          }
           return;
         }
         continue; // never stored in the config file
@@ -823,6 +834,7 @@ async function editSource(plugin, pluginName, allSources) {
       const currentValue = currentConfig[key] ?? schema.default;
       const value = await promptForSetting(key, schema, currentValue);
       if (p.isCancel(value)) {
+        rollbackEncryptedSettingChanges(encryptedSettingBackups);
         p.cancel('Cancelled');
         return;
       }
@@ -861,7 +873,17 @@ async function editSource(plugin, pluginName, allSources) {
   s.stop(colors.green(`✓ Updated "${sourceToEdit}"`));
 }
 
-async function removeSource(pluginName, allSources) {
+function rollbackEncryptedSettingChanges(encryptedSettingBackups) {
+  for (const [envVarName, previousValue] of encryptedSettingBackups.entries()) {
+    if (previousValue === null) {
+      clearEnvVar(envVarName);
+    } else {
+      setEnvVar(envVarName, previousValue);
+    }
+  }
+}
+
+async function removeSource(plugin, pluginName, allSources) {
   let sourceToRemove;
 
   if (allSources.length === 1) {
@@ -890,6 +912,7 @@ async function removeSource(pluginName, allSources) {
 
   const s = p.spinner();
   s.start('Removing source');
+  clearEncryptedSettings(pluginName, sourceToRemove, plugin.settings);
   deleteSourceConfig(pluginName, sourceToRemove);
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));
 }
@@ -903,9 +926,10 @@ async function removeSource(pluginName, allSources) {
  *
  * @returns {boolean|symbol} true on success, or a clack cancel symbol
  */
-async function promptForEncryptedSetting(pluginName, sourceName, key, schema) {
+async function promptForEncryptedSetting(pluginName, sourceName, key, schema, encryptedSettingBackups = new Map()) {
   const envVarName = getEncryptedEnvVarName(pluginName, sourceName, key);
-  const alreadySet = hasEnvVar(envVarName);
+  const existingValue = getEnvVar(envVarName);
+  const alreadySet = existingValue !== null;
 
   const value = await p.password({
     message: `${schema.description || key} ${colors.dim('[encrypted]')}`,
@@ -924,13 +948,17 @@ async function promptForEncryptedSetting(pluginName, sourceName, key, schema) {
     return true;
   }
 
-  if (setEnvVar(envVarName, value)) {
-    p.log.success(colors.dim(`  ${key}: encrypted to .env as ${envVarName}`));
-  } else {
-    p.log.error(`  ${key}: failed to encrypt — not saved`);
+  if (!encryptedSettingBackups.has(envVarName)) {
+    encryptedSettingBackups.set(envVarName, existingValue);
   }
 
-  return true;
+  if (setEnvVar(envVarName, value)) {
+    p.log.success(colors.dim(`  ${key}: encrypted to .env as ${envVarName}`));
+    return true;
+  } else {
+    p.log.error(`  ${key}: failed to encrypt — not saved`);
+    return false;
+  }
 }
 
 // Helper to prompt for a single setting based on schema
