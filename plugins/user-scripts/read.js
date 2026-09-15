@@ -17,6 +17,8 @@ import { spawnSync } from 'child_process';
 const config   = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const contextOnly = process.env.CONTEXT_ONLY === 'true';
+const vaultPath = resolve(projectRoot, process.env.VAULT_PATH || 'vault');
+const defaultScriptsDirectory = join(process.env.VAULT_PATH || 'vault', 'scripts', 'user-scripts');
 
 // Skip during AI context gathering
 if (contextOnly) {
@@ -24,7 +26,7 @@ if (contextOnly) {
   process.exit(0);
 }
 
-const scriptsDir = resolve(projectRoot, config.scripts_directory || 'vault/scripts/user-scripts');
+const scriptsDir = resolve(projectRoot, config.scripts_directory || defaultScriptsDirectory);
 const timeoutMs  = (config.timeout_seconds || 30) * 1000;
 
 if (!existsSync(scriptsDir)) {
@@ -32,7 +34,7 @@ if (!existsSync(scriptsDir)) {
     ran: 0,
     failed: 0,
     scripts: [],
-    message: `Scripts directory not found: ${config.scripts_directory || 'vault/scripts/user-scripts'}`
+    message: `Scripts directory not found: ${config.scripts_directory || defaultScriptsDirectory}`
   }));
   process.exit(0);
 }
@@ -51,7 +53,7 @@ if (entries.length === 0) {
 const childEnv = {
   ...process.env,
   PROJECT_ROOT:    projectRoot,
-  VAULT_PATH:      resolve(projectRoot, 'vault'),
+  VAULT_PATH:      vaultPath,
   LAST_SYNC_TIME:  process.env.LAST_SYNC_TIME || '',
   SOURCE_ID:       process.env.SOURCE_ID || 'user-scripts/default',
 };
