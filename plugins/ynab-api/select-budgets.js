@@ -58,6 +58,10 @@ function parseRules(value) {
     return raw
       .split(/\r?\n/)
       .map(line => line.trim().replace(/,+$/, '').trim())
+      .flatMap(line => {
+        const parsed = parseRuleLine(line);
+        return parsed.length === 1 ? parsed : [line];
+      })
       .filter(Boolean);
   }
 

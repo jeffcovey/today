@@ -67,6 +67,13 @@ describe('selectBudgets', () => {
       expect(selected).toEqual([CURRENT]);
     });
 
+    test('still unquotes a quoted comma-containing rule on its own line', () => {
+      const { selected } = selectBudgets([SHARED, CURRENT], {
+        excludeBudgetIds: `"${SHARED.name}"\n${CURRENT.name}`
+      });
+      expect(selected).toEqual([]);
+    });
+
     test('accepts comma-newline separators without leaving trailing commas in rules', () => {
       const { selected } = selectBudgets([ARCHIVED, CURRENT], {
         excludeBudgetIds: `${ARCHIVED.id},\n${CURRENT.id}`
