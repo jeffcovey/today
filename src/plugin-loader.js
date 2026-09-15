@@ -8,6 +8,7 @@ import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
 import { getEncryptedEnvVarName } from './encrypted-settings.js';
+import { reconcileFinanceSources } from './finance-reconcile.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
@@ -932,6 +933,19 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
   updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
 
+  // Reconcile finance sources against each other. Runs after any finance sync
+  // because a change on one side can make rows on another side redundant, and
+  // it is cheap and idempotent — it recomputes from scratch each time (#479).
+  let reconcileReport = null;
+  if (plugin.type === 'finance') {
+    try {
+      reconcileReport = reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
+    } catch (error) {
+      // Reconciliation is a reporting refinement; never fail a sync over it
+      console.error(`Warning: finance reconciliation failed: ${error.message}`);
+    }
+  }
+
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
   const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
@@ -1112,6 +1126,10 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // FULL mode waits for readers to finish, ensuring consistency without truncating WAL
   db.pragma('wal_checkpoint(FULL)');
 
+  const reconcileMsg = reconcileReport && (reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled) > 0
+    ? `\n    Superseded ${reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled} duplicate row(s) from lower-precedence sources` +
+      ` (key: ${reconcileReport.by_key}, window: ${reconcileReport.by_window}, scheduled: ${reconcileReport.by_scheduled})`
+    : '';
   const incrementalMsg = isIncremental ? ' (incremental)' : '';
   const archiveMsg = archiveResult?.archived ? `, archived ${archiveResult.archived}` : '';
   const rebalanceMsg = archiveResult?.rebalanced ? `, rebalanced` : '';
@@ -1125,7 +1143,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 
