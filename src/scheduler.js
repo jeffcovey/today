@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getTimezone, getConfig } from './config.js';
 import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
+import { formatCommandFailure } from './scheduler-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -205,7 +206,7 @@ async function runCommand(command, description) {
       console.error(stderr);
     }
   } catch (error) {
-    console.error(`❌ ${description} failed:`, error.message);
+    console.error(`❌ ${description} failed: ${formatCommandFailure(error)}`);
   }
 }
 
