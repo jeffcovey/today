@@ -145,6 +145,7 @@ async function main() {
     budgetIds: budgetIdsConfig,
     excludeBudgetIds: excludeBudgetIdsConfig
   });
+  const droppedBudgets = [...excluded, ...skippedByAllowlist];
 
   // A rule that matches nothing usually means a typo or a renamed budget. Say so
   // loudly — a denylist is only trustworthy if its misses are visible.
@@ -155,10 +156,17 @@ async function main() {
     console.error(`Warning: budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`);
   }
 
+  // Budgets filtered out of the sync should not keep stale delta-sync state.
+  for (const b of droppedBudgets) {
+    if (state.budgets[b.id]) delete state.budgets[b.id];
+  }
+  if (allBudgets.length === 0) state.budgets = {};
+
   if (budgets.length === 0) {
     const hint = allBudgets.length === 0
       ? 'Your YNAB account has no budgets'
       : `All ${allBudgets.length} budget(s) were filtered out by budget_ids/exclude_budget_ids`;
+    saveState(state);
     console.log(JSON.stringify({
       entries: [],
       metadata: {
@@ -170,13 +178,6 @@ async function main() {
       }
     }));
     process.exit(0);
-  }
-
-  // Drop rows and delta state for budgets that are no longer synced, so
-  // un-excluding later re-fetches cleanly instead of merging onto stale data.
-  const droppedBudgets = [...excluded, ...skippedByAllowlist];
-  for (const b of droppedBudgets) {
-    if (state.budgets[b.id]) delete state.budgets[b.id];
   }
 
   const cutoffDate = new Date();
