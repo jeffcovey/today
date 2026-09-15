@@ -85,6 +85,16 @@ describe('Plan Utils', () => {
       expect(components.day).toBe(1);
       expect(components.quarter).toBe('Q1');
     });
+
+    test('should preserve numeric component types', () => {
+      const components = getDateComponents(new Date(2025, 0, 6));
+
+      expect(typeof components.year).toBe('number');
+      expect(typeof components.month).toBe('number');
+      expect(typeof components.day).toBe('number');
+      expect(typeof components.week).toBe('number');
+      expect(typeof components.quarter).toBe('string');
+    });
   });
 
   describe('STAGE_MAPPING', () => {
