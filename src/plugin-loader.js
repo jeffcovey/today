@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
 import { validateEntries, getTableName, schemas, getStaleMinutes } from './plugin-schemas.js';
+import { getEncryptedEnvVarName } from './encrypted-settings.js';
 import { runAutoTagger, createFileBasedUpdater } from './auto-tagger.js';
 import { execGroup, installProcessGroupShutdownHandlers } from './process-group.js';
 
@@ -28,15 +29,6 @@ const refreshedEnvVarMtimes = new Map();
 // ============================================================================
 // Encrypted settings helpers
 // ============================================================================
-
-/**
- * Generate a unique environment variable name for encrypted settings
- * Must match the formula in plugins-configure-ui.js
- */
-function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
-  const sanitize = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
-}
 
 function getEnvFileMtimeMs() {
   try {

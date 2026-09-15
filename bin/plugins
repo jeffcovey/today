@@ -12,6 +12,12 @@ import * as p from '@clack/prompts';
 import { colors } from '../src/cli-utils.js';
 import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
 import {
+  getEncryptedEnvVarName,
+  setEnvVar,
+  hasEnvVar,
+  stripEncryptedSettings
+} from '../src/encrypted-settings.js';
+import {
   discoverPlugins,
   getPluginSources,
   getEnabledPlugins,
@@ -742,6 +748,15 @@ async function addSource(plugin, pluginName, existingSources) {
     p.log.info(colors.cyan('Configure plugin settings:'));
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
+      if (schema.encrypted) {
+        const ok = await promptForEncryptedSetting(pluginName, sourceName, key, schema);
+        if (p.isCancel(ok)) {
+          p.cancel('Cancelled');
+          return;
+        }
+        continue; // never stored in the config file
+      }
+
       const value = await promptForSetting(key, schema, schema.default);
       if (p.isCancel(value)) {
         p.cancel('Cancelled');
@@ -756,7 +771,7 @@ async function addSource(plugin, pluginName, existingSources) {
   // Save
   const s = p.spinner();
   s.start('Saving configuration');
-  saveSourceConfig(pluginName, sourceName, sourceConfig);
+  saveSourceConfig(pluginName, sourceName, stripEncryptedSettings(plugin.settings, sourceConfig));
   s.stop(colors.green(`✓ Added source "${sourceName}"`));
 }
 
@@ -796,6 +811,15 @@ async function editSource(plugin, pluginName, allSources) {
     p.log.info(colors.cyan('Configure plugin settings:'));
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
+      if (schema.encrypted) {
+        const ok = await promptForEncryptedSetting(pluginName, sourceToEdit, key, schema);
+        if (p.isCancel(ok)) {
+          p.cancel('Cancelled');
+          return;
+        }
+        continue; // never stored in the config file
+      }
+
       const currentValue = currentConfig[key] ?? schema.default;
       const value = await promptForSetting(key, schema, currentValue);
       if (p.isCancel(value)) {
@@ -833,7 +857,7 @@ async function editSource(plugin, pluginName, allSources) {
   // Save
   const s = p.spinner();
   s.start('Saving changes');
-  saveSourceConfig(pluginName, sourceToEdit, sourceConfig);
+  saveSourceConfig(pluginName, sourceToEdit, stripEncryptedSettings(plugin.settings, sourceConfig));
   s.stop(colors.green(`✓ Updated "${sourceToEdit}"`));
 }
 
@@ -868,6 +892,45 @@ async function removeSource(pluginName, allSources) {
   s.start('Removing source');
   deleteSourceConfig(pluginName, sourceToRemove);
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));
+}
+
+/**
+ * Prompt for a setting declared `encrypted = true`.
+ *
+ * The value is written straight to the encrypted .env and deliberately never
+ * returned to the caller, so it cannot reach the config file (issue #470).
+ * Submitting an empty answer keeps whatever is already stored.
+ *
+ * @returns {boolean|symbol} true on success, or a clack cancel symbol
+ */
+async function promptForEncryptedSetting(pluginName, sourceName, key, schema) {
+  const envVarName = getEncryptedEnvVarName(pluginName, sourceName, key);
+  const alreadySet = hasEnvVar(envVarName);
+
+  const value = await p.password({
+    message: `${schema.description || key} ${colors.dim('[encrypted]')}`,
+    validate: (v) => {
+      if (!v && !alreadySet && schema.required) return 'This value is required';
+    }
+  });
+
+  if (p.isCancel(value)) return value;
+
+  // Empty input keeps the existing secret rather than clobbering it
+  if (!value) {
+    if (!alreadySet) {
+      p.log.warn(colors.dim(`  ${key}: not set`));
+    }
+    return true;
+  }
+
+  if (setEnvVar(envVarName, value)) {
+    p.log.success(colors.dim(`  ${key}: encrypted to .env as ${envVarName}`));
+  } else {
+    p.log.error(`  ${key}: failed to encrypt — not saved`);
+  }
+
+  return true;
 }
 
 // Helper to prompt for a single setting based on schema

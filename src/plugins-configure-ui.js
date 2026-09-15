@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { schemas } from './plugin-schemas.js';
 import { getConfigPath } from './config.js';
+import { getEncryptedEnvVarName, getEnvVar, setEnvVar, hasEnvVar } from './encrypted-settings.js';
 
 const html = htm.bind(React.createElement);
 
@@ -31,63 +32,6 @@ const ENV_PATH = path.join(projectRoot, '.env');
 // Environment variable helpers (using dotenvx for encryption)
 // ============================================================================
 
-/**
- * Get an environment variable value (decrypted if encrypted)
- * @param {string} key - Environment variable name
- * @returns {string|null} - Decrypted value or null if not set
- */
-function getEnvVar(key) {
-  try {
-    const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    }).trim();
-    return result || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Set an environment variable (always encrypted)
- * Creates .env file if it doesn't exist
- * dotenvx automatically creates .env.keys on first encryption
- * @param {string} key - Environment variable name
- * @param {string} value - Value to set
- * @returns {boolean} - True if successful
- */
-function setEnvVar(key, value) {
-  // Create .env if it doesn't exist
-  if (!fs.existsSync(ENV_PATH)) {
-    fs.writeFileSync(ENV_PATH, '# Environment variables for Today\n\n');
-  }
-
-  // Escape the value for shell
-  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-
-  try {
-    // dotenvx set encrypts by default and creates .env.keys if needed
-    execSync(`npx dotenvx set ${key} "${escapedValue}"`, {
-      cwd: projectRoot,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return true;
-  } catch (error) {
-    // Log error for debugging
-    console.error(`Failed to set ${key}:`, error.message);
-    return false;
-  }
-}
-
-/**
- * Check if an environment variable is set
- * @param {string} key - Environment variable name
- * @returns {boolean}
- */
-function hasEnvVar(key) {
-  return getEnvVar(key) !== null;
-}
 
 // ============================================================================
 // Editor helper for multi-line fields
@@ -321,17 +265,6 @@ function buildSourceList(pluginName, plugin) {
 // Edit source dialog
 // ============================================================================
 
-/**
- * Generate a unique environment variable name for encrypted settings
- * @param {string} pluginName - Plugin name (e.g., "imap-email")
- * @param {string} sourceName - Source name (e.g., "personal")
- * @param {string} settingKey - Setting key (e.g., "password")
- * @returns {string} Environment variable name (e.g., "TODAY_IMAP_EMAIL_PERSONAL_PASSWORD")
- */
-function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
-  const sanitize = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
-}
 
 function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor, onEncryptedSave }) {
   const [fieldIndex, setFieldIndex] = useState(0);
