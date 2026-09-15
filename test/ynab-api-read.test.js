@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,14 @@ describe('ynab-api read plugin', () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  function createDbWithRows(rows) {
+    const db = new Database(path.join(tempRoot, '.data', 'today.db'));
+    db.exec('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, source TEXT)');
+    const insert = db.prepare('INSERT INTO financial_transactions (id, source) VALUES (?, ?)');
+    for (const row of rows) insert.run(row.id, row.source);
+    db.close();
+  }
+
   test('clears stale budget state when every budget is filtered out', () => {
     const statePath = path.join(tempRoot, '.data', 'ynab-api-test-state.json');
     fs.writeFileSync(statePath, JSON.stringify({
@@ -94,5 +103,27 @@ describe('ynab-api read plugin', () => {
         'exclude_budget_ids entry "Budget That Does Not Exist" matched no budget — check for a typo or a renamed budget'
       ]
     });
+  });
+
+  test('purges persisted rows when every budget is excluded', () => {
+    createDbWithRows([
+      { id: `ynab-api/test:${ARCHIVED.id}:old-1`, source: 'ynab-api/test' },
+      { id: `ynab-api/test:${CURRENT.id}:old-2`, source: 'ynab-api/test' },
+      { id: `other-source:${CURRENT.id}:keep`, source: 'other-source' }
+    ]);
+
+    const run = runReadPlugin(
+      tempRoot,
+      createFetchMock(tempRoot, [ARCHIVED, CURRENT]),
+      { exclude_budget_ids: `${ARCHIVED.id},${CURRENT.id}` }
+    );
+
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout).metadata.rows_purged).toBe(2);
+
+    const db = new Database(path.join(tempRoot, '.data', 'today.db'), { readonly: true });
+    const rows = db.prepare('SELECT id, source FROM financial_transactions ORDER BY id').all();
+    db.close();
+    expect(rows).toEqual([{ id: `other-source:${CURRENT.id}:keep`, source: 'other-source' }]);
   });
 });

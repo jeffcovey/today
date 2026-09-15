@@ -478,6 +478,38 @@ console.log(JSON.stringify({
         expect(result.message).toContain('All budgets were filtered out');
         expect(result.message).toContain('simulated warning');
       });
+
+      test('refreshes entries_count when a plugin reports rows_purged on an empty incremental sync', async () => {
+        const readPath = path.join(pluginDir, 'read.js');
+        fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+    entries: [],
+    files_processed: [],
+    incremental: true,
+    metadata: {
+      rows_purged: 2
+    }
+}));
+`);
+        fs.chmodSync(readPath, 0o755);
+
+        const db = new Database(':memory:');
+        db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+        db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+        const sourceId = 'warning-stub/default';
+        db.prepare(`INSERT INTO tasks (id, source, title, status) VALUES (?, ?, ?, 'open')`)
+          .run(`${sourceId}:1`, sourceId, 'kept task');
+        db.prepare(`INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count) VALUES (?, datetime('now'), '[]', 3)`)
+          .run(sourceId);
+
+        const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('Removed 2 row(s) for plugin-managed deletions');
+        expect(
+          db.prepare(`SELECT entries_count FROM sync_metadata WHERE source = ?`).get(sourceId).entries_count
+        ).toBe(1);
+      });
     });
 
     afterAll(() => {

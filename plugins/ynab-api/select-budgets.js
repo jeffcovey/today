@@ -24,14 +24,21 @@ function parseRules(value, budgets = []) {
   if (!raw) return [];
 
   const parseRuleLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+
+    if (!trimmed.includes('"') && budgets.some(b => matches(b, trimmed))) {
+      return [trimmed];
+    }
+
     const rules = [];
     let current = '';
     let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+    for (let i = 0; i < trimmed.length; i++) {
+      const ch = trimmed[i];
       if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
+        if (inQuotes && trimmed[i + 1] === '"') {
           current += '"';
           i++;
         } else {

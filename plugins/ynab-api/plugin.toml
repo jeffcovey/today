@@ -27,8 +27,9 @@ Prefer this over budget_ids. An allowlist has the wrong failure mode: pin it to
 today's budget and a budget you create next year is silently omitted. With a
 denylist, new budgets are picked up automatically and only what you name is left
 out. budget_ids still works if you genuinely want a fixed set. Rules may be
-comma- or newline-separated; if a budget name itself contains a comma, wrap that
-rule in double quotes.
+comma- or newline-separated. Unquoted text that exactly matches a budget name is
+treated as one rule, and CSV-style double quotes remain available when you need
+to disambiguate.
 
 Every sync reports all_budgets (everything the account has) alongside what was
 synced and excluded, so a newly appearing budget is visible rather than absent.
@@ -82,6 +83,6 @@ read = "./read.js"
 
 [settings]
 api_token = { type = "string", default = "", description = "YNAB Personal Access Token (from app.ynab.com/settings/developer)", encrypted = true }
-budget_ids = { type = "string", default = "", description = "Only sync these budgets (comma- or newline-separated IDs or names; wrap names containing commas in double quotes; blank = all). Prefer exclude_budget_ids so new budgets are picked up automatically" }
-exclude_budget_ids = { type = "string", default = "", description = "Never sync these budgets (comma- or newline-separated IDs or names; wrap names containing commas in double quotes), e.g. an archived budget" }
+budget_ids = { type = "string", default = "", description = "Only sync these budgets (comma- or newline-separated IDs or names; exact budget-name matches are accepted before splitting, and CSV-style quotes can disambiguate; blank = all). Prefer exclude_budget_ids so new budgets are picked up automatically" }
+exclude_budget_ids = { type = "string", default = "", description = "Never sync these budgets (comma- or newline-separated IDs or names; exact budget-name matches are accepted before splitting, and CSV-style quotes can disambiguate), e.g. an archived budget" }
 retention_days = { type = "number", default = 365, description = "Days of transaction history to keep in the database" }

@@ -111,6 +111,41 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
   };
 }
 
+function removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) {
+  let purgedRows = 0;
+  if (toDelete.length === 0 && droppedBudgets.length === 0) return purgedRows;
+
+  let Database;
+  try {
+    Database = require('better-sqlite3');
+    const db = new Database(path.join(projectRoot, '.data', 'today.db'));
+
+    if (toDelete.length > 0) {
+      const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
+      db.transaction(ids => { for (const id of ids) del.run(id); })(toDelete);
+    }
+
+    // Entry ids are `${sourceId}:${budget_id}:${ynab_tx_id}` — see convertTransaction
+    if (droppedBudgets.length > 0) {
+      const purge = db.prepare(
+        "DELETE FROM financial_transactions WHERE source = ? AND id LIKE ? ESCAPE '\\'"
+      );
+      db.transaction(list => {
+        for (const b of list) {
+          const prefix = `${sourceId}:${b.id}:`.replace(/[\\%_]/g, c => `\\${c}`);
+          purgedRows += purge.run(sourceId, `${prefix}%`).changes;
+        }
+      })(droppedBudgets);
+    }
+
+    db.close();
+  } catch (err) {
+    console.error(`Warning: could not remove transactions: ${err.message}`);
+  }
+
+  return purgedRows;
+}
+
 // Early exit for context-only mode — data is already in the DB cache
 if (contextOnly) {
   console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true, metadata: { skipped: 'context-only' } }));
@@ -163,6 +198,7 @@ async function main() {
   if (allBudgets.length === 0) state.budgets = {};
 
   if (budgets.length === 0) {
+    const purgedRows = removeTransactions(projectRoot, sourceId, [], droppedBudgets);
     const hint = allBudgets.length === 0
       ? 'Your YNAB account has no budgets'
       : `All ${allBudgets.length} budget(s) were filtered out by budget_ids/exclude_budget_ids`;
@@ -176,7 +212,8 @@ async function main() {
         excluded,
         skipped_by_budget_ids: skippedByAllowlist,
         unmatched_rules: unmatched,
-        warnings
+        warnings,
+        rows_purged: purgedRows
       }
     }));
     process.exit(0);
@@ -233,36 +270,7 @@ async function main() {
   // flow doesn't handle row deletions; we do it here the same way ynab-finance
   // handles budget_allocations. Rows for dropped budgets go in the same pass, so
   // excluding a budget actually removes its data rather than stranding it.
-  let purgedRows = 0;
-  if (toDelete.length > 0 || droppedBudgets.length > 0) {
-    let Database;
-    try {
-      Database = require('better-sqlite3');
-      const db = new Database(path.join(projectRoot, '.data', 'today.db'));
-
-      if (toDelete.length > 0) {
-        const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
-        db.transaction(ids => { for (const id of ids) del.run(id); })(toDelete);
-      }
-
-      // Entry ids are `${sourceId}:${budget_id}:${ynab_tx_id}` — see convertTransaction
-      if (droppedBudgets.length > 0) {
-        const purge = db.prepare(
-          "DELETE FROM financial_transactions WHERE source = ? AND id LIKE ? ESCAPE '\\'"
-        );
-        db.transaction(list => {
-          for (const b of list) {
-            const prefix = `${sourceId}:${b.id}:`.replace(/[\\%_]/g, c => `\\${c}`);
-            purgedRows += purge.run(sourceId, `${prefix}%`).changes;
-          }
-        })(droppedBudgets);
-      }
-
-      db.close();
-    } catch (err) {
-      console.error(`Warning: could not remove transactions: ${err.message}`);
-    }
-  }
+  const purgedRows = removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets);
 
   if (purgedRows > 0) {
     console.error(`Removed ${purgedRows} row(s) belonging to ${droppedBudgets.length} excluded budget(s)`);
@@ -285,7 +293,7 @@ async function main() {
       skipped_by_budget_ids: skippedByAllowlist,
       unmatched_rules: unmatched,
       warnings,
-      rows_purged_for_dropped_budgets: purgedRows,
+      rows_purged: purgedRows,
       transactions_upserted: entries.length,
       transactions_deleted: toDelete.length,
       retention_days: retentionDays

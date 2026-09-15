@@ -882,7 +882,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   }
 
   const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
-  const pluginPurgedRows = Number(pluginMetadata?.rows_purged_for_dropped_budgets || 0);
+  const pluginPurgedRows = Number(pluginMetadata?.rows_purged || 0);
   const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
   const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
   const warningMsg = Array.isArray(pluginMetadata?.warnings) && pluginMetadata.warnings.length > 0
