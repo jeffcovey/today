@@ -60,6 +60,7 @@ program
   .option('--source <source>', 'Filter by plugin source')
   .option('--account <account>', 'Filter by account name')
   .option('--category <category>', 'Filter by category')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
@@ -67,12 +68,22 @@ program
     const days = parseInt(options.days);
     const limit = parseInt(options.limit);
 
+    // Upper bound matters: without it a "last N days" window also swept in every
+    // future-dated row, which is how scheduled entries dated months ahead ended up
+    // counted as recent spending (#477).
+    // Scheduled rows are future-dated by definition, so --scheduled has to lift the
+    // upper bound too or it would filter out exactly what it asks to include.
     let sql = `
-      SELECT date, account, payee, category, amount, memo, cleared
+      SELECT date, account, payee, category, amount, memo, cleared, scheduled
       FROM financial_transactions
       WHERE date >= DATE('now', '-${days} days')
+        AND superseded_by IS NULL
     `;
     const params = [];
+
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
 
     if (options.source) {
       sql += ` AND source LIKE ?`;
@@ -121,12 +132,71 @@ program
     console.log(getSyncStatusMessage(db, 'finance'));
   });
 
+// Upcoming command - scheduled/recurring transactions still ahead
+program
+  .command('upcoming')
+  .description('Show scheduled and recurring transactions coming up')
+  .option('-d, --days <days>', 'Look ahead this many days', '90')
+  .option('--source <source>', 'Filter by plugin source')
+  .action(async (options) => {
+    const db = getDatabase();
+    await ensureSyncForType(db, 'finance');
+
+    const days = parseInt(options.days);
+    let sql = `
+      SELECT date, account, payee, category, amount, memo, metadata
+      FROM financial_transactions
+      WHERE IFNULL(scheduled, 0) = 1
+        AND superseded_by IS NULL
+        AND date >= DATE('now')
+        AND date <= DATE('now', '+${days} days')
+    `;
+    const params = [];
+
+    if (options.source) {
+      sql += ` AND source LIKE ?`;
+      params.push(`%${options.source}%`);
+    }
+
+    sql += ` ORDER BY date ASC`;
+
+    const rows = db.prepare(sql).all(...params);
+
+    if (rows.length === 0) {
+      console.log(colors.blue('ℹ') + ` No scheduled transactions in the next ${days} days`);
+      console.log(getSyncStatusMessage(db, 'finance'));
+      return;
+    }
+
+    console.log('');
+    console.log(colors.cyan(`Upcoming Transactions (next ${days} days)`));
+    console.log('');
+
+    let total = 0;
+    for (const tx of rows) {
+      total += tx.amount;
+      let frequency = '';
+      try {
+        frequency = JSON.parse(tx.metadata || '{}').frequency || '';
+      } catch { /* metadata is optional */ }
+
+      const freqLabel = frequency ? colors.gray(` (${frequency})`) : '';
+      console.log(`  ${colors.gray(tx.date)} ${formatAmount(tx.amount).padEnd(12)} ${colors.blue(tx.account)}`);
+      console.log(`      ${tx.payee || ''}${tx.category ? ' ' + colors.yellow(tx.category) : ''}${freqLabel}`);
+    }
+
+    console.log('');
+    console.log(`  ${colors.bold('Total')}: ${formatAmount(total)} across ${rows.length} scheduled transaction(s)`);
+    console.log(getSyncStatusMessage(db, 'finance'));
+  });
+
 // Summary command - show financial summary
 program
   .command('summary')
   .description('Show financial summary by category and account')
   .option('-d, --days <days>', 'Number of days to analyze', '30')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
@@ -134,8 +204,14 @@ program
     const days = parseInt(options.days);
     const today = getTodayDate();
 
-    let whereClause = `WHERE date >= DATE('now', '-${days} days')`;
+    // See the note in `recent`: the window needs both ends, and scheduled rows are
+    // future obligations rather than spending that happened (#477).
+    let whereClause = `WHERE date >= DATE('now', '-${days} days') AND superseded_by IS NULL`;
     const params = [];
+
+    if (!options.scheduled) {
+      whereClause += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
 
     if (options.source) {
       whereClause += ` AND source LIKE ?`;
@@ -212,18 +288,27 @@ program
   .command('categories')
   .description('List all transaction categories')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // superseded_by is always filtered, so it is the base clause and everything
+    // else appends with AND — no rebuilding the query, and --scheduled cannot
+    // accidentally reintroduce rows a higher-precedence source already replaced.
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
       FROM financial_transactions
+      WHERE superseded_by IS NULL
     `;
     const params = [];
 
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
+
     if (options.source) {
-      sql += ` WHERE source LIKE ?`;
+      sql += ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 
@@ -267,19 +352,26 @@ program
   .command('accounts')
   .description('List all accounts')
   .option('--source <source>', 'Filter by plugin source')
+  .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
+    // Same shape as `categories`: superseded_by is the always-present base clause.
     let sql = `
       SELECT account, COUNT(*) as count, SUM(amount) as balance,
              MIN(date) as first_transaction, MAX(date) as last_transaction
       FROM financial_transactions
+      WHERE superseded_by IS NULL
     `;
     const params = [];
 
+    if (!options.scheduled) {
+      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
+    }
+
     if (options.source) {
-      sql += ` WHERE source LIKE ?`;
+      sql += ` AND source LIKE ?`;
       params.push(`%${options.source}%`);
     }
 

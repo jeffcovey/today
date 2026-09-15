@@ -650,4 +650,65 @@ console.log(JSON.stringify({
       fs.rmSync(fullPluginDir, { recursive: true, force: true });
     });
   });
+
+  describe('finance reconciliation timing', () => {
+    let pluginDir;
+    let plugin;
+
+    beforeAll(() => {
+      pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'finance-stub-'));
+      const readPath = path.join(pluginDir, 'read.js');
+      fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+  entries: [{
+    id: 'csv-1',
+    date: '2026-05-01',
+    account: 'Checking',
+    payee: 'Disney+',
+    amount: -14.93,
+    metadata: JSON.stringify({ source_file: 'Household as of 2026-05-02 12-00 - Register.csv' })
+  }],
+  files_processed: ['vault/logs/Household as of 2026-05-02 12-00 - Register.csv'],
+  incremental: true
+}));
+`);
+      fs.chmodSync(readPath, 0o755);
+      plugin = {
+        name: 'ynab-finance',
+        type: 'finance',
+        _path: pluginDir,
+        commands: { read: 'read.js' }
+      };
+    });
+
+    afterAll(() => {
+      fs.rmSync(pluginDir, { recursive: true, force: true });
+    });
+
+    test('new finance rows are reconciled after insert in the same sync', async () => {
+      const db = new Database(':memory:');
+      db.exec(`CREATE TABLE financial_transactions (${getSqlColumns('finance')})`);
+      db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+      db.prepare(`INSERT INTO financial_transactions
+        (id, source, date, account, payee, amount, scheduled, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?)`)
+        .run(
+          'api-1',
+          'ynab-api/personal',
+          '2026-05-01',
+          'Checking',
+          'Disney+',
+          -14.93,
+          JSON.stringify({ budget_name: 'Household' })
+        );
+
+      const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, { _caller: 'test' });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Superseded 1 duplicate row');
+      expect(
+        db.prepare(`SELECT superseded_by FROM financial_transactions WHERE source = 'ynab-finance/default'`).get().superseded_by
+      ).toBe('api-1');
+    });
+  });
 });
