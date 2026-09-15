@@ -385,6 +385,29 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
 
       expect(ids(db)).toEqual([`${sourceId}:vault/axb.md:1`]);
     });
+
+    test('escapes LIKE wildcards when replacing processed-file rows', async () => {
+      const db = makeTasksDb();
+      insertTask(db, 'vault/a_b_exists.md:1', 'old title'); // updated target
+      insertTask(db, 'vault/axb_exists.md:1', 'lookalike'); // must NOT be deleted
+
+      const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
+        fileFilter: 'vault/a_b_exists.md',
+        _caller: 'test'
+      });
+
+      expect(result.success).toBe(true);
+      expect(ids(db)).toEqual([
+        `${sourceId}:vault/a_b_exists.md:1`,
+        `${sourceId}:vault/axb_exists.md:1`
+      ]);
+      expect(
+        db.prepare(`SELECT title FROM tasks WHERE id = ?`).get(`${sourceId}:vault/a_b_exists.md:1`).title
+      ).toBe('kept task');
+      expect(
+        db.prepare(`SELECT title FROM tasks WHERE id = ?`).get(`${sourceId}:vault/axb_exists.md:1`).title
+      ).toBe('lookalike');
+    });
   });
 
   describe('data.error surfacing', () => {

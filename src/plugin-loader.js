@@ -1174,9 +1174,10 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
       // For file-based plugins, delete entries from re-processed files before re-inserting
       // This handles line number shifts when files are edited
-      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
+      const escapeLike = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ? ESCAPE '\\'`);
       for (const file of filesProcessed) {
-        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
+        deleteStmt.run(sourceId, `${sourceId}:${escapeLike(file)}:%`);
       }
     } else if (!filesProcessed || pluginType === 'events') {
       // Full sync: delete all entries for this source
