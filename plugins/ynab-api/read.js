@@ -122,7 +122,9 @@ function removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) {
 
     if (toDelete.length > 0) {
       const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
-      db.transaction(ids => { for (const id of ids) del.run(id); })(toDelete);
+      db.transaction(ids => {
+        for (const id of ids) purgedRows += del.run(id).changes;
+      })(toDelete);
     }
 
     // Entry ids are `${sourceId}:${budget_id}:${ynab_tx_id}` — see convertTransaction
@@ -180,7 +182,11 @@ async function main() {
     budgetIds: budgetIdsConfig,
     excludeBudgetIds: excludeBudgetIdsConfig
   });
-  const droppedBudgets = [...excluded, ...skippedByAllowlist];
+  const allBudgetIds = new Set(allBudgets.map(b => b.id));
+  const disappeared = Object.entries(state.budgets || {})
+    .filter(([id]) => !allBudgetIds.has(id))
+    .map(([id, budgetState]) => ({ id, name: budgetState.budget_name || id }));
+  const droppedBudgets = [...excluded, ...skippedByAllowlist, ...disappeared];
 
   const warnings = [
     ...unmatched.exclude.map(
