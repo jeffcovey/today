@@ -235,6 +235,12 @@ describe('bin/today CLI', () => {
 
           expect(result.exitCode).toBe(0);
           expect(existsSync(markerPath)).toBe(false);
+          if (arg === '--help') {
+            expect(result.stdout).toContain('Usage:');
+            expect(result.stdout).toContain('AI-powered daily review and planning tool');
+          } else {
+            expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+          }
         });
       });
     });
