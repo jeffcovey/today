@@ -69,7 +69,7 @@ function withFakeNpx(callback) {
   const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
   const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
   const fakeNpxPath = path.join(fakeBinDir, 'npx');
-  const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.cmd');
+  const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.CMD');
 
   writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
   writeFileSync(fakeNpxCmdPath, '@echo off\r\n> "%NPX_MARKER%" echo dotenvx-called\r\nexit /b 0\r\n');
