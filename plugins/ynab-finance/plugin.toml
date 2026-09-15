@@ -67,3 +67,4 @@ read = "./read.js"
 logs_directory = { type = "string", default = "vault/logs", description = "Directory containing YNAB CSV export files" }
 cleanup_old_files = { type = "boolean", default = true, description = "Delete all older YNAB CSV/ZIP export files after reading the latest export" }
 retention_days = { type = "number", default = 365, description = "Days of transaction data to retain in database" }
+precedence = { type = "number", default = 50, description = "Higher wins when two finance sources hold the same transaction. An export is a point-in-time snapshot, so it yields to a live API source" }
