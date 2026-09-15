@@ -72,7 +72,7 @@ function withFakeNpx(callback) {
   const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.CMD');
 
   writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
-  writeFileSync(fakeNpxCmdPath, '@echo off\r\n> "%NPX_MARKER%" echo dotenvx-called\r\nexit /b 0\r\n');
+  writeFileSync(fakeNpxCmdPath, '@echo off\r\ntype nul > "%NPX_MARKER%"\r\nexit /b 0\r\n');
   chmodSync(fakeNpxPath, 0o755);
 
   try {
