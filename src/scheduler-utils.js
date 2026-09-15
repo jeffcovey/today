@@ -10,16 +10,20 @@ export function formatCommandFailure(description, error) {
   const details = [];
   if (error?.code !== undefined) details.push(`exit code ${error.code}`);
   if (error?.signal) details.push(`signal ${error.signal}`);
+  const timeoutReason = error?.timedOut ? error?.message : '';
 
   let header = `❌ ${description} failed`;
   if (details.length > 0) {
     header += ` (${details.join(', ')})`;
   }
+  if (timeoutReason) {
+    header += `: ${timeoutReason}`;
+  }
 
   const stderr = summarizeOutput(error?.stderr);
   const stdout = summarizeOutput(error?.stdout);
 
-  if (!stderr && !stdout) {
+  if (!stderr && !stdout && !timeoutReason) {
     const fallback = error?.message || String(error);
     return `${header}: ${fallback}`;
   }

@@ -176,7 +176,7 @@ async function runCommand(command, description) {
   if (fs.existsSync(path.join(PROJECT_ROOT, 'SYNC_DISABLED')) && command.includes('sync')) {
     const timestamp = new Date().toISOString();
     console.log(`\n[${timestamp}] SKIPPED: ${description}`);
-    console.log('⚠️  Sync is disabled to prevent data loss. Check GitHub repository.');
+    console.log(`⚠️  Sync is disabled to prevent data loss. Check GitHub repository.`);
     return;
   }
 
