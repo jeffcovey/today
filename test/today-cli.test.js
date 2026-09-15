@@ -1,4 +1,6 @@
 import { execSync } from 'child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -11,27 +13,35 @@ const todayBin = path.join(projectRoot, 'bin', 'today');
  * Helper to run bin/today with given arguments
  */
 function runToday(args = '', options = {}) {
+  const { env: customEnv, ...execOptions } = options;
+  const env = {
+    ...process.env,
+    // Skip dependency checks in tests for faster execution
+    SKIP_DEP_CHECK: 'true',
+    // Skip database health checks in tests for faster execution
+    SKIP_DB_HEALTH: 'true',
+    // Skip slow context gathering for faster tests
+    SKIP_CONTEXT: 'true',
+    // Skip the interactive update-check prompt — when the local checkout
+    // is behind origin/main (e.g., after a Dependabot merge) bin/today
+    // would otherwise block on readline and the assertions would fail
+    // against the prompt output instead of the help text.
+    SKIP_UPDATE_CHECK: 'true',
+    ...customEnv,
+  };
+
+  if (customEnv && Object.hasOwn(customEnv, 'DOTENVX_RUNNING') && !customEnv.DOTENVX_RUNNING) {
+    delete env.DOTENVX_RUNNING;
+  }
+
   const cmd = `node ${todayBin} ${args}`;
   try {
     const output = execSync(cmd, {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 30000,
-      env: {
-        ...process.env,
-        // Skip dependency checks in tests for faster execution
-        SKIP_DEP_CHECK: 'true',
-        // Skip database health checks in tests for faster execution
-        SKIP_DB_HEALTH: 'true',
-        // Skip slow context gathering for faster tests
-        SKIP_CONTEXT: 'true',
-        // Skip the interactive update-check prompt — when the local checkout
-        // is behind origin/main (e.g., after a Dependabot merge) bin/today
-        // would otherwise block on readline and the assertions would fail
-        // against the prompt output instead of the help text.
-        SKIP_UPDATE_CHECK: 'true',
-      },
-      ...options,
+      env,
+      ...execOptions,
     });
     return { stdout: output, exitCode: 0 };
   } catch (error) {
@@ -40,6 +50,85 @@ function runToday(args = '', options = {}) {
       stderr: error.stderr || '',
       exitCode: error.status || 1,
     };
+  }
+}
+
+function withEncryptedEnvDir(callback) {
+  const envDir = mkdtempSync(path.join(tmpdir(), 'today-env-'));
+  const envPath = path.join(envDir, '.env');
+  const envKeysPath = path.join(envDir, '.env.keys');
+  const dotenvxCliPath = path.join(envDir, 'node_modules', '@dotenvx', 'dotenvx', 'src', 'cli', 'dotenvx.js');
+
+  writeFileSync(envPath, 'DOTENV_PUBLIC_KEY=dummy-public-key\n');
+  writeFileSync(envKeysPath, 'DUMMY_DOTENV_PRIVATE_KEY=dummy-private-key\n');
+  mkdirSync(path.dirname(dotenvxCliPath), { recursive: true });
+  writeFileSync(dotenvxCliPath, '');
+
+  try {
+    return callback(envDir);
+  } finally {
+    rmSync(envDir, { recursive: true, force: true });
+  }
+}
+
+function withFakeNpx(callback) {
+  const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
+  const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
+  const fakeNpxPath = path.join(fakeBinDir, 'npx');
+  const fakeNpxShimPath = path.join(fakeBinDir, 'npx-shim.mjs');
+  const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.cmd');
+  const fakeNpxCmdUpperPath = path.join(fakeBinDir, 'npx.CMD');
+
+  writeFileSync(
+    fakeNpxShimPath,
+    `import { spawnSync } from 'child_process';
+import { writeFileSync } from 'fs';
+
+if (process.env.NPX_MARKER) {
+  writeFileSync(process.env.NPX_MARKER, '');
+}
+
+const separatorIndex = process.argv.indexOf('--');
+const commandArgs = separatorIndex === -1 ? [] : process.argv.slice(separatorIndex + 1);
+
+if (commandArgs.length === 0) {
+  process.exit(1);
+}
+
+const [command, ...args] = commandArgs;
+const result = spawnSync(command, args, {
+  stdio: 'inherit',
+  env: { ...process.env, DOTENVX_RUNNING: '1' },
+});
+
+if (result.error) {
+  throw result.error;
+}
+
+process.exit(result.status ?? 1);
+`
+  );
+  writeFileSync(fakeNpxPath, '#!/bin/sh\nexec node "$(dirname "$0")/npx-shim.mjs" "$@"\n');
+  writeFileSync(fakeNpxCmdPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
+  writeFileSync(fakeNpxCmdUpperPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
+  chmodSync(fakeNpxPath, 0o755);
+  chmodSync(fakeNpxCmdPath, 0o755);
+  chmodSync(fakeNpxCmdUpperPath, 0o755);
+
+  try {
+    const env = {
+      ...process.env,
+      PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
+      NPX_MARKER: markerPath,
+      DOTENVX_RUNNING: undefined,
+    };
+
+    return callback({
+      markerPath,
+      env,
+    });
+  } finally {
+    rmSync(fakeBinDir, { recursive: true, force: true });
   }
 }
 
@@ -141,6 +230,40 @@ describe('bin/today CLI', () => {
 
       // Should either show help or an error, not crash
       expect(result.stdout + (result.stderr || '')).toBeTruthy();
+    });
+  });
+
+  describe('startup optimization', () => {
+    test.each(['--help', '--version'])('%s should skip dotenvx re-exec', (arg) => {
+      withFakeNpx(({ markerPath, env }) => {
+        withEncryptedEnvDir(cwd => {
+          const result = runToday(arg, {
+            cwd,
+            env,
+          });
+
+          expect(result.exitCode).toBe(0);
+          expect(existsSync(markerPath)).toBe(false);
+          if (arg === '--help') {
+            expect(result.stdout).toContain('Usage:');
+            expect(result.stdout).toContain('AI-powered daily review and planning tool');
+          } else {
+            expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+          }
+        });
+      });
+    });
+
+    test('should still re-exec through dotenvx for normal invocations', () => {
+      withFakeNpx(({ markerPath, env }) => {
+        withEncryptedEnvDir(cwd => {
+          const result = runToday('dry-run --no-sync', { cwd, env });
+
+          expect(result.exitCode).toBe(0);
+          expect(result.stdout).toContain('You are an agent helping a user');
+          expect(existsSync(markerPath)).toBe(true);
+        });
+      });
     });
   });
 });
