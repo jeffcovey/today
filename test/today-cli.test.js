@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,6 +13,7 @@ const todayBin = path.join(projectRoot, 'bin', 'today');
  * Helper to run bin/today with given arguments
  */
 function runToday(args = '', options = {}) {
+  const { env: customEnv, ...execOptions } = options;
   const cmd = `node ${todayBin} ${args}`;
   try {
     const output = execSync(cmd, {
@@ -32,8 +33,9 @@ function runToday(args = '', options = {}) {
         // would otherwise block on readline and the assertions would fail
         // against the prompt output instead of the help text.
         SKIP_UPDATE_CHECK: 'true',
+        ...customEnv,
       },
-      ...options,
+      ...execOptions,
     });
     return { stdout: output, exitCode: 0 };
   } catch (error) {
@@ -45,30 +47,21 @@ function runToday(args = '', options = {}) {
   }
 }
 
-function withEncryptedEnvFiles(callback) {
-  const envPath = path.join(projectRoot, '.env');
-  const envKeysPath = path.join(projectRoot, '.env.keys');
-  const backups = new Map();
-
-  for (const filePath of [envPath, envKeysPath]) {
-    backups.set(filePath, existsSync(filePath) ? readFileSync(filePath, 'utf8') : null);
-  }
+function withEncryptedEnvDir(callback) {
+  const envDir = mkdtempSync(path.join(tmpdir(), 'today-env-'));
+  const envPath = path.join(envDir, '.env');
+  const envKeysPath = path.join(envDir, '.env.keys');
+  const dotenvxCliPath = path.join(envDir, 'node_modules', '@dotenvx', 'dotenvx', 'src', 'cli', 'dotenvx.js');
 
   writeFileSync(envPath, 'DOTENV_PUBLIC_KEY=dummy-public-key\n');
   writeFileSync(envKeysPath, 'DUMMY_DOTENV_PRIVATE_KEY=dummy-private-key\n');
+  mkdirSync(path.dirname(dotenvxCliPath), { recursive: true });
+  writeFileSync(dotenvxCliPath, '');
 
   try {
-    callback();
+    return callback(envDir);
   } finally {
-    for (const [filePath, content] of backups.entries()) {
-      if (content === null) {
-        if (existsSync(filePath)) {
-          unlinkSync(filePath);
-        }
-      } else {
-        writeFileSync(filePath, content);
-      }
-    }
+    rmSync(envDir, { recursive: true, force: true });
   }
 }
 
@@ -198,8 +191,9 @@ describe('bin/today CLI', () => {
   describe('startup optimization', () => {
     test.each(['--help', '--version'])('%s should skip dotenvx re-exec', (arg) => {
       withFakeNpx(({ markerPath, env }) => {
-        withEncryptedEnvFiles(() => {
+        withEncryptedEnvDir(cwd => {
           const result = runToday(arg, {
+            cwd,
             env,
           });
 
@@ -211,8 +205,8 @@ describe('bin/today CLI', () => {
 
     test('should still re-exec through dotenvx for normal invocations', () => {
       withFakeNpx(({ markerPath, env }) => {
-        withEncryptedEnvFiles(() => {
-          const result = runToday('dry-run --no-sync', { env });
+        withEncryptedEnvDir(cwd => {
+          const result = runToday('dry-run --no-sync', { cwd, env });
 
           expect(result.exitCode).toBe(0);
           expect(existsSync(markerPath)).toBe(true);
