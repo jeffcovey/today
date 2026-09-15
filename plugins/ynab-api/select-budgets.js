@@ -14,16 +14,36 @@
  * Kept free of I/O so the resolution rules can be tested directly.
  */
 
-function parseRules(value) {
-  return String(value || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
 function matches(budget, rule) {
   if (budget.id === rule) return true;
   return String(budget.name || '').toLowerCase() === rule.toLowerCase();
+}
+
+function parseRules(value, budgets = []) {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+
+  if (raw.includes('\n')) {
+    return raw
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+
+  const split = raw
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (
+    split.length > 1 &&
+    budgets.some(b => matches(b, raw)) &&
+    !split.some(rule => budgets.some(b => matches(b, rule)))
+  ) {
+    return [raw];
+  }
+
+  return split;
 }
 
 /**
@@ -38,8 +58,8 @@ export function selectBudgets(budgets, { budgetIds = '', excludeBudgetIds = '' }
   const all = Array.isArray(budgets) ? budgets : [];
 
   // "all" is accepted as an explicit no-op for backwards compatibility
-  const include = parseRules(budgetIds).filter(r => r.toLowerCase() !== 'all');
-  const exclude = parseRules(excludeBudgetIds);
+  const include = parseRules(budgetIds, all).filter(r => r.toLowerCase() !== 'all');
+  const exclude = parseRules(excludeBudgetIds, all);
 
   const candidates = include.length > 0
     ? all.filter(b => include.some(r => matches(b, r)))

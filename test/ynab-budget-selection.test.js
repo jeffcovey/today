@@ -11,6 +11,7 @@ import { selectBudgets } from '../plugins/ynab-api/select-budgets.js';
 const ARCHIVED = { id: 'f019497d-bb49-4c5c-aa3b-6cd15bc0595f', name: 'My Budget (Archived on 2024-03-03)' };
 const CURRENT = { id: '370e8c58-7dc8-401b-91e8-40a84e1ea9c8', name: '2024 Fresh Start' };
 const FUTURE = { id: '99999999-0000-0000-0000-000000000000', name: '2027 Budget' };
+const SHARED = { id: '11111111-2222-3333-4444-555555555555', name: 'Home, Shared' };
 
 describe('selectBudgets', () => {
   describe('defaults', () => {
@@ -48,6 +49,20 @@ describe('selectBudgets', () => {
     test('accepts several rules', () => {
       const { selected } = selectBudgets([ARCHIVED, CURRENT, FUTURE], {
         excludeBudgetIds: `${ARCHIVED.id}, ${FUTURE.name}`
+      });
+      expect(selected).toEqual([CURRENT]);
+    });
+
+    test('treats an exact single budget name with a comma as one rule', () => {
+      const { selected } = selectBudgets([SHARED, CURRENT], {
+        excludeBudgetIds: SHARED.name
+      });
+      expect(selected).toEqual([CURRENT]);
+    });
+
+    test('supports newline-separated rules for names that contain commas', () => {
+      const { selected } = selectBudgets([SHARED, CURRENT, FUTURE], {
+        excludeBudgetIds: `${SHARED.name}\n${FUTURE.name}`
       });
       expect(selected).toEqual([CURRENT]);
     });
