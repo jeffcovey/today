@@ -9,6 +9,7 @@ jest.unstable_mockModule('child_process', () => ({
 const {
   clearEnvVar,
   clearEncryptedSettings,
+  rollbackEncryptedSettingBackups,
   deleteSourceConfigWithSecrets
 } = await import('../src/encrypted-settings.js');
 
@@ -100,5 +101,30 @@ describe('encrypted settings cleanup', () => {
         }
       }
     });
+  });
+
+  test('rollbackEncryptedSettingBackups reports failed restores and clears', () => {
+    const clear = jest.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    const set = jest.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    const backups = new Map([
+      ['TODAY_TEST_PLUGIN_DEFAULT_REMOVE_ME', null],
+      ['TODAY_TEST_PLUGIN_DEFAULT_RESTORE_ME', 'before'],
+      ['TODAY_TEST_PLUGIN_DEFAULT_OK_REMOVE', null],
+      ['TODAY_TEST_PLUGIN_DEFAULT_OK_RESTORE', 'after']
+    ]);
+
+    expect(rollbackEncryptedSettingBackups(backups, { clear, set })).toEqual([
+      'TODAY_TEST_PLUGIN_DEFAULT_REMOVE_ME',
+      'TODAY_TEST_PLUGIN_DEFAULT_RESTORE_ME'
+    ]);
+
+    expect(clear).toHaveBeenNthCalledWith(1, 'TODAY_TEST_PLUGIN_DEFAULT_REMOVE_ME');
+    expect(set).toHaveBeenNthCalledWith(1, 'TODAY_TEST_PLUGIN_DEFAULT_RESTORE_ME', 'before');
+    expect(clear).toHaveBeenNthCalledWith(2, 'TODAY_TEST_PLUGIN_DEFAULT_OK_REMOVE');
+    expect(set).toHaveBeenNthCalledWith(2, 'TODAY_TEST_PLUGIN_DEFAULT_OK_RESTORE', 'after');
   });
 });

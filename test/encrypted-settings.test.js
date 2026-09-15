@@ -94,9 +94,14 @@ describe('encrypted settings', () => {
     const source = fs.readFileSync(path.join(projectRoot, 'bin', 'plugins'), 'utf8');
 
     const bodyOf = (fnName) => {
-      const start = source.indexOf(`async function ${fnName}(`);
+      const start = source.indexOf(`async function ${fnName}(`) >= 0
+        ? source.indexOf(`async function ${fnName}(`)
+        : source.indexOf(`function ${fnName}(`);
       expect(start).toBeGreaterThan(-1);
-      const next = source.indexOf('\nasync function ', start + 1);
+      const nextAsync = source.indexOf('\nasync function ', start + 1);
+      const nextSync = source.indexOf('\nfunction ', start + 1);
+      const nextCandidates = [nextAsync, nextSync].filter(i => i !== -1);
+      const next = nextCandidates.length > 0 ? Math.min(...nextCandidates) : -1;
       return source.slice(start, next === -1 ? source.length : next);
     };
 
@@ -112,6 +117,12 @@ describe('encrypted settings', () => {
       expect(bodyOf(fn)).toContain('rollbackEncryptedSettingChanges');
     });
 
+    test('rollbackEncryptedSettingChanges surfaces rollback failures', () => {
+      expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('rollbackEncryptedSettingBackups');
+      expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('p.log.error');
+      expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('Check .env manually.');
+    });
+
     test('every saveSourceConfig call is guarded by stripEncryptedSettings', () => {
       const calls = source.split('\n').filter(
         l => l.includes('saveSourceConfig(') && !l.includes('function saveSourceConfig')
@@ -123,7 +134,7 @@ describe('encrypted settings', () => {
     });
 
     test('removeSource clears encrypted settings when deleting a source', () => {
-      expect(bodyOf('removeSource')).toContain('clearEncryptedSettings');
+      expect(bodyOf('removeSource')).toContain('deleteSourceConfigWithSecretsFromFile');
       expect(bodyOf('removeSource')).toContain('Failed to clear encrypted settings');
     });
   });

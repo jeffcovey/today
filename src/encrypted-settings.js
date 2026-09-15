@@ -121,6 +121,23 @@ export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
   return allCleared;
 }
 
+/** Restore encrypted env vars after a canceled or failed configuration flow. */
+export function rollbackEncryptedSettingBackups(
+  encryptedSettingBackups,
+  { clear = clearEnvVar, set = setEnvVar } = {}
+) {
+  const failures = [];
+  for (const [envVarName, previousValue] of encryptedSettingBackups.entries()) {
+    const ok = previousValue === null
+      ? clear(envVarName)
+      : set(envVarName, previousValue);
+    if (ok !== true) {
+      failures.push(envVarName);
+    }
+  }
+  return failures;
+}
+
 /** Remove a source from config only after its encrypted settings are cleared. */
 export function deleteSourceConfigWithSecrets(
   config,
