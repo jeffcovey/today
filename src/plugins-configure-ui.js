@@ -114,13 +114,16 @@ function toggleSource(pluginName, sourceName, enabled) {
 function deleteSource(pluginName, sourceName, pluginSettings) {
   const config = readConfig();
   if (config.plugins?.[pluginName]?.[sourceName]) {
-    clearEncryptedSettings(pluginName, sourceName, pluginSettings);
+    if (!clearEncryptedSettings(pluginName, sourceName, pluginSettings)) {
+      return false;
+    }
     delete config.plugins[pluginName][sourceName];
     if (Object.keys(config.plugins[pluginName]).length === 0) {
       delete config.plugins[pluginName];
     }
     writeConfig(config);
   }
+  return true;
 }
 
 function updateSourceField(pluginName, sourceName, fieldName, value) {
@@ -494,6 +497,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
   const [sources, setSources] = useState(() => buildSourceList(pluginName, plugin));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState('list'); // 'list', 'edit', 'add', 'delete'
+  const [error, setError] = useState('');
   const [scrollOffset, setScrollOffset] = useState(0);
   const [focusPanel, setFocusPanel] = useState('sources'); // 'sources' or 'info'
   const [infoScrollOffset, setInfoScrollOffset] = useState(0);
@@ -634,7 +638,12 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         <${Box} marginTop=${1}>
           <${ConfirmInput}
             onConfirm=${() => {
-              deleteSource(pluginName, selectedSource.sourceName, plugin.settings);
+              if (!deleteSource(pluginName, selectedSource.sourceName, plugin.settings)) {
+                setError(`Failed to clear encrypted settings for "${selectedSource.sourceName}"`);
+                setMode('list');
+                return;
+              }
+              setError('');
               refreshSources();
               setSelectedIndex(Math.max(0, selectedIndex - 1));
               setMode('list');
@@ -711,6 +720,11 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
       <${Box} marginTop=${1}>
         <${Text} dimColor>Tab: switch panel │ ↑↓: ${focusPanel === 'sources' ? 'navigate' : 'scroll'} │ Space: toggle │ Enter: edit │ a: add │ d: delete │ Esc: back</Text>
       </Box>
+      ${error ? html`
+        <${Box} marginTop=${1}>
+          <${Text} color="red">${error}</Text>
+        </Box>
+      ` : null}
     </Box>
   `;
 }

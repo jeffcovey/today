@@ -124,6 +124,7 @@ describe('encrypted settings', () => {
 
     test('removeSource clears encrypted settings when deleting a source', () => {
       expect(bodyOf('removeSource')).toContain('clearEncryptedSettings');
+      expect(bodyOf('removeSource')).toContain('Failed to clear encrypted settings');
     });
   });
 
@@ -132,6 +133,7 @@ describe('encrypted settings', () => {
 
     test('deleteSource clears encrypted settings when deleting a source', () => {
       expect(source).toContain('clearEncryptedSettings(pluginName, sourceName, pluginSettings)');
+      expect(source).toContain('if (!deleteSource(pluginName, selectedSource.sourceName, plugin.settings))');
     });
   });
 });

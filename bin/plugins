@@ -912,7 +912,10 @@ async function removeSource(plugin, pluginName, allSources) {
 
   const s = p.spinner();
   s.start('Removing source');
-  clearEncryptedSettings(pluginName, sourceToRemove, plugin.settings);
+  if (!clearEncryptedSettings(pluginName, sourceToRemove, plugin.settings)) {
+    s.stop(colors.red(`✗ Failed to clear encrypted settings for "${sourceToRemove}"`));
+    return;
+  }
   deleteSourceConfig(pluginName, sourceToRemove);
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));
 }
