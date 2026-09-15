@@ -23,7 +23,6 @@ import {
   getEnvVar,
   setEnvVar,
   hasEnvVar,
-  clearEncryptedSettings,
   deleteSourceConfigWithSecrets
 } from './encrypted-settings.js';
 
@@ -114,14 +113,12 @@ function toggleSource(pluginName, sourceName, enabled) {
 
 function deleteSource(pluginName, sourceName, pluginSettings) {
   const config = readConfig();
-  if (!config.plugins?.[pluginName]?.[sourceName]) {
-    return true;
-  }
-  if (!deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, clearEncryptedSettings)) {
-    return false;
-  }
-  writeConfig(config);
-  return true;
+  return deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, {
+    persist: (nextConfig) => {
+      writeConfig(nextConfig);
+      return true;
+    }
+  });
 }
 
 function updateSourceField(pluginName, sourceName, fieldName, value) {
@@ -636,8 +633,13 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         <${Box} marginTop=${1}>
           <${ConfirmInput}
             onConfirm=${() => {
-              if (!deleteSource(pluginName, selectedSource.sourceName, plugin.settings)) {
-                setError(`Failed to clear encrypted settings for "${selectedSource.sourceName}"`);
+              const result = deleteSource(pluginName, selectedSource.sourceName, plugin.settings);
+              if (!result.ok) {
+                if (result.stage === 'clear') {
+                  setError(`Removed "${selectedSource.sourceName}", but secret may be left behind: ${result.orphanedEnvVars.join(', ')}. Check .env.`);
+                } else {
+                  setError(`Failed to remove "${selectedSource.sourceName}"`);
+                }
                 setMode('list');
                 return;
               }

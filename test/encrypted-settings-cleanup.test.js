@@ -8,7 +8,8 @@ jest.unstable_mockModule('child_process', () => ({
 
 const {
   clearEnvVar,
-  clearEncryptedSettings,
+  clearEncryptedSettingEnvVars,
+  deleteSourceConfig,
   rollbackEncryptedSettingBackups,
   deleteSourceConfigWithSecrets
 } = await import('../src/encrypted-settings.js');
@@ -35,7 +36,7 @@ describe('encrypted settings cleanup', () => {
     );
   });
 
-  test('clearEncryptedSettings attempts every encrypted key and reports failures', () => {
+  test('clearEncryptedSettingEnvVars attempts every encrypted key and reports failures', () => {
     execSync.mockImplementation((command) => {
       if (command.includes('TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN')) {
         throw new Error('boom');
@@ -43,18 +44,18 @@ describe('encrypted settings cleanup', () => {
       return '';
     });
 
-    expect(clearEncryptedSettings('test-plugin', 'default', {
+    expect(clearEncryptedSettingEnvVars('test-plugin', 'default', {
       api_token: { encrypted: true },
       password: { encrypted: true },
       base_url: { encrypted: false }
-    })).toBe(false);
+    })).toEqual(['TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN']);
 
     expect(execSync).toHaveBeenCalledTimes(2);
     expect(execSync.mock.calls[0][0]).toContain('TODAY_TEST_PLUGIN_DEFAULT_API_TOKEN');
     expect(execSync.mock.calls[1][0]).toContain('TODAY_TEST_PLUGIN_DEFAULT_PASSWORD');
   });
 
-  test('deleteSourceConfigWithSecrets removes the source after cleanup succeeds', () => {
+  test('deleteSourceConfigWithSecrets removes the source after persist and cleanup succeed', () => {
     const config = {
       plugins: {
         test: {
@@ -62,21 +63,23 @@ describe('encrypted settings cleanup', () => {
         }
       }
     };
-    const clearSettings = jest.fn().mockReturnValue(true);
+    const persist = jest.fn().mockReturnValue(true);
+    const clear = jest.fn().mockReturnValue(true);
 
     expect(deleteSourceConfigWithSecrets(
       config,
       'test',
       'default',
       { secret: { encrypted: true } },
-      clearSettings
-    )).toBe(true);
+      { persist, clear }
+    )).toEqual({ ok: true, stage: null, orphanedEnvVars: [] });
 
-    expect(clearSettings).toHaveBeenCalledWith('test', 'default', { secret: { encrypted: true } });
+    expect(persist).toHaveBeenCalledWith({ plugins: {} });
+    expect(clear).toHaveBeenCalledWith('TODAY_TEST_DEFAULT_SECRET');
     expect(config).toEqual({ plugins: {} });
   });
 
-  test('deleteSourceConfigWithSecrets aborts deletion when cleanup fails', () => {
+  test('deleteSourceConfig removes the source without touching secrets', () => {
     const config = {
       plugins: {
         test: {
@@ -84,23 +87,60 @@ describe('encrypted settings cleanup', () => {
         }
       }
     };
-    const clearSettings = jest.fn().mockReturnValue(false);
+
+    expect(deleteSourceConfig(config, 'test', 'default')).toBe(true);
+    expect(config).toEqual({ plugins: {} });
+  });
+
+  test('deleteSourceConfigWithSecrets leaves secrets intact when persist fails', () => {
+    const config = {
+      plugins: {
+        test: {
+          default: { enabled: true }
+        }
+      }
+    };
+    const persist = jest.fn().mockReturnValue(false);
+    const clear = jest.fn();
 
     expect(deleteSourceConfigWithSecrets(
       config,
       'test',
       'default',
       { secret: { encrypted: true } },
-      clearSettings
-    )).toBe(false);
+      { persist, clear }
+    )).toEqual({ ok: false, stage: 'persist', orphanedEnvVars: [] });
 
-    expect(config).toEqual({
+    expect(clear).not.toHaveBeenCalled();
+    expect(config).toEqual({ plugins: {} });
+  });
+
+  test('deleteSourceConfigWithSecrets reports orphaned secrets when cleanup fails after persist', () => {
+    const config = {
       plugins: {
         test: {
           default: { enabled: true }
         }
       }
+    };
+    const persist = jest.fn().mockReturnValue(true);
+    const clear = jest.fn().mockReturnValue(false);
+
+    expect(deleteSourceConfigWithSecrets(
+      config,
+      'test',
+      'default',
+      { secret: { encrypted: true } },
+      { persist, clear }
+    )).toEqual({
+      ok: false,
+      stage: 'clear',
+      orphanedEnvVars: ['TODAY_TEST_DEFAULT_SECRET']
     });
+
+    expect(persist).toHaveBeenCalledWith({ plugins: {} });
+    expect(clear).toHaveBeenCalledWith('TODAY_TEST_DEFAULT_SECRET');
+    expect(config).toEqual({ plugins: {} });
   });
 
   test('rollbackEncryptedSettingBackups reports failed restores and clears', () => {
