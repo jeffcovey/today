@@ -24,9 +24,14 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
-import { getTodayDate } from './date-utils.js';
+import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
+import {
+  getDateComponents as getPlanDateComponents,
+  getPlanFileHierarchy,
+  getPlanFilePath,
+} from './plan-utils.js';
 import {
   buildTasksQueryContext,
   runTasksFilterFunction,
@@ -1221,17 +1226,21 @@ async function renderDirectory(dirPath, urlPath) {
     // Use Eastern timezone for consistency with other scripts
     const easternTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/New_York"}));
     const today = easternTime;
-    const year = today.getFullYear();
-    const quarter = `Q${Math.floor(today.getMonth() / 3) + 1}`;
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const week = getWeekNumber(today);
-    const day = String(today.getDate()).padStart(2, '0');
+    const todayISO = formatDate(today);
+    const todayDisplay = `${getDayName(today)}, ${formatDisplayDate(today)}`;
+    const planComponents = getPlanDateComponents(today);
+    const { year, quarter, week } = planComponents;
+    const todayPlanFile = path.basename(getPlanFilePath(today));
+    const [yearPlan, quarterPlan, monthPlan, weekPlan] = getPlanFileHierarchy(planComponents);
+    const yearPlanFile = path.basename(yearPlan.path);
+    const quarterPlanFile = path.basename(quarterPlan.path);
+    const monthPlanFile = path.basename(monthPlan.path);
+    const weekPlanFile = path.basename(weekPlan.path);
     
     // Get task count for today from database cache
     let taskCount = 0;
     try {
       const db = getReadOnlyDatabase();
-      const todayISO = today.toISOString().split('T')[0];
 
       // Query database for open tasks with due/scheduled dates for today or earlier
       const taskRows = db.prepare(`
@@ -1250,7 +1259,6 @@ async function renderDirectory(dirPath, urlPath) {
     const diaryEnabled = isPluginConfigured('markdown-diary');
     const plansEnabled = isPluginConfigured('markdown-plans');
     const nowUpdatesEnabled = isPluginConfigured('now-updates');
-    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format for diary
 
     // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
     contentHtml += `<div class="row">`;
@@ -1266,14 +1274,13 @@ async function renderDirectory(dirPath, urlPath) {
                       <div>
                         <strong>Today's Diary</strong>
                         <br>
-                        <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                        <small>${todayDisplay}</small>
                       </div>
                     </div>
                   </a>
                 </div>
               </div>`;
     } else if (plansEnabled) {
-      const todayPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_${day}.md`;
       contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
@@ -1283,7 +1290,7 @@ async function renderDirectory(dirPath, urlPath) {
                       <div>
                         <strong>Today's Plan</strong>
                         <br>
-                        <small>${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</small>
+                        <small>${todayDisplay}</small>
                       </div>
                     </div>
                   </a>
@@ -1346,11 +1353,6 @@ async function renderDirectory(dirPath, urlPath) {
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
-      const weekPlanFile = `${year}_${quarter}_${month}_W${String(week).padStart(2, '0')}_00.md`;
-      const monthPlanFile = `${year}_${quarter}_${month}_00.md`;
-      const quarterPlanFile = `${year}_${quarter}_00.md`;
-      const yearPlanFile = `${year}_00.md`;
-
       const plansDir = path.join(dirPath, 'plans');
       const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
       const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
@@ -3688,7 +3690,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
       if (Array.isArray(value)) {
         displayValue = value.join(', ');
       } else if (value instanceof Date) {
-        displayValue = value.toISOString().split('T')[0];
+        displayValue = formatDate(value);
       } else {
         displayValue = String(value);
       }
@@ -3976,7 +3978,7 @@ async function executeTasksQuery(query, queryContext = {}) {
     const grouped = new Map();
     for (const task of filtered) {
       const date = task.happens;
-      const key = date ? date.toISOString().split('T')[0] : 'No date';
+      const key = date ? formatDate(date) : 'No date';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(task);
     }
@@ -3995,7 +3997,7 @@ async function executeTasksQuery(query, queryContext = {}) {
     const grouped = new Map();
     for (const task of filtered) {
       const key = task.createdDate
-        ? `${task.createdDate.getFullYear()}-${String(task.createdDate.getMonth() + 1).padStart(2, '0')}-${String(task.createdDate.getDate()).padStart(2, '0')}`
+        ? formatDate(task.createdDate)
         : 'No date';
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key).push(task);
@@ -4110,7 +4112,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
-            const dateStr = task.doneDate.toISOString().split('T')[0];
+            const dateStr = formatDate(task.doneDate);
             displayText += ` ✅ ${dateStr}`;
           }
           // Add cancelled indicator if task is cancelled
@@ -4143,7 +4145,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
-            const dateStr = task.doneDate.toISOString().split('T')[0];
+            const dateStr = formatDate(task.doneDate);
             displayText += ` ✅ ${dateStr}`;
           }
           // Add cancelled indicator if task is cancelled
@@ -4364,7 +4366,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
             let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
             if (task.isDone && task.doneDate) {
-              const dateStr = task.doneDate.toISOString().split('T')[0];
+              const dateStr = formatDate(task.doneDate);
               displayText += ` ✅ ${dateStr}`;
             }
             // Add cancelled indicator if task is cancelled
@@ -4392,7 +4394,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
             let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
             if (task.isDone && task.doneDate) {
-              const dateStr = task.doneDate.toISOString().split('T')[0];
+              const dateStr = formatDate(task.doneDate);
               displayText += ` ✅ ${dateStr}`;
             }
             // Add cancelled indicator if task is cancelled
@@ -4506,7 +4508,7 @@ ${cleanContent}
             const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
             let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
             if (task.isDone && task.doneDate) {
-              const dateStr = task.doneDate.toISOString().split('T')[0];
+              const dateStr = formatDate(task.doneDate);
               displayText += ` ✅ ${dateStr}`;
             }
             if (task.isCancelled) {
@@ -4534,7 +4536,7 @@ ${cleanContent}
             const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
             let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
             if (task.isDone && task.doneDate) {
-              const dateStr = task.doneDate.toISOString().split('T')[0];
+              const dateStr = formatDate(task.doneDate);
               displayText += ` ✅ ${dateStr}`;
             }
             if (task.isCancelled) {
@@ -7034,7 +7036,7 @@ function calculateNextRecurrence(pattern, fromDate) {
   }
 
   // Return in YYYY-MM-DD format
-  return nextDate.toISOString().split('T')[0];
+  return formatDate(nextDate);
 }
 
 // Handle task checkbox toggling
@@ -7090,7 +7092,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     let updatedLine;
     if (completed) {
       // Mark as done and add completion date
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDate();
       updatedLine = taskLine
         .replace(/^((?:\s*>)*\s*)- \[ \]/, '$1- [x]')  // Keep any blockquote prefix
         .replace(/✅ \d{4}-\d{2}-\d{2}/, '') // Remove old completion date if exists
@@ -7166,7 +7168,7 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       const db = getReadOnlyDatabase();
       const taskId = `markdown-tasks/local:${dbFilePath}:${line}`;
       const newStatus = completed ? 'done' : 'open';
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDate();
 
       if (completed) {
         db.prepare(`
@@ -7254,7 +7256,7 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
       if (existingCompletion) {
         completionDate = `✅ ${existingCompletion[1]}`;
       } else {
-        completionDate = `✅ ${new Date().toISOString().split('T')[0]}`;
+        completionDate = `✅ ${getTodayDate()}`;
       }
     }
 
@@ -7302,7 +7304,7 @@ app.post('/task/edit', authMiddleware, async (req, res) => {
       const taskId = `markdown-tasks/local:${dbFilePath}:${line}`;
       const newStatus = isCompleted ? 'done' : 'open';
       if (isCompleted) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayDate();
         db.prepare('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?').run(newStatus, today, taskId);
       } else {
         db.prepare('UPDATE tasks SET status = ?, completed_at = NULL WHERE id = ?').run(newStatus, taskId);
