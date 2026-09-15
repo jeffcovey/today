@@ -14,27 +14,33 @@ const todayBin = path.join(projectRoot, 'bin', 'today');
  */
 function runToday(args = '', options = {}) {
   const { env: customEnv, ...execOptions } = options;
+  const env = {
+    ...process.env,
+    // Skip dependency checks in tests for faster execution
+    SKIP_DEP_CHECK: 'true',
+    // Skip database health checks in tests for faster execution
+    SKIP_DB_HEALTH: 'true',
+    // Skip slow context gathering for faster tests
+    SKIP_CONTEXT: 'true',
+    // Skip the interactive update-check prompt — when the local checkout
+    // is behind origin/main (e.g., after a Dependabot merge) bin/today
+    // would otherwise block on readline and the assertions would fail
+    // against the prompt output instead of the help text.
+    SKIP_UPDATE_CHECK: 'true',
+    ...customEnv,
+  };
+
+  if (customEnv && Object.hasOwn(customEnv, 'DOTENVX_RUNNING') && !customEnv.DOTENVX_RUNNING) {
+    delete env.DOTENVX_RUNNING;
+  }
+
   const cmd = `node ${todayBin} ${args}`;
   try {
     const output = execSync(cmd, {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 30000,
-      env: {
-        ...process.env,
-        // Skip dependency checks in tests for faster execution
-        SKIP_DEP_CHECK: 'true',
-        // Skip database health checks in tests for faster execution
-        SKIP_DB_HEALTH: 'true',
-        // Skip slow context gathering for faster tests
-        SKIP_CONTEXT: 'true',
-        // Skip the interactive update-check prompt — when the local checkout
-        // is behind origin/main (e.g., after a Dependabot merge) bin/today
-        // would otherwise block on readline and the assertions would fail
-        // against the prompt output instead of the help text.
-        SKIP_UPDATE_CHECK: 'true',
-        ...customEnv,
-      },
+      env,
       ...execOptions,
     });
     return { stdout: output, exitCode: 0 };
@@ -110,13 +116,16 @@ process.exit(result.status ?? 1);
   chmodSync(fakeNpxCmdUpperPath, 0o755);
 
   try {
+    const env = {
+      ...process.env,
+      PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
+      NPX_MARKER: markerPath,
+      DOTENVX_RUNNING: undefined,
+    };
+
     return callback({
       markerPath,
-      env: {
-        ...process.env,
-        PATH: `${fakeBinDir}${path.delimiter}${process.env.PATH || ''}`,
-        NPX_MARKER: markerPath,
-      },
+      env,
     });
   } finally {
     rmSync(fakeBinDir, { recursive: true, force: true });
