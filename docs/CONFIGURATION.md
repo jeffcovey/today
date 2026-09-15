@@ -9,7 +9,7 @@ Most users should start with `bin/today configure`, which updates both files for
 
 ## Quick Start
 
-1. Copy the examples you need from `/home/runner/work/today/today/.env.example` into your local `.env`.
+1. Copy the examples you need from `.env.example` into your local `.env`.
 2. Store secrets with `dotenvx` instead of editing plaintext by hand:
 
    ```bash
