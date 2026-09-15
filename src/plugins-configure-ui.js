@@ -18,6 +18,13 @@ import { fileURLToPath } from 'url';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { schemas } from './plugin-schemas.js';
 import { getConfigPath } from './config.js';
+import {
+  getEncryptedEnvVarName,
+  getEnvVar,
+  setEnvVar,
+  hasEnvVar,
+  deleteSourceConfigWithSecrets
+} from './encrypted-settings.js';
 
 const html = htm.bind(React.createElement);
 
@@ -31,63 +38,6 @@ const ENV_PATH = path.join(projectRoot, '.env');
 // Environment variable helpers (using dotenvx for encryption)
 // ============================================================================
 
-/**
- * Get an environment variable value (decrypted if encrypted)
- * @param {string} key - Environment variable name
- * @returns {string|null} - Decrypted value or null if not set
- */
-function getEnvVar(key) {
-  try {
-    const result = execSync(`npx dotenvx get ${key} 2>/dev/null`, {
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe']
-    }).trim();
-    return result || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Set an environment variable (always encrypted)
- * Creates .env file if it doesn't exist
- * dotenvx automatically creates .env.keys on first encryption
- * @param {string} key - Environment variable name
- * @param {string} value - Value to set
- * @returns {boolean} - True if successful
- */
-function setEnvVar(key, value) {
-  // Create .env if it doesn't exist
-  if (!fs.existsSync(ENV_PATH)) {
-    fs.writeFileSync(ENV_PATH, '# Environment variables for Today\n\n');
-  }
-
-  // Escape the value for shell
-  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-
-  try {
-    // dotenvx set encrypts by default and creates .env.keys if needed
-    execSync(`npx dotenvx set ${key} "${escapedValue}"`, {
-      cwd: projectRoot,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    return true;
-  } catch (error) {
-    // Log error for debugging
-    console.error(`Failed to set ${key}:`, error.message);
-    return false;
-  }
-}
-
-/**
- * Check if an environment variable is set
- * @param {string} key - Environment variable name
- * @returns {boolean}
- */
-function hasEnvVar(key) {
-  return getEnvVar(key) !== null;
-}
 
 // ============================================================================
 // Editor helper for multi-line fields
@@ -161,15 +111,14 @@ function toggleSource(pluginName, sourceName, enabled) {
   writeConfig(config);
 }
 
-function deleteSource(pluginName, sourceName) {
+function deleteSource(pluginName, sourceName, pluginSettings) {
   const config = readConfig();
-  if (config.plugins?.[pluginName]?.[sourceName]) {
-    delete config.plugins[pluginName][sourceName];
-    if (Object.keys(config.plugins[pluginName]).length === 0) {
-      delete config.plugins[pluginName];
+  return deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, {
+    persist: (nextConfig) => {
+      writeConfig(nextConfig);
+      return true;
     }
-    writeConfig(config);
-  }
+  });
 }
 
 function updateSourceField(pluginName, sourceName, fieldName, value) {
@@ -321,17 +270,6 @@ function buildSourceList(pluginName, plugin) {
 // Edit source dialog
 // ============================================================================
 
-/**
- * Generate a unique environment variable name for encrypted settings
- * @param {string} pluginName - Plugin name (e.g., "imap-email")
- * @param {string} sourceName - Source name (e.g., "personal")
- * @param {string} settingKey - Setting key (e.g., "password")
- * @returns {string} Environment variable name (e.g., "TODAY_IMAP_EMAIL_PERSONAL_PASSWORD")
- */
-function getEncryptedEnvVarName(pluginName, sourceName, settingKey) {
-  const sanitize = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `TODAY_${sanitize(pluginName)}_${sanitize(sourceName)}_${sanitize(settingKey)}`;
-}
 
 function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave, onCancel, onOpenEditor, onEncryptedSave }) {
   const [fieldIndex, setFieldIndex] = useState(0);
@@ -554,6 +492,7 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
   const [sources, setSources] = useState(() => buildSourceList(pluginName, plugin));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState('list'); // 'list', 'edit', 'add', 'delete'
+  const [error, setError] = useState('');
   const [scrollOffset, setScrollOffset] = useState(0);
   const [focusPanel, setFocusPanel] = useState('sources'); // 'sources' or 'info'
   const [infoScrollOffset, setInfoScrollOffset] = useState(0);
@@ -694,7 +633,17 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
         <${Box} marginTop=${1}>
           <${ConfirmInput}
             onConfirm=${() => {
-              deleteSource(pluginName, selectedSource.sourceName);
+              const result = deleteSource(pluginName, selectedSource.sourceName, plugin.settings);
+              if (!result.ok) {
+                if (result.stage === 'clear') {
+                  setError(`Removed "${selectedSource.sourceName}", but secret may be left behind: ${result.orphanedEnvVars.join(', ')}. Check .env.`);
+                } else {
+                  setError(`Failed to remove "${selectedSource.sourceName}"`);
+                }
+                setMode('list');
+                return;
+              }
+              setError('');
               refreshSources();
               setSelectedIndex(Math.max(0, selectedIndex - 1));
               setMode('list');
@@ -771,6 +720,11 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
       <${Box} marginTop=${1}>
         <${Text} dimColor>Tab: switch panel │ ↑↓: ${focusPanel === 'sources' ? 'navigate' : 'scroll'} │ Space: toggle │ Enter: edit │ a: add │ d: delete │ Esc: back</Text>
       </Box>
+      ${error ? html`
+        <${Box} marginTop=${1}>
+          <${Text} color="red">${error}</Text>
+        </Box>
+      ` : null}
     </Box>
   `;
 }

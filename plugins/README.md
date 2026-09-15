@@ -241,6 +241,12 @@ The read command reads data and outputs JSON. It can be written in any language.
 
 The `id` field should uniquely identify entries and encode location information (e.g., `filepath:lineNum`) for incremental updates.
 
+Optional `metadata` keys for read commands:
+- `message`: surfaced in sync output on success
+- `hint`: additional context shown with `message`
+- `warnings`: array of non-fatal warnings surfaced in sync output
+- `rows_purged`: number of rows the plugin deleted itself during sync; when set on incremental reads, the loader refreshes `sync_metadata.entries_count` so caches stay accurate
+
 **Example (Node.js):**
 
 ```javascript
