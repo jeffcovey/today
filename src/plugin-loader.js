@@ -883,6 +883,9 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged_for_dropped_budgets || 0);
+  const warningMsg = Array.isArray(pluginMetadata?.warnings) && pluginMetadata.warnings.length > 0
+    ? `\n    Warnings: ${pluginMetadata.warnings.join(' | ')}`
+    : '';
 
   // If no entries and incremental, nothing changed — unless rows were removed
   // outside the loader-managed insert path, in which case sync metadata must
@@ -897,13 +900,13 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       return {
         success: true,
         count: 0,
-        message: messages.join('; ')
+        message: `${messages.join('; ')}${warningMsg}`
       };
     }
     return {
       success: true,
       count: 0,
-      message: `No changes since last sync`
+      message: `No changes since last sync${warningMsg}`
     };
   }
 
@@ -1120,7 +1123,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 

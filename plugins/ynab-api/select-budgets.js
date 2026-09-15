@@ -24,10 +24,31 @@ function parseRules(value, budgets = []) {
   if (!raw) return [];
 
   const parseRuleLine = (line) => {
-    const normalized = line.trim().replace(/,+$/, '').trim();
-    if (!normalized) return [];
-    if (budgets.some(b => matches(b, normalized))) return [normalized];
-    return normalized.split(',').map(s => s.trim()).filter(Boolean);
+    const rules = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        const rule = current.trim();
+        if (rule) rules.push(rule);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+
+    const lastRule = current.trim();
+    if (lastRule) rules.push(lastRule);
+    return rules;
   };
 
   if (raw.includes('\n')) {

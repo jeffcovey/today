@@ -412,6 +412,46 @@ console.log(JSON.stringify({ entries: [], files_processed: [], incremental: fals
       };
     });
 
+    describe('metadata warning surfacing', () => {
+      let pluginDir;
+      let plugin;
+
+      beforeAll(() => {
+        pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'warning-stub-'));
+        const readPath = path.join(pluginDir, 'read.js');
+        fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+    entries: [],
+    files_processed: [],
+    incremental: true,
+    metadata: { warnings: ['simulated warning'] }
+}));
+`);
+        fs.chmodSync(readPath, 0o755);
+        plugin = {
+          name: 'warning-stub',
+          type: 'tasks',
+          _path: pluginDir,
+          commands: { read: 'read.js' }
+        };
+      });
+
+      afterAll(() => {
+        fs.rmSync(pluginDir, { recursive: true, force: true });
+      });
+
+      test('includes plugin warnings in successful sync messages', async () => {
+        const db = new Database(':memory:');
+        db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+        db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+
+        const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('simulated warning');
+      });
+    });
+
     afterAll(() => {
       fs.rmSync(pluginDir, { recursive: true, force: true });
     });

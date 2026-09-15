@@ -147,14 +147,14 @@ async function main() {
   });
   const droppedBudgets = [...excluded, ...skippedByAllowlist];
 
-  // A rule that matches nothing usually means a typo or a renamed budget. Say so
-  // loudly — a denylist is only trustworthy if its misses are visible.
-  for (const rule of unmatched.exclude) {
-    console.error(`Warning: exclude_budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`);
-  }
-  for (const rule of unmatched.include) {
-    console.error(`Warning: budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`);
-  }
+  const warnings = [
+    ...unmatched.exclude.map(
+      rule => `exclude_budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`
+    ),
+    ...unmatched.include.map(
+      rule => `budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`
+    )
+  ];
 
   // Budgets filtered out of the sync should not keep stale delta-sync state.
   for (const b of droppedBudgets) {
@@ -174,7 +174,9 @@ async function main() {
         hint,
         all_budgets: allBudgets.map(b => ({ id: b.id, name: b.name })),
         excluded,
-        skipped_by_budget_ids: skippedByAllowlist
+        skipped_by_budget_ids: skippedByAllowlist,
+        unmatched_rules: unmatched,
+        warnings
       }
     }));
     process.exit(0);
@@ -282,6 +284,7 @@ async function main() {
       excluded_budgets: excluded,
       skipped_by_budget_ids: skippedByAllowlist,
       unmatched_rules: unmatched,
+      warnings,
       rows_purged_for_dropped_budgets: purgedRows,
       transactions_upserted: entries.length,
       transactions_deleted: toDelete.length,

@@ -53,16 +53,16 @@ describe('selectBudgets', () => {
       expect(selected).toEqual([CURRENT]);
     });
 
-    test('treats an exact single budget name with a comma as one rule', () => {
+    test('accepts a quoted budget name containing a comma', () => {
       const { selected } = selectBudgets([SHARED, CURRENT], {
-        excludeBudgetIds: SHARED.name
+        excludeBudgetIds: `"${SHARED.name}"`
       });
       expect(selected).toEqual([CURRENT]);
     });
 
     test('supports newline-separated rules for names that contain commas', () => {
       const { selected } = selectBudgets([SHARED, CURRENT, FUTURE], {
-        excludeBudgetIds: `${SHARED.name}\n${FUTURE.name}`
+        excludeBudgetIds: `"${SHARED.name}"\n${FUTURE.name}`
       });
       expect(selected).toEqual([CURRENT]);
     });
@@ -109,10 +109,10 @@ describe('selectBudgets', () => {
       expect(skippedByAllowlist).toEqual([{ id: FUTURE.id, name: FUTURE.name }]);
     });
 
-    test('prefers an exact single-line budget name match even when a split piece also matches', () => {
+    test('quoted comma-containing names do not exclude split-piece matches', () => {
       const homeOnly = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', name: 'Home' };
       const { selected } = selectBudgets([SHARED, homeOnly, CURRENT], {
-        excludeBudgetIds: SHARED.name
+        excludeBudgetIds: `"${SHARED.name}"`
       });
       expect(selected).toEqual([homeOnly, CURRENT]);
     });

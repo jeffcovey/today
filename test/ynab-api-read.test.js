@@ -79,4 +79,20 @@ describe('ynab-api read plugin', () => {
     });
     expect(JSON.parse(fs.readFileSync(statePath, 'utf8'))).toEqual({ budgets: {} });
   });
+
+  test('returns unmatched-rule warnings in structured metadata', () => {
+    const run = runReadPlugin(
+      tempRoot,
+      createFetchMock(tempRoot, [CURRENT]),
+      { exclude_budget_ids: 'Budget That Does Not Exist' }
+    );
+
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout).metadata).toMatchObject({
+      unmatched_rules: { exclude: ['Budget That Does Not Exist'] },
+      warnings: [
+        'exclude_budget_ids entry "Budget That Does Not Exist" matched no budget — check for a typo or a renamed budget'
+      ]
+    });
+  });
 });
