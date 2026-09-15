@@ -889,6 +889,16 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const warningMsg = Array.isArray(pluginMetadata?.warnings) && pluginMetadata.warnings.length > 0
     ? `\n    Warnings: ${pluginMetadata.warnings.join(' | ')}`
     : '';
+  const runFinanceReconcile = async () => {
+    if (plugin.type !== 'finance') return null;
+    try {
+      return reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
+    } catch (error) {
+      // Reconciliation is a reporting refinement; never fail a sync over it
+      console.error(`Warning: finance reconciliation failed: ${error.message}`);
+      return null;
+    }
+  };
 
   // If no entries and incremental, nothing changed — unless rows were removed
   // outside the loader-managed insert path, in which case sync metadata must
@@ -898,22 +908,20 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // another source did not change in a way that makes these rows redundant.
   // Cheap and idempotent — it clears and recomputes every run (#479).
   let reconcileReport = null;
-  if (plugin.type === 'finance') {
-    try {
-      reconcileReport = reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
-    } catch (error) {
-      // Reconciliation is a reporting refinement; never fail a sync over it
-      console.error(`Warning: finance reconciliation failed: ${error.message}`);
-    }
+  if (plugin.type === 'finance' && entries.length === 0 && isIncremental) {
+    reconcileReport = await runFinanceReconcile();
   }
 
-  const reconciledTotal = reconcileReport
-    ? reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled
-    : 0;
-  const reconcileMsg = reconciledTotal > 0
-    ? `\n    Superseded ${reconciledTotal} duplicate row(s) from lower-precedence sources` +
-      ` (key: ${reconcileReport.by_key}, window: ${reconcileReport.by_window}, scheduled: ${reconcileReport.by_scheduled})`
-    : '';
+  const buildReconcileMsg = (report) => {
+    const reconciledTotal = report
+      ? report.by_key + report.by_window + report.by_scheduled
+      : 0;
+    return reconciledTotal > 0
+      ? `\n    Superseded ${reconciledTotal} duplicate row(s) from lower-precedence sources` +
+          ` (key: ${report.by_key}, window: ${report.by_window}, scheduled: ${report.by_scheduled})`
+      : '';
+  };
+  let reconcileMsg = buildReconcileMsg(reconcileReport);
 
   if (entries.length === 0 && isIncremental) {
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
@@ -925,7 +933,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       return {
         success: true,
         count: 0,
-        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}`
+        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}${reconcileMsg}`
       };
     }
     return {
@@ -951,10 +959,11 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Insert entries with source identifier
   const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  reconcileReport = await runFinanceReconcile();
+  reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
   updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
-
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;

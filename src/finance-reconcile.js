@@ -112,16 +112,44 @@ export function getSourcePrecedence(sourceId, config, plugins) {
 }
 
 /**
- * Date range a source covers authoritatively, derived from its own non-scheduled
- * rows. A source cannot claim a window it has no data in.
+ * Budget identity shared across sources. Prefer explicit metadata; fall back to
+ * the CSV export filename used by ynab-finance so existing rows still scope
+ * correctly before that plugin starts writing budget_name directly.
  */
-function coverageWindow(db, sourceId) {
-  const row = db.prepare(`
-    SELECT MIN(date) AS start, MAX(date) AS end
+function budgetScopeSql(alias) {
+  return `COALESCE(
+    NULLIF(LOWER(TRIM(json_extract(${alias}.metadata, '$.budget_name'))), ''),
+    CASE
+      WHEN INSTR(COALESCE(json_extract(${alias}.metadata, '$.source_file'), ''), ' as of ') > 0
+      THEN LOWER(TRIM(SUBSTR(
+        json_extract(${alias}.metadata, '$.source_file'),
+        1,
+        INSTR(json_extract(${alias}.metadata, '$.source_file'), ' as of ') - 1
+      )))
+    END,
+    NULLIF(LOWER(TRIM(json_extract(${alias}.metadata, '$.budget_id'))), '')
+  )`;
+}
+
+function budgetMatchSql(leftAlias, rightAlias) {
+  const left = budgetScopeSql(leftAlias);
+  const right = budgetScopeSql(rightAlias);
+  return `(${left} IS NULL OR ${right} IS NULL OR ${left} = ${right})`;
+}
+
+/**
+ * Date ranges a source covers authoritatively, derived from its own
+ * non-scheduled rows. A source cannot claim a window it has no data in, and one
+ * budget's coverage must not hide another budget's export.
+ */
+function coverageWindows(db, sourceId) {
+  const budgetScope = budgetScopeSql('financial_transactions');
+  return db.prepare(`
+    SELECT ${budgetScope} AS budget_scope, MIN(date) AS start, MAX(date) AS end
     FROM financial_transactions
     WHERE source = ? AND IFNULL(scheduled, 0) = 0
-  `).get(sourceId);
-  return row?.start && row?.end ? row : null;
+    GROUP BY 1
+  `).all(sourceId).filter(row => row.start && row.end);
 }
 
 /**
@@ -161,6 +189,7 @@ export function reconcileFinanceSources(db, config, plugins) {
         SET superseded_by = (
           SELECT w.id FROM financial_transactions w
           WHERE w.source = ? AND w.dedup_key = loser.dedup_key
+            AND ${budgetMatchSql('w', 'loser')}
           LIMIT 1
         )
         WHERE loser.source IN (${placeholders})
@@ -169,20 +198,28 @@ export function reconcileFinanceSources(db, config, plugins) {
           AND EXISTS (
             SELECT 1 FROM financial_transactions w
             WHERE w.source = ? AND w.dedup_key = loser.dedup_key
+              AND ${budgetMatchSql('w', 'loser')}
           )
       `).run(winner.source, ...losers, winner.source).changes;
 
       // 2. window precedence
-      const window = coverageWindow(db, winner.source);
-      if (window) {
+      for (const window of coverageWindows(db, winner.source)) {
         report.by_window += db.prepare(`
           UPDATE financial_transactions AS loser
           SET superseded_by = ?
           WHERE loser.source IN (${placeholders})
             AND loser.superseded_by IS NULL
             AND IFNULL(loser.scheduled, 0) = 0
+            AND (? IS NULL OR ${budgetScopeSql('loser')} IS NULL OR ${budgetScopeSql('loser')} = ?)
             AND loser.date BETWEEN ? AND ?
-        `).run(`source:${winner.source}`, ...losers, window.start, window.end).changes;
+        `).run(
+          `source:${winner.source}`,
+          ...losers,
+          window.budget_scope,
+          window.budget_scope,
+          window.start,
+          window.end
+        ).changes;
       }
 
       // 3. scheduled-rule precedence — a projection replaced by the rule itself
@@ -193,15 +230,18 @@ export function reconcileFinanceSources(db, config, plugins) {
           WHERE w.source = ? AND IFNULL(w.scheduled,0) = 1
             AND w.amount = loser.amount
             AND IFNULL(LOWER(TRIM(w.payee)),'') = IFNULL(LOWER(TRIM(loser.payee)),'')
+            AND ${budgetMatchSql('w', 'loser')}
           LIMIT 1
         )
         WHERE loser.source IN (${placeholders})
           AND loser.superseded_by IS NULL
+          AND loser.date >= DATE('now')
           AND EXISTS (
             SELECT 1 FROM financial_transactions w
             WHERE w.source = ? AND IFNULL(w.scheduled,0) = 1
               AND w.amount = loser.amount
               AND IFNULL(LOWER(TRIM(w.payee)),'') = IFNULL(LOWER(TRIM(loser.payee)),'')
+              AND ${budgetMatchSql('w', 'loser')}
           )
       `).run(winner.source, ...losers, winner.source).changes;
     }

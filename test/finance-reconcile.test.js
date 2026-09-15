@@ -36,10 +36,10 @@ function makeDb() {
 
 function insert(db, rows) {
   const stmt = db.prepare(`INSERT INTO financial_transactions
-    (id, source, date, account, payee, amount, category, scheduled)
-    VALUES (@id, @source, @date, @account, @payee, @amount, @category, @scheduled)`);
+    (id, source, date, account, payee, amount, category, scheduled, metadata)
+    VALUES (@id, @source, @date, @account, @payee, @amount, @category, @scheduled, @metadata)`);
   for (const r of rows) {
-    stmt.run({ category: null, scheduled: 0, payee: null, ...r });
+    stmt.run({ category: null, scheduled: 0, payee: null, metadata: null, ...r });
   }
 }
 
@@ -116,8 +116,8 @@ describe('reconcileFinanceSources', () => {
   test('rule 1: an exact key match supersedes the lower-precedence row', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 },
-      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 }
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
 
@@ -132,10 +132,10 @@ describe('reconcileFinanceSources', () => {
   test('rule 2: a shifted row inside the API window is superseded despite no key match', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'AWS', amount: -161.34 },
-      { id: 'a2', source: API, date: '2026-06-01', account: 'Chase', payee: 'Other', amount: -10 },
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'AWS', amount: -161.34, metadata: '{"budget_name":"Household"}' },
+      { id: 'a2', source: API, date: '2026-06-01', account: 'Chase', payee: 'Other', amount: -10, metadata: '{"budget_name":"Household"}' },
       // pending at export: cleared two days later for a different amount
-      { id: 'c1', source: CSV, date: '2026-05-03', account: 'Chase', payee: 'AWS', amount: -159.00 }
+      { id: 'c1', source: CSV, date: '2026-05-03', account: 'Chase', payee: 'AWS', amount: -159.00, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
 
@@ -148,12 +148,12 @@ describe('reconcileFinanceSources', () => {
   test('rule 3: a projected future row is superseded by the scheduled rule', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Now', amount: -1 },
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Now', amount: -1, metadata: '{"budget_name":"Household"}' },
       // the rule's date_next has rolled on to next year's occurrence
-      { id: 'as', source: API, date: '2027-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, scheduled: 1 },
+      { id: 'as', source: API, date: '2027-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, scheduled: 1, metadata: '{"budget_name":"Household"}' },
       // the CSV froze this year's projection — different date, so no key match,
       // and outside the API's real-transaction window, so rule 2 cannot apply
-      { id: 'c1', source: CSV, date: '2026-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54 }
+      { id: 'c1', source: CSV, date: '2026-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
 
@@ -167,9 +167,9 @@ describe('reconcileFinanceSources', () => {
   test('rows outside every higher-precedence window survive', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'X', amount: -1 },
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'X', amount: -1, metadata: '{"budget_name":"Household"}' },
       // predates the API's retention window — the CSV is the only record of it
-      { id: 'c1', source: CSV, date: '2019-01-01', account: 'Chase', payee: 'Ancient', amount: -50 }
+      { id: 'c1', source: CSV, date: '2019-01-01', account: 'Chase', payee: 'Ancient', amount: -50, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     reconcileFinanceSources(db, CONFIG, PLUGINS);
 
@@ -180,8 +180,8 @@ describe('reconcileFinanceSources', () => {
   test('nothing is ever deleted', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 },
-      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 }
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     reconcileFinanceSources(db, CONFIG, PLUGINS);
 
@@ -192,8 +192,8 @@ describe('reconcileFinanceSources', () => {
   test('is idempotent — running twice changes nothing', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 },
-      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 }
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     const first = reconcileFinanceSources(db, CONFIG, PLUGINS);
     const snapshot = db.prepare(`SELECT id, superseded_by FROM financial_transactions ORDER BY id`).all();
@@ -207,8 +207,8 @@ describe('reconcileFinanceSources', () => {
   test('supersession lifts when the winning source goes away', () => {
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 },
-      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 }
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     reconcileFinanceSources(db, CONFIG, PLUGINS);
     expect(live(db, CSV)).toBe(0);
@@ -237,12 +237,56 @@ describe('reconcileFinanceSources', () => {
     ]);
     const db = makeDb();
     insert(db, [
-      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 },
-      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93 }
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Chase', payee: 'Disney+', amount: -14.93, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     reconcileFinanceSources(db, CONFIG, plugins);
 
     expect(live(db, API)).toBe(1);
+    expect(live(db, CSV)).toBe(1);
+    db.close();
+  });
+
+  test('same-looking rows from different budgets do not supersede each other', () => {
+    const db = makeDb();
+    insert(db, [
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Checking', payee: 'Starbucks', amount: -5, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-01', account: 'Checking', payee: 'Starbucks', amount: -5, metadata: '{"source_file":"Travel as of 2026-05-02 12-00 - Register.csv"}' }
+    ]);
+
+    const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
+
+    expect(report.by_key).toBe(0);
+    expect(live(db, API)).toBe(1);
+    expect(live(db, CSV)).toBe(1);
+    db.close();
+  });
+
+  test('a higher-precedence budget window does not hide another budget export', () => {
+    const db = makeDb();
+    insert(db, [
+      { id: 'a1', source: API, date: '2026-05-01', account: 'Checking', payee: 'Rent', amount: -1000, metadata: '{"budget_name":"Household"}' },
+      { id: 'a2', source: API, date: '2026-06-01', account: 'Checking', payee: 'Groceries', amount: -50, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-05-15', account: 'Checking', payee: 'Hotel', amount: -250, metadata: '{"source_file":"Travel as of 2026-05-02 12-00 - Register.csv"}' }
+    ]);
+
+    const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
+
+    expect(report.by_window).toBe(0);
+    expect(live(db, CSV)).toBe(1);
+    db.close();
+  });
+
+  test('a scheduled rule does not hide an old real transaction', () => {
+    const db = makeDb();
+    insert(db, [
+      { id: 'as', source: API, date: '2027-11-12', account: 'Checking', payee: 'Broward County Tax', amount: -10368.54, scheduled: 1, metadata: '{"budget_name":"Household"}' },
+      { id: 'c1', source: CSV, date: '2026-01-12', account: 'Checking', payee: 'Broward County Tax', amount: -10368.54, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
+    ]);
+
+    const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
+
+    expect(report.by_scheduled).toBe(0);
     expect(live(db, CSV)).toBe(1);
     db.close();
   });
