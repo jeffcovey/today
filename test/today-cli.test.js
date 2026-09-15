@@ -69,10 +69,42 @@ function withFakeNpx(callback) {
   const fakeBinDir = mkdtempSync(path.join(tmpdir(), 'today-fake-bin-'));
   const markerPath = path.join(fakeBinDir, 'dotenvx-ran');
   const fakeNpxPath = path.join(fakeBinDir, 'npx');
-  const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.CMD');
+  const fakeNpxShimPath = path.join(fakeBinDir, 'npx-shim.mjs');
+  const fakeNpxCmdPath = path.join(fakeBinDir, 'npx.cmd');
+  const fakeNpxCmdUpperPath = path.join(fakeBinDir, 'npx.CMD');
 
-  writeFileSync(fakeNpxPath, '#!/bin/sh\nprintf "dotenvx-called" > "$NPX_MARKER"\nexit 0\n');
-  writeFileSync(fakeNpxCmdPath, '@echo off\r\ntype nul > "%NPX_MARKER%"\r\nexit /b 0\r\n');
+  writeFileSync(
+    fakeNpxShimPath,
+    `import { spawnSync } from 'child_process';
+import { writeFileSync } from 'fs';
+
+if (process.env.NPX_MARKER) {
+  writeFileSync(process.env.NPX_MARKER, '');
+}
+
+const separatorIndex = process.argv.indexOf('--');
+const commandArgs = separatorIndex === -1 ? [] : process.argv.slice(separatorIndex + 1);
+
+if (commandArgs.length === 0) {
+  process.exit(1);
+}
+
+const [command, ...args] = commandArgs;
+const result = spawnSync(command, args, {
+  stdio: 'inherit',
+  env: { ...process.env, DOTENVX_RUNNING: '1' },
+});
+
+if (result.error) {
+  throw result.error;
+}
+
+process.exit(result.status ?? 1);
+`
+  );
+  writeFileSync(fakeNpxPath, '#!/bin/sh\nexec node "$(dirname "$0")/npx-shim.mjs" "$@"\n');
+  writeFileSync(fakeNpxCmdPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
+  writeFileSync(fakeNpxCmdUpperPath, '@echo off\r\nnode "%~dp0npx-shim.mjs" %*\r\nexit /b %ERRORLEVEL%\r\n');
   chmodSync(fakeNpxPath, 0o755);
 
   try {
@@ -211,6 +243,7 @@ describe('bin/today CLI', () => {
           const result = runToday('dry-run --no-sync', { cwd, env });
 
           expect(result.exitCode).toBe(0);
+          expect(result.stdout).toContain('You are an agent helping a user');
           expect(existsSync(markerPath)).toBe(true);
         });
       });
