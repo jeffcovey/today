@@ -883,6 +883,8 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged_for_dropped_budgets || 0);
+  const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
+  const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
   const warningMsg = Array.isArray(pluginMetadata?.warnings) && pluginMetadata.warnings.length > 0
     ? `\n    Warnings: ${pluginMetadata.warnings.join(' | ')}`
     : '';
@@ -900,13 +902,13 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       return {
         success: true,
         count: 0,
-        message: `${messages.join('; ')}${warningMsg}`
+        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}`
       };
     }
     return {
       success: true,
       count: 0,
-      message: `No changes since last sync${warningMsg}`
+      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}`
     };
   }
 
@@ -1123,7 +1125,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 

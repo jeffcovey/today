@@ -450,6 +450,34 @@ console.log(JSON.stringify({
         expect(result.success).toBe(true);
         expect(result.message).toContain('simulated warning');
       });
+
+      test('includes plugin message and hint in empty incremental sync messages', async () => {
+        const readPath = path.join(pluginDir, 'read.js');
+        fs.writeFileSync(readPath, `#!/usr/bin/env node
+console.log(JSON.stringify({
+    entries: [],
+    files_processed: [],
+    incremental: true,
+    metadata: {
+      message: 'No YNAB budgets to sync',
+      hint: 'All budgets were filtered out',
+      warnings: ['simulated warning']
+    }
+}));
+`);
+        fs.chmodSync(readPath, 0o755);
+
+        const db = new Database(':memory:');
+        db.exec(`CREATE TABLE tasks (${getSqlColumns('tasks')})`);
+        db.exec(`CREATE TABLE sync_metadata (source TEXT PRIMARY KEY, sync_locked_at TEXT, sync_locked_by TEXT, last_synced_at TEXT, last_sync_files TEXT, entries_count INTEGER, extra_data TEXT)`);
+
+        const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('No YNAB budgets to sync');
+        expect(result.message).toContain('All budgets were filtered out');
+        expect(result.message).toContain('simulated warning');
+      });
     });
 
     afterAll(() => {
