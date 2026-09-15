@@ -70,7 +70,7 @@ export function hasEnvVar(key) {
 
 /** Clear an env var's effective value while keeping the encrypted file valid. */
 export function clearEnvVar(key) {
-  return setEnvVar(key, '');
+  return setEnvVar(key, '') === true;
 }
 
 /**
