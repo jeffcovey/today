@@ -9,6 +9,7 @@ jest.unstable_mockModule('child_process', () => ({
 const {
   clearEnvVar,
   clearEncryptedSettings,
+  deleteSourceConfig,
   rollbackEncryptedSettingBackups,
   deleteSourceConfigWithSecrets
 } = await import('../src/encrypted-settings.js');
@@ -73,6 +74,19 @@ describe('encrypted settings cleanup', () => {
     )).toBe(true);
 
     expect(clearSettings).toHaveBeenCalledWith('test', 'default', { secret: { encrypted: true } });
+    expect(config).toEqual({ plugins: {} });
+  });
+
+  test('deleteSourceConfig removes the source without touching secrets', () => {
+    const config = {
+      plugins: {
+        test: {
+          default: { enabled: true }
+        }
+      }
+    };
+
+    expect(deleteSourceConfig(config, 'test', 'default')).toBe(true);
     expect(config).toEqual({ plugins: {} });
   });
 

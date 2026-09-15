@@ -117,6 +117,12 @@ describe('encrypted settings', () => {
       expect(bodyOf(fn)).toContain('rollbackEncryptedSettingChanges');
     });
 
+    test.each(['addSource', 'editSource'])('%s rolls back encrypted writes when the config CAS write conflicts', (fn) => {
+      const body = bodyOf(fn);
+      expect(body).toContain('if (!saveSourceConfig(');
+      expect(body).toContain('rollbackEncryptedSettingChanges(encryptedSettingBackups);');
+    });
+
     test('rollbackEncryptedSettingChanges surfaces rollback failures', () => {
       expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('rollbackEncryptedSettingBackups');
       expect(bodyOf('rollbackEncryptedSettingChanges')).toContain('p.log.error');
@@ -135,7 +141,15 @@ describe('encrypted settings', () => {
 
     test('removeSource clears encrypted settings when deleting a source', () => {
       expect(bodyOf('removeSource')).toContain('deleteSourceConfigWithSecretsFromFile');
-      expect(bodyOf('removeSource')).toContain('Failed to clear encrypted settings');
+      expect(bodyOf('removeSource')).toContain('Failed to remove');
+    });
+
+    test('deleteSourceConfigWithSecretsFromFile only clears encrypted settings after a successful CAS write', () => {
+      const body = bodyOf('deleteSourceConfigWithSecretsFromFile');
+      expect(body).toContain('deleteSourceConfig(');
+      expect(body).toContain('writeConfigToml(');
+      expect(body).toContain('clearEncryptedSettings(');
+      expect(body.indexOf('writeConfigToml(')).toBeLessThan(body.indexOf('clearEncryptedSettings('));
     });
   });
 

@@ -138,6 +138,20 @@ export function rollbackEncryptedSettingBackups(
   return failures;
 }
 
+/** Remove a source from config without touching any encrypted settings. */
+export function deleteSourceConfig(config, pluginName, sourceName) {
+  if (!config.plugins?.[pluginName]?.[sourceName]) {
+    return true;
+  }
+
+  delete config.plugins[pluginName][sourceName];
+  if (Object.keys(config.plugins[pluginName]).length === 0) {
+    delete config.plugins[pluginName];
+  }
+
+  return true;
+}
+
 /** Remove a source from config only after its encrypted settings are cleared. */
 export function deleteSourceConfigWithSecrets(
   config,
@@ -154,10 +168,5 @@ export function deleteSourceConfigWithSecrets(
     return false;
   }
 
-  delete config.plugins[pluginName][sourceName];
-  if (Object.keys(config.plugins[pluginName]).length === 0) {
-    delete config.plugins[pluginName];
-  }
-
-  return true;
+  return deleteSourceConfig(config, pluginName, sourceName);
 }

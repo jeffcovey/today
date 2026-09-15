@@ -13,7 +13,8 @@ import { colors } from '../src/cli-utils.js';
 import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
 import { readConfigToml, writeConfigToml, reportConfigConflict } from '../src/configure-toml-io.js';
 import {
-  deleteSourceConfigWithSecrets,
+  clearEncryptedSettings,
+  deleteSourceConfig,
   getEnvVar,
   getEncryptedEnvVarName,
   rollbackEncryptedSettingBackups,
@@ -693,7 +694,11 @@ async function addSource(plugin, pluginName, existingSources) {
   // Save
   const s = p.spinner();
   s.start('Saving configuration');
-  saveSourceConfig(pluginName, sourceName, stripEncryptedSettings(plugin.settings, sourceConfig));
+  if (!saveSourceConfig(pluginName, sourceName, stripEncryptedSettings(plugin.settings, sourceConfig))) {
+    rollbackEncryptedSettingChanges(encryptedSettingBackups);
+    s.stop(colors.red(`✗ Did not add source "${sourceName}"`));
+    return;
+  }
   s.stop(colors.green(`✓ Added source "${sourceName}"`));
 }
 
@@ -784,7 +789,11 @@ async function editSource(plugin, pluginName, allSources) {
   // Save
   const s = p.spinner();
   s.start('Saving changes');
-  saveSourceConfig(pluginName, sourceToEdit, stripEncryptedSettings(plugin.settings, sourceConfig));
+  if (!saveSourceConfig(pluginName, sourceToEdit, stripEncryptedSettings(plugin.settings, sourceConfig))) {
+    rollbackEncryptedSettingChanges(encryptedSettingBackups);
+    s.stop(colors.red(`✗ Did not update "${sourceToEdit}"`));
+    return;
+  }
   s.stop(colors.green(`✓ Updated "${sourceToEdit}"`));
 }
 
@@ -801,16 +810,18 @@ function rollbackEncryptedSettingChanges(encryptedSettingBackups) {
 function deleteSourceConfigWithSecretsFromFile(pluginName, sourceName, pluginSettings) {
   const { config, raw } = readConfigToml(CONFIG_PATH);
 
-  if (!deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings)) {
-    return false;
+  if (!config.plugins?.[pluginName]?.[sourceName]) {
+    return true;
   }
 
+  deleteSourceConfig(config, pluginName, sourceName);
   const { conflict } = writeConfigToml(CONFIG_PATH, config, raw);
   if (conflict) {
     reportConfigConflict(CONFIG_PATH, 'bin/plugins configure');
     return false;
   }
-  return true;
+
+  return clearEncryptedSettings(pluginName, sourceName, pluginSettings);
 }
 
 async function removeSource(plugin, pluginName, allSources) {
@@ -843,7 +854,7 @@ async function removeSource(plugin, pluginName, allSources) {
   const s = p.spinner();
   s.start('Removing source');
   if (!deleteSourceConfigWithSecretsFromFile(pluginName, sourceToRemove, plugin.settings)) {
-    s.stop(colors.red(`✗ Failed to clear encrypted settings for "${sourceToRemove}"`));
+    s.stop(colors.red(`✗ Failed to remove "${sourceToRemove}" cleanly`));
     return;
   }
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));
