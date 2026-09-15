@@ -36,6 +36,20 @@ function escapeGraphQLString(value) {
     .replace(/\n/g, '\\n');
 }
 
+function buildMetadataIssueBody(projectTitle, reviewDate, frequency) {
+  const dayOfWeek = new Date(`${reviewDate}T00:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'long',
+    timeZone: 'UTC'
+  });
+
+  return `This issue tracks review scheduling for the ${projectTitle} project.
+
+**Next Review Date:** ${reviewDate} (${dayOfWeek})
+**Review Frequency:** ${frequency}
+
+This is a metadata issue for project management - not a development task.`;
+}
+
 // Parse project ID to extract owner type, owner, and project number
 // Format: "github-projects/source:owner#number" or just "owner#number"
 // ownerTypeHint can be passed from the caller if known (from metadata)
@@ -293,13 +307,7 @@ function getProjectRepository(owner, number, ownerType) {
 
 // Create metadata issue for review scheduling
 function createMetadataIssue(repoOwner, repoName, projectTitle, reviewDate, frequency) {
-  const dayOfWeek = new Date(reviewDate).toLocaleDateString('en-US', { weekday: 'long' });
-  const body = `This issue tracks review scheduling for the ${projectTitle} project.
-
-**Next Review Date:** ${reviewDate} (${dayOfWeek})
-**Review Frequency:** ${frequency}
-
-This is a metadata issue for project management - not a development task.`;
+  const body = buildMetadataIssueBody(projectTitle, reviewDate, frequency);
 
   const mutation = `
     mutation {
@@ -323,13 +331,7 @@ This is a metadata issue for project management - not a development task.`;
 
 // Update existing metadata issue for review scheduling
 function updateMetadataIssue(issueId, projectTitle, reviewDate, frequency) {
-  const dayOfWeek = new Date(reviewDate).toLocaleDateString('en-US', { weekday: 'long' });
-  const body = `This issue tracks review scheduling for the ${projectTitle} project.
-
-**Next Review Date:** ${reviewDate} (${dayOfWeek})
-**Review Frequency:** ${frequency}
-
-This is a metadata issue for project management - not a development task.`;
+  const body = buildMetadataIssueBody(projectTitle, reviewDate, frequency);
 
   const mutation = `
     mutation {
