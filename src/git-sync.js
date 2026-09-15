@@ -1,6 +1,6 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { appendFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 import os from 'os';
 
 export function defaultLogPath() {
@@ -27,7 +27,7 @@ export function runGitSync({ vaultPath, logPath = defaultLogPath(), env = proces
   }
 
   function runGit(args) {
-    return execSync(`git ${args}`, {
+    return execFileSync('git', args, {
       cwd: vaultPath,
       env: gitEnv,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -45,8 +45,8 @@ export function runGitSync({ vaultPath, logPath = defaultLogPath(), env = proces
 
   let gitDir;
   try {
-    gitDir = runGit('rev-parse --git-dir').toString().trim();
-    if (!gitDir.startsWith('/')) gitDir = join(vaultPath, gitDir);
+    gitDir = runGit(['rev-parse', '--git-dir']).toString().trim();
+    if (!isAbsolute(gitDir)) gitDir = join(vaultPath, gitDir);
   } catch (err) {
     log(`FATAL ${vaultPath} is not a git repo: ${stderrOf(err)}`);
     return 1;
@@ -57,21 +57,21 @@ export function runGitSync({ vaultPath, logPath = defaultLogPath(), env = proces
 
   if (rebaseInProgress()) {
     log('WARN stale rebase state detected, aborting');
-    try { runGit('rebase --abort'); } catch { /* best-effort */ }
+    try { runGit(['rebase', '--abort']); } catch { /* best-effort */ }
   }
 
   try {
-    runGit('pull --rebase --autostash');
+    runGit(['pull', '--rebase', '--autostash']);
   } catch (err) {
     log(`ERROR pull failed: ${stderrOf(err)}`);
     if (rebaseInProgress()) {
-      try { runGit('rebase --abort'); } catch { /* best-effort */ }
+      try { runGit(['rebase', '--abort']); } catch { /* best-effort */ }
     }
     return 2;
   }
 
   try {
-    runGit('push');
+    runGit(['push']);
   } catch (err) {
     log(`ERROR push failed: ${stderrOf(err)}`);
     return 3;
