@@ -893,6 +893,28 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // If no entries and incremental, nothing changed — unless rows were removed
   // outside the loader-managed insert path, in which case sync metadata must
   // still be refreshed so caches see the new row count.
+  // Reconcile finance sources against each other. Must run before the
+  // no-change early return: this source having nothing new does not mean
+  // another source did not change in a way that makes these rows redundant.
+  // Cheap and idempotent — it clears and recomputes every run (#479).
+  let reconcileReport = null;
+  if (plugin.type === 'finance') {
+    try {
+      reconcileReport = reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
+    } catch (error) {
+      // Reconciliation is a reporting refinement; never fail a sync over it
+      console.error(`Warning: finance reconciliation failed: ${error.message}`);
+    }
+  }
+
+  const reconciledTotal = reconcileReport
+    ? reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled
+    : 0;
+  const reconcileMsg = reconciledTotal > 0
+    ? `\n    Superseded ${reconciledTotal} duplicate row(s) from lower-precedence sources` +
+      ` (key: ${reconcileReport.by_key}, window: ${reconcileReport.by_window}, scheduled: ${reconcileReport.by_scheduled})`
+    : '';
+
   if (entries.length === 0 && isIncremental) {
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
@@ -909,7 +931,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     return {
       success: true,
       count: 0,
-      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}`
+      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`
     };
   }
 
@@ -933,18 +955,6 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
   updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
 
-  // Reconcile finance sources against each other. Runs after any finance sync
-  // because a change on one side can make rows on another side redundant, and
-  // it is cheap and idempotent — it recomputes from scratch each time (#479).
-  let reconcileReport = null;
-  if (plugin.type === 'finance') {
-    try {
-      reconcileReport = reconcileFinanceSources(db, getFullConfig(), await discoverPlugins());
-    } catch (error) {
-      // Reconciliation is a reporting refinement; never fail a sync over it
-      console.error(`Warning: finance reconciliation failed: ${error.message}`);
-    }
-  }
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
@@ -1126,10 +1136,6 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // FULL mode waits for readers to finish, ensuring consistency without truncating WAL
   db.pragma('wal_checkpoint(FULL)');
 
-  const reconcileMsg = reconcileReport && (reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled) > 0
-    ? `\n    Superseded ${reconcileReport.by_key + reconcileReport.by_window + reconcileReport.by_scheduled} duplicate row(s) from lower-precedence sources` +
-      ` (key: ${reconcileReport.by_key}, window: ${reconcileReport.by_window}, scheduled: ${reconcileReport.by_scheduled})`
-    : '';
   const incrementalMsg = isIncremental ? ' (incremental)' : '';
   const archiveMsg = archiveResult?.archived ? `, archived ${archiveResult.archived}` : '';
   const rebalanceMsg = archiveResult?.rebalanced ? `, rebalanced` : '';
