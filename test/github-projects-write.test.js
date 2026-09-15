@@ -27,6 +27,7 @@ function output(payload) {
 }
 
 if (query.includes('fields(first: 20)')) {
+  const totalCount = scenario === 'overflow-no-meta' ? 51 : 2;
   const metadataNodes = scenario === 'existing'
     ? [{
         id: 'ITEM_META_1',
@@ -47,6 +48,7 @@ if (query.includes('fields(first: 20)')) {
             nodes: [{ id: 'FIELD_REVIEW', name: 'Next Review Date', dataType: 'DATE' }]
           },
           items: {
+            totalCount,
             nodes: [
               { id: 'ITEM_1', content: { id: 'ISSUE_1', number: 1, title: 'Task issue' } },
               ...metadataNodes
@@ -169,6 +171,20 @@ describe('github-projects/write.js set-review-date metadata issue handling', () 
     expect(result.updated.metadataIssue.itemId).toBe('ITEM_META_NEW');
     expect(queries).toContain('createIssue(input:');
     expect(queries).toContain('addProjectV2ItemById(input:');
+    expect(queries).not.toContain('updateIssue(input:');
+  });
+
+  test('fails loudly when metadata lookup may be incomplete beyond first page', () => {
+    const { result, queries } = runWrite({
+      scenario: 'overflow-no-meta',
+      reviewDate: '2026-10-05',
+      frequency: 'weekly'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Unable to safely determine existing metadata issue');
+    expect(queries).not.toContain('createIssue(input:');
+    expect(queries).not.toContain('addProjectV2ItemById(input:');
     expect(queries).not.toContain('updateIssue(input:');
   });
 });

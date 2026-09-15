@@ -2,6 +2,7 @@
 
 // Write handler for github-projects plugin
 // Supports updating project dates by setting date fields on the first item
+const PROJECT_ITEMS_PAGE_SIZE = 50;
 
 import { execSync } from 'child_process';
 
@@ -109,7 +110,8 @@ async function getProjectDetails(owner, number, ownerType) {
               }
             }
           }
-          items(first: 50) {
+          items(first: ${PROJECT_ITEMS_PAGE_SIZE}) {
+            totalCount
             nodes {
               id
               content {
@@ -145,6 +147,7 @@ async function getProjectDetails(owner, number, ownerType) {
   // Get first item and review metadata item
   const firstItem = project.items.nodes[0];
   const reviewMetadataItem = project.items.nodes.find(item =>
+    item.content?.id &&
     item.content?.title?.includes('[META]') &&
     item.content?.title?.includes('Review Schedule')
   );
@@ -163,6 +166,7 @@ async function getProjectDetails(owner, number, ownerType) {
     nextReviewDateFieldId: nextReviewDateField?.id,
     firstItemId: firstItem?.id,
     reviewMetadataItem: reviewMetadataItem,
+    metadataSearchMayBeIncomplete: !reviewMetadataItem && (project.items.totalCount || 0) > PROJECT_ITEMS_PAGE_SIZE,
   };
 }
 
@@ -708,6 +712,11 @@ async function handleSetReviewDate() {
         return output({ success: false, error: 'Failed to update metadata issue' });
       }
       metadataItemId = details.reviewMetadataItem.id;
+    } else if (details.metadataSearchMayBeIncomplete) {
+      return output({
+        success: false,
+        error: `Unable to safely determine existing metadata issue: project has more than ${PROJECT_ITEMS_PAGE_SIZE} items and metadata issue was not found on the first page.`
+      });
     } else {
       // Create new metadata issue
       const repo = getProjectRepository(owner, number, type);
