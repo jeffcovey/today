@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import { selectBudgets } from './select-budgets.js';
 
 const require = createRequire(import.meta.url);
 
@@ -24,6 +25,7 @@ const contextOnly = process.env.CONTEXT_ONLY === 'true';
 const API_BASE = 'https://api.ynab.com/v1';
 const apiToken = config.api_token || '';
 const budgetIdsConfig = (config.budget_ids || '').trim();
+const excludeBudgetIdsConfig = (config.exclude_budget_ids || '').trim();
 const retentionDays = config.retention_days || 365;
 
 // Delta-sync state: server_knowledge per budget
@@ -53,12 +55,9 @@ async function apiFetch(url) {
   return res.json();
 }
 
-async function fetchBudgets() {
+async function fetchAllBudgets() {
   const data = await apiFetch(`${API_BASE}/budgets`);
-  const all = data.data.budgets;
-  if (!budgetIdsConfig || budgetIdsConfig === 'all') return all;
-  const ids = new Set(budgetIdsConfig.split(',').map(s => s.trim()).filter(Boolean));
-  return all.filter(b => ids.has(b.id));
+  return data.data.budgets;
 }
 
 // Returns a map of category_id → { name, group_name } for enriching transactions.
@@ -112,6 +111,43 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
   };
 }
 
+function removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) {
+  let purgedRows = 0;
+  if (toDelete.length === 0 && droppedBudgets.length === 0) return purgedRows;
+
+  let Database;
+  try {
+    Database = require('better-sqlite3');
+    const db = new Database(path.join(projectRoot, '.data', 'today.db'));
+
+    if (toDelete.length > 0) {
+      const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
+      db.transaction(ids => {
+        for (const id of ids) purgedRows += del.run(id).changes;
+      })(toDelete);
+    }
+
+    // Entry ids are `${sourceId}:${budget_id}:${ynab_tx_id}` — see convertTransaction
+    if (droppedBudgets.length > 0) {
+      const purge = db.prepare(
+        "DELETE FROM financial_transactions WHERE source = ? AND id LIKE ? ESCAPE '\\'"
+      );
+      db.transaction(list => {
+        for (const b of list) {
+          const prefix = `${sourceId}:${b.id}:`.replace(/[\\%_]/g, c => `\\${c}`);
+          purgedRows += purge.run(sourceId, `${prefix}%`).changes;
+        }
+      })(droppedBudgets);
+    }
+
+    db.close();
+  } catch (err) {
+    console.error(`Warning: could not remove transactions: ${err.message}`);
+  }
+
+  return purgedRows;
+}
+
 // Early exit for context-only mode — data is already in the DB cache
 if (contextOnly) {
   console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true, metadata: { skipped: 'context-only' } }));
@@ -134,20 +170,56 @@ async function main() {
   const entries = [];
   const toDelete = [];
 
-  let budgets;
+  let allBudgets;
   try {
-    budgets = await fetchBudgets();
+    allBudgets = await fetchAllBudgets();
   } catch (err) {
     console.log(JSON.stringify({ entries: [], metadata: { error: `Failed to fetch budgets: ${err.message}` } }));
     process.exit(1);
   }
 
+  const { selected: budgets, excluded, skippedByAllowlist, unmatched } = selectBudgets(allBudgets, {
+    budgetIds: budgetIdsConfig,
+    excludeBudgetIds: excludeBudgetIdsConfig
+  });
+  const allBudgetIds = new Set(allBudgets.map(b => b.id));
+  const disappeared = Object.entries(state.budgets || {})
+    .filter(([id]) => !allBudgetIds.has(id))
+    .map(([id, budgetState]) => ({ id, name: budgetState.budget_name || id }));
+  const droppedBudgets = [...excluded, ...skippedByAllowlist, ...disappeared];
+
+  const warnings = [
+    ...unmatched.exclude.map(
+      rule => `exclude_budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`
+    ),
+    ...unmatched.include.map(
+      rule => `budget_ids entry "${rule}" matched no budget — check for a typo or a renamed budget`
+    )
+  ];
+
+  // Budgets filtered out of the sync should not keep stale delta-sync state.
+  for (const b of droppedBudgets) {
+    if (state.budgets[b.id]) delete state.budgets[b.id];
+  }
+  if (allBudgets.length === 0) state.budgets = {};
+
   if (budgets.length === 0) {
+    const purgedRows = removeTransactions(projectRoot, sourceId, [], droppedBudgets);
+    const hint = allBudgets.length === 0
+      ? 'Your YNAB account has no budgets'
+      : `All ${allBudgets.length} budget(s) were filtered out by budget_ids/exclude_budget_ids`;
+    saveState(state);
     console.log(JSON.stringify({
       entries: [],
       metadata: {
-        message: 'No YNAB budgets found',
-        hint: budgetIdsConfig ? `No budgets matched budget_ids = "${budgetIdsConfig}"` : 'Your YNAB account has no budgets'
+        message: 'No YNAB budgets to sync',
+        hint,
+        all_budgets: allBudgets.map(b => ({ id: b.id, name: b.name })),
+        excluded,
+        skipped_by_budget_ids: skippedByAllowlist,
+        unmatched_rules: unmatched,
+        warnings,
+        rows_purged: purgedRows
       }
     }));
     process.exit(0);
@@ -202,19 +274,12 @@ async function main() {
 
   // Remove deleted transactions directly — the plugin loader's INSERT OR REPLACE
   // flow doesn't handle row deletions; we do it here the same way ynab-finance
-  // handles budget_allocations.
-  if (toDelete.length > 0) {
-    let Database;
-    try {
-      Database = require('better-sqlite3');
-      const db = new Database(path.join(projectRoot, '.data', 'today.db'));
-      const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
-      const deleteMany = db.transaction(ids => { for (const id of ids) del.run(id); });
-      deleteMany(toDelete);
-      db.close();
-    } catch (err) {
-      console.error(`Warning: could not delete ${toDelete.length} removed transaction(s): ${err.message}`);
-    }
+  // handles budget_allocations. Rows for dropped budgets go in the same pass, so
+  // excluding a budget actually removes its data rather than stranding it.
+  const purgedRows = removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets);
+
+  if (purgedRows > 0) {
+    console.error(`Removed ${purgedRows} row(s) belonging to ${droppedBudgets.length} excluded budget(s)`);
   }
 
   saveState(state);
@@ -226,7 +291,15 @@ async function main() {
     files_processed: [],
     incremental: true,
     metadata: {
+      // Every budget the account has, so one appearing later is visible in sync
+      // output rather than quietly absent.
+      all_budgets: allBudgets.map(b => ({ id: b.id, name: b.name })),
       budgets: budgetsSynced,
+      excluded_budgets: excluded,
+      skipped_by_budget_ids: skippedByAllowlist,
+      unmatched_rules: unmatched,
+      warnings,
+      rows_purged: purgedRows,
       transactions_upserted: entries.length,
       transactions_deleted: toDelete.length,
       retention_days: retentionDays
