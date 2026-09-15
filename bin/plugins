@@ -11,6 +11,16 @@ import { execSync } from 'child_process';
 import * as p from '@clack/prompts';
 import { colors } from '../src/cli-utils.js';
 import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
+import { readConfigToml, writeConfigToml, reportConfigConflict } from '../src/configure-toml-io.js';
+import {
+  getEnvVar,
+  getEncryptedEnvVarName,
+  deleteSourceConfigWithSecrets,
+  rollbackEncryptedSettingBackups,
+  setEnvVar,
+  clearEnvVar,
+  stripEncryptedSettings
+} from '../src/encrypted-settings.js';
 import {
   discoverPlugins,
   getPluginSources,
@@ -24,7 +34,7 @@ import {
 } from '../src/plugin-loader.js';
 import { exportUpcomingEvents } from '../src/export-calendar-events.js';
 import { getAbsoluteVaultPath, getConfigPath } from '../src/config.js';
-import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
+import { parse as parseToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
 import { getDataContextCached } from '../src/context-cache.js';
 import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
@@ -77,93 +87,6 @@ function isDatabaseCorruptionError(error) {
          message.includes('file is not a database') ||
          message.includes('database is locked') ||
          message.includes('unable to open database');
-}
-
-/**
- * Ensure config.toml has entries for all available plugins.
- * Adds commented-out defaults for new plugins, removes entries for deleted plugins.
- */
-async function ensurePluginConfig() {
-  const plugins = await discoverPlugins();
-
-  if (plugins.size === 0) return;
-
-  // Read current config
-  let configContent = '';
-  try {
-    configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-  } catch {
-    return; // No config file yet
-  }
-
-  // Build the plugin config section
-  const pluginConfigs = [];
-  for (const [name, plugin] of plugins) {
-    const sectionHeader = `[plugins.${name}.`;
-
-    // Check if this plugin already has any configuration
-    if (configContent.includes(sectionHeader) || configContent.includes(`# ${sectionHeader}`)) {
-      continue; // Already configured (enabled or commented)
-    }
-
-    // Generate commented-out default config
-    const lines = [];
-    lines.push(`# [plugins.${name}.default]`);
-    lines.push(`# enabled = true`);
-
-    if (plugin.settings) {
-      for (const [key, schema] of Object.entries(plugin.settings)) {
-        const defaultValue = schema.default;
-        if (defaultValue !== undefined) {
-          let valueStr;
-          if (typeof defaultValue === 'string') {
-            // Escape newlines and quotes for single-line TOML string
-            const escaped = defaultValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-            valueStr = `"${escaped}"`;
-          } else if (Array.isArray(defaultValue)) {
-            valueStr = defaultValue.length === 0 ? '[]' : JSON.stringify(defaultValue);
-          } else {
-            valueStr = defaultValue;
-          }
-          lines.push(`# ${key} = ${valueStr}`);
-        }
-      }
-    }
-
-    pluginConfigs.push(lines.join('\n'));
-  }
-
-  // Update config.toml if there are new plugins
-  if (pluginConfigs.length > 0) {
-    // Find where to insert - after existing plugins section or at the end
-    const pluginsHeaderMatch = configContent.match(/^# =+\n# Plugins\n# =+/m);
-
-    if (pluginsHeaderMatch) {
-      // Find the end of the plugins section (next header or EOF)
-      const afterHeader = configContent.indexOf(pluginsHeaderMatch[0]) + pluginsHeaderMatch[0].length;
-      const nextHeaderMatch = configContent.slice(afterHeader).match(/\n# =+\n#[^=]/);
-      const insertPoint = nextHeaderMatch
-        ? afterHeader + nextHeaderMatch.index
-        : configContent.length;
-
-      // Insert new plugin configs before the next section
-      const before = configContent.slice(0, insertPoint).trimEnd();
-      const after = configContent.slice(insertPoint);
-
-      configContent = before + '\n\n' + pluginConfigs.join('\n\n') + after;
-    } else {
-      // No plugins section yet, append at the end
-      configContent = configContent.trimEnd() + '\n\n' +
-        '# =============================================================================\n' +
-        '# Plugins\n' +
-        '# =============================================================================\n' +
-        '# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]\n' +
-        '# Uncomment and set enabled = true to activate a plugin\n\n' +
-        pluginConfigs.join('\n\n') + '\n';
-    }
-
-    fs.writeFileSync(CONFIG_PATH, configContent);
-  }
 }
 
 async function cmdList() {
@@ -690,7 +613,7 @@ async function configurePlugin(plugin, pluginName) {
     } else if (action === 'edit') {
       await editSource(plugin, pluginName, allConfiguredSources);
     } else if (action === 'remove') {
-      await removeSource(pluginName, allConfiguredSources);
+      await removeSource(plugin, pluginName, allConfiguredSources);
     }
   }
 }
@@ -737,13 +660,27 @@ async function addSource(plugin, pluginName, existingSources) {
 
   // Collect settings
   const sourceConfig = { enabled: true };
+  const encryptedSettingBackups = new Map();
 
   if (plugin.settings) {
     p.log.info(colors.cyan('Configure plugin settings:'));
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
+      if (schema.encrypted) {
+        const ok = await promptForEncryptedSetting(pluginName, sourceName, key, schema, encryptedSettingBackups);
+        if (ok !== true) {
+          rollbackEncryptedSettingChanges(encryptedSettingBackups);
+          if (p.isCancel(ok)) {
+            p.cancel('Cancelled');
+          }
+          return;
+        }
+        continue; // never stored in the config file
+      }
+
       const value = await promptForSetting(key, schema, schema.default);
       if (p.isCancel(value)) {
+        rollbackEncryptedSettingChanges(encryptedSettingBackups);
         p.cancel('Cancelled');
         return;
       }
@@ -756,7 +693,11 @@ async function addSource(plugin, pluginName, existingSources) {
   // Save
   const s = p.spinner();
   s.start('Saving configuration');
-  saveSourceConfig(pluginName, sourceName, sourceConfig);
+  if (!saveSourceConfig(pluginName, sourceName, stripEncryptedSettings(plugin.settings, sourceConfig))) {
+    rollbackEncryptedSettingChanges(encryptedSettingBackups);
+    s.stop(colors.red(`✗ Did not add source "${sourceName}"`));
+    return;
+  }
   s.stop(colors.green(`✓ Added source "${sourceName}"`));
 }
 
@@ -790,15 +731,29 @@ async function editSource(plugin, pluginName, allSources) {
   if (p.isCancel(enabled)) return;
 
   const sourceConfig = { enabled };
+  const encryptedSettingBackups = new Map();
 
   // Edit settings
   if (plugin.settings) {
     p.log.info(colors.cyan('Configure plugin settings:'));
 
     for (const [key, schema] of Object.entries(plugin.settings)) {
+      if (schema.encrypted) {
+        const ok = await promptForEncryptedSetting(pluginName, sourceToEdit, key, schema, encryptedSettingBackups);
+        if (ok !== true) {
+          rollbackEncryptedSettingChanges(encryptedSettingBackups);
+          if (p.isCancel(ok)) {
+            p.cancel('Cancelled');
+          }
+          return;
+        }
+        continue; // never stored in the config file
+      }
+
       const currentValue = currentConfig[key] ?? schema.default;
       const value = await promptForSetting(key, schema, currentValue);
       if (p.isCancel(value)) {
+        rollbackEncryptedSettingChanges(encryptedSettingBackups);
         p.cancel('Cancelled');
         return;
       }
@@ -833,11 +788,25 @@ async function editSource(plugin, pluginName, allSources) {
   // Save
   const s = p.spinner();
   s.start('Saving changes');
-  saveSourceConfig(pluginName, sourceToEdit, sourceConfig);
+  if (!saveSourceConfig(pluginName, sourceToEdit, stripEncryptedSettings(plugin.settings, sourceConfig))) {
+    rollbackEncryptedSettingChanges(encryptedSettingBackups);
+    s.stop(colors.red(`✗ Did not update "${sourceToEdit}"`));
+    return;
+  }
   s.stop(colors.green(`✓ Updated "${sourceToEdit}"`));
 }
 
-async function removeSource(pluginName, allSources) {
+function rollbackEncryptedSettingChanges(encryptedSettingBackups) {
+  const failures = rollbackEncryptedSettingBackups(encryptedSettingBackups, {
+    clear: clearEnvVar,
+    set: setEnvVar
+  });
+  if (failures.length > 0) {
+    p.log.error(`Failed to roll back encrypted settings: ${failures.join(', ')}. Check .env manually.`);
+  }
+}
+
+async function removeSource(plugin, pluginName, allSources) {
   let sourceToRemove;
 
   if (allSources.length === 1) {
@@ -866,8 +835,70 @@ async function removeSource(pluginName, allSources) {
 
   const s = p.spinner();
   s.start('Removing source');
-  deleteSourceConfig(pluginName, sourceToRemove);
+  const { config, raw } = readConfigToml(CONFIG_PATH);
+  const result = deleteSourceConfigWithSecrets(config, pluginName, sourceToRemove, plugin.settings, {
+    persist: (nextConfig) => {
+      const { conflict } = writeConfigToml(CONFIG_PATH, nextConfig, raw);
+      if (conflict) {
+        reportConfigConflict(CONFIG_PATH, 'bin/plugins configure');
+        return false;
+      }
+      return true;
+    }
+  });
+  if (!result.ok) {
+    if (result.stage === 'clear') {
+      s.stop(colors.red(`✗ Removed "${sourceToRemove}", but secret may be left behind: ${result.orphanedEnvVars.join(', ')}. Check .env.`));
+      return;
+    }
+    s.stop(colors.red(`✗ Failed to remove "${sourceToRemove}"`));
+    return;
+  }
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));
+}
+
+/**
+ * Prompt for a setting declared `encrypted = true`.
+ *
+ * The value is written straight to the encrypted .env and deliberately never
+ * returned to the caller, so it cannot reach the config file (issue #470).
+ * Submitting an empty answer keeps whatever is already stored.
+ *
+ * @returns {boolean|symbol} true on success, or a clack cancel symbol
+ */
+async function promptForEncryptedSetting(pluginName, sourceName, key, schema, encryptedSettingBackups = new Map()) {
+  const envVarName = getEncryptedEnvVarName(pluginName, sourceName, key);
+  const existingValue = getEnvVar(envVarName);
+  const alreadySet = existingValue !== null;
+
+  const value = await p.password({
+    message: `${schema.description || key} ${colors.dim('[encrypted]')}`,
+    validate: (v) => {
+      if (!v && !alreadySet && schema.required) return 'This value is required';
+    }
+  });
+
+  if (p.isCancel(value)) return value;
+
+  // Empty input keeps the existing secret rather than clobbering it
+  if (!value) {
+    if (!alreadySet) {
+      p.log.warn(colors.dim(`  ${key}: not set`));
+    }
+    return true;
+  }
+
+  if (!encryptedSettingBackups.has(envVarName)) {
+    encryptedSettingBackups.set(envVarName, existingValue);
+  }
+
+  if (setEnvVar(envVarName, value)) {
+    p.log.success(colors.dim(`  ${key}: encrypted to .env as ${envVarName}`));
+    return true;
+  } else {
+    p.log.error(`  ${key}: failed to encrypt — not saved`);
+    return false;
+  }
 }
 
 // Helper to prompt for a single setting based on schema
@@ -943,122 +974,22 @@ async function promptForSetting(key, schema, currentValue) {
   }
 }
 
-// Save a source configuration
+// Save a source configuration.
+// Returns true on success, false when an external edit won the compare-and-swap.
 function saveSourceConfig(pluginName, sourceName, sourceConfig) {
-  let config = {};
-  try {
-    const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-    config = parseToml(configContent);
-  } catch {
-    // Config doesn't exist yet
-  }
+  const { config, raw } = readConfigToml(CONFIG_PATH);
 
   if (!config.plugins) config.plugins = {};
   if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
 
   config.plugins[pluginName][sourceName] = sourceConfig;
-  writeConfig(config);
-}
 
-// Delete a source configuration
-function deleteSourceConfig(pluginName, sourceName) {
-  let config = {};
-  try {
-    const configContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-    config = parseToml(configContent);
-  } catch {
-    return;
+  const { conflict } = writeConfigToml(CONFIG_PATH, config, raw);
+  if (conflict) {
+    reportConfigConflict(CONFIG_PATH, 'bin/plugins configure');
+    return false;
   }
-
-  if (config.plugins?.[pluginName]) {
-    delete config.plugins[pluginName][sourceName];
-    if (Object.keys(config.plugins[pluginName]).length === 0) {
-      delete config.plugins[pluginName];
-    }
-  }
-
-  writeConfig(config);
-}
-
-/**
- * Convert smol-toml output to use multi-line strings for fields that should be multi-line
- * smol-toml uses \n escapes, but triple-quoted strings are more readable
- */
-function formatMultilineStrings(tomlStr) {
-  // Match any field that commonly contains multi-line text and convert to triple-quoted if it contains \n
-  // This includes: instructions, ai_instructions, description, vocation, and other text fields
-  return tomlStr.replace(
-    /^((?:ai_)?(?:instructions|description|vocation|note|summary|comment)\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
-    (match, prefix, content) => {
-      // Check if it has escaped newlines
-      if (!content.includes('\\n')) {
-        return match; // Keep as-is if single line
-      }
-      // Unescape the content and use triple quotes
-      const unescaped = content
-        .replace(/\\n/g, '\n')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .trimEnd(); // Remove trailing whitespace to prevent accumulation
-      return `${prefix}"""\n${unescaped}\n"""`;
-    }
-  );
-}
-
-/**
- * Write config object to config.toml, preserving comments where possible
- */
-function writeConfig(config) {
-  // Read existing file to preserve structure/comments
-  let existingContent = '';
-  try {
-    existingContent = fs.readFileSync(CONFIG_PATH, 'utf8');
-  } catch {
-    // File doesn't exist
-  }
-
-  if (existingContent) {
-    // Generate new plugins section
-    let pluginsSection = stringifyToml({ plugins: config.plugins });
-    pluginsSection = formatMultilineStrings(pluginsSection);
-
-    // Remove ALL existing [plugins.*] sections (enabled or commented)
-    // This regex matches from [plugins. or # [plugins. to the next section header or EOF
-    existingContent = existingContent.replace(
-      /^#?\s*\[plugins\.[^\]]+\][^\[]*(?=\n#?\s*\[|$)/gm,
-      ''
-    );
-
-    // Remove the # Plugins header section if it exists
-    existingContent = existingContent.replace(
-      /^# =+\n# Plugins\n# =+[^[]*(?=\n#?\s*\[|$)/m,
-      ''
-    );
-
-    // Clean up multiple blank lines
-    existingContent = existingContent.replace(/\n{3,}/g, '\n\n').trimEnd();
-
-    // Append new plugins section
-    const newPluginsSection = `
-
-# =============================================================================
-# Plugins
-# =============================================================================
-# Each plugin source is configured under [plugins.<plugin-name>.<source-name>]
-
-${pluginsSection}`;
-
-    fs.writeFileSync(CONFIG_PATH, existingContent + newPluginsSection);
-  } else {
-    // Write new config file
-    let tomlOutput = stringifyToml(config);
-    tomlOutput = formatMultilineStrings(tomlOutput);
-    const content = `# Configuration for Today system
-# Run 'bin/today configure' to edit interactively
-
-${tomlOutput}`;
-    fs.writeFileSync(CONFIG_PATH, content);
-  }
+  return true;
 }
 
 async function cmdInfo(pluginName) {
@@ -1328,6 +1259,5 @@ program
   });
 
 // Ensure config.toml has entries for all plugins before parsing
-await ensurePluginConfig();
 
 program.parse();
