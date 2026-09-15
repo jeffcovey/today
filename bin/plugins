@@ -13,10 +13,9 @@ import { colors } from '../src/cli-utils.js';
 import { runPluginsConfigure } from '../src/plugins-configure-ui.js';
 import { readConfigToml, writeConfigToml, reportConfigConflict } from '../src/configure-toml-io.js';
 import {
-  clearEncryptedSettings,
-  deleteSourceConfig,
   getEnvVar,
   getEncryptedEnvVarName,
+  deleteSourceConfigWithSecrets,
   rollbackEncryptedSettingBackups,
   setEnvVar,
   clearEnvVar,
@@ -807,23 +806,6 @@ function rollbackEncryptedSettingChanges(encryptedSettingBackups) {
   }
 }
 
-function deleteSourceConfigWithSecretsFromFile(pluginName, sourceName, pluginSettings) {
-  const { config, raw } = readConfigToml(CONFIG_PATH);
-
-  if (!config.plugins?.[pluginName]?.[sourceName]) {
-    return true;
-  }
-
-  deleteSourceConfig(config, pluginName, sourceName);
-  const { conflict } = writeConfigToml(CONFIG_PATH, config, raw);
-  if (conflict) {
-    reportConfigConflict(CONFIG_PATH, 'bin/plugins configure');
-    return false;
-  }
-
-  return clearEncryptedSettings(pluginName, sourceName, pluginSettings);
-}
-
 async function removeSource(plugin, pluginName, allSources) {
   let sourceToRemove;
 
@@ -853,8 +835,23 @@ async function removeSource(plugin, pluginName, allSources) {
 
   const s = p.spinner();
   s.start('Removing source');
-  if (!deleteSourceConfigWithSecretsFromFile(pluginName, sourceToRemove, plugin.settings)) {
-    s.stop(colors.red(`✗ Failed to remove "${sourceToRemove}" cleanly`));
+  const { config, raw } = readConfigToml(CONFIG_PATH);
+  const result = deleteSourceConfigWithSecrets(config, pluginName, sourceToRemove, plugin.settings, {
+    persist: (nextConfig) => {
+      const { conflict } = writeConfigToml(CONFIG_PATH, nextConfig, raw);
+      if (conflict) {
+        reportConfigConflict(CONFIG_PATH, 'bin/plugins configure');
+        return false;
+      }
+      return true;
+    }
+  });
+  if (!result.ok) {
+    if (result.stage === 'clear') {
+      s.stop(colors.red(`✗ Removed "${sourceToRemove}", but secret may be left behind: ${result.orphanedEnvVars.join(', ')}. Check .env.`));
+      return;
+    }
+    s.stop(colors.red(`✗ Failed to remove "${sourceToRemove}"`));
     return;
   }
   s.stop(colors.green(`✓ Removed "${sourceToRemove}"`));

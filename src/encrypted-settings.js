@@ -112,13 +112,25 @@ export function getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings) 
 
 /** Clear all encrypted settings for a plugin source so old secrets cannot be reused. */
 export function clearEncryptedSettings(pluginName, sourceName, pluginSettings) {
+  return clearEncryptedSettingEnvVars(pluginName, sourceName, pluginSettings).length === 0;
+}
+
+/** Clear encrypted env vars and report any names that could not be removed. */
+export function clearEncryptedSettingEnvVars(
+  pluginName,
+  sourceName,
+  pluginSettings,
+  clear = clearEnvVar
+) {
+  const failures = [];
   let allCleared = true;
   for (const envVarName of getEncryptedEnvVarNames(pluginName, sourceName, pluginSettings)) {
-    if (!clearEnvVar(envVarName)) {
+    if (!clear(envVarName)) {
       allCleared = false;
+      failures.push(envVarName);
     }
   }
-  return allCleared;
+  return allCleared ? [] : failures;
 }
 
 /** Restore encrypted env vars after a canceled or failed configuration flow. */
@@ -152,21 +164,36 @@ export function deleteSourceConfig(config, pluginName, sourceName) {
   return true;
 }
 
-/** Remove a source from config only after its encrypted settings are cleared. */
+/** Remove a source from config, persist it, then clear any encrypted settings. */
 export function deleteSourceConfigWithSecrets(
   config,
   pluginName,
   sourceName,
   pluginSettings,
-  clearSettings = clearEncryptedSettings
+  {
+    persist = () => true,
+    clear = clearEnvVar
+  } = {}
 ) {
   if (!config.plugins?.[pluginName]?.[sourceName]) {
-    return true;
+    return { ok: true, stage: null, orphanedEnvVars: [] };
   }
 
-  if (!clearSettings(pluginName, sourceName, pluginSettings)) {
-    return false;
+  deleteSourceConfig(config, pluginName, sourceName);
+
+  if (persist(config) !== true) {
+    return { ok: false, stage: 'persist', orphanedEnvVars: [] };
   }
 
-  return deleteSourceConfig(config, pluginName, sourceName);
+  const orphanedEnvVars = clearEncryptedSettingEnvVars(
+    pluginName,
+    sourceName,
+    pluginSettings,
+    clear
+  );
+  if (orphanedEnvVars.length > 0) {
+    return { ok: false, stage: 'clear', orphanedEnvVars };
+  }
+
+  return { ok: true, stage: null, orphanedEnvVars: [] };
 }
