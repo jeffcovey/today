@@ -955,6 +955,12 @@ SQL: SELECT date, payee, category, amount, account FROM financial_transactions W
         required: false,
         description: 'True for a scheduled/recurring transaction that has not occurred yet — exclude from spending totals'
       },
+      transfer: {
+        sqlType: 'INTEGER DEFAULT 0',
+        jsType: 'boolean',
+        required: false,
+        description: 'True when this moves money between the user\'s own accounts — not income or spending, and not something to categorise'
+      },
       dedup_key: {
         sqlType: 'TEXT',
         jsType: 'string',
