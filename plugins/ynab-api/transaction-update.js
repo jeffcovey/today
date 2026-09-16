@@ -111,13 +111,14 @@ export function buildTransactionUpdate(current, entry, resolvedCategoryId) {
     date: current.date,
     amount: current.amount,
     payee_id: current.payee_id,
+    // Keep the current payee_name in the full-object PUT. YNAB only consults it
+    // when payee_id is null, so with a non-null id this is intentionally inert.
     payee_name: current.payee_name,
     category_id: current.category_id,
     memo: current.memo,
     cleared: current.cleared,
     approved: current.approved,
-    flag_color: current.flag_color,
-    import_id: current.import_id
+    flag_color: current.flag_color
   };
 
   if (resolvedCategoryId !== undefined && resolvedCategoryId !== null) {

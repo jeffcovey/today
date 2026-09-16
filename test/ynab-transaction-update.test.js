@@ -159,16 +159,14 @@ describe('buildTransactionUpdate', () => {
     expect(update.cleared).toBe('cleared');
   });
 
-  test('preserves payee_name and import_id when the caller did not mention them', () => {
+  test('preserves payee_name when the caller did not mention it', () => {
     const imported = {
       ...CURRENT,
       payee_id: null,
-      payee_name: 'Imported Payee',
-      import_id: 'YNAB:-2450:2026-09-13:1'
+      payee_name: 'Imported Payee'
     };
     const { update } = buildTransactionUpdate(imported, { category: 'Pharmacy' }, 'cat-pharmacy');
     expect(update.payee_name).toBe('Imported Payee');
-    expect(update.import_id).toBe('YNAB:-2450:2026-09-13:1');
   });
 
   test('always sends the immutable identity fields', () => {
