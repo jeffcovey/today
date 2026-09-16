@@ -447,7 +447,8 @@ html[data-theme="dark"] .editor-toolbar {
 
 /* Mobile styles */
 @media (max-width: 767px) {
-  input[type="checkbox"].task-checkbox {
+  input[type="checkbox"].task-checkbox,
+  [data-timer-total-seconds] input[type="checkbox"].form-check-input {
     width: 1.4rem;
     height: 1.4rem;
     min-width: 1.4rem;
