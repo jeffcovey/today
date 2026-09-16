@@ -447,6 +447,15 @@ html[data-theme="dark"] .editor-toolbar {
 
 /* Mobile styles */
 @media (max-width: 767px) {
+  input[type="checkbox"].task-checkbox {
+    width: 1.4rem;
+    height: 1.4rem;
+    min-width: 1.4rem;
+    margin-right: 0.6rem;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
   .ai-assistant-wrapper.collapsed {
     display: none;
   }
