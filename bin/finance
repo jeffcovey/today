@@ -199,6 +199,7 @@ program
   .option('-d, --days <days>', 'Number of days to analyze', '30')
   .option('--source <source>', 'Filter by plugin source')
   .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
+  .option('--transfers', 'Include transfers between your own accounts (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
@@ -208,7 +209,13 @@ program
 
     // See the note in `recent`: the window needs both ends, and scheduled rows are
     // future obligations rather than spending that happened (#477).
+    // Transfers move money between the user's own accounts. Counting them makes
+    // Expenses and Income each larger while the net stays right, so they are
+    // excluded from the spending view; --transfers brings them back.
     let whereClause = `WHERE date >= DATE('now', '-${days} days') AND superseded_by IS NULL`;
+    if (!options.transfers) {
+      whereClause += ` AND IFNULL(transfer, 0) = 0`;
+    }
     const params = [];
 
     if (!options.scheduled) {
@@ -306,6 +313,7 @@ program
       FROM financial_transactions
       WHERE superseded_by IS NULL
         AND IFNULL(scheduled, 0) = 0
+        AND IFNULL(transfer, 0) = 0
         AND date >= DATE('now', '-${days} days')
         AND date <= DATE('now')
         AND (category IS NULL OR category = '' OR LOWER(category) = 'uncategorized')
@@ -445,7 +453,7 @@ program
     let sql = `
       SELECT category, category_group, COUNT(*) as count, SUM(amount) as total
       FROM financial_transactions
-      WHERE superseded_by IS NULL
+      WHERE superseded_by IS NULL AND IFNULL(transfer, 0) = 0
     `;
     const params = [];
 

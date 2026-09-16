@@ -427,6 +427,9 @@ function convertTransaction(ynabTx, filePath, rowIndex, budgetName) {
     memo: ynabTx.Memo || '',
     cleared: ynabTx.Cleared || '',
     flag: ynabTx.Flag || '',
+    // The CSV export has no transfer field; YNAB writes transfers with a
+    // "Transfer : <account>" payee, which is the only signal available here.
+    transfer: /^Transfer\s*:/i.test(ynabTx.Payee || ''),
     metadata: JSON.stringify({
       budget_name: budgetName,
       source_file: path.basename(filePath),
