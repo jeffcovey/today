@@ -75,6 +75,8 @@ The hope is:
 
 Clone https://github.com/jeffcovey/today/ onto a POSIX system with `npm` installed. Running `bin/today` should run `npm install` if you're missing any dependencies, and should run `bin/today configure` if you haven't set up your profile and plugins. The more information you provide through your profile and plugins, the more tailored advice the AI can provide.
 
+See [Configuration and Environment Variables](docs/CONFIGURATION.md) for `.env`, `dotenvx`, deployment variables, and plugin secret setup.
+
 ## Inputs
 
 Your information comes into the system through plugins. They are categorized into several types with matching binaries. Common data types are stored for each (email "From:", event "Location"), with metadata fields for source-specific types.
@@ -423,7 +425,8 @@ npm run test:coverage          # Coverage report
 
 ## Documentation
 
-- [Email Setup Guide](docs/EMAIL_SETUP.md) - Configure email integration
+- [Configuration and Environment Variables](docs/CONFIGURATION.md) - `.env`, `dotenvx`, web/deploy variables, and plugin secrets
+- [AI Providers](docs/AI_PROVIDERS.md) - Configure Anthropic, OpenAI, Ollama, and Gemini
 
 ## License
 
