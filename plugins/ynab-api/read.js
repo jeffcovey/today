@@ -106,6 +106,7 @@ function convertScheduled(st, budgetId, budgetName, categoryMap) {
     cleared: '',
     flag: st.flag_color || '',
     scheduled: true,
+    transfer: Boolean(st.transfer_account_id),
     metadata: JSON.stringify({
       budget_id: budgetId,
       budget_name: budgetName,
@@ -147,6 +148,9 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
     cleared: tx.cleared || '',
     flag: tx.flag_color || '',
     scheduled: false,
+    // Money moving between the user's own accounts: not spending, and YNAB
+    // leaves it uncategorised on purpose.
+    transfer: Boolean(tx.transfer_account_id),
     metadata: JSON.stringify({
       budget_id: budgetId,
       budget_name: budgetName,
