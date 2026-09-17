@@ -5,7 +5,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
-import { getEncryptedEnvVarName } from '../src/encrypted-settings.js';
+import { addExactSourceCondition, getImapPasswordEnvKey, withConnectedImapClient } from '../src/email-cli-utils.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfigPath } from '../src/config.js';
 import { program } from 'commander';
@@ -14,21 +14,6 @@ import { colors } from '../src/cli-utils.js';
 program
   .name('email')
   .description('Email management CLI - queries emails synced by imap-email plugin');
-
-function getImapPasswordEnvKey(sourceName) {
-  return getEncryptedEnvVarName('imap-email', sourceName, 'password');
-}
-
-function addExactSourceCondition(conditions, params, source) {
-  const sourceId = source.startsWith('imap-email/') ? source : `imap-email/${source}`;
-  if (sourceId === source) {
-    conditions.push('source = ?');
-    params.push(source);
-    return;
-  }
-  conditions.push('(source = ? OR source = ?)');
-  params.push(source, sourceId);
-}
 
 // Stats command - show email database statistics
 program
@@ -253,47 +238,42 @@ program
           logger: false
         });
 
-        let connected = false;
         try {
-          await client.connect();
-          connected = true;
-          const allFolders = await client.list();
-          // ALL with no text query means list inbox; text queries search across folders
-          const foldersToSearch = isAll
-            ? ['INBOX']
-            : allFolders
-                .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
-                .map(f => f.path)
-                .slice(0, 5);
+          await withConnectedImapClient(client, async () => {
+            const allFolders = await client.list();
+            // ALL with no text query means list inbox; text queries search across folders
+            const foldersToSearch = isAll
+              ? ['INBOX']
+              : allFolders
+                  .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
+                  .map(f => f.path)
+                  .slice(0, 5);
 
-          for (const folder of foldersToSearch) {
-            try {
-              const lock = await client.getMailboxLock(folder);
+            for (const folder of foldersToSearch) {
               try {
-                for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
-                  allResults.push({
-                    uid: msg.uid,
-                    folder,
-                    subject: msg.envelope?.subject || '(no subject)',
-                    from: msg.envelope?.from?.[0]?.address || 'unknown',
-                    date: msg.envelope?.date,
-                    source: source.sourceName
-                  });
-                  if (allResults.length >= limit * imapSources.length) break;
+                const lock = await client.getMailboxLock(folder);
+                try {
+                  for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
+                    allResults.push({
+                      uid: msg.uid,
+                      folder,
+                      subject: msg.envelope?.subject || '(no subject)',
+                      from: msg.envelope?.from?.[0]?.address || 'unknown',
+                      date: msg.envelope?.date,
+                      source: source.sourceName
+                    });
+                    if (allResults.length >= limit * imapSources.length) break;
+                  }
+                } finally {
+                  lock.release();
                 }
-              } finally {
-                lock.release();
+              } catch (e) {
+                // Skip folders we can't access
               }
-            } catch (e) {
-              // Skip folders we can't access
             }
-          }
+          });
         } catch (e) {
           console.log(colors.yellow(`Could not search ${source.sourceName}: ${e.message}`));
-        } finally {
-          if (connected) {
-            try { await client.logout(); } catch { /* ignore logout errors */ }
-          }
         }
       }
 
@@ -431,82 +411,76 @@ program
       logger: false
     });
 
-    let connected = false;
     try {
-      await client.connect();
-      connected = true;
-      const lock = await client.getMailboxLock(folder);
+      await withConnectedImapClient(client, async () => {
+        const lock = await client.getMailboxLock(folder);
 
-      try {
-        const message = await client.fetchOne(uid, { source: true }, { uid: true });
+        try {
+          const message = await client.fetchOne(uid, { source: true }, { uid: true });
 
-        if (!message || !message.source) {
-          console.error(colors.red('Email not found or no content'));
-          process.exit(1);
-        }
-
-        const parsed = await simpleParser(message.source);
-        let textContent = parsed.text || '';
-        let htmlContent = parsed.html || '';
-        const attachments = parsed.attachments?.map(a => ({
-          filename: a.filename,
-          contentType: a.contentType,
-          size: a.size
-        })) || [];
-
-        const maxBodySize = 50000;
-        if (textContent.length > maxBodySize) {
-          textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
-        }
-        if (htmlContent.length > maxBodySize) {
-          htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
-        }
-
-        const snippet = textContent
-          ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
-          : '';
-
-        // Update database
-        const dbPath = path.join(process.cwd(), '.data', 'today.db');
-        const db = new Database(dbPath, { timeout: 30000 });
-        db.pragma('journal_mode = WAL');
-        db.pragma('busy_timeout = 30000');
-
-        const result = db.prepare(`
-          UPDATE email
-          SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
-              metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
-          WHERE id = ?
-        `).run(
-          snippet,
-          textContent,
-          htmlContent,
-          attachments.length > 0 ? JSON.stringify(attachments) : null,
-          emailId
-        );
-
-        db.close();
-
-        if (result.changes > 0) {
-          console.log(colors.green('✓ Email body fetched and saved'));
-          console.log(colors.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
-          if (attachments.length > 0) {
-            console.log(colors.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+          if (!message || !message.source) {
+            console.error(colors.red('Email not found or no content'));
+            process.exit(1);
           }
-        } else {
-          console.log(colors.yellow('Email not found in database'));
-        }
 
-      } finally {
-        lock.release();
-      }
+          const parsed = await simpleParser(message.source);
+          let textContent = parsed.text || '';
+          let htmlContent = parsed.html || '';
+          const attachments = parsed.attachments?.map(a => ({
+            filename: a.filename,
+            contentType: a.contentType,
+            size: a.size
+          })) || [];
+
+          const maxBodySize = 50000;
+          if (textContent.length > maxBodySize) {
+            textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
+          }
+          if (htmlContent.length > maxBodySize) {
+            htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
+          }
+
+          const snippet = textContent
+            ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
+            : '';
+
+          // Update database
+          const dbPath = path.join(process.cwd(), '.data', 'today.db');
+          const db = new Database(dbPath, { timeout: 30000 });
+          db.pragma('journal_mode = WAL');
+          db.pragma('busy_timeout = 30000');
+
+          const result = db.prepare(`
+            UPDATE email
+            SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
+                metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
+            WHERE id = ?
+          `).run(
+            snippet,
+            textContent,
+            htmlContent,
+            attachments.length > 0 ? JSON.stringify(attachments) : null,
+            emailId
+          );
+
+          db.close();
+
+          if (result.changes > 0) {
+            console.log(colors.green('✓ Email body fetched and saved'));
+            console.log(colors.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
+            if (attachments.length > 0) {
+              console.log(colors.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+            }
+          } else {
+            console.log(colors.yellow('Email not found in database'));
+          }
+        } finally {
+          lock.release();
+        }
+      });
     } catch (e) {
       console.error(colors.red(`Error: ${e.message}`));
       process.exit(1);
-    } finally {
-      if (connected) {
-        try { await client.logout(); } catch { /* ignore logout errors */ }
-      }
     }
   });
 
