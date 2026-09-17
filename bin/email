@@ -484,18 +484,27 @@ program
     }
   });
 
-// Trash command - move matching emails to trash
-program
-  .command('trash')
-  .description('Move matching emails to trash (shows list and confirms before acting)')
-  .option('--body <text>', 'Match emails whose body contains this text')
-  .option('--subject <text>', 'Match emails whose subject contains this text')
-  .option('--from <email>', 'Match emails from this sender')
-  .option('-d, --days <number>', 'Only look at emails from the last N days')
-  .option('--folder <folder>', 'Source folder to search (default: INBOX)', 'INBOX')
-  .option('--source <source>', 'Filter by plugin source (e.g. icloud, pobox)')
-  .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (options) => {
+// Find a special-use folder (RFC 6154) with name fallbacks
+function findSpecialFolder(folders, specialUseAttr, fallbackPaths) {
+  return folders.find(f => {
+    const use = f.specialUse;
+    if (use === specialUseAttr) return true;
+    if (Array.isArray(use) && use.includes(specialUseAttr)) return true;
+    return fallbackPaths.some(p => f.path === p || f.path.toLowerCase() === p.toLowerCase());
+  });
+}
+
+// Shared action factory for delete/spam/move commands
+// destFallbacks, destLabel, confirmVerb may be functions receiving (options)
+function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb }) {
+  return async function(options) {
+    const resolvedFallbacks = typeof destFallbacks === 'function' ? destFallbacks(options) : destFallbacks;
+    const resolvedLabel = typeof destLabel === 'function' ? destLabel(options) : destLabel;
+    const resolvedVerb = typeof confirmVerb === 'function' ? confirmVerb(options) : confirmVerb;
+    destFallbacks = resolvedFallbacks;
+    destLabel = resolvedLabel;
+    confirmVerb = resolvedVerb;
+
     const db = getDatabase();
 
     if (!options.body && !options.subject && !options.from) {
@@ -503,7 +512,6 @@ program
       process.exit(1);
     }
 
-    // Build query
     const conditions = [`folder = ?`];
     const params = [options.folder];
 
@@ -540,7 +548,7 @@ program
       return;
     }
 
-    console.log(colors.blue(`\n📧 ${emails.length} email(s) to trash:\n`));
+    console.log(colors.blue(`\n📧 ${emails.length} email(s) to move to ${destLabel}:\n`));
     for (const email of emails) {
       const date = new Date(email.date).toLocaleDateString();
       const from = email.from_name || email.from_address;
@@ -549,11 +557,10 @@ program
     }
     console.log('');
 
-    // Confirm
     if (!options.yes) {
       const { createInterface } = await import('readline');
       const rl = createInterface({ input: process.stdin, output: process.stdout });
-      const answer = await new Promise(resolve => rl.question(`Trash all ${emails.length} message(s)? [y/N] `, resolve));
+      const answer = await new Promise(resolve => rl.question(`${confirmVerb} ${emails.length} message(s)? [y/N] `, resolve));
       rl.close();
       if (answer.toLowerCase() !== 'y') {
         console.log(colors.yellow('Aborted.'));
@@ -561,7 +568,6 @@ program
       }
     }
 
-    // Group by source so we can connect to each IMAP account once
     const { ImapFlow } = await import('imapflow');
     const toml = await import('smol-toml');
     const fs = await import('fs');
@@ -572,7 +578,6 @@ program
 
     const bySource = {};
     for (const email of emails) {
-      // id format: imap-email/<sourceName>:<folder>:<uid>
       const match = email.id.match(/^imap-email\/([^:]+):(.+):(\d+)$/);
       if (!match) { console.warn(colors.yellow(`Skipping unrecognised id: ${email.id}`)); continue; }
       const [, sourceName, folder, uid] = match;
@@ -601,33 +606,30 @@ program
       try {
         await client.connect();
 
-        // Find trash folder
         const allFolders = await client.list();
-        const trashFolder = allFolders.find(f =>
-          f.specialUse === '\\Trash' ||
-          (Array.isArray(f.specialUse) && f.specialUse.includes('\\Trash')) ||
-          f.path.toLowerCase() === 'trash' ||
-          f.path === 'Deleted Messages'
-        );
+        const destFolder = destSpecialUse
+          ? findSpecialFolder(allFolders, destSpecialUse, destFallbacks)
+          : allFolders.find(f => destFallbacks.some(p => f.path === p));
+
+        if (!destFolder) {
+          console.error(colors.red(`Could not find ${destLabel} folder on ${sourceName}. Available: ${allFolders.map(f => f.path).join(', ')}`));
+          await client.logout();
+          continue;
+        }
+
+        if (folder === destFolder.path) {
+          console.log(colors.yellow(`Messages in ${sourceName}/${folder} are already in ${destFolder.path}, skipping.`));
+          await client.logout();
+          continue;
+        }
 
         const lock = await client.getMailboxLock(folder);
-        let trashed = 0;
         try {
-          if (trashFolder && folder !== trashFolder.path) {
-            await client.messageMove(uids, trashFolder.path, { uid: true });
-            trashed = uids.length;
-
-            // Update local DB
-            const placeholders = ids.map(() => '?').join(',');
-            db.prepare(`UPDATE email SET folder = ? WHERE id IN (${placeholders})`).run(trashFolder.path, ...ids);
-            console.log(colors.green(`✓ Moved ${trashed} message(s) from ${sourceName}/${folder} → ${trashFolder.path}`));
-          } else {
-            await client.messageFlagsAdd(uids, ['\\Deleted'], { uid: true });
-            trashed = uids.length;
-            db.prepare(`UPDATE email SET folder = 'Deleted' WHERE id IN (${ids.map(() => '?').join(',')})`).run(...ids);
-            console.log(colors.green(`✓ Flagged ${trashed} message(s) as deleted in ${sourceName}/${folder}`));
-          }
-          totalMoved += trashed;
+          await client.messageMove(uids, destFolder.path, { uid: true });
+          const placeholders = ids.map(() => '?').join(',');
+          db.prepare(`UPDATE email SET folder = ? WHERE id IN (${placeholders})`).run(destFolder.path, ...ids);
+          console.log(colors.green(`✓ Moved ${uids.length} message(s) from ${sourceName}/${folder} → ${destFolder.path}`));
+          totalMoved += uids.length;
         } finally {
           lock.release();
         }
@@ -637,8 +639,55 @@ program
       }
     }
 
-    console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to trash.`));
-  });
+    console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to ${destLabel}.`));
+  };
+}
+
+const MOVE_OPTIONS = (cmd) => cmd
+  .option('--body <text>', 'Match emails whose body contains this text')
+  .option('--subject <text>', 'Match emails whose subject contains this text')
+  .option('--from <email>', 'Match emails from this sender')
+  .option('-d, --days <number>', 'Only look at emails from the last N days')
+  .option('--folder <folder>', 'Source folder to search (default: INBOX)', 'INBOX')
+  .option('--source <source>', 'Filter by plugin source (e.g. icloud, pobox)')
+  .option('-y, --yes', 'Skip confirmation prompt');
+
+// delete command - move matching emails to trash
+MOVE_OPTIONS(
+  program
+    .command('delete')
+    .description('Move matching emails to trash')
+).action(makeMoveAction({
+  destSpecialUse: '\\Trash',
+  destFallbacks: ['Deleted Messages', 'Trash', 'Deleted Items'],
+  destLabel: 'trash',
+  confirmVerb: 'Delete',
+}));
+
+// spam command - move matching emails to spam/junk
+MOVE_OPTIONS(
+  program
+    .command('spam')
+    .description('Move matching emails to spam/junk folder')
+).action(makeMoveAction({
+  destSpecialUse: '\\Junk',
+  destFallbacks: ['Junk', 'Spam', 'Junk Email', 'Junk E-mail', 'Bulk Mail'],
+  destLabel: 'spam',
+  confirmVerb: 'Mark as spam',
+}));
+
+// move command - move matching emails to any named folder
+MOVE_OPTIONS(
+  program
+    .command('move')
+    .description('Move matching emails to a named folder')
+    .requiredOption('--to <folder>', 'Destination folder name (exact path on server)')
+).action(makeMoveAction({
+  destSpecialUse: null,
+  destFallbacks: (options) => [options.to],
+  destLabel: (options) => options.to,
+  confirmVerb: (options) => `Move to ${options.to}`,
+}));
 
 // Setup command - show setup instructions
 program
