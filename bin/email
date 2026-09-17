@@ -5,6 +5,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
+import { getEncryptedEnvVarName } from '../src/encrypted-settings.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfigPath } from '../src/config.js';
 import { program } from 'commander';
@@ -13,6 +14,21 @@ import { colors } from '../src/cli-utils.js';
 program
   .name('email')
   .description('Email management CLI - queries emails synced by imap-email plugin');
+
+function getImapPasswordEnvKey(sourceName) {
+  return getEncryptedEnvVarName('imap-email', sourceName, 'password');
+}
+
+function addExactSourceCondition(conditions, params, source) {
+  const sourceId = source.startsWith('imap-email/') ? source : `imap-email/${source}`;
+  if (sourceId === source) {
+    conditions.push('source = ?');
+    params.push(source);
+    return;
+  }
+  conditions.push('(source = ? OR source = ?)');
+  params.push(source, sourceId);
+}
 
 // Stats command - show email database statistics
 program
@@ -123,8 +139,7 @@ program
     }
 
     if (options.source) {
-      conditions.push('source LIKE ?');
-      params.push(`%${options.source}%`);
+      addExactSourceCondition(conditions, params, options.source);
     }
 
     if (options.unread) {
@@ -221,9 +236,10 @@ program
         : { or: [{ subject: query }, { from: query }, { body: query }] };
 
       for (const source of imapSources) {
-        const password = process.env[`TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`];
+        const envKey = getImapPasswordEnvKey(source.sourceName);
+        const password = process.env[envKey];
         if (!password) {
-          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`));
+          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in ${envKey}`));
           continue;
         }
 
@@ -237,8 +253,10 @@ program
           logger: false
         });
 
+        let connected = false;
         try {
           await client.connect();
+          connected = true;
           const allFolders = await client.list();
           // ALL with no text query means list inbox; text queries search across folders
           const foldersToSearch = isAll
@@ -270,9 +288,12 @@ program
               // Skip folders we can't access
             }
           }
-          await client.logout();
         } catch (e) {
           console.log(colors.yellow(`Could not search ${source.sourceName}: ${e.message}`));
+        } finally {
+          if (connected) {
+            try { await client.logout(); } catch { /* ignore logout errors */ }
+          }
         }
       }
 
@@ -309,8 +330,7 @@ program
       conditions.push("folder NOT LIKE '%Deleted%'");
 
       if (options.source) {
-        conditions.push('source LIKE ?');
-        params.push(`%${options.source}%`);
+        addExactSourceCondition(conditions, params, options.source);
       }
 
       const sql = `
@@ -394,10 +414,11 @@ program
     }
 
     const { host, port = 993, secure = true, username } = sourceConfig;
-    const password = process.env[`TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`];
+    const envKey = getImapPasswordEnvKey(sourceName);
+    const password = process.env[envKey];
 
     if (!password) {
-      console.error(colors.red(`Password not found in TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`));
+      console.error(colors.red(`Password not found in ${envKey}`));
       process.exit(1);
     }
 
@@ -410,8 +431,10 @@ program
       logger: false
     });
 
+    let connected = false;
     try {
       await client.connect();
+      connected = true;
       const lock = await client.getMailboxLock(folder);
 
       try {
@@ -476,11 +499,14 @@ program
 
       } finally {
         lock.release();
-        await client.logout();
       }
     } catch (e) {
       console.error(colors.red(`Error: ${e.message}`));
       process.exit(1);
+    } finally {
+      if (connected) {
+        try { await client.logout(); } catch { /* ignore logout errors */ }
+      }
     }
   });
 
@@ -533,9 +559,7 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
       params.push(`-${parseInt(options.days)} days`);
     }
     if (options.source) {
-      // Exact match: accept bare name ("icloud") or full source id ("imap-email/icloud")
-      conditions.push('(source = ? OR source = ?)');
-      params.push(options.source, `imap-email/${options.source}`);
+      addExactSourceCondition(conditions, params, options.source);
     }
 
     const emails = db.prepare(`
@@ -595,7 +619,7 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
       const sourceConfig = tomlConfig.plugins?.['imap-email']?.[sourceName];
       if (!sourceConfig) { console.error(colors.red(`No config for source: ${sourceName}`)); hadError = true; continue; }
 
-      const envKey = `TODAY_IMAP_EMAIL_${sourceName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_PASSWORD`;
+      const envKey = getImapPasswordEnvKey(sourceName);
       const password = process.env[envKey];
       if (!password) { console.error(colors.red(`Password not found for ${sourceName} (env: ${envKey})`)); hadError = true; continue; }
 
