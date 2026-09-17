@@ -528,12 +528,14 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
       params.push(`%${options.from}%`, `%${options.from}%`);
     }
     if (options.days) {
-      conditions.push("date >= datetime('now', ?)");
+      // datetime(date) normalises the stored ISO-8601 value before comparing
+      conditions.push("datetime(date) >= datetime('now', ?)");
       params.push(`-${parseInt(options.days)} days`);
     }
     if (options.source) {
-      conditions.push('source LIKE ?');
-      params.push(`%${options.source}%`);
+      // Exact match: accept bare name ("icloud") or full source id ("imap-email/icloud")
+      conditions.push('(source = ? OR source = ?)');
+      params.push(options.source, `imap-email/${options.source}`);
     }
 
     const emails = db.prepare(`
@@ -588,12 +590,14 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
     }
 
     let totalMoved = 0;
+    let hadError = false;
     for (const { sourceName, folder, uids, ids } of Object.values(bySource)) {
       const sourceConfig = tomlConfig.plugins?.['imap-email']?.[sourceName];
-      if (!sourceConfig) { console.error(colors.red(`No config for source: ${sourceName}`)); continue; }
+      if (!sourceConfig) { console.error(colors.red(`No config for source: ${sourceName}`)); hadError = true; continue; }
 
-      const password = process.env[`TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`];
-      if (!password) { console.error(colors.red(`Password not found for ${sourceName}`)); continue; }
+      const envKey = `TODAY_IMAP_EMAIL_${sourceName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_PASSWORD`;
+      const password = process.env[envKey];
+      if (!password) { console.error(colors.red(`Password not found for ${sourceName} (env: ${envKey})`)); hadError = true; continue; }
 
       const client = new ImapFlow({
         host: sourceConfig.host,
@@ -603,8 +607,10 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
         logger: false,
       });
 
+      let connected = false;
       try {
         await client.connect();
+        connected = true;
 
         const allFolders = await client.list();
         const destFolder = destSpecialUse
@@ -613,33 +619,37 @@ function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb 
 
         if (!destFolder) {
           console.error(colors.red(`Could not find ${destLabel} folder on ${sourceName}. Available: ${allFolders.map(f => f.path).join(', ')}`));
-          await client.logout();
-          continue;
-        }
-
-        if (folder === destFolder.path) {
+          hadError = true;
+        } else if (folder === destFolder.path) {
           console.log(colors.yellow(`Messages in ${sourceName}/${folder} are already in ${destFolder.path}, skipping.`));
-          await client.logout();
-          continue;
+        } else {
+          const lock = await client.getMailboxLock(folder);
+          try {
+            await client.messageMove(uids, destFolder.path, { uid: true });
+            // Delete cache rows: after a move the destination UID differs from the source UID,
+            // so updating the folder would leave stale ids. The sync will re-index them.
+            const placeholders = ids.map(() => '?').join(',');
+            db.prepare(`DELETE FROM email WHERE id IN (${placeholders})`).run(...ids);
+            console.log(colors.green(`✓ Moved ${uids.length} message(s) from ${sourceName}/${folder} → ${destFolder.path}`));
+            totalMoved += uids.length;
+          } finally {
+            lock.release();
+          }
         }
-
-        const lock = await client.getMailboxLock(folder);
-        try {
-          await client.messageMove(uids, destFolder.path, { uid: true });
-          const placeholders = ids.map(() => '?').join(',');
-          db.prepare(`UPDATE email SET folder = ? WHERE id IN (${placeholders})`).run(destFolder.path, ...ids);
-          console.log(colors.green(`✓ Moved ${uids.length} message(s) from ${sourceName}/${folder} → ${destFolder.path}`));
-          totalMoved += uids.length;
-        } finally {
-          lock.release();
-        }
-        await client.logout();
       } catch (e) {
         console.error(colors.red(`Error with ${sourceName}: ${e.message}`));
+        hadError = true;
+      } finally {
+        if (connected) {
+          try { await client.logout(); } catch { /* ignore logout errors */ }
+        }
       }
     }
 
-    console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to ${destLabel}.`));
+    if (totalMoved > 0) {
+      console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to ${destLabel}.`));
+    }
+    if (hadError) process.exitCode = 1;
   };
 }
 
