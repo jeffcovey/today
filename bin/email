@@ -484,6 +484,162 @@ program
     }
   });
 
+// Trash command - move matching emails to trash
+program
+  .command('trash')
+  .description('Move matching emails to trash (shows list and confirms before acting)')
+  .option('--body <text>', 'Match emails whose body contains this text')
+  .option('--subject <text>', 'Match emails whose subject contains this text')
+  .option('--from <email>', 'Match emails from this sender')
+  .option('-d, --days <number>', 'Only look at emails from the last N days')
+  .option('--folder <folder>', 'Source folder to search (default: INBOX)', 'INBOX')
+  .option('--source <source>', 'Filter by plugin source (e.g. icloud, pobox)')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (options) => {
+    const db = getDatabase();
+
+    if (!options.body && !options.subject && !options.from) {
+      console.error(colors.red('At least one of --body, --subject, or --from is required.'));
+      process.exit(1);
+    }
+
+    // Build query
+    const conditions = [`folder = ?`];
+    const params = [options.folder];
+
+    if (options.body) {
+      conditions.push('(text_content LIKE ? OR html_content LIKE ?)');
+      params.push(`%${options.body}%`, `%${options.body}%`);
+    }
+    if (options.subject) {
+      conditions.push('subject LIKE ?');
+      params.push(`%${options.subject}%`);
+    }
+    if (options.from) {
+      conditions.push('(from_address LIKE ? OR from_name LIKE ?)');
+      params.push(`%${options.from}%`, `%${options.from}%`);
+    }
+    if (options.days) {
+      conditions.push("date >= datetime('now', ?)");
+      params.push(`-${parseInt(options.days)} days`);
+    }
+    if (options.source) {
+      conditions.push('source LIKE ?');
+      params.push(`%${options.source}%`);
+    }
+
+    const emails = db.prepare(`
+      SELECT id, subject, from_address, from_name, date, source, folder
+      FROM email
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY date DESC
+    `).all(...params);
+
+    if (emails.length === 0) {
+      console.log(colors.yellow('No matching emails found.'));
+      return;
+    }
+
+    console.log(colors.blue(`\n📧 ${emails.length} email(s) to trash:\n`));
+    for (const email of emails) {
+      const date = new Date(email.date).toLocaleDateString();
+      const from = email.from_name || email.from_address;
+      console.log(`  ${colors.bold(email.subject || '(no subject)')}`);
+      console.log(colors.gray(`   From: ${from} | Date: ${date} | ${email.source}`));
+    }
+    console.log('');
+
+    // Confirm
+    if (!options.yes) {
+      const { createInterface } = await import('readline');
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise(resolve => rl.question(`Trash all ${emails.length} message(s)? [y/N] `, resolve));
+      rl.close();
+      if (answer.toLowerCase() !== 'y') {
+        console.log(colors.yellow('Aborted.'));
+        return;
+      }
+    }
+
+    // Group by source so we can connect to each IMAP account once
+    const { ImapFlow } = await import('imapflow');
+    const toml = await import('smol-toml');
+    const fs = await import('fs');
+    const { getConfigPath: cfgPath } = await import('../src/config.js');
+
+    const configContent = fs.readFileSync(cfgPath(), 'utf-8');
+    const tomlConfig = toml.parse(configContent);
+
+    const bySource = {};
+    for (const email of emails) {
+      // id format: imap-email/<sourceName>:<folder>:<uid>
+      const match = email.id.match(/^imap-email\/([^:]+):(.+):(\d+)$/);
+      if (!match) { console.warn(colors.yellow(`Skipping unrecognised id: ${email.id}`)); continue; }
+      const [, sourceName, folder, uid] = match;
+      const key = `${sourceName}::${folder}`;
+      if (!bySource[key]) bySource[key] = { sourceName, folder, uids: [], ids: [] };
+      bySource[key].uids.push(parseInt(uid));
+      bySource[key].ids.push(email.id);
+    }
+
+    let totalMoved = 0;
+    for (const { sourceName, folder, uids, ids } of Object.values(bySource)) {
+      const sourceConfig = tomlConfig.plugins?.['imap-email']?.[sourceName];
+      if (!sourceConfig) { console.error(colors.red(`No config for source: ${sourceName}`)); continue; }
+
+      const password = process.env[`TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`];
+      if (!password) { console.error(colors.red(`Password not found for ${sourceName}`)); continue; }
+
+      const client = new ImapFlow({
+        host: sourceConfig.host,
+        port: sourceConfig.port || 993,
+        secure: sourceConfig.secure !== false,
+        auth: { user: sourceConfig.username, pass: password },
+        logger: false,
+      });
+
+      try {
+        await client.connect();
+
+        // Find trash folder
+        const allFolders = await client.list();
+        const trashFolder = allFolders.find(f =>
+          f.specialUse === '\\Trash' ||
+          (Array.isArray(f.specialUse) && f.specialUse.includes('\\Trash')) ||
+          f.path.toLowerCase() === 'trash' ||
+          f.path === 'Deleted Messages'
+        );
+
+        const lock = await client.getMailboxLock(folder);
+        let trashed = 0;
+        try {
+          if (trashFolder && folder !== trashFolder.path) {
+            await client.messageMove(uids, trashFolder.path, { uid: true });
+            trashed = uids.length;
+
+            // Update local DB
+            const placeholders = ids.map(() => '?').join(',');
+            db.prepare(`UPDATE email SET folder = ? WHERE id IN (${placeholders})`).run(trashFolder.path, ...ids);
+            console.log(colors.green(`✓ Moved ${trashed} message(s) from ${sourceName}/${folder} → ${trashFolder.path}`));
+          } else {
+            await client.messageFlagsAdd(uids, ['\\Deleted'], { uid: true });
+            trashed = uids.length;
+            db.prepare(`UPDATE email SET folder = 'Deleted' WHERE id IN (${ids.map(() => '?').join(',')})`).run(...ids);
+            console.log(colors.green(`✓ Flagged ${trashed} message(s) as deleted in ${sourceName}/${folder}`));
+          }
+          totalMoved += trashed;
+        } finally {
+          lock.release();
+        }
+        await client.logout();
+      } catch (e) {
+        console.error(colors.red(`Error with ${sourceName}: ${e.message}`));
+      }
+    }
+
+    console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to trash.`));
+  });
+
 // Setup command - show setup instructions
 program
   .command('setup')
