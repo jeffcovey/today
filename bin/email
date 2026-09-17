@@ -5,6 +5,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
+import { addExactSourceCondition, getImapPasswordEnvKey, withConnectedImapClient } from '../src/email-cli-utils.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfigPath } from '../src/config.js';
 import { program } from 'commander';
@@ -123,8 +124,7 @@ program
     }
 
     if (options.source) {
-      conditions.push('source LIKE ?');
-      params.push(`%${options.source}%`);
+      addExactSourceCondition(conditions, params, options.source);
     }
 
     if (options.unread) {
@@ -221,9 +221,10 @@ program
         : { or: [{ subject: query }, { from: query }, { body: query }] };
 
       for (const source of imapSources) {
-        const password = process.env[`TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`];
+        const envKey = getImapPasswordEnvKey(source.sourceName);
+        const password = process.env[envKey];
         if (!password) {
-          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in TODAY_IMAP_EMAIL_${source.sourceName.toUpperCase()}_PASSWORD`));
+          console.log(colors.yellow(`Skipping ${source.sourceName}: password not found in ${envKey}`));
           continue;
         }
 
@@ -238,39 +239,39 @@ program
         });
 
         try {
-          await client.connect();
-          const allFolders = await client.list();
-          // ALL with no text query means list inbox; text queries search across folders
-          const foldersToSearch = isAll
-            ? ['INBOX']
-            : allFolders
-                .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
-                .map(f => f.path)
-                .slice(0, 5);
+          await withConnectedImapClient(client, async () => {
+            const allFolders = await client.list();
+            // ALL with no text query means list inbox; text queries search across folders
+            const foldersToSearch = isAll
+              ? ['INBOX']
+              : allFolders
+                  .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
+                  .map(f => f.path)
+                  .slice(0, 5);
 
-          for (const folder of foldersToSearch) {
-            try {
-              const lock = await client.getMailboxLock(folder);
+            for (const folder of foldersToSearch) {
               try {
-                for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
-                  allResults.push({
-                    uid: msg.uid,
-                    folder,
-                    subject: msg.envelope?.subject || '(no subject)',
-                    from: msg.envelope?.from?.[0]?.address || 'unknown',
-                    date: msg.envelope?.date,
-                    source: source.sourceName
-                  });
-                  if (allResults.length >= limit * imapSources.length) break;
+                const lock = await client.getMailboxLock(folder);
+                try {
+                  for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
+                    allResults.push({
+                      uid: msg.uid,
+                      folder,
+                      subject: msg.envelope?.subject || '(no subject)',
+                      from: msg.envelope?.from?.[0]?.address || 'unknown',
+                      date: msg.envelope?.date,
+                      source: source.sourceName
+                    });
+                    if (allResults.length >= limit * imapSources.length) break;
+                  }
+                } finally {
+                  lock.release();
                 }
-              } finally {
-                lock.release();
+              } catch (e) {
+                // Skip folders we can't access
               }
-            } catch (e) {
-              // Skip folders we can't access
             }
-          }
-          await client.logout();
+          });
         } catch (e) {
           console.log(colors.yellow(`Could not search ${source.sourceName}: ${e.message}`));
         }
@@ -309,8 +310,7 @@ program
       conditions.push("folder NOT LIKE '%Deleted%'");
 
       if (options.source) {
-        conditions.push('source LIKE ?');
-        params.push(`%${options.source}%`);
+        addExactSourceCondition(conditions, params, options.source);
       }
 
       const sql = `
@@ -394,10 +394,11 @@ program
     }
 
     const { host, port = 993, secure = true, username } = sourceConfig;
-    const password = process.env[`TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`];
+    const envKey = getImapPasswordEnvKey(sourceName);
+    const password = process.env[envKey];
 
     if (!password) {
-      console.error(colors.red(`Password not found in TODAY_IMAP_EMAIL_${sourceName.toUpperCase()}_PASSWORD`));
+      console.error(colors.red(`Password not found in ${envKey}`));
       process.exit(1);
     }
 
@@ -411,78 +412,290 @@ program
     });
 
     try {
-      await client.connect();
-      const lock = await client.getMailboxLock(folder);
+      await withConnectedImapClient(client, async () => {
+        const lock = await client.getMailboxLock(folder);
 
-      try {
-        const message = await client.fetchOne(uid, { source: true }, { uid: true });
+        try {
+          const message = await client.fetchOne(uid, { source: true }, { uid: true });
 
-        if (!message || !message.source) {
-          console.error(colors.red('Email not found or no content'));
-          process.exit(1);
-        }
-
-        const parsed = await simpleParser(message.source);
-        let textContent = parsed.text || '';
-        let htmlContent = parsed.html || '';
-        const attachments = parsed.attachments?.map(a => ({
-          filename: a.filename,
-          contentType: a.contentType,
-          size: a.size
-        })) || [];
-
-        const maxBodySize = 50000;
-        if (textContent.length > maxBodySize) {
-          textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
-        }
-        if (htmlContent.length > maxBodySize) {
-          htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
-        }
-
-        const snippet = textContent
-          ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
-          : '';
-
-        // Update database
-        const dbPath = path.join(process.cwd(), '.data', 'today.db');
-        const db = new Database(dbPath, { timeout: 30000 });
-        db.pragma('journal_mode = WAL');
-        db.pragma('busy_timeout = 30000');
-
-        const result = db.prepare(`
-          UPDATE email
-          SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
-              metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
-          WHERE id = ?
-        `).run(
-          snippet,
-          textContent,
-          htmlContent,
-          attachments.length > 0 ? JSON.stringify(attachments) : null,
-          emailId
-        );
-
-        db.close();
-
-        if (result.changes > 0) {
-          console.log(colors.green('✓ Email body fetched and saved'));
-          console.log(colors.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
-          if (attachments.length > 0) {
-            console.log(colors.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+          if (!message || !message.source) {
+            console.error(colors.red('Email not found or no content'));
+            process.exit(1);
           }
-        } else {
-          console.log(colors.yellow('Email not found in database'));
-        }
 
-      } finally {
-        lock.release();
-        await client.logout();
-      }
+          const parsed = await simpleParser(message.source);
+          let textContent = parsed.text || '';
+          let htmlContent = parsed.html || '';
+          const attachments = parsed.attachments?.map(a => ({
+            filename: a.filename,
+            contentType: a.contentType,
+            size: a.size
+          })) || [];
+
+          const maxBodySize = 50000;
+          if (textContent.length > maxBodySize) {
+            textContent = textContent.substring(0, maxBodySize) + '\n[truncated]';
+          }
+          if (htmlContent.length > maxBodySize) {
+            htmlContent = htmlContent.substring(0, maxBodySize) + '\n[truncated]';
+          }
+
+          const snippet = textContent
+            ? textContent.substring(0, 200).replace(/\s+/g, ' ').trim()
+            : '';
+
+          // Update database
+          const dbPath = path.join(process.cwd(), '.data', 'today.db');
+          const db = new Database(dbPath, { timeout: 30000 });
+          db.pragma('journal_mode = WAL');
+          db.pragma('busy_timeout = 30000');
+
+          const result = db.prepare(`
+            UPDATE email
+            SET snippet = ?, text_content = ?, html_content = ?, attachments = ?,
+                metadata = json_set(COALESCE(metadata, '{}'), '$.needs_body', false)
+            WHERE id = ?
+          `).run(
+            snippet,
+            textContent,
+            htmlContent,
+            attachments.length > 0 ? JSON.stringify(attachments) : null,
+            emailId
+          );
+
+          db.close();
+
+          if (result.changes > 0) {
+            console.log(colors.green('✓ Email body fetched and saved'));
+            console.log(colors.gray(`  Snippet: ${snippet.substring(0, 80)}...`));
+            if (attachments.length > 0) {
+              console.log(colors.gray(`  Attachments: ${attachments.map(a => a.filename).join(', ')}`));
+            }
+          } else {
+            console.log(colors.yellow('Email not found in database'));
+          }
+        } finally {
+          lock.release();
+        }
+      });
     } catch (e) {
       console.error(colors.red(`Error: ${e.message}`));
       process.exit(1);
     }
   });
+
+// Find a special-use folder (RFC 6154) with name fallbacks
+function findSpecialFolder(folders, specialUseAttr, fallbackPaths) {
+  return folders.find(f => {
+    const use = f.specialUse;
+    if (use === specialUseAttr) return true;
+    if (Array.isArray(use) && use.includes(specialUseAttr)) return true;
+    return fallbackPaths.some(p => f.path === p || f.path.toLowerCase() === p.toLowerCase());
+  });
+}
+
+// Shared action factory for delete/spam/move commands
+// destFallbacks, destLabel, confirmVerb may be functions receiving (options)
+function makeMoveAction({ destSpecialUse, destFallbacks, destLabel, confirmVerb }) {
+  return async function(options) {
+    const resolvedFallbacks = typeof destFallbacks === 'function' ? destFallbacks(options) : destFallbacks;
+    const resolvedLabel = typeof destLabel === 'function' ? destLabel(options) : destLabel;
+    const resolvedVerb = typeof confirmVerb === 'function' ? confirmVerb(options) : confirmVerb;
+    destFallbacks = resolvedFallbacks;
+    destLabel = resolvedLabel;
+    confirmVerb = resolvedVerb;
+
+    const db = getDatabase();
+
+    if (!options.body && !options.subject && !options.from) {
+      console.error(colors.red('At least one of --body, --subject, or --from is required.'));
+      process.exit(1);
+    }
+
+    const conditions = [`folder = ?`];
+    const params = [options.folder];
+
+    if (options.body) {
+      conditions.push('(text_content LIKE ? OR html_content LIKE ?)');
+      params.push(`%${options.body}%`, `%${options.body}%`);
+    }
+    if (options.subject) {
+      conditions.push('subject LIKE ?');
+      params.push(`%${options.subject}%`);
+    }
+    if (options.from) {
+      conditions.push('(from_address LIKE ? OR from_name LIKE ?)');
+      params.push(`%${options.from}%`, `%${options.from}%`);
+    }
+    if (options.days) {
+      // datetime(date) normalises the stored ISO-8601 value before comparing
+      conditions.push("datetime(date) >= datetime('now', ?)");
+      params.push(`-${parseInt(options.days)} days`);
+    }
+    if (options.source) {
+      addExactSourceCondition(conditions, params, options.source);
+    }
+
+    const emails = db.prepare(`
+      SELECT id, subject, from_address, from_name, date, source, folder
+      FROM email
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY date DESC
+    `).all(...params);
+
+    if (emails.length === 0) {
+      console.log(colors.yellow('No matching emails found.'));
+      return;
+    }
+
+    console.log(colors.blue(`\n📧 ${emails.length} email(s) to move to ${destLabel}:\n`));
+    for (const email of emails) {
+      const date = new Date(email.date).toLocaleDateString();
+      const from = email.from_name || email.from_address;
+      console.log(`  ${colors.bold(email.subject || '(no subject)')}`);
+      console.log(colors.gray(`   From: ${from} | Date: ${date} | ${email.source}`));
+    }
+    console.log('');
+
+    if (!options.yes) {
+      const { createInterface } = await import('readline');
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise(resolve => rl.question(`${confirmVerb} ${emails.length} message(s)? [y/N] `, resolve));
+      rl.close();
+      if (answer.toLowerCase() !== 'y') {
+        console.log(colors.yellow('Aborted.'));
+        return;
+      }
+    }
+
+    const { ImapFlow } = await import('imapflow');
+    const toml = await import('smol-toml');
+    const fs = await import('fs');
+    const { getConfigPath: cfgPath } = await import('../src/config.js');
+
+    const configContent = fs.readFileSync(cfgPath(), 'utf-8');
+    const tomlConfig = toml.parse(configContent);
+
+    const bySource = {};
+    for (const email of emails) {
+      const match = email.id.match(/^imap-email\/([^:]+):(.+):(\d+)$/);
+      if (!match) { console.warn(colors.yellow(`Skipping unrecognised id: ${email.id}`)); continue; }
+      const [, sourceName, folder, uid] = match;
+      const key = `${sourceName}::${folder}`;
+      if (!bySource[key]) bySource[key] = { sourceName, folder, uids: [], ids: [] };
+      bySource[key].uids.push(parseInt(uid));
+      bySource[key].ids.push(email.id);
+    }
+
+    let totalMoved = 0;
+    let hadError = false;
+    for (const { sourceName, folder, uids, ids } of Object.values(bySource)) {
+      const sourceConfig = tomlConfig.plugins?.['imap-email']?.[sourceName];
+      if (!sourceConfig) { console.error(colors.red(`No config for source: ${sourceName}`)); hadError = true; continue; }
+
+      const envKey = getImapPasswordEnvKey(sourceName);
+      const password = process.env[envKey];
+      if (!password) { console.error(colors.red(`Password not found for ${sourceName} (env: ${envKey})`)); hadError = true; continue; }
+
+      const client = new ImapFlow({
+        host: sourceConfig.host,
+        port: sourceConfig.port || 993,
+        secure: sourceConfig.secure !== false,
+        auth: { user: sourceConfig.username, pass: password },
+        logger: false,
+      });
+
+      let connected = false;
+      try {
+        await client.connect();
+        connected = true;
+
+        const allFolders = await client.list();
+        const destFolder = destSpecialUse
+          ? findSpecialFolder(allFolders, destSpecialUse, destFallbacks)
+          : allFolders.find(f => destFallbacks.some(p => f.path === p));
+
+        if (!destFolder) {
+          console.error(colors.red(`Could not find ${destLabel} folder on ${sourceName}. Available: ${allFolders.map(f => f.path).join(', ')}`));
+          hadError = true;
+        } else if (folder === destFolder.path) {
+          console.log(colors.yellow(`Messages in ${sourceName}/${folder} are already in ${destFolder.path}, skipping.`));
+        } else {
+          const lock = await client.getMailboxLock(folder);
+          try {
+            await client.messageMove(uids, destFolder.path, { uid: true });
+            // Delete cache rows: after a move the destination UID differs from the source UID,
+            // so updating the folder would leave stale ids. The sync will re-index them.
+            const placeholders = ids.map(() => '?').join(',');
+            db.prepare(`DELETE FROM email WHERE id IN (${placeholders})`).run(...ids);
+            console.log(colors.green(`✓ Moved ${uids.length} message(s) from ${sourceName}/${folder} → ${destFolder.path}`));
+            totalMoved += uids.length;
+          } finally {
+            lock.release();
+          }
+        }
+      } catch (e) {
+        console.error(colors.red(`Error with ${sourceName}: ${e.message}`));
+        hadError = true;
+      } finally {
+        if (connected) {
+          try { await client.logout(); } catch { /* ignore logout errors */ }
+        }
+      }
+    }
+
+    if (totalMoved > 0) {
+      console.log(colors.green(`\n✓ Done. ${totalMoved} message(s) moved to ${destLabel}.`));
+    }
+    if (hadError) process.exitCode = 1;
+  };
+}
+
+const MOVE_OPTIONS = (cmd) => cmd
+  .option('--body <text>', 'Match emails whose body contains this text')
+  .option('--subject <text>', 'Match emails whose subject contains this text')
+  .option('--from <email>', 'Match emails from this sender')
+  .option('-d, --days <number>', 'Only look at emails from the last N days')
+  .option('--folder <folder>', 'Source folder to search (default: INBOX)', 'INBOX')
+  .option('--source <source>', 'Filter by plugin source (e.g. icloud, pobox)')
+  .option('-y, --yes', 'Skip confirmation prompt');
+
+// delete command - move matching emails to trash
+MOVE_OPTIONS(
+  program
+    .command('delete')
+    .description('Move matching emails to trash')
+).action(makeMoveAction({
+  destSpecialUse: '\\Trash',
+  destFallbacks: ['Deleted Messages', 'Trash', 'Deleted Items'],
+  destLabel: 'trash',
+  confirmVerb: 'Delete',
+}));
+
+// spam command - move matching emails to spam/junk
+MOVE_OPTIONS(
+  program
+    .command('spam')
+    .description('Move matching emails to spam/junk folder')
+).action(makeMoveAction({
+  destSpecialUse: '\\Junk',
+  destFallbacks: ['Junk', 'Spam', 'Junk Email', 'Junk E-mail', 'Bulk Mail'],
+  destLabel: 'spam',
+  confirmVerb: 'Mark as spam',
+}));
+
+// move command - move matching emails to any named folder
+MOVE_OPTIONS(
+  program
+    .command('move')
+    .description('Move matching emails to a named folder')
+    .requiredOption('--to <folder>', 'Destination folder name (exact path on server)')
+).action(makeMoveAction({
+  destSpecialUse: null,
+  destFallbacks: (options) => [options.to],
+  destLabel: (options) => options.to,
+  confirmVerb: (options) => `Move to ${options.to}`,
+}));
 
 // Setup command - show setup instructions
 program
