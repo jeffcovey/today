@@ -73,6 +73,54 @@ async function fetchCategoryMap(budgetId) {
   return map;
 }
 
+// Scheduled transactions live on their own endpoint — /transactions returns only
+// transactions that have actually occurred. Omitting this drops every upcoming
+// bill and recurring charge the user has set up (issue #477).
+async function fetchScheduledTransactions(budgetId, lastKnowledge) {
+  const url = lastKnowledge != null
+    ? `${API_BASE}/budgets/${budgetId}/scheduled_transactions?last_knowledge_of_server=${lastKnowledge}`
+    : `${API_BASE}/budgets/${budgetId}/scheduled_transactions`;
+  const data = await apiFetch(url);
+  return {
+    scheduled: data.data.scheduled_transactions,
+    server_knowledge: data.data.server_knowledge
+  };
+}
+
+// One row per rule, dated date_next — deliberately not projected occurrences.
+// Projections are synthetic and drift: of the CSV export's projected rows, 27 had
+// already diverged from what actually cleared. frequency/date_first are carried in
+// metadata so a consumer can project if it wants to.
+function convertScheduled(st, budgetId, budgetName, categoryMap) {
+  const cat = categoryMap[st.category_id] || null;
+
+  return {
+    id: `${budgetId}:scheduled:${st.id}`,
+    date: st.date_next,
+    account: st.account_name || '',
+    payee: st.payee_name || '',
+    category: cat?.name || st.category_name || '',
+    category_group: cat?.group_name || '',
+    amount: st.amount / 1000,
+    memo: st.memo || '',
+    cleared: '',
+    flag: st.flag_color || '',
+    scheduled: true,
+    transfer: Boolean(st.transfer_account_id),
+    metadata: JSON.stringify({
+      budget_id: budgetId,
+      budget_name: budgetName,
+      ynab_id: st.id,
+      scheduled: true,
+      frequency: st.frequency,
+      date_first: st.date_first,
+      date_next: st.date_next,
+      account_id: st.account_id,
+      transfer_account_id: st.transfer_account_id || null
+    })
+  };
+}
+
 async function fetchTransactions(budgetId, lastKnowledge) {
   const url = lastKnowledge != null
     ? `${API_BASE}/budgets/${budgetId}/transactions?last_knowledge_of_server=${lastKnowledge}`
@@ -99,6 +147,10 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
     memo: tx.memo || '',
     cleared: tx.cleared || '',
     flag: tx.flag_color || '',
+    scheduled: false,
+    // Money moving between the user's own accounts: not spending, and YNAB
+    // leaves it uncategorised on purpose.
+    transfer: Boolean(tx.transfer_account_id),
     metadata: JSON.stringify({
       budget_id: budgetId,
       budget_name: budgetName,
@@ -263,13 +315,45 @@ async function main() {
       added++;
     }
 
+    // Scheduled transactions come from their own endpoint and their own
+    // server_knowledge cursor — the transactions cursor does not cover them.
+    let scheduledAdded = 0;
+    let scheduledDeleted = 0;
+    try {
+      const schedResult = await fetchScheduledTransactions(
+        budget.id,
+        budgetState.scheduled_server_knowledge ?? null
+      );
+      for (const st of schedResult.scheduled) {
+        if (st.deleted) {
+          toDelete.push(`${sourceId}:${budget.id}:scheduled:${st.id}`);
+          scheduledDeleted++;
+          continue;
+        }
+        // A rule with no next occurrence has nothing to date a row with
+        if (!st.date_next) continue;
+        entries.push(convertScheduled(st, budget.id, budget.name, categoryMap));
+        scheduledAdded++;
+      }
+      budgetState.scheduled_server_knowledge = schedResult.server_knowledge;
+    } catch (err) {
+      console.error(`Warning: could not fetch scheduled transactions for "${budget.name}": ${err.message}`);
+    }
+
     state.budgets[budget.id] = {
       server_knowledge: txResult.server_knowledge,
+      scheduled_server_knowledge: budgetState.scheduled_server_knowledge ?? null,
       budget_name: budget.name,
       last_synced: new Date().toISOString()
     };
 
-    budgetsSynced.push({ name: budget.name, added, deleted });
+    budgetsSynced.push({
+      name: budget.name,
+      added,
+      deleted,
+      scheduled_added: scheduledAdded,
+      scheduled_deleted: scheduledDeleted
+    });
   }
 
   // Remove deleted transactions directly — the plugin loader's INSERT OR REPLACE

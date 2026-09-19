@@ -18,6 +18,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { readConfigToml, writeConfigToml } from '../src/configure-toml-io.js';
 
@@ -35,6 +36,7 @@ function leafKeys(obj, prefix = '') {
 
 let tmpDir;
 let configPath;
+const projectRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'today-toml-'));
@@ -183,6 +185,28 @@ describe('today.toml write integrity (issue #472)', () => {
 
     expect(conflict).toBe(true);
     expect(fs.readFileSync(configPath, 'utf8')).toBe(external);
+  });
+});
+
+describe('today.toml writers share the canonical TOML I/O (issue #476)', () => {
+  const writers = [
+    'src/configure-ui.js',
+    'src/deployments-configure-ui.js',
+    'src/plugins-configure-ui.js',
+    'bin/plugins',
+  ];
+
+  test.each(writers)('%s reads and writes through configure-toml-io.js', (relativePath) => {
+    const source = fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
+    expect(source).toContain('readConfigToml');
+    expect(source).toContain('writeConfigToml');
+  });
+
+  test('plugins-configure-ui does not carry its own TOML serializer anymore', () => {
+    const source = fs.readFileSync(path.join(projectRoot, 'src', 'plugins-configure-ui.js'), 'utf8');
+    expect(source).not.toContain('stringify as stringifyToml');
+    expect(source).not.toContain("parse as parseToml");
+    expect(source).not.toContain('/^(ai_instructions');
   });
 });
 
