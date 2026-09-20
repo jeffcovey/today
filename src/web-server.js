@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import betterSqliteSessionStore from 'better-sqlite3-session-store';
 import path from 'path';
 import crypto from "crypto";
-import { exec, execSync, execFile, execFileSync } from 'child_process';
+import { exec, execSync, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -27,6 +27,7 @@ import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
+import { runTrackCommand } from './track-command.js';
 import {
   getDateComponents as getPlanDateComponents,
   getPlanFileHierarchy,
@@ -7316,25 +7317,6 @@ app.post(
     postWriteHook: (filePath) => { console.log(`File saved: ${filePath}`); },
   })
 );
-
-// Run bin/track without blocking the event loop (a start/stop takes a second
-// or more) and without a shell, so task titles can't be interpreted as commands.
-function runTrackCommand(args) {
-  return new Promise((resolve, reject) => {
-    execFile('bin/track', args, {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      timeout: 60000
-    }, (error, stdout, stderr) => {
-      if (error) {
-        error.message = `${error.message}\n${stderr || ''}`.trim();
-        reject(error);
-      } else {
-        resolve(stdout);
-      }
-    });
-  });
-}
 
 // Start time tracking timer
 app.post('/api/track/start', authMiddleware, express.json(), async (req, res) => {
