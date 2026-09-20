@@ -27,8 +27,8 @@
             <h4 class="mb-0">
               <i class="fas fa-edit me-2"></i>{{heading}}
             </h4>
-            <button class="btn btn-success btn-sm" onclick="startTimer()">
-              <i class="fas fa-play me-1"></i>Start Timer
+            <button class="btn btn-success btn-sm" id="startTimerBtn" onclick="startTimer(this)">
+              <i class="fas fa-play me-1"></i><span class="btn-text">Start Timer</span>
             </button>
           </div>
           <div class="card-body">
@@ -52,8 +52,19 @@
   </div>
 
   <script>
-    function startTimer() {
+    function startTimer(btn) {
       const taskText = {{taskTitleJson}};
+      const icon = btn.querySelector('i');
+      const text = btn.querySelector('.btn-text');
+      // Show progress immediately: starting a timer takes a moment
+      btn.disabled = true;
+      icon.className = 'fas fa-spinner fa-spin me-1';
+      text.textContent = 'Starting…';
+      const restore = () => {
+        btn.disabled = false;
+        icon.className = 'fas fa-play me-1';
+        text.textContent = 'Start Timer';
+      };
       fetch('/api/track/start', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -62,13 +73,16 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          alert('Timer started: ' + taskText);
+          icon.className = 'fas fa-check me-1';
+          text.textContent = 'Started';
           window.location.href = '/';
         } else {
+          restore();
           alert('Failed to start timer: ' + data.message);
         }
       })
       .catch(error => {
+        restore();
         alert('Error starting timer: ' + error.message);
       });
     }

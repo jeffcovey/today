@@ -764,7 +764,7 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 
 async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId) {
   const { db } = context;
-  const { fileFilter } = options;
+  const { fileFilter, skipAutoTag = false } = options;
 
   // Get last sync time to enable incremental sync
   const syncMeta = getSyncMetadata(db, sourceId);
@@ -968,7 +968,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
   const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
-  if (sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
+  if (!skipAutoTag && sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
     try {
       const updater = createFileBasedUpdater(PROJECT_ROOT);
       taggingResult = await runAutoTagger({
@@ -1609,7 +1609,10 @@ export async function writeEntryAndSync(pluginType, entry, options = {}) {
         source.sourceName,
         source.config,
         context,
-        { fileFilter, _caller: 'write-sync' }
+        // Someone is waiting on this write (eg. the web "Start Timer" button).
+        // Auto-tagging is a blocking AI call of several seconds; leave it to
+        // the next regular sync.
+        { fileFilter, skipAutoTag: true, _caller: 'write-sync' }
       );
       if (!syncResult.success) {
         const syncError = syncResult.message || syncResult.error || 'Unknown sync failure';

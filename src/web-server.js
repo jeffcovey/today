@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import betterSqliteSessionStore from 'better-sqlite3-session-store';
 import path from 'path';
 import crypto from "crypto";
-import { exec, execSync, execFileSync } from 'child_process';
+import { exec, execSync, execFile, execFileSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import fsSync from 'fs';
@@ -7317,6 +7317,25 @@ app.post(
   })
 );
 
+// Run bin/track without blocking the event loop (a start/stop takes a second
+// or more) and without a shell, so task titles can't be interpreted as commands.
+function runTrackCommand(args) {
+  return new Promise((resolve, reject) => {
+    execFile('bin/track', args, {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      timeout: 60000
+    }, (error, stdout, stderr) => {
+      if (error) {
+        error.message = `${error.message}\n${stderr || ''}`.trim();
+        reject(error);
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
+
 // Start time tracking timer
 app.post('/api/track/start', authMiddleware, express.json(), async (req, res) => {
   try {
@@ -7325,12 +7344,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
       return res.status(400).json({ success: false, message: 'Description required' });
     }
 
-    const { execSync } = await import('child_process');
-    execSync(`bin/track start "${description.replace(/"/g, '\\"')}"`, {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
+    await runTrackCommand(['start', '--', description]);
     res.json({ success: true, message: 'Timer started' });
   } catch (error) {
     console.error('Error starting timer:', error);
@@ -7341,12 +7355,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
 // Stop time tracking timer
 app.post('/api/track/stop', authMiddleware, async (req, res) => {
   try {
-    const { execSync } = await import('child_process');
-    execSync('bin/track stop', {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
+    await runTrackCommand(['stop']);
     res.json({ success: true, message: 'Timer stopped' });
   } catch (error) {
     console.error('Error stopping timer:', error);
