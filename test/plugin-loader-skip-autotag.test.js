@@ -92,12 +92,20 @@ describe('auto-tagging and the write→sync path', () => {
 
   // Regression: `track stop` opens with ensureSync(), so stopping a timer whose
   // description had no #topic tag blocked ~7.7s on a claude CLI call.
-  test('ensureSyncForType does not wait on the auto-tagger', async () => {
+  test('ensureSyncForType skips auto-tagging by default', async () => {
     const db = createDb();
     const ran = await ensureSyncForType(db, 'time-logs', { force: true });
     expect(ran).toBe(true);
     expect(db.prepare('SELECT count(*) AS n FROM time_logs').get().n).toBe(1);
     expect(runAutoTagger).not.toHaveBeenCalled();
+  });
+
+  test('ensureSyncForType honors skipAutoTag: false', async () => {
+    const db = createDb();
+    const ran = await ensureSyncForType(db, 'time-logs', { force: true, skipAutoTag: false });
+    expect(ran).toBe(true);
+    expect(db.prepare('SELECT count(*) AS n FROM time_logs').get().n).toBe(1);
+    expect(runAutoTagger).toHaveBeenCalledTimes(1);
   });
 
   // Regression: starting a timer from the web UI waited on a multi-second AI

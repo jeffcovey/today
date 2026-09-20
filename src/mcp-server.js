@@ -469,7 +469,7 @@ export function createMCPServer() {
             const context = { db, vaultPath };
 
             if (args.plugin_type) {
-              await ensureSyncForType(db, args.plugin_type, { force: true });
+              await ensureSyncForType(db, args.plugin_type, { force: true, skipAutoTag: false });
             } else {
               await syncAllPlugins(context);
             }
