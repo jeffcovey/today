@@ -11,6 +11,25 @@
 
 import moment from 'moment-timezone';
 
+const FORMAT_WITH_TIMEZONE_RE = /Z{1,2}|z{1,2}/;
+const TIMEZONE_IN_INPUT_RE = /[T\s]\d{2}(?::?\d{2}){0,2}(?:\.\d+)?\s*(?:Z|UTC|GMT|[+-]\d{2}(?::?\d{2})?)$/i;
+
+function shouldPreserveParsedInstant(args) {
+  const [input, format] = args;
+
+  if (moment.isMoment(input) || input instanceof Date || typeof input === 'number') {
+    return true;
+  }
+
+  if (typeof input !== 'string') return false;
+  if (TIMEZONE_IN_INPUT_RE.test(input)) return true;
+
+  if (typeof format === 'string') return FORMAT_WITH_TIMEZONE_RE.test(format);
+  if (Array.isArray(format)) return format.some(candidate => typeof candidate === 'string' && FORMAT_WITH_TIMEZONE_RE.test(candidate));
+
+  return false;
+}
+
 /**
  * @param {string} timezone - IANA timezone from config.toml
  * @returns {typeof moment} moment-like facade, defaulting to `timezone` for direct calls
@@ -23,6 +42,7 @@ export function getVaultScriptMoment(timezone) {
   const vaultMoment = (...args) => {
     if (!zone) return moment(...args);
     if (args.length === 0) return moment.tz(zone);
+    if (shouldPreserveParsedInstant(args)) return moment(...args).tz(zone);
     return moment.tz(...args, zone);
   };
 
