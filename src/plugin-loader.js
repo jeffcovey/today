@@ -600,7 +600,10 @@ export async function ensureSyncForType(db, pluginType, options = {}) {
     for (const { plugin, sources } of enabledPlugins) {
       if (!plugin.commands?.read || plugin.type !== pluginType) continue;
       for (const { sourceName, config } of sources) {
-        await syncPluginSource(plugin, sourceName, config, context, { _caller: 'ensure-sync' });
+        // A CLI command is waiting on this to freshen data before it reads
+        // (eg. `track stop`). Auto-tagging is a blocking AI call of several
+        // seconds; the scheduler's full syncs do it instead.
+        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag: true, _caller: 'ensure-sync' });
       }
     }
     return true;
