@@ -41,7 +41,6 @@ import {
 // `import yaml from 'js-yaml'` throws at startup. Works on both v4 and v5.
 import * as yaml from 'js-yaml';
 import { parseFrontmatter } from './frontmatter.js';
-import moment from 'moment';
 import { parse as parseToml } from 'smol-toml';
 import {
   chatWithFile,
@@ -62,6 +61,7 @@ import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
 import { interpolateTemplate } from './template-interpolation.js';
+import { getVaultScriptMoment } from './vault-script-moment.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -3207,7 +3207,7 @@ class DataviewAPI {
       // Execute the script in a sandbox with dv, input, and moment available
       const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
       const scriptFn = new AsyncFunction('dv', 'input', 'moment', scriptContent);
-      await scriptFn(viewDv, input, moment);
+      await scriptFn(viewDv, input, getVaultScriptMoment(getConfiguredTimezone()));
 
       // Get the output from the view
       const output = viewDv.getOutput();
@@ -3351,7 +3351,7 @@ async function executeDataviewJS(code, vaultPath, currentFilePath, allFiles) {
     // Create async function and execute (moment provided for Obsidian compatibility)
     const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
     const fn = new AsyncFunction('dv', 'console', 'moment', code);
-    await fn(dv, context.console, moment);
+    await fn(dv, context.console, getVaultScriptMoment(getConfiguredTimezone()));
 
     // Return both manual capture and buffer output
     const bufferOutput = dv.getOutput();
