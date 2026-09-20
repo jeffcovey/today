@@ -8,6 +8,8 @@
 // - Only fetches new messages on subsequent syncs
 // - Falls back to full sync if UIDVALIDITY changes (folder recreated)
 // - Clears stale DB entries for any folder whose UIDVALIDITY changed
+// - Reconciles each folder against its server UID list, so messages expunged or
+//   moved away (archived, filed by a server-side rule) leave the cache too
 // - CONDSTORE/QRESYNC: when server supports CONDSTORE, also tracks highestModseq
 //   and fetches flag changes (read/unread, flagged, etc.) for existing messages
 //
@@ -21,6 +23,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
+import { reconcileFolder, searchSince } from './reconcile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -249,6 +252,7 @@ const emailsNeedingBodies = []; // Track for background fetch
 const metadata = {
   folders_synced: [],
   total_fetched: 0,
+  total_expunged: 0,
   bodies_pending: 0,
   bodies_skipped: 0,
   errors: [],
@@ -275,6 +279,37 @@ function parseFlags(flagSet) {
   return flags;
 }
 
+// Drop cached rows for messages no longer in this folder.
+//
+// A full sync reconciles the whole folder, which is the only way rows older
+// than the sync window ever get cleaned up. An incremental sync reconciles just
+// the window it covers: asking for every UID in a 150k-message archive on each
+// ten-minute run would not be worth what it buys.
+//
+// Callers must only reach here when UIDVALIDITY still matches. If it changed,
+// the folder has already been cleared and the cached UIDs describe a mailbox
+// that no longer exists.
+async function reconcileAgainstServer(folderPath, { full }) {
+  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+  const dbPath = path.join(projectRoot, '.data', 'today.db');
+
+  try {
+    // When windowed, ask for a wider span than we are willing to delete, so a
+    // message sitting on the boundary is never mistaken for one that has gone.
+    const serverUids = full
+      ? await client.search({ all: true }, { uid: true })
+      : await client.search({ since: searchSince(sinceDate) }, { uid: true });
+
+    return reconcileFolder(dbPath, sourceId, folderPath, serverUids, {
+      messageCount: Number(client.mailbox?.exists || 0),
+      deleteRowsSince: full ? null : sinceDate.toISOString()
+    });
+  } catch (err) {
+    console.error(`  Warning: could not reconcile ${folderPath}: ${err.message}`);
+    return 0;
+  }
+}
+
 async function syncFolder(folderPath, isIncremental, lastState) {
   try {
     const lock = await client.getMailboxLock(folderPath);
@@ -297,6 +332,13 @@ async function syncFolder(folderPath, isIncremental, lastState) {
       let fetchSearchCriteria;     // Object criteria for SEARCH+FETCH
       let fetchOptions = {};       // Extra fetch options (uid, changedSince)
       const pendingFlagUpdates = [];
+
+      // Messages can leave a folder without anything new arriving, so this has
+      // to run before the "no new" early return below, not alongside the fetch.
+      let expungedCount = 0;
+      if (lastState && lastState.uidValidity === currentUidValidity) {
+        expungedCount = await reconcileAgainstServer(folderPath, { full: !isIncremental });
+      }
 
       if (isIncremental && lastState && lastState.uidValidity === currentUidValidity) {
         // UIDVALIDITY matches - we can do incremental sync
@@ -328,13 +370,19 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           console.error(`  📁 ${folderPath} (new: ${currentUidNext - lastState.uidNext})...`);
         } else {
           // No new messages and no CONDSTORE changes
-          console.error(`  📁 ${folderPath} (no new)...`);
+          console.error(`  📁 ${folderPath} (no new${expungedCount > 0 ? `, ${expungedCount} expunged` : ''})...`);
           newFolderState[folderPath] = {
             uidValidity: currentUidValidity,
             uidNext: currentUidNext,
             highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
           };
-          metadata.folders_synced.push({ folder: folderPath, count: 0, type: 'skip' });
+          metadata.folders_synced.push({
+            folder: folderPath,
+            count: 0,
+            expunged: expungedCount,
+            type: 'skip'
+          });
+          metadata.total_expunged += expungedCount;
           lock.release();
           return;
         }
@@ -449,14 +497,16 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         folder: folderPath,
         count: folderCount,
         flag_updates: flagUpdateCount,
+        expunged: expungedCount,
         type: syncType
       });
       metadata.total_fetched += folderCount;
-      if (flagUpdateCount > 0) {
-        console.error(`     ✓ ${folderCount} new emails, ${flagUpdateCount} flag updates`);
-      } else {
-        console.error(`     ✓ ${folderCount} emails`);
-      }
+      metadata.total_expunged += expungedCount;
+      const extras = [
+        flagUpdateCount > 0 ? `${flagUpdateCount} flag updates` : null,
+        expungedCount > 0 ? `${expungedCount} expunged` : null
+      ].filter(Boolean);
+      console.error(`     ✓ ${folderCount} emails${extras.length ? `, ${extras.join(', ')}` : ''}`);
 
     } finally {
       lock.release();
@@ -471,8 +521,10 @@ async function syncFolder(folderPath, isIncremental, lastState) {
 async function main() {
   const isIncremental = !!lastSyncTime;
   try {
+    // Load prior folder state even for a full sync: it carries the UIDVALIDITY
+    // that says whether cached UIDs can still be compared against the server's.
+    previousFolderState = getFolderState(sourceId);
     if (isIncremental) {
-      previousFolderState = getFolderState(sourceId);
       metadata.incremental = true;
     }
 
@@ -531,6 +583,9 @@ async function main() {
     } else {
       console.error(`✓ Synced ${metadata.total_fetched} emails from ${metadata.folders_synced.length} folder(s)`);
     }
+    if (metadata.total_expunged > 0) {
+      console.error(`✓ Removed ${metadata.total_expunged} cached emails no longer on the server`);
+    }
 
     // Launch background body fetch if needed (only for emails without bodies)
     if (includeBody && emailsNeedingBodies.length > 0) {
@@ -580,6 +635,10 @@ async function main() {
   } catch (error) {
     metadata.errors.push(`Connection error: ${error.message}`);
     console.error(`Error: ${error.message}`);
+  }
+
+  if (isIncremental && metadata.total_expunged > 0) {
+    metadata.rows_purged = metadata.total_expunged;
   }
 
   // Output in plugin format
