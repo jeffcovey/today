@@ -573,7 +573,7 @@ export function getLatestSyncTimeForType(db, pluginType) {
  * @returns {boolean} - True if sync was performed, false if data was fresh
  */
 export async function ensureSyncForType(db, pluginType, options = {}) {
-  const { staleMinutes = getStaleMinutes(pluginType), force = false } = options;
+  const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true } = options;
 
   // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
   if (process.env.CONTEXT_ONLY === 'true' && !force) {
@@ -600,10 +600,10 @@ export async function ensureSyncForType(db, pluginType, options = {}) {
     for (const { plugin, sources } of enabledPlugins) {
       if (!plugin.commands?.read || plugin.type !== pluginType) continue;
       for (const { sourceName, config } of sources) {
-        // A CLI command is waiting on this to freshen data before it reads
-        // (eg. `track stop`). Auto-tagging is a blocking AI call of several
-        // seconds; the scheduler's full syncs do it instead.
-        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag: true, _caller: 'ensure-sync' });
+        // Callers waiting on a read (CLI commands and MCP reads) use this to
+        // freshen data first. Auto-tagging is a blocking AI call of several
+        // seconds; the scheduler's full syncs do it instead unless overridden.
+        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, _caller: 'ensure-sync' });
       }
     }
     return true;
