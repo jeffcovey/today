@@ -29,8 +29,9 @@ function execTrackCommand(args) {
 // Serialize bin/track so overlapping web requests can't race each other into
 // inconsistent timer state, while still returning each caller's own outcome.
 export function runTrackCommand(args) {
-  const result = trackCommandChain.then(() => execTrackCommand(args), () => execTrackCommand(args));
-  trackCommandChain = result.catch(() => {});
+  const queued = trackCommandChain.catch(() => {});
+  const result = queued.then(() => execTrackCommand(args));
+  trackCommandChain = result;
   return result;
 }
 

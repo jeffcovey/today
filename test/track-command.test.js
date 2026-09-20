@@ -13,6 +13,10 @@ const { runTrackCommand, resetTrackCommandQueueForTests } = await import('../src
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
+const flushQueue = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
 
 describe('runTrackCommand', () => {
   beforeEach(() => {
@@ -34,7 +38,7 @@ describe('runTrackCommand', () => {
 
     const first = runTrackCommand(['start', '--', 'Review plan']);
     const second = runTrackCommand(['stop']);
-    await Promise.resolve();
+    await flushQueue();
 
     expect(execFile).toHaveBeenCalledTimes(1);
     expect(execFile).toHaveBeenCalledWith(
@@ -51,7 +55,7 @@ describe('runTrackCommand', () => {
 
     callbacks[0]();
     await expect(first).resolves.toBe('start ok');
-    await Promise.resolve();
+    await flushQueue();
 
     expect(execFile).toHaveBeenCalledTimes(2);
     expect(events).toEqual(['start:start', 'finish:start', 'start:stop']);
@@ -70,14 +74,14 @@ describe('runTrackCommand', () => {
 
     const first = runTrackCommand(['start', '--', 'Review plan']);
     const second = runTrackCommand(['stop']);
-    await Promise.resolve();
+    await flushQueue();
 
     const error = new Error('track failed');
     callbacks[0].callback(error, '', 'stderr details');
     await expect(first).rejects.toMatchObject({
       message: expect.stringContaining('stderr details')
     });
-    await Promise.resolve();
+    await flushQueue();
 
     expect(execFile).toHaveBeenCalledTimes(2);
     expect(execFile.mock.calls[1][1]).toEqual(['stop']);
