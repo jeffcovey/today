@@ -363,7 +363,7 @@ function convertAllocation(ynabAllocation, filePath, rowIndex) {
 }
 
 // Convert YNAB transaction to our format
-function convertTransaction(ynabTx, filePath, rowIndex) {
+function convertTransaction(ynabTx, filePath, rowIndex, budgetName) {
   const date = parseDate(ynabTx.Date);
 
   // Skip transactions without valid dates
@@ -427,7 +427,11 @@ function convertTransaction(ynabTx, filePath, rowIndex) {
     memo: ynabTx.Memo || '',
     cleared: ynabTx.Cleared || '',
     flag: ynabTx.Flag || '',
+    // The CSV export has no transfer field; YNAB writes transfers with a
+    // "Transfer : <account>" payee, which is the only signal available here.
+    transfer: /^Transfer\s*:/i.test(ynabTx.Payee || ''),
     metadata: JSON.stringify({
+      budget_name: budgetName,
       source_file: path.basename(filePath),
       row_index: rowIndex,
       ynab_category_full: categoryFull
@@ -495,7 +499,12 @@ if (latestRegisterFile) {
     filesProcessed.push(path.relative(projectRoot, latestRegisterFile.path));
 
     for (let i = 0; i < rows.length; i++) {
-      const transaction = convertTransaction(rows[i], latestRegisterFile.path, i + 2); // +2 for 1-based + header
+      const transaction = convertTransaction(
+        rows[i],
+        latestRegisterFile.path,
+        i + 2,
+        latestRegisterFile.budgetName
+      ); // +2 for 1-based + header
       if (transaction) {
         entries.push(transaction);
       }
