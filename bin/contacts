@@ -6,7 +6,7 @@ autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
-import { getTodayDate } from '../src/date-utils.js';
+import { formatDate, getDay, getMonth, getTodayDate } from '../src/date-utils.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
@@ -55,7 +55,7 @@ function getUpcomingBirthdays(db, days = 7) {
   for (let i = 0; i < days; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(today.getDate() + i);
-    const monthDay = `${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+    const monthDay = `${getMonth(checkDate)}-${getDay(checkDate)}`;
 
     const dayEvents = db.prepare(`
       SELECT full_name, birthday, organization, primary_email, primary_phone
@@ -65,7 +65,7 @@ function getUpcomingBirthdays(db, days = 7) {
 
     if (dayEvents.length > 0) {
       events.push({
-        date: checkDate.toISOString().split('T')[0],
+        date: formatDate(checkDate),
         dayLabel: checkDate.toDateString(),
         contacts: dayEvents
       });
@@ -82,7 +82,7 @@ function getBirthdaysForDate(db, targetDate) {
   }
 
   const date = new Date(targetDate);
-  const monthDay = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const monthDay = `${getMonth(date)}-${getDay(date)}`;
 
   return db.prepare(`
     SELECT full_name, birthday, organization, primary_email, primary_phone

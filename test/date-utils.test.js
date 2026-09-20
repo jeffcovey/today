@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { execFileSync } from 'child_process';
 import {
   formatDate,
   formatDateTime,
@@ -35,6 +36,7 @@ import {
 } from '../src/date-utils.js';
 
 describe('date-utils', () => {
+  const dateUtilsUrl = new URL('../src/date-utils.js', import.meta.url).href;
   // Use a fixed date for consistent testing: Tuesday, December 9, 2025
   const testDate = new Date('2025-12-09T12:00:00');
   const testDateStr = '2025-12-09';
@@ -50,6 +52,23 @@ describe('date-utils', () => {
 
     test('should handle single-digit months and days', () => {
       expect(formatDate(new Date('2025-01-05'))).toBe('2025-01-05');
+    });
+
+    test('uses local calendar date rather than UTC rollover', () => {
+      const result = execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { formatDate } from ${JSON.stringify(dateUtilsUrl)}; console.log(formatDate(new Date('2026-09-16T00:30:00Z')));`
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, TZ: 'America/New_York' },
+        }
+      ).trim();
+
+      expect(result).toBe('2026-09-15');
     });
   });
 
@@ -73,6 +92,13 @@ describe('date-utils', () => {
     test('should handle week 1 of year', () => {
       // January 6, 2025 is in week 2
       expect(getWeekNumber(new Date('2025-01-06'))).toBe(2);
+    });
+
+    test('should preserve ISO week numbering at year boundaries', () => {
+      expect(getWeekNumber(new Date('2026-12-28T12:00:00Z'))).toBe(53);
+      expect(getWeekNumber(new Date('2027-01-03T12:00:00Z'))).toBe(53);
+      expect(getWeekNumber(new Date('2027-01-04T12:00:00Z'))).toBe(1);
+      expect(getWeekNumber(new Date('2026-09-15T12:00:00Z'))).toBe(38);
     });
   });
 
