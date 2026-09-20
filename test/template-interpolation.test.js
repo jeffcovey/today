@@ -10,4 +10,8 @@ describe('interpolateTemplate', () => {
 
     expect(result).toBe('<main><p>$& $1 $$</p></main><footer>$` $\'</footer>');
   });
+
+  test('matches placeholder keys literally', () => {
+    expect(interpolateTemplate('{{a.b}} {{aXb}}', { 'a.b': 'literal' })).toBe('literal {{aXb}}');
+  });
 });
