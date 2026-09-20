@@ -39,6 +39,7 @@ describe('getVaultScriptMoment', () => {
     expect(moment(new Date('2026-09-20T15:16:57Z')).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
     expect(moment([2026, 8, 20, 11, 16, 57]).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
     expect(moment('2026-09-20 11:16:57', 'YYYY-MM-DD HH:mm:ss', true).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
+    expect(moment('2026-09-20T15:16:57Z', moment.ISO_8601, true).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
   });
 
   test('forwards the moment statics vault scripts use', () => {
