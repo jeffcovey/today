@@ -56,6 +56,7 @@ import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
+import { interpolateTemplate } from './template-interpolation.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -135,17 +136,13 @@ async function loadTemplate(name) {
 }
 
 function renderTemplate(template, data = {}) {
-  let result = template;
   const templateData = {
     themeToggleButton: getThemeToggleButtonHtml(),
     themeBootstrapScript: getThemeBootstrapScript(),
     staticVersion: STATIC_VERSION,
     ...data,
   };
-  for (const [key, value] of Object.entries(templateData)) {
-    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value ?? '');
-  }
-  return result;
+  return interpolateTemplate(template, templateData);
 }
 
 // HTML-escape a string to prevent XSS when interpolating user data into templates
