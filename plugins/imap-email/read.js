@@ -637,6 +637,10 @@ async function main() {
     console.error(`Error: ${error.message}`);
   }
 
+  if (isIncremental && metadata.total_expunged > 0) {
+    metadata.rows_purged = metadata.total_expunged;
+  }
+
   // Output in plugin format
   // files_processed: [] signals incremental mode to plugin-loader (preserve existing entries)
   // files_processed: null (omitted) signals full sync (plugin-loader deletes and replaces all)
