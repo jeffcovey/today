@@ -15,9 +15,13 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { schemas } from './plugin-schemas.js';
 import { getConfigPath } from './config.js';
+import {
+  readConfigToml,
+  writeConfigToml,
+  reportConfigConflict as reportTomlConflict,
+} from './configure-toml-io.js';
 import {
   getEncryptedEnvVarName,
   getEnvVar,
@@ -67,62 +71,44 @@ function editInEditor(currentText, filename = 'edit.txt') {
 // Config helpers
 // ============================================================================
 
-function readConfig() {
-  try {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return parseToml(content);
-  } catch {
-    return {};
-  }
-}
-
-function writeConfig(config) {
-  let tomlOutput = stringifyToml(config);
-  tomlOutput = tomlOutput.replace(
-    /^(ai_instructions\s*=\s*)"((?:[^"\\]|\\.)*)"/gm,
-    (match, prefix, content) => {
-      if (!content.includes('\\n')) return match;
-      const unescaped = content
-        .replace(/\\n/g, '\n')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\')
-        .trimEnd(); // Remove trailing whitespace to prevent accumulation
-      return `${prefix}"""\n${unescaped}\n"""`;
-    }
-  );
-  const header = `# Configuration for Today system
-# Edit this file when your situation changes (e.g., when traveling)
-
-`;
-  fs.writeFileSync(CONFIG_PATH, header + tomlOutput);
-}
+const readConfig = () => readConfigToml(CONFIG_PATH);
+const writeConfig = (config, originalRaw) => writeConfigToml(CONFIG_PATH, config, originalRaw);
+const reportConfigConflict = () => reportTomlConflict(CONFIG_PATH, 'plugins configure');
 
 function getPluginSources(pluginName) {
-  const config = readConfig();
+  const { config } = readConfig();
   return config.plugins?.[pluginName] || {};
 }
 
 function toggleSource(pluginName, sourceName, enabled) {
-  const config = readConfig();
+  const { config, raw } = readConfig();
   if (!config.plugins) config.plugins = {};
   if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
   if (!config.plugins[pluginName][sourceName]) config.plugins[pluginName][sourceName] = {};
   config.plugins[pluginName][sourceName].enabled = enabled;
-  writeConfig(config);
+  const { conflict } = writeConfig(config, raw);
+  if (conflict) {
+    reportConfigConflict();
+    return false;
+  }
+  return true;
 }
 
 function deleteSource(pluginName, sourceName, pluginSettings) {
-  const config = readConfig();
+  const { config, raw } = readConfig();
   return deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, {
     persist: (nextConfig) => {
-      writeConfig(nextConfig);
-      return true;
+      const { conflict } = writeConfig(nextConfig, raw);
+      if (conflict) {
+        reportConfigConflict();
+      }
+      return !conflict;
     }
   });
 }
 
 function updateSourceField(pluginName, sourceName, fieldName, value) {
-  const config = readConfig();
+  const { config, raw } = readConfig();
   if (!config.plugins) config.plugins = {};
   if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
   if (!config.plugins[pluginName][sourceName]) config.plugins[pluginName][sourceName] = {};
@@ -131,20 +117,30 @@ function updateSourceField(pluginName, sourceName, fieldName, value) {
   } else {
     config.plugins[pluginName][sourceName][fieldName] = value;
   }
-  writeConfig(config);
+  const { conflict } = writeConfig(config, raw);
+  if (conflict) {
+    reportConfigConflict();
+    return false;
+  }
+  return true;
 }
 
 function createSource(pluginName, sourceName) {
-  const config = readConfig();
+  const { config, raw } = readConfig();
   if (!config.plugins) config.plugins = {};
   if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
   config.plugins[pluginName][sourceName] = { enabled: true };
-  writeConfig(config);
+  const { conflict } = writeConfig(config, raw);
+  if (conflict) {
+    reportConfigConflict();
+    return false;
+  }
+  return true;
 }
 
 // Function to get available calendar sources for dropdowns
 function getAvailableCalendarSources() {
-  const config = readConfig();
+  const { config } = readConfig();
   const sources = [];
 
   if (config.plugins && config.plugins['public-calendars']) {
@@ -191,7 +187,7 @@ function getOrderedPluginTypes() {
 }
 
 function buildPluginList(plugins) {
-  const config = readConfig();
+  const { config } = readConfig();
   const byType = {};
 
   for (const [pluginName, plugin] of plugins) {
@@ -489,6 +485,7 @@ function AddSourceDialog({ pluginName, existingSources, onAdd, onCancel }) {
 // ============================================================================
 
 function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorRequest }) {
+  const { exit } = useApp();
   const [sources, setSources] = useState(() => buildSourceList(pluginName, plugin));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState('list'); // 'list', 'edit', 'add', 'delete'
@@ -536,7 +533,10 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
           }
         }
       } else if (input === ' ' && selectedSource) {
-        toggleSource(pluginName, selectedSource.sourceName, !selectedSource.enabled);
+        if (!toggleSource(pluginName, selectedSource.sourceName, !selectedSource.enabled)) {
+          exit();
+          process.exit(1);
+        }
         refreshSources();
       } else if (key.return && selectedSource) {
         setMode('edit');
@@ -561,15 +561,24 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
 
   const handleEditSave = (fieldKey, value) => {
     if (fieldKey === 'enabled') {
-      toggleSource(pluginName, selectedSource.sourceName, value);
+      if (!toggleSource(pluginName, selectedSource.sourceName, value)) {
+        exit();
+        process.exit(1);
+      }
     } else {
-      updateSourceField(pluginName, selectedSource.sourceName, fieldKey, value);
+      if (!updateSourceField(pluginName, selectedSource.sourceName, fieldKey, value)) {
+        exit();
+        process.exit(1);
+      }
     }
     refreshSources();
   };
 
   const handleAddSource = (sourceName) => {
-    createSource(pluginName, sourceName);
+    if (!createSource(pluginName, sourceName)) {
+      exit();
+      process.exit(1);
+    }
     refreshSources();
     // Find the index of the newly created source and select it
     const newSources = buildSourceList(pluginName, plugin);
@@ -635,7 +644,10 @@ function SourceListView({ pluginName, plugin, onBack, visibleHeight, onEditorReq
             onConfirm=${() => {
               const result = deleteSource(pluginName, selectedSource.sourceName, plugin.settings);
               if (!result.ok) {
-                if (result.stage === 'clear') {
+                if (result.stage === 'persist') {
+                  exit();
+                  process.exit(1);
+                } else if (result.stage === 'clear') {
                   setError(`Removed "${selectedSource.sourceName}", but secret may be left behind: ${result.orphanedEnvVars.join(', ')}. Check .env.`);
                 } else {
                   setError(`Failed to remove "${selectedSource.sourceName}"`);
@@ -924,7 +936,9 @@ export async function runPluginsConfigure(plugins) {
 
       // Save if editor returned a value (not cancelled)
       if (newValue !== null) {
-        updateSourceField(pluginName, sourceName, fieldKey, newValue);
+        if (!updateSourceField(pluginName, sourceName, fieldKey, newValue)) {
+          process.exit(1);
+        }
       }
 
       // Loop continues - will re-render the UI

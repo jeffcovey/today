@@ -157,10 +157,22 @@ describe('encrypted settings', () => {
   describe('plugins-configure-ui delete path', () => {
     const source = fs.readFileSync(path.join(projectRoot, 'src', 'plugins-configure-ui.js'), 'utf8');
 
-    test('deleteSource uses the shared delete helper with a persist callback', () => {
+    test('deleteSource uses shared TOML I/O and passes the CAS baseline into delete persistence', () => {
+      expect(source).toContain('const readConfig = () => readConfigToml(CONFIG_PATH);');
+      expect(source).toContain('const writeConfig = (config, originalRaw) => writeConfigToml(CONFIG_PATH, config, originalRaw);');
+      expect(source).toContain("const reportConfigConflict = () => reportTomlConflict(CONFIG_PATH, 'plugins configure');");
+      expect(source).toContain('const { config, raw } = readConfig();');
       expect(source).toContain('deleteSourceConfigWithSecrets(config, pluginName, sourceName, pluginSettings, {');
       expect(source).toContain('persist: (nextConfig) => {');
-      expect(source).toContain('const result = deleteSource(pluginName, selectedSource.sourceName, plugin.settings);');
+      expect(source).toContain('const { conflict } = writeConfig(nextConfig, raw);');
+    });
+
+    test('delete persistence stops before secret cleanup when the config CAS write conflicts', () => {
+      expect(source).toContain('if (conflict) {');
+      expect(source).toContain('reportConfigConflict();');
+      expect(source).toContain('return !conflict;');
+      expect(source).toContain("if (result.stage === 'persist') {");
+      expect(source).toContain('process.exit(1);');
     });
 
     test('delete confirmation reports orphaned secrets after a successful persist', () => {

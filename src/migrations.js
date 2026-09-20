@@ -88,6 +88,67 @@ const systemMigrations = [
         )
       `);
     }
+  },
+  {
+    version: 106,
+    description: 'Add scheduled column to financial_transactions',
+    fn: (db) => {
+      // financial_transactions is built from plugin-schemas.js, so a database
+      // created after the field was added already has this column and a bare
+      // ALTER would fail with "duplicate column name". The unguarded ALTERs at
+      // 101 and 104 are safe only because sync_metadata is created without them.
+      const hasColumn = db.prepare(`PRAGMA table_info(financial_transactions)`)
+        .all()
+        .some(col => col.name === 'scheduled');
+      if (!hasColumn) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN scheduled INTEGER DEFAULT 0`);
+      }
+    }
+  },
+  {
+    version: 108,
+    description: 'Add transfer column to financial_transactions',
+    fn: (db) => {
+      // Guarded like 106/107: the table is built from plugin-schemas.js, so a
+      // fresh database already has the column.
+      const existing = new Set(
+        db.prepare(`PRAGMA table_info(financial_transactions)`).all().map(c => c.name)
+      );
+      if (!existing.has('transfer')) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN transfer INTEGER DEFAULT 0`);
+      }
+      // Backfill from what each plugin already recorded, so existing rows are
+      // correct without waiting for a re-sync: the API plugin stores
+      // transfer_account_id in metadata, the CSV export uses a payee convention.
+      db.exec(`
+        UPDATE financial_transactions
+        SET transfer = 1
+        WHERE IFNULL(transfer, 0) = 0
+          AND (json_extract(metadata, '$.transfer_account_id') IS NOT NULL
+               OR payee LIKE 'Transfer :%')
+      `);
+    }
+  },
+  {
+    version: 107,
+    description: 'Add dedup_key and superseded_by to financial_transactions for cross-source reconciliation',
+    fn: (db) => {
+      // Guarded for the same reason as 106: the table is built from
+      // plugin-schemas.js, so a fresh database already has these columns.
+      const existing = new Set(
+        db.prepare(`PRAGMA table_info(financial_transactions)`).all().map(c => c.name)
+      );
+      if (!existing.has('dedup_key')) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN dedup_key TEXT`);
+      }
+      if (!existing.has('superseded_by')) {
+        db.exec(`ALTER TABLE financial_transactions ADD COLUMN superseded_by TEXT`);
+      }
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_financial_transactions_dedup_key
+               ON financial_transactions(dedup_key)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_financial_transactions_superseded_by
+               ON financial_transactions(superseded_by)`);
+    }
   }
 ];
 

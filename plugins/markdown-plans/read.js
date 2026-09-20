@@ -24,9 +24,12 @@ import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { getTimezone } from '../../src/config.js';
+import { getLocalDayUTCRange } from '../../src/date-utils.js';
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+const userTimezone = getTimezone();
 
 // FILE_FILTER is set by vault-watcher when a small set of files changed.
 // Watcher-triggered runs skip the AI backlog drain; that work belongs on
@@ -1249,8 +1252,14 @@ function getPlanningDataWithSchemas(targetDateStr, targetDayOfWeek) {
       .map(([name]) => name);
 
     if (pluginType === 'events') {
-      // Events scheduled for target date
-      query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE date(start_date) = '${targetDateStr}' ORDER BY start_date`;
+      // Events scheduled for target date — use two conditions:
+      // 1. UTC range for timed events (stored as ISO timestamps), so late-evening
+      //    events in negative-offset timezones aren't bumped to the next UTC day.
+      // 2. Exact date match for all-day events (stored as bare YYYY-MM-DD strings,
+      //    e.g. from Google Calendar), which sort before any ISO timestamp and are
+      //    excluded by the range comparison alone.
+      const { start: dayStartUTC, end: dayEndUTC } = getLocalDayUTCRange(targetDateStr, userTimezone);
+      query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE (start_date >= '${dayStartUTC}' AND start_date <= '${dayEndUTC}') OR start_date = '${targetDateStr}' ORDER BY start_date`;
     } else if (pluginType === 'tasks') {
       // Open tasks: due by target date, overdue, or high priority
       query = `SELECT ${columns.join(', ')} FROM ${tableName} WHERE status != 'completed' AND (date(due_date) <= '${targetDateStr}' OR (due_date IS NULL AND priority IN ('highest', 'high'))) ORDER BY CASE priority WHEN 'highest' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 WHEN 'lowest' THEN 5 ELSE 6 END, due_date ASC LIMIT 30`;
@@ -1365,7 +1374,14 @@ function formatPlanningSection(section) {
 
   for (const row of section.data) {
     if (section.type === 'events') {
-      const time = row.start_date ? row.start_date.substring(11, 16) : 'all-day';
+      // Treat as all-day when: no start_date, all_day flag set, or start_date is
+      // a bare date string (YYYY-MM-DD) with no time component — parsing those as
+      // Date objects yields UTC midnight, which renders as the previous evening in
+      // negative-offset timezones.
+      const isAllDay = !row.start_date || row.all_day || !row.start_date.includes('T');
+      const time = isAllDay
+        ? 'all-day'
+        : new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: userTimezone }).format(new Date(row.start_date));
       const calendar = row.calendar_name ? ` [${row.calendar_name}]` : '';
       lines.push(`- ${time}: ${row.title}${row.location ? ` @ ${row.location}` : ''}${calendar}`);
     } else if (section.type === 'tasks') {

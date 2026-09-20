@@ -949,6 +949,30 @@ SQL: SELECT date, payee, category, amount, account FROM financial_transactions W
         required: false,
         description: 'Cleared status (Cleared, Uncleared, Reconciled)'
       },
+      scheduled: {
+        sqlType: 'INTEGER DEFAULT 0',
+        jsType: 'boolean',
+        required: false,
+        description: 'True for a scheduled/recurring transaction that has not occurred yet — exclude from spending totals'
+      },
+      transfer: {
+        sqlType: 'INTEGER DEFAULT 0',
+        jsType: 'boolean',
+        required: false,
+        description: 'True when this moves money between the user\'s own accounts — not income or spending, and not something to categorise'
+      },
+      dedup_key: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Cross-source identity: account|date|milliunits|payee|occurrence. Lets the same transaction be recognised across plugins that have no shared ID'
+      },
+      superseded_by: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Id of the row from a higher-precedence source that replaces this one. Non-null means the row is retained for audit but excluded from reporting'
+      },
       flag: {
         sqlType: 'TEXT',
         jsType: 'string',

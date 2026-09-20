@@ -3,7 +3,7 @@
  * Provides standardized date formatting and calculations.
  */
 
-import { format, getWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
+import { format, getISOWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 import { getFullConfig } from './config.js';
 
@@ -34,7 +34,7 @@ export function formatDateTime(date) {
  */
 export function getWeekNumber(date) {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return getWeek(d, { weekStartsOn: 1 }); // Monday start
+  return getISOWeek(d);
 }
 
 /**
@@ -432,4 +432,23 @@ export function getTimezoneOffset(date, timezone) {
  */
 export function sqlLocalDate(column) {
   return `SUBSTR(${column}, 1, 10)`;
+}
+
+/**
+ * Return the UTC ISO boundaries [start, end) for a local calendar day.
+ *
+ * Calendar events are stored as UTC (e.g. "2026-09-18T10:30:00Z"), so
+ * WHERE date(start_date) = '2026-09-18' compares UTC dates and misses
+ * late-evening events in negative-offset timezones. Use this helper to
+ * build a range query that covers the full local day instead.
+ *
+ * @param {string} localDateStr - YYYY-MM-DD in the user's timezone
+ * @param {string} [timezone] - Optional timezone override
+ * @returns {{ start: string, end: string }} Exclusive UTC range [start, end)
+ */
+export function getLocalDayUTCRange(localDateStr, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const dayStart = new TZDate(`${localDateStr}T00:00:00`, tz);
+  const dayEnd = new TZDate(`${localDateStr}T23:59:59.999`, tz);
+  return { start: dayStart.toISOString(), end: dayEnd.toISOString() };
 }
