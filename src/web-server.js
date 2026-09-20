@@ -60,6 +60,7 @@ import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
+import { containsDynamicContent, markDynamic } from './dynamic-content.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -219,17 +220,6 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 
 // Disk-based HTML cache (persists across server restarts)
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
-
-/**
- * Returns true when rendered HTML contains content that changes independently
- * of the source file's mtime (task query results, dataview results).
- * Such pages are excluded from the persistent disk cache.
- */
-function containsDynamicContent(html) {
-  return html.includes('tasks-query-result') ||
-    html.includes('dataview-table') ||
-    html.includes('dataview-list');
-}
 
 /**
  * Resolve and validate disk cache paths for a given URL path.
@@ -3405,13 +3395,13 @@ async function processDataviewJSBlocks(content, vaultPath, currentFilePath, allF
       const html = await executeDataviewJS(code, vaultPath, currentFilePath, allFiles);
 
       // Replace the code block with the rendered HTML
-      processedContent = processedContent.replace(fullMatch, html);
+      processedContent = processedContent.replace(fullMatch, () => markDynamic(html));
     } catch (error) {
       debug('Error executing dataviewjs block:', error);
       const errorHtml = `<div class="alert alert-danger" role="alert">
         <strong>Dataview Error:</strong> ${error.message}
       </div>`;
-      processedContent = processedContent.replace(fullMatch, errorHtml);
+      processedContent = processedContent.replace(fullMatch, () => markDynamic(errorHtml));
     }
   }
 
@@ -3441,13 +3431,13 @@ async function processDataviewDQLBlocks(content, vaultPath, currentFilePath, pro
 
     try {
       const html = await executeDQLQuery(code, vaultPath, currentFilePath, currentProperties, allFiles);
-      processedContent = processedContent.replace(fullMatch, html);
+      processedContent = processedContent.replace(fullMatch, () => markDynamic(html));
     } catch (error) {
       debug('Error executing dataview DQL block:', error);
       const errorHtml = `<div class="alert alert-danger" role="alert">
         <strong>Dataview DQL Error:</strong> ${error.message}
       </div>`;
-      processedContent = processedContent.replace(fullMatch, errorHtml);
+      processedContent = processedContent.replace(fullMatch, () => markDynamic(errorHtml));
     }
   }
 
