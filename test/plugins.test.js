@@ -3,13 +3,19 @@ import path from 'path';
 import { discoverPlugins, getPluginAccess } from '../src/plugin-loader.js';
 import { getSchema } from '../src/plugin-schemas.js';
 
-// Discover plugins before tests run
+// Discover plugins before tests run.
+//
+// Other suites (eg. plugin-loader-write-sync) create a temporary stub plugin
+// inside the real plugins/ directory and delete it in afterAll. Jest runs those
+// in parallel workers, so a stub can appear here mid-run and vanish again
+// before its generated tests execute. Ignore them: this suite validates the
+// plugins that ship with the repo.
 const plugins = await discoverPlugins();
-const pluginNames = Array.from(plugins.keys());
+const pluginNames = Array.from(plugins.keys()).filter(name => !name.endsWith('-stub'));
 
 describe('All Plugins', () => {
   test('should have at least one plugin', () => {
-    expect(plugins.size).toBeGreaterThan(0);
+    expect(pluginNames.length).toBeGreaterThan(0);
   });
 
   // Dynamically create tests for each discovered plugin
