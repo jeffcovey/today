@@ -3,7 +3,7 @@
  * Provides standardized date formatting and calculations.
  */
 
-import { format, getWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
+import { format, getISOWeek, getQuarter, startOfWeek, endOfWeek, startOfDay as dfStartOfDay, addDays, subSeconds, parseISO } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 import { getFullConfig } from './config.js';
 
@@ -34,7 +34,7 @@ export function formatDateTime(date) {
  */
 export function getWeekNumber(date) {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return getWeek(d, { weekStartsOn: 1 }); // Monday start
+  return getISOWeek(d);
 }
 
 /**

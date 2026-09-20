@@ -6,6 +6,13 @@
 
 import fs from 'fs';
 import path from 'path';
+import {
+  formatDisplayDate,
+  getDateComponents as getSharedDateComponents,
+  getDayName,
+  getWeekNumber,
+  getYear,
+} from './date-utils.js';
 
 // ============================================================================
 // Date Utilities
@@ -26,11 +33,7 @@ export function getQuarter(month) {
  * @returns {number} ISO week number (1-53)
  */
 export function getISOWeek(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return getWeekNumber(date);
 }
 
 /**
@@ -39,12 +42,14 @@ export function getISOWeek(date) {
  * @returns {{year: number, month: number, day: number, week: number, quarter: string}}
  */
 export function getDateComponents(date = new Date()) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const week = getISOWeek(date);
-  const quarter = getQuarter(month);
-  return { year, month, day, week, quarter };
+  const components = getSharedDateComponents(date);
+  return {
+    year: Number(components.year),
+    month: Number(components.month),
+    day: Number(components.day),
+    week: Number(components.week),
+    quarter: components.quarter,
+  };
 }
 
 // ============================================================================
@@ -72,7 +77,7 @@ export const STAGE_MAPPING = {
 export function getStageInfo(dayOrDate) {
   let dayOfWeek;
   if (dayOrDate instanceof Date) {
-    dayOfWeek = dayOrDate.toLocaleDateString('en-US', { weekday: 'long' });
+    dayOfWeek = getDayName(dayOrDate);
   } else {
     dayOfWeek = dayOrDate;
   }
@@ -301,15 +306,15 @@ export function extractJsonFromResponse(text) {
  * @returns {Object} Template variable replacements
  */
 export function getTemplateVariables(date) {
-  const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const dayOfWeek = getDayName(date);
   const [stageTheme, stageFocus] = getStageInfo(dayOfWeek);
 
   return {
     '{{DAY_OF_WEEK}}': dayOfWeek,
     '{{MONTH_NAME}}': date.toLocaleDateString('en-US', { month: 'long' }),
     '{{DAY}}': String(date.getDate()),
-    '{{YEAR}}': String(date.getFullYear()),
-    '{{FULL_DATE}}': date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    '{{YEAR}}': getYear(date),
+    '{{FULL_DATE}}': formatDisplayDate(date),
     '{{STAGE_THEME}}': stageTheme,
     '{{STAGE_FOCUS}}': stageFocus,
     '{{PRIORITIES_FROM_DATABASE}}': '',

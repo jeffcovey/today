@@ -96,6 +96,17 @@ describe('Plugin Loader', () => {
       expect(timeTracking).toHaveProperty('_path');
       expect(timeTracking._path).toContain('markdown-time-tracking');
     });
+
+    test('should expose the richer streaks-habits manifest metadata', async () => {
+      const plugins = await discoverPlugins();
+      const streaksHabits = plugins.get('streaks-habits');
+
+      expect(streaksHabits.longDescription).toContain('Setup:');
+      expect(streaksHabits.longDescription).toContain('bin/plugins sync streaks-habits');
+      expect(streaksHabits.aiInstructions).toContain("streaks-habits/%");
+      expect(streaksHabits.aiInstructions).toContain('metadata.target_type');
+      expect(streaksHabits.aiInstructions).toContain('metadata.paused');
+    });
   });
 
   describe('getPluginSources', () => {

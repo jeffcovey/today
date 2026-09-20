@@ -18,6 +18,8 @@
  * - yearly on March 15
  */
 
+import { formatDate as formatSharedDate } from './date-utils.js';
+
 const DAYS_OF_WEEK = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
                 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -363,8 +365,5 @@ function getOrdinalWeekday(year, month, ordinal, dayOfWeek, referenceDate) {
  * @returns {string}
  */
 export function formatDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatSharedDate(date);
 }

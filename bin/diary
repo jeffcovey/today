@@ -10,7 +10,9 @@ import {
   getTodayDate,
   getWeekAgoDate,
   formatDate,
-  getCurrentTime
+  getCurrentTime,
+  getDay,
+  getMonth
 } from '../src/date-utils.js';
 import { format } from 'date-fns';
 import {
@@ -285,7 +287,7 @@ async function cmdSearch(searchTerm, options = {}) {
 async function cmdOnThisDay(options = {}) {
   const db = getDatabase();
   const today = new Date();
-  const monthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const monthDay = `${getMonth(today)}-${getDay(today)}`;
 
   let query = `
     SELECT date, text, metadata, source

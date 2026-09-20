@@ -85,6 +85,22 @@ describe('Plan Utils', () => {
       expect(components.day).toBe(1);
       expect(components.quarter).toBe('Q1');
     });
+
+    test('should preserve numeric component types', () => {
+      const components = getDateComponents(new Date(2025, 0, 6));
+
+      expect(typeof components.year).toBe('number');
+      expect(typeof components.month).toBe('number');
+      expect(typeof components.day).toBe('number');
+      expect(typeof components.week).toBe('number');
+      expect(typeof components.quarter).toBe('string');
+    });
+
+    test('should keep ISO week values at the 2026/2027 boundary', () => {
+      expect(getDateComponents(new Date('2026-12-28T12:00:00Z')).week).toBe(53);
+      expect(getDateComponents(new Date('2027-01-03T12:00:00Z')).week).toBe(53);
+      expect(getDateComponents(new Date('2027-01-04T12:00:00Z')).week).toBe(1);
+    });
   });
 
   describe('STAGE_MAPPING', () => {
@@ -153,6 +169,11 @@ describe('Plan Utils', () => {
       const date = new Date(2025, 11, 7); // Dec 7, 2025
       const path = getPlanFilePath(date);
       expect(path).toBe('vault/plans/2025_Q4_12_W49_07.md');
+    });
+
+    test('should match the existing 2026-09-15 plan naming convention', () => {
+      const path = getPlanFilePath(new Date('2026-09-15T12:00:00Z'));
+      expect(path).toBe('vault/plans/2026_Q3_09_W38_15.md');
     });
   });
 
