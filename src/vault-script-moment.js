@@ -13,11 +13,25 @@ import moment from 'moment-timezone';
 
 /**
  * @param {string} timezone - IANA timezone from config.toml
- * @returns {typeof moment} moment, defaulting to `timezone` for creation and formatting
+ * @returns {typeof moment} moment-like facade, defaulting to `timezone` for direct calls
  */
 export function getVaultScriptMoment(timezone) {
   // Resolved on every call (not once at startup) so config hot-reload applies.
   // An unknown zone falls back to the process-local time rather than throwing.
-  moment.tz.setDefault(timezone && moment.tz.zone(timezone) ? timezone : undefined);
-  return moment;
+  const zone = timezone && moment.tz.zone(timezone) ? timezone : undefined;
+
+  const vaultMoment = (...args) => {
+    if (!zone) return moment(...args);
+    if (args.length === 0) return moment.tz(zone);
+    return moment.tz(...args, zone);
+  };
+
+  vaultMoment.duration = moment.duration;
+  vaultMoment.unix = moment.unix;
+  vaultMoment.utc = moment.utc;
+  vaultMoment.isMoment = moment.isMoment;
+  vaultMoment.locale = moment.locale;
+  vaultMoment.tz = moment.tz;
+
+  return vaultMoment;
 }
