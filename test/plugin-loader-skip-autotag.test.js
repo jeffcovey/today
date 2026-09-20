@@ -54,7 +54,7 @@ jest.unstable_mockModule('../src/auto-tagger.js', () => ({
   createFileBasedUpdater: () => ({ update: () => false, flush: () => {} }),
 }));
 
-const { writeEntryAndSync, syncPluginSource, getWritableSource } = await import('../src/plugin-loader.js');
+const { writeEntryAndSync, syncPluginSource, getWritableSource, ensureSyncForType } = await import('../src/plugin-loader.js');
 const { getSqlColumns } = await import('../src/plugin-schemas.js');
 const Database = (await import('better-sqlite3')).default;
 
@@ -87,6 +87,24 @@ describe('auto-tagging and the write→sync path', () => {
     const { source } = await getWritableSource('time-logs', 'skip-autotag-stub/default');
     const result = await syncPluginSource(source.plugin, source.sourceName, source.config, { db, vaultPath: 'vault' }, { _caller: 'test' });
     expect(result.success).toBe(true);
+    expect(runAutoTagger).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: `track stop` opens with ensureSync(), so stopping a timer whose
+  // description had no #topic tag blocked ~7.7s on a claude CLI call.
+  test('ensureSyncForType skips auto-tagging by default', async () => {
+    const db = createDb();
+    const ran = await ensureSyncForType(db, 'time-logs', { force: true });
+    expect(ran).toBe(true);
+    expect(db.prepare('SELECT count(*) AS n FROM time_logs').get().n).toBe(1);
+    expect(runAutoTagger).not.toHaveBeenCalled();
+  });
+
+  test('ensureSyncForType honors skipAutoTag: false', async () => {
+    const db = createDb();
+    const ran = await ensureSyncForType(db, 'time-logs', { force: true, skipAutoTag: false });
+    expect(ran).toBe(true);
+    expect(db.prepare('SELECT count(*) AS n FROM time_logs').get().n).toBe(1);
     expect(runAutoTagger).toHaveBeenCalledTimes(1);
   });
 
