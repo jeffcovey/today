@@ -46,6 +46,7 @@ export function getVaultScriptMoment(timezone) {
     return moment.tz(...args, zone);
   };
 
+  Object.setPrototypeOf(vaultMoment, moment);
   vaultMoment.duration = moment.duration;
   vaultMoment.unix = moment.unix;
   vaultMoment.utc = moment.utc;

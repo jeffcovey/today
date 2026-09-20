@@ -36,6 +36,7 @@ describe('getVaultScriptMoment', () => {
 
   test('supports common moment constructor signatures through the facade', () => {
     const moment = getVaultScriptMoment('America/New_York');
+    expect(moment.ISO_8601).toBeDefined();
     expect(moment(new Date('2026-09-20T15:16:57Z')).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
     expect(moment([2026, 8, 20, 11, 16, 57]).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
     expect(moment('2026-09-20 11:16:57', 'YYYY-MM-DD HH:mm:ss', true).format('YYYY-MM-DDTHH:mm:ssZ')).toBe('2026-09-20T11:16:57-04:00');
