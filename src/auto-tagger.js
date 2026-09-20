@@ -275,6 +275,18 @@ export function createFileBasedUpdater(projectRoot) {
       const line = lines[lineNum];
       if (!line) return false;
 
+      // Running timer (current-timer.md): line 0 is the bare description.
+      // Without this the running timer could never be tagged, so every sync
+      // re-asked the AI about it. Only touch the line if it still holds the
+      // description we were asked to tag — the timer may have been stopped
+      // or replaced while the AI call was in flight.
+      if (path.basename(fullPath) === 'current-timer.md') {
+        if (lineNum !== 0 || !newValue.startsWith(`${line} #topic/`)) return false;
+        lines[0] = newValue;
+        modifiedFiles.add(fullPath);
+        return true;
+      }
+
       // For pipe-delimited format (time tracking), update the description field
       if (line.includes('|')) {
         const parts = line.split('|');

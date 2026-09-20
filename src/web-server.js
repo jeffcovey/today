@@ -27,6 +27,7 @@ import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
+import { runTrackCommand } from './track-command.js';
 import {
   getDateComponents as getPlanDateComponents,
   getPlanFileHierarchy,
@@ -7325,12 +7326,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
       return res.status(400).json({ success: false, message: 'Description required' });
     }
 
-    const { execSync } = await import('child_process');
-    execSync(`bin/track start "${description.replace(/"/g, '\\"')}"`, {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
+    await runTrackCommand(['start', '--', description]);
     res.json({ success: true, message: 'Timer started' });
   } catch (error) {
     console.error('Error starting timer:', error);
@@ -7341,12 +7337,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
 // Stop time tracking timer
 app.post('/api/track/stop', authMiddleware, async (req, res) => {
   try {
-    const { execSync } = await import('child_process');
-    execSync('bin/track stop', {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
+    await runTrackCommand(['stop']);
     res.json({ success: true, message: 'Timer stopped' });
   } catch (error) {
     console.error('Error stopping timer:', error);
