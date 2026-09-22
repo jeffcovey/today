@@ -653,16 +653,23 @@ export function getSyncStatusMessage(db, pluginType) {
  * Update sync metadata after a successful sync.
  * Uses upsert to preserve lock columns (INSERT OR REPLACE would delete and re-insert, nulling them).
  */
-function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null) {
+/**
+ * @param {string} [syncStartedAt] - when this sync began, as datetime('now')
+ *   formats it. The watermark must be the START of the sync, not its end: a
+ *   file written while the sync was running would otherwise look older than
+ *   the watermark and never be re-read, leaving the cache stale for good (#508).
+ */
+function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null, syncStartedAt = null) {
+  const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
   db.prepare(`
     INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
-    VALUES (?, datetime('now'), ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(source) DO UPDATE SET
-      last_synced_at = datetime('now'),
+      last_synced_at = excluded.last_synced_at,
       last_sync_files = excluded.last_sync_files,
       entries_count = excluded.entries_count,
       extra_data = excluded.extra_data
-  `).run(sourceId, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
+  `).run(sourceId, stamp, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
 }
 
 const SYNC_LOCK_STALE_MINUTES = 5;
@@ -767,6 +774,8 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 
 async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId) {
   const { db } = context;
+  // Taken before the plugin reads anything — see updateSyncMetadata.
+  const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
   const { fileFilter, skipAutoTag = false } = options;
 
   // Get last sync time to enable incremental sync
@@ -929,7 +938,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   if (entries.length === 0 && isIncremental) {
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
-      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
       const messages = [];
       if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
@@ -966,7 +975,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
