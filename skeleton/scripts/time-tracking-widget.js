@@ -116,6 +116,7 @@ if (isWebRender) {
     timerText.style.flex = '1';
 
     const stopBtn = timerContainer.createEl('button', { text: '⏹ Stop', cls: 'mod-cta' });
+    stopBtn.style.cssText = CTA_BTN_STYLE;
     stopBtn.onclick = async () => {
         try {
             const now = moment().format('YYYY-MM-DDTHH:mm:ssZ');
@@ -137,12 +138,14 @@ if (isWebRender) {
 
     const input = formContainer.createEl('input', { type: 'text', placeholder: 'Start tracking... (include #topic/tags)' });
     input.style.flex = '1';
+    input.style.minHeight = '44px';
     input.style.padding = '6px 12px';
     input.style.fontSize = '14px';
     input.style.borderRadius = '4px';
     input.style.border = '1px solid var(--background-modifier-border)';
 
     const startBtn = formContainer.createEl('button', { text: '▶ Start', cls: 'mod-cta' });
+    startBtn.style.cssText = CTA_BTN_STYLE;
     startBtn.onclick = async () => {
         const description = input.value.trim();
         if (!description) { alert('Please enter a description'); return; }
