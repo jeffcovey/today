@@ -37,10 +37,72 @@ try {
     }
 } catch (e) {}
 
+// The web server renders this script server-side through a Dataview shim whose
+// pseudo-elements serialise to an HTML string, so a handler assigned to
+// `.onclick` is silently dropped and the buttons do nothing. Detect that by the
+// capability we actually need and emit inline markup calling the web API
+// instead. In Obsidian these are real DOM nodes and the original path runs.
+const probeEl = dv.el('span', '');
+const isWebRender = typeof probeEl.addEventListener !== 'function';
+probeEl.style.display = 'none';
+
+const esc = (s) => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// Descriptions are URI-encoded before going into a handler, for two reasons:
+// the server runs every rendered page through a `#topic/x` -> emoji pass that
+// would otherwise rewrite the payload and silently drop the tag, and it leaves
+// nothing needing quote-escaping. The browser decodes it back.
+// encodeURIComponent misses `'`, which would close the JS string literal.
+const enc = (s) => encodeURIComponent(String(s)).replace(/'/g, '%27');
+
+// Comfortably tappable on a phone; the old icon was ~20x18px at 60% opacity.
+const ICON_BTN_STYLE = 'cursor:pointer;margin-right:8px;min-width:44px;min-height:44px;' +
+    'font-size:20px;line-height:1;padding:6px 10px;vertical-align:middle;' +
+    'border:1px solid var(--background-modifier-border);border-radius:6px;' +
+    'background-color:transparent;color:inherit;';
+const CTA_BTN_STYLE = 'cursor:pointer;min-height:44px;padding:8px 16px;font-size:15px;' +
+    'border-radius:6px;border:1px solid var(--background-modifier-border);';
+
+// Build an inline onclick that POSTs and reloads. `bodyJs` is raw JS source;
+// the whole thing is HTML-escaped exactly once, at the end.
+const postAttr = (endpoint, bodyJs, guardJs) => esc(
+    `(function(b){${guardJs || ''}b.disabled=true;var o=b.textContent;b.textContent='\u2026';` +
+    `fetch('${endpoint}',{method:'POST',headers:{'Content-Type':'application/json'},` +
+    `credentials:'same-origin',body:JSON.stringify(${bodyJs})})` +
+    `.then(function(r){return r.json()})` +
+    `.then(function(d){if(d&&d.success){location.reload()}else{b.disabled=false;` +
+    `b.textContent=o;alert('Failed: '+((d&&d.message)||'unknown error'))}})` +
+    `.catch(function(e){b.disabled=false;b.textContent=o;alert('Error: '+e.message)})})(this)`);
+
 const container = dv.el('div', '');
 container.style.marginBottom = '1em';
 
-if (runningTimer) {
+if (isWebRender) {
+    if (runningTimer) {
+        container.innerHTML =
+            `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;` +
+            `padding:8px 12px;background-color:var(--background-secondary);border-radius:6px;">` +
+            `<div style="flex:1;min-width:200px;">\u23f1\ufe0f <strong>${esc(runningTimer.description)}</strong> ` +
+            `<span style="color:var(--text-muted);">\u2022 ${esc(runningTimer.duration)}</span></div>` +
+            `<button type="button" class="mod-cta" style="${CTA_BTN_STYLE}" ` +
+            `onclick="${postAttr('/api/track/stop', '{}')}">\u23f9 Stop</button></div>`;
+    } else {
+        // Note the space in "#topic/ tags": without it the server's tag pass
+        // strips the example out of the placeholder.
+        const guard = `var i=document.getElementById('today-timer-input');` +
+            `var v=(i&&i.value||'').trim();if(!v){alert('Please enter a description');return}`;
+        container.innerHTML =
+            `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">` +
+            `<input id="today-timer-input" type="text" ` +
+            `placeholder="Start tracking... (include #topic/ tags)" ` +
+            `style="flex:1;min-width:200px;min-height:44px;padding:8px 12px;font-size:15px;` +
+            `border-radius:6px;border:1px solid var(--background-modifier-border);">` +
+            `<button type="button" class="mod-cta" style="${CTA_BTN_STYLE}" ` +
+            `onclick="${postAttr('/api/track/start', '{description:v}', guard)}">\u25b6 Start</button></div>`;
+    }
+} else if (runningTimer) {
     const timerContainer = container.createEl('div', { cls: 'timer-running' });
     timerContainer.style.display = 'flex';
     timerContainer.style.alignItems = 'center';
@@ -157,18 +219,25 @@ if (entries.length > 0) {
     tableContainer.style.marginTop = '8px';
 
     const tableData = entries.map(e => {
+        const descContainerWeb = isWebRender ? dv.el('span', '') : null;
+        if (descContainerWeb) {
+            // `.onclick`/`.title` never survive the shim, so inline the markup.
+            // POSTing to /api/track/start is also safer than the Obsidian path
+            // below: `bin/track start` stops a running timer instead of
+            // overwriting current-timer.md and losing it.
+            descContainerWeb.innerHTML =
+                `<button type="button" title="Start new timer with this description" ` +
+                `aria-label="Start new timer" style="${ICON_BTN_STYLE}" ` +
+                `onclick="${postAttr('/api/track/start', `{description:decodeURIComponent('${enc(e.description)}')}`)}">` +
+                `\u21bb</button>` +
+                `<span style="vertical-align:middle;">${esc(e.description)}</span>`;
+            return isSingleDay
+                ? [e.start, e.duration, descContainerWeb]
+                : [e.date, e.start, e.duration, descContainerWeb];
+        }
         const btn = dv.el('button', '↻');
-        btn.style.cursor = 'pointer';
-        btn.style.marginRight = '8px';
-        btn.style.padding = '2px 6px';
-        btn.style.fontSize = '12px';
-        btn.style.border = '1px solid var(--background-modifier-border)';
-        btn.style.borderRadius = '3px';
-        btn.style.backgroundColor = 'transparent';
-        btn.style.opacity = '0.6';
+        btn.style.cssText = ICON_BTN_STYLE;
         btn.title = 'Start new timer with this description';
-        btn.onmouseover = () => { btn.style.opacity = '1'; };
-        btn.onmouseout = () => { btn.style.opacity = '0.6'; };
         btn.onclick = async () => {
             try {
                 const now = moment().format('YYYY-MM-DDTHH:mm:ssZ');
