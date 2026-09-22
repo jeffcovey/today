@@ -1183,6 +1183,28 @@ function getTableNameForType(pluginType) {
  * @param {Array|null} filesProcessed - List of files that were processed (for incremental sync)
  * @returns {number} Number of entries inserted
  */
+/**
+ * True when a processed file produced no entries even though it still holds
+ * content on disk — the signature of a read that raced a writer mid-update.
+ *
+ * Deleting on that basis destroys cached rows the file still contains, and the
+ * loss is permanent: read.js only revisits files whose mtime is newer than
+ * last_synced_at, so a writer that finished before the sync recorded its
+ * timestamp is never re-read (see #508). A genuinely emptied or deleted file
+ * has no content, so it still reconciles normally.
+ */
+function skipTornReadDelete(file, contributingFiles) {
+  if (contributingFiles.has(file)) return false;
+  try {
+    const stats = fs.statSync(path.join(PROJECT_ROOT, file));
+    if (!stats.isFile() || stats.size === 0) return false;
+  } catch {
+    return false; // gone from disk: the delete is correct
+  }
+  console.warn(`Warning: skipping delete for ${file} — it yielded no entries but still has content on disk (possible concurrent write)`);
+  return true;
+}
+
 function insertEntries(db, tableName, pluginType, entries, sourceId, filesProcessed) {
   const schema = schemas[pluginType];
   if (!schema || !schema.fields) {
@@ -1213,6 +1235,15 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     : schema.fields.start_date ? 'start_date'
     : null;
 
+  // Which of the processed files actually produced entries this run. Ids are
+  // `<file>:<lineNum>`, so the file is everything before the last colon.
+  const contributingFiles = new Set();
+  for (const entry of entries) {
+    if (typeof entry.id !== 'string') continue;
+    const idx = entry.id.lastIndexOf(':');
+    if (idx > 0) contributingFiles.add(entry.id.slice(0, idx));
+  }
+
   // Deletion strategy and inserts are wrapped in one transaction so there is
   // never a window where the table is empty between the delete and the inserts.
   const insertAll = db.transaction(() => {
@@ -1222,6 +1253,7 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
       // This handles line number shifts when files are edited
       const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
       for (const file of filesProcessed) {
+        if (skipTornReadDelete(file, contributingFiles)) continue;
         deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
       }
     } else if (!filesProcessed || pluginType === 'events') {

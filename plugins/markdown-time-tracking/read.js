@@ -26,8 +26,12 @@ const lastSyncDate = lastSyncTime ? new Date(lastSyncTime) : null;
 
 // Check if directory exists
 if (!fs.existsSync(timeDir)) {
+  // files_processed MUST be present, even empty: omitting it tells the loader
+  // this was a full sync and it deletes every row for this source. A missing
+  // directory is "nothing to report", not "the source is now empty".
   console.log(JSON.stringify({
     entries: [],
+    files_processed: [],
     metadata: {
       message: `Time tracking directory not found: ${directory}`,
       hint: 'Create the directory and add YYYY-MM.md files with time entries'
