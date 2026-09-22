@@ -540,6 +540,26 @@ console.log(JSON.stringify({
   });
 
   describe('insertEntries atomicity', () => {
+    // These tests prove the rollback by making an INSERT abort mid-transaction,
+    // which requires the stub's read command to have run. If that command fails
+    // for any reason (it is a spawned subprocess, so a loaded machine can starve
+    // it), syncPluginSource does not throw — it RESOLVES with {success:false},
+    // and a bare `.rejects.toThrow()` then reports only "did not throw", hiding
+    // the real cause. Surface it instead. See #505.
+    async function expectSyncToAbort(promise) {
+      const outcome = await promise.then(
+        (resolved) => ({ resolved }),
+        (threw) => ({ threw })
+      );
+      if (!outcome.threw) {
+        throw new Error(
+          'Expected the sync to abort mid-insert, but it resolved — the stub plugin read ' +
+          `probably never ran. Sync returned: ${JSON.stringify(outcome.resolved)}`
+        );
+      }
+      expect(String(outcome.threw.message)).toContain('simulated mid-insert failure');
+    }
+
     // Verifies that the delete and the inserts happen inside a single transaction
     // so a concurrent reader never sees an empty table between the two operations.
     // We prove atomicity by making the INSERT fail mid-way with a SQLite trigger
@@ -605,9 +625,9 @@ console.log(JSON.stringify({
       `);
 
       // Sync will throw because the trigger aborts the second insert
-      await expect(
+      await expectSyncToAbort(
         syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, { _caller: 'test' })
-      ).rejects.toThrow('simulated mid-insert failure');
+      );
 
       // The pre-existing task must still be present — the delete was rolled back
       // with the failed insert because both ran inside the same transaction.
@@ -650,9 +670,9 @@ console.log(JSON.stringify({
         END;
       `);
 
-      await expect(
+      await expectSyncToAbort(
         syncPluginSource(fullPlugin, 'default', {}, { db, vaultPath: 'vault' }, { _caller: 'test' })
-      ).rejects.toThrow('simulated mid-insert failure');
+      );
 
       // The unrelated task must survive — the full-source delete was rolled back
       const rows = db.prepare(`SELECT id FROM tasks WHERE source = ?`).all(sourceId);
