@@ -861,6 +861,13 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // files_processed — the plugin skips paths that no longer exist — so its rows
   // would otherwise be orphaned in the DB and keep surfacing (e.g. in the task
   // timer). Emptied-but-existing files already reconcile via files_processed.
+  //
+  // "Requested but not processed" is NOT sufficient on its own: a reader may
+  // also skip a file it could not read coherently because a writer was mid-
+  // update (#508). Treating that as a deletion purged every row of a file that
+  // was sitting intact on disk — on this very path, since stopping a timer
+  // writes the month file and immediately triggers a filtered sync. Require the
+  // file to actually be gone.
   let reconciledDeletions = 0;
   if (fileFilter && (plugin.type === 'tasks' || plugin.type === 'time-logs')) {
     const reconcileTable = getTableNameForType(plugin.type);
@@ -869,7 +876,8 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       const deletedFiles = fileFilter
         .split(',')
         .map(f => f.trim())
-        .filter(f => f && !processed.has(f));
+        .filter(f => f && !processed.has(f))
+        .filter(f => !fs.existsSync(path.join(PROJECT_ROOT, f)));
       if (deletedFiles.length > 0) {
         // Escape LIKE wildcards (% _ \) in the file path so e.g. a filename with
         // underscores can't match unrelated rows.
