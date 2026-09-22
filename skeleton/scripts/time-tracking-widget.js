@@ -139,6 +139,7 @@ if (isWebRender) {
     const input = formContainer.createEl('input', { type: 'text', placeholder: 'Start tracking... (include #topic/tags)' });
     input.style.flex = '1';
     input.style.minHeight = '44px';
+    input.style.boxSizing = 'border-box';
     input.style.padding = '6px 12px';
     input.style.fontSize = '14px';
     input.style.borderRadius = '4px';
