@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -9,11 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const trackBin = path.join(repoRoot, 'bin', 'track');
-const dbPath = path.join(repoRoot, '.data', 'today.db');
 
-function runTrack(configPath, args) {
+// The database path is resolved with path.resolve('.data/today.db'), i.e.
+// against the working directory — so running bin/track from the temp root
+// keeps this test off the repo's own database, which on a deployment is the
+// live one. Everything else (plugin discovery, vault_path) resolves from the
+// script location, so it is unaffected by the cwd.
+function runTrack(cwd, configPath, args) {
   return spawnSync(process.execPath, [trackBin, ...args], {
-    cwd: repoRoot,
+    cwd,
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -27,8 +32,11 @@ describe('bin/track start syncs file-backed timers first', () => {
   let configPath;
   let vaultPath;
   let sourceId;
+  let dbPath;
 
   beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'track-start-sync-'));
+    dbPath = path.join(tempRoot, '.data', 'today.db');
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     const db = new Database(dbPath);
     db.exec(`CREATE TABLE IF NOT EXISTS time_logs (${getSqlColumns('time-logs')})`);
@@ -45,9 +53,6 @@ describe('bin/track start syncs file-backed timers first', () => {
     `);
     db.close();
 
-    const tmpBase = path.join(repoRoot, 'tmp');
-    fs.mkdirSync(tmpBase, { recursive: true });
-    tempRoot = fs.mkdtempSync(path.join(tmpBase, 'track-start-sync-'));
     vaultPath = path.join(tempRoot, 'vault');
     fs.mkdirSync(path.join(vaultPath, 'logs', 'time-tracking'), { recursive: true });
 
@@ -66,15 +71,7 @@ describe('bin/track start syncs file-backed timers first', () => {
   });
 
   afterEach(() => {
-    try {
-      if (fs.existsSync(dbPath)) {
-        const db = new Database(dbPath);
-        db.prepare('DELETE FROM time_logs WHERE source = ?').run(sourceId);
-        db.prepare('DELETE FROM sync_metadata WHERE source = ?').run(sourceId);
-        db.close();
-      }
-    } catch {}
-
+    // Nothing shared is touched, so removing the temp root is the whole cleanup.
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
@@ -86,7 +83,7 @@ describe('bin/track start syncs file-backed timers first', () => {
       `Synced running timer #topic/original\n${priorStart}\n`
     );
 
-    const result = runTrack(configPath, ['start', 'Replacement timer #topic/new']);
+    const result = runTrack(tempRoot, configPath, ['start', 'Replacement timer #topic/new']);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Stopping previous timer: Synced running timer #topic/original');
