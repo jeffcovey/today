@@ -32,6 +32,7 @@ if (!fs.existsSync(timeDir)) {
   console.log(JSON.stringify({
     entries: [],
     files_processed: [],
+    incremental: true,
     metadata: {
       message: `Time tracking directory not found: ${directory}`,
       hint: 'Create the directory and add YYYY-MM.md files with time entries'
@@ -47,7 +48,8 @@ const allFiles = fs.readdirSync(timeDir)
   .map(f => ({
     name: f,
     path: path.join(timeDir, f),
-    relativePath: path.join(directory, f)
+    relativePath: path.join(directory, f),
+    mtimeMs: fs.statSync(path.join(timeDir, f)).mtimeMs
   }));
 
 // Check which files need syncing based on modification time
@@ -65,10 +67,27 @@ if (lastSyncDate) {
 // Parse entries from files that need syncing
 const entries = [];
 const filesProcessed = [];
+const warnings = [];
 
 for (const file of filesToSync) {
-  filesProcessed.push(file.relativePath);
+  // Only report a file as processed once we know we read it whole. A file
+  // being rewritten as we read it can come back empty or truncated, and the
+  // loader deletes the rows of every processed file before re-inserting — so
+  // reporting a torn read destroys cached entries the file still contains
+  // (#508). Skipping it leaves its rows alone, and its mtime stays newer than
+  // the sync watermark, so the next sync picks it up.
+  //
+  // Size is compared against what we actually read rather than guessed at by
+  // the loader: a file holding only comments or malformed lines reads fine and
+  // yields no entries, and must still reconcile normally.
   const content = fs.readFileSync(file.path, 'utf8');
+  const afterRead = fs.statSync(file.path);
+  if (Buffer.byteLength(content) !== afterRead.size || afterRead.mtimeMs !== file.mtimeMs) {
+    warnings.push(`Skipped ${file.name}: changed while being read`);
+    continue;
+  }
+
+  filesProcessed.push(file.relativePath);
   const lines = content.split('\n');
 
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
@@ -128,7 +147,8 @@ if (fs.existsSync(currentTimerFile)) {
 console.log(JSON.stringify({
   entries,
   files_processed: filesProcessed,
-  incremental: isIncremental
+  incremental: isIncremental,
+  ...(warnings.length > 0 ? { metadata: { warnings } } : {})
 }));
 
 function calculateDuration(start, end) {
