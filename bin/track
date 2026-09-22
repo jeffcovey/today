@@ -93,6 +93,7 @@ async function cmdStart(description, options = {}) {
     process.exit(1);
   }
 
+  await ensureSync();
   const db = getDatabase();
   const vaultPath = path.join(PROJECT_ROOT, 'vault');
 
