@@ -63,49 +63,66 @@ describe('time-logs sync never deletes rows on a torn read (#508)', () => {
     fs.utimesSync(file, t, t);
   };
 
-  test('keeps rows when a read reports nothing for a file that still has content', async () => {
-    // A read that raced a writer: it returned no entries for the month file,
-    // but the writer has since finished so the file holds its lines again.
-    // A stub plugin expresses that interleaving deterministically; the running
-    // timer keeps the batch non-empty, so the "nothing changed" early return
-    // does not apply.
-    const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'torn-stub-'));
-    const relMonth = path.relative(repoRoot, monthFile);
-    const relTimer = path.relative(repoRoot, timerFile);
-    fs.writeFileSync(path.join(stubDir, 'read.js'), `#!/usr/bin/env node
-console.log(JSON.stringify({
-  entries: [{ id: ${JSON.stringify(relTimer + ':0')}, start_time: '2026-09-22T10:00:00-04:00', end_time: null, duration_minutes: 0, description: 'Running now #topic/x' }],
-  files_processed: [${JSON.stringify(relMonth)}, ${JSON.stringify(relTimer)}],
-  incremental: true
-}));
-`);
-    fs.chmodSync(path.join(stubDir, 'read.js'), 0o755);
-
-    try {
-      await syncPluginSource(
-        { ...plugin, _path: stubDir, commands: { read: './read.js' } },
-        'local', cfg, ctx, { _caller: 'test' }
-      );
-      // The month file's 3 rows survive, plus the running timer.
-      expect(rows()).toBe(4);
-    } finally {
-      fs.rmSync(stubDir, { recursive: true, force: true });
-    }
-  });
-
   test('still removes rows when a file is genuinely emptied', async () => {
     fs.writeFileSync(monthFile, '');
     markModifiedAfterLastSync(monthFile);
     fs.writeFileSync(timerFile, 'Running now #topic/x\n2026-09-22T10:00:00-04:00\n');
     await sync();
-    // Only the running timer remains — an empty file really means no entries.
     expect(rows()).toBe(1);
+  });
+
+  // A file that reads cleanly but parses to nothing (comments, malformed lines)
+  // must still reconcile — it is not a torn read.
+  test('removes rows for a file left holding only comments', async () => {
+    fs.writeFileSync(monthFile, '# just a comment\n# and another\n');
+    markModifiedAfterLastSync(monthFile);
+    fs.writeFileSync(timerFile, 'Running now #topic/x\n2026-09-22T10:00:00-04:00\n');
+    await sync();
+    expect(rows()).toBe(1);
+  });
+
+  // The watermark is the moment the sync STARTED. A file written while a sync
+  // was running must still look new to the next one, or its rows stay stale
+  // for good. The stub returns an entry so the sync actually records a
+  // watermark rather than taking the "nothing changed" early return.
+  test('re-reads a file that was written while a sync was running', async () => {
+    const relTimer = path.relative(repoRoot, timerFile);
+    fs.writeFileSync(timerFile, 'Running now #topic/x\n2026-09-22T10:00:00-04:00\n');
+    const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slow-stub-'));
+    const extra = '2026-09-04T09:00:00-04:00|2026-09-04T10:00:00-04:00|Entry four #topic/d\n';
+    fs.writeFileSync(path.join(stubDir, 'read.js'), `#!/usr/bin/env node
+const fs = require('fs');
+// a writer touches the month file while this sync is in flight...
+fs.appendFileSync(${JSON.stringify(monthFile)}, ${JSON.stringify(extra)});
+// ...and the sync runs on past it, into a later second
+const until = Date.now() + 1500; while (Date.now() < until) {}
+console.log(JSON.stringify({
+  entries: [{ id: ${JSON.stringify(relTimer + ':0')}, start_time: '2026-09-22T10:00:00-04:00', end_time: null, duration_minutes: 0, description: 'Running now #topic/x' }],
+  files_processed: [${JSON.stringify(relTimer)}],
+  incremental: true
+}));
+`);
+    fs.chmodSync(path.join(stubDir, 'read.js'), 0o755);
+    try {
+      await syncPluginSource(
+        { ...plugin, _path: stubDir, commands: { read: './read.js' } },
+        'local', cfg, ctx, { _caller: 'test' }
+      );
+      expect(rows()).toBe(4);           // 3 original + the running timer
+      await sync();                     // the real reader must pick the file up
+      expect(rows()).toBe(5);           // ...revealing the appended 4th entry
+    } finally {
+      fs.rmSync(stubDir, { recursive: true, force: true });
+    }
   });
 
   test('does not wipe the source when the directory is missing', async () => {
     db.prepare("UPDATE sync_metadata SET last_synced_at = NULL WHERE source = 'markdown-time-tracking/local'").run();
     fs.renameSync(timeDir, `${timeDir}.away`);
+    const before = lastSync();
     await sync();
     expect(rows()).toBe(3);
+    // the cursor must not move, or restored files with older mtimes are skipped
+    expect(lastSync()).toBe(before);
   });
 });

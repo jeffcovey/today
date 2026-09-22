@@ -653,16 +653,23 @@ export function getSyncStatusMessage(db, pluginType) {
  * Update sync metadata after a successful sync.
  * Uses upsert to preserve lock columns (INSERT OR REPLACE would delete and re-insert, nulling them).
  */
-function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null) {
+/**
+ * @param {string} [syncStartedAt] - when this sync began, as datetime('now')
+ *   formats it. The watermark must be the START of the sync, not its end: a
+ *   file written while the sync was running would otherwise look older than
+ *   the watermark and never be re-read, leaving the cache stale for good (#508).
+ */
+function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null, syncStartedAt = null) {
+  const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
   db.prepare(`
     INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
-    VALUES (?, datetime('now'), ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(source) DO UPDATE SET
-      last_synced_at = datetime('now'),
+      last_synced_at = excluded.last_synced_at,
       last_sync_files = excluded.last_sync_files,
       entries_count = excluded.entries_count,
       extra_data = excluded.extra_data
-  `).run(sourceId, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
+  `).run(sourceId, stamp, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
 }
 
 const SYNC_LOCK_STALE_MINUTES = 5;
@@ -767,6 +774,8 @@ export async function syncPluginSource(plugin, sourceName, sourceConfig, context
 
 async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context, options, sourceId) {
   const { db } = context;
+  // Taken before the plugin reads anything — see updateSyncMetadata.
+  const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
   const { fileFilter, skipAutoTag = false } = options;
 
   // Get last sync time to enable incremental sync
@@ -929,7 +938,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   if (entries.length === 0 && isIncremental) {
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
-      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
       const messages = [];
       if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
@@ -966,7 +975,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData);
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
@@ -1183,28 +1192,6 @@ function getTableNameForType(pluginType) {
  * @param {Array|null} filesProcessed - List of files that were processed (for incremental sync)
  * @returns {number} Number of entries inserted
  */
-/**
- * True when a processed file produced no entries even though it still holds
- * content on disk — the signature of a read that raced a writer mid-update.
- *
- * Deleting on that basis destroys cached rows the file still contains, and the
- * loss is permanent: read.js only revisits files whose mtime is newer than
- * last_synced_at, so a writer that finished before the sync recorded its
- * timestamp is never re-read (see #508). A genuinely emptied or deleted file
- * has no content, so it still reconciles normally.
- */
-function skipTornReadDelete(file, contributingFiles) {
-  if (contributingFiles.has(file)) return false;
-  try {
-    const stats = fs.statSync(path.join(PROJECT_ROOT, file));
-    if (!stats.isFile() || stats.size === 0) return false;
-  } catch {
-    return false; // gone from disk: the delete is correct
-  }
-  console.warn(`Warning: skipping delete for ${file} — it yielded no entries but still has content on disk (possible concurrent write)`);
-  return true;
-}
-
 function insertEntries(db, tableName, pluginType, entries, sourceId, filesProcessed) {
   const schema = schemas[pluginType];
   if (!schema || !schema.fields) {
@@ -1235,15 +1222,6 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     : schema.fields.start_date ? 'start_date'
     : null;
 
-  // Which of the processed files actually produced entries this run. Ids are
-  // `<file>:<lineNum>`, so the file is everything before the last colon.
-  const contributingFiles = new Set();
-  for (const entry of entries) {
-    if (typeof entry.id !== 'string') continue;
-    const idx = entry.id.lastIndexOf(':');
-    if (idx > 0) contributingFiles.add(entry.id.slice(0, idx));
-  }
-
   // Deletion strategy and inserts are wrapped in one transaction so there is
   // never a window where the table is empty between the delete and the inserts.
   const insertAll = db.transaction(() => {
@@ -1253,7 +1231,6 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
       // This handles line number shifts when files are edited
       const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
       for (const file of filesProcessed) {
-        if (skipTornReadDelete(file, contributingFiles)) continue;
         deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
       }
     } else if (!filesProcessed || pluginType === 'events') {
