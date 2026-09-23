@@ -330,3 +330,22 @@ export function applyDeploymentOverrides(aiOverrides, outputPath) {
 
   writeFileAtomic(outputPath, stringify(config));
 }
+/**
+ * Public https base for this deployment, e.g. https://today.jeffcovey.net.
+ *
+ * The deployment name is recorded in .data/deployment-name but the provider is
+ * not, so the domain has to be looked up across providers. Returns null when
+ * this deployment has no domain — a laptop, typically — and callers should
+ * then leave links out rather than inventing one.
+ */
+export function getPublicBaseUrl() {
+  const name = getDeploymentName();
+  if (!name) return null;
+
+  const deployments = getConfig('deployments') || {};
+  for (const provider of Object.values(deployments)) {
+    const domain = provider?.[name]?.domain;
+    if (domain) return `https://${domain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+  }
+  return null;
+}
