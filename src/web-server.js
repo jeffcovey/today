@@ -875,7 +875,15 @@ function advanceTimerIfNeeded() {
   }
 }
 
+// Wrapped in a stable container so the client can swap the banner in place.
+// Reloading the page at each phase end discarded the document, and with it the
+// audio unlock — on iPadOS every new document needs a fresh user gesture, so
+// the end-of-phase chime never had permission to sound.
 async function getTaskTimerWidget() {
+  return `<div id="taskTimerWidget">${await renderTaskTimerWidget()}</div>`;
+}
+
+async function renderTaskTimerWidget() {
   advanceTimerIfNeeded();
 
   if (taskTimerState.isRunning && taskTimerState.currentItem) {
@@ -7447,6 +7455,18 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error skipping task timer:', error);
     res.status(500).json({ success: false, message: 'Failed to skip task timer' });
+  }
+});
+
+// Re-render the timer banner so the client can advance without reloading the
+// page. advanceTimerIfNeeded() runs inside the renderer, so this is the same
+// source of truth a full page render uses.
+app.get('/api/task-timer/widget', authMiddleware, async (req, res) => {
+  try {
+    res.type('html').send(await getTaskTimerWidget());
+  } catch (error) {
+    console.error('Error rendering task timer widget:', error);
+    res.status(500).send('');
   }
 });
 
