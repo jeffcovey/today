@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { sendPushover } from './pushover.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -875,8 +876,73 @@ function advanceTimerIfNeeded() {
   }
 }
 
+// advanceTimerIfNeeded() is lazy: it only runs when something asks for the
+// banner. That is enough for a page being looked at, but a phase boundary has
+// to happen whether or not anyone is looking — iPadOS freezes a background
+// tab's timers, so the turn-over would otherwise wait for you to come back.
+let taskTimerBoundaryTimeout = null;
+
+function clearTaskTimerBoundary() {
+  if (taskTimerBoundaryTimeout) {
+    clearTimeout(taskTimerBoundaryTimeout);
+    taskTimerBoundaryTimeout = null;
+  }
+}
+
+function msUntilPhaseEnd() {
+  const workMs = taskTimerState.duration * 60 * 1000;
+  const totalMs = taskTimerState.phase === 'rest' ? Math.round(workMs * 0.1) : workMs;
+  const elapsed = Date.now() - new Date(taskTimerState.startTime).getTime();
+  return Math.max(0, totalMs - elapsed);
+}
+
+function armTaskTimerBoundary() {
+  clearTaskTimerBoundary();
+  if (!taskTimerState.isRunning || taskTimerState.isPaused || !taskTimerState.startTime) return;
+
+  // A small margin so the elapsed-time check inside advanceTimerIfNeeded has
+  // certainly passed by the time it runs.
+  taskTimerBoundaryTimeout = setTimeout(handleTaskTimerBoundary, msUntilPhaseEnd() + 250);
+  if (typeof taskTimerBoundaryTimeout.unref === 'function') taskTimerBoundaryTimeout.unref();
+}
+
+function handleTaskTimerBoundary() {
+  taskTimerBoundaryTimeout = null;
+
+  const previousPhase = taskTimerState.phase;
+  const previousItem = taskTimerState.currentItem;
+  advanceTimerIfNeeded();
+
+  // A page render may have advanced it first; only announce a real turn-over.
+  const turnedOver = taskTimerState.phase !== previousPhase ||
+    taskTimerState.currentItem !== previousItem;
+
+  if (taskTimerState.isRunning && turnedOver) notifyTaskTimerPhase();
+  armTaskTimerBoundary();
+}
+
+function notifyTaskTimerPhase() {
+  const item = taskTimerState.currentItem;
+  // Markdown links read badly in a notification; keep the label, drop the URL.
+  const label = (item?.displayText || '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').trim();
+
+  const notification = taskTimerState.phase === 'rest'
+    ? { title: 'Task timer — rest', message: label ? `Break. Just finished: ${label}` : 'Break' }
+    : { title: 'Task timer — next up', message: label || 'Next task' };
+
+  // Deliberately not awaited: a notification must never hold up a phase change.
+  sendPushover(notification).then(result => {
+    if (!result.sent && !/not set|disabled/.test(result.reason || '')) {
+      console.error(`Pushover notification failed: ${result.reason}`);
+    }
+  });
+}
+
 async function getTaskTimerWidget() {
   advanceTimerIfNeeded();
+  if (taskTimerState.isRunning && !taskTimerState.isPaused && !taskTimerBoundaryTimeout) {
+    armTaskTimerBoundary();
+  }
 
   if (taskTimerState.isRunning && taskTimerState.currentItem) {
     const item = taskTimerState.currentItem;
@@ -7327,6 +7393,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
     }
 
     await runTrackCommand(['start', '--', description]);
+    armTaskTimerBoundary();
     res.json({ success: true, message: 'Timer started' });
   } catch (error) {
     console.error('Error starting timer:', error);
@@ -7338,6 +7405,7 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
 app.post('/api/track/stop', authMiddleware, async (req, res) => {
   try {
     await runTrackCommand(['stop']);
+    clearTaskTimerBoundary();
     res.json({ success: true, message: 'Timer stopped' });
   } catch (error) {
     console.error('Error stopping timer:', error);
@@ -7443,6 +7511,7 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     taskTimerState.isPaused = false;
     taskTimerState.pausedAt = null;
 
+    armTaskTimerBoundary();
     res.json({ success: true, message: 'Skipped to next item', item: taskTimerState.currentItem });
   } catch (error) {
     console.error('Error skipping task timer:', error);
@@ -7456,6 +7525,7 @@ app.post('/api/task-timer/pause', authMiddleware, async (req, res) => {
   }
   taskTimerState.isPaused = true;
   taskTimerState.pausedAt = new Date().toISOString();
+  clearTaskTimerBoundary();
   res.json({ success: true });
 });
 
@@ -7469,6 +7539,7 @@ app.post('/api/task-timer/resume', authMiddleware, async (req, res) => {
   taskTimerState.startTime = adjustedStart.toISOString();
   taskTimerState.isPaused = false;
   taskTimerState.pausedAt = null;
+  armTaskTimerBoundary();
   res.json({ success: true });
 });
 
