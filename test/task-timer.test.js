@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 /**
  * Task Timer Logic Tests
  *
@@ -46,6 +48,31 @@ function advancePastSeen(items, currentIndex, seenIds, isValid = () => true) {
  */
 function includeHabitInTimer(habit) {
   return habit.metadata?.paused !== true;
+}
+
+const webServerSource = fs.readFileSync(new URL('../src/web-server.js', import.meta.url), 'utf8');
+
+function routeBody(source, routePath) {
+  const marker = `app.post('${routePath}'`;
+  const start = source.indexOf(marker);
+  if (start === -1) return null;
+
+  const braceStart = source.indexOf('{', start);
+  if (braceStart === -1) return null;
+
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index++) {
+    const char = source[index];
+    if (char === '{') depth++;
+    if (char === '}') {
+      depth--;
+      if (depth === 0) {
+        return source.slice(braceStart, index + 1);
+      }
+    }
+  }
+
+  return null;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -205,5 +232,19 @@ describe('habit filtering – exclude paused habits', () => {
 
   test('excludes habits where paused is true', () => {
     expect(includeHabitInTimer({ metadata: { paused: true } })).toBe(false);
+  });
+});
+
+describe('task timer route wiring', () => {
+  test('arms and clears boundaries only from task-timer routes', () => {
+    const trackStart = routeBody(webServerSource, '/api/track/start');
+    const trackStop = routeBody(webServerSource, '/api/track/stop');
+    const taskTimerStart = routeBody(webServerSource, '/api/task-timer/start');
+    const taskTimerStop = routeBody(webServerSource, '/api/task-timer/stop');
+
+    expect(trackStart).not.toContain('armTaskTimerBoundary()');
+    expect(trackStop).not.toContain('clearTaskTimerBoundary()');
+    expect(taskTimerStart).toContain('armTaskTimerBoundary()');
+    expect(taskTimerStop).toContain('clearTaskTimerBoundary()');
   });
 });

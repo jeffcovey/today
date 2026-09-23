@@ -30,13 +30,16 @@ export function pushoverSkipReason(settings) {
   return null;
 }
 
-export function buildPushoverBody({ title, message, settings }) {
+export function buildPushoverBody({ title, message, url, urlTitle, settings }) {
   const body = new URLSearchParams({
     token: settings.apiToken,
     user: settings.userKey,
     message
   });
   if (title) body.set('title', title);
+  // Pushover shows this as a tappable link on the notification.
+  if (url) body.set('url', url);
+  if (url && urlTitle) body.set('url_title', urlTitle);
   if (settings.sound) body.set('sound', settings.sound);
   if (settings.priority !== null) body.set('priority', String(settings.priority));
   return body;
@@ -44,7 +47,7 @@ export function buildPushoverBody({ title, message, settings }) {
 
 // Never throws and never blocks the caller's own work: a notification that
 // cannot be delivered must not stall a task timer phase change.
-export async function sendPushover({ title, message }, options = {}) {
+export async function sendPushover({ title, message, url, urlTitle }, options = {}) {
   const {
     settings = getPushoverSettings(),
     fetchImpl = fetch,
@@ -61,7 +64,7 @@ export async function sendPushover({ title, message }, options = {}) {
     const response = await fetchImpl(PUSHOVER_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: buildPushoverBody({ title, message, settings }).toString(),
+      body: buildPushoverBody({ title, message, url, urlTitle, settings }).toString(),
       signal: controller.signal
     });
     if (!response.ok) {

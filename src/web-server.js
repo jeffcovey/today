@@ -24,7 +24,7 @@ import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath, getConfig, getVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { isPluginConfigured } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
@@ -921,14 +921,24 @@ function handleTaskTimerBoundary() {
   armTaskTimerBoundary();
 }
 
+// Where the notification should take you. Items carry a linkUrl when they have
+// a page of their own — tasks and markdown projects do, habits do not — so fall
+// back to the vault's home page rather than offering nothing to tap.
+function taskTimerNotificationLink(item) {
+  const base = getPublicBaseUrl();
+  if (!base) return null;
+  return { url: base + (item?.linkUrl || '/'), urlTitle: item?.linkUrl ? 'Open task' : 'Open Today' };
+}
+
 function notifyTaskTimerPhase() {
   const item = taskTimerState.currentItem;
   // Markdown links read badly in a notification; keep the label, drop the URL.
   const label = (item?.displayText || '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').trim();
+  const link = taskTimerNotificationLink(item) || {};
 
   const notification = taskTimerState.phase === 'rest'
-    ? { title: 'Task timer — rest', message: label ? `Break. Just finished: ${label}` : 'Break' }
-    : { title: 'Task timer — next up', message: label || 'Next task' };
+    ? { ...link, title: 'Task timer — rest', message: label ? `Break. Just finished: ${label}` : 'Break' }
+    : { ...link, title: 'Task timer — next up', message: label || 'Next task' };
 
   // Deliberately not awaited: a notification must never hold up a phase change.
   sendPushover(notification).then(result => {
@@ -7401,7 +7411,6 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
     }
 
     await runTrackCommand(['start', '--', description]);
-    armTaskTimerBoundary();
     res.json({ success: true, message: 'Timer started' });
   } catch (error) {
     console.error('Error starting timer:', error);
@@ -7413,7 +7422,6 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
 app.post('/api/track/stop', authMiddleware, async (req, res) => {
   try {
     await runTrackCommand(['stop']);
-    clearTaskTimerBoundary();
     res.json({ success: true, message: 'Timer stopped' });
   } catch (error) {
     console.error('Error stopping timer:', error);
@@ -7449,6 +7457,7 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
     taskTimerSyncedItems = null;
     triggerTaskTimerSync();
 
+    armTaskTimerBoundary();
     res.json({ success: true, message: 'Task timer started', item: items[0] });
   } catch (error) {
     console.error('Error starting task timer:', error);
@@ -7474,6 +7483,7 @@ app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
     };
     taskTimerSyncedItems = null;
 
+    clearTaskTimerBoundary();
     res.json({ success: true, message: 'Task timer stopped' });
   } catch (error) {
     console.error('Error stopping task timer:', error);
