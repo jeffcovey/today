@@ -7393,7 +7393,6 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
     }
 
     await runTrackCommand(['start', '--', description]);
-    armTaskTimerBoundary();
     res.json({ success: true, message: 'Timer started' });
   } catch (error) {
     console.error('Error starting timer:', error);
@@ -7405,7 +7404,6 @@ app.post('/api/track/start', authMiddleware, express.json(), async (req, res) =>
 app.post('/api/track/stop', authMiddleware, async (req, res) => {
   try {
     await runTrackCommand(['stop']);
-    clearTaskTimerBoundary();
     res.json({ success: true, message: 'Timer stopped' });
   } catch (error) {
     console.error('Error stopping timer:', error);
@@ -7441,6 +7439,7 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
     taskTimerSyncedItems = null;
     triggerTaskTimerSync();
 
+    armTaskTimerBoundary();
     res.json({ success: true, message: 'Task timer started', item: items[0] });
   } catch (error) {
     console.error('Error starting task timer:', error);
@@ -7466,6 +7465,7 @@ app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
     };
     taskTimerSyncedItems = null;
 
+    clearTaskTimerBoundary();
     res.json({ success: true, message: 'Task timer stopped' });
   } catch (error) {
     console.error('Error stopping task timer:', error);
