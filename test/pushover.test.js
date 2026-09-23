@@ -66,6 +66,28 @@ describe('buildPushoverBody', () => {
   });
 });
 
+describe('buildPushoverBody link handling', () => {
+  it('attaches a tappable url and its title', () => {
+    const body = buildPushoverBody({
+      message: 'x', url: 'https://example.test/task/1', urlTitle: 'Open task', settings
+    });
+    expect(body.get('url')).toBe('https://example.test/task/1');
+    expect(body.get('url_title')).toBe('Open task');
+  });
+
+  it('omits the url entirely when there is none', () => {
+    const body = buildPushoverBody({ message: 'x', settings });
+    expect(body.has('url')).toBe(false);
+    expect(body.has('url_title')).toBe(false);
+  });
+
+  // A title with no url is meaningless to Pushover and would just be noise.
+  it('does not send a url title without a url', () => {
+    const body = buildPushoverBody({ message: 'x', urlTitle: 'Open task', settings });
+    expect(body.has('url_title')).toBe(false);
+  });
+});
+
 describe('sendPushover', () => {
   it('posts to pushover and reports success', async () => {
     const fetchImpl = okFetch();
