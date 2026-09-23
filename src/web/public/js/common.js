@@ -195,7 +195,9 @@ function unlockTaskTimerAudio() {
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return;
     if (!taskTimerAudioContext) taskTimerAudioContext = new AudioCtor();
-    if (taskTimerAudioContext.state === 'suspended') taskTimerAudioContext.resume();
+    if (taskTimerAudioContext.state === 'suspended') {
+      void taskTimerAudioContext.resume().catch(() => {});
+    }
   } catch {
     // No audio on this device or context creation refused; the timer still advances.
   }
