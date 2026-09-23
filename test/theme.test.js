@@ -48,6 +48,7 @@ function loadCommonJsContext(options = {}) {
       querySelector: () => null,
       querySelectorAll: () => [],
       getElementById: () => null,
+      createElement: () => ({ className: '', innerHTML: '', remove() {} }),
       documentElement: {
         dataset: {},
         setAttribute(name, value) {
@@ -165,6 +166,7 @@ describe('task timer audio behavior', () => {
       querySelector(selector) {
         return selector === '.task-timer-countdown' ? countdownSpan : null;
       },
+      appendChild() {},
     };
     const oscillatorStarts = [];
     const reload = jest.fn();
@@ -238,6 +240,7 @@ describe('task timer audio behavior', () => {
       querySelector(selector) {
         return selector === '.task-timer-countdown' ? countdownSpan : null;
       },
+      appendChild() {},
     };
     const reload = jest.fn();
     const ctx = {
@@ -289,6 +292,7 @@ describe('task timer audio behavior', () => {
       querySelector(selector) {
         return selector === '.task-timer-countdown' ? countdownSpan : null;
       },
+      appendChild() {},
     };
     const reload = jest.fn();
     const container = widgetContainer();
@@ -324,6 +328,7 @@ describe('task timer audio behavior', () => {
       querySelector(selector) {
         return selector === '.task-timer-countdown' ? countdownSpan : null;
       },
+      appendChild() {},
     };
     const reload = jest.fn();
     const ctx = {

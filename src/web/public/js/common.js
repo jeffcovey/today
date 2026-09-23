@@ -200,6 +200,21 @@ function unlockTaskTimerAudio() {
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return;
     if (!taskTimerAudioContext) taskTimerAudioContext = new AudioCtor();
+
+    // Play one silent sample. On iOS creating the context and resuming it is
+    // not enough to open the output — something has to actually play inside
+    // the gesture. Verified on the device: a tone deferred by five seconds
+    // sounds after this, and the timer's chime is deferred the same way.
+    // Guarded separately so a failure here cannot skip the resume below.
+    try {
+      const source = taskTimerAudioContext.createBufferSource();
+      source.buffer = taskTimerAudioContext.createBuffer(1, 1, 22050);
+      source.connect(taskTimerAudioContext.destination);
+      source.start(0);
+    } catch {
+      // Partial Web Audio implementation; resuming alone may still suffice.
+    }
+
     if (taskTimerAudioContext.state === 'suspended') {
       void taskTimerAudioContext.resume().catch(() => {});
     }
@@ -275,6 +290,25 @@ function refreshTaskTimerWidget() {
     });
 }
 
+// Safari will not let a page make a sound until that page has been touched,
+// and a tap on the previous page does not carry over. That is invisible
+// otherwise, so say so in the banner until the first tap arms it.
+function updateTaskTimerAudioHint(alertElement) {
+  const armed = taskTimerAudioContext && taskTimerAudioContext.state === 'running';
+  const existing = alertElement.querySelector('.task-timer-audio-hint');
+
+  if (armed) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) return;
+
+  const hint = document.createElement('div');
+  hint.className = 'task-timer-audio-hint mt-1';
+  hint.innerHTML = '<small><i class="fas fa-volume-xmark"></i> Tap anywhere to enable the end-of-phase sound</small>';
+  alertElement.appendChild(hint);
+}
+
 // Task Timer countdown functionality
 function updateTaskTimerCountdown() {
   const taskTimerAlert = document.querySelector('[data-timer-total-seconds]');
@@ -289,6 +323,8 @@ function updateTaskTimerCountdown() {
   const now = new Date();
   const elapsed = Math.floor((now - startTime) / 1000);
   const remaining = Math.max(0, totalSeconds - elapsed);
+
+  updateTaskTimerAudioHint(taskTimerAlert);
 
   const countdownSpan = taskTimerAlert.querySelector('.task-timer-countdown');
   if (countdownSpan) {
