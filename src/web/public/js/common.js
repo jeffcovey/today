@@ -187,6 +187,11 @@ function updateTimerDuration() {
 let taskTimerAudioContext = null;
 let taskTimerAdvancing = false;
 
+// Two notes plus a little tail. Also how long the reload waits, so the tone
+// is not cut off when it does play.
+const TASK_TIMER_NOTE_SECONDS = 0.18;
+const TASK_TIMER_CHIME_MS = TASK_TIMER_NOTE_SECONDS * 2 * 1000 + 180;
+
 // Browsers refuse to produce sound until the document has seen a user gesture,
 // and a gesture does not survive a navigation. Build the context on the first
 // interaction with this page and keep it for the page's lifetime.
@@ -211,8 +216,14 @@ async function playTaskTimerChime(endingPhase) {
   if (!ctx) return;
 
   if (ctx.state !== 'running') {
+    // When the autoplay policy refuses, resume() does not reject — it stays
+    // pending until a user gesture that may never come. Never wait on it
+    // without a bound.
     try {
-      await ctx.resume();
+      await Promise.race([
+        ctx.resume(),
+        new Promise(resolve => setTimeout(resolve, 100))
+      ]);
     } catch {
       return;
     }
@@ -221,7 +232,7 @@ async function playTaskTimerChime(endingPhase) {
   if (ctx.state !== 'running') return;
 
   const notes = endingPhase === 'rest' ? [523.25, 783.99] : [783.99, 523.25];
-  const noteSeconds = 0.18;
+  const noteSeconds = TASK_TIMER_NOTE_SECONDS;
 
   try {
     notes.forEach((frequency, index) => {
@@ -268,11 +279,16 @@ function updateTaskTimerCountdown() {
     countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
     // Auto-advance: just reload — server auto-advances based on elapsed time.
-    // The tick keeps firing at zero until the reload lands, so guard it, and
-    // let the chime finish before the reload tears the page down.
+    // The tick keeps firing at zero until the reload lands, so guard it.
+    //
+    // The reload is on its own timer rather than chained to the chime. Waiting
+    // for the chime to resolve stranded the countdown at 0:00 whenever audio
+    // was refused, because a blocked AudioContext leaves resume() pending
+    // rather than rejecting. Advancing the timer matters more than the sound.
     if (remaining === 0 && !taskTimerAdvancing) {
       taskTimerAdvancing = true;
-      playTaskTimerChime(phase).then(() => location.reload());
+      playTaskTimerChime(phase).catch(() => {});
+      setTimeout(() => location.reload(), TASK_TIMER_CHIME_MS);
     }
   }
 }
