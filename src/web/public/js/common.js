@@ -179,6 +179,71 @@ function updateTimerDuration() {
   }
 }
 
+// Task Timer chime
+//
+// The timer advances on whatever vault page happens to be open, so the cue
+// lives in this shared script rather than on the timer's own page.
+
+let taskTimerAudioContext = null;
+let taskTimerAdvancing = false;
+
+// Browsers refuse to produce sound until the document has seen a user gesture,
+// and a gesture does not survive a navigation. Build the context on the first
+// interaction with this page and keep it for the page's lifetime.
+function unlockTaskTimerAudio() {
+  try {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return;
+    if (!taskTimerAudioContext) taskTimerAudioContext = new AudioCtor();
+    if (taskTimerAudioContext.state === 'suspended') taskTimerAudioContext.resume();
+  } catch {
+    // No audio on this device or context creation refused; the timer still advances.
+  }
+}
+
+// Two short notes: rising into work, falling into rest, so the phase is
+// recognisable from another room without looking at the screen.
+async function playTaskTimerChime(endingPhase) {
+  unlockTaskTimerAudio();
+  const ctx = taskTimerAudioContext;
+  if (!ctx) return;
+
+  if (ctx.state !== 'running') {
+    try {
+      await ctx.resume();
+    } catch {
+      return;
+    }
+  }
+  // Autoplay policy can still refuse. Advance silently rather than stall.
+  if (ctx.state !== 'running') return;
+
+  const notes = endingPhase === 'rest' ? [523.25, 783.99] : [783.99, 523.25];
+  const noteSeconds = 0.18;
+
+  try {
+    notes.forEach((frequency, index) => {
+      const startAt = ctx.currentTime + index * noteSeconds;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      // Ramp the envelope; starting and stopping a bare oscillator clicks.
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.2, startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + noteSeconds);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + noteSeconds);
+    });
+  } catch {
+    return;
+  }
+
+  await new Promise(resolve => setTimeout(resolve, notes.length * noteSeconds * 1000 + 60));
+}
+
 // Task Timer countdown functionality
 function updateTaskTimerCountdown() {
   const taskTimerAlert = document.querySelector('[data-timer-total-seconds]');
@@ -200,9 +265,12 @@ function updateTaskTimerCountdown() {
     const seconds = remaining % 60;
     countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    // Auto-advance: just reload — server auto-advances based on elapsed time
-    if (remaining === 0) {
-      location.reload();
+    // Auto-advance: just reload — server auto-advances based on elapsed time.
+    // The tick keeps firing at zero until the reload lands, so guard it, and
+    // let the chime finish before the reload tears the page down.
+    if (remaining === 0 && !taskTimerAdvancing) {
+      taskTimerAdvancing = true;
+      playTaskTimerChime(phase).then(() => location.reload());
     }
   }
 }
@@ -323,6 +391,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Start task timer countdown if there's an active task timer
   if (document.querySelector('[data-timer-total-seconds]')) {
+    // Arm audio on this page's first interaction, so the chime at the end of
+    // the phase is not silenced by the autoplay policy.
+    ['pointerdown', 'keydown'].forEach(eventName => {
+      document.addEventListener(eventName, unlockTaskTimerAudio, { once: true, passive: true });
+    });
     updateTaskTimerCountdown();
     setInterval(updateTaskTimerCountdown, 1000);
   }
