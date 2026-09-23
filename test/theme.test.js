@@ -191,7 +191,9 @@ describe('task timer audio behavior', () => {
     expect(oscillatorStarts).toEqual([0, 0.18]);
     expect(reload).not.toHaveBeenCalled();
 
-    await jest.advanceTimersByTimeAsync(419);
+    // The reload runs on its own timer rather than waiting on the chime to
+    // resolve, but is still long enough for both notes to sound.
+    await jest.advanceTimersByTimeAsync(539);
     expect(reload).not.toHaveBeenCalled();
 
     await jest.advanceTimersByTimeAsync(1);
@@ -199,6 +201,8 @@ describe('task timer audio behavior', () => {
   });
 
   test('task timer reloads silently when autoplay is still blocked', async () => {
+    jest.useFakeTimers();
+
     const countdownSpan = { textContent: '' };
     const timerAlert = {
       dataset: {
@@ -229,10 +233,53 @@ describe('task timer audio behavior', () => {
     });
 
     context.updateTaskTimerCountdown();
-    await new Promise(resolve => setImmediate(resolve));
+    await jest.advanceTimersByTimeAsync(540);
 
     expect(countdownSpan.textContent).toBe('0:00');
     expect(ctx.resume).toHaveBeenCalledTimes(2);
+    expect(ctx.createOscillator).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // The regression this guards: a refused AudioContext does not reject
+  // resume(), it leaves the promise pending. Chaining the reload to the chime
+  // stranded the countdown at 0:00 until the page was reloaded by hand.
+  test('task timer still advances when a blocked resume never settles', async () => {
+    jest.useFakeTimers();
+
+    const countdownSpan = { textContent: '' };
+    const timerAlert = {
+      dataset: {
+        timerPaused: 'false',
+        timerStart: new Date(Date.now() - 5_000).toISOString(),
+        timerTotalSeconds: '5',
+        timerPhase: 'work',
+      },
+      querySelector(selector) {
+        return selector === '.task-timer-countdown' ? countdownSpan : null;
+      },
+    };
+    const reload = jest.fn();
+    const ctx = {
+      state: 'suspended',
+      currentTime: 0,
+      destination: {},
+      resume: jest.fn(() => new Promise(() => {})),
+      createOscillator: jest.fn(),
+      createGain: jest.fn(),
+    };
+    const context = loadCommonJsContext({
+      windowOverrides: { AudioContext: jest.fn(() => ctx) },
+      documentOverrides: {
+        querySelector: (selector) => (selector === '[data-timer-total-seconds]' ? timerAlert : null),
+      },
+      locationOverrides: { reload },
+    });
+
+    context.updateTaskTimerCountdown();
+    await jest.advanceTimersByTimeAsync(540);
+
+    expect(countdownSpan.textContent).toBe('0:00');
     expect(ctx.createOscillator).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledTimes(1);
   });
