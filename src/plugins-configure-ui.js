@@ -82,6 +82,14 @@ function getPluginSources(pluginName) {
 
 function toggleSource(pluginName, sourceName, enabled) {
   const { config, raw } = readConfig();
+
+  // Turning off a source that was never configured should leave it absent,
+  // not write it into existence as an explicit opt-out. Doing that made
+  // "never mentioned" indistinguishable from "deliberately disabled", and
+  // wrote a configured plugin back as `enabled = false` with none of its
+  // settings, which stopped it syncing without saying so.
+  if (!enabled && !config.plugins?.[pluginName]?.[sourceName]) return true;
+
   if (!config.plugins) config.plugins = {};
   if (!config.plugins[pluginName]) config.plugins[pluginName] = {};
   if (!config.plugins[pluginName][sourceName]) config.plugins[pluginName][sourceName] = {};

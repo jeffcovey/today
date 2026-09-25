@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { writeFileAtomicCAS } from './fs-atomic.js';
+import { diffScalarChanges, applyScalarChanges } from './config-diff.js';
 
 const CONFIG_HEADER = `# Configuration for Today system
 # Edit this file when your situation changes (e.g., when traveling)
@@ -60,6 +61,26 @@ export function reportConfigConflict(configPath, source) {
  * the caller is expected to surface the conflict to the user.
  */
 export function writeConfigToml(configPath, config, originalRaw) {
+  // Prefer editing the original text. Re-serialising discards comments,
+  // section order and formatting on every save, touched or not.
+  if (typeof originalRaw === 'string') {
+    const changes = diffScalarChanges(parseToml(originalRaw), config);
+
+    // Nothing actually changed: leave the file alone entirely. A no-op save
+    // must not be able to damage anything.
+    if (changes.length === 0) {
+      return { content: originalRaw, conflict: false };
+    }
+
+    const edited = applyScalarChanges(originalRaw, changes);
+    if (edited !== null) {
+      const { conflict } = writeFileAtomicCAS(configPath, edited, originalRaw);
+      return { content: edited, conflict };
+    }
+    // Structural change this editor cannot express — fall through to a full
+    // rewrite, which is lossy but still correct as TOML.
+  }
+
   let tomlOutput = stringifyToml(config);
 
   // Convert ai_instructions back to triple-quoted multi-line strings
