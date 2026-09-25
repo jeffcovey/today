@@ -5,7 +5,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
-import { addExactSourceCondition, getImapPasswordEnvKey, withConnectedImapClient } from '../src/email-cli-utils.js';
+import { addExactSourceCondition, getImapPasswordEnvKey, newestUids, rankSearchResults, searchableFolders, withConnectedImapClient } from '../src/email-cli-utils.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfigPath } from '../src/config.js';
 import { program } from 'commander';
@@ -213,6 +213,8 @@ program
 
       const allResults = [];
       const limit = parseInt(options.limit);
+      let foldersSearched = 0;
+      let totalMatches = 0;
 
       // "ALL" is an IMAP criterion meaning every message; anything else is a text search
       const isAll = query.toUpperCase() === 'ALL';
@@ -241,19 +243,26 @@ program
         try {
           await withConnectedImapClient(client, async () => {
             const allFolders = await client.list();
-            // ALL with no text query means list inbox; text queries search across folders
-            const foldersToSearch = isAll
-              ? ['INBOX']
-              : allFolders
-                  .filter(f => !f.path.startsWith('[') && f.path !== 'Notes')
-                  .map(f => f.path)
-                  .slice(0, 5);
+            // ALL with no text query means list inbox; text queries search every folder
+            const foldersToSearch = isAll ? ['INBOX'] : searchableFolders(allFolders);
+            foldersSearched += foldersToSearch.length;
 
             for (const folder of foldersToSearch) {
               try {
                 const lock = await client.getMailboxLock(folder);
                 try {
-                  for await (const msg of client.fetch(searchCriteria, { envelope: true, size: true })) {
+                  // Ask for matching UIDs first. That is cheap, and it lets us
+                  // fetch envelopes only for the newest candidates rather than
+                  // walking a folder from its oldest message until a cap trips.
+                  const uids = await client.search(searchCriteria, { uid: true });
+                  if (!Array.isArray(uids) || uids.length === 0) continue;
+
+                  totalMatches += uids.length;
+                  const candidates = newestUids(uids, limit);
+
+                  for await (const msg of client.fetch(
+                    candidates, { envelope: true, size: true }, { uid: true }
+                  )) {
                     allResults.push({
                       uid: msg.uid,
                       folder,
@@ -262,7 +271,6 @@ program
                       date: msg.envelope?.date,
                       source: source.sourceName
                     });
-                    if (allResults.length >= limit * imapSources.length) break;
                   }
                 } finally {
                   lock.release();
@@ -280,14 +288,12 @@ program
       if (allResults.length === 0) {
         console.log(colors.yellow('No emails found matching your query.'));
       } else {
-        allResults.sort((a, b) => {
-          const dateA = a.date ? new Date(a.date).getTime() : 0;
-          const dateB = b.date ? new Date(b.date).getTime() : 0;
-          return dateB - dateA;
-        });
+        // Rank once across every folder and source, then truncate. Doing this
+        // per folder is what hid recent mail behind older matches.
+        const ranked = rankSearchResults(allResults, limit);
 
-        console.log(colors.green(`\n📧 Found ${allResults.length} emails on server:\n`));
-        for (const email of allResults.slice(0, limit)) {
+        console.log(colors.green(`\n📧 Showing ${ranked.length} of ${totalMatches} matches across ${foldersSearched} folder(s):\n`));
+        for (const email of ranked) {
           const date = email.date ? new Date(email.date).toLocaleDateString() : 'unknown';
           console.log(`${colors.bold(email.subject)}`);
           console.log(`   From: ${email.from} | Date: ${date} | Folder: ${email.folder}`);
