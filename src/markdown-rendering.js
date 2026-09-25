@@ -80,10 +80,10 @@ function generateTableOfContentsHtml(headings, options = {}) {
   tocHeadings.forEach(heading => {
     const indent = (heading.level - minLevel) * 15;
     const escapedId = escapeHtml(String(heading.id ?? ''));
-    const escapedText = escapeHtml(String(heading.text ?? ''));
+    const linkText = String(heading.text ?? '');
     tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.15rem; line-height: 1.3;">`;
     tocHtml += `<a href="#${escapedId}">`;
-    tocHtml += escapedText;
+    tocHtml += linkText;
     tocHtml += '</a></li>\n';
   });
 
