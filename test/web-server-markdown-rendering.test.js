@@ -1,5 +1,6 @@
 import {
   formatInlineDataviewValue,
+  generateTableOfContentsHtml,
   renderTableOfContentsCodeBlocks,
   resolveDataviewPath,
 } from '../src/markdown-rendering.js';
@@ -65,5 +66,19 @@ maxLevel: 3</code></pre>
     expect(html).toContain('href="#details"');
     expect(html).not.toContain('href="#overview"');
     expect(html).not.toContain('href="#appendix"');
+  });
+
+  test('table of contents preserves heading inline HTML in link text', () => {
+    const html = generateTableOfContentsHtml([
+      {
+        level: 2,
+        id: 'usage-of-diff',
+        text: 'Usage of <code>diff()</code>'
+      }
+    ]);
+
+    expect(html).toContain('href="#usage-of-diff"');
+    expect(html).toContain('>Usage of <code>diff()</code></a>');
+    expect(html).not.toContain('&lt;code&gt;diff()&lt;/code&gt;');
   });
 });
