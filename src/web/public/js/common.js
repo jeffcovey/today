@@ -179,136 +179,6 @@ function updateTimerDuration() {
   }
 }
 
-// Task Timer chime
-//
-// The timer advances on whatever vault page happens to be open, so the cue
-// lives in this shared script rather than on the timer's own page.
-
-let taskTimerAudioContext = null;
-let taskTimerAdvancing = false;
-
-// Two notes plus a little tail. Also how long the reload waits, so the tone
-// is not cut off when it does play.
-const TASK_TIMER_NOTE_SECONDS = 0.18;
-const TASK_TIMER_CHIME_MS = TASK_TIMER_NOTE_SECONDS * 2 * 1000 + 180;
-
-// Browsers refuse to produce sound until the document has seen a user gesture,
-// and a gesture does not survive a navigation. Build the context on the first
-// interaction with this page and keep it for the page's lifetime.
-function unlockTaskTimerAudio() {
-  try {
-    const AudioCtor = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtor) return;
-    if (!taskTimerAudioContext) taskTimerAudioContext = new AudioCtor();
-
-    // Play one silent sample. On iOS creating the context and resuming it is
-    // not enough to open the output — something has to actually play inside
-    // the gesture. Verified on the device: a tone deferred by five seconds
-    // sounds after this, and the timer's chime is deferred the same way.
-    // Guarded separately so a failure here cannot skip the resume below.
-    try {
-      const source = taskTimerAudioContext.createBufferSource();
-      source.buffer = taskTimerAudioContext.createBuffer(1, 1, 22050);
-      source.connect(taskTimerAudioContext.destination);
-      source.start(0);
-    } catch {
-      // Partial Web Audio implementation; resuming alone may still suffice.
-    }
-
-    if (taskTimerAudioContext.state === 'suspended') {
-      void taskTimerAudioContext.resume().catch(() => {});
-    }
-  } catch {
-    // No audio on this device or context creation refused; the timer still advances.
-  }
-}
-
-// Two short notes: rising into work, falling into rest, so the phase is
-// recognisable from another room without looking at the screen.
-async function playTaskTimerChime(endingPhase) {
-  unlockTaskTimerAudio();
-  const ctx = taskTimerAudioContext;
-  if (!ctx) return;
-
-  if (ctx.state !== 'running') {
-    // When the autoplay policy refuses, resume() does not reject — it stays
-    // pending until a user gesture that may never come. Never wait on it
-    // without a bound.
-    try {
-      await Promise.race([
-        ctx.resume(),
-        new Promise(resolve => setTimeout(resolve, 100))
-      ]);
-    } catch {
-      return;
-    }
-  }
-  // Autoplay policy can still refuse. Advance silently rather than stall.
-  if (ctx.state !== 'running') return;
-
-  const notes = endingPhase === 'rest' ? [523.25, 783.99] : [783.99, 523.25];
-  const noteSeconds = TASK_TIMER_NOTE_SECONDS;
-
-  try {
-    notes.forEach((frequency, index) => {
-      const startAt = ctx.currentTime + index * noteSeconds;
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      oscillator.type = 'sine';
-      oscillator.frequency.value = frequency;
-      // Ramp the envelope; starting and stopping a bare oscillator clicks.
-      gain.gain.setValueAtTime(0.0001, startAt);
-      gain.gain.exponentialRampToValueAtTime(0.2, startAt + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + noteSeconds);
-      oscillator.connect(gain);
-      gain.connect(ctx.destination);
-      oscillator.start(startAt);
-      oscillator.stop(startAt + noteSeconds);
-    });
-  } catch {
-    return;
-  }
-
-  await new Promise(resolve => setTimeout(resolve, notes.length * noteSeconds * 1000 + 60));
-}
-
-// Swap the banner for a freshly rendered one instead of reloading the page.
-// Keeping the document alive is what lets the audio unlock survive from one
-// phase to the next; a reload would throw it away and silence every chime
-// after the first.
-function refreshTaskTimerWidget() {
-  return fetch('/api/task-timer/widget', { credentials: 'same-origin' })
-    .then(response => {
-      if (!response.ok) throw new Error('widget request failed: ' + response.status);
-      return response.text();
-    })
-    .then(html => {
-      const current = document.getElementById('taskTimerWidget');
-      if (!current) throw new Error('no task timer container to replace');
-      current.outerHTML = html;
-      taskTimerAdvancing = false;
-    });
-}
-
-// Safari will not let a page make a sound until that page has been touched,
-// and a tap on the previous page does not carry over. That is invisible
-// otherwise, so say so in the banner until the first tap arms it.
-function updateTaskTimerAudioHint(alertElement) {
-  const armed = taskTimerAudioContext && taskTimerAudioContext.state === 'running';
-  const existing = alertElement.querySelector('.task-timer-audio-hint');
-
-  if (armed) {
-    if (existing) existing.remove();
-    return;
-  }
-  if (existing) return;
-
-  const hint = document.createElement('div');
-  hint.className = 'task-timer-audio-hint mt-1';
-  hint.innerHTML = '<small><i class="fas fa-volume-xmark"></i> Tap anywhere to enable the end-of-phase sound</small>';
-  alertElement.appendChild(hint);
-}
-
 // Task Timer countdown functionality
 function updateTaskTimerCountdown() {
   const taskTimerAlert = document.querySelector('[data-timer-total-seconds]');
@@ -324,26 +194,15 @@ function updateTaskTimerCountdown() {
   const elapsed = Math.floor((now - startTime) / 1000);
   const remaining = Math.max(0, totalSeconds - elapsed);
 
-  updateTaskTimerAudioHint(taskTimerAlert);
-
   const countdownSpan = taskTimerAlert.querySelector('.task-timer-countdown');
   if (countdownSpan) {
     const minutes = Math.floor(remaining / 60);
     const seconds = remaining % 60;
     countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    // Auto-advance. The tick keeps firing at zero until the swap lands, so
-    // guard it, and never chain the advance to the chime resolving: a refused
-    // AudioContext leaves resume() pending rather than rejecting, which once
-    // stranded the countdown at 0:00.
-    if (remaining === 0 && !taskTimerAdvancing) {
-      taskTimerAdvancing = true;
-      playTaskTimerChime(phase).catch(() => {});
-      // The short wait covers clock skew between this page and the server,
-      // which decides the phase from its own elapsed time.
-      setTimeout(() => {
-        refreshTaskTimerWidget().catch(() => location.reload());
-      }, TASK_TIMER_CHIME_MS);
+    // Auto-advance: just reload — server auto-advances based on elapsed time
+    if (remaining === 0) {
+      location.reload();
     }
   }
 }
@@ -461,14 +320,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimerDuration();
     setInterval(updateTimerDuration, 1000);
   }
-
-  // Arm audio on any interaction with this page, whether or not a timer is
-  // running yet. Not `once`: iPadOS suspends the context when you switch apps,
-  // lock the device or background the tab, so it has to be re-armed on the
-  // next touch rather than only the first.
-  ['touchend', 'click', 'keydown'].forEach(eventName => {
-    document.addEventListener(eventName, unlockTaskTimerAudio, { passive: true });
-  });
 
   // Start task timer countdown if there's an active task timer
   if (document.querySelector('[data-timer-total-seconds]')) {
