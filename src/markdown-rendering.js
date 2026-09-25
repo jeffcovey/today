@@ -1,4 +1,5 @@
 import * as yaml from 'js-yaml';
+import { load as loadHtml } from 'cheerio';
 import { formatDate } from './date-utils.js';
 
 function resolveDataviewPath(properties, propertyPath) {
@@ -78,9 +79,11 @@ function generateTableOfContentsHtml(headings, options = {}) {
 
   tocHeadings.forEach(heading => {
     const indent = (heading.level - minLevel) * 15;
+    const escapedId = escapeHtml(String(heading.id ?? ''));
+    const escapedText = escapeHtml(String(heading.text ?? ''));
     tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.15rem; line-height: 1.3;">`;
-    tocHtml += `<a href="#${heading.id}">`;
-    tocHtml += heading.text;
+    tocHtml += `<a href="#${escapedId}">`;
+    tocHtml += escapedText;
     tocHtml += '</a></li>\n';
   });
 
@@ -91,14 +94,18 @@ function generateTableOfContentsHtml(headings, options = {}) {
   return tocHtml;
 }
 
-function decodeHtmlEntities(text) {
+function escapeHtml(text) {
   return text
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function decodeHtmlEntities(text) {
+  const $ = loadHtml(`<textarea>${text}</textarea>`);
+  return $('textarea').text();
 }
 
 function renderTableOfContentsCodeBlocks(htmlContent, headings) {

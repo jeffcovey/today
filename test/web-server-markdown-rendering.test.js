@@ -51,4 +51,19 @@ maxLevel: 3</code></pre>
     expect(html).not.toContain('minLevel: 3');
     expect(html).not.toContain('maxLevel: 3');
   });
+
+  test('table-of-contents code blocks decode HTML-encoded config before parsing', () => {
+    const html = renderTableOfContentsCodeBlocks(
+      '<pre><code class="language-table-of-contents">minLevel: 3&#10;maxLevel: 3</code></pre>',
+      [
+        { level: 2, id: 'overview', text: 'Overview' },
+        { level: 3, id: 'details', text: 'Details' },
+        { level: 4, id: 'appendix', text: 'Appendix' }
+      ]
+    );
+
+    expect(html).toContain('href="#details"');
+    expect(html).not.toContain('href="#overview"');
+    expect(html).not.toContain('href="#appendix"');
+  });
 });
