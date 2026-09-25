@@ -18,6 +18,11 @@ function sameValue(a, b) {
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((item, i) => sameValue(item, b[i]));
   }
+  if (isPlainObject(a) && isPlainObject(b)) {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    return aKeys.length === bKeys.length && aKeys.every(key => sameValue(a[key], b[key]));
+  }
   return a === b;
 }
 
@@ -46,10 +51,15 @@ export function diffScalarChanges(before, after, tablePath = '') {
     }
 
     if (isPlainObject(prevValue)) return [{ structural: true }];
-    if (prevValue === undefined || !sameValue(prevValue, nextValue)) {
+    if (prevValue === undefined) {
       // A new key inside an existing table is fine; a new top-level key is not,
       // since it has no table to be written into.
       if (!tablePath) return [{ structural: true }];
+      changes.push({ table: tablePath, key, value: nextValue });
+      continue;
+    }
+
+    if (!sameValue(prevValue, nextValue)) {
       changes.push({ table: tablePath, key, value: nextValue });
     }
   }

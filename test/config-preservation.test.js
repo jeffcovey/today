@@ -61,6 +61,22 @@ describe('saving an unchanged config', () => {
 });
 
 describe('saving a changed value', () => {
+  it('edits an existing root scalar without rewriting the file', () => {
+    withTempConfig(SAMPLE, file => {
+      const { config, raw } = readConfigToml(file);
+      config.timezone = 'America/Los_Angeles';
+      writeConfigToml(file, config, raw);
+
+      const after = fs.readFileSync(file, 'utf8');
+      expect(after).toContain('timezone = "America/Los_Angeles"');
+      expect(after).toContain('nested-clone runaway');
+      expect(after.indexOf('[deployments.local.mini.unison]'))
+        .toBeLessThan(after.indexOf('[plugins.ynab-api.personal]'));
+      const changed = SAMPLE.split('\n').filter((l, i) => l !== after.split('\n')[i]);
+      expect(changed).toEqual(['timezone = "America/New_York"']);
+    });
+  });
+
   it('changes only that line and keeps everything else', () => {
     withTempConfig(SAMPLE, file => {
       const { config, raw } = readConfigToml(file);
@@ -107,6 +123,16 @@ describe('setTomlValue', () => {
     expect(setTomlValue(withComment, 'a', 'k', 2)).toContain('k = 2 # keep me');
   });
 
+  it('does not match keys inside multiline strings', () => {
+    const withMultiline = `[a]
+ai_instructions = """
+k = 99
+"""
+k = 1
+`;
+    expect(setTomlValue(withMultiline, 'a', 'k', 2)).toContain('"""\nk = 2\n');
+  });
+
   it('returns null for a table that is not there', () => {
     expect(setTomlValue(SAMPLE, 'plugins.nope.default', 'enabled', true)).toBeNull();
   });
@@ -134,6 +160,27 @@ describe('findTableRanges', () => {
       'plugins.ynab-api.personal'
     ]);
   });
+
+  it('ignores table-shaped lines inside multiline strings', () => {
+    const withMultiline = `title = "x"
+
+[plugins.alpha.default]
+ai_instructions = """
+[plugins.fake.default]
+not_a_key = true
+"""
+enabled = true
+
+[plugins.beta.default]
+enabled = true
+`;
+
+    const paths = [...findTableRanges(withMultiline.split('\n')).keys()];
+    expect(paths).toEqual([
+      'plugins.alpha.default',
+      'plugins.beta.default'
+    ]);
+  });
 });
 
 describe('diffScalarChanges', () => {
@@ -149,6 +196,26 @@ describe('diffScalarChanges', () => {
     expect(diffScalarChanges(base, next)).toEqual([
       { table: 'plugins.a.one', key: 'n', value: 2 }
     ]);
+  });
+
+  it('reports an existing changed root scalar without flagging structural change', () => {
+    expect(diffScalarChanges({ timezone: 'A' }, { timezone: 'B' })).toEqual([
+      { table: '', key: 'timezone', value: 'B' }
+    ]);
+  });
+
+  it('treats unchanged arrays of inline tables as unchanged', () => {
+    const before = {
+      plugins: {
+        a: {
+          one: {
+            windows: [{ start: '2026-01-01T00:00:00Z', end: '2026-01-01T01:00:00Z' }]
+          }
+        }
+      }
+    };
+    const after = structuredClone(before);
+    expect(diffScalarChanges(before, after)).toEqual([]);
   });
 
   // A new or deleted table cannot be expressed as a line edit, so the caller
