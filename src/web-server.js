@@ -2813,13 +2813,60 @@ function registerLinkRenderer() {
   });
 }
 
+function parseTableOfContentsOptions(config) {
+  const options = { minLevel: 2, maxLevel: 6 };
+
+  if (!config.trim()) return options;
+
+  try {
+    const parsed = yaml.load(config);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return options;
+    }
+
+    if (Number.isInteger(parsed.minLevel)) {
+      options.minLevel = Math.min(6, Math.max(1, parsed.minLevel));
+    }
+    if (Number.isInteger(parsed.maxLevel)) {
+      options.maxLevel = Math.min(6, Math.max(1, parsed.maxLevel));
+    }
+    if (options.minLevel > options.maxLevel) {
+      [options.minLevel, options.maxLevel] = [options.maxLevel, options.minLevel];
+    }
+  } catch (error) {
+    debug('Error parsing table-of-contents block config:', error);
+  }
+
+  return options;
+}
+
+function replaceTableOfContentsBlocks(content) {
+  const tocBlocks = [];
+  let tocIndex = 0;
+
+  const updatedContent = content.replace(/```table-of-contents\s*([\s\S]*?)```/gi, (match, config) => {
+    const placeholder = `<div data-toc-placeholder="${tocIndex}"></div>`;
+    tocBlocks.push({
+      placeholder,
+      options: parseTableOfContentsOptions(config)
+    });
+    tocIndex++;
+    return placeholder;
+  });
+
+  return { content: updatedContent, tocBlocks };
+}
+
 // Generate table of contents from parsed headings (using marked-gfm-heading-id)
-function generateTableOfContents() {
+function generateTableOfContents(options = {}) {
+  const minLevel = options.minLevel ?? 2;
+  const maxLevel = options.maxLevel ?? 6;
+
   // Get headings from the most recent marked.parse() call
   const headings = getHeadingList();
 
-  // Filter to h2-h6 only (skip h1 which is usually the title)
-  const tocHeadings = headings.filter(h => h.level >= 2 && h.level <= 6);
+  // Filter to the requested heading range
+  const tocHeadings = headings.filter(h => h.level >= minLevel && h.level <= maxLevel);
 
   if (tocHeadings.length === 0) return '';
 
@@ -2843,6 +2890,16 @@ function generateTableOfContents() {
   tocHtml += '</details>\n';
 
   return tocHtml;
+}
+
+function renderTableOfContentsBlocks(htmlContent, tocBlocks) {
+  let renderedHtml = htmlContent;
+
+  for (const { placeholder, options } of tocBlocks) {
+    renderedHtml = renderedHtml.replace(placeholder, generateTableOfContents(options));
+  }
+
+  return renderedHtml;
 }
 
 // The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
@@ -3727,42 +3784,66 @@ async function executeDQLTable(lines, vaultPath, currentFilePath, properties, al
 }
 
 // Process inline dataview expressions ($= syntax and =this.property syntax)
+function resolveDataviewPath(properties, propertyPath) {
+  if (!properties || !propertyPath) return undefined;
+
+  let value = properties;
+  for (const segment of propertyPath.split('.')) {
+    if (value === null || value === undefined || typeof value !== 'object' || !Object.prototype.hasOwnProperty.call(value, segment)) {
+      return undefined;
+    }
+    value = value[segment];
+  }
+
+  return value;
+}
+
+function formatInlineDataviewValue(value, fallback = '') {
+  if (value === null || value === undefined) return fallback;
+
+  if (Array.isArray(value)) {
+    if (value.some(item => item !== null && typeof item === 'object')) {
+      return fallback;
+    }
+    return value.join(', ');
+  }
+
+  if (value instanceof Date) {
+    return formatDate(value);
+  }
+
+  if (typeof value === 'object') {
+    return fallback;
+  }
+
+  return String(value);
+}
+
 async function processInlineDataview(content, properties, vaultPath, currentFilePath, allFiles) {
   // First, handle simple =this.property syntax (Obsidian Dataview style)
-  // Match =this.property where property is alphanumeric/underscore
+  // Match =this.property where property segments are alphanumeric/underscore
   // Must not be inside backticks or code blocks
-  const thisPropertyRegex = /=this\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const thisPropertyRegex = /=this\.([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)/g;
 
   let thisMatch;
   const thisMatches = [];
   while ((thisMatch = thisPropertyRegex.exec(content)) !== null) {
     thisMatches.push({
       fullMatch: thisMatch[0],
-      propName: thisMatch[1],
+      propPath: thisMatch[1],
       index: thisMatch.index
     });
   }
 
   // Process =this.property matches in reverse to maintain indices
   for (let i = thisMatches.length - 1; i >= 0; i--) {
-    const { fullMatch, propName, index } = thisMatches[i];
-    const value = properties?.[propName];
+    const { fullMatch, propPath, index } = thisMatches[i];
+    const value = resolveDataviewPath(properties, propPath);
+    const displayValue = formatInlineDataviewValue(value, '');
 
-    if (value !== undefined) {
-      // Format the value appropriately
-      let displayValue;
-      if (Array.isArray(value)) {
-        displayValue = value.join(', ');
-      } else if (value instanceof Date) {
-        displayValue = formatDate(value);
-      } else {
-        displayValue = String(value);
-      }
-
-      content = content.substring(0, index) +
-                displayValue +
-                content.substring(index + fullMatch.length);
-    }
+    content = content.substring(0, index) +
+              displayValue +
+              content.substring(index + fullMatch.length);
   }
 
   // Then handle $= expressions inside backticks: `$= expression`
@@ -3787,15 +3868,14 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
 
       // Handle this.property syntax
       if (expression.startsWith('this.')) {
-        const propName = expression.substring(5);
-        result = properties?.[propName];
+        result = formatInlineDataviewValue(resolveDataviewPath(properties, expression.substring(5)), '');
       } else if (expression.includes('dv.')) {
         // Execute dv expressions (dv.pages, dv.current, etc.) using DataviewAPI
         if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
         const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
         // Inline expressions are synchronous, so we can just evaluate directly
         const fn = new Function('dv', `return ${expression}`);
-        result = fn(dv);
+        result = formatInlineDataviewValue(fn(dv), fullMatch);
       } else {
         result = fullMatch; // Keep original if we can't process
       }
@@ -4309,6 +4389,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
     content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
   }
 
+  const { content: contentWithTocBlocks, tocBlocks } = replaceTableOfContentsBlocks(content);
+  content = contentWithTocBlocks;
+
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
   const lines = content.split('\n');
@@ -4359,6 +4442,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
 
   // Generate TOC from the parsed headings (must be called after marked.parse)
   const toc = generateTableOfContents();
+  htmlContent = renderTableOfContentsBlocks(htmlContent, tocBlocks);
 
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
