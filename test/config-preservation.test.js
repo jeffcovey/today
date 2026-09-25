@@ -181,6 +181,22 @@ enabled = true
       'plugins.beta.default'
     ]);
   });
+
+  it('keeps scanning correctly when a multiline string closes with four quotes', () => {
+    const withQuotedClose = `[plugins.alpha.default]
+ai_instructions = """quote at end""""
+enabled = true
+
+[plugins.beta.default]
+enabled = true
+`;
+
+    const paths = [...findTableRanges(withQuotedClose.split('\n')).keys()];
+    expect(paths).toEqual([
+      'plugins.alpha.default',
+      'plugins.beta.default'
+    ]);
+  });
 });
 
 describe('diffScalarChanges', () => {
