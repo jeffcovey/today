@@ -125,7 +125,7 @@ After`;
     const { content, tocBlocks } = replaceTableOfContentsBlocks(markdown);
     const html = renderTableOfContentsBlocks(content, tocBlocks);
 
-    expect(content).toContain('data-toc-placeholder="0"');
+    expect(content).toContain('<!--TOC_PLACEHOLDER_0-->');
     expect(content).not.toContain('minLevel: 3');
     expect(html).toContain('href="#details"');
     expect(html).not.toContain('href="#overview"');
