@@ -35,11 +35,16 @@ function findBasicStringEnd(line, start) {
 
 function findMultilineBasicEnd(line, start) {
   for (let i = start; i <= line.length - 3; i++) {
-    if (line.slice(i, i + 3) !== '"""') continue;
+    if (line[i] !== '"') continue;
 
     let backslashes = 0;
     for (let j = i - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
-    if (backslashes % 2 === 0) return i;
+    if (backslashes % 2 !== 0) continue;
+
+    let runEnd = i;
+    while (runEnd < line.length && line[runEnd] === '"') runEnd++;
+    if (runEnd - i >= 3) return runEnd - 3;
+    i = runEnd - 1;
   }
   return -1;
 }
