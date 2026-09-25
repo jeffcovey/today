@@ -28,13 +28,13 @@ export async function withConnectedImapClient(client, action) {
   }
 }
 
-// A UID search returns matches in ascending UID order, which within a folder is
-// effectively oldest first. Taking the front of that list yields the oldest
-// messages and hides recent ones, so take the back instead.
+// A UID search returns matches in ascending UID order. Keep the list numeric and
+// let callers decide whether to use all of it or a tail slice.
 export function newestUids(uids, limit) {
   if (!Array.isArray(uids) || uids.length === 0) return [];
   const sorted = [...uids].sort((a, b) => a - b);
-  if (!Number.isFinite(limit) || limit <= 0) return sorted;
+  if (Number.isFinite(limit) && limit <= 0) return [];
+  if (!Number.isFinite(limit)) return sorted;
   return sorted.slice(-limit);
 }
 
@@ -48,7 +48,8 @@ export function rankSearchResults(results, limit) {
     const dateB = b?.date ? new Date(b.date).getTime() : 0;
     return dateB - dateA;
   });
-  if (!Number.isFinite(limit) || limit <= 0) return ranked;
+  if (Number.isFinite(limit) && limit <= 0) return [];
+  if (!Number.isFinite(limit)) return ranked;
   return ranked.slice(0, limit);
 }
 
@@ -56,7 +57,7 @@ export function rankSearchResults(results, limit) {
 // mailbox, which holds notes rather than mail.
 export function searchableFolders(folders) {
   return (folders || [])
-    .filter(f => f?.path && !f.path.startsWith('[') && f.path !== 'Notes')
+    .filter(f => f?.path && f.path !== 'Notes')
     .filter(f => !f.flags || !f.flags.has || !f.flags.has('\\Noselect'))
     .map(f => f.path);
 }

@@ -99,7 +99,10 @@ describe('newestUids', () => {
 
   it('returns all uids when the limit is not a usable number', () => {
     expect(newestUids([3, 1, 2], NaN)).toEqual([1, 2, 3]);
-    expect(newestUids([3, 1, 2], 0)).toEqual([1, 2, 3]);
+  });
+
+  it('returns no uids when the limit is zero', () => {
+    expect(newestUids([3, 1, 2], 0)).toEqual([]);
   });
 });
 
@@ -135,6 +138,10 @@ describe('rankSearchResults', () => {
     rankSearchResults(input, 1);
     expect(input.map(r => r.subject)).toEqual(['old', 'new']);
   });
+
+  it('returns no results when the limit is zero', () => {
+    expect(rankSearchResults([older, newer], 0)).toEqual([]);
+  });
 });
 
 describe('searchableFolders', () => {
@@ -147,11 +154,12 @@ describe('searchableFolders', () => {
     const folders = [
       { path: 'INBOX' },
       { path: 'Archive' },
-      { path: '[Gmail]' },
+      { path: '[Gmail]', flags: new Set(['\\Noselect']) },
+      { path: '[Gmail]/All Mail' },
       { path: 'Notes' },
       { path: 'Containers', flags: new Set(['\\Noselect']) }
     ];
-    expect(searchableFolders(folders)).toEqual(['INBOX', 'Archive']);
+    expect(searchableFolders(folders)).toEqual(['INBOX', 'Archive', '[Gmail]/All Mail']);
   });
 
   it('handles a missing folder list', () => {

@@ -5,7 +5,7 @@ import { autoDotenvx } from './lib/dotenvx-loader.js';
 autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
-import { addExactSourceCondition, getImapPasswordEnvKey, newestUids, rankSearchResults, searchableFolders, withConnectedImapClient } from '../src/email-cli-utils.js';
+import { addExactSourceCondition, getImapPasswordEnvKey, rankSearchResults, searchableFolders, withConnectedImapClient } from '../src/email-cli-utils.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getConfigPath } from '../src/config.js';
 import { program } from 'commander';
@@ -251,17 +251,12 @@ program
               try {
                 const lock = await client.getMailboxLock(folder);
                 try {
-                  // Ask for matching UIDs first. That is cheap, and it lets us
-                  // fetch envelopes only for the newest candidates rather than
-                  // walking a folder from its oldest message until a cap trips.
                   const uids = await client.search(searchCriteria, { uid: true });
                   if (!Array.isArray(uids) || uids.length === 0) continue;
 
                   totalMatches += uids.length;
-                  const candidates = newestUids(uids, limit);
-
                   for await (const msg of client.fetch(
-                    candidates, { envelope: true, size: true }, { uid: true }
+                    uids, { envelope: true, size: true }, { uid: true }
                   )) {
                     allResults.push({
                       uid: msg.uid,
