@@ -2845,7 +2845,7 @@ function replaceTableOfContentsBlocks(content) {
   let tocIndex = 0;
 
   const updatedContent = content.replace(/```table-of-contents\s*([\s\S]*?)```/gi, (match, config) => {
-    const placeholder = `<div data-toc-placeholder="${tocIndex}"></div>`;
+    const placeholder = `<!--TOC_PLACEHOLDER_${tocIndex}-->`;
     tocBlocks.push({
       placeholder,
       options: parseTableOfContentsOptions(config)
@@ -3875,7 +3875,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
         const dv = new DataviewAPI(vaultPath, currentFilePath, allFiles);
         // Inline expressions are synchronous, so we can just evaluate directly
         const fn = new Function('dv', `return ${expression}`);
-        result = formatInlineDataviewValue(fn(dv), fullMatch);
+        result = fn(dv);
       } else {
         result = fullMatch; // Keep original if we can't process
       }
