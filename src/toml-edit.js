@@ -22,19 +22,107 @@ function isArrayOfTablesHeader(line) {
   return /^\s*\[\[/.test(line);
 }
 
+function findBasicStringEnd(line, start) {
+  for (let i = start; i < line.length; i++) {
+    if (line[i] !== '"') continue;
+
+    let backslashes = 0;
+    for (let j = i - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+    if (backslashes % 2 === 0) return i;
+  }
+  return -1;
+}
+
+function findMultilineBasicEnd(line, start) {
+  for (let i = start; i <= line.length - 3; i++) {
+    if (line.slice(i, i + 3) !== '"""') continue;
+
+    let backslashes = 0;
+    for (let j = i - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+    if (backslashes % 2 === 0) return i;
+  }
+  return -1;
+}
+
+function updateMultilineState(line, multiline) {
+  if (multiline) {
+    const end = multiline === '"""'
+      ? findMultilineBasicEnd(line, 0)
+      : line.indexOf(multiline);
+    return end === -1 ? multiline : null;
+  }
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '#') break;
+
+    if (char === "'") {
+      if (line.slice(i, i + 3) === "'''") {
+        const end = line.indexOf("'''", i + 3);
+        if (end === -1) return "'''";
+        i = end + 2;
+      } else {
+        const end = line.indexOf("'", i + 1);
+        if (end === -1) break;
+        i = end;
+      }
+      continue;
+    }
+
+    if (char !== '"') continue;
+
+    if (line.slice(i, i + 3) === '"""') {
+      const end = findMultilineBasicEnd(line, i + 3);
+      if (end === -1) return '"""';
+      i = end + 2;
+      continue;
+    }
+
+    const end = findBasicStringEnd(line, i + 1);
+    if (end === -1) break;
+    i = end;
+  }
+
+  return null;
+}
+
+function firstTableHeaderIndex(lines) {
+  let multiline = null;
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (!multiline) {
+      const match = line.match(TABLE_HEADER);
+      if (match && !isArrayOfTablesHeader(line)) return index;
+    }
+    multiline = updateMultilineState(line, multiline);
+  }
+
+  return lines.length;
+}
+
 // Where each table starts and ends, by dotted path. End is exclusive and stops
 // before the blank lines and comments that introduce the next table, so an
 // insertion lands inside the table it belongs to.
 export function findTableRanges(lines) {
   const ranges = new Map();
   let current = null;
+  let multiline = null;
 
   lines.forEach((line, index) => {
+    if (multiline) {
+      multiline = updateMultilineState(line, multiline);
+      return;
+    }
+
     const match = line.match(TABLE_HEADER);
-    if (!match || isArrayOfTablesHeader(line)) return;
-    if (current) ranges.get(current).end = lastMeaningfulLine(lines, index);
-    current = match[1].trim();
-    ranges.set(current, { header: index, start: index + 1, end: lines.length });
+    if (match && !isArrayOfTablesHeader(line)) {
+      if (current) ranges.get(current).end = lastMeaningfulLine(lines, index);
+      current = match[1].trim();
+      ranges.set(current, { header: index, start: index + 1, end: lines.length });
+    }
+
+    multiline = updateMultilineState(line, multiline);
   });
 
   if (current) ranges.get(current).end = lastMeaningfulLine(lines, lines.length);
@@ -52,8 +140,11 @@ function lastMeaningfulLine(lines, beforeIndex) {
 // Matches `key = ...` at the start of a line, ignoring indentation.
 function keyLineIndex(lines, range, key) {
   const pattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=`);
+  let multiline = null;
+
   for (let i = range.start; i < range.end; i++) {
-    if (pattern.test(lines[i])) return i;
+    if (!multiline && pattern.test(lines[i])) return i;
+    multiline = updateMultilineState(lines[i], multiline);
   }
   return -1;
 }
@@ -79,8 +170,9 @@ export function formatTomlValue(value) {
  */
 export function setTomlValue(raw, tablePath, key, value) {
   const lines = raw.split('\n');
-  const ranges = findTableRanges(lines);
-  const range = ranges.get(tablePath);
+  const range = tablePath
+    ? findTableRanges(lines).get(tablePath)
+    : { start: 0, end: firstTableHeaderIndex(lines) };
   if (!range) return null;
 
   const formatted = formatTomlValue(value);
