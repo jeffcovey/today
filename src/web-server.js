@@ -64,6 +64,12 @@ import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
 import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
+import {
+  formatInlineDataviewValue,
+  generateTableOfContentsHtml,
+  renderTableOfContentsCodeBlocks,
+  resolveDataviewPath,
+} from './markdown-rendering.js';
 
 // Configure marked extensions
 marked.use(gfmHeadingId());
@@ -2813,38 +2819,6 @@ function registerLinkRenderer() {
   });
 }
 
-// Generate table of contents from parsed headings (using marked-gfm-heading-id)
-function generateTableOfContents() {
-  // Get headings from the most recent marked.parse() call
-  const headings = getHeadingList();
-
-  // Filter to h2-h6 only (skip h1 which is usually the title)
-  const tocHeadings = headings.filter(h => h.level >= 2 && h.level <= 6);
-
-  if (tocHeadings.length === 0) return '';
-
-  // Generate TOC HTML for header
-  let tocHtml = '';
-  tocHtml += '<details class="toc-header">\n';
-  tocHtml += '<summary class="text-muted small" style="cursor: pointer; user-select: none;"><i class="fas fa-list me-1"></i>Table of Contents</summary>\n';
-  tocHtml += '<div class="toc-links mt-1">\n';
-  tocHtml += '<ul class="list-unstyled small mb-0">\n';
-
-  tocHeadings.forEach(heading => {
-    const indent = (heading.level - 2) * 15; // Start from h2, each level adds 15px
-    tocHtml += `<li style="margin-left: ${indent}px; margin-bottom: 0.15rem; line-height: 1.3;">`;
-    tocHtml += `<a href="#${heading.id}">`;
-    tocHtml += heading.text;
-    tocHtml += '</a></li>\n';
-  });
-
-  tocHtml += '</ul>\n';
-  tocHtml += '</div>\n';
-  tocHtml += '</details>\n';
-
-  return tocHtml;
-}
-
 // The replaceTagsWithEmojis function is now imported from tag-emoji-mappings.js
 
 // Convert markdown links [text](url) to HTML <a> tags in task display text
@@ -3729,40 +3703,29 @@ async function executeDQLTable(lines, vaultPath, currentFilePath, properties, al
 // Process inline dataview expressions ($= syntax and =this.property syntax)
 async function processInlineDataview(content, properties, vaultPath, currentFilePath, allFiles) {
   // First, handle simple =this.property syntax (Obsidian Dataview style)
-  // Match =this.property where property is alphanumeric/underscore
+  // Match =this.property where property segments are alphanumeric/underscore
   // Must not be inside backticks or code blocks
-  const thisPropertyRegex = /=this\.([a-zA-Z_][a-zA-Z0-9_]*)/g;
+  const thisPropertyRegex = /=this\.([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)/g;
 
   let thisMatch;
   const thisMatches = [];
   while ((thisMatch = thisPropertyRegex.exec(content)) !== null) {
     thisMatches.push({
       fullMatch: thisMatch[0],
-      propName: thisMatch[1],
+      propPath: thisMatch[1],
       index: thisMatch.index
     });
   }
 
   // Process =this.property matches in reverse to maintain indices
   for (let i = thisMatches.length - 1; i >= 0; i--) {
-    const { fullMatch, propName, index } = thisMatches[i];
-    const value = properties?.[propName];
+    const { fullMatch, propPath, index } = thisMatches[i];
+    const value = resolveDataviewPath(properties, propPath);
+    const displayValue = formatInlineDataviewValue(value, '');
 
-    if (value !== undefined) {
-      // Format the value appropriately
-      let displayValue;
-      if (Array.isArray(value)) {
-        displayValue = value.join(', ');
-      } else if (value instanceof Date) {
-        displayValue = formatDate(value);
-      } else {
-        displayValue = String(value);
-      }
-
-      content = content.substring(0, index) +
-                displayValue +
-                content.substring(index + fullMatch.length);
-    }
+    content = content.substring(0, index) +
+              displayValue +
+              content.substring(index + fullMatch.length);
   }
 
   // Then handle $= expressions inside backticks: `$= expression`
@@ -3787,8 +3750,7 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
 
       // Handle this.property syntax
       if (expression.startsWith('this.')) {
-        const propName = expression.substring(5);
-        result = properties?.[propName];
+        result = formatInlineDataviewValue(resolveDataviewPath(properties, expression.substring(5)), '');
       } else if (expression.includes('dv.')) {
         // Execute dv expressions (dv.pages, dv.current, etc.) using DataviewAPI
         if (!allFiles) allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
@@ -4358,7 +4320,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   let htmlContent = marked.parse(contentToRender, { breaks: true });
 
   // Generate TOC from the parsed headings (must be called after marked.parse)
-  const toc = generateTableOfContents();
+  const headings = getHeadingList();
+  const toc = generateTableOfContentsHtml(headings);
+  htmlContent = renderTableOfContentsCodeBlocks(htmlContent, headings);
 
   // Convert emojis to Font Awesome icons
   htmlContent = convertEmojisToIcons(htmlContent);
