@@ -49,6 +49,9 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
             <i class="fas ${icon} me-2"></i>${title}
           </a>
           ${getThemeToggleButtonHtml()}
+          <a class="nav-link text-light px-2" href="/_summaries" title="Plan Summaries">
+            <i class="fas fa-pen-to-square"></i>
+          </a>
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
             <i class="fas fa-code-branch"></i>
           </a>
