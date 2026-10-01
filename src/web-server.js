@@ -6376,7 +6376,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   ${getNavbar('Plan Summaries', 'fa-pen-to-square', { showSearch: false })}
   <div class="container mt-3 px-3" style="max-width: 900px;">
     <p class="text-muted">
-      Plans in progress today or from the last 30 days whose summary is blank or not yet committed,
+      Today's plan and plans from the last 30 days whose summary is blank or not yet committed,
       with each day's Top Priorities for reference (and tomorrow's, for planning ahead). Saving keeps a plan here; it drops off once its
       summary and priorities are committed on the <a href="/_git">Git page</a>.
     </p>

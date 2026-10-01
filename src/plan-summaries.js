@@ -198,9 +198,9 @@ function parseStatus(output) {
 }
 
 /**
- * List plans that are in progress today or ended within the last `days`
- * days, and whose summary is blank or not yet committed. Plans covering
- * today are included so their summaries can be drafted during the period.
+ * List plans that ended within the last `days` days, plus today's daily
+ * plan, whose summary is blank or not yet committed. Today's plan is
+ * included so its summary can be drafted during the day.
  * Daily plans are also listed while their Top Priorities section has
  * uncommitted changes, so priorities can be reviewed alongside the summary.
  * Tomorrow's daily plan is listed (priorities only, no summary) whenever it
@@ -215,7 +215,7 @@ function parseStatus(output) {
  * @returns {Array<{file, type, label, start, end, field, summary, status,
  *   inProgress, upcoming, priorities, prioritiesStatus}>}
  *   status: summary state, 'blank' | 'uncommitted' | null (committed, or
- *   tomorrow's plan); inProgress: period includes today; upcoming: tomorrow's
+ *   tomorrow's plan); inProgress: today's daily plan; upcoming: tomorrow's
  *   daily plan; priorities: section body or null when
  *   the plan has none; prioritiesStatus: 'uncommitted' | 'committed' | null.
  */
@@ -234,8 +234,10 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
   for (const filename of filenames) {
     const period = parsePlanFilename(filename);
     if (!period) continue;
-    const isTomorrow = period.type === 'day' && period.start === tomorrow;
-    if ((period.start > today && !isTomorrow) || period.end < windowStart) continue;
+    if (period.end < windowStart) continue;
+    // Longer periods only once they've ended; daily plans from today on
+    // (today's to draft during the day, tomorrow's for its priorities).
+    if (period.type === 'day' ? period.start > tomorrow : period.end >= today) continue;
     candidates.push({ ...period, file: path.posix.join(plansDir, filename) });
   }
   if (candidates.length === 0) return [];
