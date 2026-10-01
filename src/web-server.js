@@ -6313,6 +6313,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
             ${heading}
             ${getPlanStatusBadge(status)}
             ${p.inProgress ? '<span class="badge bg-secondary">In progress</span>' : ''}
+            ${p.upcoming ? '<span class="badge bg-primary">Tomorrow</span>' : ''}
           </div>
           <textarea class="form-control editor-text" rows="${rows}" aria-label="${escapeHtmlEntities(ariaLabel)}" placeholder="${escapeHtmlEntities(placeholder)}">${escapeHtmlEntities(text)}</textarea>
           <div class="d-flex align-items-center gap-2 mt-2">
@@ -6376,7 +6377,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   <div class="container mt-3 px-3" style="max-width: 900px;">
     <p class="text-muted">
       Plans in progress today or from the last 30 days whose summary is blank or not yet committed,
-      with each day's Top Priorities for reference. Saving keeps a plan here; it drops off once its
+      with each day's Top Priorities for reference (and tomorrow's, for planning ahead). Saving keeps a plan here; it drops off once its
       summary and priorities are committed on the <a href="/_git">Git page</a>.
     </p>
     ${plans.length === 0
