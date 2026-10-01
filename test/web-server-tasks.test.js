@@ -1,7 +1,7 @@
 /**
  * Web Server Task Toggle Tests
  *
- * Tests the /task/toggle and /task/edit endpoints for completing/uncompleting tasks.
+ * Tests the /task/toggle, /task/edit and /task/postpone endpoints.
  * Requires the web server to be running on localhost:3001 with VAULT_PATH=test/fixtures.
  */
 
@@ -628,6 +628,90 @@ describe('Task Edit API', () => {
           title: 'Some title',
           completed: false
         }),
+        redirect: 'manual'
+      });
+
+      expect([302, 401, 403]).toContain(response.status);
+    });
+  });
+});
+
+describe('Task Postpone API', () => {
+  const UNDATED_LINE = 9; // "Another test task" - no scheduled or due date
+
+  beforeEach(async () => {
+    await resetFixture();
+  });
+
+  describe('POST /task/postpone', () => {
+    test('should push a future scheduled date out one day', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: TEST_FILE, lineNumber: TEST_LINE })
+      });
+
+      expect(response.ok).toBe(true);
+      const result = await response.json();
+      expect(result.success).toBe(true);
+      expect(result.scheduledDate).toBe('2100-01-01');
+
+      const taskLine = await readTaskLine(TEST_LINE);
+      expect(taskLine).toBe('- [ ] Test task for toggle testing #test ⏳ 2100-01-01 ➕ 2025-01-01');
+    });
+
+    test('should reject a task with no scheduled or due date', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const before = await readTaskLine(UNDATED_LINE);
+      const response = await fetchWithAuth(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: TEST_FILE, lineNumber: UNDATED_LINE })
+      });
+
+      expect(response.status).toBe(400);
+      expect(await readTaskLine(UNDATED_LINE)).toBe(before);
+    });
+
+    test('should return 400 for missing parameters', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: TEST_FILE })
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should reject paths outside the vault, including sibling-prefix paths', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: '../fixtures-private/task.md', lineNumber: 1 })
+      });
+
+      expect(response.status).toBe(403);
+    });
+
+    test('should require authentication', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetch(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: TEST_FILE, lineNumber: TEST_LINE }),
         redirect: 'manual'
       });
 
