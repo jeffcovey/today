@@ -181,7 +181,7 @@ console.log(`Excluded plugins: ${watcherConfig.exclude_plugins.join(', ')}`);
 // Ensure database is healthy before starting
 const healthResult = await ensureHealthyDatabase({ verbose: false });
 if (!healthResult.success) {
-  console.error('Database health check failed, exiting');
+  console.error(`Database health check failed, exiting: ${healthResult.message}`);
   process.exit(1);
 }
 
