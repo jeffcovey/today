@@ -64,6 +64,7 @@ import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
 import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
+import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -3804,6 +3805,21 @@ class LRUMap {
 const taskQueryCache = new LRUMap(200);
 const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
 
+// Postpone (⏩) button shown at the end of an open task that has a scheduled
+// and/or due date, like Obsidian Tasks. Clicks are handled by event delegation
+// in the markdown page script and POST to /task/postpone.
+function postponeButtonHtml(filePath, lineNumber) {
+  return ` <button type="button" class="task-postpone" data-file="${filePath}" data-line="${lineNumber}" title="Postpone to tomorrow" aria-label="Postpone to tomorrow"><i class="fas fa-forward"></i></button>`;
+}
+
+// Postpone button for a task from executeTasksQuery, or '' if it can't be postponed
+function taskPostponeButton(task) {
+  if (task.isDone || task.isCancelled) return '';
+  if (!task.scheduledDate && !task.dueDate) return '';
+  if (!task.filePath || !task.lineNumber) return '';
+  return postponeButtonHtml(task.filePath, task.lineNumber);
+}
+
 // Execute Obsidian Tasks query and return matching tasks
 async function executeTasksQuery(query, queryContext = {}) {
   const db = getReadOnlyDatabase();
@@ -4235,6 +4251,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   // Updated regex to also match tasks inside blockquotes (lines starting with >) and cancelled tasks
   const taskRegex = /^((?:\s*>)*\s*)- \[[ x-]\] (.+)$/i;
   const contentLines = content.split('\n'); // content is WITHOUT frontmatter
+  // Embeds have no page script, so a postpone button there would do nothing
+  const showPostpone = !options.embed;
+  const postponableLines = new Set(); // original file line numbers
 
   for (let i = 0; i < contentLines.length; i++) {
     const line = contentLines[i];
@@ -4245,6 +4264,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
       const isChecked = line.includes('[x]') || line.includes('[X]');
       const isCancelled = line.includes('[-]');
       const taskText = match[2];
+      if (showPostpone && isPostponable(line)) postponableLines.add(lineNumber);
 
       // Add metadata as a suffix that marked.js will preserve
       // Convert cancelled tasks to unchecked for markdown parser, but preserve cancelled state in metadata
@@ -4409,6 +4429,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             } else {
               tasksHtml += `${priorityIcon}${displayText}`;
             }
+            if (showPostpone) tasksHtml += taskPostponeButton(task);
             tasksHtml += `</li>\n`;
           }
           tasksHtml += '</ul>\n';
@@ -4437,6 +4458,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
             } else {
               tasksHtml += `${priorityIcon}${displayText}`;
             }
+            if (showPostpone) tasksHtml += taskPostponeButton(task);
             tasksHtml += `</li>\n`;
           }
           tasksHtml += '</ul>\n';
@@ -4551,6 +4573,7 @@ ${cleanContent}
             } else {
               replacement += `${priorityIcon}${displayText}`;
             }
+            if (showPostpone) replacement += taskPostponeButton(task);
             replacement += `</li>\n`;
           }
           replacement += '</ul>\n';
@@ -4579,6 +4602,7 @@ ${cleanContent}
             } else {
               replacement += `${priorityIcon}${displayText}`;
             }
+            if (showPostpone) replacement += taskPostponeButton(task);
             replacement += `</li>\n`;
           }
           replacement += '</ul>\n';
@@ -4682,7 +4706,8 @@ ${cleanContent}
       const taskLink = `/task/${taskId}`;
       // Wrap the task text in a link (but keep any leading space outside the link)
       const linkedText = textBetween.replace(/^(\s*)(.+)$/, `$1<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">$2</a>`);
-      return `<input type="checkbox"${taskClass} data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${linkedText}`;
+      const postponeButton = postponableLines.has(Number(line)) ? postponeButtonHtml(file, line) : '';
+      return `<input type="checkbox"${taskClass} data-file="${file}" data-line="${line}"${isChecked ? ' checked' : ''}>${linkedText}${postponeButton}`;
     }
   );
 
@@ -5386,6 +5411,41 @@ ${cleanContent}
                 // Re-enable checkbox
                 checkbox.disabled = false;
               }
+          });
+
+          // Postpone (⏩) buttons - delegated so they keep working after refreshContentArea()
+          document.addEventListener('click', async function(event) {
+            const button = event.target.closest('.task-postpone');
+            if (!button) return;
+            event.preventDefault();
+
+            button.disabled = true;
+            try {
+              const response = await fetch('/task/postpone', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                  filePath: button.dataset.file,
+                  lineNumber: parseInt(button.dataset.line, 10)
+                })
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to postpone task');
+              }
+
+              // Re-render so the task leaves views it no longer matches (e.g. due
+              // today) and shows its new date everywhere else
+              await refreshContentArea();
+            } catch (error) {
+              console.error('Error postponing task:', error);
+              alert('Failed to postpone task. Please try again.');
+            } finally {
+              button.disabled = false;
+            }
           });
         });
 
@@ -7223,6 +7283,79 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
     console.error('Error updating task:', error);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Failed to update task', details: error.message });
+  }
+});
+
+// Postpone a task (the ⏩ button): move its scheduled/due dates off today
+app.post('/task/postpone', authMiddleware, async (req, res) => {
+  try {
+    const { filePath: file, lineNumber: line } = req.body;
+    debug(`[TASK] Postponing task - file: ${file}, line: ${line}`);
+
+    if (!file || !line) {
+      return res.status(400).json({ error: 'Missing file path or line number' });
+    }
+
+    const filePath = path.join(VAULT_PATH, file);
+
+    // Security: prevent directory traversal
+    if (!path.resolve(filePath).startsWith(VAULT_PATH)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const taskLine = lines[line - 1];
+
+    if (!taskLine) {
+      return res.status(400).json({ error: 'Task line not found' });
+    }
+
+    const postponed = postponeTaskLine(taskLine, getTodayDate());
+    if (!postponed) {
+      return res.status(400).json({ error: 'Not an open task with a scheduled or due date' });
+    }
+
+    lines[line - 1] = postponed.line;
+
+    {
+      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      if (conflict) {
+        return res.status(409).json({ error: 'Concurrent update; retry' });
+      }
+    }
+
+    // Clear the task query cache so the next page load reflects the change
+    taskQueryCache.clear();
+
+    // Update the database so date-based queries see the new dates right away
+    try {
+      const db = getReadOnlyDatabase();
+      const taskId = `markdown-tasks/local:${path.join('vault', file)}:${line}`;
+      if (postponed.dueDate) {
+        db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?').run(postponed.dueDate, taskId);
+      }
+      if (postponed.scheduledDate) {
+        db.prepare(`
+          UPDATE tasks
+          SET metadata = json_set(COALESCE(metadata, '{}'), '$.scheduled_date', ?)
+          WHERE id = ?
+        `).run(postponed.scheduledDate, taskId);
+      }
+    } catch (dbError) {
+      // Log but don't fail - file is the source of truth
+      console.error('[TASK] Failed to update database:', dbError.message);
+    }
+
+    res.json({
+      success: true,
+      updatedLine: postponed.line,
+      scheduledDate: postponed.scheduledDate,
+      dueDate: postponed.dueDate
+    });
+  } catch (error) {
+    console.error('Error postponing task:', error);
+    res.status(500).json({ error: 'Failed to postpone task', details: error.message });
   }
 });
 
