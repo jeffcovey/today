@@ -38,6 +38,39 @@ const LEGACY_TABLES = [
   'markdown_sync',
 ];
 
+// SQLite result codes (and the matching messages, for errors that carry no
+// code) that mean the database file itself is damaged.
+const CORRUPTION_CODES = ['SQLITE_CORRUPT', 'SQLITE_NOTADB'];
+const CORRUPTION_MESSAGES = [
+  'database disk image is malformed',
+  'file is not a database',
+];
+
+function isCorruptionError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  const message = error?.message || '';
+  return CORRUPTION_CODES.some(c => code.startsWith(c)) ||
+         CORRUPTION_MESSAGES.some(m => message.includes(m));
+}
+
+/**
+ * Turn an error from opening or querying the database into a health result.
+ *
+ * Only errors that say the file itself is damaged are `corrupted` (recreated,
+ * without a backup). Everything else is `unavailable`: the database may be
+ * perfectly fine and must not be recreated. That covers a locked or
+ * unopenable file and — when the error did not come from SQLite at all — a
+ * better-sqlite3 native binding that failed to load (`driverError`).
+ */
+function healthFromError(prefix, error) {
+  const reason = `${prefix}: ${error.message}`;
+  if (isCorruptionError(error)) {
+    return { healthy: false, corrupted: true, reason };
+  }
+  const fromSqlite = typeof error?.code === 'string' && error.code.startsWith('SQLITE_');
+  return { healthy: false, unavailable: true, driverError: !fromSqlite, reason };
+}
+
 /**
  * Clean up orphaned WAL/SHM files when main database is missing.
  * These files can cause undefined SQLite behavior if left behind.
@@ -63,7 +96,8 @@ function cleanOrphanedWalFiles() {
  * @param {Object} [opts]
  * @param {boolean} [opts.skipIntegrityCheck=false] - Skip PRAGMA integrity_check
  *   (caller is responsible for having already run or deliberately skipped it)
- * @returns {Object} { healthy: boolean, reason?: string, version?: number, corrupted?: boolean }
+ * @returns {Object} { healthy: boolean, reason?: string, version?: number,
+ *   corrupted?: boolean, unavailable?: boolean, driverError?: boolean }
  */
 export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
   // Check if database file exists
@@ -85,16 +119,12 @@ export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
   try {
     db = new Database(DB_PATH, { readonly: true });
 
-    // Test that we can actually query the database (detects disk I/O errors)
+    // Test that we can actually query the database.
     try {
       db.prepare('SELECT 1').get();
     } catch (queryError) {
       db.close();
-      return {
-        healthy: false,
-        corrupted: true,
-        reason: `Database query failed: ${queryError.message}`
-      };
+      return healthFromError('Database query failed', queryError);
     }
 
     if (!skipIntegrityCheck) {
@@ -110,11 +140,7 @@ export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
         }
       } catch (integrityError) {
         db.close();
-        return {
-          healthy: false,
-          corrupted: true,
-          reason: `Integrity check error: ${integrityError.message}`
-        };
+        return healthFromError('Integrity check error', integrityError);
       }
     }
 
@@ -152,15 +178,7 @@ export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
     if (db) {
       try { db.close(); } catch { /* ignore */ }
     }
-    // Treat connection errors as corruption
-    const isCorruption = error.message.includes('disk I/O error') ||
-                         error.message.includes('database disk image is malformed') ||
-                         error.message.includes('file is not a database');
-    return {
-      healthy: false,
-      corrupted: isCorruption,
-      reason: `Database error: ${error.message}`
-    };
+    return healthFromError('Database error', error);
   }
 }
 
@@ -192,10 +210,10 @@ export function backupDatabase() {
 }
 
 /**
- * Remove database files including WAL and SHM
+ * Remove a database file along with its WAL and SHM
  */
-function removeAllDatabaseFiles() {
-  for (const filePath of [DB_PATH, WAL_PATH, SHM_PATH]) {
+function removeDatabaseFiles(dbPath) {
+  for (const filePath of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);
@@ -207,7 +225,11 @@ function removeAllDatabaseFiles() {
 }
 
 /**
- * Create a fresh database with the current schema
+ * Create a fresh database with the current schema.
+ *
+ * The replacement is built beside the existing database and only swapped in
+ * once it is complete, so a failure at any point (the driver won't load, a
+ * migration throws) leaves the existing database in place.
  * @returns {Promise<boolean>} Success status
  */
 export async function createFreshDatabase() {
@@ -217,24 +239,54 @@ export async function createFreshDatabase() {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  // Remove existing database AND WAL/SHM files
-  removeAllDatabaseFiles();
+  const stagingPath = `${DB_PATH}.new-${process.pid}`;
+  removeDatabaseFiles(stagingPath);
 
   let db;
   try {
-    db = new Database(DB_PATH);
+    db = new Database(stagingPath);
     db.pragma('journal_mode = WAL');
 
     // Run migrations
     const migrationManager = new MigrationManager(db);
     await migrationManager.runMigrations();
 
+    // Fold the WAL into the main file so that file alone is the whole database
+    db.pragma('wal_checkpoint(TRUNCATE)');
     db.close();
-    return true;
+    db = null;
+
+    // Move the old database set aside so its WAL/SHM cannot be replayed into
+    // the replacement. If the swap fails, restore the complete old set.
+    const oldPaths = [DB_PATH, WAL_PATH, SHM_PATH];
+    const oldAsidePaths = oldPaths.map(filePath => `${filePath}.old-${process.pid}`);
+    const movedPaths = [];
+    try {
+      for (let i = 0; i < oldPaths.length; i++) {
+        if (fs.existsSync(oldPaths[i])) {
+          fs.renameSync(oldPaths[i], oldAsidePaths[i]);
+          movedPaths.push(i);
+        }
+      }
+
+      fs.renameSync(stagingPath, DB_PATH);
+      for (const i of movedPaths) {
+        try { fs.unlinkSync(oldAsidePaths[i]); } catch { /* ignore cleanup errors */ }
+      }
+      return true;
+    } catch (swapError) {
+      for (const i of movedPaths.reverse()) {
+        if (fs.existsSync(oldAsidePaths[i]) && !fs.existsSync(oldPaths[i])) {
+          try { fs.renameSync(oldAsidePaths[i], oldPaths[i]); } catch { /* ignore restore errors */ }
+        }
+      }
+      throw swapError;
+    }
   } catch (error) {
     if (db) {
       try { db.close(); } catch { /* ignore */ }
     }
+    removeDatabaseFiles(stagingPath);
     console.error(`Failed to create database: ${error.message}`);
     return false;
   }
@@ -313,8 +365,20 @@ export async function ensureHealthyDatabase(options = {}) {
     return { success: true, recreated: false, message: 'Database is healthy' };
   }
 
-  // Database needs recreation — stamp (if any) is no longer valid.
+  // The check did not pass — stamp (if any) is no longer valid.
   if (ranIntegrityCheck) clearStamp();
+
+  // We could not look at the database, which says nothing about its contents.
+  // Recreating it here would throw away a database that may be perfectly good,
+  // so fail and leave the files alone.
+  if (health.unavailable && !forceRecreate) {
+    error(`Cannot open database: ${health.reason}`);
+    if (health.driverError) {
+      log('   The better-sqlite3 native module failed to load. Try: npm rebuild better-sqlite3');
+    }
+    log(`   ${DB_PATH} was left untouched`);
+    return { success: false, recreated: false, message: `Cannot open database: ${health.reason}` };
+  }
 
   const reason = forceRecreate ? 'Force recreate requested' : health.reason;
   warn(`Database needs recreation: ${reason}`);
