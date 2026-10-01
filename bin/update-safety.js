@@ -102,14 +102,6 @@ export function recoverInterruptedUpdate(projectRoot, execSync, logger = console
   let canUpdate = true;
 
   try {
-    const markerPath = getGitPath(projectRoot, 'today-update-stash', execSync);
-    if (existsSync(markerPath)) {
-      const token = readFileSync(markerPath, 'utf8').trim();
-      if (token && !restoreUpdateStash(projectRoot, execSync, markerPath, token, logger)) {
-        canUpdate = false;
-      }
-    }
-
     const mergeHeadPath = getGitPath(projectRoot, 'MERGE_HEAD', execSync);
     if (existsSync(mergeHeadPath)) {
       const mergeHeads = readFileSync(mergeHeadPath, 'utf8').trim().split(/\s+/);
@@ -139,6 +131,16 @@ export function recoverInterruptedUpdate(projectRoot, execSync, logger = console
       } else {
         logger.error('⚠️  An unfinished or unresolved merge is present. Resolve it before updating.');
         canUpdate = false;
+      }
+    }
+
+    const markerPath = getGitPath(projectRoot, 'today-update-stash', execSync);
+    if (canUpdate && existsSync(markerPath)) {
+      const token = readFileSync(markerPath, 'utf8').trim();
+      if (token && !restoreUpdateStash(projectRoot, execSync, markerPath, token, logger)) {
+        canUpdate = false;
+      } else if (!token) {
+        unlinkSync(markerPath);
       }
     }
   } catch (error) {

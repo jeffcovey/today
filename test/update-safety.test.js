@@ -28,6 +28,16 @@ describe('update safety', () => {
   });
 
   describe('ensureBetterSqliteBinding', () => {
+    test('does not rebuild a binding that loads successfully', () => {
+      const exec = jest.fn();
+      class FakeDatabase {
+        close() {}
+      }
+
+      expect(ensureBetterSqliteBinding(projectRoot, exec, () => FakeDatabase)).toBe(true);
+      expect(exec).not.toHaveBeenCalled();
+    });
+
     test('rebuilds an unloadable binding and verifies it again', () => {
       let canLoad = false;
       const exec = jest.fn(() => {
@@ -68,12 +78,18 @@ describe('update safety', () => {
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'local change\n');
     writeFileSync(path.join(projectRoot, 'untracked.txt'), 'untracked change\n');
     const updateStash = stashUpdateChanges(projectRoot, execSync);
+    const head = execSync('git rev-parse HEAD', {
+      cwd: projectRoot,
+      encoding: 'utf8'
+    }).trim();
+    writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
 
     expect(existsSync(path.join(projectRoot, 'untracked.txt'))).toBe(false);
     expect(recoverInterruptedUpdate(projectRoot, execSync)).toBe(true);
     expect(readFileSync(path.join(projectRoot, 'tracked.txt'), 'utf8')).toBe('local change\n');
     expect(readFileSync(path.join(projectRoot, 'untracked.txt'), 'utf8')).toBe('untracked change\n');
     expect(existsSync(updateStash.markerPath)).toBe(false);
+    expect(existsSync(path.join(projectRoot, '.git', 'MERGE_HEAD'))).toBe(false);
   });
 
   test('clears merge metadata when the merge commit is already complete', () => {

@@ -199,13 +199,17 @@ async function checkForUpdates(execSync, readline) {
 
       let updateSucceeded = false;
       try {
+        const headBeforeUpdate = execSync('git rev-parse HEAD', {
+          cwd: projectRoot,
+          encoding: 'utf8'
+        }).trim();
         execSync('git pull origin main', {
           cwd: projectRoot,
           stdio: 'inherit',
           env: { ...process.env, LEFTHOOK: '0' }
         });
         const changedDependencies = execSync(
-          'git diff --name-only ORIG_HEAD HEAD -- package.json package-lock.json',
+          `git diff --name-only ${headBeforeUpdate} HEAD -- package.json package-lock.json`,
           { cwd: projectRoot, encoding: 'utf8' }
         ).trim();
         if (changedDependencies) {
