@@ -20,6 +20,7 @@ import { existsSync, statSync, utimesSync, openSync, closeSync, mkdirSync } from
 import { dirname, join } from 'path';
 import { execSync as execSyncBuiltin } from 'child_process';
 import { fileURLToPath } from 'url';
+import { ensureBetterSqliteBinding, recoverInterruptedUpdate, restoreUpdateStash, stashUpdateChanges } from './update-safety.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,17 +55,24 @@ if (!process.env.SKIP_DEP_CHECK) {
     console.log('');
     try {
       execSyncBuiltin('npm install', { stdio: 'inherit', cwd: projectRoot });
-      // Touch node_modules to update mtime so we don't reinstall on next run
-      const now = new Date();
-      utimesSync(nodeModulesPath, now, now);
-      console.log('');
-      console.log('✅ Dependencies installed!');
-      console.log('');
     } catch (e) {
       console.error('❌ Failed to install dependencies:', e.message);
       console.error('   Please run: npm install');
       process.exit(1);
     }
+  }
+
+  if (!ensureBetterSqliteBinding(projectRoot, execSyncBuiltin)) {
+    process.exit(1);
+  }
+
+  if (needsInstall) {
+    // Touch node_modules only after the dependencies and native binding are verified.
+    const now = new Date();
+    utimesSync(nodeModulesPath, now, now);
+    console.log('');
+    console.log('✅ Dependencies installed!');
+    console.log('');
   }
 }
 
@@ -178,23 +186,45 @@ async function checkForUpdates(execSync, readline) {
       const status = execSync('git status --porcelain', { cwd: projectRoot, encoding: 'utf8' }).trim();
       const hasLocalChanges = status.length > 0;
 
+      let updateStash;
       if (hasLocalChanges) {
         console.log('Stashing local changes...');
-        execSync('git stash --include-untracked', { cwd: projectRoot, stdio: 'pipe' });
+        try {
+          updateStash = stashUpdateChanges(projectRoot, execSync);
+        } catch (stashError) {
+          console.error('❌ Could not stash local changes:', stashError.message);
+          return;
+        }
       }
 
+      let updateSucceeded = false;
       try {
-        execSync('git pull origin main', { cwd: projectRoot, stdio: 'inherit' });
-
-        if (hasLocalChanges) {
-          console.log('Restoring local changes...');
-          try {
-            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
-          } catch {
-            console.log('⚠️  Could not auto-restore changes. Run: git stash pop');
+        execSync('git pull origin main', {
+          cwd: projectRoot,
+          stdio: 'inherit',
+          env: { ...process.env, LEFTHOOK: '0' }
+        });
+        const changedDependencies = execSync(
+          'git diff --name-only ORIG_HEAD HEAD -- package.json package-lock.json',
+          { cwd: projectRoot, encoding: 'utf8' }
+        ).trim();
+        if (changedDependencies) {
+          execSync('npm install', { cwd: projectRoot, stdio: 'inherit' });
+          if (!ensureBetterSqliteBinding(projectRoot, execSync)) {
+            throw new Error('better-sqlite3 native binding could not be verified');
           }
         }
+        updateSucceeded = true;
+      } catch (pullError) {
+        console.error(`❌ Update failed: ${pullError.message}`);
+      } finally {
+        if (updateStash) {
+          console.log('Restoring local changes...');
+          restoreUpdateStash(projectRoot, execSync, updateStash.markerPath, updateStash.token);
+        }
+      }
 
+      if (updateSucceeded) {
         console.log('');
         console.log('✅ Updated!');
         console.log('');
@@ -207,14 +237,6 @@ async function checkForUpdates(execSync, readline) {
         console.log('');
         console.log('Please restart bin/today to use the new version.');
         process.exit(0);
-      } catch (pullError) {
-        // Restore stashed changes if pull failed
-        if (hasLocalChanges) {
-          try {
-            execSync('git stash pop', { cwd: projectRoot, stdio: 'pipe' });
-          } catch { /* ignore */ }
-        }
-        console.error('❌ Update failed. Please run: git pull origin main');
       }
     }
 
@@ -280,8 +302,11 @@ async function main() {
 
   process.chdir(projectRoot);
 
+  const updateStateIsSafe = !wantsHelpOrVersion && recoverInterruptedUpdate(projectRoot, execSync);
+
   // Check for updates (skip in non-interactive mode)
-  if (!wantsHelpOrVersion
+  if (updateStateIsSafe
+    && !wantsHelpOrVersion
     && !process.argv.includes('--non-interactive')
     && !process.argv.includes('--skip-update-check')) {
     await checkForUpdates(execSync, readline);
