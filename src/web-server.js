@@ -3809,7 +3809,7 @@ const TASK_QUERY_CACHE_TTL = 30000; // 30 seconds
 // and/or due date, like Obsidian Tasks. Clicks are handled by event delegation
 // in the markdown page script and POST to /task/postpone.
 function postponeButtonHtml(filePath, lineNumber) {
-  return ` <button type="button" class="task-postpone" data-file="${filePath}" data-line="${lineNumber}" title="Postpone to tomorrow" aria-label="Postpone to tomorrow"><i class="fas fa-forward"></i></button>`;
+  return ` <button type="button" class="task-postpone" data-file="${filePath}" data-line="${lineNumber}" title="Postpone task" aria-label="Postpone task"><i class="fas fa-forward"></i></button>`;
 }
 
 // Postpone button for a task from executeTasksQuery, or '' if it can't be postponed
@@ -3965,8 +3965,11 @@ async function executeTasksQuery(query, queryContext = {}) {
     const doneDate = row.completed_at ? new Date(row.completed_at) : null;
     const createdDate = metadata.created_date ? new Date(metadata.created_date + 'T00:00:00') : null;
 
-    // Get file path from metadata (strip 'vault/' prefix if present for consistent matching)
-    const filePath = metadata.file_path ? metadata.file_path.replace(/^vault\//, '') : null;
+    // Get vault-relative file path from metadata
+    const vaultPrefix = `${getVaultPath()}/`;
+    const filePath = metadata.file_path
+      ? (metadata.file_path.startsWith(vaultPrefix) ? metadata.file_path.slice(vaultPrefix.length) : metadata.file_path)
+      : null;
     const lineNumber = metadata.line_number || null;
 
     return {
@@ -7296,10 +7299,8 @@ app.post('/task/postpone', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Missing file path or line number' });
     }
 
-    const filePath = path.join(VAULT_PATH, file);
-
-    // Security: prevent directory traversal
-    if (!path.resolve(filePath).startsWith(VAULT_PATH)) {
+    const filePath = safeVaultPath(file);
+    if (!filePath) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -7331,7 +7332,7 @@ app.post('/task/postpone', authMiddleware, async (req, res) => {
     // Update the database so date-based queries see the new dates right away
     try {
       const db = getReadOnlyDatabase();
-      const taskId = `markdown-tasks/local:${path.join('vault', file)}:${line}`;
+      const taskId = `markdown-tasks/local:${path.join(getVaultPath(), file)}:${line}`;
       if (postponed.dueDate) {
         db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?').run(postponed.dueDate, taskId);
       }
