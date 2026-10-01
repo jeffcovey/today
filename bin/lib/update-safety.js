@@ -6,7 +6,8 @@ import { isAbsolute, join, resolve } from 'path';
 function getGitPath(projectRoot, pathName, execSync) {
   const gitPath = execSync(`git rev-parse --git-path ${pathName}`, {
     cwd: projectRoot,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
   }).trim();
   return isAbsolute(gitPath) ? gitPath : resolve(projectRoot, gitPath);
 }
@@ -99,6 +100,19 @@ export function restoreUpdateStash(projectRoot, execSync, markerPath, token, log
 }
 
 export function recoverInterruptedUpdate(projectRoot, execSync, logger = console) {
+  if (!existsSync(join(projectRoot, '.git'))) return true;
+
+  try {
+    const isWorkTree = execSync('git rev-parse --is-inside-work-tree', {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).trim();
+    if (isWorkTree !== 'true') return true;
+  } catch {
+    return true;
+  }
+
   let canUpdate = true;
 
   try {

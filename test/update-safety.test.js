@@ -7,7 +7,7 @@ import {
   ensureBetterSqliteBinding,
   recoverInterruptedUpdate,
   stashUpdateChanges
-} from '../bin/update-safety.js';
+} from '../bin/lib/update-safety.js';
 
 describe('update safety', () => {
   let projectRoot;
@@ -72,6 +72,35 @@ describe('update safety', () => {
         '❌ better-sqlite3 is still not loadable after rebuilding.'
       );
     });
+  });
+
+  test('silently skips a directory outside a Git worktree', () => {
+    rmSync(path.join(projectRoot, '.git'), { recursive: true, force: true });
+    const exec = jest.fn();
+    const logger = { error: jest.fn(), log: jest.fn() };
+
+    expect(recoverInterruptedUpdate(projectRoot, exec, logger)).toBe(true);
+    expect(exec).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.log).not.toHaveBeenCalled();
+  });
+
+  test('silently skips when Git is unavailable', () => {
+    rmSync(path.join(projectRoot, '.git'), { recursive: true, force: true });
+    writeFileSync(path.join(projectRoot, '.git'), 'gitdir: missing\n');
+    const exec = jest.fn(() => {
+      throw new Error('spawnSync git ENOENT');
+    });
+    const logger = { error: jest.fn(), log: jest.fn() };
+
+    expect(recoverInterruptedUpdate(projectRoot, exec, logger)).toBe(true);
+    expect(exec).toHaveBeenCalledWith('git rev-parse --is-inside-work-tree', {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.log).not.toHaveBeenCalled();
   });
 
   test('restores a named update stash on startup', () => {
