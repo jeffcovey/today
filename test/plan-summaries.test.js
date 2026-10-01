@@ -118,9 +118,10 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
     write('2026_Q3_09_W39_23.md', daily('Done.'));          // summary edited below → listed
     write('2026_Q3_09_W39_24.md', daily('Done.'));          // task edited below → closed
     write('2026_Q3_08_W33_10.md', daily(''));               // outside the window
-    write('2026_Q4_10_W40_01.md', daily(''));               // today: not yet over
+    write('2026_Q4_10_W40_01.md', daily(''));               // today: in progress → listed
+    write('2026_Q4_10_W40_02.md', daily(''));               // tomorrow: not started
     write('2026_Q3_09_00.md', '---\nmonth_summary:\n---\n'); // month ended 9/30
-    write('2026_00.md', '---\nyear_summary:\n---\n');       // year not over
+    write('2026_00.md', '---\nyear_summary:\n---\n');       // year in progress → listed
     git(['add', '-A']);
     git(['commit', '-qm', 'init']);
 
@@ -133,12 +134,14 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
 
   const list = () => listPlanSummaries({ vaultPath: vault, today: '2026-10-01', gitExec: git });
 
-  test('lists blank and uncommitted summaries in the window', () => {
-    expect(list().map((p) => [p.file, p.status])).toEqual([
-      ['plans/2026_Q3_09_00.md', 'blank'],
-      ['plans/2026_Q3_09_W39_25.md', 'uncommitted'],
-      ['plans/2026_Q3_09_W39_23.md', 'uncommitted'],
-      ['plans/2026_Q3_09_W39_21.md', 'blank'],
+  test('lists blank and uncommitted summaries in the window, including in-progress plans', () => {
+    expect(list().map((p) => [p.file, p.status, p.inProgress])).toEqual([
+      ['plans/2026_00.md', 'blank', true],
+      ['plans/2026_Q3_09_00.md', 'blank', false],
+      ['plans/2026_Q4_10_W40_01.md', 'blank', true],
+      ['plans/2026_Q3_09_W39_25.md', 'uncommitted', false],
+      ['plans/2026_Q3_09_W39_23.md', 'uncommitted', false],
+      ['plans/2026_Q3_09_W39_21.md', 'blank', false],
     ]);
   });
 

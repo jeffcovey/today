@@ -164,8 +164,9 @@ function parseStatus(output) {
 }
 
 /**
- * List plans whose period ended within the last `days` days before `today`
- * and whose summary is blank or not yet committed.
+ * List plans that are in progress today or ended within the last `days`
+ * days, and whose summary is blank or not yet committed. Plans covering
+ * today are included so their summaries can be drafted during the period.
  *
  * @param {object} opts
  * @param {string} opts.vaultPath - Absolute vault root (git work tree).
@@ -174,7 +175,7 @@ function parseStatus(output) {
  * @param {number} [opts.days=30]
  * @param {(args: string[]) => string} opts.gitExec - Runs git in the vault.
  * @returns {Array<{file, type, label, start, end, field, summary, status}>}
- *   status: 'blank' | 'uncommitted'
+ *   status: 'blank' | 'uncommitted'; inProgress: period includes today
  */
 export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days = 30, gitExec }) {
   const windowStart = addDays(today, -days);
@@ -190,7 +191,7 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
   for (const filename of filenames) {
     const period = parsePlanFilename(filename);
     if (!period) continue;
-    if (period.end >= today || period.end < windowStart) continue;
+    if (period.start > today || period.end < windowStart) continue;
     candidates.push({ ...period, file: path.posix.join(plansDir, filename) });
   }
   if (candidates.length === 0) return [];
@@ -217,7 +218,7 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
       if (headContent !== null && readSummary(headContent, field) === summary) continue;
       planStatus = 'uncommitted';
     }
-    results.push({ ...plan, field, summary, status: planStatus });
+    results.push({ ...plan, field, summary, status: planStatus, inProgress: plan.end >= today });
   }
 
   results.sort((a, b) =>
