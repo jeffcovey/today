@@ -46,7 +46,7 @@ const CORRUPTION_MESSAGES = [
   'file is not a database',
 ];
 
-function isCorruptionError(error) {
+export function isCorruptionError(error) {
   const code = typeof error?.code === 'string' ? error.code : '';
   const message = error?.message || '';
   return CORRUPTION_CODES.some(c => code.startsWith(c)) ||

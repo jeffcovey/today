@@ -37,7 +37,7 @@ import { getAbsoluteVaultPath, getConfigPath } from '../src/config.js';
 import { parse as parseToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
 import { getDataContextCached } from '../src/context-cache.js';
-import { ensureHealthyDatabase, createFreshDatabase } from '../src/db-health.js';
+import { ensureHealthyDatabase, isCorruptionError } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { program } from 'commander';
@@ -75,18 +75,6 @@ function editInEditor(currentText, filename = 'edit.txt') {
     try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
     return null;
   }
-}
-
-/**
- * Check if an error is a database corruption error that warrants recreation
- */
-function isDatabaseCorruptionError(error) {
-  const message = error?.message || String(error);
-  return message.includes('database disk image is malformed') ||
-         message.includes('disk I/O error') ||
-         message.includes('file is not a database') ||
-         message.includes('database is locked') ||
-         message.includes('unable to open database');
 }
 
 async function cmdList() {
@@ -496,7 +484,7 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
       }
       return; // Success - exit the retry loop
     } catch (error) {
-      if (isDatabaseCorruptionError(error) && retryCount < maxRetries) {
+      if (isCorruptionError(error) && retryCount < maxRetries) {
         retryCount++;
         console.log('');
         console.log(colors.yellow(`⚠️  Database error detected: ${error.message}`));
@@ -511,11 +499,16 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
           // Ignore close errors
         }
 
-        // Recreate the database from scratch
-        const recreated = await createFreshDatabase();
-        if (!recreated) {
-          console.error(colors.red('Failed to recreate database'));
+        // Re-check health before recreation so recovery follows the same
+        // backup policy as startup recovery.
+        const recovery = await ensureHealthyDatabase({ verbose: true });
+        if (!recovery.success) {
+          console.error(colors.red('Failed to recover database'));
           process.exit(1);
+        }
+
+        if (!recovery.recreated) {
+          throw new Error(`Sync failed: ${error.message}. Database was not recreated.`, { cause: error });
         }
 
         console.log(colors.green('✅ Database recreated successfully'));
@@ -524,7 +517,7 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
         // Continue to retry
       } else {
         // Non-recoverable error or max retries exceeded
-        throw error;
+        throw new Error(`Sync failed: ${error.message}. Database was not recreated.`, { cause: error });
       }
     }
   }

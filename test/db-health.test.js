@@ -20,6 +20,7 @@ const {
   checkDatabaseHealth,
   createFreshDatabase,
   ensureHealthyDatabase,
+  isCorruptionError,
 } = await import('../src/db-health.js');
 
 const DB = '.data/today.db';
@@ -168,6 +169,29 @@ describe('db-health', () => {
 
       driverError = null;
       expect(canary()).toBe('still here');
+    });
+  });
+
+  describe('corruption error classification', () => {
+    test.each([
+      ['SQLITE_CORRUPT', 'unknown error'],
+      ['SQLITE_CORRUPT_VTAB', 'unknown error'],
+      ['SQLITE_NOTADB', 'unknown error'],
+      [undefined, 'database disk image is malformed'],
+      [undefined, 'file is not a database'],
+    ])('recognizes corruption code %s and message %s', (code, message) => {
+      expect(isCorruptionError(sqliteError(code, message))).toBe(true);
+    });
+
+    test.each([
+      ['SQLITE_BUSY', 'database is locked'],
+      ['SQLITE_CANTOPEN', 'unable to open database file'],
+      ['SQLITE_IOERR', 'disk I/O error'],
+      [undefined, 'database is locked'],
+      [undefined, 'unable to open database file'],
+      [undefined, 'disk I/O error'],
+    ])('does not classify %s / %s as corruption', (code, message) => {
+      expect(isCorruptionError(sqliteError(code, message))).toBe(false);
     });
   });
 
