@@ -72,7 +72,7 @@ export function parseFrontmatterLenient(yamlText) {
 // (null when there is no frontmatter or nothing could be recovered) and the
 // body with the frontmatter block removed.
 export function parseFrontmatter(content) {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
+  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/;
   const match = content.match(frontmatterRegex);
 
   if (!match) {

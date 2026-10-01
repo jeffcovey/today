@@ -57,6 +57,7 @@ import {
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
+import { listPlanSummaries, savePlanSummary, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
@@ -6293,6 +6294,108 @@ app.post('/_git/discard', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Error discarding file:', err);
     res.status(500).json({ error: 'Failed to discard changes' });
+  }
+});
+
+// ── Plan summaries review page (#541) ────────────────────────────────────────
+
+app.get('/_summaries', authMiddleware, (req, res) => {
+  try {
+    const plans = listPlanSummaries({ vaultPath: VAULT_PATH, today: getTodayDate(), gitExec });
+    const typeHeadings = { year: 'Years', quarter: 'Quarters', month: 'Months', week: 'Weeks', day: 'Days' };
+    const statusBadge = (status) => status === 'blank'
+      ? '<span class="badge bg-warning text-dark status-badge">Blank</span>'
+      : '<span class="badge bg-info text-dark status-badge">Not committed</span>';
+
+    const card = (p) => `
+      <div class="card mb-3 summary-card" data-file="${escapeHtmlEntities(p.file)}">
+        <div class="card-body">
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <a href="/${escapeHtmlEntities(p.file)}" class="fw-bold">${escapeHtmlEntities(p.label)}</a>
+            ${statusBadge(p.status)}
+          </div>
+          <textarea class="form-control summary-text" rows="4" aria-label="Summary for ${escapeHtmlEntities(p.label)}" placeholder="What happened during this ${p.type}?">${escapeHtmlEntities(p.summary)}</textarea>
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <button class="btn btn-sm btn-primary save-btn" onclick="saveSummary(this)">
+              <i class="fas fa-save me-1"></i>Save
+            </button>
+            <span class="save-status small text-muted"></span>
+          </div>
+        </div>
+      </div>`;
+
+    const sections = PLAN_TYPE_ORDER
+      .map((type) => {
+        const group = plans.filter((p) => p.type === type);
+        if (group.length === 0) return '';
+        return `<h5 class="mt-4 mb-3">${typeHeadings[type]} <span class="text-muted small">(${group.length})</span></h5>
+          ${group.map(card).join('')}`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Plan Summaries</title>
+  ${pageStyle}
+</head>
+<body>
+  ${getNavbar('Plan Summaries', 'fa-pen-to-square', { showSearch: false })}
+  <div class="container mt-3 px-3" style="max-width: 900px;">
+    <p class="text-muted">
+      Plans from the last 30 days whose summary is blank or not yet committed.
+      Saving keeps a plan here; it drops off once the summary is committed on the
+      <a href="/_git">Git page</a>.
+    </p>
+    ${plans.length === 0
+    ? '<div class="alert alert-success"><i class="fas fa-check me-1"></i>All summaries are written and committed.</div>'
+    : sections}
+  </div>
+  <script>
+    async function saveSummary(btn) {
+      const card = btn.closest('.summary-card');
+      const status = card.querySelector('.save-status');
+      btn.disabled = true;
+      status.textContent = 'Saving…';
+      status.className = 'save-status small text-muted';
+      try {
+        const resp = await fetch('/_summaries/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: card.dataset.file, summary: card.querySelector('.summary-text').value }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || resp.statusText);
+        card.querySelector('.status-badge').outerHTML = data.status === 'blank'
+          ? '<span class="badge bg-warning text-dark status-badge">Blank</span>'
+          : '<span class="badge bg-info text-dark status-badge">Not committed</span>';
+        status.textContent = 'Saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        status.className = 'save-status small text-success';
+      } catch (err) {
+        status.textContent = 'Save failed: ' + err.message;
+        status.className = 'save-status small text-danger';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+    res.send(html);
+  } catch (err) {
+    console.error('Error rendering plan summaries page:', err);
+    res.status(500).send('Failed to load plan summaries');
+  }
+});
+
+app.post('/_summaries/save', authMiddleware, (req, res) => {
+  try {
+    res.json(savePlanSummary({ vaultPath: VAULT_PATH, file: req.body.file, summary: req.body.summary }));
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    console.error('Error saving plan summary:', err);
+    res.status(500).json({ error: 'Failed to save summary' });
   }
 });
 
