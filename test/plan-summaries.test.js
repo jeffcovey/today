@@ -156,9 +156,9 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
     write('2026_Q3_09_W39_24.md', daily('Done.'));          // task edited below → closed
     write('2026_Q3_08_W33_10.md', daily(''));               // outside the window
     write('2026_Q4_10_W40_01.md', daily(''));               // today: in progress → listed
-    write('2026_Q4_10_W40_02.md', daily(''));               // tomorrow: not started
+    write('2026_Q4_10_W40_02.md', daily(''));               // tomorrow without priorities: excluded
     write('2026_Q3_09_00.md', '---\nmonth_summary:\n---\n'); // month ended 9/30
-    write('2026_00.md', '---\nyear_summary:\n---\n');       // year in progress → listed
+    write('2026_00.md', '---\nyear_summary:\n---\n');       // year in progress → not listed until it ends
     git(['add', '-A']);
     git(['commit', '-qm', 'init']);
 
@@ -172,9 +172,8 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
 
   const list = () => listPlanSummaries({ vaultPath: vault, today: '2026-10-01', gitExec: git });
 
-  test('lists blank and uncommitted summaries in the window, including in-progress plans', () => {
+  test("lists blank and uncommitted summaries in the window, plus today's daily plan", () => {
     expect(list().map((p) => [p.file, p.status, p.inProgress])).toEqual([
-      ['plans/2026_00.md', 'blank', true],
       ['plans/2026_Q3_09_00.md', 'blank', false],
       ['plans/2026_Q4_10_W40_01.md', 'blank', true],
       ['plans/2026_Q3_09_W39_25.md', 'uncommitted', false],
@@ -221,6 +220,25 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
     expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: 'Done.', gitExec: git }).status).toBe('committed');
     expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: 'Changed.', gitExec: git }).status).toBe('uncommitted');
     expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: '', gitExec: git }).status).toBe('blank');
+  });
+
+  test("lists tomorrow's priorities (even when committed) but not later days", () => {
+    write('2026_Q4_10_W40_02.md', withPriorities(daily(''), '- [ ] Plan ahead'));
+    write('2026_Q4_10_W40_03.md', withPriorities(daily(''), '- [ ] Too far'));
+    git(['add', '-A']);
+    git(['commit', '-qm', 'upcoming']);
+
+    const upcoming = list().filter((p) => p.start > '2026-10-01');
+    expect(upcoming).toEqual([expect.objectContaining({
+      file: 'plans/2026_Q4_10_W40_02.md',
+      status: null,
+      inProgress: false,
+      upcoming: true,
+      priorities: '- [ ] Plan ahead',
+      prioritiesStatus: 'committed',
+    })]);
+    // Sorted first among days (latest end date).
+    expect(list().filter((p) => p.type === 'day')[0].file).toBe('plans/2026_Q4_10_W40_02.md');
   });
 
   test('refuses to save priorities where there is no section', () => {

@@ -198,11 +198,13 @@ function parseStatus(output) {
 }
 
 /**
- * List plans that are in progress today or ended within the last `days`
- * days, and whose summary is blank or not yet committed. Plans covering
- * today are included so their summaries can be drafted during the period.
+ * List plans that ended within the last `days` days, plus today's daily
+ * plan, whose summary is blank or not yet committed. Today's plan is
+ * included so its summary can be drafted during the day.
  * Daily plans are also listed while their Top Priorities section has
  * uncommitted changes, so priorities can be reviewed alongside the summary.
+ * Tomorrow's daily plan is listed (priorities only, no summary) whenever it
+ * has a Top Priorities section, for planning the next day in the evening.
  *
  * @param {object} opts
  * @param {string} opts.vaultPath - Absolute vault root (git work tree).
@@ -211,13 +213,15 @@ function parseStatus(output) {
  * @param {number} [opts.days=30]
  * @param {(args: string[]) => string} opts.gitExec - Runs git in the vault.
  * @returns {Array<{file, type, label, start, end, field, summary, status,
- *   inProgress, priorities, prioritiesStatus}>}
- *   status: summary state, 'blank' | 'uncommitted' | null (committed);
- *   inProgress: period includes today; priorities: section body or null when
+ *   inProgress, upcoming, priorities, prioritiesStatus}>}
+ *   status: summary state, 'blank' | 'uncommitted' | null (committed, or
+ *   tomorrow's plan); inProgress: today's daily plan; upcoming: tomorrow's
+ *   daily plan; priorities: section body or null when
  *   the plan has none; prioritiesStatus: 'uncommitted' | 'committed' | null.
  */
 export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days = 30, gitExec }) {
   const windowStart = addDays(today, -days);
+  const tomorrow = addDays(today, 1);
   const absDir = path.join(vaultPath, plansDir);
   let filenames;
   try {
@@ -230,7 +234,10 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
   for (const filename of filenames) {
     const period = parsePlanFilename(filename);
     if (!period) continue;
-    if (period.start > today || period.end < windowStart) continue;
+    if (period.end < windowStart) continue;
+    // Longer periods only once they've ended; daily plans from today on
+    // (today's to draft during the day, tomorrow's for its priorities).
+    if (period.type === 'day' ? period.start > tomorrow : period.end >= today) continue;
     candidates.push({ ...period, file: path.posix.join(plansDir, filename) });
   }
   if (candidates.length === 0) return [];
@@ -261,18 +268,31 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
     // same value. Other edits to the file (tasks, notes) don't keep it open.
     const committed = (read, value) => !status.has(plan.file) || (head() !== null && read(head()) === value);
 
+    const upcoming = plan.start > today;
+    if (upcoming && priorities === null) continue;
+
+    // Tomorrow hasn't happened yet, so it has no summary to write.
     let planStatus = null;
-    if (!summary) planStatus = 'blank';
-    else if (!committed((c) => readSummary(c, field), summary)) planStatus = 'uncommitted';
+    if (!upcoming) {
+      if (!summary) planStatus = 'blank';
+      else if (!committed((c) => readSummary(c, field), summary)) planStatus = 'uncommitted';
+    }
 
     let prioritiesStatus = null;
     if (priorities !== null) {
       prioritiesStatus = committed(readPriorities, priorities) ? 'committed' : 'uncommitted';
     }
 
-    if (planStatus === null && prioritiesStatus !== 'uncommitted') continue;
+    if (!upcoming && planStatus === null && prioritiesStatus !== 'uncommitted') continue;
     results.push({
-      ...plan, field, summary, status: planStatus, inProgress: plan.end >= today, priorities, prioritiesStatus,
+      ...plan,
+      field,
+      summary,
+      status: planStatus,
+      inProgress: !upcoming && plan.end >= today,
+      upcoming,
+      priorities,
+      prioritiesStatus,
     });
   }
 
@@ -309,7 +329,9 @@ const normalizePriorities = (text) => trimPriorityFramingLines(text.replace(/\r\
 function isSavedValueCommitted({ gitExec, file, readValue, value }) {
   if (typeof gitExec !== 'function') return false;
   try {
-    return readValue(gitExec(['show', `HEAD:${file}`])) === value;
+    // Untracked files (most daily plans) make `git show` fail; keep its
+    // "fatal: ... not in HEAD" out of the server's stderr.
+    return readValue(gitExec(['show', `HEAD:${file}`], { stdio: ['ignore', 'pipe', 'ignore'] })) === value;
   } catch {
     return false;
   }
