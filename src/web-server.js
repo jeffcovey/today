@@ -58,6 +58,7 @@ import {
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
+import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
@@ -6303,12 +6304,6 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   try {
     const plans = listPlanSummaries({ vaultPath: VAULT_PATH, today: getTodayDate(), gitExec });
     const typeHeadings = { year: 'Years', quarter: 'Quarters', month: 'Months', week: 'Weeks', day: 'Days' };
-    const statusBadge = (status) => {
-      if (status === 'blank') return '<span class="badge bg-warning text-dark status-badge">Blank</span>';
-      if (status === 'uncommitted') return '<span class="badge bg-info text-dark status-badge">Not committed</span>';
-      return '<span class="status-badge"></span>';
-    };
-
     // One editable text box with a Save button. kind selects the endpoint
     // and request field on the client ('summary' or 'priorities').
     const editorCard = ({ p, kind, heading, text, status, rows, placeholder, ariaLabel, extraClass = '' }) => `
@@ -6316,7 +6311,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
         <div class="card-body">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
             ${heading}
-            ${statusBadge(status)}
+            ${getPlanStatusBadge(status)}
             ${p.inProgress ? '<span class="badge bg-secondary">In progress</span>' : ''}
           </div>
           <textarea class="form-control editor-text" rows="${rows}" aria-label="${escapeHtmlEntities(ariaLabel)}" placeholder="${escapeHtmlEntities(placeholder)}">${escapeHtmlEntities(text)}</textarea>
@@ -6390,6 +6385,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   </div>
   <script>
     const SAVE_ENDPOINTS = { summary: '/_summaries/save', priorities: '/_summaries/priorities' };
+    const STATUS_BADGES = ${JSON.stringify(PLAN_STATUS_BADGES)};
 
     async function saveCard(btn) {
       const card = btn.closest('.editor-card');
@@ -6406,9 +6402,8 @@ app.get('/_summaries', authMiddleware, (req, res) => {
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || resp.statusText);
-        card.querySelector('.status-badge').outerHTML = data.status === 'blank'
-          ? '<span class="badge bg-warning text-dark status-badge">Blank</span>'
-          : '<span class="badge bg-info text-dark status-badge">Not committed</span>';
+        card.querySelector('.status-badge').outerHTML = STATUS_BADGES[data.status]
+          || '<span class="status-badge"></span>';
         status.textContent = 'Saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         status.className = 'save-status small text-success';
       } catch (err) {
@@ -6431,7 +6426,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
 
 app.post('/_summaries/save', authMiddleware, (req, res) => {
   try {
-    res.json(savePlanSummary({ vaultPath: VAULT_PATH, file: req.body.file, summary: req.body.summary }));
+    res.json(savePlanSummary({ vaultPath: VAULT_PATH, file: req.body.file, summary: req.body.summary, gitExec }));
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     console.error('Error saving plan summary:', err);
@@ -6441,7 +6436,7 @@ app.post('/_summaries/save', authMiddleware, (req, res) => {
 
 app.post('/_summaries/priorities', authMiddleware, (req, res) => {
   try {
-    res.json(savePlanPriorities({ vaultPath: VAULT_PATH, file: req.body.file, priorities: req.body.priorities }));
+    res.json(savePlanPriorities({ vaultPath: VAULT_PATH, file: req.body.file, priorities: req.body.priorities, gitExec }));
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     console.error('Error saving plan priorities:', err);

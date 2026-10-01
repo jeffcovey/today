@@ -109,6 +109,12 @@ describe('readPriorities / setPriorities', () => {
     expect(readPriorities('---\ndaily_summary:\n---\n# no section\n')).toBeNull();
   });
 
+  test('preserves indentation on first and last task lines', () => {
+    expect(readPriorities(plan('\n  - [ ] Parent\n    - [ ] Child\n\n'))).toBe('  - [ ] Parent\n    - [ ] Child');
+    expect(setPriorities(plan('\n- [ ] Old\n\n'), '  - [ ] Parent\n    - [ ] Child'))
+      .toBe(plan('\n  - [ ] Parent\n    - [ ] Child\n\n'));
+  });
+
   test('replaces only the body, keeping markers, heading and the rest of the file', () => {
     const out = setPriorities(plan('\n- [ ] Old\n\n'), '- [x] New\n- [ ] Another');
     expect(out).toBe(plan('\n- [x] New\n- [ ] Another\n\n'));
@@ -190,12 +196,31 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
     git(['commit', '-qam', 'commit edits']); // closes out 22's priorities
     expect(list().find((p) => p.file.endsWith('_20.md'))).toBeUndefined();
 
-    const result = savePlanPriorities({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_20.md', priorities: '- [x] P1\r\n- [ ] P2\n' });
+    const result = savePlanPriorities({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_20.md', priorities: '- [x] P1\r\n- [ ] P2\n', gitExec: git });
     expect(result).toEqual({ file: 'plans/2026_Q3_09_W39_20.md', priorities: '- [x] P1\n- [ ] P2', status: 'uncommitted' });
     expect(list().find((p) => p.file.endsWith('_20.md'))).toMatchObject({ status: null, prioritiesStatus: 'uncommitted' });
 
     git(['commit', '-qam', 'priorities']);
     expect(list().find((p) => p.file.endsWith('_20.md'))).toBeUndefined();
+  });
+
+  test('save statuses reflect the committed value', () => {
+    const file = 'plans/2026_Q3_09_W39_20.md';
+    expect(savePlanPriorities({ vaultPath: vault, file, priorities: '- [x] P1', gitExec: git }).status).toBe('committed');
+    const edited = savePlanPriorities({
+      vaultPath: vault, file, priorities: '  - [ ] Parent\n    - [ ] Child', gitExec: git,
+    });
+    expect(edited).toMatchObject({
+      priorities: '  - [ ] Parent\n    - [ ] Child',
+      status: 'uncommitted',
+    });
+    expect(fs.readFileSync(path.join(vault, file), 'utf8')).toContain('\n  - [ ] Parent\n    - [ ] Child\n\n<!-- /TOP_PRIORITIES -->');
+    expect(savePlanPriorities({ vaultPath: vault, file, priorities: '- [x] P1', gitExec: git }).status).toBe('committed');
+
+    const summaryFile = 'plans/2026_Q3_09_W39_23.md';
+    expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: 'Done.', gitExec: git }).status).toBe('committed');
+    expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: 'Changed.', gitExec: git }).status).toBe('uncommitted');
+    expect(savePlanSummary({ vaultPath: vault, file: summaryFile, summary: '', gitExec: git }).status).toBe('blank');
   });
 
   test('refuses to save priorities where there is no section', () => {
@@ -204,7 +229,7 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
   });
 
   test('a saved summary stays listed until committed', () => {
-    const result = savePlanSummary({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_21.md', summary: '  Rested.\r\n' });
+    const result = savePlanSummary({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_21.md', summary: '  Rested.\r\n', gitExec: git });
     expect(result).toEqual({ file: 'plans/2026_Q3_09_W39_21.md', summary: 'Rested.', status: 'uncommitted' });
     expect(fs.readFileSync(path.join(vault, 'plans/2026_Q3_09_W39_21.md'), 'utf8')).toContain('daily_summary: "Rested."\n');
 
@@ -215,8 +240,8 @@ describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
   });
 
   test('rejects paths that are not plan files', () => {
-    expect(() => savePlanSummary({ vaultPath: vault, file: '../etc/passwd', summary: 'x' })).toThrow('Not a plan file');
-    expect(() => savePlanSummary({ vaultPath: vault, file: 'plans/../2026_00.md', summary: 'x' })).toThrow('Not a plan file');
-    expect(() => savePlanSummary({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_29.md', summary: 'x' })).toThrow('not found');
+    expect(() => savePlanSummary({ vaultPath: vault, file: '../etc/passwd', summary: 'x', gitExec: git })).toThrow('Not a plan file');
+    expect(() => savePlanSummary({ vaultPath: vault, file: 'plans/../2026_00.md', summary: 'x', gitExec: git })).toThrow('Not a plan file');
+    expect(() => savePlanSummary({ vaultPath: vault, file: 'plans/2026_Q3_09_W39_29.md', summary: 'x', gitExec: git })).toThrow('not found');
   });
 });

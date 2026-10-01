@@ -157,8 +157,15 @@ export function readPriorities(content) {
   if (content == null) return null;
   const m = content.match(PRIORITIES_RE);
   if (!m) return null;
-  const body = m[2].replace(/\r\n/g, '\n').trim();
+  const body = trimPriorityFramingLines(m[2].replace(/\r\n/g, '\n'));
   return body === '{{PRIORITIES_FROM_DATABASE}}' ? '' : body;
+}
+
+function trimPriorityFramingLines(text) {
+  const lines = text.split('\n');
+  while (lines.length && lines[0].trim() === '') lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+  return lines.join('\n');
 }
 
 /**
@@ -297,13 +304,23 @@ function updateFile(absPath, transform) {
 }
 
 const normalizeText = (text) => text.replace(/\r\n?/g, '\n').trim();
+const normalizePriorities = (text) => trimPriorityFramingLines(text.replace(/\r\n?/g, '\n'));
+
+function isSavedValueCommitted({ gitExec, file, readValue, value }) {
+  if (typeof gitExec !== 'function') return false;
+  try {
+    return readValue(gitExec(['show', `HEAD:${file}`])) === value;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Write a summary into a plan file's frontmatter.
- * @returns {{file: string, summary: string, status: 'blank'|'uncommitted'}}
+ * @returns {{file: string, summary: string, status: 'blank'|'committed'|'uncommitted'}}
  * @throws {Error} with `.statusCode` for invalid input
  */
-export function savePlanSummary({ vaultPath, plansDir = 'plans', file, summary }) {
+export function savePlanSummary({ vaultPath, plansDir = 'plans', file, summary, gitExec }) {
   if (typeof file !== 'string' || typeof summary !== 'string') throw httpError(400, 'file and summary are required');
   const { period, absPath } = resolvePlanFile({ vaultPath, plansDir, file });
 
@@ -311,15 +328,18 @@ export function savePlanSummary({ vaultPath, plansDir = 'plans', file, summary }
   const after = updateFile(absPath, (before) => setFrontmatterField(before, field, normalizeText(summary)));
 
   const saved = readSummary(after, field);
-  return { file, summary: saved, status: saved ? 'uncommitted' : 'blank' };
+  const status = !saved ? 'blank' : isSavedValueCommitted({
+    gitExec, file, readValue: (content) => readSummary(content, field), value: saved,
+  }) ? 'committed' : 'uncommitted';
+  return { file, summary: saved, status };
 }
 
 /**
  * Replace the Top Priorities section of a daily plan.
- * @returns {{file: string, priorities: string, status: 'uncommitted'}}
+ * @returns {{file: string, priorities: string, status: 'committed'|'uncommitted'}}
  * @throws {Error} with `.statusCode` for invalid input
  */
-export function savePlanPriorities({ vaultPath, plansDir = 'plans', file, priorities }) {
+export function savePlanPriorities({ vaultPath, plansDir = 'plans', file, priorities, gitExec }) {
   if (typeof file !== 'string' || typeof priorities !== 'string') throw httpError(400, 'file and priorities are required');
   const { period, absPath } = resolvePlanFile({ vaultPath, plansDir, file });
   if (period.type !== 'day') throw httpError(400, 'Only daily plans have Top Priorities');
@@ -327,9 +347,13 @@ export function savePlanPriorities({ vaultPath, plansDir = 'plans', file, priori
   let hasSection = true;
   const after = updateFile(absPath, (before) => {
     hasSection = readPriorities(before) !== null;
-    return hasSection ? setPriorities(before, normalizeText(priorities)) : before;
+    return hasSection ? setPriorities(before, normalizePriorities(priorities)) : before;
   });
   if (!hasSection) throw httpError(404, 'Plan has no Top Priorities section');
 
-  return { file, priorities: readPriorities(after), status: 'uncommitted' };
+  const saved = readPriorities(after);
+  const status = isSavedValueCommitted({ gitExec, file, readValue: readPriorities, value: saved })
+    ? 'committed'
+    : 'uncommitted';
+  return { file, priorities: saved, status };
 }
