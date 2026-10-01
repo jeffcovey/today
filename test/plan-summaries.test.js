@@ -68,6 +68,14 @@ describe('setFrontmatterField', () => {
     expect(fm.daily_summary).toBe('He said "hi": then left.\nSecond line.');
   });
 
+  test('updates CRLF frontmatter without adding a second block', () => {
+    const crlfDoc = '---\r\ncssclasses: plan\r\ndaily_summary:\r\nobsidianUIMode: preview\r\n---\r\n\r\n# Body\r\n';
+    const out = setFrontmatterField(crlfDoc, 'daily_summary', 'A good day.');
+    expect(out).toBe('---\r\ncssclasses: plan\r\ndaily_summary: "A good day."\r\nobsidianUIMode: preview\r\n---\r\n\r\n# Body\r\n');
+    expect(out.match(/^---/gm)).toHaveLength(2);
+    expect(readSummary(out, 'daily_summary')).toBe('A good day.');
+  });
+
   test('replaces a multi-line block value', () => {
     const multi = '---\nweek_summary: >\n  folded line one\n  folded line two\nnext: 1\n---\nbody';
     expect(setFrontmatterField(multi, 'week_summary', 'new')).toBe('---\nweek_summary: "new"\nnext: 1\n---\nbody');

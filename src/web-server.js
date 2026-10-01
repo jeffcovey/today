@@ -6314,7 +6314,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
             <a href="/${escapeHtmlEntities(p.file)}" class="fw-bold">${escapeHtmlEntities(p.label)}</a>
             ${statusBadge(p.status)}
           </div>
-          <textarea class="form-control summary-text" rows="4" placeholder="What happened during this ${p.type}?">${escapeHtmlEntities(p.summary)}</textarea>
+          <textarea class="form-control summary-text" rows="4" aria-label="Summary for ${escapeHtmlEntities(p.label)}" placeholder="What happened during this ${p.type}?">${escapeHtmlEntities(p.summary)}</textarea>
           <div class="d-flex align-items-center gap-2 mt-2">
             <button class="btn btn-sm btn-primary save-btn" onclick="saveSummary(this)">
               <i class="fas fa-save me-1"></i>Save

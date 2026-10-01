@@ -123,10 +123,11 @@ export function readSummary(content, field) {
  */
 export function setFrontmatterField(content, field, value) {
   const newLine = value === '' ? `${field}:` : `${field}: ${JSON.stringify(value)}`;
-  const fm = content.match(/^---\n([\s\S]*?)\n---(\n|$)/);
-  if (!fm) return `---\n${newLine}\n---\n${content}`;
+  const fm = content.match(/^---(\r\n|\n)([\s\S]*?)(\r\n|\n)---(\r\n|\n|$)/);
+  const lineEnding = fm?.[1] ?? content.match(/\r\n|\n/)?.[0] ?? '\n';
+  if (!fm) return `---${lineEnding}${newLine}${lineEnding}---${lineEnding}${content}`;
 
-  const lines = fm[1].split('\n');
+  const lines = fm[2].split(/\r?\n/);
   const keyRe = new RegExp(`^${field}:`);
   const idx = lines.findIndex((l) => keyRe.test(l));
   if (idx === -1) {
@@ -140,7 +141,7 @@ export function setFrontmatterField(content, field, value) {
     while (endIdx > idx + 1 && lines[endIdx - 1] === '') endIdx--;
     lines.splice(idx, endIdx - idx, newLine);
   }
-  return `---\n${lines.join('\n')}\n---${fm[2]}${content.slice(fm[0].length)}`;
+  return `---${lineEnding}${lines.join(lineEnding)}${lineEnding}---${fm[4]}${content.slice(fm[0].length)}`;
 }
 
 function addDays(dateStr, days) {
