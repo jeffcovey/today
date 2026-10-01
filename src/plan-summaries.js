@@ -144,6 +144,33 @@ export function setFrontmatterField(content, field, value) {
   return `---${lineEnding}${lines.join(lineEnding)}${lineEnding}---${fm[4]}${content.slice(fm[0].length)}`;
 }
 
+// Top Priorities block in daily plans: marker comment, heading, task lines,
+// end marker. Group 2 is the editable body between heading and end marker.
+const PRIORITIES_RE = /(<!-- TOP_PRIORITIES:[^\n]*-->\r?\n## 📋 Top Priorities[^\n]*\r?\n)([\s\S]*?)(<!-- \/TOP_PRIORITIES -->)/;
+
+/**
+ * Read the Top Priorities section body of a daily plan.
+ * @returns {string|null} trimmed body (LF line endings), or null when the
+ *   plan has no Top Priorities section.
+ */
+export function readPriorities(content) {
+  if (content == null) return null;
+  const m = content.match(PRIORITIES_RE);
+  if (!m) return null;
+  const body = m[2].replace(/\r\n/g, '\n').trim();
+  return body === '{{PRIORITIES_FROM_DATABASE}}' ? '' : body;
+}
+
+/**
+ * Replace the Top Priorities section body, keeping the markers and heading
+ * and the file's line endings. Returns content unchanged if there's no section.
+ */
+export function setPriorities(content, text) {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const body = text === '' ? eol : `${eol}${text.split('\n').join(eol)}${eol}${eol}`;
+  return content.replace(PRIORITIES_RE, (_, head, _old, tail) => `${head}${body}${tail}`);
+}
+
 function addDays(dateStr, days) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return isoDate(utcDate(y, m, d + days));
@@ -167,6 +194,8 @@ function parseStatus(output) {
  * List plans that are in progress today or ended within the last `days`
  * days, and whose summary is blank or not yet committed. Plans covering
  * today are included so their summaries can be drafted during the period.
+ * Daily plans are also listed while their Top Priorities section has
+ * uncommitted changes, so priorities can be reviewed alongside the summary.
  *
  * @param {object} opts
  * @param {string} opts.vaultPath - Absolute vault root (git work tree).
@@ -174,8 +203,11 @@ function parseStatus(output) {
  * @param {string} opts.today - YYYY-MM-DD in the user's timezone.
  * @param {number} [opts.days=30]
  * @param {(args: string[]) => string} opts.gitExec - Runs git in the vault.
- * @returns {Array<{file, type, label, start, end, field, summary, status}>}
- *   status: 'blank' | 'uncommitted'; inProgress: period includes today
+ * @returns {Array<{file, type, label, start, end, field, summary, status,
+ *   inProgress, priorities, prioritiesStatus}>}
+ *   status: summary state, 'blank' | 'uncommitted' | null (committed);
+ *   inProgress: period includes today; priorities: section body or null when
+ *   the plan has none; prioritiesStatus: 'uncommitted' | 'committed' | null.
  */
 export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days = 30, gitExec }) {
   const windowStart = addDays(today, -days);
@@ -203,22 +235,38 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
     const field = SUMMARY_FIELDS[plan.type];
     const content = fs.readFileSync(path.join(vaultPath, plan.file), 'utf-8');
     const summary = readSummary(content, field);
-    let planStatus;
-    if (!summary) {
-      planStatus = 'blank';
-    } else if (!status.has(plan.file)) {
-      continue; // clean in git and has a summary: closed out
-    } else {
-      let headContent = null;
-      if (status.get(plan.file) !== '??') {
-        try { headContent = gitExec(['show', `HEAD:${plan.file}`]); } catch { headContent = null; }
+    const priorities = plan.type === 'day' ? readPriorities(content) : null;
+
+    // HEAD copy, fetched lazily: null when the file is untracked or clean
+    // files don't need it (clean means working tree === HEAD).
+    let headContent;
+    const head = () => {
+      if (headContent === undefined) {
+        headContent = null;
+        const xy = status.get(plan.file);
+        if (xy && xy !== '??') {
+          try { headContent = gitExec(['show', `HEAD:${plan.file}`]); } catch { headContent = null; }
+        }
       }
-      // Other edits to the file (tasks, notes) don't keep it open; only an
-      // uncommitted change to the summary itself does.
-      if (headContent !== null && readSummary(headContent, field) === summary) continue;
-      planStatus = 'uncommitted';
+      return headContent;
+    };
+    // A part of the file is committed when the file is clean, or HEAD has the
+    // same value. Other edits to the file (tasks, notes) don't keep it open.
+    const committed = (read, value) => !status.has(plan.file) || (head() !== null && read(head()) === value);
+
+    let planStatus = null;
+    if (!summary) planStatus = 'blank';
+    else if (!committed((c) => readSummary(c, field), summary)) planStatus = 'uncommitted';
+
+    let prioritiesStatus = null;
+    if (priorities !== null) {
+      prioritiesStatus = committed(readPriorities, priorities) ? 'committed' : 'uncommitted';
     }
-    results.push({ ...plan, field, summary, status: planStatus, inProgress: plan.end >= today });
+
+    if (planStatus === null && prioritiesStatus !== 'uncommitted') continue;
+    results.push({
+      ...plan, field, summary, status: planStatus, inProgress: plan.end >= today, priorities, prioritiesStatus,
+    });
   }
 
   results.sort((a, b) =>
@@ -226,34 +274,62 @@ export function listPlanSummaries({ vaultPath, plansDir = 'plans', today, days =
   return results;
 }
 
+const httpError = (code, msg) => Object.assign(new Error(msg), { statusCode: code });
+
+function resolvePlanFile({ vaultPath, plansDir, file }) {
+  const filename = path.posix.basename(file);
+  const period = parsePlanFilename(filename);
+  if (!period || file !== path.posix.join(plansDir, filename)) throw httpError(400, 'Not a plan file');
+  const absPath = path.join(vaultPath, plansDir, filename);
+  if (!fs.existsSync(absPath)) throw httpError(404, 'Plan file not found');
+  return { period, absPath };
+}
+
+// Read-modify-write with compare-and-swap; on a concurrent edit (e.g. the
+// vault watcher touching tasks) recompute from the fresh bytes and retry.
+function updateFile(absPath, transform) {
+  for (let attempt = 0; ; attempt++) {
+    const before = fs.readFileSync(absPath, 'utf-8');
+    const after = transform(before);
+    if (!writeFileAtomicCAS(absPath, after, before).conflict) return after;
+    if (attempt >= 2) throw httpError(409, 'Plan file changed while saving; try again');
+  }
+}
+
+const normalizeText = (text) => text.replace(/\r\n?/g, '\n').trim();
+
 /**
  * Write a summary into a plan file's frontmatter.
  * @returns {{file: string, summary: string, status: 'blank'|'uncommitted'}}
  * @throws {Error} with `.statusCode` for invalid input
  */
 export function savePlanSummary({ vaultPath, plansDir = 'plans', file, summary }) {
-  const fail = (code, msg) => Object.assign(new Error(msg), { statusCode: code });
-  if (typeof file !== 'string' || typeof summary !== 'string') throw fail(400, 'file and summary are required');
-
-  const filename = path.posix.basename(file);
-  const period = parsePlanFilename(filename);
-  if (!period || file !== path.posix.join(plansDir, filename)) throw fail(400, 'Not a plan file');
-
-  const absPath = path.join(vaultPath, plansDir, filename);
-  if (!fs.existsSync(absPath)) throw fail(404, 'Plan file not found');
+  if (typeof file !== 'string' || typeof summary !== 'string') throw httpError(400, 'file and summary are required');
+  const { period, absPath } = resolvePlanFile({ vaultPath, plansDir, file });
 
   const field = SUMMARY_FIELDS[period.type];
-  const text = summary.replace(/\r\n?/g, '\n').trim();
-  // Read-modify-write with compare-and-swap; on a concurrent edit (e.g. the
-  // vault watcher touching tasks) recompute from the fresh bytes and retry.
-  let after;
-  for (let attempt = 0; ; attempt++) {
-    const before = fs.readFileSync(absPath, 'utf-8');
-    after = setFrontmatterField(before, field, text);
-    if (!writeFileAtomicCAS(absPath, after, before).conflict) break;
-    if (attempt >= 2) throw fail(409, 'Plan file changed while saving; try again');
-  }
+  const after = updateFile(absPath, (before) => setFrontmatterField(before, field, normalizeText(summary)));
 
   const saved = readSummary(after, field);
   return { file, summary: saved, status: saved ? 'uncommitted' : 'blank' };
+}
+
+/**
+ * Replace the Top Priorities section of a daily plan.
+ * @returns {{file: string, priorities: string, status: 'uncommitted'}}
+ * @throws {Error} with `.statusCode` for invalid input
+ */
+export function savePlanPriorities({ vaultPath, plansDir = 'plans', file, priorities }) {
+  if (typeof file !== 'string' || typeof priorities !== 'string') throw httpError(400, 'file and priorities are required');
+  const { period, absPath } = resolvePlanFile({ vaultPath, plansDir, file });
+  if (period.type !== 'day') throw httpError(400, 'Only daily plans have Top Priorities');
+
+  let hasSection = true;
+  const after = updateFile(absPath, (before) => {
+    hasSection = readPriorities(before) !== null;
+    return hasSection ? setPriorities(before, normalizeText(priorities)) : before;
+  });
+  if (!hasSection) throw httpError(404, 'Plan has no Top Priorities section');
+
+  return { file, priorities: readPriorities(after), status: 'uncommitted' };
 }

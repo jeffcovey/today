@@ -57,7 +57,7 @@ import {
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
-import { listPlanSummaries, savePlanSummary, PLAN_TYPE_ORDER } from './plan-summaries.js';
+import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
@@ -6303,21 +6303,25 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   try {
     const plans = listPlanSummaries({ vaultPath: VAULT_PATH, today: getTodayDate(), gitExec });
     const typeHeadings = { year: 'Years', quarter: 'Quarters', month: 'Months', week: 'Weeks', day: 'Days' };
-    const statusBadge = (status) => status === 'blank'
-      ? '<span class="badge bg-warning text-dark status-badge">Blank</span>'
-      : '<span class="badge bg-info text-dark status-badge">Not committed</span>';
+    const statusBadge = (status) => {
+      if (status === 'blank') return '<span class="badge bg-warning text-dark status-badge">Blank</span>';
+      if (status === 'uncommitted') return '<span class="badge bg-info text-dark status-badge">Not committed</span>';
+      return '<span class="status-badge"></span>';
+    };
 
-    const card = (p) => `
-      <div class="card mb-3 summary-card" data-file="${escapeHtmlEntities(p.file)}">
+    // One editable text box with a Save button. kind selects the endpoint
+    // and request field on the client ('summary' or 'priorities').
+    const editorCard = ({ p, kind, heading, text, status, rows, placeholder, ariaLabel, extraClass = '' }) => `
+      <div class="card mb-3 editor-card ${extraClass}" data-file="${escapeHtmlEntities(p.file)}" data-kind="${kind}">
         <div class="card-body">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-            <a href="/${escapeHtmlEntities(p.file)}" class="fw-bold">${escapeHtmlEntities(p.label)}</a>
-            ${statusBadge(p.status)}
+            ${heading}
+            ${statusBadge(status)}
             ${p.inProgress ? '<span class="badge bg-secondary">In progress</span>' : ''}
           </div>
-          <textarea class="form-control summary-text" rows="4" aria-label="Summary for ${escapeHtmlEntities(p.label)}" placeholder="What happened during this ${p.type}?">${escapeHtmlEntities(p.summary)}</textarea>
+          <textarea class="form-control editor-text" rows="${rows}" aria-label="${escapeHtmlEntities(ariaLabel)}" placeholder="${escapeHtmlEntities(placeholder)}">${escapeHtmlEntities(text)}</textarea>
           <div class="d-flex align-items-center gap-2 mt-2">
-            <button class="btn btn-sm btn-primary save-btn" onclick="saveSummary(this)">
+            <button class="btn btn-sm btn-primary save-btn" onclick="saveCard(this)">
               <i class="fas fa-save me-1"></i>Save
             </button>
             <span class="save-status small text-muted"></span>
@@ -6325,12 +6329,41 @@ app.get('/_summaries', authMiddleware, (req, res) => {
         </div>
       </div>`;
 
+    const planLink = (p) => `<a href="/${escapeHtmlEntities(p.file)}" class="fw-bold">${escapeHtmlEntities(p.label)}</a>`;
+
+    const summaryCard = (p) => editorCard({
+      p,
+      kind: 'summary',
+      heading: planLink(p),
+      text: p.summary,
+      status: p.status,
+      rows: 4,
+      placeholder: `What happened during this ${p.type}?`,
+      ariaLabel: `Summary for ${p.label}`,
+    });
+
+    // Daily plans: Top Priorities (when the plan has the section) sit above
+    // the summary as a reference for writing it. Either card may be absent.
+    const prioritiesCard = (p) => editorCard({
+      p,
+      kind: 'priorities',
+      heading: `<span class="fw-bold">📋 Top Priorities</span><span class="text-muted">·</span>${planLink(p)}`,
+      text: p.priorities,
+      status: p.prioritiesStatus,
+      rows: Math.max(3, p.priorities.split('\n').length + 1),
+      placeholder: '- [ ] A priority for the day',
+      ariaLabel: `Top Priorities for ${p.label}`,
+      extraClass: 'priorities-card',
+    });
+
+    const planCards = (p) => (p.priorities !== null ? prioritiesCard(p) : '') + (p.status ? summaryCard(p) : '');
+
     const sections = PLAN_TYPE_ORDER
       .map((type) => {
         const group = plans.filter((p) => p.type === type);
         if (group.length === 0) return '';
         return `<h5 class="mt-4 mb-3">${typeHeadings[type]} <span class="text-muted small">(${group.length})</span></h5>
-          ${group.map(card).join('')}`;
+          ${group.map(planCards).join('')}`;
       })
       .join('');
 
@@ -6339,31 +6372,37 @@ app.get('/_summaries', authMiddleware, (req, res) => {
 <head>
   <title>Plan Summaries</title>
   ${pageStyle}
+  <style>
+    .priorities-card .editor-text { font-family: var(--bs-font-monospace, monospace); font-size: 0.85rem; }
+  </style>
 </head>
 <body>
   ${getNavbar('Plan Summaries', 'fa-pen-to-square', { showSearch: false })}
   <div class="container mt-3 px-3" style="max-width: 900px;">
     <p class="text-muted">
-      Plans in progress today or from the last 30 days whose summary is blank or not yet committed.
-      Saving keeps a plan here; it drops off once the summary is committed on the
-      <a href="/_git">Git page</a>.
+      Plans in progress today or from the last 30 days whose summary is blank or not yet committed,
+      with each day's Top Priorities for reference. Saving keeps a plan here; it drops off once its
+      summary and priorities are committed on the <a href="/_git">Git page</a>.
     </p>
     ${plans.length === 0
     ? '<div class="alert alert-success"><i class="fas fa-check me-1"></i>All summaries are written and committed.</div>'
     : sections}
   </div>
   <script>
-    async function saveSummary(btn) {
-      const card = btn.closest('.summary-card');
+    const SAVE_ENDPOINTS = { summary: '/_summaries/save', priorities: '/_summaries/priorities' };
+
+    async function saveCard(btn) {
+      const card = btn.closest('.editor-card');
+      const kind = card.dataset.kind;
       const status = card.querySelector('.save-status');
       btn.disabled = true;
       status.textContent = 'Saving…';
       status.className = 'save-status small text-muted';
       try {
-        const resp = await fetch('/_summaries/save', {
+        const resp = await fetch(SAVE_ENDPOINTS[kind], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: card.dataset.file, summary: card.querySelector('.summary-text').value }),
+          body: JSON.stringify({ file: card.dataset.file, [kind]: card.querySelector('.editor-text').value }),
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || resp.statusText);
@@ -6397,6 +6436,16 @@ app.post('/_summaries/save', authMiddleware, (req, res) => {
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     console.error('Error saving plan summary:', err);
     res.status(500).json({ error: 'Failed to save summary' });
+  }
+});
+
+app.post('/_summaries/priorities', authMiddleware, (req, res) => {
+  try {
+    res.json(savePlanPriorities({ vaultPath: VAULT_PATH, file: req.body.file, priorities: req.body.priorities }));
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    console.error('Error saving plan priorities:', err);
+    res.status(500).json({ error: 'Failed to save priorities' });
   }
 });
 
