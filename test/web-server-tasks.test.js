@@ -691,6 +691,19 @@ describe('Task Postpone API', () => {
       expect(response.status).toBe(400);
     });
 
+    test('should reject paths outside the vault, including sibling-prefix paths', async () => {
+      const running = await isServerConfiguredForTests();
+      if (!running) return;
+
+      const response = await fetchWithAuth(`${BASE_URL}/task/postpone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: '../fixtures-private/task.md', lineNumber: 1 })
+      });
+
+      expect(response.status).toBe(403);
+    });
+
     test('should require authentication', async () => {
       const running = await isServerConfiguredForTests();
       if (!running) return;
