@@ -151,6 +151,8 @@ describe('db-health', () => {
     test.each([
       ['SQLITE_BUSY', 'database is locked'],
       ['SQLITE_CANTOPEN', 'unable to open database file'],
+      ['SQLITE_IOERR', 'disk I/O error'],
+      ['SQLITE_IOERR_LOCK', 'disk I/O error'],
     ])('%s leaves the database alone', async (code, message) => {
       await seedDatabase();
       driverError = sqliteError(code, message);
@@ -212,5 +214,35 @@ describe('db-health', () => {
     expect(hasTable('canary')).toBe(false);
     expect(hasTable('schema_version')).toBe(true);
     expect(stagingFiles()).toEqual([]);
+  });
+
+  test('a failed swap preserves the database and its WAL', async () => {
+    await seedDatabase();
+    const db = new RealDatabase(DB);
+    db.pragma('journal_mode = WAL');
+    db.exec("INSERT INTO canary VALUES ('only in WAL')");
+    expect(fs.existsSync(`${DB}-wal`)).toBe(true);
+
+    const realRenameSync = fs.renameSync;
+    jest.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+      if (source.includes('.new-')) {
+        throw new Error('swap failed');
+      }
+      return realRenameSync(source, destination);
+    });
+
+    expect(await createFreshDatabase()).toBe(false);
+    db.close();
+
+    expect(canary()).toBe('still here');
+    const restored = new RealDatabase(DB, { readonly: true });
+    try {
+      expect(restored.prepare('SELECT note FROM canary ORDER BY rowid').all().map(row => row.note))
+        .toEqual(['still here', 'only in WAL']);
+    } finally {
+      restored.close();
+    }
+    expect(stagingFiles()).toEqual([]);
+    expect(dataFiles().filter(f => f.includes('.old-'))).toEqual([]);
   });
 });

@@ -40,9 +40,8 @@ const LEGACY_TABLES = [
 
 // SQLite result codes (and the matching messages, for errors that carry no
 // code) that mean the database file itself is damaged.
-const CORRUPTION_CODES = ['SQLITE_CORRUPT', 'SQLITE_NOTADB', 'SQLITE_IOERR'];
+const CORRUPTION_CODES = ['SQLITE_CORRUPT', 'SQLITE_NOTADB'];
 const CORRUPTION_MESSAGES = [
-  'disk I/O error',
   'database disk image is malformed',
   'file is not a database',
 ];
@@ -120,7 +119,7 @@ export function checkDatabaseHealth({ skipIntegrityCheck = false } = {}) {
   try {
     db = new Database(DB_PATH, { readonly: true });
 
-    // Test that we can actually query the database (detects disk I/O errors)
+    // Test that we can actually query the database.
     try {
       db.prepare('SELECT 1').get();
     } catch (queryError) {
@@ -257,12 +256,32 @@ export async function createFreshDatabase() {
     db.close();
     db = null;
 
-    // Swap it in. The old WAL/SHM go first so they can never be replayed into
-    // the new file; rename() then replaces the old main file atomically.
-    cleanOrphanedWalFiles();
-    fs.renameSync(stagingPath, DB_PATH);
-    removeDatabaseFiles(stagingPath);
-    return true;
+    // Move the old database set aside so its WAL/SHM cannot be replayed into
+    // the replacement. If the swap fails, restore the complete old set.
+    const oldPaths = [DB_PATH, WAL_PATH, SHM_PATH];
+    const oldAsidePaths = oldPaths.map(filePath => `${filePath}.old-${process.pid}`);
+    const movedPaths = [];
+    try {
+      for (let i = 0; i < oldPaths.length; i++) {
+        if (fs.existsSync(oldPaths[i])) {
+          fs.renameSync(oldPaths[i], oldAsidePaths[i]);
+          movedPaths.push(i);
+        }
+      }
+
+      fs.renameSync(stagingPath, DB_PATH);
+      for (const i of movedPaths) {
+        try { fs.unlinkSync(oldAsidePaths[i]); } catch { /* ignore cleanup errors */ }
+      }
+      return true;
+    } catch (swapError) {
+      for (const i of movedPaths.reverse()) {
+        if (fs.existsSync(oldAsidePaths[i]) && !fs.existsSync(oldPaths[i])) {
+          try { fs.renameSync(oldAsidePaths[i], oldPaths[i]); } catch { /* ignore restore errors */ }
+        }
+      }
+      throw swapError;
+    }
   } catch (error) {
     if (db) {
       try { db.close(); } catch { /* ignore */ }
