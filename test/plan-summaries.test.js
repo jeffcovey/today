@@ -91,7 +91,10 @@ describe('setFrontmatterField', () => {
 
 describe('listPlanSummaries / savePlanSummary (real git repo)', () => {
   let vault;
-  const git = (args) => execFileSync('git', args, { cwd: vault, encoding: 'utf8' });
+  // Strip GIT_DIR/GIT_INDEX_FILE etc.: when jest runs from a git hook they
+  // point at the real repo, and the fixture repo's init/commit would land there.
+  const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+  const git = (args) => execFileSync('git', args, { cwd: vault, encoding: 'utf8', env: gitEnv });
   const write = (name, content) => fs.writeFileSync(path.join(vault, 'plans', name), content);
   const daily = (summary) => `---\ncssclasses: plan\ndaily_summary:${summary ? ` "${summary}"` : ''}\n---\n\n- [ ] task\n`;
 
