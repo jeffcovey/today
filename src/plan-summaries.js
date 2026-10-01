@@ -150,8 +150,8 @@ const PRIORITIES_RE = /(<!-- TOP_PRIORITIES:[^\n]*-->\r?\n## 📋 Top Priorities
 
 /**
  * Read the Top Priorities section body of a daily plan.
- * @returns {string|null} trimmed body (LF line endings), or null when the
- *   plan has no Top Priorities section.
+ * @returns {string|null} body without framing blank lines (LF line endings),
+ *   or null when the plan has no Top Priorities section.
  */
 export function readPriorities(content) {
   if (content == null) return null;
