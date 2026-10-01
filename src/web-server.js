@@ -6313,6 +6313,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
           <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
             <a href="/${escapeHtmlEntities(p.file)}" class="fw-bold">${escapeHtmlEntities(p.label)}</a>
             ${statusBadge(p.status)}
+            ${p.inProgress ? '<span class="badge bg-secondary">In progress</span>' : ''}
           </div>
           <textarea class="form-control summary-text" rows="4" aria-label="Summary for ${escapeHtmlEntities(p.label)}" placeholder="What happened during this ${p.type}?">${escapeHtmlEntities(p.summary)}</textarea>
           <div class="d-flex align-items-center gap-2 mt-2">
@@ -6343,7 +6344,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
   ${getNavbar('Plan Summaries', 'fa-pen-to-square', { showSearch: false })}
   <div class="container mt-3 px-3" style="max-width: 900px;">
     <p class="text-muted">
-      Plans from the last 30 days whose summary is blank or not yet committed.
+      Plans in progress today or from the last 30 days whose summary is blank or not yet committed.
       Saving keeps a plan here; it drops off once the summary is committed on the
       <a href="/_git">Git page</a>.
     </p>
