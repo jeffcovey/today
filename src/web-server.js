@@ -2,7 +2,6 @@
 
 import { sendPushover } from './pushover.js';
 import express from 'express';
-import { rateLimit } from 'express-rate-limit';
 import session from 'express-session';
 import Database from 'better-sqlite3';
 import betterSqliteSessionStore from 'better-sqlite3-session-store';
@@ -393,13 +392,6 @@ app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
 app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/auth/login")));
 
 const authMiddleware = sessionAuth;
-const deferredBlockRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 120,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, res) => res.status(429).send('<div class="alert alert-warning small mb-0">Too many sections requested. Please try again shortly.</div>')
-});
 app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAge: '1d' }));
 
 // MDBootstrap and custom styles (CSS moved to web/public/css/style.css)
@@ -5513,7 +5505,7 @@ async function resolveVaultMarkdownFile(urlPath) {
 }
 
 // Render one deferred query block (see src/deferred-blocks.js)
-app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, deferredBlockRateLimit, async (req, res) => {
+app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
   const urlPath = typeof req.query.path === 'string' ? req.query.path : '';
   const id = typeof req.query.id === 'string' ? req.query.id : '';
   res.set('Cache-Control', 'no-store');
