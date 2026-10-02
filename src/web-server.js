@@ -65,6 +65,7 @@ import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
+import { DeferredBlockRegistry, deferredBlockPlaceholder, DEFERRED_BLOCK_ENDPOINT } from './deferred-blocks.js';
 import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
@@ -223,6 +224,8 @@ function scheduleMarkdownUpdate(filePath) {
 
 // Cache for rendered Markdown
 const renderCache = new Map();
+// Sources of the query blocks left as placeholders in cached page shells
+const deferredBlocks = new DeferredBlockRegistry();
 const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
@@ -2643,9 +2646,10 @@ function cleanupCache() {
 
 // Get cached render or generate new one
 async function getCachedRender(filePath, urlPath) {
+  let fileMtime = null;
   try {
     const stats = await fs.stat(filePath);
-    const mtime = stats.mtime.getTime();
+    const mtime = fileMtime = stats.mtime.getTime();
     const size = stats.size;
 
     // Create cache key from filepath + urlPath (urlPath is baked into rendered HTML for chat paths)
@@ -2684,7 +2688,7 @@ async function getCachedRender(filePath, urlPath) {
 
     // Render and cache the result
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
-    const rendered = await renderMarkdownUncached(filePath, urlPath);
+    const rendered = await renderMarkdownUncached(filePath, urlPath, { deferBlocks: true, fileMtime });
     
     // Flag pages with dynamic content (task queries or dataview blocks) — these are
     // excluded from the disk cache because their content changes independently of
@@ -2718,7 +2722,7 @@ async function getCachedRender(filePath, urlPath) {
   } catch (error) {
     console.error(`Error in getCachedRender for ${filePath}:`, error);
     // Fall back to uncached rendering
-    return renderMarkdownUncached(filePath, urlPath);
+    return renderMarkdownUncached(filePath, urlPath, { deferBlocks: true, fileMtime });
   }
 }
 
@@ -3371,6 +3375,18 @@ async function executeDataviewJS(code, vaultPath, currentFilePath, allFiles) {
   }
 }
 
+// Replace dataview and dataviewjs blocks with placeholders the page loads
+// from /_block. Uses the same patterns as processDataviewDQLBlocks and
+// processDataviewJSBlocks, and registers each block's full markdown so
+// /_block can render it through renderMarkdownUncached.
+function deferDataviewBlocks(content, filePath, urlPath, mtime) {
+  const defer = (fullMatch) =>
+    deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'markdown', fullMatch, mtime));
+  return content
+    .replace(/```dataview\n[\s\S]*?```/g, defer)
+    .replace(/```dataviewjs\s*[\s\S]*?```/g, defer);
+}
+
 // Process dataviewjs code blocks in markdown content
 async function processDataviewJSBlocks(content, vaultPath, currentFilePath, allFiles) {
   const codeBlockRegex = /```dataviewjs\s*([\s\S]*?)```/g;
@@ -3716,6 +3732,8 @@ async function processInlineDataview(content, properties, vaultPath, currentFile
         // Inline expressions are synchronous, so we can just evaluate directly
         const fn = new Function('dv', `return ${expression}`);
         result = fn(dv);
+        // Marked so pages whose only query is inline still get a short cache TTL
+        if (result !== undefined) result = markDynamic(String(result));
       } else {
         result = fullMatch; // Keep original if we can't process
       }
@@ -4182,9 +4200,111 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 }
 
 
+// Inner HTML of a ```tasks block's result list (without the wrapper div)
+function renderTasksQueryListHtml(queryResult, showPostpone) {
+  let tasksHtml = '';
+  if (queryResult.grouped) {
+    for (const [groupKey, tasks] of queryResult.grouped) {
+      if (tasks.length === 0) continue;
+
+      // Format header
+      let dateHeader = groupKey;
+      if (queryResult.groupType !== 'custom' && groupKey !== 'No date') {
+        const d = new Date(groupKey + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        if (!isNaN(d.getTime())) {
+          if (d.toDateString() === today.toDateString()) {
+            dateHeader = 'Today';
+          } else if (d.toDateString() === tomorrow.toDateString()) {
+            dateHeader = 'Tomorrow';
+          } else {
+            dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          }
+        }
+      }
+
+      tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
+      for (const task of tasks) {
+        const checkbox = task.isDone ? 'checked' : '';
+        const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
+        const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+        // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+        let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
+        if (task.isDone && task.doneDate) {
+          const dateStr = formatDate(task.doneDate);
+          displayText += ` ✅ ${dateStr}`;
+        }
+        // Add cancelled indicator if task is cancelled
+        if (task.isCancelled) {
+          displayText += ` <span class="text-muted">(cancelled)</span>`;
+        }
+        const taskLink = task.id ? `/task/${task.id}` : '';
+        tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+        tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+        if (taskLink) {
+          tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+        } else {
+          tasksHtml += `${priorityIcon}${displayText}`;
+        }
+        if (showPostpone) tasksHtml += taskPostponeButton(task);
+        tasksHtml += `</li>\n`;
+      }
+      tasksHtml += '</ul>\n';
+    }
+  } else {
+    if (queryResult.tasks.length > 0) {
+      tasksHtml += '<ul>\n';
+      for (const task of queryResult.tasks) {
+        const checkbox = task.isDone ? 'checked' : '';
+        const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
+        const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+        let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
+        if (task.isDone && task.doneDate) {
+          const dateStr = formatDate(task.doneDate);
+          displayText += ` ✅ ${dateStr}`;
+        }
+        // Add cancelled indicator if task is cancelled
+        if (task.isCancelled) {
+          displayText += ` <span class="text-muted">(cancelled)</span>`;
+        }
+        const taskLink = task.id ? `/task/${task.id}` : '';
+        tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+        tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+        if (taskLink) {
+          tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+        } else {
+          tasksHtml += `${priorityIcon}${displayText}`;
+        }
+        if (showPostpone) tasksHtml += taskPostponeButton(task);
+        tasksHtml += `</li>\n`;
+      }
+      tasksHtml += '</ul>\n';
+    } else {
+      tasksHtml += '<p class="text-muted">No matching tasks</p>\n';
+    }
+  }
+  return tasksHtml;
+}
+
+async function renderTasksQueryResult(query, urlPath, showPostpone) {
+  const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
+  return `<div class="tasks-query-result">\n${renderTasksQueryListHtml(queryResult, showPostpone)}</div>`;
+}
+
 // Uncached Markdown rendering (original implementation)
+// Options:
+//   embed        - minimal HTML for embedding; no postpone buttons
+//   deferBlocks  - leave placeholders for query blocks; the page loads them from /_block
+//   bodyMarkdown - render this markdown instead of the file's body (the file still
+//                  supplies frontmatter); used to render a single deferred block
+//   bodyOnly     - return the rendered content HTML without the page around it
 async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   debug('renderMarkdown called for:', urlPath);
+  const fileMtime = options.fileMtime ?? null;
   let content = await fs.readFile(filePath, 'utf-8');
 
   // IMPORTANT: Save the original content BEFORE any modifications
@@ -4193,7 +4313,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
 
   // Parse YAML frontmatter
   const { properties, contentWithoutFrontmatter } = parseFrontmatter(content);
-  content = contentWithoutFrontmatter;
+  content = options.bodyMarkdown ?? contentWithoutFrontmatter;
 
   // Calculate frontmatter offset for accurate line numbers
   const frontmatterOffset = originalContent.length - contentWithoutFrontmatter.length > 0
@@ -4241,8 +4361,12 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
 
   // Process dataview code blocks before rendering (only scan vault if needed)
   const vaultPath = VAULT_PATH;
-  const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.');
-  if (hasDataview) {
+  const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.') || content.includes('$=');
+  if (hasDataview && options.deferBlocks) {
+    content = deferDataviewBlocks(content, filePath, urlPath, fileMtime);
+    // Inline expressions stay inline; they fetch the file index only if they use dv
+    content = await processInlineDataview(content, properties, vaultPath, filePath);
+  } else if (hasDataview) {
     const allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
     content = await processDataviewDQLBlocks(content, vaultPath, filePath, properties, allFiles);
     content = await processDataviewJSBlocks(content, vaultPath, filePath, allFiles);
@@ -4258,7 +4382,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   // Extract title from first H1 if it exists
   let pageTitle = path.basename(urlPath, '.md');
   let contentToRender = content;
-  const titleMatch = content.match(/^# (.+)$/m);
+  const titleMatch = options.bodyOnly ? null : content.match(/^# (.+)$/m);
   if (titleMatch) {
     pageTitle = titleMatch[1];
     // Remove the title from content so it's not duplicated
@@ -4337,95 +4461,10 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
     for (const { fullMatch, type, modifier, title, query, additionalContent } of matches) {
       debug(`Processing Obsidian callout with tasks query`);
 
-      // Execute the tasks query
-      const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
-
-      // Build the tasks HTML
-      let tasksHtml = '';
-      if (queryResult.grouped) {
-        for (const [groupKey, tasks] of queryResult.grouped) {
-          if (tasks.length === 0) continue;
-
-          // Format header
-          let dateHeader = groupKey;
-          if (queryResult.groupType !== 'custom' && groupKey !== 'No date') {
-            const d = new Date(groupKey + 'T00:00:00');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            if (!isNaN(d.getTime())) {
-              if (d.toDateString() === today.toDateString()) {
-                dateHeader = 'Today';
-              } else if (d.toDateString() === tomorrow.toDateString()) {
-                dateHeader = 'Tomorrow';
-              } else {
-                dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-              }
-            }
-          }
-
-          tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
-          for (const task of tasks) {
-            const checkbox = task.isDone ? 'checked' : '';
-            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
-            if (task.isDone && task.doneDate) {
-              const dateStr = formatDate(task.doneDate);
-              displayText += ` ✅ ${dateStr}`;
-            }
-            // Add cancelled indicator if task is cancelled
-            if (task.isCancelled) {
-              displayText += ` <span class="text-muted">(cancelled)</span>`;
-            }
-            const taskLink = task.id ? `/task/${task.id}` : '';
-            tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-            if (taskLink) {
-              tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-            } else {
-              tasksHtml += `${priorityIcon}${displayText}`;
-            }
-            if (showPostpone) tasksHtml += taskPostponeButton(task);
-            tasksHtml += `</li>\n`;
-          }
-          tasksHtml += '</ul>\n';
-        }
-      } else {
-        if (queryResult.tasks.length > 0) {
-          tasksHtml += '<ul>\n';
-          for (const task of queryResult.tasks) {
-            const checkbox = task.isDone ? 'checked' : '';
-            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-            const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
-            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
-            if (task.isDone && task.doneDate) {
-              const dateStr = formatDate(task.doneDate);
-              displayText += ` ✅ ${dateStr}`;
-            }
-            // Add cancelled indicator if task is cancelled
-            if (task.isCancelled) {
-              displayText += ` <span class="text-muted">(cancelled)</span>`;
-            }
-            const taskLink = task.id ? `/task/${task.id}` : '';
-            tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-            if (taskLink) {
-              tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-            } else {
-              tasksHtml += `${priorityIcon}${displayText}`;
-            }
-            if (showPostpone) tasksHtml += taskPostponeButton(task);
-            tasksHtml += `</li>\n`;
-          }
-          tasksHtml += '</ul>\n';
-        } else {
-          tasksHtml += '<p class="text-muted">No matching tasks</p>\n';
-        }
-      }
+      // Execute the tasks query, or leave a placeholder the browser fills in
+      const tasksResultHtml = options.deferBlocks
+        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
+        : await renderTasksQueryResult(query, urlPath, showPostpone);
 
       // Build the callout HTML
       const calloutType = type.toLowerCase();
@@ -4436,9 +4475,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
       const replacement = `<details${openAttr} class="task-section callout-${calloutType}">
 <summary>${calloutTitle}</summary>
 <div class="section-content">
-<div class="tasks-query-result">
-${tasksHtml}
-</div>
+${tasksResultHtml}
 ${additionalContent.trim()}
 </div>
 </details>`;
@@ -4484,94 +4521,9 @@ ${cleanContent}
     }
 
     for (const { fullMatch, query } of matches) {
-      const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
-
-      let replacement = '<div class="tasks-query-result">\n';
-
-      if (queryResult.grouped) {
-        for (const [groupKey, tasks] of queryResult.grouped) {
-          if (tasks.length === 0) continue;
-
-          let dateHeader = groupKey;
-          if (queryResult.groupType !== 'custom' && groupKey !== 'No date') {
-            const d = new Date(groupKey + 'T00:00:00');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            if (!isNaN(d.getTime())) {
-              if (d.toDateString() === today.toDateString()) {
-                dateHeader = 'Today';
-              } else if (d.toDateString() === tomorrow.toDateString()) {
-                dateHeader = 'Tomorrow';
-              } else {
-                dateHeader = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-              }
-            }
-          }
-
-          replacement += `<h4>${dateHeader}</h4>\n<ul>\n`;
-          for (const task of tasks) {
-            const checkbox = task.isDone ? 'checked' : '';
-            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-            const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
-            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
-            if (task.isDone && task.doneDate) {
-              const dateStr = formatDate(task.doneDate);
-              displayText += ` ✅ ${dateStr}`;
-            }
-            if (task.isCancelled) {
-              displayText += ` <span class="text-muted">(cancelled)</span>`;
-            }
-
-            const taskLink = task.id ? `/task/${task.id}` : '';
-            replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-            if (taskLink) {
-              replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-            } else {
-              replacement += `${priorityIcon}${displayText}`;
-            }
-            if (showPostpone) replacement += taskPostponeButton(task);
-            replacement += `</li>\n`;
-          }
-          replacement += '</ul>\n';
-        }
-      } else {
-        if (queryResult.tasks.length > 0) {
-          replacement += '<ul>\n';
-          for (const task of queryResult.tasks) {
-            const checkbox = task.isDone ? 'checked' : '';
-            const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-            const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
-            let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
-            if (task.isDone && task.doneDate) {
-              const dateStr = formatDate(task.doneDate);
-              displayText += ` ✅ ${dateStr}`;
-            }
-            if (task.isCancelled) {
-              displayText += ` <span class="text-muted">(cancelled)</span>`;
-            }
-
-            const taskLink = task.id ? `/task/${task.id}` : '';
-            replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-            replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-            if (taskLink) {
-              replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-            } else {
-              replacement += `${priorityIcon}${displayText}`;
-            }
-            if (showPostpone) replacement += taskPostponeButton(task);
-            replacement += `</li>\n`;
-          }
-          replacement += '</ul>\n';
-        } else {
-          replacement += '<p class="text-muted">No matching tasks</p>\n';
-        }
-      }
-
-      replacement += '</div>';
+      const replacement = options.deferBlocks
+        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
+        : await renderTasksQueryResult(query, urlPath, showPostpone);
       result = result.replace(fullMatch, replacement);
     }
 
@@ -4746,6 +4698,8 @@ ${cleanContent}
   // Make regular markdown tasks with task-id comments clickable
   // Tasks are now rendered with links directly from the tasks table
   // No post-processing needed for task links
+
+  if (options.bodyOnly) return htmlContent;
 
   const fileName = pageTitle || path.basename(urlPath);
 
@@ -5243,6 +5197,7 @@ ${cleanContent}
               
               // Replace the content
               currentContent.innerHTML = newContent.innerHTML;
+              loadDeferredBlocks(currentContent);
               
               // Restore scroll position
               currentContent.scrollTop = scrollTop;
@@ -5293,6 +5248,24 @@ ${cleanContent}
           return;
         }
         
+        // Fill in query blocks the server left as placeholders (see src/deferred-blocks.js)
+        function loadDeferredBlocks(root) {
+          root.querySelectorAll('.deferred-block[data-deferred-src]').forEach(async function(block) {
+            try {
+              const response = await fetch(block.dataset.deferredSrc, { credentials: 'same-origin' });
+              // A redirect means the session expired and we got the login page
+              if (response.redirected) { location.reload(); return; }
+              block.outerHTML = await response.text();
+            } catch (error) {
+              console.error('Error loading deferred block:', error);
+              block.innerHTML = '<span class="text-danger small">Could not load this section. <a href="javascript:location.reload()">Reload</a></span>';
+            }
+          });
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+          loadDeferredBlocks(document);
+        });
+
         // Add interactivity to task checkboxes using event delegation
         document.addEventListener('DOMContentLoaded', function() {
           console.log('DOMContentLoaded - Setting up event handlers');
@@ -5467,6 +5440,64 @@ async function renderMarkdown(filePath, urlPath) {
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
+
+// Resolve a vault-relative URL path to a markdown file the way the vault
+// route does (with an implicit .md extension), or null if there isn't one.
+async function resolveVaultMarkdownFile(urlPath) {
+  const candidates = [path.join(VAULT_PATH, urlPath)];
+  if (!path.extname(urlPath)) candidates.push(candidates[0] + '.md');
+  for (const candidate of candidates) {
+    const relative = path.relative(VAULT_PATH, candidate);
+    if (relative.startsWith('..') || path.isAbsolute(relative) || !candidate.endsWith('.md')) continue;
+    try {
+      const stats = await fs.stat(candidate);
+      if (stats.isFile()) return { filePath: candidate, mtime: stats.mtime.getTime() };
+    } catch {
+      // try the next candidate
+    }
+  }
+  return null;
+}
+
+// Render one deferred query block (see src/deferred-blocks.js)
+app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
+  const urlPath = typeof req.query.path === 'string' ? req.query.path : '';
+  const id = typeof req.query.id === 'string' ? req.query.id : '';
+  res.set('Cache-Control', 'no-store');
+  try {
+    let block = deferredBlocks.get(urlPath, id);
+    let needsRegistration = !block;
+    if (block) {
+      const currentFile = await resolveVaultMarkdownFile(urlPath);
+      if (!currentFile || currentFile.mtime !== block.mtime) {
+        deferredBlocks.invalidatePage(urlPath);
+        block = null;
+        needsRegistration = true;
+      }
+    }
+    if (needsRegistration) {
+      // Not registered since the last restart or file change: re-render the
+      // page shell (cheap, since it runs no queries) to register its blocks.
+      const currentFile = await resolveVaultMarkdownFile(urlPath);
+      if (currentFile) {
+        await renderMarkdownUncached(currentFile.filePath, urlPath, { deferBlocks: true, fileMtime: currentFile.mtime });
+        block = deferredBlocks.get(urlPath, id);
+      }
+    }
+    if (!block) {
+      // The block was edited or removed since the page was rendered
+      return res.status(404).send('<div class="alert alert-warning small mb-0">This section has changed. <a href="javascript:location.reload()">Reload the page</a> to see it.</div>');
+    }
+
+    const html = block.kind === 'tasks'
+      ? await renderTasksQueryResult(block.source, block.urlPath, true)
+      : await renderMarkdownUncached(block.filePath, block.urlPath, { bodyMarkdown: block.source, bodyOnly: true });
+    res.send(html);
+  } catch (error) {
+    console.error(`Error rendering deferred block ${id} of ${urlPath}:`, error);
+    res.status(500).send(`<div class="alert alert-danger small mb-0">Couldn't load this section: ${escapeHtmlEntities(error.message)}</div>`);
+  }
+});
 
 // Cache status endpoint
 app.get('/_cache/status', sessionAuth, (req, res) => {
@@ -8042,7 +8073,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
     let fullPath = path.join(VAULT_PATH, urlPath);
 
     // Security: prevent directory traversal
-    if (!fullPath.startsWith(VAULT_PATH)) {
+    const relativePath = path.relative(VAULT_PATH, fullPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return res.status(403).send('Access denied');
     }
 
@@ -8054,7 +8086,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
       if (error.code === 'ENOENT' && !path.extname(urlPath)) {
         // No extension and file not found - try adding .md
         const mdPath = fullPath + '.md';
-        if (mdPath.startsWith(VAULT_PATH)) {
+        const mdRelativePath = path.relative(VAULT_PATH, mdPath);
+        if (!mdRelativePath.startsWith('..') && !path.isAbsolute(mdRelativePath)) {
           try {
             stats = await fs.stat(mdPath);
             fullPath = mdPath;
