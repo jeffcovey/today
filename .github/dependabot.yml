@@ -28,3 +28,8 @@ updates:
       # Ignore major updates for sqlite3 due to tar vulnerability workaround
       - dependency-name: "sqlite3"
         update-types: ["version-update:semver-major"]
+      # Pinned to 2.26.1, the last release without node-forge: every node-forge
+      # release is covered by GHSA-86w9-cpqp-85rv and none is patched (#551).
+      # Remove this (and the exact pin in package.json) once dotenvx ships a
+      # release whose dependencies pass `npm audit --omit=dev`.
+      - dependency-name: "@dotenvx/dotenvx"

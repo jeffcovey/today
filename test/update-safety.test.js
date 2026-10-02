@@ -1,5 +1,5 @@
-import { execSync } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { execSync as nodeExecSync } from 'child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { jest } from '@jest/globals';
@@ -9,12 +9,19 @@ import {
   stashUpdateChanges
 } from '../bin/lib/update-safety.js';
 
-// When jest runs from a git hook, GIT_DIR/GIT_INDEX_FILE point at the real
-// repository, and git would act on it instead of the temp fixture repo. This
-// covers the fixture setup and the git commands bin/lib/update-safety.js runs
-// (stash push/pop, merge --quit) through the exec it's handed.
-const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-const exec = (command, options = {}) => execSync(command, { ...options, env: gitEnv });
+// Git exports repository variables to its hooks, and the pre-push hook runs this
+// suite. Run every command without them so Git acts on the temp fixture rather
+// than the real repository.
+const repoEnvVars = nodeExecSync('git rev-parse --local-env-vars', { encoding: 'utf8' })
+  .split('\n')
+  .filter(Boolean);
+const withoutRepoEnv = env => Object.fromEntries(
+  Object.entries(env).filter(([name]) => !repoEnvVars.includes(name))
+);
+const exec = (command, options = {}) => nodeExecSync(command, {
+  ...options,
+  env: withoutRepoEnv(options.env ?? process.env)
+});
 
 describe('update safety', () => {
   let projectRoot;
@@ -32,6 +39,64 @@ describe('update safety', () => {
   afterEach(() => {
     rmSync(projectRoot, { recursive: true, force: true });
     jest.restoreAllMocks();
+  });
+
+  test('git ignores inherited repository variables and leaves their repo untouched', () => {
+    const victimRoot = mkdtempSync(path.join(tmpdir(), 'today-update-safety-victim-'));
+    try {
+      exec('git init -b main', { cwd: victimRoot, stdio: 'pipe' });
+      exec('git config user.email victim@example.test', { cwd: victimRoot, stdio: 'pipe' });
+      exec('git config user.name "Victim Test"', { cwd: victimRoot, stdio: 'pipe' });
+      writeFileSync(path.join(victimRoot, 'victim.txt'), 'victim\n');
+      exec('git add victim.txt && git commit -m initial', {
+        cwd: victimRoot,
+        stdio: 'pipe'
+      });
+
+      const pollutedEnv = {
+        ...process.env,
+        GIT_DIR: path.join(victimRoot, '.git'),
+        GIT_WORK_TREE: victimRoot
+      };
+      const rawGitDir = nodeExecSync('git rev-parse --absolute-git-dir', {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        env: pollutedEnv
+      }).trim();
+      expect(realpathSync(rawGitDir)).toBe(realpathSync(path.join(victimRoot, '.git')));
+
+      const gitDir = exec('git rev-parse --absolute-git-dir', {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        env: pollutedEnv
+      }).trim();
+      expect(realpathSync(gitDir)).toBe(realpathSync(path.join(projectRoot, '.git')));
+
+      const victimConfig = readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8');
+      const victimCommitCount = exec('git rev-list --count HEAD', {
+        cwd: victimRoot,
+        encoding: 'utf8'
+      }).trim();
+      exec('git config user.name "Updated Test"', {
+        cwd: projectRoot,
+        env: pollutedEnv,
+        stdio: 'pipe'
+      });
+      writeFileSync(path.join(projectRoot, 'tracked.txt'), 'updated\n');
+      exec('git add tracked.txt && git commit -m updated', {
+        cwd: projectRoot,
+        env: pollutedEnv,
+        stdio: 'pipe'
+      });
+
+      expect(readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8')).toBe(victimConfig);
+      expect(exec('git rev-list --count HEAD', {
+        cwd: victimRoot,
+        encoding: 'utf8'
+      }).trim()).toBe(victimCommitCount);
+    } finally {
+      rmSync(victimRoot, { recursive: true, force: true });
+    }
   });
 
   describe('ensureBetterSqliteBinding', () => {
