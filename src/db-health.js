@@ -46,11 +46,53 @@ const CORRUPTION_MESSAGES = [
   'file is not a database',
 ];
 
-function isCorruptionError(error) {
+export function isCorruptionError(error) {
   const code = typeof error?.code === 'string' ? error.code : '';
   const message = error?.message || '';
   return CORRUPTION_CODES.some(c => code.startsWith(c)) ||
          CORRUPTION_MESSAGES.some(m => message.includes(m));
+}
+
+/**
+ * Decide whether a sync database error warrants a recovery and retry.
+ * Non-database errors are rethrown unchanged; SQLite availability errors are
+ * reported without modifying the database.
+ */
+export async function recoverFromSyncError(syncError, {
+  verbose = true,
+  allowRetry = true,
+  closeDatabase,
+} = {}) {
+  if (!isCorruptionError(syncError)) {
+    if (typeof syncError?.code === 'string' && syncError.code.startsWith('SQLITE_')) {
+      const description = syncError.code.startsWith('SQLITE_BUSY')
+        ? 'Database is locked'
+        : syncError.code.startsWith('SQLITE_CANTOPEN') || syncError.code.startsWith('SQLITE_IOERR')
+          ? 'Database cannot be opened or accessed'
+          : 'SQLite database error';
+      const databaseStatus = allowRetry
+        ? 'Database was left untouched.'
+        : 'No additional database recovery was attempted.';
+      const error = new Error(
+        `${description} during sync (${syncError.code}): ${syncError.message}. ${databaseStatus}`,
+        { cause: syncError }
+      );
+      error.code = syncError.code;
+      throw error;
+    }
+    throw syncError;
+  }
+
+  if (!allowRetry) return false;
+
+  await closeDatabase?.();
+  const recovery = await ensureHealthyDatabase({ verbose, forceIntegrityCheck: true });
+  if (!recovery.success) {
+    throw new Error(`Failed to recover database after sync error: ${recovery.message}`, {
+      cause: syncError,
+    });
+  }
+  return recovery.recreated;
 }
 
 /**
@@ -299,10 +341,15 @@ export async function createFreshDatabase() {
  * @param {Object} options
  * @param {boolean} options.verbose - Print status messages
  * @param {boolean} options.forceRecreate - Force database recreation
+ * @param {boolean} options.forceIntegrityCheck - Run PRAGMA integrity_check even if recently checked
  * @returns {Promise<Object>} { success: boolean, recreated: boolean, message: string }
  */
 export async function ensureHealthyDatabase(options = {}) {
-  const { verbose = true, forceRecreate = false } = options;
+  const {
+    verbose = true,
+    forceRecreate = false,
+    forceIntegrityCheck = false,
+  } = options;
 
   const log = (msg) => { if (verbose) console.log(msg); };
   const warn = (msg) => { if (verbose) console.log(`⚠️  ${msg}`); };
@@ -325,7 +372,7 @@ export async function ensureHealthyDatabase(options = {}) {
     const stampAge = fs.existsSync(INTEGRITY_CHECK_STAMP)
       ? Date.now() - fs.statSync(INTEGRITY_CHECK_STAMP).mtimeMs
       : Infinity;
-    if (stampAge < INTEGRITY_CHECK_INTERVAL_MS) {
+    if (!forceIntegrityCheck && stampAge < INTEGRITY_CHECK_INTERVAL_MS) {
       skipIntegrityCheck = true;
     } else {
       // Pre-claim: write stamp now so concurrent processes skip the check.
