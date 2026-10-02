@@ -9,19 +9,16 @@ import {
   stashUpdateChanges
 } from '../bin/lib/update-safety.js';
 
-// Git exports GIT_DIR and friends to its hooks, and the pre-push hook runs this
-// suite. With those inherited, every `git` below would ignore `cwd` and act on
-// the real repository — reinitialising it, rewriting its config and committing
-// to the branch being pushed. Run every command without them. (Deleting them
-// from `process.env` is not enough: Jest's `process.env` is a copy, and child
-// processes inherit the real one.)
+// Git exports repository variables to its hooks, and the pre-push hook runs this
+// suite. Run every command without them so Git acts on the temp fixture rather
+// than the real repository.
 const repoEnvVars = nodeExecSync('git rev-parse --local-env-vars', { encoding: 'utf8' })
   .split('\n')
   .filter(Boolean);
 const withoutRepoEnv = env => Object.fromEntries(
   Object.entries(env).filter(([name]) => !repoEnvVars.includes(name))
 );
-const execSync = (command, options = {}) => nodeExecSync(command, {
+const exec = (command, options = {}) => nodeExecSync(command, {
   ...options,
   env: withoutRepoEnv(options.env ?? process.env)
 });
@@ -32,11 +29,11 @@ describe('update safety', () => {
   beforeEach(() => {
     projectRoot = mkdtempSync(path.join(tmpdir(), 'today-update-safety-'));
     mkdirSync(path.join(projectRoot, '.git'));
-    execSync('git init -b main', { cwd: projectRoot, stdio: 'pipe' });
-    execSync('git config user.email today@example.test', { cwd: projectRoot, stdio: 'pipe' });
-    execSync('git config user.name "Today Test"', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git init -b main', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git config user.email today@example.test', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git config user.name "Today Test"', { cwd: projectRoot, stdio: 'pipe' });
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'committed\n');
-    execSync('git add tracked.txt && git commit -m initial', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git add tracked.txt && git commit -m initial', { cwd: projectRoot, stdio: 'pipe' });
   });
 
   afterEach(() => {
@@ -47,11 +44,11 @@ describe('update safety', () => {
   test('git ignores inherited repository variables and leaves their repo untouched', () => {
     const victimRoot = mkdtempSync(path.join(tmpdir(), 'today-update-safety-victim-'));
     try {
-      execSync('git init -b main', { cwd: victimRoot, stdio: 'pipe' });
-      execSync('git config user.email victim@example.test', { cwd: victimRoot, stdio: 'pipe' });
-      execSync('git config user.name "Victim Test"', { cwd: victimRoot, stdio: 'pipe' });
+      exec('git init -b main', { cwd: victimRoot, stdio: 'pipe' });
+      exec('git config user.email victim@example.test', { cwd: victimRoot, stdio: 'pipe' });
+      exec('git config user.name "Victim Test"', { cwd: victimRoot, stdio: 'pipe' });
       writeFileSync(path.join(victimRoot, 'victim.txt'), 'victim\n');
-      execSync('git add victim.txt && git commit -m initial', {
+      exec('git add victim.txt && git commit -m initial', {
         cwd: victimRoot,
         stdio: 'pipe'
       });
@@ -68,7 +65,7 @@ describe('update safety', () => {
       }).trim();
       expect(realpathSync(rawGitDir)).toBe(realpathSync(path.join(victimRoot, '.git')));
 
-      const gitDir = execSync('git rev-parse --absolute-git-dir', {
+      const gitDir = exec('git rev-parse --absolute-git-dir', {
         cwd: projectRoot,
         encoding: 'utf8',
         env: pollutedEnv
@@ -76,24 +73,24 @@ describe('update safety', () => {
       expect(realpathSync(gitDir)).toBe(realpathSync(path.join(projectRoot, '.git')));
 
       const victimConfig = readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8');
-      const victimCommitCount = execSync('git rev-list --count HEAD', {
+      const victimCommitCount = exec('git rev-list --count HEAD', {
         cwd: victimRoot,
         encoding: 'utf8'
       }).trim();
-      execSync('git config user.name "Updated Test"', {
+      exec('git config user.name "Updated Test"', {
         cwd: projectRoot,
         env: pollutedEnv,
         stdio: 'pipe'
       });
       writeFileSync(path.join(projectRoot, 'tracked.txt'), 'updated\n');
-      execSync('git add tracked.txt && git commit -m updated', {
+      exec('git add tracked.txt && git commit -m updated', {
         cwd: projectRoot,
         env: pollutedEnv,
         stdio: 'pipe'
       });
 
       expect(readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8')).toBe(victimConfig);
-      expect(execSync('git rev-list --count HEAD', {
+      expect(exec('git rev-list --count HEAD', {
         cwd: victimRoot,
         encoding: 'utf8'
       }).trim()).toBe(victimCommitCount);
@@ -181,15 +178,15 @@ describe('update safety', () => {
   test('restores a named update stash on startup', () => {
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'local change\n');
     writeFileSync(path.join(projectRoot, 'untracked.txt'), 'untracked change\n');
-    const updateStash = stashUpdateChanges(projectRoot, execSync);
-    const head = execSync('git rev-parse HEAD', {
+    const updateStash = stashUpdateChanges(projectRoot, exec);
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
 
     expect(existsSync(path.join(projectRoot, 'untracked.txt'))).toBe(false);
-    expect(recoverInterruptedUpdate(projectRoot, execSync)).toBe(true);
+    expect(recoverInterruptedUpdate(projectRoot, exec)).toBe(true);
     expect(readFileSync(path.join(projectRoot, 'tracked.txt'), 'utf8')).toBe('local change\n');
     expect(readFileSync(path.join(projectRoot, 'untracked.txt'), 'utf8')).toBe('untracked change\n');
     expect(existsSync(updateStash.markerPath)).toBe(false);
@@ -197,27 +194,27 @@ describe('update safety', () => {
   });
 
   test('clears merge metadata when the merge commit is already complete', () => {
-    const head = execSync('git rev-parse HEAD', {
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
 
-    expect(recoverInterruptedUpdate(projectRoot, execSync)).toBe(true);
+    expect(recoverInterruptedUpdate(projectRoot, exec)).toBe(true);
     expect(existsSync(path.join(projectRoot, '.git', 'MERGE_HEAD'))).toBe(false);
   });
 
   test('reports merge metadata that cannot safely be cleared', () => {
     const logger = { error: jest.fn(), log: jest.fn() };
-    const head = execSync('git rev-parse HEAD', {
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'staged change\n');
-    execSync('git add tracked.txt', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git add tracked.txt', { cwd: projectRoot, stdio: 'pipe' });
 
-    expect(recoverInterruptedUpdate(projectRoot, execSync, logger)).toBe(false);
+    expect(recoverInterruptedUpdate(projectRoot, exec, logger)).toBe(false);
     expect(existsSync(path.join(projectRoot, '.git', 'MERGE_HEAD'))).toBe(true);
     expect(logger.error).toHaveBeenCalledWith(
       '⚠️  An unfinished or unresolved merge is present. Resolve it before updating.'
