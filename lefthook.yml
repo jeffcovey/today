@@ -45,6 +45,9 @@ pre-commit:
       root: "src/"
       run: |
         echo "JavaScript source files changed, running tests..."
+        # Git exports GIT_DIR and friends to hooks. Drop them so a test that
+        # spawns git in a temp directory cannot act on this repository (#555).
+        unset $(git rev-parse --local-env-vars)
         npm test -- --bail --passWithNoTests --findRelatedTests {staged_files}
         echo "✅ All tests passed!"
 
@@ -78,4 +81,7 @@ pre-push:
       fail_text: ""
 
     all-tests:
-      run: npm test
+      run: |
+        # See the note on test-related above (#555).
+        unset $(git rev-parse --local-env-vars)
+        npm test
