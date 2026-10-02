@@ -21,6 +21,7 @@ const {
   createFreshDatabase,
   ensureHealthyDatabase,
   isCorruptionError,
+  recoverFromSyncError,
 } = await import('../src/db-health.js');
 
 const DB = '.data/today.db';
@@ -192,6 +193,61 @@ describe('db-health', () => {
       [undefined, 'disk I/O error'],
     ])('does not classify %s / %s as corruption', (code, message) => {
       expect(isCorruptionError(sqliteError(code, message))).toBe(false);
+    });
+  });
+
+  describe('sync error recovery', () => {
+    test('a locked database is reported untouched and not recreated', async () => {
+      await seedDatabase();
+      const before = fs.readFileSync(DB);
+      const error = sqliteError('SQLITE_BUSY', 'database is locked');
+
+      await expect(recoverFromSyncError(error)).rejects.toMatchObject({
+        code: 'SQLITE_BUSY',
+        message: expect.stringContaining('Database is locked'),
+      });
+
+      expect(fs.readFileSync(DB).equals(before)).toBe(true);
+      expect(canary()).toBe('still here');
+    });
+
+    test('corruption is detected despite a fresh integrity-check stamp', async () => {
+      fs.mkdirSync('.data');
+      fs.writeFileSync(DB, 'this is not a sqlite database '.repeat(200));
+      fs.writeFileSync('.data/.last-integrity-check', '');
+
+      await expect(
+        recoverFromSyncError(sqliteError('SQLITE_CORRUPT', 'database disk image is malformed'), {
+          verbose: false,
+        })
+      ).resolves.toBe(true);
+
+      expect(checkDatabaseHealth().healthy).toBe(true);
+    });
+
+    test('does not recreate when a forced integrity check passes', async () => {
+      await seedDatabase();
+      fs.writeFileSync('.data/.last-integrity-check', '');
+      const future = new Date(Date.now() + 60_000);
+      fs.utimesSync('.data/.last-integrity-check', future, future);
+      const freshStampTime = fs.statSync('.data/.last-integrity-check').mtimeMs;
+      const before = fs.readFileSync(DB);
+
+      await expect(
+        recoverFromSyncError(sqliteError('SQLITE_CORRUPT', 'database disk image is malformed'), {
+          verbose: false,
+        })
+      ).resolves.toBe(false);
+
+      expect(fs.statSync('.data/.last-integrity-check').mtimeMs).toBeLessThan(freshStampTime);
+      expect(fs.readFileSync(DB).equals(before)).toBe(true);
+      expect(canary()).toBe('still here');
+    });
+
+    test('rethrows non-database errors unchanged', async () => {
+      const error = new Error('plugin network unavailable');
+
+      await expect(recoverFromSyncError(error)).rejects.toBe(error);
     });
   });
 

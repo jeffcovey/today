@@ -37,7 +37,7 @@ import { getAbsoluteVaultPath, getConfigPath } from '../src/config.js';
 import { parse as parseToml } from 'smol-toml';
 import { getDatabase } from '../src/database-service.js';
 import { getDataContextCached } from '../src/context-cache.js';
-import { ensureHealthyDatabase, isCorruptionError } from '../src/db-health.js';
+import { ensureHealthyDatabase, recoverFromSyncError } from '../src/db-health.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { program } from 'commander';
@@ -484,40 +484,26 @@ displaying results. Use 'bin/plugins sync' to force an immediate refresh.
       }
       return; // Success - exit the retry loop
     } catch (error) {
-      if (isCorruptionError(error) && retryCount < maxRetries) {
+      const shouldRetry = await recoverFromSyncError(error, {
+        verbose: true,
+        allowRetry: retryCount < maxRetries,
+        closeDatabase: async () => {
+          try {
+            const db = getDatabase();
+            await db.close();
+          } catch {
+            // Ignore close errors
+          }
+        },
+      });
+      if (shouldRetry) {
         retryCount++;
         console.log('');
-        console.log(colors.yellow(`⚠️  Database error detected: ${error.message}`));
-        console.log(colors.cyan('🔄 Recreating database and retrying sync...'));
+        console.log(colors.yellow(`⚠️  Database corruption detected: ${error.message}`));
+        console.log(colors.cyan('🔄 Database recreated; retrying sync...'));
         console.log('');
-
-        // Close existing connection and clear singleton
-        try {
-          const db = getDatabase();
-          await db.close();
-        } catch {
-          // Ignore close errors
-        }
-
-        // Re-check health before recreation so recovery follows the same
-        // backup policy as startup recovery.
-        const recovery = await ensureHealthyDatabase({ verbose: true });
-        if (!recovery.success) {
-          console.error(colors.red('Failed to recover database'));
-          process.exit(1);
-        }
-
-        if (!recovery.recreated) {
-          throw new Error(`Sync failed: ${error.message}. Database was not recreated.`, { cause: error });
-        }
-
-        console.log(colors.green('✅ Database recreated successfully'));
-        console.log('');
-
-        // Continue to retry
       } else {
-        // Non-recoverable error or max retries exceeded
-        throw new Error(`Sync failed: ${error.message}. Database was not recreated.`, { cause: error });
+        throw error;
       }
     }
   }
