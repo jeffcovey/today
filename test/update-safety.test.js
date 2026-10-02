@@ -18,10 +18,13 @@ import {
 const repoEnvVars = nodeExecSync('git rev-parse --local-env-vars', { encoding: 'utf8' })
   .split('\n')
   .filter(Boolean);
-const cleanEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([name]) => !repoEnvVars.includes(name))
+const withoutRepoEnv = env => Object.fromEntries(
+  Object.entries(env).filter(([name]) => !repoEnvVars.includes(name))
 );
-const execSync = (command, options = {}) => nodeExecSync(command, { ...options, env: cleanEnv });
+const execSync = (command, options = {}) => nodeExecSync(command, {
+  ...options,
+  env: withoutRepoEnv(options.env ?? process.env)
+});
 
 describe('update safety', () => {
   let projectRoot;
@@ -41,18 +44,62 @@ describe('update safety', () => {
     jest.restoreAllMocks();
   });
 
-  test('git runs against the temp repository, not one inherited from a hook', () => {
-    for (const name of repoEnvVars) {
-      expect(cleanEnv).not.toHaveProperty(name);
-    }
+  test('git ignores inherited repository variables and leaves their repo untouched', () => {
+    const victimRoot = mkdtempSync(path.join(tmpdir(), 'today-update-safety-victim-'));
+    try {
+      execSync('git init -b main', { cwd: victimRoot, stdio: 'pipe' });
+      execSync('git config user.email victim@example.test', { cwd: victimRoot, stdio: 'pipe' });
+      execSync('git config user.name "Victim Test"', { cwd: victimRoot, stdio: 'pipe' });
+      writeFileSync(path.join(victimRoot, 'victim.txt'), 'victim\n');
+      execSync('git add victim.txt && git commit -m initial', {
+        cwd: victimRoot,
+        stdio: 'pipe'
+      });
 
-    // Under the pre-push hook, an inherited GIT_DIR would make this resolve to
-    // the real repository instead.
-    const gitDir = execSync('git rev-parse --absolute-git-dir', {
-      cwd: projectRoot,
-      encoding: 'utf8'
-    }).trim();
-    expect(realpathSync(gitDir)).toBe(realpathSync(path.join(projectRoot, '.git')));
+      const pollutedEnv = {
+        ...process.env,
+        GIT_DIR: path.join(victimRoot, '.git'),
+        GIT_WORK_TREE: victimRoot
+      };
+      const rawGitDir = nodeExecSync('git rev-parse --absolute-git-dir', {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        env: pollutedEnv
+      }).trim();
+      expect(realpathSync(rawGitDir)).toBe(realpathSync(path.join(victimRoot, '.git')));
+
+      const gitDir = execSync('git rev-parse --absolute-git-dir', {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        env: pollutedEnv
+      }).trim();
+      expect(realpathSync(gitDir)).toBe(realpathSync(path.join(projectRoot, '.git')));
+
+      const victimConfig = readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8');
+      const victimCommitCount = execSync('git rev-list --count HEAD', {
+        cwd: victimRoot,
+        encoding: 'utf8'
+      }).trim();
+      execSync('git config user.name "Updated Test"', {
+        cwd: projectRoot,
+        env: pollutedEnv,
+        stdio: 'pipe'
+      });
+      writeFileSync(path.join(projectRoot, 'tracked.txt'), 'updated\n');
+      execSync('git add tracked.txt && git commit -m updated', {
+        cwd: projectRoot,
+        env: pollutedEnv,
+        stdio: 'pipe'
+      });
+
+      expect(readFileSync(path.join(victimRoot, '.git', 'config'), 'utf8')).toBe(victimConfig);
+      expect(execSync('git rev-list --count HEAD', {
+        cwd: victimRoot,
+        encoding: 'utf8'
+      }).trim()).toBe(victimCommitCount);
+    } finally {
+      rmSync(victimRoot, { recursive: true, force: true });
+    }
   });
 
   describe('ensureBetterSqliteBinding', () => {
