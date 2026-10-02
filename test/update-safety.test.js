@@ -9,17 +9,24 @@ import {
   stashUpdateChanges
 } from '../bin/lib/update-safety.js';
 
+// When jest runs from a git hook, GIT_DIR/GIT_INDEX_FILE point at the real
+// repository, and git would act on it instead of the temp fixture repo. This
+// covers the fixture setup and the git commands bin/lib/update-safety.js runs
+// (stash push/pop, merge --quit) through the exec it's handed.
+const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+const exec = (command, options = {}) => execSync(command, { ...options, env: gitEnv });
+
 describe('update safety', () => {
   let projectRoot;
 
   beforeEach(() => {
     projectRoot = mkdtempSync(path.join(tmpdir(), 'today-update-safety-'));
     mkdirSync(path.join(projectRoot, '.git'));
-    execSync('git init -b main', { cwd: projectRoot, stdio: 'pipe' });
-    execSync('git config user.email today@example.test', { cwd: projectRoot, stdio: 'pipe' });
-    execSync('git config user.name Today Test', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git init -b main', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git config user.email today@example.test', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git config user.name "Today Test"', { cwd: projectRoot, stdio: 'pipe' });
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'committed\n');
-    execSync('git add tracked.txt && git commit -m initial', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git add tracked.txt && git commit -m initial', { cwd: projectRoot, stdio: 'pipe' });
   });
 
   afterEach(() => {
@@ -106,15 +113,15 @@ describe('update safety', () => {
   test('restores a named update stash on startup', () => {
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'local change\n');
     writeFileSync(path.join(projectRoot, 'untracked.txt'), 'untracked change\n');
-    const updateStash = stashUpdateChanges(projectRoot, execSync);
-    const head = execSync('git rev-parse HEAD', {
+    const updateStash = stashUpdateChanges(projectRoot, exec);
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
 
     expect(existsSync(path.join(projectRoot, 'untracked.txt'))).toBe(false);
-    expect(recoverInterruptedUpdate(projectRoot, execSync)).toBe(true);
+    expect(recoverInterruptedUpdate(projectRoot, exec)).toBe(true);
     expect(readFileSync(path.join(projectRoot, 'tracked.txt'), 'utf8')).toBe('local change\n');
     expect(readFileSync(path.join(projectRoot, 'untracked.txt'), 'utf8')).toBe('untracked change\n');
     expect(existsSync(updateStash.markerPath)).toBe(false);
@@ -122,27 +129,27 @@ describe('update safety', () => {
   });
 
   test('clears merge metadata when the merge commit is already complete', () => {
-    const head = execSync('git rev-parse HEAD', {
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
 
-    expect(recoverInterruptedUpdate(projectRoot, execSync)).toBe(true);
+    expect(recoverInterruptedUpdate(projectRoot, exec)).toBe(true);
     expect(existsSync(path.join(projectRoot, '.git', 'MERGE_HEAD'))).toBe(false);
   });
 
   test('reports merge metadata that cannot safely be cleared', () => {
     const logger = { error: jest.fn(), log: jest.fn() };
-    const head = execSync('git rev-parse HEAD', {
+    const head = exec('git rev-parse HEAD', {
       cwd: projectRoot,
       encoding: 'utf8'
     }).trim();
     writeFileSync(path.join(projectRoot, '.git', 'MERGE_HEAD'), `${head}\n`);
     writeFileSync(path.join(projectRoot, 'tracked.txt'), 'staged change\n');
-    execSync('git add tracked.txt', { cwd: projectRoot, stdio: 'pipe' });
+    exec('git add tracked.txt', { cwd: projectRoot, stdio: 'pipe' });
 
-    expect(recoverInterruptedUpdate(projectRoot, execSync, logger)).toBe(false);
+    expect(recoverInterruptedUpdate(projectRoot, exec, logger)).toBe(false);
     expect(existsSync(path.join(projectRoot, '.git', 'MERGE_HEAD'))).toBe(true);
     expect(logger.error).toHaveBeenCalledWith(
       '⚠️  An unfinished or unresolved merge is present. Resolve it before updating.'
