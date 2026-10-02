@@ -28,11 +28,11 @@ export class DeferredBlockRegistry {
     this.entries = new Map();
   }
 
-  register(urlPath, filePath, kind, source) {
+  register(urlPath, filePath, kind, source, mtime) {
     const id = deferredBlockId(kind, source);
     const key = `${urlPath}\0${id}`;
     this.entries.delete(key); // re-insert as most recent
-    this.entries.set(key, { urlPath, filePath, kind, source });
+    this.entries.set(key, { urlPath, filePath, kind, source, mtime });
     if (this.entries.size > this.maxSize) {
       this.entries.delete(this.entries.keys().next().value);
     }
@@ -41,6 +41,13 @@ export class DeferredBlockRegistry {
 
   get(urlPath, id) {
     return this.entries.get(`${urlPath}\0${id}`) || null;
+  }
+
+  invalidatePage(urlPath) {
+    const prefix = `${urlPath}\0`;
+    for (const key of this.entries.keys()) {
+      if (key.startsWith(prefix)) this.entries.delete(key);
+    }
   }
 }
 

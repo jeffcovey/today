@@ -3423,9 +3423,9 @@ async function executeDataviewJS(code, vaultPath, currentFilePath, allFiles) {
 // from /_block. Uses the same patterns as processDataviewDQLBlocks and
 // processDataviewJSBlocks, and registers each block's full markdown so
 // /_block can render it through renderMarkdownUncached.
-function deferDataviewBlocks(content, filePath, urlPath) {
+function deferDataviewBlocks(content, filePath, urlPath, mtime) {
   const defer = (fullMatch) =>
-    deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'markdown', fullMatch));
+    deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'markdown', fullMatch, mtime));
   return content
     .replace(/```dataview\n[\s\S]*?```/g, defer)
     .replace(/```dataviewjs\s*[\s\S]*?```/g, defer);
@@ -4348,6 +4348,7 @@ async function renderTasksQueryResult(query, urlPath, showPostpone) {
 //   bodyOnly     - return the rendered content HTML without the page around it
 async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   debug('renderMarkdown called for:', urlPath);
+  const fileMtime = options.deferBlocks ? (await fs.stat(filePath)).mtime.getTime() : null;
   let content = await fs.readFile(filePath, 'utf-8');
 
   // IMPORTANT: Save the original content BEFORE any modifications
@@ -4404,9 +4405,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
 
   // Process dataview code blocks before rendering (only scan vault if needed)
   const vaultPath = path.join(process.cwd(), 'vault');
-  const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.');
+  const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.') || content.includes('$=');
   if (hasDataview && options.deferBlocks) {
-    content = deferDataviewBlocks(content, filePath, urlPath);
+    content = deferDataviewBlocks(content, filePath, urlPath, fileMtime);
     // Inline expressions stay inline; they fetch the file index only if they use dv
     content = await processInlineDataview(content, properties, vaultPath, filePath);
   } else if (hasDataview) {
@@ -4506,7 +4507,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
 
       // Execute the tasks query, or leave a placeholder the browser fills in
       const tasksResultHtml = options.deferBlocks
-        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query))
+        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
         : await renderTasksQueryResult(query, urlPath, showPostpone);
 
       // Build the callout HTML
@@ -4565,7 +4566,7 @@ ${cleanContent}
 
     for (const { fullMatch, query } of matches) {
       const replacement = options.deferBlocks
-        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query))
+        ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
         : await renderTasksQueryResult(query, urlPath, showPostpone);
       result = result.replace(fullMatch, replacement);
     }
@@ -5508,9 +5509,23 @@ app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   try {
     let block = deferredBlocks.get(urlPath, id);
-    if (!block) {
-      // Not registered since the last restart: re-render the page shell
-      // (cheap, since it runs no queries) to register its blocks
+    let needsRegistration = !block;
+    if (block) {
+      let currentMtime = null;
+      try {
+        currentMtime = (await fs.stat(block.filePath)).mtime.getTime();
+      } catch {
+        // The file may have been removed since the shell was rendered.
+      }
+      if (currentMtime !== block.mtime) {
+        deferredBlocks.invalidatePage(urlPath);
+        block = null;
+        needsRegistration = true;
+      }
+    }
+    if (needsRegistration) {
+      // Not registered since the last restart or file change: re-render the
+      // page shell (cheap, since it runs no queries) to register its blocks.
       const filePath = await resolveVaultMarkdownFile(urlPath);
       if (filePath) {
         await renderMarkdownUncached(filePath, urlPath, { deferBlocks: true });
