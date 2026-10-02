@@ -2,6 +2,7 @@
 
 import { sendPushover } from './pushover.js';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import session from 'express-session';
 import Database from 'better-sqlite3';
 import betterSqliteSessionStore from 'better-sqlite3-session-store';
@@ -392,6 +393,13 @@ app.post("/auth/login", express.urlencoded({extended:true}), (req,res) => {
 app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/auth/login")));
 
 const authMiddleware = sessionAuth;
+const deferredBlockRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).send('<div class="alert alert-warning small mb-0">Too many sections requested. Please try again shortly.</div>')
+});
 app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAge: '1d' }));
 
 // MDBootstrap and custom styles (CSS moved to web/public/css/style.css)
@@ -2645,9 +2653,10 @@ function cleanupCache() {
 
 // Get cached render or generate new one
 async function getCachedRender(filePath, urlPath) {
+  let fileMtime = null;
   try {
     const stats = await fs.stat(filePath);
-    const mtime = stats.mtime.getTime();
+    const mtime = fileMtime = stats.mtime.getTime();
     const size = stats.size;
 
     // Create cache key from filepath + urlPath (urlPath is baked into rendered HTML for chat paths)
@@ -2686,7 +2695,7 @@ async function getCachedRender(filePath, urlPath) {
 
     // Render and cache the result
     debug(`[CACHE MISS] ${urlPath} - rendering...`);
-    const rendered = await renderMarkdownUncached(filePath, urlPath, { deferBlocks: true });
+    const rendered = await renderMarkdownUncached(filePath, urlPath, { deferBlocks: true, fileMtime });
     
     // Flag pages with dynamic content (task queries or dataview blocks) — these are
     // excluded from the disk cache because their content changes independently of
@@ -2720,7 +2729,7 @@ async function getCachedRender(filePath, urlPath) {
   } catch (error) {
     console.error(`Error in getCachedRender for ${filePath}:`, error);
     // Fall back to uncached rendering
-    return renderMarkdownUncached(filePath, urlPath, { deferBlocks: true });
+    return renderMarkdownUncached(filePath, urlPath, { deferBlocks: true, fileMtime });
   }
 }
 
@@ -4348,7 +4357,7 @@ async function renderTasksQueryResult(query, urlPath, showPostpone) {
 //   bodyOnly     - return the rendered content HTML without the page around it
 async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   debug('renderMarkdown called for:', urlPath);
-  const fileMtime = options.deferBlocks ? (await fs.stat(filePath)).mtime.getTime() : null;
+  const fileMtime = options.fileMtime ?? null;
   let content = await fs.readFile(filePath, 'utf-8');
 
   // IMPORTANT: Save the original content BEFORE any modifications
@@ -5494,7 +5503,8 @@ async function resolveVaultMarkdownFile(urlPath) {
     const relative = path.relative(VAULT_PATH, candidate);
     if (relative.startsWith('..') || path.isAbsolute(relative) || !candidate.endsWith('.md')) continue;
     try {
-      if ((await fs.stat(candidate)).isFile()) return candidate;
+      const stats = await fs.stat(candidate);
+      if (stats.isFile()) return { filePath: candidate, mtime: stats.mtime.getTime() };
     } catch {
       // try the next candidate
     }
@@ -5503,7 +5513,7 @@ async function resolveVaultMarkdownFile(urlPath) {
 }
 
 // Render one deferred query block (see src/deferred-blocks.js)
-app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
+app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, deferredBlockRateLimit, async (req, res) => {
   const urlPath = typeof req.query.path === 'string' ? req.query.path : '';
   const id = typeof req.query.id === 'string' ? req.query.id : '';
   res.set('Cache-Control', 'no-store');
@@ -5511,13 +5521,8 @@ app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
     let block = deferredBlocks.get(urlPath, id);
     let needsRegistration = !block;
     if (block) {
-      let currentMtime = null;
-      try {
-        currentMtime = (await fs.stat(block.filePath)).mtime.getTime();
-      } catch {
-        // The file may have been removed since the shell was rendered.
-      }
-      if (currentMtime !== block.mtime) {
+      const currentFile = await resolveVaultMarkdownFile(urlPath);
+      if (!currentFile || currentFile.mtime !== block.mtime) {
         deferredBlocks.invalidatePage(urlPath);
         block = null;
         needsRegistration = true;
@@ -5526,9 +5531,9 @@ app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
     if (needsRegistration) {
       // Not registered since the last restart or file change: re-render the
       // page shell (cheap, since it runs no queries) to register its blocks.
-      const filePath = await resolveVaultMarkdownFile(urlPath);
-      if (filePath) {
-        await renderMarkdownUncached(filePath, urlPath, { deferBlocks: true });
+      const currentFile = await resolveVaultMarkdownFile(urlPath);
+      if (currentFile) {
+        await renderMarkdownUncached(currentFile.filePath, urlPath, { deferBlocks: true, fileMtime: currentFile.mtime });
         block = deferredBlocks.get(urlPath, id);
       }
     }
@@ -8121,7 +8126,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
     let fullPath = path.join(VAULT_PATH, urlPath);
 
     // Security: prevent directory traversal
-    if (!fullPath.startsWith(VAULT_PATH)) {
+    const relativePath = path.relative(VAULT_PATH, fullPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return res.status(403).send('Access denied');
     }
 
@@ -8133,7 +8139,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
       if (error.code === 'ENOENT' && !path.extname(urlPath)) {
         // No extension and file not found - try adding .md
         const mdPath = fullPath + '.md';
-        if (mdPath.startsWith(VAULT_PATH)) {
+        const mdRelativePath = path.relative(VAULT_PATH, mdPath);
+        if (!mdRelativePath.startsWith('..') && !path.isAbsolute(mdRelativePath)) {
           try {
             stats = await fs.stat(mdPath);
             fullPath = mdPath;
