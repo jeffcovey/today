@@ -4240,7 +4240,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   // processing below for <pre><code class="language-tasks"> blocks.
 
   // Process dataview code blocks before rendering (only scan vault if needed)
-  const vaultPath = path.join(process.cwd(), 'vault');
+  const vaultPath = VAULT_PATH;
   const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.');
   if (hasDataview) {
     const allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
@@ -8131,7 +8131,7 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`Username: ${process.env.WEB_USER || 'admin'}`);
   console.log(`Password: ${process.env.WEB_PASSWORD || '(set WEB_PASSWORD in .env)'}`);
   // Build the vault file index now so the first dataview page doesn't wait for it
-  DataviewAPI.getCachedAllFiles(path.join(process.cwd(), 'vault')).catch((error) => {
+  DataviewAPI.getCachedAllFiles(VAULT_PATH).catch((error) => {
     console.error('Initial vault file index build failed:', error.message);
   });
 });
