@@ -43,6 +43,7 @@ import {
 // `import yaml from 'js-yaml'` throws at startup. Works on both v4 and v5.
 import * as yaml from 'js-yaml';
 import { parseFrontmatter } from './frontmatter.js';
+import { VaultFileIndex } from './vault-file-index.js';
 import { parse as parseToml } from 'smol-toml';
 import {
   chatWithFile,
@@ -2869,65 +2870,19 @@ class DataviewAPI {
     this._outputBuffer = []; // Accumulates rendered HTML
   }
 
-  // Cached version - reuses result for 5 minutes to avoid reading 13k+ files on every render
-  static _cachedFiles = null;
-  static _cachedFilesTime = 0;
-  static _cachedFilesPath = null;
-  static async getCachedAllFiles(vaultPath) {
-    const now = Date.now();
-    if (DataviewAPI._cachedFiles && DataviewAPI._cachedFilesPath === vaultPath && now - DataviewAPI._cachedFilesTime < 5 * 60 * 1000) {
-      return DataviewAPI._cachedFiles;
+  // One index per vault path. Reading all ~10k files takes seconds, so after
+  // the first build a stale index is served while it refreshes in the
+  // background (see src/vault-file-index.js).
+  static _fileIndexes = new Map();
+  static getCachedAllFiles(vaultPath) {
+    let index = DataviewAPI._fileIndexes.get(vaultPath);
+    if (!index) {
+      index = new VaultFileIndex(vaultPath, {
+        onError: (error) => console.error('Vault file index refresh failed:', error.message)
+      });
+      DataviewAPI._fileIndexes.set(vaultPath, index);
     }
-    const files = await DataviewAPI.getAllFiles(vaultPath);
-    DataviewAPI._cachedFiles = files;
-    DataviewAPI._cachedFilesTime = now;
-    DataviewAPI._cachedFilesPath = vaultPath;
-    return files;
-  }
-
-  // Get all files in the vault with their frontmatter (static method for initialization)
-  static async getAllFiles(vaultPath) {
-    const files = [];
-
-    async function walkDir(dir, relativePath = '') {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        // Skip hidden files and node_modules
-        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-
-        const fullPath = path.join(dir, entry.name);
-        const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-
-        if (entry.isDirectory()) {
-          await walkDir(fullPath, relPath);
-        } else if (entry.name.endsWith('.md')) {
-          try {
-            const content = await fs.readFile(fullPath, 'utf-8');
-            const { properties } = parseFrontmatter(content);
-
-            files.push({
-              ...(properties || {}),
-              path: relPath,
-              name: entry.name.replace('.md', ''),
-              folder: path.dirname(relPath),
-              frontmatter: properties || {},
-              file: {
-                path: relPath,
-                name: entry.name.replace('.md', ''),
-                folder: path.dirname(relPath)
-              }
-            });
-          } catch (error) {
-            // Silently skip files we can't read (error already logged in parseFrontmatter)
-            // This prevents flooding logs when scanning large vaults
-          }
-        }
-      }
-    }
-
-    await walkDir(vaultPath);
-    return files;
+    return index.get();
   }
 
   // Query pages by folder or tag (now synchronous since files are pre-loaded)
@@ -4285,7 +4240,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
   // processing below for <pre><code class="language-tasks"> blocks.
 
   // Process dataview code blocks before rendering (only scan vault if needed)
-  const vaultPath = path.join(process.cwd(), 'vault');
+  const vaultPath = VAULT_PATH;
   const hasDataview = content.includes('```dataview') || content.includes('```dataviewjs') || content.includes('=this.');
   if (hasDataview) {
     const allFiles = await DataviewAPI.getCachedAllFiles(vaultPath);
@@ -8175,6 +8130,10 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`Web server running on http://localhost:${PORT}`);
   console.log(`Username: ${process.env.WEB_USER || 'admin'}`);
   console.log(`Password: ${process.env.WEB_PASSWORD || '(set WEB_PASSWORD in .env)'}`);
+  // Build the vault file index now so the first dataview page doesn't wait for it
+  DataviewAPI.getCachedAllFiles(VAULT_PATH).catch((error) => {
+    console.error('Initial vault file index build failed:', error.message);
+  });
 });
 
 // Set server timeout to 5 minutes to match AI processing time
