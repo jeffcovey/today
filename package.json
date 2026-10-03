@@ -17,17 +17,17 @@
     "lint": "npm run lint:md"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.68",
-    "@ai-sdk/google": "^4.0.85",
-    "@ai-sdk/openai": "^4.0.81",
-    "@anthropic-ai/sdk": "^0.129.0",
+    "@ai-sdk/anthropic": "^4.0.70",
+    "@ai-sdk/google": "^4.0.87",
+    "@ai-sdk/openai": "^4.0.83",
+    "@anthropic-ai/sdk": "^0.130.0",
     "@clack/prompts": "^1.8.1",
     "@date-fns/tz": "^1.5.0",
     "@dotenvx/dotenvx": "2.26.1",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "adm-zip": "^0.6.1",
-    "ai": "^7.0.122",
+    "ai": "^7.0.124",
     "better-sqlite3": "^12.11.1",
     "better-sqlite3-session-store": "^0.1.0",
     "canvas": "^3.2.3",
@@ -38,7 +38,7 @@
     "commander": "^15.0.0",
     "countries-and-timezones": "^3.10.0",
     "date-fns": "^4.4.0",
-    "dotenv": "^18.0.4",
+    "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "express-session": "^1.18.2",
     "googleapis": "^182.0.0",
@@ -73,7 +73,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "jest": "^30.5.2",
-    "lefthook": "^2.1.14",
+    "lefthook": "^2.1.15",
     "markdownlint-cli2": "^0.23.3"
   },
   "overrides": {
