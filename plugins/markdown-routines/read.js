@@ -21,6 +21,7 @@ import path from 'path';
 import { parseRecurrence, getCurrentPeriodStart, getNextPeriodStart, formatDate } from '../../src/recurrence-parser.js';
 import { TZDate } from '@date-fns/tz';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { normalizeRoutineTime } from '../../src/routine-collapse.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -285,6 +286,10 @@ function processRoutine(filePath, today) {
   const name = frontMatter.name || routineId;
   const recurrence = frontMatter.recurrence || 'daily';
   const estimatedMinutes = frontMatter.estimated_minutes || null;
+  const startTime = normalizeRoutineTime(frontMatter.start_time);
+  const endTime = normalizeRoutineTime(frontMatter.end_time);
+  const vaultBase = path.resolve(projectRoot, process.env.VAULT_PATH || 'vault');
+  const fileRelToVault = path.relative(vaultBase, path.resolve(projectRoot, filePath)).split(path.sep).join('/');
   const history = frontMatter.history || [];
 
   // Find all tasks
@@ -435,7 +440,10 @@ function processRoutine(filePath, today) {
       current_streak: streak,
       estimated_minutes: estimatedMinutes,
       completion_pct: Math.round((todayValue / todayTotal) * 100),
-      recurrence: recurrence
+      recurrence: recurrence,
+      file_path: fileRelToVault,
+      start_time: startTime,
+      end_time: endTime
     })
   };
 

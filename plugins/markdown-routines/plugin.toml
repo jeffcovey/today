@@ -28,6 +28,18 @@ Recurrence patterns supported:
 - monthly on the first Monday / monthly on the third Thursday
 - quarterly
 - yearly / yearly on March 15
+
+Optional front matter fields (used when collapse_routines is on):
+- start_time: "HH:MM" (24h) — show the routine only at or after this time of day
+- end_time: "HH:MM" (24h)   — hide the routine at or after this time of day
+
+Collapsing routines: set task_display.collapse_routines = true in the main config.
+Each routine then shows up once instead of step by step:
+- task query lists: one plain bullet linking to the routine file, with "(N remaining)"
+  (queries that filter on "path includes routines..." still list individual steps)
+- the "tasks scheduled/due today" count: one per routine
+- the task timer: one item per routine, linking to its file
+A routine drops out once all of its steps are checked off, or outside its time window.
 """
 
 aiInstructions = """
@@ -42,6 +54,9 @@ Key fields:
 - metadata.target_value: Total steps in routine
 - metadata.current_streak: Consecutive days with 100% completion
 - metadata.recurrence: How often (daily, weekly, etc.)
+- metadata.file_path: Vault-relative path to the routine file (e.g. 'routines/evening.md')
+- metadata.start_time: Optional HH:MM — routine only shown from this time of day onward
+- metadata.end_time: Optional HH:MM — routine hidden at or after this time of day
 
 Query today's routines:
   SELECT title, status, value as done,

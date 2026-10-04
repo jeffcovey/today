@@ -62,6 +62,13 @@ import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
+import {
+  buildRoutineInfoMap,
+  collapseRoutineTasks,
+  currentHHMM,
+  getActiveRoutines,
+  isRoutinePath
+} from './routine-collapse.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
 import { containsDynamicContent, markDynamic } from './dynamic-content.js';
@@ -542,6 +549,18 @@ function getConfiguredTimezone() {
   return getConfig('timezone') || 'America/New_York';
 }
 
+function isCollapseRoutinesEnabled() {
+  return getConfig('task_display.collapse_routines') === true;
+}
+
+function getActiveRoutinesNow(db, today) {
+  return getActiveRoutines(db, {
+    today,
+    hhmm: currentHHMM(getConfiguredTimezone()),
+    vaultPath: getVaultPath()
+  });
+}
+
 // Helper function to get current time tracking timer info
 async function getCurrentTimer() {
   const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', 'current-timer.md');
@@ -615,7 +634,7 @@ async function getTodayTaskTimerItems() {
   `).all(today, today);
 
   const habits = db.prepare(`
-    SELECT habit_id, title, category
+    SELECT habit_id, title, category, source
     FROM habits
     WHERE date = ?
       AND status = 'pending'
@@ -650,17 +669,37 @@ async function getTodayTaskTimerItems() {
   // Filter out tasks from excluded files (vault-relative paths)
   const excludeFiles = getConfig('task_timer.exclude_files') || [];
   const vaultPrefix = getVaultPath() + '/';
-  const filteredTasks = excludeFiles.length > 0
+  let filteredTasks = excludeFiles.length > 0
     ? tasks.filter(task => !excludeFiles.some(f => task.id.includes(vaultPrefix + f)))
     : tasks;
 
   // Filter out habits with excluded habit IDs
   const excludeHabits = getConfig('task_timer.exclude_habits') || [];
-  const filteredHabits = excludeHabits.length > 0
+  let filteredHabits = excludeHabits.length > 0
     ? habits.filter(habit => !excludeHabits.includes(habit.habit_id))
     : habits;
 
   const items = [];
+
+  // Each routine becomes one item linking to its file, replacing its steps and its habit entry
+  if (isCollapseRoutinesEnabled()) {
+    const routinePrefix = `markdown-tasks/local:${vaultPrefix}routines/`;
+    filteredTasks = filteredTasks.filter(task => !task.id.startsWith(routinePrefix));
+    filteredHabits = filteredHabits.filter(habit => !String(habit.source || '').startsWith('markdown-routines/'));
+
+    for (const routine of getActiveRoutinesNow(db, today)) {
+      if (excludeFiles.includes(routine.filePath)) continue;
+      items.push({
+        id: `routine-${routine.filePath}`,
+        type: 'routine',
+        title: routine.title,
+        displayText: `${routine.title} (${routine.remainingSteps} remaining)`,
+        canComplete: false,
+        routineFile: routine.filePath,
+        linkUrl: `/${routine.filePath}`
+      });
+    }
+  }
 
   // Add tasks with completion capability
   for (const task of filteredTasks) {
@@ -762,6 +801,8 @@ function isItemStillValid(item) {
        WHERE habit_id = ? AND date = ? AND status = 'pending'
          AND COALESCE(json_extract(metadata, '$.paused'), 0) = 0`
     ).get(habitId, today);
+  } else if (item.type === 'routine') {
+    return getActiveRoutinesNow(db, getTodayDate()).some(r => r.filePath === item.routineFile);
   } else if (item.type === 'project') {
     const projectId = item.id.replace(/^project-/, '');
     const today = getTodayDate();
@@ -1320,14 +1361,19 @@ async function renderDirectory(dirPath, urlPath) {
       const db = getReadOnlyDatabase();
 
       // Query database for open tasks with due/scheduled dates for today or earlier
+      const collapse = isCollapseRoutinesEnabled();
       const taskRows = db.prepare(`
         SELECT COUNT(*) as count
         FROM tasks
         WHERE status = 'open'
           AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
-      `).get(todayISO, todayISO);
+          ${collapse ? 'AND id NOT LIKE ?' : ''}
+      `).get(todayISO, todayISO, ...(collapse ? [`markdown-tasks/local:${getVaultPath()}/routines/%`] : []));
 
       taskCount = taskRows.count;
+      if (collapse) {
+        taskCount += getActiveRoutinesNow(db, todayISO).length;
+      }
     } catch (error) {
       console.error('Error getting task count from database:', error);
     }
@@ -3990,6 +4036,16 @@ async function executeTasksQuery(query, queryContext = {}) {
     filtered = filtered.filter(task => runTasksFilterFunction(task, filterCode, queryContext, debug));
   }
 
+  // Queries scoped to routines (e.g. a routine's own checklist) keep their individual steps
+  const queryTargetsRoutines = filters.some(f => f.startsWith('path includes ') && f.includes('routines'));
+  if (isCollapseRoutinesEnabled() && !queryTargetsRoutines && filtered.some(t => isRoutinePath(t.filePath))) {
+    const routineInfo = buildRoutineInfoMap(db.prepare(`
+      SELECT title, metadata FROM habits
+      WHERE date = ? AND source LIKE 'markdown-routines/%'
+    `).all(todayStr));
+    filtered = collapseRoutineTasks(filtered, routineInfo, currentHHMM(tz));
+  }
+
   // Sort - apply directives in order (first = primary, last = least significant)
   sortTasks(filtered, sortDirectives, debug);
 
@@ -4125,6 +4181,10 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 
         replacement += `<h4>${dateHeader}</h4>\n<ul>\n`;
         for (const task of tasks) {
+          if (task.type === 'routine') {
+            replacement += renderRoutineSummaryItem(task);
+            continue;
+          }
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
           const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
@@ -4201,6 +4261,13 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
 
 
 // Inner HTML of a ```tasks block's result list (without the wrapper div)
+function renderRoutineSummaryItem(task) {
+  const remaining = task.remainingSteps
+    ? ` <span class="text-muted">(${task.remainingSteps} remaining)</span>`
+    : '';
+  return `<li class="routine-summary"><a href="/${escapeHtmlEntities(encodeURI(task.filePath))}">${escapeHtmlEntities(task.text)}</a>${remaining}</li>\n`;
+}
+
 function renderTasksQueryListHtml(queryResult, showPostpone) {
   let tasksHtml = '';
   if (queryResult.grouped) {
@@ -4229,6 +4296,10 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
 
       tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
       for (const task of tasks) {
+        if (task.type === 'routine') {
+          tasksHtml += renderRoutineSummaryItem(task);
+          continue;
+        }
         const checkbox = task.isDone ? 'checked' : '';
         const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
         const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
@@ -4259,6 +4330,10 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
     if (queryResult.tasks.length > 0) {
       tasksHtml += '<ul>\n';
       for (const task of queryResult.tasks) {
+        if (task.type === 'routine') {
+          tasksHtml += renderRoutineSummaryItem(task);
+          continue;
+        }
         const checkbox = task.isDone ? 'checked' : '';
         const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
         const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
