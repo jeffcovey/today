@@ -63,11 +63,12 @@ import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js
 import { parseCreatedAfterDate, sortCreatedGroups } from './tasks-query-created.js';
 import { parseSortLine, sortTasks } from './tasks-query-sort.js';
 import {
-  buildRoutineInfoMap,
   collapseRoutineTasks,
   currentHHMM,
   getActiveRoutines,
-  isRoutinePath
+  getRoutineInfoMapForDate,
+  isRoutinePath,
+  routineTaskFilePath
 } from './routine-collapse.js';
 import { extractMostRecentNowEntry } from './now-updates-utils.js';
 import { normalizeUrlPath } from './url-path.js';
@@ -614,10 +615,11 @@ async function getCurrentTimer() {
 // Task Timer functions
 async function getTodayTaskTimerItems() {
   const db = getDatabase();
-  const today = getTodayDate();
+  const collapseRoutines = isCollapseRoutinesEnabled();
+  const today = collapseRoutines ? getTodayDate(getConfiguredTimezone()) : getTodayDate();
 
   const tasks = db.prepare(`
-    SELECT id, title, priority, source
+    SELECT id, title, priority, source, metadata
     FROM tasks
     WHERE status = 'open'
       AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
@@ -634,7 +636,7 @@ async function getTodayTaskTimerItems() {
   `).all(today, today);
 
   const habits = db.prepare(`
-    SELECT habit_id, title, category, source
+    SELECT habit_id, title, category, source, metadata
     FROM habits
     WHERE date = ?
       AND status = 'pending'
@@ -682,10 +684,18 @@ async function getTodayTaskTimerItems() {
   const items = [];
 
   // Each routine becomes one item linking to its file, replacing its steps and its habit entry
-  if (isCollapseRoutinesEnabled()) {
-    const routinePrefix = `markdown-tasks/local:${vaultPrefix}routines/`;
-    filteredTasks = filteredTasks.filter(task => !task.id.startsWith(routinePrefix));
-    filteredHabits = filteredHabits.filter(habit => !String(habit.source || '').startsWith('markdown-routines/'));
+  if (collapseRoutines) {
+    const routineInfo = getRoutineInfoMapForDate(db, today);
+    filteredTasks = filteredTasks.filter(task => !isRoutinePath(routineTaskFilePath(task, getVaultPath()), routineInfo));
+    filteredHabits = filteredHabits.filter(habit => {
+      if (!String(habit.source || '').startsWith('markdown-routines/')) return true;
+      try {
+        const metadata = habit.metadata ? JSON.parse(habit.metadata) : {};
+        return !isRoutinePath(metadata.file_path, routineInfo);
+      } catch {
+        return true;
+      }
+    });
 
     for (const routine of getActiveRoutinesNow(db, today)) {
       if (excludeFiles.includes(routine.filePath)) continue;
@@ -802,7 +812,7 @@ function isItemStillValid(item) {
          AND COALESCE(json_extract(metadata, '$.paused'), 0) = 0`
     ).get(habitId, today);
   } else if (item.type === 'routine') {
-    return getActiveRoutinesNow(db, getTodayDate()).some(r => r.filePath === item.routineFile);
+    return getActiveRoutinesNow(db, getTodayDate(getConfiguredTimezone())).some(r => r.filePath === item.routineFile);
   } else if (item.type === 'project') {
     const projectId = item.id.replace(/^project-/, '');
     const today = getTodayDate();
@@ -1362,17 +1372,25 @@ async function renderDirectory(dirPath, urlPath) {
 
       // Query database for open tasks with due/scheduled dates for today or earlier
       const collapse = isCollapseRoutinesEnabled();
+      const countTodayISO = collapse ? getTodayDate(getConfiguredTimezone()) : todayISO;
       const taskRows = db.prepare(`
-        SELECT COUNT(*) as count
+        SELECT id, metadata
         FROM tasks
         WHERE status = 'open'
           AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
-          ${collapse ? 'AND id NOT LIKE ?' : ''}
-      `).get(todayISO, todayISO, ...(collapse ? [`markdown-tasks/local:${getVaultPath()}/routines/%`] : []));
+      `).all(countTodayISO, countTodayISO);
 
-      taskCount = taskRows.count;
       if (collapse) {
-        taskCount += getActiveRoutinesNow(db, todayISO).length;
+        const routineInfo = getRoutineInfoMapForDate(db, countTodayISO);
+        taskCount = taskRows.filter(task => !isRoutinePath(
+          routineTaskFilePath(task, getVaultPath()),
+          routineInfo
+        )).length;
+      } else {
+        taskCount = taskRows.length;
+      }
+      if (collapse) {
+        taskCount += getActiveRoutinesNow(db, countTodayISO).length;
       }
     } catch (error) {
       console.error('Error getting task count from database:', error);
@@ -4037,13 +4055,16 @@ async function executeTasksQuery(query, queryContext = {}) {
   }
 
   // Queries scoped to routines (e.g. a routine's own checklist) keep their individual steps
-  const queryTargetsRoutines = filters.some(f => f.startsWith('path includes ') && f.includes('routines'));
-  if (isCollapseRoutinesEnabled() && !queryTargetsRoutines && filtered.some(t => isRoutinePath(t.filePath))) {
-    const routineInfo = buildRoutineInfoMap(db.prepare(`
-      SELECT title, metadata FROM habits
-      WHERE date = ? AND source LIKE 'markdown-routines/%'
-    `).all(todayStr));
-    filtered = collapseRoutineTasks(filtered, routineInfo, currentHHMM(tz));
+  if (isCollapseRoutinesEnabled()) {
+    const routineInfo = getRoutineInfoMapForDate(db, todayStr);
+    const queryTargetsRoutines = filters.some(filter => {
+      if (!filter.startsWith('path includes ')) return false;
+      const pathPattern = filter.replace('path includes ', '').trim();
+      return [...routineInfo.keys()].some(filePath => filePath.includes(pathPattern));
+    });
+    if (!queryTargetsRoutines && filtered.some(t => isRoutinePath(t.filePath, routineInfo))) {
+      filtered = collapseRoutineTasks(filtered, routineInfo, currentHHMM(tz));
+    }
   }
 
   // Sort - apply directives in order (first = primary, last = least significant)

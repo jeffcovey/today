@@ -46,12 +46,32 @@ export function buildRoutineInfoMap(habitRows) {
   return info;
 }
 
+export function getRoutineInfoMapForDate(db, today) {
+  return buildRoutineInfoMap(db.prepare(`
+    SELECT title, metadata FROM habits
+    WHERE date = ? AND source LIKE 'markdown-routines/%'
+  `).all(today));
+}
+
+export function routineTaskFilePath(task, vaultPath) {
+  let metadata = {};
+  try {
+    metadata = typeof task.metadata === 'string' ? JSON.parse(task.metadata) : (task.metadata || {});
+  } catch {
+    return null;
+  }
+  const filePath = task.filePath || metadata.file_path;
+  if (typeof filePath !== 'string') return null;
+  const vaultPrefix = `${vaultPath}/`;
+  return filePath.startsWith(vaultPrefix) ? filePath.slice(vaultPrefix.length) : filePath;
+}
+
 export function routineTitleFromPath(filePath) {
   return path.basename(filePath, '.md').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function isRoutinePath(filePath) {
-  return typeof filePath === 'string' && filePath.startsWith('routines/');
+export function isRoutinePath(filePath, routineInfo) {
+  return typeof filePath === 'string' && routineInfo?.has(filePath) === true;
 }
 
 // Replace open routine steps with one summary per routine file; drop routines outside their time window
@@ -59,7 +79,7 @@ export function collapseRoutineTasks(tasks, routineInfo, hhmm) {
   const byFile = new Map();
   const others = [];
   for (const task of tasks) {
-    if (!isRoutinePath(task.filePath) || task.isDone || task.isCancelled) {
+    if (!isRoutinePath(task.filePath, routineInfo) || task.isDone || task.isCancelled) {
       others.push(task);
       continue;
     }
@@ -102,28 +122,27 @@ export function collapseRoutineTasks(tasks, routineInfo, hhmm) {
 // Routines with open steps due/scheduled by `today` that are inside their time window
 export function getActiveRoutines(db, { today, hhmm, vaultPath }) {
   const prefix = `markdown-tasks/local:${vaultPath}/`;
+  const routineInfo = getRoutineInfoMapForDate(db, today);
+  if (routineInfo.size === 0) return [];
+
   const rows = db.prepare(`
-    SELECT id FROM tasks
+    SELECT id, metadata FROM tasks
     WHERE status = 'open'
       AND (due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)
-      AND id LIKE ?
-  `).all(today, today, `${prefix}routines/%`);
+      AND substr(id, 1, ?) = ?
+  `).all(today, today, prefix.length, prefix);
 
   const counts = new Map();
-  for (const { id } of rows) {
-    const filePath = id.slice(prefix.length).replace(/:\d+$/, '');
+  for (const task of rows) {
+    const filePath = routineTaskFilePath(task, vaultPath);
+    if (!routineInfo.has(filePath)) continue;
     counts.set(filePath, (counts.get(filePath) || 0) + 1);
   }
   if (counts.size === 0) return [];
 
-  const info = buildRoutineInfoMap(db.prepare(`
-    SELECT title, metadata FROM habits
-    WHERE date = ? AND source LIKE 'markdown-routines/%'
-  `).all(today));
-
   const active = [];
   for (const [filePath, remainingSteps] of counts) {
-    const routine = info.get(filePath);
+    const routine = routineInfo.get(filePath);
     if (!isWithinTimeWindow(hhmm, routine?.startTime, routine?.endTime)) continue;
     active.push({ filePath, title: routine?.title || routineTitleFromPath(filePath), remainingSteps });
   }

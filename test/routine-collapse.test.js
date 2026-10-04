@@ -100,8 +100,27 @@ describe('collapseRoutineTasks', () => {
   });
 
   test('falls back to a title derived from the file name', () => {
-    const [summary] = collapseRoutineTasks([step('routines/hip-mobility.md', 3)], new Map(), '10:00');
+    const info = new Map([['routines/hip-mobility.md', { title: null }]]);
+    const [summary] = collapseRoutineTasks([step('routines/hip-mobility.md', 3)], info, '10:00');
     expect(summary.text).toBe('Hip Mobility');
+  });
+
+  test('collapses routines from a custom directory using habit metadata', () => {
+    const customInfo = new Map([
+      ['custom-routines/mobility.md', { title: 'Mobility', startTime: null, endTime: null }]
+    ]);
+    const result = collapseRoutineTasks(
+      [step('custom-routines/mobility.md', 1)],
+      customInfo,
+      '10:00'
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: 'routine',
+      text: 'Mobility',
+      filePath: 'custom-routines/mobility.md',
+      remainingSteps: 1
+    });
   });
 });
 
@@ -127,13 +146,13 @@ describe('getActiveRoutines', () => {
       CREATE TABLE habits (title TEXT, date TEXT, source TEXT, metadata TEXT);
     `);
     const addTask = db.prepare('INSERT INTO tasks VALUES (?, ?, NULL, ?)');
-    const sched = d => JSON.stringify({ scheduled_date: d });
-    addTask.run('markdown-tasks/local:vault/routines/morning.md:10', 'open', sched('2026-10-04'));
-    addTask.run('markdown-tasks/local:vault/routines/morning.md:11', 'open', sched('2026-10-04'));
-    addTask.run('markdown-tasks/local:vault/routines/morning.md:12', 'completed', sched('2026-10-04'));
-    addTask.run('markdown-tasks/local:vault/routines/evening.md:5', 'open', sched('2026-10-04'));
-    addTask.run('markdown-tasks/local:vault/routines/weekly.md:5', 'open', sched('2026-10-10'));
-    addTask.run('markdown-tasks/local:vault/projects/x.md:1', 'open', sched('2026-10-04'));
+    const sched = (d, filePath) => JSON.stringify({ scheduled_date: d, file_path: filePath });
+    addTask.run('markdown-tasks/local:vault/routines/morning.md:10', 'open', sched('2026-10-04', 'routines/morning.md'));
+    addTask.run('markdown-tasks/local:vault/routines/morning.md:11', 'open', sched('2026-10-04', 'routines/morning.md'));
+    addTask.run('markdown-tasks/local:vault/routines/morning.md:12', 'completed', sched('2026-10-04', 'routines/morning.md'));
+    addTask.run('markdown-tasks/local:vault/routines/evening.md:5', 'open', sched('2026-10-04', 'routines/evening.md'));
+    addTask.run('markdown-tasks/local:vault/routines/weekly.md:5', 'open', sched('2026-10-10', 'routines/weekly.md'));
+    addTask.run('markdown-tasks/local:vault/projects/x.md:1', 'open', sched('2026-10-04', 'projects/x.md'));
 
     const addHabit = db.prepare("INSERT INTO habits VALUES (?, '2026-10-04', 'markdown-routines/default', ?)");
     addHabit.run('Morning Routine', JSON.stringify({ file_path: 'routines/morning.md' }));
@@ -154,5 +173,28 @@ describe('getActiveRoutines', () => {
     db.prepare("UPDATE tasks SET status = 'completed' WHERE id LIKE '%morning.md%'").run();
     const result = getActiveRoutines(db, { today: '2026-10-04', hhmm: '10:00', vaultPath: 'vault' });
     expect(result).toEqual([]);
+  });
+
+  test('finds active routines in a custom directory from habit metadata', () => {
+    db.prepare('INSERT INTO tasks VALUES (?, ?, NULL, ?)').run(
+      'markdown-tasks/local:vault/custom-routines/mobility.md:4',
+      'open',
+      JSON.stringify({ scheduled_date: '2026-10-04', file_path: 'custom-routines/mobility.md' })
+    );
+    db.prepare('INSERT INTO habits VALUES (?, ?, ?, ?)').run(
+      'Mobility',
+      '2026-10-04',
+      'markdown-routines/default',
+      JSON.stringify({ file_path: 'custom-routines/mobility.md' })
+    );
+    expect(getActiveRoutines(db, {
+      today: '2026-10-04',
+      hhmm: '10:00',
+      vaultPath: 'vault'
+    })).toContainEqual({
+      filePath: 'custom-routines/mobility.md',
+      title: 'Mobility',
+      remainingSteps: 1
+    });
   });
 });
