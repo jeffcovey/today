@@ -79,10 +79,69 @@ describe('theme behavior', () => {
 });
 
 describe('navbar rendering', () => {
-  test('getNavbar renders theme toggle button', () => {
+  test('getNavbar renders the display settings menu with three theme modes', () => {
     const navbarHtml = getNavbar();
-    expect(navbarHtml).toContain('id="themeToggleBtn"');
-    expect(navbarHtml).toContain('id="themeToggleIcon"');
+    expect(navbarHtml).toContain('id="displayMenuBtn"');
+    expect(navbarHtml).toContain('id="displayMenuPanel"');
+    expect(navbarHtml).toContain('data-theme-mode="light"');
+    expect(navbarHtml).toContain('data-theme-mode="system"');
+    expect(navbarHtml).toContain('data-theme-mode="dark"');
+    expect(navbarHtml).not.toContain('themeToggleBtn');
+  });
+
+  test('setThemeMode stores the mode, applies it, and marks the matching button', () => {
+    const context = loadCommonJsContext(true);
+    const buttons = ['light', 'system', 'dark'].map((mode) => ({
+      dataset: { themeMode: mode },
+      classes: new Set(),
+      classList: { toggle(name, on) { on ? this.owner.classes.add(name) : this.owner.classes.delete(name); } },
+      attrs: {},
+      setAttribute(name, value) { this.attrs[name] = value; },
+    }));
+    buttons.forEach((b) => { b.classList.owner = b; });
+    context.document.querySelectorAll = (sel) => sel === '[data-theme-mode]' ? buttons : [];
+
+    context.setThemeMode('light');
+    expect(context.localStorage.getItem('todayThemeMode')).toBe('light');
+    expect(context.document.documentElement.dataset.theme).toBe('light');
+    expect(buttons[0].classes.has('active')).toBe(true);
+    expect(buttons[0].attrs['aria-pressed']).toBe('true');
+    expect(buttons[2].classes.has('active')).toBe(false);
+
+    context.setThemeMode('system');
+    expect(context.document.documentElement.dataset.theme).toBe('dark');
+    expect(buttons[1].classes.has('active')).toBe(true);
+
+    context.setThemeMode('bogus');
+    expect(context.localStorage.getItem('todayThemeMode')).toBe('system');
+  });
+
+  test('display menu toggles, closes on Escape, and closes on outside click', () => {
+    const context = loadCommonJsContext();
+    const panel = { classes: new Set(), classList: {
+      toggle(name, on) { on ? panel.classes.add(name) : panel.classes.delete(name); },
+      contains(name) { return panel.classes.has(name); },
+    } };
+    const button = { attrs: {}, setAttribute(n, v) { this.attrs[n] = v; }, focused: 0, focus() { this.focused++; } };
+    const inside = {};
+    const menu = { contains: (el) => el === inside };
+    context.document.getElementById = (id) => ({ displayMenuPanel: panel, displayMenuBtn: button, displayMenu: menu })[id] || null;
+
+    context.toggleDisplayMenu({ stopPropagation() {} });
+    expect(panel.classes.has('show')).toBe(true);
+    expect(button.attrs['aria-expanded']).toBe('true');
+
+    context.documentListeners.click({ target: inside });
+    expect(panel.classes.has('show')).toBe(true);
+
+    context.documentListeners.click({ target: {} });
+    expect(panel.classes.has('show')).toBe(false);
+    expect(button.attrs['aria-expanded']).toBe('false');
+
+    context.toggleDisplayMenu();
+    context.documentListeners.keydown({ key: 'Escape' });
+    expect(panel.classes.has('show')).toBe(false);
+    expect(button.focused).toBe(1);
   });
 });
 
@@ -152,11 +211,37 @@ describe('text size behavior', () => {
     expect(context.document.documentElement.style.fontSize).toBe('14px');
   });
 
-  test('getNavbar renders text size controls', () => {
+  test('getNavbar renders text size controls inside the display menu', () => {
     const navbarHtml = getNavbar();
     expect(navbarHtml).toContain('id="textSizeDownBtn"');
     expect(navbarHtml).toContain('id="textSizeUpBtn"');
-    expect(navbarHtml).toContain('id="textSizeAnnouncement"');
+    expect(navbarHtml).toContain('id="textSizeLabel"');
+    expect(navbarHtml).toContain('id="textSizeResetBtn"');
+  });
+
+  test('reset returns to the device size and the reset button tracks the offset', () => {
+    const context = loadCommonJsContext();
+    context.document.createElement = () => ({ style: {}, remove() {} });
+    context.document.documentElement.style = {};
+    context.document.documentElement.appendChild = () => {};
+    context.CSS = { supports: () => false };
+    const reset = { disabled: null };
+    const hint = { textContent: '' };
+    context.document.getElementById = (id) => ({ textSizeResetBtn: reset, textSizeHint: hint })[id] || null;
+
+    context.applyTextSize();
+    expect(reset.disabled).toBe(true);
+    expect(hint.textContent).toBe('Matches your device setting');
+
+    context.adjustTextSize(2);
+    expect(context.document.documentElement.style.fontSize).toBe('21px');
+    expect(reset.disabled).toBe(false);
+    expect(hint.textContent).toBe('Device setting: Large');
+
+    context.resetTextSize();
+    expect(context.document.documentElement.style.fontSize).toBe('17px');
+    expect(context.localStorage.getItem('todayTextSizeOffset')).toBe('0');
+    expect(reset.disabled).toBe(true);
   });
 
   test('announces text size changes and reapplies size on restore and visibility', () => {
@@ -166,11 +251,12 @@ describe('text size behavior', () => {
     context.document.documentElement.appendChild = () => {};
     context.getComputedStyle = () => ({ fontSize: '17px' });
     context.CSS = { supports: () => false };
-    const announcement = { textContent: '' };
-    context.document.getElementById = (id) => id === 'textSizeAnnouncement' ? announcement : null;
+    const label = { textContent: '', title: '' };
+    context.document.getElementById = (id) => id === 'textSizeLabel' ? label : null;
 
     context.adjustTextSize(1);
-    expect(announcement.textContent).toBe('Text size: Extra Large');
+    expect(label.textContent).toBe('Extra Large');
+    expect(label.title).toBe('Text size: Extra Large');
     expect(context.document.documentElement.style.fontSize).toBe('19px');
 
     context.localStorage.setItem('todayTextSizeOffset', '0');

@@ -29,10 +29,90 @@ html {
   font-size: 17px;
 }
 
-/* Text size +/- control in the navbar */
+/* Display settings menu (gear button in the navbar) */
+.navbar .container-fluid {
+  position: relative;
+}
+
+.display-menu .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0.75rem;
+  right: auto;
+  margin-top: 0.25rem;
+  width: max-content;
+  min-width: 15rem;
+  max-width: calc(100% - 1.5rem);
+  padding: 0.25rem 0.75rem;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  border: 1px solid var(--today-border);
+  z-index: 1100;
+}
+
+.display-menu .dropdown-menu.show {
+  display: block;
+}
+
+.display-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.display-menu-row + .display-menu-row {
+  border-top: 1px solid var(--today-border);
+}
+
+.display-menu-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.display-menu-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.display-menu-value {
+  font-size: 0.85rem;
+  color: var(--today-muted-text);
+  text-align: right;
+}
+
+.display-menu-foot {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
+
+.display-menu-hint {
+  font-size: 0.75rem;
+  color: var(--today-muted-text);
+}
+
+.display-menu-reset {
+  font-size: 0.8rem;
+}
+
+.display-menu-reset:disabled {
+  opacity: 0.4;
+}
+
+.theme-mode-group .btn,
 .text-size-control .btn {
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+  color: var(--today-text);
+  border-color: var(--today-border);
+}
+
+.theme-mode-group .btn.active {
+  background: var(--mdb-primary, #3b71ca);
+  border-color: var(--mdb-primary, #3b71ca);
+  color: #fff;
 }
 
 .text-size-control .btn:disabled {
