@@ -56,7 +56,7 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
-import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml } from './web/navbar.js';
+import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml, getTextSizeControlHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -164,6 +164,7 @@ async function loadTemplate(name) {
 function renderTemplate(template, data = {}) {
   const templateData = {
     themeToggleButton: getThemeToggleButtonHtml(),
+    textSizeControl: getTextSizeControlHtml(),
     themeBootstrapScript: getThemeBootstrapScript(),
     staticVersion: STATIC_VERSION,
     ...data,
@@ -4801,9 +4802,11 @@ ${cleanContent}
 
   // Embed mode: return minimal HTML with just the content
   if (options.embed) {
+    // data-zoom is read by the text-size bootstrap script; the style is a no-JS fallback
+    const zoomAttr = options.zoom ? ` data-zoom="${options.zoom}"` : '';
     const zoomStyle = options.zoom ? `<style>html { font-size: ${options.zoom}%; }</style>` : '';
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en"${zoomAttr}>
 <head>
   <title>${fileName}</title>
   ${pageStyle}

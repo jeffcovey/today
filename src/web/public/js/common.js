@@ -77,6 +77,87 @@ function initializeTheme() {
   }
 }
 
+// Text size functionality
+// Mirrors iOS Dynamic Type body sizes (px). Index 3 ('Large') is the iOS default.
+const TEXT_SIZES = [14, 15, 16, 17, 19, 21, 23, 28, 33, 40, 47, 53];
+const TEXT_SIZE_NAMES = [
+  'Extra Small', 'Small', 'Medium', 'Large', 'Extra Large', 'XX Large', 'XXX Large',
+  'AX1', 'AX2', 'AX3', 'AX4', 'AX5',
+];
+const DEFAULT_TEXT_SIZE_INDEX = 3;
+const TEXT_SIZE_STORAGE_KEY = 'todayTextSizeOffset';
+
+function nearestTextSizeIndex(px) {
+  return TEXT_SIZES.reduce((best, size, i) =>
+    Math.abs(size - px) < Math.abs(TEXT_SIZES[best] - px) ? i : best, 0);
+}
+
+// Measure the device's Dynamic Type setting via Safari's -apple-system-body.
+// Returns the iOS default on browsers without that keyword.
+function getSystemTextSizeIndex() {
+  try {
+    if (typeof CSS === 'undefined' || !CSS.supports || !CSS.supports('font', '-apple-system-body')) {
+      return DEFAULT_TEXT_SIZE_INDEX;
+    }
+    const probe = document.createElement('div');
+    probe.style.font = '-apple-system-body';
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    (document.body || document.documentElement).appendChild(probe);
+    const px = parseFloat(getComputedStyle(probe).fontSize);
+    probe.remove();
+    return px > 0 ? nearestTextSizeIndex(px) : DEFAULT_TEXT_SIZE_INDEX;
+  } catch {
+    return DEFAULT_TEXT_SIZE_INDEX;
+  }
+}
+
+function getTextSizeOffset() {
+  return parseInt(localStorage.getItem(TEXT_SIZE_STORAGE_KEY) || '0', 10) || 0;
+}
+
+function clampTextSizeIndex(index) {
+  return Math.min(TEXT_SIZES.length - 1, Math.max(0, index));
+}
+
+function getTextSizeIndex(systemIndex = getSystemTextSizeIndex(), offset = getTextSizeOffset()) {
+  return clampTextSizeIndex(systemIndex + offset);
+}
+
+function updateTextSizeControl(index, systemIndex) {
+  const label = document.getElementById('textSizeLabel');
+  const down = document.getElementById('textSizeDownBtn');
+  const up = document.getElementById('textSizeUpBtn');
+  const name = TEXT_SIZE_NAMES[index];
+  const suffix = index === systemIndex ? ' (system)' : '';
+  if (label) label.title = `Text size: ${name}${suffix}`;
+  if (down) down.disabled = index <= 0;
+  if (up) up.disabled = index >= TEXT_SIZES.length - 1;
+}
+
+function applyTextSize() {
+  const systemIndex = getSystemTextSizeIndex();
+  const index = getTextSizeIndex(systemIndex);
+  const zoom = parseFloat(document.documentElement.dataset.zoom) || 100;
+  document.documentElement.style.fontSize = `${TEXT_SIZES[index] * zoom / 100}px`;
+  updateTextSizeControl(index, systemIndex);
+  return index;
+}
+
+// Step one iOS text size up (+1) or down (-1), stored as an offset from the
+// device setting so the site keeps tracking iOS Text Size changes.
+function adjustTextSize(delta) {
+  const systemIndex = getSystemTextSizeIndex();
+  const current = getTextSizeIndex(systemIndex);
+  const next = clampTextSizeIndex(current + delta);
+  localStorage.setItem(TEXT_SIZE_STORAGE_KEY, String(next - systemIndex));
+  applyTextSize();
+}
+
+function initializeTextSize() {
+  applyTextSize();
+}
+
 // Search functionality
 function performSearch(event) {
   event.preventDefault();
@@ -311,6 +392,7 @@ function initializeLoadingSpinner() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
+  initializeTextSize();
   initializeAIAssistant();
   restoreCollapseStates();
   initializeLoadingSpinner();

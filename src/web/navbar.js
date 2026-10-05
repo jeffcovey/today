@@ -2,6 +2,18 @@ function escapeSearchValue(value) {
   return String(value).replace(/"/g, '&quot;');
 }
 
+// iOS Dynamic Type body sizes (UIFontTextStyleBody), in CSS px. The index of
+// 'Large' (17px) is the iOS default. Safari exposes the user's current setting
+// through the `font: -apple-system-body` keyword; other browsers fall back to
+// the iOS default so every device shares the same scale.
+export const TEXT_SIZES = [14, 15, 16, 17, 19, 21, 23, 28, 33, 40, 47, 53];
+export const TEXT_SIZE_NAMES = [
+  'Extra Small', 'Small', 'Medium', 'Large', 'Extra Large', 'XX Large', 'XXX Large',
+  'AX1', 'AX2', 'AX3', 'AX4', 'AX5',
+];
+export const DEFAULT_TEXT_SIZE_INDEX = 3;
+export const TEXT_SIZE_STORAGE_KEY = 'todayTextSizeOffset';
+
 export function getThemeBootstrapScript() {
   return `<script>
 (() => {
@@ -16,8 +28,44 @@ export function getThemeBootstrapScript() {
   } catch {
     // Ignore storage/matchMedia failures
   }
+  // Apply text size before first paint (full logic lives in common.js)
+  try {
+    const sizes = ${JSON.stringify(TEXT_SIZES)};
+    let systemIndex = ${DEFAULT_TEXT_SIZE_INDEX};
+    if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('font', '-apple-system-body')) {
+      const probe = document.createElement('div');
+      probe.style.font = '-apple-system-body';
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      document.documentElement.appendChild(probe);
+      const px = parseFloat(getComputedStyle(probe).fontSize);
+      probe.remove();
+      if (px > 0) {
+        systemIndex = sizes.reduce((best, size, i) =>
+          Math.abs(size - px) < Math.abs(sizes[best] - px) ? i : best, 0);
+      }
+    }
+    const offset = parseInt(localStorage.getItem('${TEXT_SIZE_STORAGE_KEY}') || '0', 10) || 0;
+    const index = Math.min(sizes.length - 1, Math.max(0, systemIndex + offset));
+    const zoom = parseFloat(document.documentElement.dataset.zoom) || 100;
+    document.documentElement.style.fontSize = (sizes[index] * zoom / 100) + 'px';
+  } catch {
+    // Ignore failures; CSS fallback applies
+  }
 })();
 </script>`;
+}
+
+export function getTextSizeControlHtml() {
+  return `<div class="btn-group btn-group-sm ms-1 text-size-control" role="group" aria-label="Text size">
+            <button class="btn btn-light btn-sm" type="button" id="textSizeDownBtn" onclick="adjustTextSize(-1)" title="Smaller text" aria-label="Smaller text">
+              <i class="fas fa-minus"></i>
+            </button>
+            <span class="btn btn-light btn-sm pe-none" id="textSizeLabel" aria-live="polite"><i class="fas fa-font"></i></span>
+            <button class="btn btn-light btn-sm" type="button" id="textSizeUpBtn" onclick="adjustTextSize(1)" title="Larger text" aria-label="Larger text">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>`;
 }
 
 export function getThemeToggleButtonHtml() {
@@ -49,6 +97,7 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
             <i class="fas ${icon} me-2"></i>${title}
           </a>
           ${getThemeToggleButtonHtml()}
+          ${getTextSizeControlHtml()}
           <a class="nav-link text-light px-2" href="/_summaries" title="Plan Summaries">
             <i class="fas fa-pen-to-square"></i>
           </a>
