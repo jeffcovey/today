@@ -1,9 +1,0 @@
-
-name = "write-sync-stub"
-displayName = "Write Sync Stub"
-description = "Stub plugin for write/sync tests"
-type = "tasks"
-
-[commands]
-read = "./read.js"
-write = "./write.js"
