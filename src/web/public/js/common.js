@@ -7,7 +7,8 @@ const THEME_STORAGE_KEY = 'todayThemeMode';
 let themeMediaQuery = null;
 
 function getThemeMode() {
-  return localStorage.getItem(THEME_STORAGE_KEY) || 'system';
+  const mode = localStorage.getItem(THEME_STORAGE_KEY);
+  return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system';
 }
 
 function getEffectiveTheme(mode) {
@@ -18,24 +19,18 @@ function getEffectiveTheme(mode) {
 }
 
 function updateThemeToggle(mode, effectiveTheme) {
-  const toggle = document.getElementById('themeToggleBtn');
-  const icon = document.getElementById('themeToggleIcon');
-  if (!toggle || !icon) return;
-
-  if (mode === 'system') {
-    icon.className = 'fas fa-circle-half-stroke';
-    toggle.title = `Theme: System (${effectiveTheme})`;
-    return;
+  const buttons = document.querySelectorAll('#displayMenuPanel [data-theme-mode]');
+  buttons.forEach((button) => {
+    const active = button.dataset.themeMode === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  const menuButton = document.getElementById('displayMenuBtn');
+  if (menuButton) {
+    const themeLabels = { light: 'Light', dark: 'Dark', system: `System (${effectiveTheme})` };
+    const themeLabel = themeLabels[mode] || themeLabels.system;
+    menuButton.title = `Display settings. Theme: ${themeLabel}`;
   }
-
-  if (mode === 'dark') {
-    icon.className = 'fas fa-moon';
-    toggle.title = 'Theme: Dark';
-    return;
-  }
-
-  icon.className = 'fas fa-sun';
-  toggle.title = 'Theme: Light';
 }
 
 function applyTheme(mode = getThemeMode()) {
@@ -50,11 +45,14 @@ function getNextThemeMode(mode) {
   return 'system';
 }
 
-function cycleThemeMode() {
-  const current = getThemeMode();
-  const next = getNextThemeMode(current);
+function setThemeMode(mode) {
+  const next = mode === 'dark' || mode === 'light' ? mode : 'system';
   localStorage.setItem(THEME_STORAGE_KEY, next);
   applyTheme(next);
+}
+
+function cycleThemeMode() {
+  setThemeMode(getNextThemeMode(getThemeMode()));
 }
 
 function initializeTheme() {
@@ -131,11 +129,20 @@ function updateTextSizeControl(index, systemIndex) {
   const label = document.getElementById('textSizeLabel');
   const down = document.getElementById('textSizeDownBtn');
   const up = document.getElementById('textSizeUpBtn');
-  const announcement = document.getElementById('textSizeAnnouncement');
+  const hint = document.getElementById('textSizeHint');
+  const reset = document.getElementById('textSizeResetBtn');
   const name = TEXT_SIZE_NAMES[index];
-  const suffix = index === systemIndex ? ' (system)' : '';
-  if (label) label.title = `Text size: ${name}${suffix}`;
-  if (announcement) announcement.textContent = `Text size: ${name}${suffix}`;
+  const hasOverride = getTextSizeOffset() !== 0;
+  if (label) {
+    label.textContent = name;
+    label.title = `Text size: ${name}${hasOverride ? '' : ' (system)'}`;
+  }
+  if (hint) {
+    hint.textContent = hasOverride
+      ? `Device setting: ${TEXT_SIZE_NAMES[systemIndex]}`
+      : 'Matches your device setting';
+  }
+  if (reset) reset.disabled = !hasOverride;
   if (down) down.disabled = index <= 0;
   if (up) up.disabled = index >= TEXT_SIZES.length - 1;
 }
@@ -159,9 +166,53 @@ function adjustTextSize(delta) {
   applyTextSize();
 }
 
+// Return to the device's own text size.
+function resetTextSize() {
+  localStorage.setItem(TEXT_SIZE_STORAGE_KEY, '0');
+  applyTextSize();
+}
+
 function initializeTextSize() {
   applyTextSize();
 }
+
+// Display settings menu (gear button in the navbar)
+function setDisplayMenuOpen(open) {
+  const panel = document.getElementById('displayMenuPanel');
+  const button = document.getElementById('displayMenuBtn');
+  if (!panel || !button) return;
+  panel.classList.toggle('show', open);
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function isDisplayMenuOpen() {
+  const panel = document.getElementById('displayMenuPanel');
+  return Boolean(panel && panel.classList.contains('show'));
+}
+
+function toggleDisplayMenu(event) {
+  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+  setDisplayMenuOpen(!isDisplayMenuOpen());
+}
+
+function closeDisplayMenu() {
+  setDisplayMenuOpen(false);
+}
+
+document.addEventListener('click', (event) => {
+  if (!isDisplayMenuOpen()) return;
+  const menu = document.getElementById('displayMenu');
+  if (menu && event.target && typeof menu.contains === 'function' && menu.contains(event.target)) return;
+  closeDisplayMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && isDisplayMenuOpen()) {
+    closeDisplayMenu();
+    const button = document.getElementById('displayMenuBtn');
+    if (button && typeof button.focus === 'function') button.focus();
+  }
+});
 
 window.addEventListener('pageshow', applyTextSize);
 document.addEventListener('visibilitychange', () => {
