@@ -24,17 +24,9 @@ html[data-theme="dark"] {
   --today-overlay: rgba(17, 24, 39, 0.9);
 }
 
-/* Base text size: follow iOS Dynamic Type when available (no-JS fallback;
-   the bootstrap script in the page head sets an explicit px size on <html>).
-   Default to the iOS 'Large' size elsewhere so all devices share one scale. */
+/* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
 html {
   font-size: 17px;
-}
-
-@supports (font: -apple-system-body) {
-  html {
-    font: -apple-system-body;
-  }
 }
 
 /* Text size +/- control in the navbar */

@@ -32,7 +32,13 @@ export function getThemeBootstrapScript() {
   try {
     const sizes = ${JSON.stringify(TEXT_SIZES)};
     let systemIndex = ${DEFAULT_TEXT_SIZE_INDEX};
-    if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('font', '-apple-system-body')) {
+    const isIOS = typeof navigator !== 'undefined' &&
+      (/iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    const getSystemIndex = () => {
+      let index = ${DEFAULT_TEXT_SIZE_INDEX};
+      if (!isIOS || typeof CSS === 'undefined' || !CSS.supports ||
+          !CSS.supports('font', '-apple-system-body')) return index;
       const probe = document.createElement('div');
       probe.style.font = '-apple-system-body';
       probe.style.position = 'absolute';
@@ -41,14 +47,23 @@ export function getThemeBootstrapScript() {
       const px = parseFloat(getComputedStyle(probe).fontSize);
       probe.remove();
       if (px > 0) {
-        systemIndex = sizes.reduce((best, size, i) =>
+        index = sizes.reduce((best, size, i) =>
           Math.abs(size - px) < Math.abs(sizes[best] - px) ? i : best, 0);
       }
-    }
-    const offset = parseInt(localStorage.getItem('${TEXT_SIZE_STORAGE_KEY}') || '0', 10) || 0;
-    const index = Math.min(sizes.length - 1, Math.max(0, systemIndex + offset));
-    const zoom = parseFloat(document.documentElement.dataset.zoom) || 100;
-    document.documentElement.style.fontSize = (sizes[index] * zoom / 100) + 'px';
+      return index;
+    };
+    const applyTextSize = () => {
+      systemIndex = getSystemIndex();
+      const offset = parseInt(localStorage.getItem('${TEXT_SIZE_STORAGE_KEY}') || '0', 10) || 0;
+      const index = Math.min(sizes.length - 1, Math.max(0, systemIndex + offset));
+      const zoom = parseFloat(document.documentElement.dataset.zoom) || 100;
+      document.documentElement.style.fontSize = (sizes[index] * zoom / 100) + 'px';
+    };
+    applyTextSize();
+    window.addEventListener('pageshow', applyTextSize);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') applyTextSize();
+    });
   } catch {
     // Ignore failures; CSS fallback applies
   }
@@ -61,7 +76,9 @@ export function getTextSizeControlHtml() {
             <button class="btn btn-light btn-sm" type="button" id="textSizeDownBtn" onclick="adjustTextSize(-1)" title="Smaller text" aria-label="Smaller text">
               <i class="fas fa-minus"></i>
             </button>
-            <span class="btn btn-light btn-sm pe-none" id="textSizeLabel" aria-live="polite"><i class="fas fa-font"></i></span>
+            <span class="btn btn-light btn-sm pe-none" id="textSizeLabel" title="Text size: Large" aria-live="polite">
+              <i class="fas fa-font" aria-hidden="true"></i><span class="visually-hidden" id="textSizeAnnouncement">Text size: Large (system)</span>
+            </span>
             <button class="btn btn-light btn-sm" type="button" id="textSizeUpBtn" onclick="adjustTextSize(1)" title="Larger text" aria-label="Larger text">
               <i class="fas fa-plus"></i>
             </button>

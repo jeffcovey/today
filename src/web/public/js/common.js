@@ -93,10 +93,13 @@ function nearestTextSizeIndex(px) {
 }
 
 // Measure the device's Dynamic Type setting via Safari's -apple-system-body.
-// Returns the iOS default on browsers without that keyword.
+// Returns the iOS default outside iOS or when the keyword is unavailable.
 function getSystemTextSizeIndex() {
   try {
-    if (typeof CSS === 'undefined' || !CSS.supports || !CSS.supports('font', '-apple-system-body')) {
+    const isIOS = typeof navigator !== 'undefined' &&
+      (/iPhone|iPad|iPod/i.test(navigator.userAgent || '') ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    if (!isIOS || typeof CSS === 'undefined' || !CSS.supports || !CSS.supports('font', '-apple-system-body')) {
       return DEFAULT_TEXT_SIZE_INDEX;
     }
     const probe = document.createElement('div');
@@ -128,9 +131,11 @@ function updateTextSizeControl(index, systemIndex) {
   const label = document.getElementById('textSizeLabel');
   const down = document.getElementById('textSizeDownBtn');
   const up = document.getElementById('textSizeUpBtn');
+  const announcement = document.getElementById('textSizeAnnouncement');
   const name = TEXT_SIZE_NAMES[index];
   const suffix = index === systemIndex ? ' (system)' : '';
   if (label) label.title = `Text size: ${name}${suffix}`;
+  if (announcement) announcement.textContent = `Text size: ${name}${suffix}`;
   if (down) down.disabled = index <= 0;
   if (up) up.disabled = index >= TEXT_SIZES.length - 1;
 }
@@ -157,6 +162,11 @@ function adjustTextSize(delta) {
 function initializeTextSize() {
   applyTextSize();
 }
+
+window.addEventListener('pageshow', applyTextSize);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') applyTextSize();
+});
 
 // Search functionality
 function performSearch(event) {

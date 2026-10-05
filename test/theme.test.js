@@ -3,7 +3,7 @@ import path from 'path';
 import vm from 'vm';
 import { fileURLToPath } from 'url';
 
-import { getNavbar } from '../src/web/navbar.js';
+import { getNavbar, getThemeBootstrapScript } from '../src/web/navbar.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,10 +13,12 @@ function loadCommonJsContext(prefersDark = false) {
   const source = fs.readFileSync(sourcePath, 'utf8');
 
   const storage = new Map();
+  const windowListeners = {};
+  const documentListeners = {};
   const context = {
     window: {
       innerWidth: 1280,
-      addEventListener: () => {},
+      addEventListener: (name, listener) => { windowListeners[name] = listener; },
       matchMedia: () => ({
         matches: prefersDark,
         addEventListener: () => {},
@@ -24,7 +26,7 @@ function loadCommonJsContext(prefersDark = false) {
       location: { href: '' },
     },
     document: {
-      addEventListener: () => {},
+      addEventListener: (name, listener) => { documentListeners[name] = listener; },
       querySelector: () => null,
       querySelectorAll: () => [],
       getElementById: () => null,
@@ -47,6 +49,8 @@ function loadCommonJsContext(prefersDark = false) {
     clearTimeout: () => {},
     setInterval: () => 0,
     console,
+    windowListeners,
+    documentListeners,
   };
 
   vm.createContext(context);
@@ -106,6 +110,7 @@ describe('text size behavior', () => {
 
   test('tracks the iOS Dynamic Type setting when available', () => {
     const context = loadCommonJsContext();
+    context.navigator = { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 1 };
     context.document.createElement = () => ({ style: {}, remove() {} });
     context.document.documentElement.style = {};
     context.document.documentElement.appendChild = () => {};
@@ -118,6 +123,20 @@ describe('text size behavior', () => {
 
     context.adjustTextSize(1);
     expect(context.document.documentElement.style.fontSize).toBe('23px');
+  });
+
+  test('ignores the system font keyword on macOS', () => {
+    const context = loadCommonJsContext();
+    context.navigator = { userAgent: 'Macintosh', platform: 'MacIntel', maxTouchPoints: 0 };
+    context.document.createElement = () => ({ style: {}, remove() {} });
+    context.document.documentElement.style = {};
+    context.document.documentElement.appendChild = () => {};
+    context.getComputedStyle = () => ({ fontSize: '14px' });
+    context.CSS = { supports: () => true };
+
+    expect(context.getSystemTextSizeIndex()).toBe(3);
+    expect(context.applyTextSize()).toBe(3);
+    expect(context.document.documentElement.style.fontSize).toBe('17px');
   });
 
   test('clamps at the ends of the scale', () => {
@@ -137,5 +156,70 @@ describe('text size behavior', () => {
     const navbarHtml = getNavbar();
     expect(navbarHtml).toContain('id="textSizeDownBtn"');
     expect(navbarHtml).toContain('id="textSizeUpBtn"');
+    expect(navbarHtml).toContain('id="textSizeAnnouncement"');
+  });
+
+  test('announces text size changes and reapplies size on restore and visibility', () => {
+    const context = loadCommonJsContext();
+    context.document.createElement = () => ({ style: {}, remove() {} });
+    context.document.documentElement.style = {};
+    context.document.documentElement.appendChild = () => {};
+    context.getComputedStyle = () => ({ fontSize: '17px' });
+    context.CSS = { supports: () => false };
+    const announcement = { textContent: '' };
+    context.document.getElementById = (id) => id === 'textSizeAnnouncement' ? announcement : null;
+
+    context.adjustTextSize(1);
+    expect(announcement.textContent).toBe('Text size: Extra Large');
+    expect(context.document.documentElement.style.fontSize).toBe('19px');
+
+    context.localStorage.setItem('todayTextSizeOffset', '0');
+    context.windowListeners.pageshow();
+    expect(context.document.documentElement.style.fontSize).toBe('17px');
+
+    context.localStorage.setItem('todayTextSizeOffset', '1');
+    context.document.visibilityState = 'visible';
+    context.documentListeners.visibilitychange();
+    expect(context.document.documentElement.style.fontSize).toBe('19px');
+  });
+
+  test('bootstrap applies iOS text size again after page restore and visibility', () => {
+    const script = getThemeBootstrapScript().replace(/^<script>|<\/script>$/g, '');
+    const windowListeners = {};
+    const documentListeners = {};
+    const storage = new Map([['todayTextSizeOffset', '0']]);
+    let systemSize = '21px';
+    const documentElement = {
+      dataset: {},
+      style: {},
+      appendChild() {},
+    };
+    const context = {
+      CSS: { supports: () => true },
+      document: {
+        documentElement,
+        createElement: () => ({ style: {}, remove() {} }),
+        addEventListener: (name, listener) => { documentListeners[name] = listener; },
+      },
+      getComputedStyle: () => ({ fontSize: systemSize }),
+      localStorage: {
+        getItem: (key) => storage.get(key) || null,
+      },
+      navigator: { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 1 },
+      window: {
+        addEventListener: (name, listener) => { windowListeners[name] = listener; },
+        matchMedia: () => ({ matches: false }),
+      },
+    };
+
+    vm.runInNewContext(script, context);
+    expect(documentElement.style.fontSize).toBe('21px');
+    systemSize = '23px';
+    windowListeners.pageshow();
+    expect(documentElement.style.fontSize).toBe('23px');
+    systemSize = '19px';
+    context.document.visibilityState = 'visible';
+    documentListeners.visibilitychange();
+    expect(documentElement.style.fontSize).toBe('19px');
   });
 });

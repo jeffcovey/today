@@ -6500,6 +6500,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
       }
     }
   </script>
+  ${pageScripts}
 </body>
 </html>`;
 
