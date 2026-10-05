@@ -74,7 +74,7 @@ export function getThemeBootstrapScript() {
 // Display settings menu: theme (light / system / dark) and text size live
 // behind one gear button so the navbar stays uncluttered on phones.
 export function getDisplayMenuHtml() {
-  return `<div class="display-menu ms-auto" id="displayMenu">
+  return `<div class="display-menu" id="displayMenu">
             <button class="btn btn-light btn-sm" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-haspopup="true" aria-expanded="false" aria-controls="displayMenuPanel">
               <i class="fas fa-gear" aria-hidden="true"></i>
             </button>
@@ -103,7 +103,7 @@ export function getDisplayMenuHtml() {
               </div>
               <div class="display-menu-row display-menu-foot">
                 <span class="display-menu-hint" id="textSizeHint">Matches your device setting</span>
-                <button type="button" class="btn btn-link btn-sm p-0 display-menu-reset" id="textSizeResetBtn" onclick="resetTextSize()" disabled>Reset</button>
+                <button type="button" class="btn btn-link btn-sm p-0 display-menu-reset" id="textSizeResetBtn" onclick="resetTextSize()" aria-label="Reset text size to device setting" title="Reset text size to device setting" disabled>Reset</button>
               </div>
             </div>
           </div>`;
@@ -132,7 +132,7 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
             <i class="fas ${icon} me-2"></i>${title}
           </a>
           ${getDisplayMenuHtml()}
-          <a class="nav-link text-light px-2" href="/_summaries" title="Plan Summaries">
+          <a class="nav-link text-light px-2 ms-auto" href="/_summaries" title="Plan Summaries">
             <i class="fas fa-pen-to-square"></i>
           </a>
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">

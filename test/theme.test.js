@@ -60,6 +60,15 @@ function loadCommonJsContext(prefersDark = false) {
 }
 
 describe('theme behavior', () => {
+  test('invalid stored theme mode falls back to system', () => {
+    const context = loadCommonJsContext(true);
+    context.localStorage.setItem('todayThemeMode', 'garbage');
+
+    expect(context.getThemeMode()).toBe('system');
+    expect(() => context.applyTheme()).not.toThrow();
+    expect(context.document.documentElement.dataset.theme).toBe('dark');
+  });
+
   test('theme mode cycle order is system -> dark -> light -> system', () => {
     const context = loadCommonJsContext();
     expect(context.getNextThemeMode('system')).toBe('dark');
@@ -87,6 +96,18 @@ describe('navbar rendering', () => {
     expect(navbarHtml).toContain('data-theme-mode="system"');
     expect(navbarHtml).toContain('data-theme-mode="dark"');
     expect(navbarHtml).not.toContain('themeToggleBtn');
+
+    const brandIndex = navbarHtml.indexOf('class="navbar-brand"');
+    const menuIndex = navbarHtml.indexOf('id="displayMenu"');
+    const summariesIndex = navbarHtml.indexOf('href="/_summaries"');
+    const gitIndex = navbarHtml.indexOf('href="/_git"');
+    const searchIndex = navbarHtml.indexOf('id="searchInput"');
+    expect(brandIndex).toBeLessThan(menuIndex);
+    expect(menuIndex).toBeLessThan(summariesIndex);
+    expect(summariesIndex).toBeLessThan(gitIndex);
+    expect(gitIndex).toBeLessThan(searchIndex);
+    expect(navbarHtml).toContain('class="nav-link text-light px-2 ms-auto" href="/_summaries"');
+    expect(navbarHtml).toContain('class="display-menu" id="displayMenu"');
   });
 
   test('setThemeMode stores the mode, applies it, and marks the matching button', () => {
@@ -217,6 +238,7 @@ describe('text size behavior', () => {
     expect(navbarHtml).toContain('id="textSizeUpBtn"');
     expect(navbarHtml).toContain('id="textSizeLabel"');
     expect(navbarHtml).toContain('id="textSizeResetBtn"');
+    expect(navbarHtml).toContain('aria-label="Reset text size to device setting" title="Reset text size to device setting"');
   });
 
   test('reset returns to the device size and the reset button tracks the offset', () => {
@@ -242,6 +264,31 @@ describe('text size behavior', () => {
     expect(context.document.documentElement.style.fontSize).toBe('17px');
     expect(context.localStorage.getItem('todayTextSizeOffset')).toBe('0');
     expect(reset.disabled).toBe(true);
+  });
+
+  test('reset stays enabled when an override is clamped at AX5', () => {
+    const context = loadCommonJsContext();
+    context.navigator = { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 1 };
+    context.document.createElement = () => ({ style: {}, remove() {} });
+    context.document.documentElement.style = {};
+    context.document.documentElement.appendChild = () => {};
+    context.getComputedStyle = () => ({ fontSize: '53px' });
+    context.CSS = { supports: (prop, value) => prop === 'font' && value === '-apple-system-body' };
+    const reset = { disabled: null };
+    const hint = { textContent: '' };
+    context.document.getElementById = (id) => ({ textSizeResetBtn: reset, textSizeHint: hint })[id] || null;
+    context.localStorage.setItem('todayTextSizeOffset', '2');
+
+    expect(context.getSystemTextSizeIndex()).toBe(11);
+    expect(context.applyTextSize()).toBe(11);
+    expect(context.document.documentElement.style.fontSize).toBe('53px');
+    expect(reset.disabled).toBe(false);
+    expect(hint.textContent).toBe('Device setting: AX5');
+
+    context.resetTextSize();
+    expect(context.localStorage.getItem('todayTextSizeOffset')).toBe('0');
+    expect(reset.disabled).toBe(true);
+    expect(hint.textContent).toBe('Matches your device setting');
   });
 
   test('announces text size changes and reapplies size on restore and visibility', () => {

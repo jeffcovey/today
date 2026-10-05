@@ -7,7 +7,8 @@ const THEME_STORAGE_KEY = 'todayThemeMode';
 let themeMediaQuery = null;
 
 function getThemeMode() {
-  return localStorage.getItem(THEME_STORAGE_KEY) || 'system';
+  const mode = localStorage.getItem(THEME_STORAGE_KEY);
+  return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system';
 }
 
 function getEffectiveTheme(mode) {
@@ -26,7 +27,8 @@ function updateThemeToggle(mode, effectiveTheme) {
   });
   const menuButton = document.getElementById('displayMenuBtn');
   if (menuButton) {
-    const themeLabel = mode === 'system' ? `System (${effectiveTheme})` : mode[0].toUpperCase() + mode.slice(1);
+    const themeLabels = { light: 'Light', dark: 'Dark', system: `System (${effectiveTheme})` };
+    const themeLabel = themeLabels[mode] || themeLabels.system;
     menuButton.title = `Display settings. Theme: ${themeLabel}`;
   }
 }
@@ -130,17 +132,17 @@ function updateTextSizeControl(index, systemIndex) {
   const hint = document.getElementById('textSizeHint');
   const reset = document.getElementById('textSizeResetBtn');
   const name = TEXT_SIZE_NAMES[index];
-  const atSystem = index === systemIndex;
+  const hasOverride = getTextSizeOffset() !== 0;
   if (label) {
     label.textContent = name;
-    label.title = `Text size: ${name}${atSystem ? ' (system)' : ''}`;
+    label.title = `Text size: ${name}${hasOverride ? '' : ' (system)'}`;
   }
   if (hint) {
-    hint.textContent = atSystem
-      ? 'Matches your device setting'
-      : `Device setting: ${TEXT_SIZE_NAMES[systemIndex]}`;
+    hint.textContent = hasOverride
+      ? `Device setting: ${TEXT_SIZE_NAMES[systemIndex]}`
+      : 'Matches your device setting';
   }
-  if (reset) reset.disabled = atSystem;
+  if (reset) reset.disabled = !hasOverride;
   if (down) down.disabled = index <= 0;
   if (up) up.disabled = index >= TEXT_SIZES.length - 1;
 }
