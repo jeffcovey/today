@@ -19,7 +19,7 @@ function getEffectiveTheme(mode) {
 }
 
 function updateThemeToggle(mode, effectiveTheme) {
-  const buttons = document.querySelectorAll('[data-theme-mode]');
+  const buttons = document.querySelectorAll('#displayMenuPanel [data-theme-mode]');
   buttons.forEach((button) => {
     const active = button.dataset.themeMode === mode;
     button.classList.toggle('active', active);

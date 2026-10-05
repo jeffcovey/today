@@ -92,6 +92,9 @@ describe('navbar rendering', () => {
     const navbarHtml = getNavbar();
     expect(navbarHtml).toContain('id="displayMenuBtn"');
     expect(navbarHtml).toContain('id="displayMenuPanel"');
+    expect(navbarHtml).not.toContain('aria-haspopup');
+    expect(navbarHtml).toContain('role="group" aria-label="Display settings"');
+    expect(navbarHtml).toContain('class="container-fluid has-display-menu"');
     expect(navbarHtml).toContain('data-theme-mode="light"');
     expect(navbarHtml).toContain('data-theme-mode="system"');
     expect(navbarHtml).toContain('data-theme-mode="dark"');
@@ -120,7 +123,7 @@ describe('navbar rendering', () => {
       setAttribute(name, value) { this.attrs[name] = value; },
     }));
     buttons.forEach((b) => { b.classList.owner = b; });
-    context.document.querySelectorAll = (sel) => sel === '[data-theme-mode]' ? buttons : [];
+    context.document.querySelectorAll = (sel) => sel === '#displayMenuPanel [data-theme-mode]' ? buttons : [];
 
     context.setThemeMode('light');
     expect(context.localStorage.getItem('todayThemeMode')).toBe('light');

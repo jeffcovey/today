@@ -30,7 +30,7 @@ html {
 }
 
 /* Display settings menu (gear button in the navbar) */
-.navbar .container-fluid {
+.navbar .container-fluid.has-display-menu {
   position: relative;
 }
 

@@ -75,10 +75,10 @@ export function getThemeBootstrapScript() {
 // behind one gear button so the navbar stays uncluttered on phones.
 export function getDisplayMenuHtml() {
   return `<div class="display-menu" id="displayMenu">
-            <button class="btn btn-light btn-sm" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-haspopup="true" aria-expanded="false" aria-controls="displayMenuPanel">
+            <button class="btn btn-light btn-sm" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-expanded="false" aria-controls="displayMenuPanel">
               <i class="fas fa-gear" aria-hidden="true"></i>
             </button>
-            <div class="dropdown-menu display-menu-panel" id="displayMenuPanel" aria-labelledby="displayMenuBtn">
+            <div class="dropdown-menu display-menu-panel" id="displayMenuPanel" role="group" aria-label="Display settings" aria-labelledby="displayMenuBtn">
               <div class="display-menu-row">
                 <span class="display-menu-label">Theme</span>
                 <div class="btn-group btn-group-sm theme-mode-group" role="group" aria-label="Theme">
@@ -127,7 +127,7 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
       </div>
       <!-- Navbar -->
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
+        <div class="container-fluid has-display-menu">
           <a class="navbar-brand" href="/">
             <i class="fas ${icon} me-2"></i>${title}
           </a>
