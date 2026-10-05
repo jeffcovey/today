@@ -184,7 +184,8 @@ describe('text size behavior', () => {
   });
 
   test('bootstrap applies iOS text size again after page restore and visibility', () => {
-    const script = getThemeBootstrapScript().replace(/^<script>|<\/script>$/g, '');
+    const bootstrap = getThemeBootstrapScript();
+    const script = bootstrap.slice('<script>'.length, -'</script>'.length);
     const windowListeners = {};
     const documentListeners = {};
     const storage = new Map([['todayTextSizeOffset', '0']]);
