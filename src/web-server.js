@@ -56,7 +56,7 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
-import { getNavbar, getThemeBootstrapScript, getThemeToggleButtonHtml, getTextSizeControlHtml } from './web/navbar.js';
+import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -163,8 +163,7 @@ async function loadTemplate(name) {
 
 function renderTemplate(template, data = {}) {
   const templateData = {
-    themeToggleButton: getThemeToggleButtonHtml(),
-    textSizeControl: getTextSizeControlHtml(),
+    displayMenu: getDisplayMenuHtml(),
     themeBootstrapScript: getThemeBootstrapScript(),
     staticVersion: STATIC_VERSION,
     ...data,

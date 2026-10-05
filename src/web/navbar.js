@@ -71,24 +71,42 @@ export function getThemeBootstrapScript() {
 </script>`;
 }
 
-export function getTextSizeControlHtml() {
-  return `<div class="btn-group btn-group-sm ms-1 text-size-control" role="group" aria-label="Text size">
-            <button class="btn btn-light btn-sm" type="button" id="textSizeDownBtn" onclick="adjustTextSize(-1)" title="Smaller text" aria-label="Smaller text">
-              <i class="fas fa-minus"></i>
+// Display settings menu: theme (light / system / dark) and text size live
+// behind one gear button so the navbar stays uncluttered on phones.
+export function getDisplayMenuHtml() {
+  return `<div class="display-menu" id="displayMenu">
+            <button class="btn btn-light btn-sm" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-expanded="false" aria-controls="displayMenuPanel">
+              <i class="fas fa-gear" aria-hidden="true"></i>
             </button>
-            <span class="btn btn-light btn-sm pe-none" id="textSizeLabel" title="Text size: Large" aria-live="polite">
-              <i class="fas fa-font" aria-hidden="true"></i><span class="visually-hidden" id="textSizeAnnouncement">Text size: Large (system)</span>
-            </span>
-            <button class="btn btn-light btn-sm" type="button" id="textSizeUpBtn" onclick="adjustTextSize(1)" title="Larger text" aria-label="Larger text">
-              <i class="fas fa-plus"></i>
-            </button>
+            <div class="dropdown-menu display-menu-panel" id="displayMenuPanel" role="group" aria-label="Display settings" aria-labelledby="displayMenuBtn">
+              <div class="display-menu-row">
+                <span class="display-menu-label">Theme</span>
+                <div class="btn-group btn-group-sm theme-mode-group" role="group" aria-label="Theme">
+                  <button type="button" class="btn btn-outline-secondary" data-theme-mode="light" onclick="setThemeMode('light')" aria-pressed="false"><i class="fas fa-sun me-1" aria-hidden="true"></i>Light</button>
+                  <button type="button" class="btn btn-outline-secondary" data-theme-mode="system" onclick="setThemeMode('system')" aria-pressed="false"><i class="fas fa-circle-half-stroke me-1" aria-hidden="true"></i>System</button>
+                  <button type="button" class="btn btn-outline-secondary" data-theme-mode="dark" onclick="setThemeMode('dark')" aria-pressed="false"><i class="fas fa-moon me-1" aria-hidden="true"></i>Dark</button>
+                </div>
+              </div>
+              <div class="display-menu-row">
+                <span class="display-menu-label">Text size</span>
+                <div class="display-menu-controls">
+                  <span class="display-menu-value" id="textSizeLabel" aria-live="polite" title="Text size: Large (system)">Large</span>
+                  <div class="btn-group btn-group-sm text-size-control" role="group" aria-label="Text size">
+                    <button class="btn btn-outline-secondary" type="button" id="textSizeDownBtn" onclick="adjustTextSize(-1)" title="Smaller text" aria-label="Smaller text">
+                      <i class="fas fa-minus" aria-hidden="true"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" id="textSizeUpBtn" onclick="adjustTextSize(1)" title="Larger text" aria-label="Larger text">
+                      <i class="fas fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="display-menu-row display-menu-foot">
+                <span class="display-menu-hint" id="textSizeHint">Matches your device setting</span>
+                <button type="button" class="btn btn-link btn-sm p-0 display-menu-reset" id="textSizeResetBtn" onclick="resetTextSize()" aria-label="Reset text size to device setting" title="Reset text size to device setting" disabled>Reset</button>
+              </div>
+            </div>
           </div>`;
-}
-
-export function getThemeToggleButtonHtml() {
-  return `<button class="btn btn-light btn-sm ms-auto" type="button" id="themeToggleBtn" onclick="cycleThemeMode()" title="Theme" aria-label="Toggle theme mode">
-            <i class="fas fa-circle-half-stroke" id="themeToggleIcon"></i>
-          </button>`;
 }
 
 export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
@@ -109,13 +127,12 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
       </div>
       <!-- Navbar -->
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
+        <div class="container-fluid has-display-menu">
           <a class="navbar-brand" href="/">
             <i class="fas ${icon} me-2"></i>${title}
           </a>
-          ${getThemeToggleButtonHtml()}
-          ${getTextSizeControlHtml()}
-          <a class="nav-link text-light px-2" href="/_summaries" title="Plan Summaries">
+          ${getDisplayMenuHtml()}
+          <a class="nav-link text-light px-2 ms-auto" href="/_summaries" title="Plan Summaries">
             <i class="fas fa-pen-to-square"></i>
           </a>
           <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
