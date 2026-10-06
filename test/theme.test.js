@@ -18,7 +18,7 @@ function loadCommonJsContext(prefersDark = false) {
   const context = {
     window: {
       innerWidth: 1280,
-      addEventListener: (name, listener) => { windowListeners[name] = listener; },
+      addEventListener: (name, listener) => { const prev = windowListeners[name]; windowListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
       matchMedia: () => ({
         matches: prefersDark,
         addEventListener: () => {},
@@ -26,7 +26,7 @@ function loadCommonJsContext(prefersDark = false) {
       location: { href: '' },
     },
     document: {
-      addEventListener: (name, listener) => { documentListeners[name] = listener; },
+      addEventListener: (name, listener) => { const prev = documentListeners[name]; documentListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
       querySelector: () => null,
       querySelectorAll: () => [],
       getElementById: () => null,
@@ -109,7 +109,7 @@ describe('navbar rendering', () => {
     expect(menuIndex).toBeLessThan(summariesIndex);
     expect(summariesIndex).toBeLessThan(gitIndex);
     expect(gitIndex).toBeLessThan(searchIndex);
-    expect(navbarHtml).toContain('class="nav-link text-light px-2 ms-auto" href="/_summaries"');
+    expect(navbarHtml).toContain('class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries"');
     expect(navbarHtml).toContain('class="display-menu" id="displayMenu"');
   });
 
@@ -336,7 +336,7 @@ describe('text size behavior', () => {
       document: {
         documentElement,
         createElement: () => ({ style: {}, remove() {} }),
-        addEventListener: (name, listener) => { documentListeners[name] = listener; },
+        addEventListener: (name, listener) => { const prev = documentListeners[name]; documentListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
       },
       getComputedStyle: () => ({ fontSize: systemSize }),
       localStorage: {
@@ -344,7 +344,7 @@ describe('text size behavior', () => {
       },
       navigator: { userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 1 },
       window: {
-        addEventListener: (name, listener) => { windowListeners[name] = listener; },
+        addEventListener: (name, listener) => { const prev = windowListeners[name]; windowListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
         matchMedia: () => ({ matches: false }),
       },
     };
@@ -358,5 +358,53 @@ describe('text size behavior', () => {
     context.document.visibilityState = 'visible';
     documentListeners.visibilitychange();
     expect(documentElement.style.fontSize).toBe('19px');
+  });
+});
+
+describe('compact navbar search', () => {
+  test('getNavbar renders the search toggle, inline form and mobile row', () => {
+    const navbarHtml = getNavbar('Today', 'fa-folder-open', { searchValue: 'furnace "quote"' });
+    expect(navbarHtml).toContain('id="navbarSearchToggle"');
+    expect(navbarHtml).toContain('id="navbarSearchRow"');
+    expect(navbarHtml).toContain('id="searchInputMobile"');
+    expect(navbarHtml).toContain('id="searchInput"');
+    expect(navbarHtml).toContain('navbar-brand-text d-none d-sm-inline');
+    expect(navbarHtml).toContain('value="furnace &quot;quote&quot;"');
+    expect(navbarHtml).not.toContain('btn btn-light btn-sm" type="button" id="displayMenuBtn"');
+  });
+
+  test('getNavbar omits search entirely when showSearch is false', () => {
+    const navbarHtml = getNavbar('Plan Summaries', 'fa-pen-to-square', { showSearch: false });
+    expect(navbarHtml).not.toContain('navbarSearchToggle');
+    expect(navbarHtml).not.toContain('navbarSearchRow');
+    expect(navbarHtml).not.toContain('searchInput');
+  });
+
+  test('performSearch reads the submitting form, not a fixed element id', () => {
+    const context = loadCommonJsContext();
+    const form = { querySelector: () => ({ value: '  piano  ' }) };
+    context.performSearch({ preventDefault() {}, currentTarget: form });
+    expect(context.window.location.href).toBe('/search?q=piano');
+  });
+
+  test('search row opens with focus, closes on Cancel and Escape', () => {
+    const context = loadCommonJsContext();
+    const row = { hidden: true };
+    const toggle = { attrs: {}, setAttribute(n, v) { this.attrs[n] = v; }, focus() {} };
+    const input = { focused: 0, focus() { this.focused++; } };
+    context.document.getElementById = (id) => ({ navbarSearchRow: row, navbarSearchToggle: toggle, searchInputMobile: input })[id] || null;
+
+    context.toggleNavbarSearch();
+    expect(row.hidden).toBe(false);
+    expect(toggle.attrs['aria-expanded']).toBe('true');
+    expect(input.focused).toBe(1);
+
+    context.closeNavbarSearch();
+    expect(row.hidden).toBe(true);
+    expect(toggle.attrs['aria-expanded']).toBe('false');
+
+    context.toggleNavbarSearch();
+    context.documentListeners.keydown({ key: 'Escape' });
+    expect(row.hidden).toBe(true);
   });
 });
