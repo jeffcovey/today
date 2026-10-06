@@ -800,11 +800,108 @@ html[data-theme="dark"] .editor-toolbar {
   padding: 1.5rem;
 }
 
-/* Sticky navbar */
+/* Sticky navbar. Its chrome is pinned to px sizes so it stays one compact
+   row at every iOS text size; only the page content follows the root size. */
 .navbar {
   position: sticky;
   top: 0;
   z-index: 1020;
+  font-size: 16px;
+  padding: 0;
+}
+
+.navbar > .container-fluid {
+  min-height: 56px;
+  padding: 4px 12px;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.navbar .navbar-brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 8px 0 0;
+  padding: 0 4px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.navbar .navbar-brand .fas {
+  font-size: 22px;
+}
+
+.navbar .nav-link,
+.navbar .navbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 6px;
+  font-size: 18px;
+  line-height: 1;
+  color: #fff;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+}
+
+.navbar .nav-link:hover,
+.navbar .navbar-icon-btn:hover,
+.navbar .navbar-icon-btn[aria-expanded="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.navbar .navbar-icon-btn:focus-visible,
+.navbar .nav-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.navbar .navbar-search-inline .form-control-sm {
+  height: 34px;
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 14px;
+}
+
+.navbar .navbar-search-inline .btn-sm {
+  height: 34px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+.navbar-search-row {
+  padding: 2px 12px 10px;
+}
+
+.navbar-search-row form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-search-row .form-control {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  font-size: 16px; /* 16px keeps iOS from zooming the page on focus */
+  padding: 6px 12px;
+}
+
+.navbar-search-cancel {
+  color: #fff;
+  font-size: 16px;
+  padding: 0 4px;
+  text-decoration: none;
+}
+
+.navbar-search-cancel:hover,
+.navbar-search-cancel:focus {
+  color: #fff;
+  text-decoration: underline;
 }
 
 nav[aria-label="breadcrumb"] {
