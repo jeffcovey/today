@@ -56,7 +56,7 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
-import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml } from './web/navbar.js';
+import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml } from './web/navbar.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -164,6 +164,11 @@ async function loadTemplate(name) {
 function renderTemplate(template, data = {}) {
   const templateData = {
     displayMenu: getDisplayMenuHtml(),
+    navbarSearch: `<a class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries" title="Plan Summaries" aria-label="Plan Summaries"><i class="fas fa-pen-to-square" aria-hidden="true"></i></a>
+      <a class="nav-link navbar-icon-link px-2" href="/_git" title="Git Changes" aria-label="Git Changes"><i class="fas fa-code-branch" aria-hidden="true"></i></a>
+      ${getSearchToggleHtml()}
+      ${getSearchFormHtml()}`,
+    navbarSearchRow: getSearchRowHtml(),
     themeBootstrapScript: getThemeBootstrapScript(),
     staticVersion: STATIC_VERSION,
     ...data,

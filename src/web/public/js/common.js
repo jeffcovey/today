@@ -222,11 +222,48 @@ document.addEventListener('visibilitychange', () => {
 // Search functionality
 function performSearch(event) {
   event.preventDefault();
-  const searchQuery = document.getElementById('searchInput').value.trim();
+  const form = event.currentTarget || event.target;
+  const input = (form && typeof form.querySelector === 'function' && form.querySelector('input[type="search"]'))
+    || document.getElementById('searchInput');
+  const searchQuery = input ? input.value.trim() : '';
   if (searchQuery) {
     window.location.href = '/search?q=' + encodeURIComponent(searchQuery);
   }
 }
+
+// Collapsible search row under the navbar on narrow screens
+function isNavbarSearchOpen() {
+  const row = document.getElementById('navbarSearchRow');
+  return Boolean(row && !row.hidden);
+}
+
+function setNavbarSearchOpen(open) {
+  const row = document.getElementById('navbarSearchRow');
+  const toggle = document.getElementById('navbarSearchToggle');
+  if (!row) return;
+  const shouldRestoreFocus = !open && document.activeElement && row.contains(document.activeElement);
+  row.hidden = !open;
+  if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    if (typeof closeDisplayMenu === 'function') closeDisplayMenu();
+    const input = document.getElementById('searchInputMobile');
+    if (input && typeof input.focus === 'function') input.focus();
+  } else if (shouldRestoreFocus && toggle && typeof toggle.focus === 'function') {
+    toggle.focus();
+  }
+}
+
+function toggleNavbarSearch() {
+  setNavbarSearchOpen(!isNavbarSearchOpen());
+}
+
+function closeNavbarSearch() {
+  setNavbarSearchOpen(false);
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && isNavbarSearchOpen()) closeNavbarSearch();
+});
 
 // AI Assistant Toggle Functionality
 let isCollapsed = false;

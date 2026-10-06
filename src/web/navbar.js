@@ -75,7 +75,7 @@ export function getThemeBootstrapScript() {
 // behind one gear button so the navbar stays uncluttered on phones.
 export function getDisplayMenuHtml() {
   return `<div class="display-menu" id="displayMenu">
-            <button class="btn btn-light btn-sm" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-expanded="false" aria-controls="displayMenuPanel">
+            <button class="nav-link navbar-icon-btn px-2" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-expanded="false" aria-controls="displayMenuPanel">
               <i class="fas fa-gear" aria-hidden="true"></i>
             </button>
             <div class="dropdown-menu display-menu-panel" id="displayMenuPanel" role="group" aria-label="Display settings" aria-labelledby="displayMenuBtn">
@@ -109,17 +109,40 @@ export function getDisplayMenuHtml() {
           </div>`;
 }
 
-export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
-  const { showSearch = true, searchValue = '' } = options;
-  const searchForm = showSearch ? `
-          <form class="d-flex" onsubmit="performSearch(event)">
+function searchValueAttr(searchValue) {
+  return searchValue ? ` value="${escapeSearchValue(searchValue)}"` : '';
+}
+
+// Inline search field, shown from the md breakpoint up where there is room.
+export function getSearchFormHtml(searchValue = '') {
+  return `<form class="d-none d-md-flex ms-2 navbar-search-inline" onsubmit="performSearch(event)">
             <div class="input-group">
-              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValue ? ` value="${escapeSearchValue(searchValue)}"` : ''} style="max-width: 250px;">
-              <button class="btn btn-light btn-sm" type="submit">
-                <i class="fas fa-search"></i>
+              <input class="form-control form-control-sm" type="search" placeholder="Search vault..." aria-label="Search" id="searchInput"${searchValueAttr(searchValue)} style="max-width: 250px;">
+              <button class="btn btn-light btn-sm" type="submit" aria-label="Search">
+                <i class="fas fa-search" aria-hidden="true"></i>
               </button>
             </div>
-          </form>` : '';
+          </form>`;
+}
+
+// Magnifier icon for narrow screens; opens a full-width field under the bar.
+export function getSearchToggleHtml() {
+  return `<button class="nav-link navbar-icon-btn px-2 d-md-none" type="button" id="navbarSearchToggle" onclick="toggleNavbarSearch()" title="Search" aria-label="Search" aria-expanded="false" aria-controls="navbarSearchRow">
+            <i class="fas fa-search" aria-hidden="true"></i>
+          </button>`;
+}
+
+export function getSearchRowHtml(searchValue = '') {
+  return `<div class="navbar-search-row w-100 d-md-none" id="navbarSearchRow" hidden>
+          <form onsubmit="performSearch(event)">
+            <input class="form-control" type="search" placeholder="Search vault..." aria-label="Search" id="searchInputMobile"${searchValueAttr(searchValue)}>
+            <button class="btn btn-link navbar-search-cancel" type="button" onclick="closeNavbarSearch()">Cancel</button>
+          </form>
+        </div>`;
+}
+
+export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}) {
+  const { showSearch = true, searchValue = '' } = options;
 
   return `<!-- Loading Spinner Overlay -->
       <div id="loadingOverlay" class="loading-overlay">
@@ -128,17 +151,19 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
       <!-- Navbar -->
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid has-display-menu">
-          <a class="navbar-brand" href="/">
-            <i class="fas ${icon} me-2"></i>${title}
+          <a class="navbar-brand" href="/" title="${title}">
+            <i class="fas ${icon}" aria-hidden="true"></i><span class="navbar-brand-text d-none d-sm-inline ms-2">${title}</span>
           </a>
           ${getDisplayMenuHtml()}
-          <a class="nav-link text-light px-2 ms-auto" href="/_summaries" title="Plan Summaries">
-            <i class="fas fa-pen-to-square"></i>
+          <a class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries" title="Plan Summaries" aria-label="Plan Summaries">
+            <i class="fas fa-pen-to-square" aria-hidden="true"></i>
           </a>
-          <a class="nav-link text-light px-2" href="/_git" title="Git Changes">
-            <i class="fas fa-code-branch"></i>
+          <a class="nav-link navbar-icon-link px-2" href="/_git" title="Git Changes" aria-label="Git Changes">
+            <i class="fas fa-code-branch" aria-hidden="true"></i>
           </a>
-          ${showSearch ? `<div class="ms-2">${searchForm}</div>` : ''}
+          ${showSearch ? getSearchToggleHtml() : ''}
+          ${showSearch ? getSearchFormHtml(searchValue) : ''}
         </div>
+        ${showSearch ? getSearchRowHtml(searchValue) : ''}
       </nav>`;
 }
