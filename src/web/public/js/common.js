@@ -241,14 +241,14 @@ function setNavbarSearchOpen(open) {
   const row = document.getElementById('navbarSearchRow');
   const toggle = document.getElementById('navbarSearchToggle');
   if (!row) return;
+  const shouldRestoreFocus = !open && document.activeElement && row.contains(document.activeElement);
   row.hidden = !open;
   if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (open) {
     if (typeof closeDisplayMenu === 'function') closeDisplayMenu();
     const input = document.getElementById('searchInputMobile');
     if (input && typeof input.focus === 'function') input.focus();
-  } else if (toggle && typeof toggle.focus === 'function' && document.activeElement &&
-             document.activeElement.id === 'searchInputMobile') {
+  } else if (shouldRestoreFocus && toggle && typeof toggle.focus === 'function') {
     toggle.focus();
   }
 }

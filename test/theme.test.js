@@ -389,8 +389,9 @@ describe('compact navbar search', () => {
 
   test('search row opens with focus, closes on Cancel and Escape', () => {
     const context = loadCommonJsContext();
-    const row = { hidden: true };
-    const toggle = { attrs: {}, setAttribute(n, v) { this.attrs[n] = v; }, focus() {} };
+    const cancel = {};
+    const row = { hidden: true, contains: (element) => element === cancel };
+    const toggle = { attrs: {}, focused: 0, setAttribute(n, v) { this.attrs[n] = v; }, focus() { this.focused++; } };
     const input = { focused: 0, focus() { this.focused++; } };
     context.document.getElementById = (id) => ({ navbarSearchRow: row, navbarSearchToggle: toggle, searchInputMobile: input })[id] || null;
 
@@ -399,9 +400,11 @@ describe('compact navbar search', () => {
     expect(toggle.attrs['aria-expanded']).toBe('true');
     expect(input.focused).toBe(1);
 
+    context.document.activeElement = cancel;
     context.closeNavbarSearch();
     expect(row.hidden).toBe(true);
     expect(toggle.attrs['aria-expanded']).toBe('false');
+    expect(toggle.focused).toBe(1);
 
     context.toggleNavbarSearch();
     context.documentListeners.keydown({ key: 'Escape' });
