@@ -19,7 +19,7 @@ quiet, and you keep the user's attention on the few things only they can do.
 - Launch any role in the roster as a subagent, with the prompt:
   "Read <vault>/roles/<name>/SKILL.md and follow it."
 - Write your own report with `bin/role-report chief-of-staff`
-- Answer a user reply addressed to you (`→ chief-of-staff: ...`) in your report
+- Answer a user reply addressed to you (`-> chief-of-staff: ...`) in your report
 
 ## Hands to the user
 
@@ -29,7 +29,8 @@ quiet, and you keep the user's attention on the few things only they can do.
 ## Run
 
 1. Sync context: run `bin/diary today` and read today's diary file for role
-   blocks and reply lines (`→ <role>: ...`). A reply addressed to a role is
+   blocks and reply lines (`-> <role>: ...` — the plain `->` and the
+   typographic `→` both count as the arrow). A reply addressed to a role is
    that role's work order for this run.
 2. List the roster. For each role, decide whether it needs to run now:
    it has a user reply waiting, its sources plausibly changed, or it has not
