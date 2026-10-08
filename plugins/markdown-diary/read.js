@@ -9,6 +9,8 @@
  * - Progress: ### HH:MM blocks (timestamped, multi-paragraph)
  * - Concerns: ### HH:MM blocks (timestamped, multi-paragraph)
  * - Journal: ### HH:MM blocks (timestamped, multi-paragraph)
+ * - ROLE marker blocks: role-agent reports (see src/diary-roles.js),
+ *   durable and parsed with metadata.role
  *
  * Uses vault-changes for efficient incremental sync - only processes
  * diary files that have actually changed.
@@ -18,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { extractRoleBlocks } from '../../src/diary-roles.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -371,6 +374,9 @@ function isEmptyDiaryFile(filePath) {
 
 /**
  * Remove TODAY sections from old diary files (sections only relevant for current day)
+ *
+ * Deliberately leaves ROLE: marker blocks alone — role-agent reports are the
+ * permanent record and must survive in past days' files.
  */
 function removeTodaySectionsFromOldFiles() {
   const today = getTodayDateString();
@@ -508,15 +514,27 @@ function parseFrontMatter(content) {
 
 /**
  * Parse sections from markdown body
- * Returns { gratitude: [...], progress: [...], concerns: [...], journal: [...] }
+ * Returns { gratitude: [...], progress: [...], concerns: [...], journal: [...], role: [...] }
  */
 function parseSections(body, fileDate) {
   const sections = {
     gratitude: [],
     progress: [],
     concern: [],
-    journal: []
+    journal: [],
+    role: []
   };
+
+  // Pull ROLE marker blocks out first so their content is never attributed
+  // to an adjacent ## section below.
+  const { blocks, remainder } = extractRoleBlocks(body);
+  for (const block of blocks) {
+    const entries = parseTimestampedSection(block.content, fileDate, 'role');
+    for (const entry of entries) {
+      sections.role.push({ ...entry, role: block.role });
+    }
+  }
+  body = remainder;
 
   // Split by ## headers
   const sectionRegex = /^## (I'm grateful for(?:\.\.\.)?|Gratitude|Progress|Concerns?|Journal)\s*$/gim;
@@ -640,7 +658,7 @@ function processDiaryFile(filePath) {
         id: `markdown-diary:${fileDate}-${type}-${i + 1}`,
         date: item.date,
         text: item.text,
-        metadata: JSON.stringify({ type: type })
+        metadata: JSON.stringify(item.role ? { type, role: item.role } : { type })
       });
     }
   }
