@@ -2089,6 +2089,43 @@ export async function syncPluginVaultFiles(options = {}) {
     }
   }
 
+  // Install role templates from skeleton/roles.
+  // Unlike scripts, role files are the user's to edit after install, so they
+  // are only ever copied when missing — never overwritten, even with --force.
+  const rolesSrc = path.join(PROJECT_ROOT, 'skeleton', 'roles');
+  const rolesDest = path.join(vaultPath, 'roles');
+
+  if (fs.existsSync(rolesSrc)) {
+    try {
+      for (const roleDir of fs.readdirSync(rolesSrc)) {
+        const srcDir = path.join(rolesSrc, roleDir);
+        if (!fs.statSync(srcDir).isDirectory()) continue;
+
+        for (const roleFile of fs.readdirSync(srcDir)) {
+          const srcPath = path.join(srcDir, roleFile);
+          if (!fs.statSync(srcPath).isFile()) continue;
+
+          const destDir = path.join(rolesDest, roleDir);
+          const destPath = path.join(destDir, roleFile);
+
+          if (fs.existsSync(destPath)) {
+            result.skipped.push(`skeleton:roles/${roleDir}/${roleFile}`);
+            continue;
+          }
+
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(srcPath, destPath);
+          result.installed.push(`skeleton:roles/${roleDir}/${roleFile}`);
+          if (verbose) {
+            console.log(`  Installed: roles/${roleDir}/${roleFile}`);
+          }
+        }
+      }
+    } catch (error) {
+      result.errors.push(`skeleton:roles: ${error.message}`);
+    }
+  }
+
   return result;
 }
 

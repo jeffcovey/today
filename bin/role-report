@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+
+/**
+ * Append a role-agent report to today's diary as a durable ROLE: block.
+ *
+ *   bin/role-report <role> "report text"
+ *   echo "report text" | bin/role-report <role> --status ok
+ *
+ * Role agents must use this instead of editing diary files by hand: it
+ * validates the report (length cap, no marker injection), appends inside
+ * the role's block without touching existing content (so user replies
+ * survive), and writes atomically.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { program } from 'commander';
+import { getAbsoluteVaultPath } from '../src/config.js';
+import { colors } from '../src/cli-utils.js';
+import { appendRoleReport, ROLE_STATUSES, MAX_REPORT_LENGTH } from '../src/diary-roles.js';
+
+function todayDateString() {
+  const tz = process.env.TZ || 'America/New_York';
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+}
+
+async function readStdin() {
+  let data = '';
+  for await (const chunk of process.stdin) {
+    data += chunk;
+  }
+  return data;
+}
+
+program
+  .name('role-report')
+  .description(`Append a role-agent report to the diary (max ${MAX_REPORT_LENGTH} chars). Reads the report from the argument or stdin.`)
+  .argument('<role>', 'role name (lowercase letters, digits, hyphens)')
+  .argument('[message]', 'report text (omit to read from stdin)')
+  .option('--status <status>', `status line: ${ROLE_STATUSES.join(', ')}`)
+  .option('--title <title>', 'display heading used when the block is first created')
+  .option('--date <date>', 'diary date (YYYY-MM-DD, default: today)')
+  .action(async (role, message, options) => {
+    const text = message !== undefined ? message : await readStdin();
+
+    const date = options.date || todayDateString();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      console.error(colors.red('✗') + ` Invalid date "${options.date}": expected YYYY-MM-DD`);
+      process.exit(1);
+    }
+
+    const diaryDir = path.join(getAbsoluteVaultPath(), 'diary');
+    fs.mkdirSync(diaryDir, { recursive: true });
+    const filePath = path.join(diaryDir, `${date}.md`);
+
+    const result = appendRoleReport(filePath, role, text, {
+      status: options.status,
+      title: options.title,
+      fileDate: date
+    });
+
+    if (!result.ok) {
+      console.error(colors.red('✗') + ` ${result.error}`);
+      process.exit(1);
+    }
+
+    const extras = [
+      result.createdFile ? 'created diary file' : null,
+      result.createdBlock ? 'created role block' : null
+    ].filter(Boolean);
+    const suffix = extras.length > 0 ? ` (${extras.join(', ')})` : '';
+    console.log(colors.green('✓') + ` Added ${role} report to ${filePath}${suffix}`);
+  });
+
+program.parse();
