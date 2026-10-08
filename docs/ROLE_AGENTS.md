@@ -69,9 +69,11 @@ Properties, all enforced by the `markdown-diary` plugin and
   lines are never rewritten, so replies the user writes inside a block
   survive every later report.
 
-Replies use routing lines: `→ cpa: yes, do it` inside (or near) a role's
-block is picked up on the next run. `→ Jeff:` (the user's name) marks items
-only the user can resolve.
+Replies use routing lines: `-> cpa: yes, do it` inside (or near) a role's
+block is picked up on the next run. The arrow is typed as plain `->`
+(hyphen + greater-than); roles treat the typographic `→` as identical, so
+either form works. `→ Jeff:` (the user's name) marks items only the user
+can resolve — roles write that one, so they use the pretty arrow.
 
 ## bin/role-report
 
