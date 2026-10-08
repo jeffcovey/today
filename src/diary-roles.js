@@ -99,7 +99,7 @@ export function validateRoleReport(role, text, { status, title } = {}) {
       if (title.length > MAX_ROLE_TITLE_LENGTH) {
         errors.push(`Title exceeds ${MAX_ROLE_TITLE_LENGTH} characters`);
       }
-      if (/<!--|-->|(?:ROLE|TODAY)\s*:/i.test(title)) {
+      if (/<!--|--!?>|(?:ROLE|TODAY)\s*:/i.test(title)) {
         errors.push('Title may not contain comments or ROLE:/TODAY: markers');
       }
     }

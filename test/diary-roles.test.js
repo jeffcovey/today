@@ -98,6 +98,7 @@ describe('validateRoleReport', () => {
     ['multi\u2028line', 'Unicode line separator'],
     ['x'.repeat(81), 'too long'],
     ['hello <!-- comment -->', 'comment delimiters'],
+    ['hello --!>', 'HTML comment end tag'],
     ['hello ROLE:cpa:END', 'role marker'],
     ['hello TODAY:START', 'today marker']
   ])('rejects invalid title (%s: %s)', (title) => {
