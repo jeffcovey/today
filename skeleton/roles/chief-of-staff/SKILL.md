@@ -23,7 +23,7 @@ quiet, and you keep the user's attention on the few things only they can do.
 
 ## Hands to the user
 
-- Anything a role escalated with `→ Jeff:` lines (use the user's name) — relay, don't resolve
+- Anything a role escalated with `→ <user>:` lines — relay, don't resolve
 - Hiring or retiring roles — propose it; the user edits the roster
 
 ## Run

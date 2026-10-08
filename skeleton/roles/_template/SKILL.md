@@ -1,6 +1,6 @@
 ---
 name: role-template
-description: Copy this template to create a new role. Replace every <placeholder> and delete this line.
+description: Copy this template to create a new role. Replace every <placeholder> (including <user>) and delete this line.
 ---
 
 # <Role Title>
@@ -31,7 +31,7 @@ You are the <Role Title>: <one sentence describing the job this role was hired t
    your past reports are in previous days' diary files (`bin/diary search`).
 3. Do the work you may do alone; note anything that belongs to the user.
 4. Report once with `bin/role-report <role-name> --status <ok|blocked|needs-attention|quiet>`:
-   what you did, what needs the user (prefix those lines with `→ Jeff:` — use
+   what you did, what needs the user (prefix those lines with `→ <user>:` — use
    the user's name), and one suggested next step. Under 2000 characters.
    If there was nothing to do, still report a one-liner with `--status quiet`
    so silence is distinguishable from failure.

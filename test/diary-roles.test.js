@@ -91,6 +91,22 @@ describe('validateRoleReport', () => {
   test('rejects unknown status', () => {
     expect(validateRoleReport('cpa', 'text', { status: 'fine' })).toHaveLength(1);
   });
+
+  test.each([
+    ['  ', 'empty'],
+    ['multi\nline', 'multiple lines'],
+    ['multi\u2028line', 'Unicode line separator'],
+    ['x'.repeat(81), 'too long'],
+    ['hello <!-- comment -->', 'comment delimiters'],
+    ['hello ROLE:cpa:END', 'role marker'],
+    ['hello TODAY:START', 'today marker']
+  ])('rejects invalid title (%s: %s)', (title) => {
+    expect(validateRoleReport('cpa', 'text', { title }).length).toBeGreaterThan(0);
+  });
+
+  test('accepts a valid title', () => {
+    expect(validateRoleReport('cpa', 'text', { title: 'Bookkeeper' })).toEqual([]);
+  });
 });
 
 describe('formatRoleEntry', () => {
@@ -131,6 +147,32 @@ describe('appendRoleReport', () => {
     expect(content).toContain('### 10:00');
     expect(content).toContain('First report.');
     expect(content).toContain('<!-- ROLE:cpa:END -->');
+    expect(fs.existsSync(`${filePath}.lock`)).toBe(false);
+  });
+
+  test('does not write when the diary lockfile is already held', () => {
+    const lockPath = `${filePath}.lock`;
+    fs.writeFileSync(lockPath, 'another writer');
+
+    const result = appendRoleReport(filePath, 'cpa', 'First report.', { fileDate: '2026-10-08' });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain(lockPath);
+    expect(fs.existsSync(filePath)).toBe(false);
+    expect(fs.existsSync(lockPath)).toBe(true);
+  });
+
+  test('removes and replaces a stale diary lockfile', () => {
+    const lockPath = `${filePath}.lock`;
+    fs.writeFileSync(lockPath, 'stale writer');
+    const staleTime = new Date(Date.now() - 11_000);
+    fs.utimesSync(lockPath, staleTime, staleTime);
+
+    const result = appendRoleReport(filePath, 'cpa', 'Recovered report.', { fileDate: '2026-10-08' });
+
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(filePath, 'utf8')).toContain('Recovered report.');
+    expect(fs.existsSync(lockPath)).toBe(false);
   });
 
   test('appends inside the block, preserving earlier entries and user replies', () => {
@@ -168,6 +210,15 @@ describe('appendRoleReport', () => {
   test('uses a custom title when creating the block', () => {
     appendRoleReport(filePath, 'cpa', 'Books.', { time: '10:00', fileDate: '2026-10-08', title: 'Bookkeeper' });
     expect(fs.readFileSync(filePath, 'utf8')).toContain('## 🤖 Bookkeeper');
+  });
+
+  test('rejects a custom title that could corrupt the role block', () => {
+    const result = appendRoleReport(filePath, 'cpa', 'Books.', {
+      title: 'CPA\n<!-- ROLE:cpa:END -->'
+    });
+
+    expect(result.ok).toBe(false);
+    expect(fs.existsSync(filePath)).toBe(false);
   });
 
   test('refuses invalid reports without touching the file', () => {
