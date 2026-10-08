@@ -27,7 +27,8 @@ const TYPE_EMOJI = {
   gratitude: '🙏',
   progress: '📈',
   concern: '😟',
-  journal: '📝'
+  journal: '📝',
+  role: '🤖'
 };
 
 const __filename = fileURLToPath(import.meta.url);
@@ -491,6 +492,9 @@ function displayEntry(entry, highlightTerm = null) {
 
   // Header line with date and location
   let header = `${typeEmoji} ` + colors.yellow(`${dateStr} ${timeStr}`);
+  if (meta.role) {
+    header += colors.cyan(` [${meta.role}]`);
+  }
   if (meta.location?.localityName) {
     header += colors.gray(` • ${meta.location.localityName}`);
   }
