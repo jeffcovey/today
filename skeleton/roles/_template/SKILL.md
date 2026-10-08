@@ -26,7 +26,8 @@ You are the <Role Title>: <one sentence describing the job this role was hired t
 ## Run
 
 1. Read today's diary for your block and any reply lines addressed to you
-   (lines like `→ <role-name>: ...`). Replies outrank everything below.
+   (lines like `-> <role-name>: ...` — accept both the plain `->` and the
+   typographic `→` as the arrow). Replies outrank everything below.
 2. Check your sources (see Owns) for anything new since your last report —
    your past reports are in previous days' diary files (`bin/diary search`).
 3. Do the work you may do alone; note anything that belongs to the user.
