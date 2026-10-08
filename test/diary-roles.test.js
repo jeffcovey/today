@@ -5,6 +5,7 @@ import {
   extractRoleBlocks,
   validateRoleReport,
   appendRoleReport,
+  setRoleCheckboxState,
   formatRoleEntry,
   MAX_REPORT_LENGTH
 } from '../src/diary-roles.js';
@@ -227,5 +228,110 @@ describe('appendRoleReport', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/markers/);
     expect(fs.existsSync(filePath)).toBe(false);
+  });
+});
+
+describe('setRoleCheckboxState', () => {
+  let tempDir;
+  let filePath;
+
+  const report = [
+    'Rooms ready.',
+    '',
+    '- [ ] Put the bins out Sunday night',
+    '- [ ] Order more towels',
+    '- [x] Confirm the entry codes went out'
+  ].join('\n');
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-roles-'));
+    filePath = path.join(tempDir, '2026-10-09.md');
+    appendRoleReport(filePath, 'innkeeper', report, { time: '08:00', fileDate: '2026-10-09' });
+    appendRoleReport(filePath, 'cpa', '- [ ] Put the bins out Sunday night', { time: '08:05' });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('flips exactly one open checkbox to done', () => {
+    const result = setRoleCheckboxState(filePath, 'innkeeper', 'more towels', 'x');
+
+    expect(result).toMatchObject({ ok: true, line: '- [x] Order more towels' });
+    const content = fs.readFileSync(filePath, 'utf8');
+    expect(content).toContain('- [x] Order more towels');
+    expect(content).toContain('- [ ] Put the bins out Sunday night');
+    expect(fs.existsSync(`${filePath}.lock`)).toBe(false);
+  });
+
+  test('flips to cancelled and matches case-insensitively', () => {
+    const result = setRoleCheckboxState(filePath, 'innkeeper', 'ORDER MORE', '-');
+
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(filePath, 'utf8')).toContain('- [-] Order more towels');
+  });
+
+  test('only touches the state character, nothing else', () => {
+    const before = fs.readFileSync(filePath, 'utf8');
+    setRoleCheckboxState(filePath, 'innkeeper', 'more towels', 'x');
+    const after = fs.readFileSync(filePath, 'utf8');
+
+    expect(after).toBe(before.replace('- [ ] Order more towels', '- [x] Order more towels'));
+  });
+
+  test("never flips a line in another role's block", () => {
+    // The same text exists as an open checkbox in BOTH blocks; the flip
+    // must land in cpa's block only.
+    const result = setRoleCheckboxState(filePath, 'cpa', 'bins out', 'x');
+
+    expect(result.ok).toBe(true);
+    const content = fs.readFileSync(filePath, 'utf8');
+    const innkeeperBlock = content.slice(content.indexOf('ROLE:innkeeper:START'), content.indexOf('ROLE:innkeeper:END'));
+    const cpaBlock = content.slice(content.indexOf('ROLE:cpa:START'), content.indexOf('ROLE:cpa:END'));
+    expect(innkeeperBlock).toContain('- [ ] Put the bins out Sunday night');
+    expect(cpaBlock).toContain('- [x] Put the bins out Sunday night');
+  });
+
+  test('refuses an ambiguous match and leaves the file untouched', () => {
+    const before = fs.readFileSync(filePath, 'utf8');
+    const result = setRoleCheckboxState(filePath, 'innkeeper', 'o', 'x');
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/matches 2 open checkboxes/);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
+  });
+
+  test('reports an already-settled checkbox distinctly from no match', () => {
+    const settled = setRoleCheckboxState(filePath, 'innkeeper', 'entry codes', 'x');
+    expect(settled.ok).toBe(false);
+    expect(settled.error).toMatch(/already checked or cancelled/);
+
+    const missing = setRoleCheckboxState(filePath, 'innkeeper', 'no such item', 'x');
+    expect(missing.ok).toBe(false);
+    expect(missing.error).toMatch(/No open checkbox/);
+  });
+
+  test('matching prose that is not a checkbox counts as no match', () => {
+    const result = setRoleCheckboxState(filePath, 'innkeeper', 'Rooms ready', 'x');
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/No open checkbox/);
+  });
+
+  test('refuses a missing block, a missing file, and a bad state', () => {
+    expect(setRoleCheckboxState(filePath, 'secretary', 'towels', 'x').error).toMatch(/No secretary block/);
+    expect(setRoleCheckboxState(path.join(tempDir, 'absent.md'), 'innkeeper', 'towels', 'x').error).toMatch(/does not exist/);
+    expect(setRoleCheckboxState(filePath, 'innkeeper', 'towels', 'y').error).toMatch(/Invalid checkbox state/);
+  });
+
+  test('does not write while the diary lockfile is held', () => {
+    const lockPath = `${filePath}.lock`;
+    fs.writeFileSync(lockPath, 'another writer');
+    const before = fs.readFileSync(filePath, 'utf8');
+
+    const result = setRoleCheckboxState(filePath, 'innkeeper', 'more towels', 'x');
+
+    expect(result.ok).toBe(false);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
+    fs.unlinkSync(lockPath);
   });
 });

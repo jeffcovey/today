@@ -31,7 +31,9 @@ quiet, and you keep the user's attention on the few things only they can do.
 1. Sync context: run `bin/diary today` and read today's diary file for role
    blocks and reply lines (`-> <role>: ...` — the plain `->` and the
    typographic `→` both count as the arrow). A reply addressed to a role is
-   that role's work order for this run.
+   that role's work order for this run. Within a block, the latest
+   timestamped entry is that role's current state — earlier entries are
+   history, and a checked (`[x]`) or cancelled (`[-]`) checkbox is settled.
 2. List the roster. For each role, decide whether it needs to run now:
    it has a user reply waiting, its sources plausibly changed, or it has not
    reported today. Skip roles with nothing to do — launches cost money.

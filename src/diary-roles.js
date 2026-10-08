@@ -195,6 +195,109 @@ function acquireDiaryLock(lockPath) {
   throw new Error(`Timed out acquiring diary lock ${lockPath}`);
 }
 
+export const CHECKBOX_STATES = ['x', '-'];
+
+/**
+ * Flip one checkbox inside a role's own block: `- [ ]` becomes `- [x]`
+ * (done) or `- [-]` (cancelled). This is the only mutation allowed on
+ * existing block content — a single state-character substitution. The
+ * match must identify exactly one unchecked checkbox line inside the
+ * block; anything else is an error and the file is left untouched, so
+ * prose (and user replies) stay append-only.
+ *
+ * Returns { ok, line } with the updated line, or { ok: false, error }.
+ */
+export function setRoleCheckboxState(filePath, role, match, state) {
+  if (!ROLE_NAME_RE.test(role || '')) {
+    return { ok: false, error: `Invalid role name "${role}": use lowercase letters, digits, and hyphens (max 32 chars)` };
+  }
+  const needle = (match || '').trim();
+  if (!needle) {
+    return { ok: false, error: 'Checkbox match text is empty' };
+  }
+  if (!CHECKBOX_STATES.includes(state)) {
+    return { ok: false, error: `Invalid checkbox state "${state}": expected one of ${CHECKBOX_STATES.join(', ')}` };
+  }
+
+  const startMarker = roleStartMarker(role);
+  const endMarker = roleEndMarker(role);
+  const lockPath = `${filePath}.lock`;
+
+  let lockStat;
+  try {
+    lockStat = acquireDiaryLock(lockPath);
+    try {
+      for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
+        let original;
+        try {
+          original = fs.readFileSync(filePath, 'utf8');
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return { ok: false, error: `Diary file ${filePath} does not exist` };
+          }
+          throw error;
+        }
+
+        const startIndex = original.indexOf(startMarker);
+        const endIndex = original.indexOf(endMarker);
+        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+          return { ok: false, error: `No ${role} block in ${filePath}` };
+        }
+
+        const blockStart = startIndex + startMarker.length;
+        const block = original.slice(blockStart, endIndex);
+        const lines = block.split('\n');
+        const haystackNeedle = needle.toLowerCase();
+
+        const openMatches = [];
+        let settledMatches = 0;
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].toLowerCase().includes(haystackNeedle)) {
+            continue;
+          }
+          if (/^\s*- \[ \] /.test(lines[i])) {
+            openMatches.push(i);
+          } else if (/^\s*- \[[^ ]\] /.test(lines[i])) {
+            settledMatches++;
+          }
+        }
+
+        if (openMatches.length === 0) {
+          return settledMatches > 0
+            ? { ok: false, error: `The checkbox matching "${needle}" in the ${role} block is already checked or cancelled` }
+            : { ok: false, error: `No open checkbox matching "${needle}" in the ${role} block` };
+        }
+        if (openMatches.length > 1) {
+          return { ok: false, error: `"${needle}" matches ${openMatches.length} open checkboxes in the ${role} block; use more specific text` };
+        }
+
+        lines[openMatches[0]] = lines[openMatches[0]].replace('- [ ] ', `- [${state}] `);
+        const updated = original.slice(0, blockStart) + lines.join('\n') + original.slice(endIndex);
+
+        const { conflict } = writeFileAtomicCAS(filePath, updated, original);
+        if (!conflict) {
+          return { ok: true, line: lines[openMatches[0]].trim() };
+        }
+      }
+
+      return { ok: false, error: `Concurrent writes kept changing ${filePath}; checkbox not flipped` };
+    } finally {
+      try {
+        const current = fs.statSync(lockPath);
+        if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
+          fs.unlinkSync(lockPath);
+        }
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+    }
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
 /**
  * Append a role report to a diary file. Creates the file (with minimal
  * front matter) and the role's block when missing; otherwise inserts the
