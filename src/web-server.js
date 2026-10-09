@@ -190,7 +190,7 @@ function escapeHtmlEntities(str) {
 async function renderError(errorCode, errorMessage) {
   const template = await loadTemplate('error');
   if (!template) {
-    return `<html><body><h1>${errorCode}</h1><p>${errorMessage}</p></body></html>`;
+    return `<html lang="en"><body><h1>${errorCode}</h1><p>${errorMessage}</p></body></html>`;
   }
   return renderTemplate(template, { errorCode: String(errorCode), errorMessage });
 }
@@ -5814,7 +5814,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
     };
 
     const html = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Git Changes</title>
   ${pageStyle}
@@ -5961,6 +5961,13 @@ app.get('/_git', authMiddleware, async (req, res) => {
     const modifiedFiles = ${JSON.stringify(modified)};
     const untrackedFiles = ${JSON.stringify(untracked)};
 
+    // diff2html bakes its colour scheme into the markup, so redraw the open
+    // diff when the theme changes.
+    new MutationObserver(() => {
+      const active = document.querySelector('.file-item.active');
+      if (active) loadDiff(active);
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
     async function loadDiff(el) {
       document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
       el.classList.add('active');
@@ -5985,6 +5992,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
             outputFormat: 'side-by-side',
             highlight: true,
             fileListToggle: false,
+            colorScheme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
           };
           if (typeof Diff2HtmlUI === 'undefined') {
             throw new Error('the diff2html script failed to load — try a hard reload (empty caches)');
@@ -5992,6 +6000,8 @@ app.get('/_git', authMiddleware, async (req, res) => {
           const ui = new Diff2HtmlUI(diffEl, data.diff, config);
           ui.draw();
           ui.highlightCode();
+          // The side-by-side panes scroll sideways; a tab stop lets keyboards scroll them.
+          diffEl.querySelectorAll('.d2h-file-side-diff, .d2h-file-diff').forEach((pane) => { pane.tabIndex = 0; });
           // Make diff2html's filename header link to the file's page on the site.
           diffEl.querySelectorAll('.d2h-file-name').forEach((nameEl) => {
             if (nameEl.querySelector('a')) return;
@@ -6426,7 +6436,7 @@ app.get('/_summaries', authMiddleware, (req, res) => {
       .join('');
 
     const html = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Plan Summaries</title>
   ${pageStyle}

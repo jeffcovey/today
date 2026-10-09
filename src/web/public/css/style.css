@@ -1121,9 +1121,11 @@ input[type="checkbox"].task-checkbox {
   line-height: 24px;
 }
 
-/* Yellow stays yellow in dark mode, so its text stays dark. */
+/* Yellow and light blue stay light in dark mode, so their text stays dark. */
 html[data-theme="dark"] .bg-warning.text-dark,
-html[data-theme="dark"] .bg-warning .text-dark {
+html[data-theme="dark"] .bg-warning .text-dark,
+html[data-theme="dark"] .bg-info.text-dark,
+html[data-theme="dark"] .bg-info .text-dark {
   color: #212529 !important;
 }
 
@@ -1199,4 +1201,145 @@ html[data-theme="dark"] .input-group-text {
   background-color: var(--today-surface-2);
   color: var(--today-text);
   border-color: var(--today-border);
+}
+
+/* Badges that carry white text need a darker green and red than Bootstrap's. */
+.bg-success {
+  background-color: #15803d !important;
+}
+
+.bg-danger {
+  background-color: #b02a37 !important;
+}
+
+/* Git diffs (diff2html). The page passes Today's theme as diff2html's
+   colorScheme; these variables replace its colours that fail WCAG contrast.
+   html:root outranks diff2html's own :root block, which loads later. */
+html:root {
+  --d2h-dim-color: #464c53;
+  --d2h-change-label-color: #5c4a00;
+  --d2h-ins-label-color: #125a27;
+  --d2h-moved-label-color: #234d78;
+  --d2h-dark-dim-color: #a3abb4;
+}
+
+/* highlight.js's github-dark theme is loaded for code blocks, which are dark
+   in both themes. Light diffs get a light palette instead. */
+.d2h-light-color-scheme .hljs {
+  color: #1f2328;
+  background: transparent;
+}
+
+.d2h-light-color-scheme .hljs-keyword,
+.d2h-light-color-scheme .hljs-doctag,
+.d2h-light-color-scheme .hljs-template-tag,
+.d2h-light-color-scheme .hljs-template-variable,
+.d2h-light-color-scheme .hljs-type,
+.d2h-light-color-scheme .hljs-variable.language_ {
+  color: #990016;
+}
+
+.d2h-light-color-scheme .hljs-title,
+.d2h-light-color-scheme .hljs-title.class_,
+.d2h-light-color-scheme .hljs-title.function_ {
+  color: #5a2ea6;
+}
+
+.d2h-light-color-scheme .hljs-attr,
+.d2h-light-color-scheme .hljs-attribute,
+.d2h-light-color-scheme .hljs-literal,
+.d2h-light-color-scheme .hljs-meta,
+.d2h-light-color-scheme .hljs-number,
+.d2h-light-color-scheme .hljs-operator,
+.d2h-light-color-scheme .hljs-variable,
+.d2h-light-color-scheme .hljs-selector-attr,
+.d2h-light-color-scheme .hljs-selector-class,
+.d2h-light-color-scheme .hljs-selector-id,
+.d2h-light-color-scheme .hljs-section,
+.d2h-light-color-scheme .hljs-link {
+  color: #0349a6;
+}
+
+.d2h-light-color-scheme .hljs-regexp,
+.d2h-light-color-scheme .hljs-string,
+.d2h-light-color-scheme .hljs-meta .hljs-string {
+  color: #0a3069;
+}
+
+.d2h-light-color-scheme .hljs-built_in,
+.d2h-light-color-scheme .hljs-symbol,
+.d2h-light-color-scheme .hljs-bullet {
+  color: #7a3500;
+}
+
+.d2h-light-color-scheme .hljs-comment,
+.d2h-light-color-scheme .hljs-code,
+.d2h-light-color-scheme .hljs-formula,
+.d2h-light-color-scheme .hljs-quote {
+  color: #464c53;
+}
+
+.d2h-light-color-scheme .hljs-name,
+.d2h-light-color-scheme .hljs-selector-tag,
+.d2h-light-color-scheme .hljs-selector-pseudo,
+.d2h-light-color-scheme .hljs-addition {
+  color: #0f5323;
+}
+
+.d2h-light-color-scheme .hljs-deletion {
+  color: #990016;
+}
+
+.d2h-light-color-scheme .hljs-subst,
+.d2h-light-color-scheme .hljs-emphasis,
+.d2h-light-color-scheme .hljs-strong {
+  color: #1f2328;
+}
+
+/* Bootstrap's text and outline colours used on the git page and elsewhere. */
+code {
+  color: var(--today-code-text);
+}
+
+.text-warning {
+  color: #7a5000 !important;
+}
+
+html[data-theme="dark"] .text-warning {
+  color: #fbbf24 !important;
+}
+
+.btn-outline-success {
+  color: #15803d;
+  border-color: #15803d;
+}
+
+html[data-theme="dark"] .btn-outline-success {
+  color: #4ade80;
+  border-color: #4ade80;
+}
+
+html[data-theme="dark"] .btn-outline-primary {
+  color: var(--today-link);
+  border-color: var(--today-link);
+}
+
+.btn-outline-danger {
+  color: #b02a37;
+  border-color: #b02a37;
+}
+
+html[data-theme="dark"] .btn-outline-danger {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+html[data-theme="dark"] .btn-outline-secondary {
+  color: var(--today-text);
+  border-color: var(--today-border);
+}
+
+/* github-dark's section blue is too dark on diff2html's dark added-line highlight. */
+.d2h-dark-color-scheme .hljs-section {
+  color: #a5d6ff;
 }
