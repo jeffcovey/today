@@ -15,6 +15,8 @@ import {
   startServer,
   auditPage,
   findPinnedOverlaps,
+  openDiff,
+  PASSWORD,
   PAGES,
   THEMES,
   VIEWPORTS
@@ -56,5 +58,27 @@ describe('web view layout', () => {
   test.each(combinations(longPages))('%s, %s theme, %s size: pinned elements never overlap', async (_name, theme, viewport, page) => {
     const overlaps = await findPinnedOverlaps(browser, { baseUrl: server.baseUrl, page, theme, viewport });
     expect(overlaps).toEqual([]);
+  });
+});
+
+describe('git page diffs', () => {
+  test.each([['light', 'dark'], ['dark', 'light']])('follow the theme: %s, then switched to %s', async (first, second) => {
+    const page = await browser.newPage();
+    try {
+      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), first);
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      await openDiff(page, 'code/example.js');
+
+      const scheme = () => page.$eval('#diffContent .d2h-wrapper', el =>
+        [...el.classList].find(c => /^d2h-(light|dark|auto)-color-scheme$/.test(c)) || 'none');
+      expect(await scheme()).toBe(`d2h-${first}-color-scheme`);
+
+      await page.evaluate((mode) => setThemeMode(mode), second);
+      await page.waitForSelector(`#diffContent .d2h-wrapper.d2h-${second}-color-scheme .hljs`, { timeout: 10_000 });
+      expect(await scheme()).toBe(`d2h-${second}-color-scheme`);
+    } finally {
+      await page.close();
+    }
   });
 });
