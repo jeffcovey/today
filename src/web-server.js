@@ -389,7 +389,7 @@ app.get("/auth/login", async (req, res) => {
   if (req.session && req.session.authenticated) return res.redirect("/");
   const template = await loadTemplate('login');
   if (template) {
-    res.send(template);
+    res.send(renderTemplate(template));
   } else {
     // Fallback if template not found
     res.send('<h1>Login</h1><form method="POST"><input name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button>Login</button></form>');
@@ -477,7 +477,7 @@ function getAIAssistantPanel(placeholderText = 'Ask me anything...') {
               placeholder="Type your message or /clear to reset..."
               rows="4"
               onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-            <button class="btn btn-primary" onclick="sendMessage()">
+            <button class="btn btn-primary" onclick="sendMessage()" aria-label="Send message">
               <i class="fas fa-paper-plane"></i>
             </button>
           </div>
@@ -1138,7 +1138,7 @@ async function getTaskTimerWidget() {
             </div>
             <div class="col-auto">
               <div class="input-group input-group-sm">
-                <input type="number" class="form-control" id="taskTimerMinutes" value="${taskTimerState.duration}" min="1" max="60" style="width: 60px;">
+                <input type="number" class="form-control" id="taskTimerMinutes" aria-label="Minutes per task" value="${taskTimerState.duration}" min="1" max="60" style="width: 60px;">
                 <span class="input-group-text">min</span>
               </div>
             </div>
@@ -1341,7 +1341,7 @@ async function renderDirectory(dirPath, urlPath) {
   
   // Build breadcrumb items
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
-  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
+  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;
@@ -1448,7 +1448,7 @@ async function renderDirectory(dirPath, urlPath) {
     contentHtml += `
               <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
                 <div class="card shadow-sm h-100">
-                  <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning' : 'bg-secondary'} text-white h-100">
+                  <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning text-dark' : 'bg-secondary text-white'} h-100">
                     <div class="d-flex align-items-center justify-content-between ps-2 py-2">
                       <div class="d-flex align-items-center">
                         <i class="fas fa-tasks me-2"></i>
@@ -1980,7 +1980,7 @@ async function renderEditor(filePath, urlPath) {
   
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
-  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
+  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;
@@ -2139,7 +2139,7 @@ async function renderToml(filePath, urlPath) {
 
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
-  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
+  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;
@@ -2929,7 +2929,7 @@ function renderProperties(properties) {
     <summary class="text-muted small" style="cursor: pointer; user-select: none;">
       <i class="fas fa-code me-1"></i>Properties (${propCount})
     </summary>
-    <pre class="mt-2 p-2 bg-light rounded small" style="max-height: 300px; overflow: auto;"><code>${escapedYaml}</code></pre>
+    <pre class="mt-2 p-2 rounded small" tabindex="0" style="max-height: 300px; overflow: auto;"><code>${escapedYaml}</code></pre>
   </details>`;
 }
 
@@ -4223,7 +4223,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           }
           // Add cancelled indicator if task is cancelled
           if (task.isCancelled) {
-            displayText += ` <span class="text-muted">(cancelled)</span>`;
+            displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
           }
 
           // Use task.id directly for the link (tasks come from tasks table)
@@ -4256,7 +4256,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           }
           // Add cancelled indicator if task is cancelled
           if (task.isCancelled) {
-            displayText += ` <span class="text-muted">(cancelled)</span>`;
+            displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
           }
 
           // Use task.id directly for the link
@@ -4337,7 +4337,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         // Add cancelled indicator if task is cancelled
         if (task.isCancelled) {
-          displayText += ` <span class="text-muted">(cancelled)</span>`;
+          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
         }
         const taskLink = task.id ? `/task/${task.id}` : '';
         tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
@@ -4370,7 +4370,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         // Add cancelled indicator if task is cancelled
         if (task.isCancelled) {
-          displayText += ` <span class="text-muted">(cancelled)</span>`;
+          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
         }
         const taskLink = task.id ? `/task/${task.id}` : '';
         tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
@@ -4656,46 +4656,19 @@ ${cleanContent}
     </div>`;
   });
   
-  // Replace details/summary elements with simple collapsible sections
-  let collapseId = 0;
-  htmlContent = htmlContent.replace(/<details[^>]*>([\s\S]*?)<\/details>/gi, (match, content) => {
-    collapseId++;
-    const id = `details-${Date.now()}-${collapseId}`;
-    
-    // Extract summary and content
-    const summaryMatch = content.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i);
-    let summaryText = summaryMatch ? summaryMatch[1].trim() : 'Click to expand';
-    const detailsContent = content.replace(/<summary[^>]*>[\s\S]*?<\/summary>/i, '').trim();
-    
-    // Convert emojis in the summary text
-    summaryText = convertEmojisToIcons(summaryText);
-    
-    // Check if it should be open by default
-    const isOpen = match.includes('open');
-    
-    return `
-      <div class="mb-3">
-        <div class="d-flex align-items-center p-2 bg-light rounded" 
-             style="cursor: pointer; user-select: none;"
-             onclick="const content = this.nextElementSibling; const icon = this.querySelector('.fa-chevron-right, .fa-chevron-down'); 
-                      if(content.style.display === 'none') {
-                        content.style.display = 'block'; 
-                        icon.classList.remove('fa-chevron-right'); 
-                        icon.classList.add('fa-chevron-down');
-                      } else {
-                        content.style.display = 'none';
-                        icon.classList.remove('fa-chevron-down'); 
-                        icon.classList.add('fa-chevron-right');
-                      }">
-          <i class="fas fa-chevron-${isOpen ? 'down' : 'right'} me-2 text-secondary"></i>
-          <strong>${summaryText}</strong>
-        </div>
-        <div style="display: ${isOpen ? 'block' : 'none'}; padding: 1rem; border-left: 3px solid #dee2e6; margin-left: 0.5rem;">
-          ${detailsContent}
-        </div>
-      </div>
-    `;
+  // Keep <details> native (keyboard- and screen-reader-operable) and give
+  // plain ones the themed task-section styling; only convert summary emojis.
+  htmlContent = htmlContent.replace(/<details([^>]*)>/gi, (match, attrs) => {
+    if (/\bclass\s*=/.test(attrs)) {
+      return match;
+    }
+    return `<details${attrs} class="task-section">`;
   });
+  htmlContent = htmlContent.replace(/<summary([^>]*)>([\s\S]*?)<\/summary>/gi,
+    (match, attrs, summaryText) => `<summary${attrs}>${convertEmojisToIcons(summaryText.trim())}</summary>`);
+
+  // Code blocks scroll sideways on a phone; a tab stop lets keyboard users scroll them.
+  htmlContent = htmlContent.replace(/<pre(?![^>]*\btabindex=)(\s|>)/gi, '<pre tabindex="0"$1');
   
   // Process metadata markers and add them to checkboxes
   // The markers look like {data-file="..." data-line="..."} and were added before marked.js
@@ -4828,7 +4801,7 @@ ${cleanContent}
 
   // Build breadcrumb
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
-  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i></a></li>';
+  let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;

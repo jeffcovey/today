@@ -578,3 +578,37 @@ function getTimeAgo(date) {
 
   return 'just now';
 }
+
+// Task checkboxes are generated in several places without a <label>; name
+// each one from its task text so screen readers announce what it toggles.
+function labelTaskCheckboxes(root = document) {
+  const selector = 'input[type="checkbox"].task-checkbox:not([aria-label]):not([aria-labelledby])';
+  const checkboxes = [...root.querySelectorAll(selector)];
+  if (root.matches && root.matches(selector)) checkboxes.push(root);
+  checkboxes.forEach(checkbox => {
+    const item = checkbox.closest('li') || checkbox.parentElement;
+    if (!item) return;
+    const clone = item.cloneNode(true);
+    clone.querySelectorAll('button, input, ul, ol').forEach(el => el.remove());
+    const text = clone.textContent.replace(/\s+/g, ' ').trim().slice(0, 150);
+    checkbox.setAttribute('aria-label', text || 'Task');
+  });
+}
+
+if (typeof document.querySelectorAll === 'function') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => labelTaskCheckboxes());
+  } else {
+    labelTaskCheckboxes();
+  }
+}
+
+if (typeof MutationObserver === 'function') {
+  new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === 1) labelTaskCheckboxes(node);
+      });
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
