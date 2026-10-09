@@ -7,9 +7,17 @@
   --today-muted-bg: #f8f9fa;
   --today-border: #dee2e6;
   --today-text: #212529;
-  --today-muted-text: #6c757d;
+  --today-muted-text: #5c636a;
   --today-hover-bg: #f8f9fa;
   --today-overlay: rgba(255, 255, 255, 0.9);
+  --today-surface-2: #f1f3f5;
+  --today-link: #2b5fb4;
+  --today-accent: #1266f1;
+  --today-code-text: #0b4ea2;
+  --today-code-bg: rgba(18, 102, 241, 0.1);
+  --mdb-link-color: #2b5fb4;
+  --mdb-link-color-rgb: 43, 95, 180;
+  --mdb-secondary-color: #5c636a;
 }
 
 html[data-theme="dark"] {
@@ -22,6 +30,14 @@ html[data-theme="dark"] {
   --today-muted-text: #9ca3af;
   --today-hover-bg: #374151;
   --today-overlay: rgba(17, 24, 39, 0.9);
+  --today-surface-2: #273244;
+  --today-link: #93c5fd;
+  --today-accent: #60a5fa;
+  --today-code-text: #bfdbfe;
+  --today-code-bg: #273a5c;
+  --mdb-link-color: #93c5fd;
+  --mdb-link-color-rgb: 147, 197, 253;
+  --mdb-secondary-color: #9ca3af;
 }
 
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
@@ -121,10 +137,10 @@ html {
   opacity: 0.4;
 }
 
-/* Sticky card header with TOC */
+/* Sticky card header with TOC, pinned just under the 56px navbar */
 .card-header {
   position: sticky;
-  top: 0;
+  top: 56px;
   z-index: 100;
   background: var(--today-card-bg);
 }
@@ -267,7 +283,7 @@ body {
 }
 
 .markdown-content h1 {
-  color: #1266f1;
+  color: var(--today-accent);
   font-weight: 300;
   border-bottom: 2px solid #e0e0e0;
   padding-bottom: 0.5rem;
@@ -298,8 +314,8 @@ body {
 }
 
 .markdown-content code {
-  background: rgba(18, 102, 241, 0.1);
-  color: #1266f1;
+  background: var(--today-code-bg);
+  color: var(--today-code-text);
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.875em;
@@ -342,7 +358,6 @@ body {
 /* Task styles */
 .task-cancelled {
   text-decoration: line-through;
-  opacity: 0.6;
   color: var(--today-muted-text);
 }
 
@@ -350,7 +365,7 @@ body {
   opacity: 1;
 }
 
-.task-cancelled::after {
+.task-cancelled:not(input)::after {
   content: " (cancelled)";
   font-style: italic;
   color: var(--today-muted-text);
@@ -904,11 +919,8 @@ html[data-theme="dark"] .editor-toolbar {
   text-decoration: underline;
 }
 
+/* Not sticky: a pinned breadcrumb landed on top of the pinned card header. */
 nav[aria-label="breadcrumb"] {
-  position: sticky;
-  top: 56px;
-  background: transparent;
-  z-index: 1010;
   padding: 0.5rem 0;
   margin-bottom: 1rem;
 }
@@ -1025,7 +1037,7 @@ html[data-theme="dark"] .dropdown-menu {
   border-color: var(--today-border);
 }
 
-html[data-theme="dark"] .text-muted {
+.text-muted {
   color: var(--today-muted-text) !important;
 }
 
@@ -1049,4 +1061,138 @@ html[data-theme="dark"] textarea {
 html[data-theme="dark"] .form-control::placeholder,
 html[data-theme="dark"] textarea::placeholder {
   color: var(--today-muted-text);
+}
+
+/* Accessibility: colours and targets checked by test/web-accessibility.test.js.
+   Bootstrap's light-only utilities follow the theme, and every interactive
+   control meets the WCAG 2.2 24px target size. */
+
+a {
+  color: var(--today-link);
+}
+
+.markdown-content a:not(.btn) {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+html[data-theme="dark"] .bg-white {
+  background-color: var(--today-card-bg) !important;
+  color: var(--today-text);
+}
+
+html[data-theme="dark"] .bg-light {
+  background-color: var(--today-surface-2) !important;
+  color: var(--today-text);
+}
+
+html[data-theme="dark"] .text-dark {
+  color: var(--today-text) !important;
+}
+
+.bg-secondary {
+  background-color: #5c636a !important;
+}
+
+details.task-section > summary {
+  color: var(--today-text);
+  font-weight: 500;
+}
+
+input[type="checkbox"].task-checkbox {
+  min-width: 24px;
+  min-height: 24px;
+  vertical-align: middle;
+}
+
+.task-postpone {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.toc-header a,
+.toc-content a {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
+}
+
+/* Yellow stays yellow in dark mode, so its text stays dark. */
+html[data-theme="dark"] .bg-warning.text-dark,
+html[data-theme="dark"] .bg-warning .text-dark {
+  color: #212529 !important;
+}
+
+html[data-theme="dark"] .table,
+html[data-theme="dark"] .markdown-content table {
+  --mdb-table-bg: transparent;
+  --mdb-table-color: var(--today-text);
+  --mdb-table-border-color: var(--today-border);
+  color: var(--today-text);
+}
+
+html[data-theme="dark"] .markdown-content th,
+html[data-theme="dark"] .markdown-content td {
+  background-color: transparent;
+  color: var(--today-text);
+  border-color: var(--today-border);
+}
+
+/* Let the focusable <pre> do the scrolling instead of highlight.js's <code>. */
+.markdown-content pre code.hljs {
+  overflow-x: visible;
+}
+
+/* Bootstrap alerts have no dark variants; these keep their meaning on a dark page. */
+html[data-theme="dark"] .alert-secondary,
+html[data-theme="dark"] .alert-light {
+  background-color: var(--today-surface-2);
+  color: var(--today-text);
+  border-color: var(--today-border);
+}
+
+html[data-theme="dark"] .alert-primary {
+  background-color: #1e3a5f;
+  color: #dbeafe;
+  border-color: #1d4ed8;
+}
+
+html[data-theme="dark"] .alert-info {
+  background-color: #164e63;
+  color: #cffafe;
+  border-color: #0e7490;
+}
+
+html[data-theme="dark"] .alert-success {
+  background-color: #14532d;
+  color: #dcfce7;
+  border-color: #15803d;
+}
+
+html[data-theme="dark"] .alert-warning {
+  background-color: #713f12;
+  color: #fef3c7;
+  border-color: #a16207;
+}
+
+html[data-theme="dark"] .alert-danger {
+  background-color: #7f1d1d;
+  color: #fee2e2;
+  border-color: #b91c1c;
+}
+
+html[data-theme="dark"] .alert strong,
+html[data-theme="dark"] .alert a:not(.btn) {
+  color: inherit;
+}
+
+html[data-theme="dark"] .btn-outline-dark {
+  color: var(--today-text);
+  border-color: var(--today-border);
+}
+
+html[data-theme="dark"] .input-group-text {
+  background-color: var(--today-surface-2);
+  color: var(--today-text);
+  border-color: var(--today-border);
 }
