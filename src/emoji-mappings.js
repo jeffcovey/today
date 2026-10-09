@@ -845,19 +845,32 @@ export const emojiToFontAwesome = {
   // Default fallback - we'll keep original emoji if no mapping exists
 };
 
+const emojiRegex = new RegExp(
+  Object.keys(emojiToFontAwesome)
+    .sort((a, b) => b.length - a.length)
+    .map(emoji => emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|'),
+  'g'
+);
+const protectedElements = new Set(['code', 'pre', 'script', 'style', 'textarea']);
+
 // Function to convert emojis to Font Awesome icons in HTML
 export function convertEmojisToIcons(html) {
-  let convertedHtml = html;
-  
-  // Sort emojis by length (longer emojis first to avoid partial matches)
-  const sortedEmojis = Object.keys(emojiToFontAwesome).sort((a, b) => b.length - a.length);
-  
-  for (const emoji of sortedEmojis) {
-    const icon = emojiToFontAwesome[emoji];
-    // Use a global replace with proper escaping
-    const emojiRegex = new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    convertedHtml = convertedHtml.replace(emojiRegex, icon);
-  }
-  
-  return convertedHtml;
+  const protectedDepths = new Map();
+  return html.split(/(<[^>]*>)/).map((segment, index) => {
+    if (index % 2 === 0) {
+      return [...protectedDepths.values()].some(depth => depth > 0)
+        ? segment
+        : segment.replace(emojiRegex, emoji => emojiToFontAwesome[emoji]);
+    }
+
+    const tag = segment.match(/^<\s*(\/?)\s*(code|pre|script|style|textarea)\b[^>]*>$/i);
+    if (tag) {
+      const [, closing, element] = tag;
+      const name = element.toLowerCase();
+      const depth = protectedDepths.get(name) || 0;
+      protectedDepths.set(name, closing ? Math.max(0, depth - 1) : depth + 1);
+    }
+    return segment;
+  }).join('');
 }

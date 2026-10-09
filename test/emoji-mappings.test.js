@@ -76,6 +76,29 @@ describe('emoji-mappings', () => {
       expect(result).toContain('<p>Status: ');
     });
 
+    test('converts link text without changing emoji-bearing attributes', () => {
+      const result = convertEmojisToIcons('<a href="notes/📔.md">📔 note</a>');
+      expect(result).toBe(`<a href="notes/📔.md">${emojiToFontAwesome['📔']} note</a>`);
+    });
+
+    test('leaves emojis in title and aria-label attributes untouched', () => {
+      const html = '<span title="📔 title" aria-label="✅ label">✅ text</span>';
+      const result = convertEmojisToIcons(html);
+      expect(result).toBe(`<span title="📔 title" aria-label="✅ label">${emojiToFontAwesome['✅']} text</span>`);
+    });
+
+    test('leaves emojis inside code and pre elements untouched', () => {
+      const html = '<code>✅</code><pre><code>🔺</code></pre> ✅';
+      const result = convertEmojisToIcons(html);
+      expect(result).toBe(`<code>✅</code><pre><code>🔺</code></pre> ${emojiToFontAwesome['✅']}`);
+    });
+
+    test('handles nested and case-insensitive protected elements', () => {
+      const html = '<CODE><code>✅</code>🔺</CODE><SCRIPT>📔</SCRIPT><STYLE>🔼</STYLE><TEXTAREA>✅</TEXTAREA> ✅';
+      const result = convertEmojisToIcons(html);
+      expect(result).toBe(`<CODE><code>✅</code>🔺</CODE><SCRIPT>📔</SCRIPT><STYLE>🔼</STYLE><TEXTAREA>✅</TEXTAREA> ${emojiToFontAwesome['✅']}`);
+    });
+
     test('handles longer multi-character emojis before shorter ones', () => {
       // Ensure the function handles emoji sequences correctly
       const result = convertEmojisToIcons('⚠️ warning');
