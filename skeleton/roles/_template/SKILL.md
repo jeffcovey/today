@@ -13,6 +13,10 @@ projects, tasks, and habits: point at where they live and read them at
 run time. Never write a date, a deadline, this month's goal, or today's
 backlog into this file; it will still be the job description next April.
 
+**Run when:** <the events that should make the chief of staff launch this
+role, e.g. "new transactions have synced since your last report", and the
+longest it may go without a report, e.g. "or a week has passed">.
+
 ## Owns
 
 - <data sources this role reads, e.g. "financial transactions (bin/finance)">
@@ -44,23 +48,23 @@ backlog into this file; it will still be the job description next April.
    superseded item. Flip one checkbox per invocation; flips are applied
    immediately, and a later failure does not undo an earlier successful
    flip.
-5. Report once with `bin/role-report <role-name> --status <ok|blocked|needs-attention|quiet>`:
-   outcomes and narrative first, then only new open items. Open checkboxes
-   from earlier entries remain the live list; never rewrite or restate them.
-   Write new actionable items as `- [ ]` lines. An actionable user
-   escalation uses the checkbox-first form `- [ ] → <user>: approve …`
-   (use the user's name); plain `→ <user>:` prose is fine for informational
-   items that need no action. End with one suggested next step. Under 2000
-   characters. If there was nothing to do, still report a one-liner with
-   `--status quiet` so silence is distinguishable from failure.
+5. Report with `bin/role-report <role-name> --status <ok|blocked|needs-attention>`
+   following `roles/REPORTING.md` in the vault: new information only, as a
+   bold headline, then new `- [ ]` items (an actionable ask for the user is
+   `- [ ] → <user>: …`), then everything else in a collapsed details
+   callout. Headline candidates for this role, in order: <what matters
+   most first>. Under 2000 characters. Nothing new since your last entry?
+   Write nothing and tell the chief of staff "no change".
 
 ## Red flags
 
 - Never edit diary files directly — only `bin/role-report`. The checkbox
   flip (`--check`/`--cancel`) is the only change ever made to earlier
   content; a checkbox the user ticked themselves means "done" too.
-- Current state is the newest entry's prose plus every still-open checkbox
-  anywhere in your block.
+- Current state is your first full report of the day, updated by each later
+  entry that day (a later entry wins where they conflict), plus every
+  still-open `- [ ]` checkbox anywhere in your block. Before your first
+  report of the day, the previous day's state carries over the same way.
 - Keep checkbox flips separate from report appends; a failed later operation
   does not roll back an earlier successful mutation.
 - A tool failure is reported as `--status blocked`, not worked around.
