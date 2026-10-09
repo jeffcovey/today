@@ -2,7 +2,8 @@
 
 Role agents are standing AI helpers — a bookkeeper, a fitness coach, an
 innkeeper — defined by the user in their vault and reporting into the daily
-diary. The diary is the whole interaction model: roles write durable report
+diary. They are the optional `roles` plugin (`plugins/roles/`); nothing here
+runs or installs unless it is enabled. The diary is the whole interaction model: roles write durable report
 blocks, the user replies inline from any device, and the next run reads the
 replies. Because diary entries already feed AI context, every `bin/today`
 session sees the reports for free, and past diary files are each role's
@@ -24,10 +25,11 @@ vault/roles/
   <your-role>/SKILL.md
 ```
 
-Templates ship in `skeleton/roles/` and are installed by
-`bin/plugins vault-files --install` **only when missing** — unlike skeleton
-scripts, role files belong to the user after install and are never
-overwritten, even with `--force`.
+The plugin ships these as vault files in `plugins/roles/vault/roles/`.
+Like every plugin's vault files, `bin/plugins vault-files --install` copies
+them only when the plugin is enabled and only when they are missing; `--force`
+would overwrite edited copies, so don't use it once you've customized your
+roles.
 
 Every role file answers the same five sections, so roles stay comparable:
 
@@ -44,7 +46,8 @@ events that should make the chief of staff launch it, and the longest it may
 go without a report. The chief launches a role only for a reason it can name
 from that line or from a reply addressed to the role; "hasn't reported today"
 is not a reason. The chief is exempt from dispatch and runs only when the
-scheduler starts it or the user runs it by hand.
+plugin starts it at its run times (see **Running the staff**) or the user runs
+it by hand.
 
 ## Reports for a phone screen
 
@@ -85,8 +88,9 @@ Categorized 12 transactions.
 <!-- ROLE:cpa:END -->
 ```
 
-Properties, all enforced by the `markdown-diary` plugin and
-`src/diary-roles.js`:
+The block format lives in `src/diary-role-blocks.js`, shared by the
+`markdown-diary` plugin (which parses blocks) and the roles plugin (which
+writes them). Properties:
 
 - **Durable.** The `TODAY:` marker namespace is stripped from past days'
   files; `ROLE:` blocks never are. They also count as real content, so a
@@ -131,9 +135,9 @@ check one off from the rendered diary page without editing text. Put the
 checkbox first for actionable user escalations:
 
 ```bash
-bin/role-report cpa "- [ ] → Jeff: approve the money-market transfer"
-bin/role-report cpa --check "money market"    # - [ ] money market…  → - [x]
-bin/role-report cpa --cancel "Meadow Ridge"   # - [ ] Meadow Ridge…  → - [-] (cancelled)
+plugins/roles/report.js cpa "- [ ] → Jeff: approve the money-market transfer"
+plugins/roles/report.js cpa --check "money market"    # - [ ] money market…  → - [x]
+plugins/roles/report.js cpa --cancel "Meadow Ridge"   # - [ ] Meadow Ridge…  → - [-] (cancelled)
 ```
 
 Both flags are repeatable and can combine with a report argument, but
@@ -149,14 +153,17 @@ match, or an ambiguous match is an error that leaves the file untouched.
 Prose, including user replies, stays append-only; freehand edits of
 earlier entries (strikethroughs included) remain forbidden.
 
-## bin/role-report
+## Writing reports: plugins/roles/report.js
 
-Roles never edit diary files by hand. The guarded writer:
+Roles never edit diary files by hand. The guarded writer, run from the
+project root:
 
 ```bash
-bin/role-report cpa "Categorized 12 transactions." --status ok
-echo "Longer report..." | bin/role-report cpa --status needs-attention
+plugins/roles/report.js cpa "Categorized 12 transactions." --status ok
+echo "Longer report..." | plugins/roles/report.js cpa --status needs-attention
 ```
+
+It refuses to run unless the roles plugin is enabled.
 
 It validates the role name (`[a-z0-9-]`, max 32 chars), caps reports at
 2,000 characters, rejects text containing `ROLE:`/`TODAY:` markers (which
@@ -166,19 +173,32 @@ retries. Statuses: `ok`, `blocked`, `needs-attention`, `quiet`.
 `--check "<text>"` / `--cancel "<text>"` flip one open checkbox in the
 role's own block (see **Snapshots and checkboxes**).
 
-## Orchestration
+## Running the staff
 
-Only one role is scheduled: the chief of staff. Everything else runs as a
-subagent of its session. Add a scheduler job via your deploy config
-(`bin/deploy` writes `.data/scheduler-config.json`):
+Enable the plugin and set its run times (wall-clock `HH:MM` in your configured
+time zone):
 
-```json
-{
-  "name": "chief-of-staff",
-  "schedule": "0 8,13,17 * * *",
-  "command": "bin/today --non-interactive --quiet 'Read vault/roles/chief-of-staff/SKILL.md and follow it.'"
-}
+```toml
+[plugins.roles.default]
+enabled = true
+run_times = ["04:00", "08:00", "12:00", "16:00"]
 ```
+
+Then install the starting role files with `bin/plugins vault-files --install`.
+
+Like `now-updates`, the plugin does its work on the regular plugin sync. Each
+sync checks whether a run time has passed since the last run. If so, it starts
+the chief of staff (`bin/today --non-interactive --no-sync`, following
+`roles/chief-of-staff/SKILL.md`) as a detached background process and returns,
+so the run takes as long as it needs; its output goes to
+`.data/roles/last-run.log`. If a run is still going when the next run time
+arrives, that run time is skipped. When the plugin is first enabled, it waits
+for the next run time rather than starting a run at once. Settings:
+`run_times`, `roles_directory` (default `roles`), and `chief_role` (default
+`chief-of-staff`).
+
+Only the chief of staff is started by the plugin; every other role runs as a
+subagent of its session.
 
 Guardrails (borrowed from a system running in production since 2026-09):
 

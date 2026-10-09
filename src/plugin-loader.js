@@ -2089,62 +2089,6 @@ export async function syncPluginVaultFiles(options = {}) {
     }
   }
 
-  installRoleTemplates(
-    path.join(PROJECT_ROOT, 'skeleton', 'roles'),
-    path.join(vaultPath, 'roles'),
-    result,
-    { verbose }
-  );
-
-  return result;
-}
-
-/**
- * Install role templates from skeleton/roles: shared files at the top level
- * (such as REPORTING.md) and each role directory's files.
- * Unlike scripts, role files are the user's to edit after install, so they
- * are only ever copied when missing — never overwritten, even with --force.
- */
-export function installRoleTemplates(rolesSrc, rolesDest, result, { verbose = false } = {}) {
-  if (!fs.existsSync(rolesSrc)) {
-    return result;
-  }
-
-  const copyIfMissing = (srcPath, relPath) => {
-    const destPath = path.join(rolesDest, ...relPath.split('/'));
-    if (fs.existsSync(destPath)) {
-      result.skipped.push(`skeleton:roles/${relPath}`);
-      return;
-    }
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.copyFileSync(srcPath, destPath);
-    result.installed.push(`skeleton:roles/${relPath}`);
-    if (verbose) {
-      console.log(`  Installed: roles/${relPath}`);
-    }
-  };
-
-  try {
-    for (const entry of fs.readdirSync(rolesSrc)) {
-      const srcPath = path.join(rolesSrc, entry);
-      const stat = fs.statSync(srcPath);
-
-      if (stat.isFile()) {
-        copyIfMissing(srcPath, entry);
-        continue;
-      }
-      if (!stat.isDirectory()) continue;
-
-      for (const roleFile of fs.readdirSync(srcPath)) {
-        const roleFilePath = path.join(srcPath, roleFile);
-        if (!fs.statSync(roleFilePath).isFile()) continue;
-        copyIfMissing(roleFilePath, path.posix.join(entry, roleFile));
-      }
-    }
-  } catch (error) {
-    result.errors.push(`skeleton:roles: ${error.message}`);
-  }
-
   return result;
 }
 
