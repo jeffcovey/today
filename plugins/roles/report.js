@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import { program } from 'commander';
-import { getAbsoluteVaultPath, getFullConfig } from '../../src/config.js';
+import { getAbsoluteVaultPath, getFullConfig, getTimezone } from '../../src/config.js';
 import { colors } from '../../src/cli-utils.js';
 import { appendRoleReport, setRoleCheckboxState, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
 
@@ -27,7 +27,7 @@ function rolesPluginEnabled() {
 }
 
 function todayDateString() {
-  const tz = process.env.TZ || 'America/New_York';
+  const tz = process.env.TZ || getTimezone();
   return new Date().toLocaleDateString('en-CA', { timeZone: tz });
 }
 

@@ -7,7 +7,7 @@
  * The run is started as a detached process with its own process group and
  * this script returns at once, so the plugin loader's timeout never applies
  * to it: the run takes as long as it needs. Its output goes to
- * .data/roles/last-run.log.
+ * .data/roles/<source>.log.
  */
 
 import { spawn } from 'child_process';
@@ -26,8 +26,9 @@ const rolesDirectory = config.roles_directory || 'roles';
 const chiefRole = config.chief_role || 'chief-of-staff';
 
 const stateDir = path.join(projectRoot, '.data', 'roles');
-const statePath = path.join(stateDir, `${sourceId.replace(/[^a-z0-9-]+/gi, '_')}.json`);
-const logPath = path.join(stateDir, 'last-run.log');
+const sourceStem = sourceId.replace(/[^a-z0-9-]+/gi, '_');
+const statePath = path.join(stateDir, `${sourceStem}.json`);
+const logPath = path.join(stateDir, `${sourceStem}.log`);
 
 function output(result) {
   console.log(JSON.stringify(result));
@@ -48,11 +49,11 @@ function writeState(state) {
   fs.renameSync(tmp, statePath);
 }
 
-function startRun(chiefSkillPath) {
+function startRun(chiefSkillPath, timeZone) {
   fs.mkdirSync(stateDir, { recursive: true });
   const log = fs.openSync(logPath, 'w');
 
-  const env = { ...process.env, TODAY_ROLES_RUN: '1' };
+  const env = { ...process.env, TODAY_ROLES_RUN: '1', TZ: timeZone };
   for (const key of Object.keys(env)) {
     if (key === 'PLUGIN_CONFIG' || key === 'SOURCE_ID') {
       delete env[key];
@@ -104,14 +105,13 @@ function main() {
 
   const chiefSkillPath = path.join(vaultPath, rolesDirectory, chiefRole, 'SKILL.md');
   if (!fs.existsSync(path.resolve(projectRoot, chiefSkillPath))) {
-    writeState({ ...state, lastSlot: slot });
     console.error(JSON.stringify({
       error: `${chiefSkillPath} not found; run bin/plugins vault-files --install, or set chief_role / roles_directory`
     }));
     process.exit(1);
   }
 
-  const pid = startRun(chiefSkillPath);
+  const pid = startRun(chiefSkillPath, timeZone);
   const startedAt = new Date().toISOString();
   writeState({ lastSlot: slot, pid, startedAt });
   output({ started: true, slot, pid, startedAt, log: path.relative(projectRoot, logPath), reason });

@@ -191,7 +191,8 @@ sync checks whether a run time has passed since the last run. If so, it starts
 the chief of staff (`bin/today --non-interactive --no-sync`, following
 `roles/chief-of-staff/SKILL.md`) as a detached background process and returns,
 so the run takes as long as it needs; its output goes to
-`.data/roles/last-run.log`. If a run is still going when the next run time
+`.data/roles/roles_default.log` (one log per plugin source). If a run is still
+going when the next run time
 arrives, that run time is skipped. When the plugin is first enabled, it waits
 for the next run time rather than starting a run at once. Settings:
 `run_times`, `roles_directory` (default `roles`), and `chief_role` (default

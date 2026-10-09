@@ -61,7 +61,7 @@ describe('roles plugin read.js', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-plugin-'));
     fs.mkdirSync(path.join(root, 'bin'));
     fs.writeFileSync(path.join(root, 'bin', 'today'),
-      '#!/bin/sh\nprintf "%s\\n" "$@" > "$(dirname "$0")/../args.txt"\necho "role env: $TODAY_ROLES_RUN" >> "$(dirname "$0")/../args.txt"\n');
+      '#!/bin/sh\nprintf "%s\\n" "$@" > "$(dirname "$0")/../args.txt"\necho "role env: $TODAY_ROLES_RUN" >> "$(dirname "$0")/../args.txt"\necho "timezone: $TZ" >> "$(dirname "$0")/../args.txt"\n');
     fs.chmodSync(path.join(root, 'bin', 'today'), 0o755);
     fs.mkdirSync(path.join(root, 'vault', 'roles', 'chief-of-staff'), { recursive: true });
     fs.writeFileSync(path.join(root, 'vault', 'roles', 'chief-of-staff', 'SKILL.md'), '# Chief of Staff\n');
@@ -121,6 +121,8 @@ describe('roles plugin read.js', () => {
     expect(args).toContain('--no-sync');
     expect(args).toContain('Read vault/roles/chief-of-staff/SKILL.md and follow it.');
     expect(args).toContain('role env: 1');
+    expect(args).toContain('timezone: UTC');
+    expect(json.log).toBe('.data/roles/roles_default.log');
     const state = JSON.parse(fs.readFileSync(statePath(), 'utf8'));
     expect(state.pid).toBe(json.pid);
     expect(state.lastSlot).not.toBe('2000-01-01 00:00');
@@ -156,6 +158,7 @@ describe('roles plugin read.js', () => {
 
     expect(status).toBe(1);
     expect(stderr).toMatch(/vault-files --install/);
+    expect(JSON.parse(fs.readFileSync(statePath(), 'utf8')).lastSlot).toBe('2000-01-01 00:00');
   });
 });
 

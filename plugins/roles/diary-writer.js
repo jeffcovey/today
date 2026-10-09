@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 import { ROLE_NAME_RE, roleStartMarker, roleEndMarker } from '../../src/diary-role-blocks.js';
+import { getTimezone } from '../../src/config.js';
 
 export const MAX_REPORT_LENGTH = 2000;
 export const MAX_ROLE_TITLE_LENGTH = 80;
@@ -96,7 +97,7 @@ export function formatRoleEntry(text, { time, status } = {}) {
 }
 
 function localTime(date = new Date()) {
-  const tz = process.env.TZ || 'America/New_York';
+  const tz = process.env.TZ || getTimezone();
   return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
 }
 
@@ -280,7 +281,7 @@ export function appendRoleReport(filePath, role, text, { time, status, title, fi
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     lockStat = acquireDiaryLock(lockPath);
     try {
-      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || 'America/New_York' });
+      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
       const initialContent = `---\ndate: ${date}\ncssclasses: dashboard\nobsidianUIMode: preview\n---\n\n`;
 
       for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
