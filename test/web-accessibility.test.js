@@ -82,3 +82,33 @@ describe('git page diffs', () => {
     }
   });
 });
+
+describe('task markers', () => {
+  const MARKER = /[🔺⏫🔼🔽⏬⏳🛫➕🔁📅✅❌]/u;
+
+  test.each([
+    ['Markdown task list', '/notes/kitchen-sink.md', 'li'],
+    ['task query results', '/projects/sample-project.md', '.tasks-query-result li']
+  ])('%s show icons, not raw emoji', async (_label, pagePath, itemSelector) => {
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}${pagePath}`, { waitUntil: 'networkidle0' });
+      await page.waitForSelector(`${itemSelector} input.task-checkbox`, { timeout: 15_000 });
+
+      const items = await page.$$eval(`${itemSelector}`, (els) => els
+        .filter(li => li.querySelector('input.task-checkbox'))
+        .map(li => ({ text: li.textContent.replace(/\s+/g, ' ').trim(), icons: li.querySelectorAll('i.fas').length })));
+      const brokenAttributes = await page.$$eval('[href], [title]', els => els
+        .flatMap(el => [el.getAttribute('href'), el.getAttribute('title')])
+        .filter(value => value?.includes('<i')));
+
+      expect(items.length).toBeGreaterThan(0);
+      expect(items.filter(item => MARKER.test(item.text)).map(item => item.text)).toEqual([]);
+      expect(items.some(item => item.icons > 0)).toBe(true);
+      expect(brokenAttributes).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+});

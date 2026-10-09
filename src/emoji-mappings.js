@@ -1,10 +1,58 @@
-// Helper function to create Font Awesome icon HTML
-function fa(iconClass, colorClass = '') {
-  return `<i class="fas fa-${iconClass}${colorClass ? ' text-' + colorClass : ''}"></i>`;
+// Font Awesome icon HTML. An icon that carries meaning (a task's priority or
+// dates) gets a label, read by screen readers and shown as a tooltip; the
+// rest are decorative.
+function fa(iconClass, colorClass = '', label = '') {
+  const classes = `fas fa-${iconClass}${colorClass ? ' text-' + colorClass : ''}`;
+  return label
+    ? `<i class="${classes}" role="img" aria-label="${label}" title="${label}"></i>`
+    : `<i class="${classes}" aria-hidden="true"></i>`;
 }
 
 // Comprehensive emoji to Font Awesome icon mapping
 export const emojiToFontAwesome = {
+  // Obsidian Tasks markers: distinct icons, labelled because they carry meaning
+  '🔺': fa('angles-up', 'danger', 'Highest priority'),
+  '⏫': fa('angle-up', 'warning', 'High priority'),
+  '🔼': fa('caret-up', 'primary', 'Medium priority'),
+  '🔽': fa('angle-down', 'info', 'Low priority'),
+  '⏬': fa('angles-down', 'secondary', 'Lowest priority'),
+  '⏳': fa('hourglass-half', 'warning', 'Scheduled'),
+  '🛫': fa('plane-departure', 'info', 'Starts'),
+  '➕': fa('plus', 'success', 'Created'),
+  '🔁': fa('repeat', 'info', 'Recurs'),
+
+  // Formerly only in the web server's private copy of this table
+  '🔍': fa('search', 'secondary'),
+  '🔎': fa('search-plus', 'secondary'),
+  '🔥': fa('fire', 'danger'),
+  '💰': fa('dollar-sign', 'success'),
+  '💵': fa('money-bill', 'success'),
+  '🗑️': fa('trash', 'danger'),
+  '🐛': fa('bug', 'danger'),
+  '🌐': fa('globe', 'primary'),
+  '📦': fa('box', 'warning'),
+  '🎬': fa('film', 'secondary'),
+  '🏃': fa('running', 'primary'),
+  '🚴': fa('biking', 'primary'),
+  '🗺️': fa('map', 'info'),
+  '🚦': fa('traffic-light', 'warning'),
+  '🚧': fa('triangle-exclamation', 'warning'),
+  '🖌️': fa('paint-brush', 'danger'),
+  '🧮': fa('calculator', 'secondary'),
+  '🏷️': fa('tag', 'info'),
+  '💳': fa('credit-card', 'primary'),
+  '🧾': fa('receipt', 'secondary'),
+  '🗳️': fa('box-archive', 'secondary'),
+  '📰': fa('newspaper', 'secondary'),
+  '🗞️': fa('newspaper', 'secondary'),
+  '🧱': fa('cube', 'danger'),
+  '🪨': fa('mountain', 'secondary'),
+  '🪵': fa('tree', 'brown'),
+  '🛢️': fa('oil-can', 'dark'),
+  '⛽': fa('gas-pump', 'danger'),
+  '🚥': fa('traffic-light', 'warning'),
+  '🛑': fa('hand', 'danger'),
+
   // Status & Check marks
   '✅': fa('check-circle', 'success'),
   '✔️': fa('check', 'success'),
@@ -20,7 +68,7 @@ export const emojiToFontAwesome = {
   '❔': fa('question', 'secondary'),
   '‼️': fa('exclamation', 'danger'),
   '⁉️': fa('question', 'warning'),
-  '🚨': fa('siren', 'danger'),
+  '🚨': fa('triangle-exclamation', 'danger'),
   
   // Documents & Writing
   '💡': fa('lightbulb', 'warning'),
@@ -36,7 +84,7 @@ export const emojiToFontAwesome = {
   '📘': fa('book', 'info'),
   '📙': fa('book', 'warning'),
   '📓': fa('book', 'secondary'),
-  '📔': fa('journal-whills', 'secondary'),
+  '📔': fa('book', 'secondary'),
   '📒': fa('book', 'warning'),
   '📃': fa('file', 'secondary'),
   '📄': fa('file-alt', 'secondary'),
@@ -53,10 +101,9 @@ export const emojiToFontAwesome = {
   '📐': fa('ruler-combined', 'secondary'),
   
   // Charts & Data
-  '📊': fa('chart-bar', 'primary'),
-  '📈': fa('chart-line', 'success'),
-  '📉': fa('chart-line', 'danger'),
   '📊': fa('chart-pie', 'primary'),
+  '📈': fa('chart-area', 'success'),
+  '📉': fa('chart-line', 'danger'),
   
   // Folders & Files
   '📁': fa('folder', 'warning'),
@@ -75,7 +122,6 @@ export const emojiToFontAwesome = {
   '⏰': fa('clock', 'warning'),
   '⏲️': fa('stopwatch', 'info'),
   '⏱️': fa('stopwatch', 'info'),
-  '⏳': fa('hourglass-half', 'warning'),
   '⌛': fa('hourglass', 'secondary'),
   '🕐': fa('clock', 'secondary'),
   '🕑': fa('clock', 'secondary'),
@@ -96,10 +142,10 @@ export const emojiToFontAwesome = {
   '📩': fa('envelope', 'info'),
   '📤': fa('share', 'info'),
   '📥': fa('inbox', 'info'),
-  '📬': fa('mailbox', 'secondary'),
-  '📪': fa('mailbox', 'secondary'),
+  '📬': fa('envelope-open-text', 'info'),
+  '📪': fa('envelope', 'secondary'),
   '📫': fa('envelope-open', 'info'),
-  '📭': fa('mailbox', 'secondary'),
+  '📭': fa('envelope-open', 'secondary'),
   '📮': fa('envelope-open', 'info'),
   '✉️': fa('envelope', 'info'),
   '📞': fa('phone', 'success'),
@@ -108,13 +154,13 @@ export const emojiToFontAwesome = {
   '🔔': fa('bell', 'warning'),
   '🔕': fa('bell-slash', 'secondary'),
   '📢': fa('bullhorn', 'warning'),
-  '📣': fa('megaphone', 'warning'),
+  '📣': fa('bullhorn', 'warning'),
   '📻': fa('broadcast-tower', 'secondary'),
   '📡': fa('satellite-dish', 'secondary'),
   '💬': fa('comments', 'info'),
   '💭': fa('comment-dots', 'info'),
   '🗨️': fa('comment', 'secondary'),
-  '🗯️': fa('comment-exclamation', 'warning'),
+  '🗯️': fa('comment-dots', 'danger'),
   '💢': fa('angry', 'danger'),
   
   // Tech & Devices
@@ -125,9 +171,6 @@ export const emojiToFontAwesome = {
   '🖱️': fa('mouse', 'secondary'),
   '🖲️': fa('hockey-puck', 'secondary'),
   '💽': fa('compact-disc', 'secondary'),
-  '💾': fa('save', 'primary'),
-  '💿': fa('compact-disc', 'secondary'),
-  '📀': fa('compact-disc', 'info'),
   '🔌': fa('plug', 'secondary'),
   '🔋': fa('battery-full', 'success'),
   '🪫': fa('battery-empty', 'danger'),
@@ -135,7 +178,6 @@ export const emojiToFontAwesome = {
   '📹': fa('video', 'danger'),
   '🎥': fa('video', 'danger'),
   '📺': fa('tv', 'secondary'),
-  '📻': fa('broadcast-tower', 'secondary'),
   '🎙️': fa('microphone', 'secondary'),
   '🎚️': fa('sliders-h', 'secondary'),
   '🎛️': fa('sliders-h', 'secondary'),
@@ -144,7 +186,7 @@ export const emojiToFontAwesome = {
   // Stars, Hearts & Symbols
   '⭐': fa('star', 'warning'),
   '🌟': fa('star', 'warning'),
-  '✨': fa('sparkles', 'warning'),
+  '✨': fa('wand-magic-sparkles', 'warning'),
   '💫': fa('star', 'info'),
   '❤️': fa('heart', 'danger'),
   '🧡': fa('heart', 'warning'),
@@ -163,7 +205,7 @@ export const emojiToFontAwesome = {
   '💗': fa('heart', 'pink'),
   '💓': fa('heart-pulse', 'danger'),
   '💘': fa('heart', 'pink'),
-  '💝': fa('gift-heart', 'danger'),
+  '💝': fa('gift', 'danger'),
   
   // Nature & Weather
   '☀️': fa('sun', 'warning'),
@@ -177,7 +219,7 @@ export const emojiToFontAwesome = {
   '🌧️': fa('cloud-rain', 'info'),
   '⛈️': fa('cloud-bolt', 'danger'),
   '🌩️': fa('cloud-bolt', 'danger'),
-  '🌨️': fa('cloud-snow', 'info'),
+  '🌨️': fa('snowflake', 'info'),
   '☔': fa('umbrella', 'info'),
   '☂️': fa('umbrella', 'secondary'),
   '❄️': fa('snowflake', 'info'),
@@ -224,13 +266,10 @@ export const emojiToFontAwesome = {
   '🚑': fa('ambulance', 'danger'),
   '🚓': fa('car', 'info'),
   '🚔': fa('car', 'info'),
-  '🚨': fa('light-emergency', 'danger'),
   '🚲': fa('bicycle', 'primary'),
-  '🛴': fa('scooter', 'info'),
   '🛵': fa('motorcycle', 'warning'),
   '🏍️': fa('motorcycle', 'dark'),
   '✈️': fa('plane', 'info'),
-  '🛫': fa('plane-departure', 'info'),
   '🛬': fa('plane-arrival', 'info'),
   '🚁': fa('helicopter', 'info'),
   '🚂': fa('train', 'secondary'),
@@ -294,9 +333,7 @@ export const emojiToFontAwesome = {
   '🥍': fa('hockey-puck', 'info'),
   '🏏': fa('baseball-ball', 'danger'),
   '⛳': fa('golf-ball', 'white'),
-  '🏹': fa('bullseye', 'warning'),
   '🎣': fa('fish', 'info'),
-  '🤿': fa('mask-snorkel', 'info'),
   '🥊': fa('hand-rock', 'danger'),
   '🥋': fa('user-ninja', 'white'),
   '🎯': fa('bullseye', 'danger'),
@@ -309,12 +346,9 @@ export const emojiToFontAwesome = {
   '🎮': fa('gamepad', 'primary'),
   '🕹️': fa('gamepad', 'dark'),
   '🎲': fa('dice', 'secondary'),
-  '♠️': fa('spade', 'dark'),
   '♥️': fa('heart', 'danger'),
   '♦️': fa('diamond', 'danger'),
-  '♣️': fa('club', 'dark'),
   '♟️': fa('chess-pawn', 'dark'),
-  '🃏': fa('joker', 'danger'),
   '🀄': fa('dice-d20', 'danger'),
   '🎴': fa('square', 'danger'),
   '🎭': fa('theater-masks', 'warning'),
@@ -330,27 +364,21 @@ export const emojiToFontAwesome = {
   '🎶': fa('music', 'info'),
   '🎼': fa('music', 'secondary'),
   '🎤': fa('microphone', 'secondary'),
-  '🎧': fa('headphones', 'secondary'),
   '🎸': fa('guitar', 'warning'),
   '🎹': fa('keyboard', 'secondary'),
-  '🎺': fa('trumpet', 'warning'),
-  '🎻': fa('violin', 'warning'),
+  '🎺': fa('music', 'warning'),
+  '🎻': fa('music', 'brown'),
   '🪗': fa('music', 'secondary'),
   '🥁': fa('drum', 'secondary'),
   '🪘': fa('drum', 'warning'),
   
   // Tools & Objects
-  '🔨': fa('hammer', 'secondary'),
-  '🪓': fa('axe', 'secondary'),
+  '🔨': fa('gavel', 'secondary'),
   '⛏️': fa('hammer', 'secondary'),
   '⚒️': fa('hammer', 'secondary'),
   '🛠️': fa('tools', 'secondary'),
-  '🗡️': fa('sword', 'secondary'),
-  '⚔️': fa('swords', 'secondary'),
   '🔫': fa('gun', 'secondary'),
-  '🏹': fa('bow-arrow', 'warning'),
   '🛡️': fa('shield-alt', 'primary'),
-  '🪚': fa('saw', 'secondary'),
   '🔧': fa('wrench', 'secondary'),
   '🪛': fa('screwdriver', 'secondary'),
   '🔩': fa('screwdriver', 'secondary'),
@@ -358,19 +386,16 @@ export const emojiToFontAwesome = {
   '🗜️': fa('compress', 'secondary'),
   '⚖️': fa('balance-scale', 'secondary'),
   '🦯': fa('walking', 'secondary'),
-  '🔗': fa('link', 'info'),
   '⛓️': fa('link', 'secondary'),
   '🪝': fa('anchor', 'secondary'),
   '🧰': fa('toolbox', 'secondary'),
   '🧲': fa('magnet', 'danger'),
-  '🪜': fa('ladder', 'secondary'),
   '⚗️': fa('flask', 'info'),
   '🧪': fa('vial', 'info'),
   '🧫': fa('bacteria', 'success'),
   '🧬': fa('dna', 'info'),
   '🔬': fa('microscope', 'info'),
   '🔭': fa('satellite', 'info'),
-  '📡': fa('satellite-dish', 'secondary'),
   
   // Lock & Keys
   '🔒': fa('lock', 'secondary'),
@@ -403,7 +428,6 @@ export const emojiToFontAwesome = {
   '🛅': fa('box', 'secondary'),
   
   // Warning & Signs
-  '⚠️': fa('exclamation-triangle', 'warning'),
   '🚸': fa('child', 'warning'),
   '⛔': fa('ban', 'danger'),
   '🚫': fa('ban', 'danger'),
@@ -450,10 +474,6 @@ export const emojiToFontAwesome = {
   '⏮️': fa('step-backward', 'info'),
   '⏯️': fa('play', 'secondary'),
   '◀️': fa('backward', 'secondary'),
-  '🔼': fa('caret-up', 'secondary'),
-  '🔽': fa('caret-down', 'secondary'),
-  '⏫': fa('angle-double-up', 'info'),
-  '⏬': fa('angle-double-down', 'info'),
   '⏏️': fa('eject', 'secondary'),
   
   // Shapes & Colors
@@ -485,7 +505,6 @@ export const emojiToFontAwesome = {
   '🔷': fa('diamond', 'primary'),
   '🔸': fa('diamond', 'warning'),
   '🔹': fa('diamond', 'primary'),
-  '🔺': fa('caret-up', 'danger'),
   '🔻': fa('caret-down', 'danger'),
   '💠': fa('diamond', 'info'),
   '🔘': fa('circle', 'secondary'),
@@ -493,37 +512,23 @@ export const emojiToFontAwesome = {
   '🔲': fa('square', 'dark'),
   
   // Math & Symbols
-  '➕': fa('plus', 'success'),
   '➖': fa('minus', 'danger'),
-  '✖️': fa('times', 'danger'),
   '➗': fa('divide', 'warning'),
   '♾️': fa('infinity', 'secondary'),
-  '‼️': fa('exclamation', 'danger'),
-  '⁉️': fa('question', 'warning'),
-  '❓': fa('question-circle', 'info'),
-  '❔': fa('question', 'secondary'),
-  '❗': fa('exclamation-circle', 'danger'),
-  '❕': fa('exclamation', 'warning'),
   '〰️': fa('wave-square', 'secondary'),
   '💱': fa('exchange-alt', 'info'),
   '💲': fa('dollar-sign', 'success'),
   '♻️': fa('recycle', 'success'),
-  '⚜️': fa('fleur-de-lis', 'warning'),
   '🔱': fa('anchor', 'warning'),
   '📛': fa('tag', 'danger'),
   '🔰': fa('shield-alt', 'warning'),
   '⭕': fa('circle', 'danger'),
-  '✅': fa('check-circle', 'success'),
-  '☑️': fa('check-square', 'success'),
-  '✔️': fa('check', 'success'),
-  '❌': fa('times-circle', 'danger'),
-  '❎': fa('times-square', 'danger'),
   '➰': fa('infinity', 'secondary'),
   '➿': fa('infinity', 'secondary'),
   '〽️': fa('chart-line', 'secondary'),
   '✳️': fa('asterisk', 'success'),
   '✴️': fa('star', 'secondary'),
-  '❇️': fa('sparkles', 'success'),
+  '❇️': fa('star', 'success'),
   
   // Miscellaneous
   '©️': fa('copyright', 'secondary'),
@@ -541,7 +546,6 @@ export const emojiToFontAwesome = {
   '7️⃣': fa('7', 'secondary'),
   '8️⃣': fa('8', 'secondary'),
   '9️⃣': fa('9', 'secondary'),
-  '🔟': fa('10', 'secondary'),
   '🔠': fa('font', 'secondary'),
   '🔡': fa('font', 'secondary'),
   '🔤': fa('language', 'secondary'),
@@ -562,7 +566,6 @@ export const emojiToFontAwesome = {
   '🅿️': fa('parking', 'primary'),
   '🆘': fa('life-ring', 'danger'),
   '🆙': fa('arrow-up', 'info'),
-  '🆚': fa('vs', 'warning'),
   '🈁': fa('language', 'secondary'),
   '🈂️': fa('credit-card', 'info'),
   '🈷️': fa('moon', 'warning'),
@@ -602,8 +605,6 @@ export const emojiToFontAwesome = {
   '🤏': fa('hand-rock', 'secondary'),
   '✌️': fa('hand-peace', 'secondary'),
   '🤞': fa('hand-peace', 'secondary'),
-  '🤟': fa('hand-horns', 'secondary'),
-  '🤘': fa('hand-horns', 'secondary'),
   '🤙': fa('phone', 'secondary'),
   '👈': fa('hand-point-left', 'secondary'),
   '👉': fa('hand-point-right', 'secondary'),
@@ -630,23 +631,13 @@ export const emojiToFontAwesome = {
   '🦶': fa('shoe-prints', 'secondary'),
   '👂': fa('assistive-listening-systems', 'secondary'),
   '🦻': fa('assistive-listening-systems', 'secondary'),
-  '👃': fa('nose', 'secondary'),
   '🧠': fa('brain', 'pink'),
-  '🦷': fa('tooth', 'white'),
-  '🦴': fa('bone', 'secondary'),
   '👀': fa('eye', 'info'),
   '👁️': fa('eye', 'info'),
-  '👅': fa('tongue', 'danger'),
-  '👄': fa('lips', 'danger'),
   
   // Clothing & Accessories
   '🧳': fa('suitcase-rolling', 'secondary'),
   '🌂': fa('umbrella', 'secondary'),
-  '☂️': fa('umbrella', 'info'),
-  '🧵': fa('circle', 'secondary'),
-  '🪡': fa('circle', 'secondary'),
-  '🪢': fa('circle', 'secondary'),
-  '🧶': fa('circle', 'warning'),
   '👓': fa('glasses', 'secondary'),
   '🕶️': fa('glasses', 'dark'),
   '🥽': fa('glasses', 'info'),
@@ -655,7 +646,6 @@ export const emojiToFontAwesome = {
   '👔': fa('user-tie', 'info'),
   '👕': fa('tshirt', 'info'),
   '👖': fa('socks', 'info'),
-  '🧣': fa('scarf', 'danger'),
   '🧤': fa('mitten', 'secondary'),
   '🧥': fa('vest', 'danger'),
   '🧦': fa('socks', 'secondary'),
@@ -670,7 +660,7 @@ export const emojiToFontAwesome = {
   '👛': fa('wallet', 'danger'),
   '👜': fa('shopping-bag', 'secondary'),
   '👝': fa('wallet', 'warning'),
-  '🎒': fa('backpack', 'danger'),
+  '🎒': fa('suitcase', 'secondary'),
   '👞': fa('shoe-prints', 'secondary'),
   '👟': fa('shoe-prints', 'white'),
   '🥾': fa('hiking', 'warning'),
@@ -690,16 +680,9 @@ export const emojiToFontAwesome = {
   '💼': fa('briefcase', 'secondary'),
   
   // Home & Living
-  '🏠': fa('home', 'primary'),
-  '🏡': fa('home', 'info'),
   '🏘️': fa('city', 'secondary'),
   '🏚️': fa('home', 'secondary'),
   '🏗️': fa('hard-hat', 'warning'),
-  '🏢': fa('building', 'secondary'),
-  '🏬': fa('shopping-bag', 'info'),
-  '🏭': fa('industry', 'secondary'),
-  '🏯': fa('torii-gate', 'danger'),
-  '🏰': fa('chess-rook', 'secondary'),
   '💺': fa('chair', 'secondary'),
   '🚪': fa('door-open', 'secondary'),
   '🛏️': fa('bed', 'info'),
@@ -716,7 +699,6 @@ export const emojiToFontAwesome = {
   '🛒': fa('shopping-cart', 'secondary'),
   '🚬': fa('smoking', 'secondary'),
   '⚰️': fa('cross', 'secondary'),
-  '⚱️': fa('urn', 'secondary'),
   '🗿': fa('monument', 'secondary'),
   '🧭': fa('compass', 'info'),
   
@@ -724,15 +706,11 @@ export const emojiToFontAwesome = {
   '🍏': fa('apple-alt', 'success'),
   '🍎': fa('apple-alt', 'danger'),
   '🍐': fa('lemon', 'success'),
-  '🍊': fa('orange', 'warning'),
   '🍋': fa('lemon', 'warning'),
-  '🍌': fa('banana', 'warning'),
   '🍉': fa('apple-alt', 'danger'),
-  '🍇': fa('grapes', 'purple'),
   '🍓': fa('apple-alt', 'danger'),
   '🫐': fa('circle', 'info'),
   '🍈': fa('apple-alt', 'success'),
-  '🍒': fa('cherry', 'danger'),
   '🍑': fa('apple-alt', 'warning'),
   '🥭': fa('apple-alt', 'warning'),
   '🍍': fa('crown', 'warning'),
@@ -746,7 +724,6 @@ export const emojiToFontAwesome = {
   '🥒': fa('hotdog', 'success'),
   '🌶️': fa('pepper-hot', 'danger'),
   '🫑': fa('pepper-hot', 'success'),
-  '🌽': fa('corn', 'warning'),
   '🥕': fa('carrot', 'warning'),
   '🫒': fa('circle', 'success'),
   '🧄': fa('circle', 'white'),
@@ -773,10 +750,8 @@ export const emojiToFontAwesome = {
   '🥪': fa('bread-slice', 'warning'),
   '🥙': fa('hotdog', 'warning'),
   '🧆': fa('circle', 'warning'),
-  '🌮': fa('taco', 'warning'),
   '🌯': fa('hotdog', 'warning'),
   '🫔': fa('hotdog', 'warning'),
-  '🥗': fa('salad', 'success'),
   '🥘': fa('utensils', 'warning'),
   '🫕': fa('fire', 'danger'),
   '🍝': fa('utensils', 'warning'),
@@ -807,19 +782,17 @@ export const emojiToFontAwesome = {
   '🍭': fa('circle', 'danger'),
   '🍬': fa('candy-cane', 'danger'),
   '🍫': fa('square', 'brown'),
-  '🍿': fa('popcorn', 'warning'),
   '🍩': fa('circle', 'warning'),
   '🍪': fa('cookie-bite', 'warning'),
   '🌰': fa('circle', 'brown'),
   '🥜': fa('circle', 'warning'),
   '🍯': fa('jar', 'warning'),
   '🥛': fa('glass-water', 'white'),
-  '🍼': fa('baby-bottle', 'secondary'),
   '🫖': fa('coffee', 'secondary'),
   '☕': fa('coffee', 'brown'),
   '🍵': fa('mug-hot', 'success'),
   '🧃': fa('box', 'warning'),
-  '🥤': fa('glass-whiskey', 'danger'),
+  '🥤': fa('glass-whiskey', 'info'),
   '🧋': fa('glass-whiskey', 'info'),
   '🍶': fa('wine-bottle', 'secondary'),
   '🍺': fa('beer', 'warning'),
@@ -855,47 +828,15 @@ export const emojiToFontAwesome = {
   '🥇': fa('medal', 'warning'),
   '🥈': fa('medal', 'secondary'),
   '🥉': fa('medal', 'brown'),
-  '⚽': fa('futbol', 'success'),
-  '⚾': fa('baseball-ball', 'white'),
-  '🥎': fa('baseball-ball', 'warning'),
-  '🏀': fa('basketball-ball', 'warning'),
-  '🏐': fa('volleyball-ball', 'white'),
-  '🏈': fa('football-ball', 'brown'),
-  '🏉': fa('football-ball', 'secondary'),
-  '🎾': fa('baseball', 'success'),
-  '🥏': fa('compact-disc', 'white'),
   '🎳': fa('bowling-ball', 'danger'),
-  '🏏': fa('baseball', 'danger'),
-  '🏑': fa('hockey-puck', 'warning'),
-  '🏒': fa('hockey-puck', 'secondary'),
-  '🥍': fa('hockey-puck', 'secondary'),
-  '🏓': fa('table-tennis', 'danger'),
-  '🏸': fa('baseball', 'secondary'),
-  '🥊': fa('mitten', 'danger'),
-  '🥋': fa('user-ninja', 'white'),
   '🥅': fa('hockey-puck', 'secondary'),
-  '⛳': fa('golf-ball', 'white'),
-  '⛸️': fa('skating', 'white'),
-  '🎣': fa('fish', 'secondary'),
-  '🤿': fa('mask-snorkel', 'info'),
   '🎽': fa('tshirt', 'info'),
-  '🎿': fa('skiing', 'secondary'),
-  '🛷': fa('sleigh', 'danger'),
-  '🥌': fa('hockey-puck', 'secondary'),
   
   // Cleanup & Hygiene
-  '🧹': fa('broom', 'secondary'),
-  '🧺': fa('shopping-basket', 'warning'),
-  '🧻': fa('toilet-paper', 'secondary'),
-  '🧼': fa('soap', 'info'),
   '🫧': fa('circle', 'info'),
-  '🧽': fa('eraser', 'warning'),
-  '🧯': fa('fire-extinguisher', 'danger'),
-  '🛒': fa('shopping-cart', 'secondary'),
   
   // Special Characters
   '💯': fa('certificate', 'danger'),
-  '💢': fa('angry', 'danger'),
   '💥': fa('bomb', 'danger'),
   '💨': fa('wind', 'secondary'),
   '💦': fa('tint', 'info'),
@@ -904,19 +845,31 @@ export const emojiToFontAwesome = {
   // Default fallback - we'll keep original emoji if no mapping exists
 };
 
+const emojiRegex = new RegExp(
+  Object.keys(emojiToFontAwesome)
+    .sort((a, b) => b.length - a.length)
+    .map(emoji => emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|'),
+  'g'
+);
+
 // Function to convert emojis to Font Awesome icons in HTML
 export function convertEmojisToIcons(html) {
-  let convertedHtml = html;
-  
-  // Sort emojis by length (longer emojis first to avoid partial matches)
-  const sortedEmojis = Object.keys(emojiToFontAwesome).sort((a, b) => b.length - a.length);
-  
-  for (const emoji of sortedEmojis) {
-    const icon = emojiToFontAwesome[emoji];
-    // Use a global replace with proper escaping
-    const emojiRegex = new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    convertedHtml = convertedHtml.replace(emojiRegex, icon);
-  }
-  
-  return convertedHtml;
+  const protectedDepths = new Map();
+  return html.split(/(<[^>]*>)/).map((segment, index) => {
+    if (index % 2 === 0) {
+      return [...protectedDepths.values()].some(depth => depth > 0)
+        ? segment
+        : segment.replace(emojiRegex, emoji => emojiToFontAwesome[emoji]);
+    }
+
+    const tag = segment.match(/^<\s*(\/?)\s*(code|pre|script|style|textarea)\b[^>]*>$/i);
+    if (tag) {
+      const [, closing, element] = tag;
+      const name = element.toLowerCase();
+      const depth = protectedDepths.get(name) || 0;
+      protectedDepths.set(name, closing ? Math.max(0, depth - 1) : depth + 1);
+    }
+    return segment;
+  }).join('');
 }
