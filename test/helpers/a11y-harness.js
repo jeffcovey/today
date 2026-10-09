@@ -81,9 +81,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     const insert = db.prepare(
       'INSERT INTO tasks (id, source, title, status, priority, due_date, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    insert.run('markdown-tasks/local:vault/notes/kitchen-sink.md:34', 'markdown-tasks/local',
+    insert.run('markdown-tasks/local:vault/notes/kitchen-sink.md:59', 'markdown-tasks/local',
       'Open task due today', 'open', 'highest', today,
-      JSON.stringify({ file_path: 'vault/notes/kitchen-sink.md', line_number: 34, tags: ['topic/sample'] }));
+      JSON.stringify({ file_path: 'vault/notes/kitchen-sink.md', line_number: 59, tags: ['topic/sample'] }));
     insert.run('markdown-tasks/local:vault/projects/sample-project.md:21', 'markdown-tasks/local',
       'Overdue objective', 'open', 'medium', '2026-01-10',
       JSON.stringify({ file_path: 'vault/projects/sample-project.md', line_number: 21, stage: 'back-stage' }));
