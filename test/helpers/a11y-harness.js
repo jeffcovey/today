@@ -57,6 +57,9 @@ function initVaultRepo(vaultDir) {
     .replace('- Bullet two', '- Bullet two, edited with a [new link](https://example.com)')
     .replace('## Footnote', '## Footnote, renamed'));
 
+  // Staged, so its diff shows the staged-file actions (Unstage).
+  git('add', 'notes/kitchen-sink.md');
+
   const codePath = path.join(vaultDir, 'code', 'example.js');
   fs.writeFileSync(codePath, fs.readFileSync(codePath, 'utf8')
     .replace("const greeting = 'hello';", "const greeting = 'hello there';\nconst answer = 42;")
