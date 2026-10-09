@@ -11,7 +11,8 @@ quiet, and you keep the user's attention on the few things only they can do.
 ## Owns
 
 - Today's diary file: every role's block and the user's reply lines
-- The roster: every `SKILL.md` under the vault's `roles/` directory (except `_template`)
+- The roster: every `SKILL.md` under the vault's `roles/` directory (except `_template`);
+  `roles/REPORTING.md` holds the reporting rules every role follows
 - Deciding which roles need to run this time, and launching them
 
 ## May do alone
@@ -35,32 +36,51 @@ quiet, and you keep the user's attention on the few things only they can do.
    state is the newest entry's prose plus every still-open checkbox anywhere
    in the block; earlier prose is history, and a checked (`[x]`) or
    cancelled (`[-]`) checkbox is settled.
-2. List the roster. For each role, decide whether it needs to run now:
-   it has a user reply waiting, its sources plausibly changed, or it has not
-   reported today. Skip roles with nothing to do — launches cost money.
-3. Record your dispatch decisions FIRST in your own report (which roles you
-   are launching and why, one line each), then launch them as subagents.
-   Limits: at most one launch per role per run; if a role fails, retry once,
-   then report the failure; roles never launch other roles.
-4. After subagents finish, settle your earlier checkboxes with
-   `bin/role-report chief-of-staff --check "<item text>"` or `--cancel
-   "<item text>"` before reporting (use `--date` for an earlier day's
-   diary), one flip per invocation. Flips apply immediately; a later
-   failure does not undo an earlier successful flip. Then write your report
-   with `bin/role-report chief-of-staff`:
-   the user's items first (everything the roles escalated, capped at five —
-   pick the five that matter most), then one line per role launched
-   (done/blocked), then anything you're watching for next run. Write
-   actionable user items as `- [ ] → <user>: …` (use the user's name);
-   informational items may remain `→ <user>:` prose. Open checkboxes from
-   earlier entries remain the live list — never restate them in your new
-   entry. Under 2000 characters.
-   Nothing to do at all? Report a one-liner with `--status quiet`.
+2. List the roster. Launch a role only for a reason you can name:
+   - a `->` reply addressed to it is waiting;
+   - something its **Run when** line names has happened (each role file
+     states its own triggers and how long it may go unreported);
+   - it has gone longer than its **Run when** line allows without a
+     report.
+
+   "Hasn't reported today" is not a reason by itself. No nameable reason
+   means skip it; launches cost money and every report costs the user
+   reading time.
+3. Record your dispatch FIRST, before launching anything, as one collapsed
+   callout so it takes a single line on screen:
+
+   ```markdown
+   > [!abstract]- Dispatch: innkeeper, cpa (4 skipped)
+   >
+   > - innkeeper: a guest checks out tomorrow
+   > - cpa: 6 new transactions since its last report
+   ```
+
+   Then launch them as subagents. Limits: at most one launch per role per
+   run; if a role fails, retry once, then report the failure; roles never
+   launch other roles. Nothing to launch? The dispatch entry
+   ("Dispatch: nothing due") is the whole run, and the record that it ran.
+4. After subagents finish, write your summary with
+   `bin/role-report chief-of-staff` following `roles/REPORTING.md` in the
+   vault, only if something changed since your last summary today. Your
+   summary is what the user reads first:
+   - a bold headline: the one thing that matters most;
+   - up to five numbered one-line items, most important first, each naming
+     the role that owns it. These are plain prose, never checkboxes: the
+     checkbox lives once, in the owning role's block, where the user ticks
+     it;
+   - a collapsed details callout with one line per role launched (done,
+     blocked, or "no change"), corrections you made, and what you're
+     watching for next run.
+
+   Settle your own earlier checkboxes first, if you have any, with
+   `--check` / `--cancel`, one flip per invocation.
 
 ## Red flags
 
 - Role reports are leads, not facts — verify anything surprising at its
-  source before putting it in front of the user.
+  source before putting it in front of the user. When two roles disagree on
+  a fact, check the source and say which is right in your details callout.
 - Never edit another role's block or any diary content by hand.
 - Never launch a role twice in one run.
 - The diary report is your only output channel. You may run with shell

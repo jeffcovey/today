@@ -18,6 +18,7 @@ A role is a directory in the vault with an
 
 ```text
 vault/roles/
+  REPORTING.md              # how every role writes to the diary
   _template/SKILL.md        # copy to create a new role
   chief-of-staff/SKILL.md   # the orchestrator (the only scheduled role)
   <your-role>/SKILL.md
@@ -37,6 +38,27 @@ Every role file answers the same five sections, so roles stay comparable:
 | Hands to the user | what it must never decide itself |
 | Run | the numbered steps of one run, ending in one report |
 | Red flags | role-specific hazards |
+
+Each role also states a **Run when** line: the events that should make the
+chief of staff launch it, and the longest it may go without a report. The
+chief launches a role only for a reason it can name from that line or from a
+reply addressed to the role; "hasn't reported today" is not a reason.
+
+## Reports for a phone screen
+
+`roles/REPORTING.md` holds the rules every role follows when it writes:
+
+- **New information only.** The first report of the day is complete; later
+  runs report only what changed. A role with nothing new writes nothing and
+  tells the chief "no change", which the chief records in its own block.
+- **Headline, checkboxes, then a toggle.** One bold headline sentence, then
+  any new `- [ ]` items, then everything else inside a collapsed callout
+  (`> [!info]- Details`, followed by an empty `>` line, which the web view
+  needs to render a toggle). Checkboxes stay outside the callout because the
+  task list only sees a checkbox at the start of a line.
+- **One checkbox per item.** The chief's summary lists the user's top items
+  as numbered prose naming the owning role; the checkbox itself lives once,
+  in that role's block.
 
 ## Diary ROLE blocks
 
@@ -155,9 +177,10 @@ Guardrails (borrowed from a system running in production since 2026-09):
 - at most one launch per role per run; one retry, then report the failure;
 - roles never launch other roles, and nothing triggers on diary edits —
   only the scheduled run reads them, which is the anti-loop defense;
-- dispatch decisions are recorded before launching, so a crashed run
-  leaves no unaccountable subagents;
-- a run with nothing to do still reports a `--status quiet` one-liner, so
-  silence is distinguishable from failure;
+- dispatch decisions are recorded before launching, as a one-line collapsed
+  callout, so a crashed run leaves no unaccountable subagents and every run
+  leaves a trace even when nothing was due;
+- a role with nothing new writes nothing; the chief notes "no change" for
+  it, so silence is distinguishable from failure;
 - role reports are leads, not facts — the orchestrator verifies anything
   surprising at its source before relaying it to the user.
