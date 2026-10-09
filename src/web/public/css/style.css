@@ -1314,8 +1314,26 @@ html[data-theme="dark"] .text-warning {
   border-color: #15803d;
 }
 
+html .btn.btn-outline-success:hover,
+html .btn.btn-outline-success:focus-visible,
+html .btn.btn-outline-success:active,
+html .btn.btn-outline-success.active {
+  color: #ffffff;
+  background-color: #15803d;
+  border-color: #15803d;
+}
+
 html[data-theme="dark"] .btn-outline-success {
   color: #4ade80;
+  border-color: #4ade80;
+}
+
+html[data-theme="dark"] .btn.btn-outline-success:hover,
+html[data-theme="dark"] .btn.btn-outline-success:focus-visible,
+html[data-theme="dark"] .btn.btn-outline-success:active,
+html[data-theme="dark"] .btn.btn-outline-success.active {
+  color: #111827;
+  background-color: #4ade80;
   border-color: #4ade80;
 }
 
@@ -1324,8 +1342,26 @@ html[data-theme="dark"] .btn-outline-primary {
   border-color: var(--today-link);
 }
 
+html[data-theme="dark"] .btn.btn-outline-primary:hover,
+html[data-theme="dark"] .btn.btn-outline-primary:focus-visible,
+html[data-theme="dark"] .btn.btn-outline-primary:active,
+html[data-theme="dark"] .btn.btn-outline-primary.active {
+  color: #111827;
+  background-color: var(--today-link);
+  border-color: var(--today-link);
+}
+
 .btn-outline-danger {
   color: #b02a37;
+  border-color: #b02a37;
+}
+
+html .btn.btn-outline-danger:hover,
+html .btn.btn-outline-danger:focus-visible,
+html .btn.btn-outline-danger:active,
+html .btn.btn-outline-danger.active {
+  color: #ffffff;
+  background-color: #b02a37;
   border-color: #b02a37;
 }
 
@@ -1334,9 +1370,27 @@ html[data-theme="dark"] .btn-outline-danger {
   border-color: #f87171;
 }
 
+html[data-theme="dark"] .btn.btn-outline-danger:hover,
+html[data-theme="dark"] .btn.btn-outline-danger:focus-visible,
+html[data-theme="dark"] .btn.btn-outline-danger:active,
+html[data-theme="dark"] .btn.btn-outline-danger.active {
+  color: #111827;
+  background-color: #f87171;
+  border-color: #f87171;
+}
+
 html[data-theme="dark"] .btn-outline-secondary {
   color: var(--today-text);
-  border-color: var(--today-border);
+  border-color: var(--today-muted-text);
+}
+
+html[data-theme="dark"] .btn.btn-outline-secondary:hover,
+html[data-theme="dark"] .btn.btn-outline-secondary:focus-visible,
+html[data-theme="dark"] .btn.btn-outline-secondary:active,
+html[data-theme="dark"] .btn.btn-outline-secondary.active {
+  color: var(--today-text);
+  background-color: var(--today-surface-2);
+  border-color: var(--today-surface-2);
 }
 
 /* github-dark's section blue is too dark on diff2html's dark added-line highlight. */

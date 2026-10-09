@@ -5957,6 +5957,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
   <script>
     let currentFile = null;
     let currentSection = null;
+    let diffRequestId = 0;
     const stagedFiles = ${JSON.stringify(staged)};
     const modifiedFiles = ${JSON.stringify(modified)};
     const untrackedFiles = ${JSON.stringify(untracked)};
@@ -5969,20 +5970,31 @@ app.get('/_git', authMiddleware, async (req, res) => {
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     async function loadDiff(el) {
+      const requestId = ++diffRequestId;
       document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active'));
       el.classList.add('active');
 
       const file = el.dataset.file;
       const section = el.dataset.section;
-      currentFile = file;
-      currentSection = section;
 
       const type = section === 'staged' ? 'staged' : (section === 'untracked' ? 'untracked' : 'unstaged');
 
       try {
         const resp = await fetch('/_git/diff?file=' + encodeURIComponent(file) + '&type=' + type);
+        if (requestId !== diffRequestId) return;
         const data = await resp.json();
-        if (!resp.ok) { document.getElementById('diffContent').innerHTML = '<div class="p-3 text-danger">' + (data.error || 'Error') + '</div>'; return; }
+        if (requestId !== diffRequestId) return;
+
+        currentFile = file;
+        currentSection = section;
+
+        if (!resp.ok) {
+          currentFile = null;
+          currentSection = null;
+          document.getElementById('diffContent').innerHTML = '<div class="p-3 text-danger">' + (data.error || 'Error') + '</div>';
+          document.getElementById('diffActions').innerHTML = '';
+          return;
+        }
 
         const diffEl = document.getElementById('diffContent');
         diffEl.innerHTML = '';
@@ -6030,7 +6042,11 @@ app.get('/_git', authMiddleware, async (req, res) => {
         }
         actions.innerHTML = btns;
       } catch (err) {
+        if (requestId !== diffRequestId) return;
+        currentFile = null;
+        currentSection = null;
         document.getElementById('diffContent').innerHTML = '<div class="p-3 text-danger">Failed to load diff: ' + err.message + '</div>';
+        document.getElementById('diffActions').innerHTML = '';
       }
     }
 
