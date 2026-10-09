@@ -58,6 +58,7 @@ a [relative link](../diary/2026-01-15.md), and a [[diary/2026-01-15|wiki link]].
 
 - [ ] Open task 🔺 📅 2026-01-20 #topic/sample
 - [ ] Scheduled task 🔽 ⏳ 2026-01-18
+- [ ] Read [the journal](../diary/2026-01-15.md "📔 journal") 🔼
 - [x] Done task ✅ 2026-01-14
 - [-] Cancelled task ❌ 2026-01-14
 

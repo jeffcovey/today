@@ -23,6 +23,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
+import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
@@ -2438,257 +2439,6 @@ async function renderToml(filePath, urlPath) {
   return html;
 }
 
-// Emoji to Font Awesome icon mapping
-const emojiToFontAwesome = {
-  // Common emojis
-  '✅': '<i class="fas fa-check-circle text-success"></i>',
-  '❌': '<i class="fas fa-times-circle text-danger"></i>',
-  '⚠️': '<i class="fas fa-exclamation-triangle text-warning"></i>',
-  '💡': '<i class="fas fa-lightbulb text-warning"></i>',
-  '📝': '<i class="fas fa-edit text-info"></i>',
-  '📚': '<i class="fas fa-book text-info"></i>',
-  '📖': '<i class="fas fa-book-open text-info"></i>',
-  '📊': '<i class="fas fa-chart-bar text-primary"></i>',
-  '📈': '<i class="fas fa-chart-line text-success"></i>',
-  '📉': '<i class="fas fa-chart-line text-danger"></i>',
-  '🎯': '<i class="fas fa-bullseye text-danger"></i>',
-  '🔍': '<i class="fas fa-search text-secondary"></i>',
-  '🔎': '<i class="fas fa-search-plus text-secondary"></i>',
-  '💭': '<i class="fas fa-comment-dots text-info"></i>',
-  '💬': '<i class="fas fa-comments text-info"></i>',
-  '📅': '<i class="fas fa-calendar-alt text-primary"></i>',
-  '📆': '<i class="fas fa-calendar text-primary"></i>',
-  '⏰': '<i class="fas fa-clock text-warning"></i>',
-  '🕐': '<i class="fas fa-clock text-secondary"></i>',
-  '📧': '<i class="fas fa-envelope text-info"></i>',
-  '📮': '<i class="fas fa-envelope-open text-info"></i>',
-  '📞': '<i class="fas fa-phone text-success"></i>',
-  '🔔': '<i class="fas fa-bell text-warning"></i>',
-  '🔕': '<i class="fas fa-bell-slash text-secondary"></i>',
-  '⭐': '<i class="fas fa-star text-warning"></i>',
-  '🌟': '<i class="fas fa-star text-warning"></i>',
-  '❤️': '<i class="fas fa-heart text-danger"></i>',
-  '💔': '<i class="fas fa-heart-broken text-danger"></i>',
-  '🔥': '<i class="fas fa-fire text-danger"></i>',
-  '🚀': '<i class="fas fa-rocket text-primary"></i>',
-  '💰': '<i class="fas fa-dollar-sign text-success"></i>',
-  '💵': '<i class="fas fa-money-bill text-success"></i>',
-  '🏠': '<i class="fas fa-home text-primary"></i>',
-  '🏢': '<i class="fas fa-building text-secondary"></i>',
-  '🔑': '<i class="fas fa-key text-warning"></i>',
-  '🔒': '<i class="fas fa-lock text-secondary"></i>',
-  '🔓': '<i class="fas fa-lock-open text-warning"></i>',
-  '🔗': '<i class="fas fa-link text-info"></i>',
-  '📎': '<i class="fas fa-paperclip text-secondary"></i>',
-  '✏️': '<i class="fas fa-pencil-alt text-secondary"></i>',
-  '🖊️': '<i class="fas fa-pen text-secondary"></i>',
-  '📁': '<i class="fas fa-folder text-warning"></i>',
-  '📂': '<i class="fas fa-folder-open text-warning"></i>',
-  '💾': '<i class="fas fa-save text-primary"></i>',
-  '🗑️': '<i class="fas fa-trash text-danger"></i>',
-  '⚙️': '<i class="fas fa-cog text-secondary"></i>',
-  '🔧': '<i class="fas fa-wrench text-secondary"></i>',
-  '🔨': '<i class="fas fa-hammer text-secondary"></i>',
-  '🛠️': '<i class="fas fa-tools text-secondary"></i>',
-  '🐛': '<i class="fas fa-bug text-danger"></i>',
-  '💻': '<i class="fas fa-laptop text-primary"></i>',
-  '🖥️': '<i class="fas fa-desktop text-primary"></i>',
-  '📱': '<i class="fas fa-mobile-alt text-primary"></i>',
-  '☁️': '<i class="fas fa-cloud text-info"></i>',
-  '🌐': '<i class="fas fa-globe text-primary"></i>',
-  '📦': '<i class="fas fa-box text-warning"></i>',
-  '🎁': '<i class="fas fa-gift text-danger"></i>',
-  '🏆': '<i class="fas fa-trophy text-warning"></i>',
-  '🥇': '<i class="fas fa-medal text-warning"></i>',
-  '🎓': '<i class="fas fa-graduation-cap text-primary"></i>',
-  '💊': '<i class="fas fa-pills text-danger"></i>',
-  '🏥': '<i class="fas fa-hospital text-danger"></i>',
-  '✈️': '<i class="fas fa-plane text-info"></i>',
-  '🚗': '<i class="fas fa-car text-secondary"></i>',
-  '🚌': '<i class="fas fa-bus text-secondary"></i>',
-  '🚂': '<i class="fas fa-train text-secondary"></i>',
-  '⚡': '<i class="fas fa-bolt text-warning"></i>',
-  '☕': '<i class="fas fa-coffee text-brown"></i>',
-  '🍕': '<i class="fas fa-pizza-slice text-warning"></i>',
-  '🎵': '<i class="fas fa-music text-info"></i>',
-  '🎬': '<i class="fas fa-film text-secondary"></i>',
-  '📷': '<i class="fas fa-camera text-secondary"></i>',
-  '🎮': '<i class="fas fa-gamepad text-primary"></i>',
-  '⚽': '<i class="fas fa-futbol text-success"></i>',
-  '🏀': '<i class="fas fa-basketball-ball text-warning"></i>',
-  '⚾': '<i class="fas fa-baseball-ball text-danger"></i>',
-  '🎾': '<i class="fas fa-table-tennis text-success"></i>',
-  '🏃': '<i class="fas fa-running text-primary"></i>',
-  '🚴': '<i class="fas fa-biking text-primary"></i>',
-  '👍': '<i class="fas fa-thumbs-up text-success"></i>',
-  '👎': '<i class="fas fa-thumbs-down text-danger"></i>',
-  '👏': '<i class="fas fa-hands-clapping text-success"></i>',
-  '🙏': '<i class="fas fa-praying-hands text-info"></i>',
-  '👁️': '<i class="fas fa-eye text-info"></i>',
-  '👀': '<i class="fas fa-eye text-info"></i>',
-  '🧠': '<i class="fas fa-brain text-pink"></i>',
-  '💪': '<i class="fas fa-dumbbell text-primary"></i>',
-  '🌳': '<i class="fas fa-tree text-success"></i>',
-  '🌲': '<i class="fas fa-tree text-success"></i>',
-  '🌱': '<i class="fas fa-seedling text-success"></i>',
-  '🌸': '<i class="fas fa-spa text-pink"></i>',
-  '☀️': '<i class="fas fa-sun text-warning"></i>',
-  '🌙': '<i class="fas fa-moon text-info"></i>',
-  '⛅': '<i class="fas fa-cloud-sun text-info"></i>',
-  '☔': '<i class="fas fa-umbrella text-info"></i>',
-  '❄️': '<i class="fas fa-snowflake text-info"></i>',
-  '🌡️': '<i class="fas fa-thermometer-half text-danger"></i>',
-  '💧': '<i class="fas fa-tint text-info"></i>',
-  '🔴': '<i class="fas fa-circle text-danger"></i>',
-  '🟢': '<i class="fas fa-circle text-success"></i>',
-  '🔵': '<i class="fas fa-circle text-primary"></i>',
-  '🟡': '<i class="fas fa-circle text-warning"></i>',
-  '⚫': '<i class="fas fa-circle text-dark"></i>',
-  '⚪': '<i class="fas fa-circle text-secondary"></i>',
-  '▶️': '<i class="fas fa-play text-success"></i>',
-  '⏸️': '<i class="fas fa-pause text-warning"></i>',
-  '⏹️': '<i class="fas fa-stop text-danger"></i>',
-  '⏪': '<i class="fas fa-backward text-info"></i>',
-  '⏩': '<i class="fas fa-forward text-info"></i>',
-  '🔄': '<i class="fas fa-sync text-info"></i>',
-  '♻️': '<i class="fas fa-recycle text-success"></i>',
-  '➕': '<i class="fas fa-plus text-success"></i>',
-  '➖': '<i class="fas fa-minus text-danger"></i>',
-  '✖️': '<i class="fas fa-times text-danger"></i>',
-  '❓': '<i class="fas fa-question-circle text-info"></i>',
-  '❗': '<i class="fas fa-exclamation-circle text-danger"></i>',
-  '💤': '<i class="fas fa-bed text-info"></i>',
-  '🛏️': '<i class="fas fa-bed text-info"></i>',
-  '🚿': '<i class="fas fa-shower text-info"></i>',
-  '🚽': '<i class="fas fa-toilet text-secondary"></i>',
-  '🍴': '<i class="fas fa-utensils text-secondary"></i>',
-  '🥤': '<i class="fas fa-glass-whiskey text-info"></i>',
-  '🍺': '<i class="fas fa-beer text-warning"></i>',
-  '🍷': '<i class="fas fa-wine-glass-alt text-danger"></i>',
-  '🎂': '<i class="fas fa-birthday-cake text-warning"></i>',
-  '🎉': '<i class="fas fa-glass-cheers text-warning"></i>',
-  '🎊': '<i class="fas fa-glass-cheers text-warning"></i>',
-  '🎈': '<i class="fas fa-gift text-danger"></i>',
-  '📍': '<i class="fas fa-map-marker-alt text-danger"></i>',
-  '🗺️': '<i class="fas fa-map text-info"></i>',
-  '🧭': '<i class="fas fa-compass text-info"></i>',
-  '🚦': '<i class="fas fa-traffic-light text-warning"></i>',
-  '🚧': '<i class="fas fa-exclamation-triangle text-warning"></i>',
-  '⛔': '<i class="fas fa-ban text-danger"></i>',
-  '🚫': '<i class="fas fa-ban text-danger"></i>',
-  '🚭': '<i class="fas fa-smoking-ban text-danger"></i>',
-  '♿': '<i class="fas fa-wheelchair text-info"></i>',
-  '🚻': '<i class="fas fa-restroom text-info"></i>',
-  '🚹': '<i class="fas fa-male text-info"></i>',
-  '🚺': '<i class="fas fa-female text-info"></i>',
-  '🚼': '<i class="fas fa-baby text-info"></i>',
-  '📢': '<i class="fas fa-bullhorn text-warning"></i>',
-  '📣': '<i class="fas fa-megaphone text-warning"></i>',
-  '📡': '<i class="fas fa-satellite-dish text-secondary"></i>',
-  '📻': '<i class="fas fa-broadcast-tower text-secondary"></i>',
-  '📹': '<i class="fas fa-video text-danger"></i>',
-  '🎥': '<i class="fas fa-video text-danger"></i>',
-  '🎤': '<i class="fas fa-microphone text-secondary"></i>',
-  '🎧': '<i class="fas fa-headphones text-secondary"></i>',
-  '🎸': '<i class="fas fa-guitar text-warning"></i>',
-  '🥁': '<i class="fas fa-drum text-secondary"></i>',
-  '🎹': '<i class="fas fa-keyboard text-secondary"></i>',
-  '🎺': '<i class="fas fa-trumpet text-warning"></i>',
-  '🎻': '<i class="fas fa-violin text-warning"></i>',
-  '🎭': '<i class="fas fa-theater-masks text-warning"></i>',
-  '🎨': '<i class="fas fa-palette text-danger"></i>',
-  '🖼️': '<i class="fas fa-image text-info"></i>',
-  '🖌️': '<i class="fas fa-paint-brush text-danger"></i>',
-  '✂️': '<i class="fas fa-cut text-secondary"></i>',
-  '📏': '<i class="fas fa-ruler text-secondary"></i>',
-  '📐': '<i class="fas fa-ruler-combined text-secondary"></i>',
-  '🔬': '<i class="fas fa-microscope text-info"></i>',
-  '🔭': '<i class="fas fa-satellite text-info"></i>',
-  '💉': '<i class="fas fa-syringe text-danger"></i>',
-  '🩺': '<i class="fas fa-stethoscope text-info"></i>',
-  '🩹': '<i class="fas fa-band-aid text-warning"></i>',
-  '🧬': '<i class="fas fa-dna text-info"></i>',
-  '🧪': '<i class="fas fa-vial text-info"></i>',
-  '🧫': '<i class="fas fa-bacteria text-success"></i>',
-  '🧯': '<i class="fas fa-fire-extinguisher text-danger"></i>',
-  '🪜': '<i class="fas fa-ladder text-secondary"></i>',
-  '🧲': '<i class="fas fa-magnet text-danger"></i>',
-  '🔩': '<i class="fas fa-screwdriver text-secondary"></i>',
-  '⚖️': '<i class="fas fa-balance-scale text-secondary"></i>',
-  '🧮': '<i class="fas fa-calculator text-secondary"></i>',
-  '📌': '<i class="fas fa-thumbtack text-danger"></i>',
-  '📋': '<i class="fas fa-clipboard text-secondary"></i>',
-  '📄': '<i class="fas fa-file-alt text-secondary"></i>',
-  '📃': '<i class="fas fa-file text-secondary"></i>',
-  '📑': '<i class="fas fa-bookmark text-warning"></i>',
-  '🔖': '<i class="fas fa-bookmark text-warning"></i>',
-  '🏷️': '<i class="fas fa-tag text-info"></i>',
-  '💳': '<i class="fas fa-credit-card text-primary"></i>',
-  '🧾': '<i class="fas fa-receipt text-secondary"></i>',
-  '📊': '<i class="fas fa-chart-pie text-primary"></i>',
-  '📈': '<i class="fas fa-chart-area text-success"></i>',
-  '📉': '<i class="fas fa-chart-line text-danger"></i>',
-  '🗂️': '<i class="fas fa-folder-tree text-warning"></i>',
-  '🗄️': '<i class="fas fa-archive text-secondary"></i>',
-  '🗃️': '<i class="fas fa-box-archive text-secondary"></i>',
-  '📥': '<i class="fas fa-inbox text-info"></i>',
-  '📤': '<i class="fas fa-share text-info"></i>',
-  '📨': '<i class="fas fa-envelope-open-text text-info"></i>',
-  '📩': '<i class="fas fa-envelope text-info"></i>',
-  '📬': '<i class="fas fa-mailbox text-secondary"></i>',
-  '📭': '<i class="fas fa-mailbox text-secondary"></i>',
-  '🗳️': '<i class="fas fa-box-ballot text-primary"></i>',
-  '✉️': '<i class="fas fa-envelope text-info"></i>',
-  '📜': '<i class="fas fa-scroll text-warning"></i>',
-  '📰': '<i class="fas fa-newspaper text-secondary"></i>',
-  '🗞️': '<i class="fas fa-newspaper text-secondary"></i>',
-  '📖': '<i class="fas fa-book-open text-info"></i>',
-  '📕': '<i class="fas fa-book text-danger"></i>',
-  '📗': '<i class="fas fa-book text-success"></i>',
-  '📘': '<i class="fas fa-book text-info"></i>',
-  '📙': '<i class="fas fa-book text-warning"></i>',
-  '📓': '<i class="fas fa-book text-secondary"></i>',
-  '📒': '<i class="fas fa-book text-warning"></i>',
-  '📔': '<i class="fas fa-book text-secondary"></i>',
-  '🔏': '<i class="fas fa-lock text-secondary"></i>',
-  '🔐': '<i class="fas fa-lock text-warning"></i>',
-  '🔒': '<i class="fas fa-lock text-secondary"></i>',
-  '🔓': '<i class="fas fa-lock-open text-warning"></i>',
-  '🛡️': '<i class="fas fa-shield-alt text-primary"></i>',
-  '🗝️': '<i class="fas fa-key text-warning"></i>',
-  '🔨': '<i class="fas fa-gavel text-secondary"></i>',
-  '⛏️': '<i class="fas fa-hammer text-secondary"></i>',
-  '🪓': '<i class="fas fa-axe text-secondary"></i>',
-  '🧰': '<i class="fas fa-toolbox text-secondary"></i>',
-  '🧱': '<i class="fas fa-cube text-danger"></i>',
-  '🪨': '<i class="fas fa-mountain text-secondary"></i>',
-  '🪵': '<i class="fas fa-tree text-brown"></i>',
-  '🛢️': '<i class="fas fa-oil-can text-dark"></i>',
-  '⛽': '<i class="fas fa-gas-pump text-danger"></i>',
-  '🚨': '<i class="fas fa-siren text-danger"></i>',
-  '🚥': '<i class="fas fa-traffic-light text-warning"></i>',
-  '🚦': '<i class="fas fa-traffic-light text-warning"></i>',
-  '🛑': '<i class="fas fa-stop-sign text-danger"></i>',
-  '🚧': '<i class="fas fa-construction text-warning"></i>'
-};
-
-// Function to convert emojis to Font Awesome icons in HTML
-function convertEmojisToIcons(html) {
-  let convertedHtml = html;
-  
-  // Sort emojis by length (longer emojis first to avoid partial matches)
-  const sortedEmojis = Object.keys(emojiToFontAwesome).sort((a, b) => b.length - a.length);
-  
-  for (const emoji of sortedEmojis) {
-    const icon = emojiToFontAwesome[emoji];
-    // Use a global replace with proper escaping
-    const emojiRegex = new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    convertedHtml = convertedHtml.replace(emojiRegex, icon);
-  }
-  
-  return convertedHtml;
-}
-
 // Cache management functions
 function cleanupCache() {
   // Remove expired entries
@@ -3865,6 +3615,15 @@ function taskPostponeButton(task) {
 }
 
 // Execute Obsidian Tasks query and return matching tasks
+// Obsidian Tasks priority markers, keyed on the priority name: the numeric
+// score can't tell "lowest" (0) from no priority at all.
+const PRIORITY_MARKERS = { highest: '🔺', high: '⏫', medium: '🔼', low: '🔽', lowest: '⏬' };
+
+function priorityMarker(task) {
+  const marker = PRIORITY_MARKERS[task.priorityText];
+  return marker ? `${marker} ` : '';
+}
+
 async function executeTasksQuery(query, queryContext = {}) {
   const db = getReadOnlyDatabase();
 
@@ -4213,7 +3972,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           }
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-          const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+          const priorityIcon = priorityMarker(task);
           // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
           let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
           // Add completion date if task is done
@@ -4247,7 +4006,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
         for (const task of result.tasks) {
           const checkbox = task.isDone ? 'checked' : '';
           const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-          const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+          const priorityIcon = priorityMarker(task);
           let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
           // Add completion date if task is done
           if (task.isDone && task.doneDate) {
@@ -4328,7 +4087,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         const checkbox = task.isDone ? 'checked' : '';
         const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-        const priorityIcon = task.priority === 3 ? '🔺 ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '⏫ ' : '';
+        const priorityIcon = priorityMarker(task);
         // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
         let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
         if (task.isDone && task.doneDate) {
@@ -4362,7 +4121,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         const checkbox = task.isDone ? 'checked' : '';
         const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-        const priorityIcon = task.priority === 4 ? '🔺 ' : task.priority === 3 ? '⏫ ' : task.priority === 2 ? '🔼 ' : task.priority === 1 ? '🔽 ' : '';
+        const priorityIcon = priorityMarker(task);
         let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
         if (task.isDone && task.doneDate) {
           const dateStr = formatDate(task.doneDate);
@@ -4393,7 +4152,8 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
 
 async function renderTasksQueryResult(query, urlPath, showPostpone) {
   const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
-  return `<div class="tasks-query-result">\n${renderTasksQueryListHtml(queryResult, showPostpone)}</div>`;
+  // Query results are inserted after the page-wide emoji conversion has run.
+  return `<div class="tasks-query-result">\n${convertEmojisToIcons(renderTasksQueryListHtml(queryResult, showPostpone))}</div>`;
 }
 
 // Uncached Markdown rendering (original implementation)
