@@ -852,7 +852,6 @@ const emojiRegex = new RegExp(
     .join('|'),
   'g'
 );
-const protectedElements = new Set(['code', 'pre', 'script', 'style', 'textarea']);
 
 // Function to convert emojis to Font Awesome icons in HTML
 export function convertEmojisToIcons(html) {
