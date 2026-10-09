@@ -4,7 +4,7 @@
  * pages in each theme and run axe-core on them.
  */
 
-import { spawn } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { createRequire } from 'module';
 import fs from 'fs';
 import net from 'net';
@@ -31,8 +31,40 @@ export const PAGES = [
   { name: 'kitchen-sink', path: '/notes/kitchen-sink.md' },
   { name: 'project', path: '/projects/sample-project.md' },
   { name: 'directory', path: '/notes/' },
-  { name: 'login', path: '/auth/login', public: true }
+  { name: 'login', path: '/auth/login', public: true },
+  { name: 'git-markdown', path: '/_git', openDiff: 'notes/kitchen-sink.md' },
+  { name: 'git-javascript', path: '/_git', openDiff: 'code/example.js' }
 ];
+
+/**
+ * Make the vault copy a git repository with uncommitted edits, so the /_git
+ * page has diffs to show: Markdown and JavaScript, for both highlighters.
+ */
+function initVaultRepo(vaultDir) {
+  // Lefthook and other hooks export GIT_* variables that would point these
+  // commands at the project's own repository.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (...args) => execFileSync('git', args, { cwd: vaultDir, env, stdio: 'pipe' });
+  git('init', '--quiet');
+  git('config', 'user.email', 'a11y@example.com');
+  git('config', 'user.name', 'Accessibility Test');
+  git('config', 'commit.gpgsign', 'false');
+  git('add', '-A');
+  git('commit', '--quiet', '--no-verify', '-m', 'Fixture vault');
+
+  const notePath = path.join(vaultDir, 'notes', 'kitchen-sink.md');
+  fs.writeFileSync(notePath, fs.readFileSync(notePath, 'utf8')
+    .replace('- Bullet two', '- Bullet two, edited with a [new link](https://example.com)')
+    .replace('## Footnote', '## Footnote, renamed'));
+
+  // Staged, so its diff shows the staged-file actions (Unstage).
+  git('add', 'notes/kitchen-sink.md');
+
+  const codePath = path.join(vaultDir, 'code', 'example.js');
+  fs.writeFileSync(codePath, fs.readFileSync(codePath, 'utf8')
+    .replace("const greeting = 'hello';", "const greeting = 'hello there';\nconst answer = 42;")
+    .replace('return `${greeting}, ${name}`;', 'return `${greeting}, ${name}! The answer is ${answer}.`;'));
+}
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -53,6 +85,7 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'today-a11y-'));
   const vaultDir = path.join(workDir, 'vault');
   fs.cpSync(vaultSource, vaultDir, { recursive: true });
+  initVaultRepo(vaultDir);
 
   // The server resolves vault_path against the project root, so it must be
   // relative even though the vault lives in a temp directory.
@@ -224,10 +257,15 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
       throw new Error(`${pageSpec.path}: expected data-theme="${theme}", got "${appliedTheme}"`);
     }
 
+    if (pageSpec.openDiff) {
+      await openDiff(page, pageSpec.openDiff);
+    }
+
+    // Measure final colours: a background mid-transition (a just-selected
+    // item fading in) would otherwise fail or pass depending on timing.
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
     await page.addScriptTag({ content: axeSource() });
     const runAxe = () => page.evaluate(async (ruleIds) => {
-      // Let transitions settle so axe measures final colours.
-      document.documentElement.style.setProperty('scroll-behavior', 'auto');
       const options = ruleIds
         ? { runOnly: { type: 'rule', values: ruleIds } }
         : { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } };
@@ -318,4 +356,15 @@ export async function findPinnedOverlaps(browser, { baseUrl, page: pageSpec, the
   } finally {
     await page.close();
   }
+}
+
+/**
+ * On the /_git page, click a changed file and wait until its diff is drawn
+ * and syntax-highlighted.
+ */
+export async function openDiff(page, file) {
+  const selector = `.file-item[data-file="${file}"]`;
+  await page.waitForSelector(selector, { timeout: 10_000 });
+  await page.$eval(selector, el => el.click());
+  await page.waitForSelector('#diffContent .d2h-wrapper .hljs', { timeout: 15_000 });
 }
