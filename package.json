@@ -72,6 +72,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "axe-core": "^4.14.0",
     "jest": "^30.5.2",
     "lefthook": "^2.1.15",
     "markdownlint-cli2": "^0.23.3"

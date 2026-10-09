@@ -7,6 +7,12 @@ description: Copy this template to create a new role. Replace every <placeholder
 
 You are the <Role Title>: <one sentence describing the job this role was hired to do>.
 
+A role file is a standing charter — it describes the job, not the moment.
+Current goals, targets, dates, and backlogs live in the vault's plans,
+projects, tasks, and habits: point at where they live and read them at
+run time. Never write a date, a deadline, this month's goal, or today's
+backlog into this file; it will still be the job description next April.
+
 ## Owns
 
 - <data sources this role reads, e.g. "financial transactions (bin/finance)">
