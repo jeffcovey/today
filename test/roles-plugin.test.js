@@ -93,7 +93,7 @@ describe('roles plugin read.js', () => {
   function waitForFile(file, timeoutMs = 5000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      if (fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('role env')) return;
+      if (fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('timezone:')) return;
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
     }
     throw new Error(`${file} never appeared`);
