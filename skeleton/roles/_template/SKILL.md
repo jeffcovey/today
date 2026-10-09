@@ -61,8 +61,10 @@ longest it may go without a report, e.g. "or a week has passed">.
 - Never edit diary files directly — only `bin/role-report`. The checkbox
   flip (`--check`/`--cancel`) is the only change ever made to earlier
   content; a checkbox the user ticked themselves means "done" too.
-- Current state is the newest entry's prose plus every still-open checkbox
-  anywhere in your block.
+- Current state is your first full report of the day, updated by each later
+  entry that day (a later entry wins where they conflict), plus every
+  still-open `- [ ]` checkbox anywhere in your block. Before your first
+  report of the day, the previous day's state carries over the same way.
 - Keep checkbox flips separate from report appends; a failed later operation
   does not roll back an earlier successful mutation.
 - A tool failure is reported as `--status blocked`, not worked around.

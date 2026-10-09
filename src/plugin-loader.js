@@ -2111,7 +2111,7 @@ export function installRoleTemplates(rolesSrc, rolesDest, result, { verbose = fa
   }
 
   const copyIfMissing = (srcPath, relPath) => {
-    const destPath = path.join(rolesDest, relPath);
+    const destPath = path.join(rolesDest, ...relPath.split('/'));
     if (fs.existsSync(destPath)) {
       result.skipped.push(`skeleton:roles/${relPath}`);
       return;
@@ -2138,7 +2138,7 @@ export function installRoleTemplates(rolesSrc, rolesDest, result, { verbose = fa
       for (const roleFile of fs.readdirSync(srcPath)) {
         const roleFilePath = path.join(srcPath, roleFile);
         if (!fs.statSync(roleFilePath).isFile()) continue;
-        copyIfMissing(roleFilePath, path.join(entry, roleFile));
+        copyIfMissing(roleFilePath, path.posix.join(entry, roleFile));
       }
     }
   } catch (error) {

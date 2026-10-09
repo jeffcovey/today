@@ -45,7 +45,9 @@ nothing beyond the headline is worth keeping, leave the callout out.
 - One checkbox per item, ever. Never restate an open checkbox, yours or
   another role's. The chief of staff never writes checkboxes for items a role
   owns; it points to them.
-- Your current state is your newest entry plus every open checkbox in your
-  block.
+- Your current state is your first full report of the day, updated by each
+  later entry that day (a later entry wins where they conflict), plus every
+  still-open `- [ ]` checkbox in your block. Before your first report of the
+  day, the previous day's state carries over the same way.
 - Don't put `#` directly before a word or number in prose ("listing #123"):
   Obsidian and the task list read it as a tag. Write "listing 123".
