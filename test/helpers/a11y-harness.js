@@ -258,10 +258,11 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
       await openDiff(page, pageSpec.openDiff);
     }
 
+    // Measure final colours: a background mid-transition (a just-selected
+    // item fading in) would otherwise fail or pass depending on timing.
+    await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
     await page.addScriptTag({ content: axeSource() });
     const runAxe = () => page.evaluate(async (ruleIds) => {
-      // Let transitions settle so axe measures final colours.
-      document.documentElement.style.setProperty('scroll-behavior', 'auto');
       const options = ruleIds
         ? { runOnly: { type: 'rule', values: ruleIds } }
         : { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } };
