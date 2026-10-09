@@ -2929,7 +2929,7 @@ function renderProperties(properties) {
     <summary class="text-muted small" style="cursor: pointer; user-select: none;">
       <i class="fas fa-code me-1"></i>Properties (${propCount})
     </summary>
-    <pre class="mt-2 p-2 rounded small" style="max-height: 300px; overflow: auto;"><code>${escapedYaml}</code></pre>
+    <pre class="mt-2 p-2 rounded small" tabindex="0" style="max-height: 300px; overflow: auto;"><code>${escapedYaml}</code></pre>
   </details>`;
 }
 
@@ -4223,7 +4223,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           }
           // Add cancelled indicator if task is cancelled
           if (task.isCancelled) {
-            displayText += ` <span class="text-muted">(cancelled)</span>`;
+            displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
           }
 
           // Use task.id directly for the link (tasks come from tasks table)
@@ -4256,7 +4256,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           }
           // Add cancelled indicator if task is cancelled
           if (task.isCancelled) {
-            displayText += ` <span class="text-muted">(cancelled)</span>`;
+            displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
           }
 
           // Use task.id directly for the link
@@ -4337,7 +4337,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         // Add cancelled indicator if task is cancelled
         if (task.isCancelled) {
-          displayText += ` <span class="text-muted">(cancelled)</span>`;
+          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
         }
         const taskLink = task.id ? `/task/${task.id}` : '';
         tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
@@ -4370,7 +4370,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
         }
         // Add cancelled indicator if task is cancelled
         if (task.isCancelled) {
-          displayText += ` <span class="text-muted">(cancelled)</span>`;
+          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
         }
         const taskLink = task.id ? `/task/${task.id}` : '';
         tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;

@@ -166,6 +166,36 @@ export function axeSource() {
   return fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 }
 
+async function gotoAndVerifyAssets(page, url) {
+  const failedAssets = new Set();
+  const trackAsset = (request) => {
+    if (['stylesheet', 'script'].includes(request.resourceType())) {
+      failedAssets.add(request.url());
+    }
+  };
+  page.on('requestfailed', trackAsset);
+  page.on('response', (response) => {
+    if (response.status() >= 400) {
+      trackAsset(response.request());
+    }
+  });
+
+  const response = await page.goto(url, { waitUntil: 'networkidle0', timeout: 30_000 });
+  if (failedAssets.size > 0) {
+    throw new Error(`Failed stylesheet or script requests: ${[...failedAssets].join(', ')}`);
+  }
+
+  const unattachedStylesheets = await page.evaluate(() =>
+    [...document.querySelectorAll('link[rel="stylesheet"]')]
+      .filter(link => !link.sheet)
+      .map(link => link.href || link.outerHTML)
+  );
+  if (unattachedStylesheets.length > 0) {
+    throw new Error(`Stylesheets did not load: ${unattachedStylesheets.join(', ')}`);
+  }
+  return response;
+}
+
 /**
  * Load a page in the given theme and viewport and run axe on it twice: as
  * rendered (collapsed toggles closed), then with every <details> opened so
@@ -184,7 +214,7 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
     }
 
-    const response = await page.goto(baseUrl + pageSpec.path, { waitUntil: 'networkidle0', timeout: 30_000 });
+    const response = await gotoAndVerifyAssets(page, baseUrl + pageSpec.path);
     if (!response || response.status() >= 400) {
       throw new Error(`${pageSpec.path} returned ${response ? response.status() : 'no response'}`);
     }
@@ -249,7 +279,7 @@ export async function findPinnedOverlaps(browser, { baseUrl, page: pageSpec, the
       try { localStorage.setItem('todayThemeMode', mode); } catch { /* storage blocked */ }
     }, theme);
     await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
-    await page.goto(baseUrl + pageSpec.path, { waitUntil: 'networkidle0', timeout: 30_000 });
+    await gotoAndVerifyAssets(page, baseUrl + pageSpec.path);
     await page.evaluate((y) => window.scrollTo(0, y), scrollY);
     await new Promise(resolve => setTimeout(resolve, 300));
 

@@ -371,6 +371,10 @@ body {
   color: var(--today-muted-text);
 }
 
+.task-cancelled:not(input):has(.task-cancelled-suffix)::after {
+  content: none;
+}
+
 /* Hide list markers for task items (has checkbox) */
 li:has(.task-checkbox) {
   list-style: none;
