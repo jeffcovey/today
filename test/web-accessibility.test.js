@@ -62,12 +62,43 @@ describe('web view layout', () => {
 });
 
 describe('git page diffs', () => {
+  test('dark theme directory headers differ from file rows in the same list', async () => {
+    const page = await browser.newPage();
+    try {
+      await page.evaluateOnNewDocument(() => localStorage.setItem('todayThemeMode', 'dark'));
+      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      expect(await page.$eval('html', el => el.dataset.theme)).toBe('dark');
+
+      const backgrounds = await page.$eval('.git-dir-header', header => {
+        const file = header.closest('.list-group').querySelector('.file-item');
+        return {
+          header: getComputedStyle(header).backgroundColor,
+          file: getComputedStyle(file).backgroundColor
+        };
+      });
+      expect(backgrounds.header).not.toBe(backgrounds.file);
+    } finally {
+      await page.close();
+    }
+  });
+
   test.each([['light', 'dark'], ['dark', 'light']])('follow the theme: %s, then switched to %s', async (first, second) => {
     const page = await browser.newPage();
     try {
       await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), first);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      const headerBackground = () => page.$eval('.git-dir-header', el => {
+        const probe = document.createElement('div');
+        probe.style.backgroundColor = 'var(--today-surface-2)';
+        el.appendChild(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { actual: getComputedStyle(el).backgroundColor, expected };
+      });
+      let background = await headerBackground();
+      expect(background.actual).toBe(background.expected);
       await openDiff(page, 'code/example.js');
 
       const scheme = () => page.$eval('#diffContent .d2h-wrapper', el =>
@@ -77,6 +108,8 @@ describe('git page diffs', () => {
       await page.evaluate((mode) => setThemeMode(mode), second);
       await page.waitForSelector(`#diffContent .d2h-wrapper.d2h-${second}-color-scheme .hljs`, { timeout: 10_000 });
       expect(await scheme()).toBe(`d2h-${second}-color-scheme`);
+      background = await headerBackground();
+      expect(background.actual).toBe(background.expected);
     } finally {
       await page.close();
     }
