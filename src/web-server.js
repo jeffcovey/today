@@ -5557,13 +5557,13 @@ app.get('/_git', authMiddleware, async (req, res) => {
         const dirFiles = byDir[dir];
         if (dir && dirFiles.length > 1) {
           const escaped = JSON.stringify(dirFiles).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-          html += `<div class="list-group-item d-flex justify-content-between align-items-center py-1" style="background: var(--bs-tertiary-bg, #f0f0f0);">
-            <span style="font-size:0.8rem; font-weight:600; opacity:0.7;">${dir}</span>
+          html += `<div class="list-group-item d-flex justify-content-between align-items-center py-1 git-dir-header">
+            <span class="git-dir-name">${dir}</span>
             <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="${action}(JSON.parse(this.dataset.files))" data-files="${escaped}">${action === 'stageAll' ? 'Stage' : 'Unstage'}</button>
           </div>`;
         }
         if (dir && dirFiles.length > 1) {
-          html += `<div style="border-left: 3px solid var(--bs-secondary-bg, #ccc); margin-left: 0;">`;
+          html += `<div class="git-dir-files">`;
           html += dirFiles.map(f => fileItem(f, section)).join('');
           html += `</div>`;
         } else {
