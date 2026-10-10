@@ -356,7 +356,7 @@ Each plugin type has a defined schema. Data is stored in a shared table for that
 | Type | Table | Description |
 |------|-------|-------------|
 | `context` | *(none)* | Ephemeral AI context (weather, plans, day themes) |
-| `diary` | `diary` | Journal entries with date and text (including durable `ROLE:` report blocks — see [docs/ROLE_AGENTS.md](../docs/ROLE_AGENTS.md)) |
+| `diary` | `diary` | Journal entries with date and text (including durable `ROLE:` report blocks written by the `roles` plugin — see [docs/ROLE_AGENTS.md](../docs/ROLE_AGENTS.md)) |
 | `email` | `email` | Email messages with headers and content |
 | `events` | `events` | Calendar events with start/end times |
 | `finance` | `financial_transactions` | Financial data (transactions, budget planning) |

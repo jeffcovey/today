@@ -1,14 +1,14 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { extractRoleBlocks } from '../src/diary-role-blocks.js';
 import {
-  extractRoleBlocks,
   validateRoleReport,
   appendRoleReport,
   setRoleCheckboxState,
   formatRoleEntry,
   MAX_REPORT_LENGTH
-} from '../src/diary-roles.js';
+} from '../plugins/roles/diary-writer.js';
 
 describe('extractRoleBlocks', () => {
   test('extracts a block and removes it from the remainder', () => {
