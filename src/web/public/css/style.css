@@ -1441,3 +1441,19 @@ html[data-theme="dark"] .text-success {
 html[data-theme="dark"] .text-danger {
   color: #f87171 !important;
 }
+
+/* Git page: directory headers grouping two or more changed files. */
+.git-dir-header {
+  background-color: var(--today-surface-2);
+  color: var(--today-text);
+}
+
+.git-dir-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--today-muted-text);
+}
+
+.git-dir-files {
+  border-left: 3px solid var(--today-border);
+}

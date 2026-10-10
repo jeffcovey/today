@@ -60,6 +60,10 @@ function initVaultRepo(vaultDir) {
   // Staged, so its diff shows the staged-file actions (Unstage).
   git('add', 'notes/kitchen-sink.md');
 
+  // A second edit in code/, so the git page groups the directory under a header.
+  const helperPath = path.join(vaultDir, 'code', 'helper.js');
+  fs.writeFileSync(helperPath, fs.readFileSync(helperPath, 'utf8').replace("'helper'", "'helper, edited'"));
+
   const codePath = path.join(vaultDir, 'code', 'example.js');
   fs.writeFileSync(codePath, fs.readFileSync(codePath, 'utf8')
     .replace("const greeting = 'hello';", "const greeting = 'hello there';\nconst answer = 42;")
