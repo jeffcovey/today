@@ -68,6 +68,16 @@ describe('git page diffs', () => {
       await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), first);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      const headerBackground = () => page.$eval('.git-dir-header', el => {
+        const probe = document.createElement('div');
+        probe.style.backgroundColor = 'var(--today-surface-2)';
+        el.appendChild(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { actual: getComputedStyle(el).backgroundColor, expected };
+      });
+      let background = await headerBackground();
+      expect(background.actual).toBe(background.expected);
       await openDiff(page, 'code/example.js');
 
       const scheme = () => page.$eval('#diffContent .d2h-wrapper', el =>
@@ -77,6 +87,8 @@ describe('git page diffs', () => {
       await page.evaluate((mode) => setThemeMode(mode), second);
       await page.waitForSelector(`#diffContent .d2h-wrapper.d2h-${second}-color-scheme .hljs`, { timeout: 10_000 });
       expect(await scheme()).toBe(`d2h-${second}-color-scheme`);
+      background = await headerBackground();
+      expect(background.actual).toBe(background.expected);
     } finally {
       await page.close();
     }
