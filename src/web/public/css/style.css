@@ -1443,8 +1443,8 @@ html[data-theme="dark"] .text-danger {
 }
 
 /* Git page: directory headers grouping two or more changed files. */
-.git-dir-header,
-html[data-theme="dark"] .git-dir-header {
+.list-group-item.git-dir-header,
+html[data-theme="dark"] .list-group-item.git-dir-header {
   background-color: var(--today-surface-2);
   color: var(--today-text);
 }
