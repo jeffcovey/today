@@ -1,31 +1,20 @@
 /**
- * Durable ROLE sections in diary files.
+ * Writes role-agent reports into the day's diary, inside the durable ROLE
+ * marker blocks defined in src/diary-role-blocks.js. Used by report.js, the
+ * only way roles write to the diary.
  *
- * Role agents report into the day's diary inside marker blocks:
- *
- *   <!-- ROLE:cpa:START -->
- *   ## 🤖 CPA
- *
- *   ### 14:05
- *
- *   **Status:** OK
- *
- *   Categorized 12 transactions.
- *   <!-- ROLE:cpa:END -->
- *
- * Unlike the TODAY: marker namespace (ephemeral, stripped from past days
- * by the markdown-diary plugin), ROLE: blocks are the permanent record:
- * they are never cleaned up, they count as real diary content, and the
- * plugin parses them into the diary table. Content inside a block is
- * append-only — new entries are inserted before the END marker and
- * existing lines (including user replies) are never rewritten.
+ * Content inside a block is append-only: new entries are inserted before the
+ * END marker, and existing lines (including the user's replies) are never
+ * rewritten. The one exception is setRoleCheckboxState, which flips a single
+ * checkbox's state character.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { writeFileAtomicCAS } from './fs-atomic.js';
+import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { ROLE_NAME_RE, roleStartMarker, roleEndMarker } from '../../src/diary-role-blocks.js';
+import { getTimezone } from '../../src/config.js';
 
-export const ROLE_NAME_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 export const MAX_REPORT_LENGTH = 2000;
 export const MAX_ROLE_TITLE_LENGTH = 80;
 export const ROLE_STATUSES = ['ok', 'blocked', 'needs-attention', 'quiet'];
@@ -34,37 +23,6 @@ const CAS_RETRIES = 3;
 const LOCK_RETRIES = 20;
 const LOCK_RETRY_DELAY_MS = 50;
 const STALE_LOCK_TIMEOUT_MS = 10_000;
-
-export function roleStartMarker(role) {
-  return `<!-- ROLE:${role}:START -->`;
-}
-
-export function roleEndMarker(role) {
-  return `<!-- ROLE:${role}:END -->`;
-}
-
-/**
- * Extract ROLE blocks from a diary body.
- * Returns { blocks: [{ role, content }], remainder } where remainder is the
- * body with all ROLE blocks removed, so section parsers never attribute
- * role content to an adjacent ## section.
- */
-export function extractRoleBlocks(body) {
-  const blocks = [];
-  const blockRe = /<!-- ROLE:([a-z0-9-]+):START -->\n?([\s\S]*?)<!-- ROLE:\1:END -->\n?/g;
-
-  const remainder = body.replace(blockRe, (match, role, content) => {
-    blocks.push({ role, content: stripRoleHeading(content).trim() });
-    return '';
-  });
-
-  return { blocks, remainder };
-}
-
-/** Drop the block's display heading (e.g. "## 🤖 CPA") so it isn't parsed as entry text. */
-function stripRoleHeading(content) {
-  return content.replace(/^\s*## [^\n]*\n/, '');
-}
 
 /**
  * Validate a role report before writing. Returns an array of error strings
@@ -139,7 +97,7 @@ export function formatRoleEntry(text, { time, status } = {}) {
 }
 
 function localTime(date = new Date()) {
-  const tz = process.env.TZ || 'America/New_York';
+  const tz = process.env.TZ || getTimezone();
   return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
 }
 
@@ -323,7 +281,7 @@ export function appendRoleReport(filePath, role, text, { time, status, title, fi
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     lockStat = acquireDiaryLock(lockPath);
     try {
-      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || 'America/New_York' });
+      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
       const initialContent = `---\ndate: ${date}\ncssclasses: dashboard\nobsidianUIMode: preview\n---\n\n`;
 
       for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {

@@ -25,7 +25,7 @@ longest it may go without a report, e.g. "or a week has passed">.
 ## May do alone
 
 - Read any data source listed under Owns
-- Write one report per run with `bin/role-report <role-name>`
+- Write one report per run with `plugins/roles/report.js <role-name>`
 - <other safe actions, e.g. "draft text for the user to review">
 
 ## Hands to the user
@@ -42,13 +42,13 @@ longest it may go without a report, e.g. "or a week has passed">.
    your past reports are in previous days' diary files (`bin/diary search`).
 3. Do the work you may do alone; note anything that belongs to the user.
 4. Settle your earlier checkboxes before writing: anything now done gets
-   `bin/role-report <role-name> --check "<item text>"`, anything no longer
+   `plugins/roles/report.js <role-name> --check "<item text>"`, anything no longer
    relevant gets `--cancel "<item text>"`. If the checkbox is in an earlier
    day's diary, include that file's date with `--date`. Never restate a
    superseded item. Flip one checkbox per invocation; flips are applied
    immediately, and a later failure does not undo an earlier successful
    flip.
-5. Report with `bin/role-report <role-name> --status <ok|blocked|needs-attention>`
+5. Report with `plugins/roles/report.js <role-name> --status <ok|blocked|needs-attention>`
    following `roles/REPORTING.md` in the vault: new information only, as a
    bold headline, then new `- [ ]` items (an actionable ask for the user is
    `- [ ] → <user>: …`), then everything else in a collapsed details
@@ -58,7 +58,7 @@ longest it may go without a report, e.g. "or a week has passed">.
 
 ## Red flags
 
-- Never edit diary files directly — only `bin/role-report`. The checkbox
+- Never edit diary files directly — only `plugins/roles/report.js`. The checkbox
   flip (`--check`/`--cancel`) is the only change ever made to earlier
   content; a checkbox the user ticked themselves means "done" too.
 - Current state is your first full report of the day, updated by each later

@@ -9,7 +9,7 @@
  * - Progress: ### HH:MM blocks (timestamped, multi-paragraph)
  * - Concerns: ### HH:MM blocks (timestamped, multi-paragraph)
  * - Journal: ### HH:MM blocks (timestamped, multi-paragraph)
- * - ROLE marker blocks: role-agent reports (see src/diary-roles.js),
+ * - ROLE marker blocks: role-agent reports (see src/diary-role-blocks.js),
  *   durable and parsed with metadata.role
  *
  * Uses vault-changes for efficient incremental sync - only processes
@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
-import { extractRoleBlocks } from '../../src/diary-roles.js';
+import { extractRoleBlocks } from '../../src/diary-role-blocks.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');

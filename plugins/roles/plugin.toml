@@ -1,0 +1,35 @@
+name = "roles"
+displayName = "Roles"
+description = "Runs your staff of AI role agents, which report into the daily diary"
+type = "utility"
+longDescription = """
+A staff of AI helpers (a bookkeeper, an innkeeper, a fitness coach…) that each
+look after one part of your life and report into the day's diary. You read their
+reports and reply inline; they pick up your replies on their next run.
+
+Each role is a SKILL.md file under vault/roles/<name>/. Installing the plugin's
+vault files adds:
+- roles/chief-of-staff/SKILL.md, the orchestrator, which decides which roles
+  need to run and launches them
+- roles/_template/SKILL.md, to copy when you add a role
+- roles/REPORTING.md, the rules every role follows when it writes
+
+On each sync, the plugin checks whether one of `run_times` has passed since the
+last run. If so, it starts the chief of staff in the background
+(`bin/today --non-interactive`) and returns; the run takes as long as it needs.
+A run still going at the next run time makes that run time skip. When the
+plugin is first enabled, it waits for the next run time instead of starting a
+run immediately.
+
+Roles write only through `plugins/roles/report.js`, which appends to durable
+<!-- ROLE:<name>:START/END --> blocks in the diary. The markdown-diary plugin
+reads those blocks into the diary table. See docs/ROLE_AGENTS.md.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+run_times = { type = "array", default = ["08:00", "13:00", "17:00"], description = "Times of day (HH:MM, in your configured time zone) to run the chief of staff" }
+roles_directory = { type = "string", default = "roles", description = "Directory within the vault that holds the role files" }
+chief_role = { type = "string", default = "chief-of-staff", description = "The role that orchestrates the others; its SKILL.md is what each run follows" }

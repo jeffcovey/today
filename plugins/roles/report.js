@@ -3,10 +3,10 @@
 /**
  * Append a role-agent report to today's diary as a durable ROLE: block.
  *
- *   bin/role-report <role> "report text"
- *   echo "report text" | bin/role-report <role> --status ok
- *   bin/role-report <role> --check "item text"     # flip - [ ] to - [x]
- *   bin/role-report <role> --cancel "item text"    # flip - [ ] to - [-]
+ *   plugins/roles/report.js <role> "report text"
+ *   echo "report text" | plugins/roles/report.js <role> --status ok
+ *   plugins/roles/report.js <role> --check "item text"     # flip - [ ] to - [x]
+ *   plugins/roles/report.js <role> --cancel "item text"    # flip - [ ] to - [-]
  *
  * Role agents must use this instead of editing diary files by hand: it
  * validates the report (length cap, no marker injection), appends inside
@@ -17,12 +17,17 @@
 import fs from 'fs';
 import path from 'path';
 import { program } from 'commander';
-import { getAbsoluteVaultPath } from '../src/config.js';
-import { colors } from '../src/cli-utils.js';
-import { appendRoleReport, setRoleCheckboxState, ROLE_STATUSES, MAX_REPORT_LENGTH } from '../src/diary-roles.js';
+import { getAbsoluteVaultPath, getFullConfig, getTimezone } from '../../src/config.js';
+import { colors } from '../../src/cli-utils.js';
+import { appendRoleReport, setRoleCheckboxState, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
+
+function rolesPluginEnabled() {
+  const sources = getFullConfig().plugins?.roles || {};
+  return Object.values(sources).some(source => source && source.enabled);
+}
 
 function todayDateString() {
-  const tz = process.env.TZ || 'America/New_York';
+  const tz = process.env.TZ || getTimezone();
   return new Date().toLocaleDateString('en-CA', { timeZone: tz });
 }
 
@@ -39,7 +44,7 @@ function collect(value, previous) {
 }
 
 program
-  .name('role-report')
+  .name('plugins/roles/report.js')
   .description(`Append a role-agent report to the diary (max ${MAX_REPORT_LENGTH} chars). Reads the report from the argument or stdin.`)
   .argument('<role>', 'role name (lowercase letters, digits, hyphens)')
   .argument('[message]', 'report text (omit to read from stdin)')
@@ -49,6 +54,11 @@ program
   .option('--check <text>', 'flip a matching open checkbox in your block to done ([x]); repeatable', collect, [])
   .option('--cancel <text>', 'flip a matching open checkbox in your block to cancelled ([-]); repeatable', collect, [])
   .action(async (role, message, options) => {
+    if (!rolesPluginEnabled()) {
+      console.error(colors.red('✗') + ' The roles plugin is not enabled; enable [plugins.roles.<source>] in your config to use role reports.');
+      process.exit(1);
+    }
+
     const flips = [
       ...options.check.map((text) => ({ text, state: 'x', label: 'Checked' })),
       ...options.cancel.map((text) => ({ text, state: '-', label: 'Cancelled' }))
