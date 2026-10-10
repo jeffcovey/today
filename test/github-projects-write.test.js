@@ -27,7 +27,7 @@ function output(payload) {
 }
 
 if (query.includes('fields(first: 20)')) {
-  const totalCount = scenario === 'overflow-no-meta' ? 51 : 2;
+  const hasNextPage = scenario.startsWith('overflow');
   const metadataNodes = scenario === 'existing'
     ? [{
         id: 'ITEM_META_1',
@@ -48,7 +48,7 @@ if (query.includes('fields(first: 20)')) {
             nodes: [{ id: 'FIELD_REVIEW', name: 'Next Review Date', dataType: 'DATE' }]
           },
           items: {
-            totalCount,
+            pageInfo: { hasNextPage, endCursor: hasNextPage ? 'CURSOR_1' : null },
             nodes: [
               { id: 'ITEM_1', content: { id: 'ISSUE_1', number: 1, title: 'Task issue' } },
               ...metadataNodes
@@ -58,6 +58,55 @@ if (query.includes('fields(first: 20)')) {
       }
     }
   });
+} else if (query.includes('after:')) {
+  // Paginated continuation of the project items search
+  if (scenario === 'overflow-meta-later') {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [{
+                id: 'ITEM_META_1',
+                content: {
+                  id: 'ISSUE_META_1',
+                  number: 434,
+                  title: '[META] AI-Agnostic Architecture Review Schedule'
+                }
+              }]
+            }
+          }
+        }
+      }
+    });
+  } else if (scenario === 'overflow-runaway') {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: true, endCursor: 'CURSOR_LOOP' },
+              nodes: [{ id: 'ITEM_2', content: { id: 'ISSUE_2', number: 2, title: 'Another task' } }]
+            }
+          }
+        }
+      }
+    });
+  } else {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [{ id: 'ITEM_2', content: { id: 'ISSUE_2', number: 2, title: 'Another task' } }]
+            }
+          }
+        }
+      }
+    });
+  }
 } else if (query.includes('items(first: 10)')) {
   output({
     data: {
@@ -174,9 +223,40 @@ describe('github-projects/write.js set-review-date metadata issue handling', () 
     expect(queries).not.toContain('updateIssue(input:');
   });
 
-  test('fails loudly when metadata lookup may be incomplete beyond first page', () => {
+  test('finds metadata issue beyond the first page of items and updates it', () => {
+    const { result, queries } = runWrite({
+      scenario: 'overflow-meta-later',
+      reviewDate: '2026-10-18',
+      frequency: 'weekly'
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.updated.metadataIssue.number).toBe(434);
+    expect(result.updated.metadataIssue.itemId).toBe('ITEM_META_1');
+    expect(queries).toContain('after:');
+    expect(queries).toContain('updateIssue(input:');
+    expect(queries).not.toContain('createIssue(input:');
+    expect(queries).not.toContain('addProjectV2ItemById(input:');
+  });
+
+  test('creates metadata issue after paginating through all items without a match', () => {
     const { result, queries } = runWrite({
       scenario: 'overflow-no-meta',
+      reviewDate: '2026-10-05',
+      frequency: 'weekly'
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.updated.metadataIssue.number).toBe(500);
+    expect(queries).toContain('after:');
+    expect(queries).toContain('createIssue(input:');
+    expect(queries).toContain('addProjectV2ItemById(input:');
+    expect(queries).not.toContain('updateIssue(input:');
+  });
+
+  test('fails loudly when the page cap is hit before reaching the end of the items list', () => {
+    const { result, queries } = runWrite({
+      scenario: 'overflow-runaway',
       reviewDate: '2026-10-05',
       frequency: 'weekly'
     });

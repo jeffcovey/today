@@ -3,6 +3,7 @@
 // Write handler for github-projects plugin
 // Supports updating project dates by setting date fields on the first item
 const PROJECT_ITEMS_PAGE_SIZE = 50;
+const MAX_PROJECT_ITEM_PAGES = 20;
 
 import { execSync } from 'child_process';
 
@@ -111,7 +112,10 @@ async function getProjectDetails(owner, number, ownerType) {
             }
           }
           items(first: ${PROJECT_ITEMS_PAGE_SIZE}) {
-            totalCount
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             nodes {
               id
               content {
@@ -146,11 +150,7 @@ async function getProjectDetails(owner, number, ownerType) {
 
   // Get first item and review metadata item
   const firstItem = project.items.nodes[0];
-  const reviewMetadataItem = project.items.nodes.find(item =>
-    item.content?.id &&
-    item.content?.title?.includes('[META]') &&
-    item.content?.title?.includes('Review Schedule')
-  );
+  const reviewMetadataItem = project.items.nodes.find(isReviewMetadataItem);
 
   return {
     projectId: project.id,
@@ -166,8 +166,71 @@ async function getProjectDetails(owner, number, ownerType) {
     nextReviewDateFieldId: nextReviewDateField?.id,
     firstItemId: firstItem?.id,
     reviewMetadataItem: reviewMetadataItem,
-    metadataSearchMayBeIncomplete: !reviewMetadataItem && (project.items.totalCount || 0) > PROJECT_ITEMS_PAGE_SIZE,
+    itemsHasNextPage: Boolean(project.items.pageInfo?.hasNextPage),
+    itemsEndCursor: project.items.pageInfo?.endCursor,
   };
+}
+
+function isReviewMetadataItem(item) {
+  return Boolean(
+    item.content?.id &&
+    item.content?.title?.includes('[META]') &&
+    item.content?.title?.includes('Review Schedule')
+  );
+}
+
+// Continue the metadata issue search from getProjectDetails across the
+// project's remaining item pages. Returns { item, searchExhausted }:
+// searchExhausted is false only when the page cap was hit before reaching
+// the end of the items list.
+function findReviewMetadataItemAfter(owner, number, ownerType, cursor) {
+  const ownerField = ownerType === 'user' ? 'user' : 'organization';
+  let after = cursor;
+
+  for (let page = 0; page < MAX_PROJECT_ITEM_PAGES; page++) {
+    const query = `
+      query {
+        ${ownerField}(login: "${owner}") {
+          projectV2(number: ${number}) {
+            items(first: ${PROJECT_ITEMS_PAGE_SIZE}, after: "${after}") {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                id
+                content {
+                  ... on Issue {
+                    id
+                    number
+                    title
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const items = graphql(query).data?.[ownerField]?.projectV2?.items;
+    if (!items) {
+      throw new Error(`Project not found: ${owner}#${number}`);
+    }
+
+    const match = items.nodes.find(isReviewMetadataItem);
+    if (match) {
+      return { item: match, searchExhausted: true };
+    }
+
+    if (!items.pageInfo?.hasNextPage) {
+      return { item: null, searchExhausted: true };
+    }
+
+    after = items.pageInfo.endCursor;
+  }
+
+  return { item: null, searchExhausted: false };
 }
 
 // Update a date field on an item
@@ -696,14 +759,34 @@ async function handleSetReviewDate() {
       }
     }
 
+    // The metadata issue may live beyond the first page of items — keep
+    // searching before concluding it doesn't exist.
+    let reviewMetadataItem = details.reviewMetadataItem;
+    if (!reviewMetadataItem && details.itemsHasNextPage) {
+      const { item, searchExhausted } = findReviewMetadataItemAfter(
+        owner,
+        number,
+        type,
+        details.itemsEndCursor
+      );
+      reviewMetadataItem = item;
+
+      if (!item && !searchExhausted) {
+        return output({
+          success: false,
+          error: `Unable to safely determine existing metadata issue: gave up after searching ${MAX_PROJECT_ITEM_PAGES * PROJECT_ITEMS_PAGE_SIZE + PROJECT_ITEMS_PAGE_SIZE} project items without reaching the end of the list.`
+        });
+      }
+    }
+
     // Create or update metadata issue
     let metadataIssue;
     let metadataItemId;
     const finalFrequency = frequency || 'weekly';
 
-    if (details.reviewMetadataItem) {
+    if (reviewMetadataItem) {
       metadataIssue = updateMetadataIssue(
-        details.reviewMetadataItem.content.id,
+        reviewMetadataItem.content.id,
         details.title,
         reviewDate,
         finalFrequency
@@ -711,12 +794,7 @@ async function handleSetReviewDate() {
       if (!metadataIssue) {
         return output({ success: false, error: 'Failed to update metadata issue' });
       }
-      metadataItemId = details.reviewMetadataItem.id;
-    } else if (details.metadataSearchMayBeIncomplete) {
-      return output({
-        success: false,
-        error: `Unable to safely determine existing metadata issue: project has more than ${PROJECT_ITEMS_PAGE_SIZE} items and metadata issue was not found on the first page.`
-      });
+      metadataItemId = reviewMetadataItem.id;
     } else {
       // Create new metadata issue
       const repo = getProjectRepository(owner, number, type);
