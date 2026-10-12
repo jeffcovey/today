@@ -28,6 +28,10 @@ function escapeHtml(text) {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 
+function normalizeRelativePath(relativePath) {
+  return relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
 // The block's display name from its rendered "## 🤖 Title" heading. The
 // heading text is already HTML-escaped by the renderer; decode the few
 // entities it uses so escapeHtml doesn't double them.
@@ -67,7 +71,7 @@ export function roleReplyFormHtml(role, title, relativePath) {
  * when the page is today's diary and the roles plugin is enabled.
  */
 export function injectRoleReplyForms(html, relativePath, { now = new Date(), enabled = rolesPluginEnabled } = {}) {
-  const normalized = relativePath.replace(/^\/+/, '');
+  const normalized = normalizeRelativePath(relativePath);
   if (normalized !== todayDiaryRelativePath(now) || !html.includes('<!-- ROLE:') || !enabled()) {
     return html;
   }
@@ -92,7 +96,7 @@ export function saveRoleReply(vaultPath, relativePath, role, text, { now = new D
   if (!enabled()) {
     return { status: 404, body: { error: 'The roles plugin is not enabled' } };
   }
-  const normalized = (relativePath || '').replace(/^\/+/, '');
+  const normalized = normalizeRelativePath(relativePath || '');
   if (normalized !== todayDiaryRelativePath(now)) {
     return { status: 409, body: { error: "This isn't today's diary any more. Reload the page and reply there." } };
   }

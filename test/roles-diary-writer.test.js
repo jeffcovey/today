@@ -477,6 +477,11 @@ describe('role reply web hooks', () => {
     expect(out).toContain('<label for="role-reply-cpa"');
   });
 
+  test("matches today's diary when the path uses Windows separators", () => {
+    const out = injectRoleReplyForms(html, 'diary\\2026-10-12.md', { now: NOW, enabled });
+    expect(out.match(/<form class="role-reply-form"/g)).toHaveLength(2);
+  });
+
   test.each([
     ['another day', 'diary/2026-10-11.md', enabled],
     ['another file', 'notes/2026-10-12.md', enabled],
@@ -499,6 +504,9 @@ describe('role reply web hooks', () => {
       const ok = saveRoleReply(vault, 'diary/2026-10-12.md', 'cpa', 'hi', { now: NOW, enabled });
       expect(ok).toEqual({ status: 200, body: { success: true, reply: '-> cpa: hi' } });
       expect(fs.readFileSync(path.join(vault, 'diary', '2026-10-12.md'), 'utf8')).toContain('-> cpa: hi\n\n<!-- ROLE:cpa:END -->');
+
+      const windowsPath = saveRoleReply(vault, 'diary\\2026-10-12.md', 'cpa', 'another reply', { now: NOW, enabled });
+      expect(windowsPath.status).toBe(200);
     } finally {
       fs.rmSync(vault, { recursive: true, force: true });
     }

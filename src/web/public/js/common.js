@@ -619,6 +619,7 @@ async function sendRoleReply(form) {
   const textarea = form.querySelector('textarea');
   const button = form.querySelector('button[type="submit"]');
   const status = form.querySelector('.role-reply-status');
+  if (button.disabled) return;
   const text = textarea.value;
   if (!text.trim()) {
     status.textContent = 'Type a reply first.';
