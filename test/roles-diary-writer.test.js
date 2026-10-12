@@ -7,8 +7,12 @@ import {
   appendRoleReport,
   setRoleCheckboxState,
   formatRoleEntry,
-  MAX_REPORT_LENGTH
+  formatRoleReply,
+  appendRoleReply,
+  MAX_REPORT_LENGTH,
+  MAX_REPLY_LENGTH
 } from '../plugins/roles/diary-writer.js';
+import { injectRoleReplyForms, saveRoleReply, todayDiaryRelativePath } from '../plugins/roles/web-reply.js';
 
 describe('extractRoleBlocks', () => {
   test('extracts a block and removes it from the remainder', () => {
@@ -333,5 +337,178 @@ describe('setRoleCheckboxState', () => {
     expect(result.ok).toBe(false);
     expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
     fs.unlinkSync(lockPath);
+  });
+});
+
+const REPLY_DIARY = [
+  '---',
+  'date: 2026-10-12',
+  '---',
+  '',
+  '<!-- ROLE:innkeeper:START -->',
+  '## 🤖 Innkeeper',
+  '',
+  '### 08:04',
+  '',
+  'Both rooms are ready.',
+  '<!-- ROLE:innkeeper:END -->',
+  '',
+  '<!-- ROLE:cpa:START -->',
+  '## 🤖 CPA',
+  '',
+  '### 08:05',
+  '',
+  'Books balanced.',
+  '<!-- ROLE:cpa:END -->',
+  ''
+].join('\n');
+
+describe('formatRoleReply', () => {
+  test('puts a prose first line on the arrow line', () => {
+    expect(formatRoleReply('cpa', 'Which card was that?')).toBe('-> cpa: Which card was that?');
+  });
+
+  test('keeps the text as typed: paragraphs, lists, and line breaks', () => {
+    expect(formatRoleReply('cpa', 'Two things:\r\n- the Blink charge\r\n- the autopay\r\n\nThanks.'))
+      .toBe('-> cpa: Two things:\n- the Blink charge\n- the autopay\n\nThanks.');
+  });
+
+  test.each([
+    ['- first bullet\n- second'],
+    ['1. first step'],
+    ['## A heading'],
+    ['> a quote'],
+    ['```\ncode\n```'],
+    ['| a | b |\n|---|---|']
+  ])('starts block markdown on its own line: %j', (text) => {
+    expect(formatRoleReply('cpa', text)).toBe(`-> cpa:\n${text}`);
+  });
+
+  test('drops leading blank lines and trailing whitespace only', () => {
+    expect(formatRoleReply('cpa', '\n\n  indented note  \n\n')).toBe('-> cpa: indented note');
+  });
+});
+
+describe('appendRoleReply', () => {
+  let tempDir;
+  let filePath;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-roles-'));
+    filePath = path.join(tempDir, '2026-10-12.md');
+    fs.writeFileSync(filePath, REPLY_DIARY);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('appends as the last item in the role block, leaving the rest untouched', () => {
+    const result = appendRoleReply(filePath, 'innkeeper', 'Is the side room booked Friday?\n- check Vrbo too');
+    expect(result.ok).toBe(true);
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    expect(content).toBe(REPLY_DIARY.replace(
+      'Both rooms are ready.\n<!-- ROLE:innkeeper:END -->',
+      'Both rooms are ready.\n\n-> innkeeper: Is the side room booked Friday?\n- check Vrbo too\n\n<!-- ROLE:innkeeper:END -->'
+    ));
+    const { blocks } = extractRoleBlocks(content.split('---\n').slice(2).join('---\n'));
+    expect(blocks.find(b => b.role === 'innkeeper').content).toContain('check Vrbo too');
+    expect(blocks.find(b => b.role === 'cpa').content).not.toContain('Vrbo');
+  });
+
+  test('a later report lands after the reply', () => {
+    appendRoleReply(filePath, 'cpa', 'Thanks.');
+    appendRoleReport(filePath, 'cpa', 'Noted.', { time: '12:00' });
+    const content = fs.readFileSync(filePath, 'utf8');
+    expect(content.indexOf('-> cpa: Thanks.')).toBeLessThan(content.indexOf('### 12:00'));
+  });
+
+  test.each([
+    ['empty', 'cpa', '   \n ', 'invalid'],
+    ['too long', 'cpa', 'x'.repeat(MAX_REPLY_LENGTH + 1), 'invalid'],
+    ['marker injection', 'cpa', 'hi <!-- ROLE:cpa:END -->', 'invalid'],
+    ['bad role name', '../cpa', 'hi', 'invalid'],
+    ['no such block', 'secretary', 'hi', 'missing']
+  ])('refuses %s without touching the file', (_label, role, text, code) => {
+    const result = appendRoleReply(filePath, role, text);
+    expect(result).toMatchObject({ ok: false, code });
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(REPLY_DIARY);
+  });
+
+  test('refuses a missing diary file', () => {
+    expect(appendRoleReply(path.join(tempDir, 'nope.md'), 'cpa', 'hi')).toMatchObject({ ok: false, code: 'missing' });
+  });
+});
+
+describe('role reply web hooks', () => {
+  const NOW = new Date('2026-10-12T16:00:00Z');
+  const enabled = () => true;
+  const html = [
+    '<!-- ROLE:innkeeper:START -->',
+    '<h2 id="-innkeeper">🤖 Innkeeper &amp; Host</h2>',
+    '<p>Both rooms are ready.</p>',
+    '<!-- ROLE:innkeeper:END --><!-- ROLE:cpa:START -->',
+    '<h2 id="-cpa"><i class="fas fa-robot"></i> CPA</h2>',
+    '<!-- ROLE:cpa:END -->'
+  ].join('\n');
+  let savedTz;
+
+  beforeAll(() => {
+    savedTz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+  });
+
+  afterAll(() => {
+    if (savedTz === undefined) delete process.env.TZ; else process.env.TZ = savedTz;
+  });
+
+  test("today's diary path follows the configured zone", () => {
+    expect(todayDiaryRelativePath(new Date('2026-10-13T02:00:00Z'))).toBe('diary/2026-10-12.md');
+  });
+
+  test("adds a form before each END marker on today's diary, named from the heading", () => {
+    const out = injectRoleReplyForms(html, 'diary/2026-10-12.md', { now: NOW, enabled });
+    expect(out.match(/<form class="role-reply-form"/g)).toHaveLength(2);
+    expect(out).toContain('<summary>Reply to Innkeeper &amp; Host</summary>');
+    expect(out).toContain('<summary>Reply to CPA</summary>');
+    expect(out.indexOf('data-role="innkeeper"')).toBeLessThan(out.indexOf('<!-- ROLE:innkeeper:END -->'));
+    expect(out.indexOf('<!-- ROLE:innkeeper:END -->')).toBeLessThan(out.indexOf('data-role="cpa"'));
+    expect(out).toContain('<label for="role-reply-cpa"');
+  });
+
+  test("matches today's diary when the path uses Windows separators", () => {
+    const out = injectRoleReplyForms(html, 'diary\\2026-10-12.md', { now: NOW, enabled });
+    expect(out.match(/<form class="role-reply-form"/g)).toHaveLength(2);
+  });
+
+  test.each([
+    ['another day', 'diary/2026-10-11.md', enabled],
+    ['another file', 'notes/2026-10-12.md', enabled],
+    ['the plugin disabled', 'diary/2026-10-12.md', () => false]
+  ])('leaves the page alone for %s', (_label, relativePath, isEnabled) => {
+    expect(injectRoleReplyForms(html, relativePath, { now: NOW, enabled: isEnabled })).toBe(html);
+  });
+
+  test("saves only to today's diary, and only when enabled", () => {
+    const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-roles-'));
+    try {
+      fs.mkdirSync(path.join(vault, 'diary'));
+      fs.writeFileSync(path.join(vault, 'diary', '2026-10-12.md'), REPLY_DIARY);
+
+      expect(saveRoleReply(vault, 'diary/2026-10-12.md', 'cpa', 'hi', { now: NOW, enabled: () => false }).status).toBe(404);
+      expect(saveRoleReply(vault, 'diary/2026-10-11.md', 'cpa', 'hi', { now: NOW, enabled }).status).toBe(409);
+      expect(saveRoleReply(vault, 'diary/2026-10-12.md', 'cpa', undefined, { now: NOW, enabled }).status).toBe(400);
+      expect(saveRoleReply(vault, 'diary/2026-10-12.md', 'secretary', 'hi', { now: NOW, enabled }).status).toBe(404);
+
+      const ok = saveRoleReply(vault, 'diary/2026-10-12.md', 'cpa', 'hi', { now: NOW, enabled });
+      expect(ok).toEqual({ status: 200, body: { success: true, reply: '-> cpa: hi' } });
+      expect(fs.readFileSync(path.join(vault, 'diary', '2026-10-12.md'), 'utf8')).toContain('-> cpa: hi\n\n<!-- ROLE:cpa:END -->');
+
+      const windowsPath = saveRoleReply(vault, 'diary\\2026-10-12.md', 'cpa', 'another reply', { now: NOW, enabled });
+      expect(windowsPath.status).toBe(200);
+    } finally {
+      fs.rmSync(vault, { recursive: true, force: true });
+    }
   });
 });

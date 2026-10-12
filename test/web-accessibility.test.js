@@ -19,8 +19,11 @@ import {
   PASSWORD,
   PAGES,
   THEMES,
+  TODAY_DIARY_PATH,
   VIEWPORTS
 } from './helpers/a11y-harness.js';
+import fs from 'fs';
+import path from 'path';
 
 jest.setTimeout(240_000);
 
@@ -140,6 +143,58 @@ describe('task markers', () => {
       expect(items.filter(item => MARKER.test(item.text)).map(item => item.text)).toEqual([]);
       expect(items.some(item => item.icons > 0)).toBe(true);
       expect(brokenAttributes).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+describe('role reply forms', () => {
+  test("appear under each role block in today's diary only", async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}${TODAY_DIARY_PATH}`, { waitUntil: 'networkidle0' });
+      expect(await page.$$eval('form.role-reply-form', forms => forms.map(f => f.dataset.role)))
+        .toEqual(['chief-of-staff', 'innkeeper']);
+      expect(await page.$eval('details.role-reply', el => el.open)).toBe(false);
+
+      await page.goto(`${server.baseUrl}/diary/2026-01-15.md`, { waitUntil: 'networkidle0' });
+      expect(await page.$$('form.role-reply-form')).toHaveLength(0);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('save a multi-line reply as the last item in the block, formatting intact', async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}${TODAY_DIARY_PATH}`, { waitUntil: 'networkidle0' });
+      await page.click('details.role-reply:has(form[data-role="innkeeper"]) > summary');
+      await page.type('form[data-role="innkeeper"] textarea', 'Thanks. Two things:\n- check the side room\n- confirm the cleaner');
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle0' }),
+        page.click('form[data-role="innkeeper"] button[type="submit"]')
+      ]);
+
+      const diary = fs.readFileSync(path.join(server.vaultDir, TODAY_DIARY_PATH), 'utf8');
+      expect(diary).toContain(
+        '-> innkeeper: Thanks. Two things:\n- check the side room\n- confirm the cleaner\n\n<!-- ROLE:innkeeper:END -->'
+      );
+
+      // Rendered as a paragraph and a list inside the innkeeper block, after
+      // its last report and before the reply form.
+      const items = await page.$$eval('details:has(form[data-role="innkeeper"])', ([form]) => {
+        const texts = [];
+        for (let el = form.previousElementSibling; el && !/^H2$/.test(el.tagName); el = el.previousElementSibling) {
+          texts.unshift(el.textContent.trim());
+        }
+        return texts.slice(-2);
+      });
+      expect(items[0]).toBe('-> innkeeper: Thanks. Two things:');
+      expect(items[1]).toContain('check the side room');
+      expect(items[1]).toContain('confirm the cleaner');
     } finally {
       await page.close();
     }
