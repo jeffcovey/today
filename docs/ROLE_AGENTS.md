@@ -104,7 +104,17 @@ writes them). Properties:
   (below) — a single-character substitution that never touches prose.
 
 Replies use routing lines: `-> cpa: yes, do it` inside (or near) a role's
-block is picked up on the next run. The arrow is typed as plain `->`
+block is picked up on the next run. A reply can run over several lines
+(paragraphs, bullet lists): it continues until the next `### HH:MM` entry,
+the next reply, or the end of the block.
+
+On the web view of today's diary, each role block ends with a collapsed
+**Reply to <Role>** form. What you type there is saved as the block's last
+item with `-> <role>:` put in front of it, formatting kept as typed (a
+reply that starts with a list or heading starts on the line after the
+arrow). The form appears only on today's diary, because that's the file
+the next run reads, and only while the roles plugin is enabled. Replies
+wait for the next scheduled run; sending one doesn't start a run. The arrow is typed as plain `->`
 (hyphen + greater-than); roles treat the typographic `→` as identical, so
 either form works. `→ Jeff:` (the user's name) marks items only the user
 can resolve — roles write that one, so they use the pretty arrow. An

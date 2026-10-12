@@ -25,9 +25,14 @@ export const VIEWPORTS = {
   desktop: { width: 1280, height: 900, deviceScaleFactor: 1 }
 };
 
+// Today's diary gets the role reply forms; it's a copy of the fixture diary.
+export const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+export const TODAY_DIARY_PATH = `/diary/${TODAY}.md`;
+
 export const PAGES = [
   { name: 'home', path: '/' },
   { name: 'diary', path: '/diary/2026-01-15.md' },
+  { name: 'diary-today', path: TODAY_DIARY_PATH },
   { name: 'kitchen-sink', path: '/notes/kitchen-sink.md' },
   { name: 'project', path: '/projects/sample-project.md' },
   { name: 'directory', path: '/notes/' },
@@ -89,6 +94,11 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'today-a11y-'));
   const vaultDir = path.join(workDir, 'vault');
   fs.cpSync(vaultSource, vaultDir, { recursive: true });
+  const fixtureDiary = path.join(vaultDir, 'diary', '2026-01-15.md');
+  if (fs.existsSync(fixtureDiary)) {
+    fs.writeFileSync(path.join(vaultDir, TODAY_DIARY_PATH),
+      fs.readFileSync(fixtureDiary, 'utf8').replace(/^date: .*$/m, `date: ${TODAY}`));
+  }
   initVaultRepo(vaultDir);
 
   // The server resolves vault_path against the project root, so it must be
@@ -101,6 +111,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     '[profile]',
     'name = "Sam"',
     'timezone = "America/New_York"',
+    '',
+    '[plugins.roles.default]',
+    'enabled = true',
     ''
   ].join('\n'));
 
@@ -196,7 +209,7 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     throw new Error(`Web server did not start within ${timeoutMs}ms:\n${output.slice(-3000)}`);
   }
 
-  return { baseUrl, stop, output: () => output };
+  return { baseUrl, vaultDir, stop, output: () => output };
 }
 
 export function axeSource() {

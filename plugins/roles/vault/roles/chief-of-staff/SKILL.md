@@ -35,8 +35,9 @@ It is the one role exempt from dispatch.
 
 1. Sync context: run `bin/diary today` and read today's diary file for role
    blocks and reply lines (`-> <role>: ...` — the plain `->` and the
-   typographic `→` both count as the arrow). A reply addressed to a role is
-   that role's work order for this run. Within a block, a role's current
+   typographic `→` both count as the arrow). A reply can span several
+   lines, up to the next entry heading or reply. A reply addressed to a
+   role is that role's work order for this run. Within a block, a role's current
    state is its first full report of the day, updated by each later entry
    that day (a later entry wins where they conflict), plus every still-open
    `- [ ]` checkbox anywhere in the block. Before its first report today,
