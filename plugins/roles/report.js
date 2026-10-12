@@ -17,14 +17,9 @@
 import fs from 'fs';
 import path from 'path';
 import { program } from 'commander';
-import { getAbsoluteVaultPath, getFullConfig, getTimezone } from '../../src/config.js';
+import { getAbsoluteVaultPath, getTimezone } from '../../src/config.js';
 import { colors } from '../../src/cli-utils.js';
-import { appendRoleReport, setRoleCheckboxState, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
-
-function rolesPluginEnabled() {
-  const sources = getFullConfig().plugins?.roles || {};
-  return Object.values(sources).some(source => source && source.enabled);
-}
+import { appendRoleReport, setRoleCheckboxState, rolesPluginEnabled, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
 
 function todayDateString() {
   const tz = process.env.TZ || getTimezone();

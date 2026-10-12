@@ -249,6 +249,15 @@ details.task-section summary::-webkit-details-marker {
   margin-right: 0.5rem;
 }
 
+/* Reply form under each role block in today's diary */
+details.role-reply .form-label {
+  color: var(--today-text);
+}
+
+details.role-reply .form-text {
+  color: var(--today-muted-text);
+}
+
 /* Obsidian-style callout variations */
 details.callout-note { border-left: 4px solid #007bff; }
 details.callout-tip { border-left: 4px solid #28a745; }

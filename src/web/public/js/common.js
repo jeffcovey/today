@@ -612,3 +612,55 @@ if (typeof MutationObserver === 'function') {
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
+
+// Reply forms under each role block in today's diary (plugins/roles/web-reply.js).
+// The server adds "-> role:" and saves the reply as the block's last item.
+async function sendRoleReply(form) {
+  const textarea = form.querySelector('textarea');
+  const button = form.querySelector('button[type="submit"]');
+  const status = form.querySelector('.role-reply-status');
+  if (button.disabled) return;
+  const text = textarea.value;
+  if (!text.trim()) {
+    status.textContent = 'Type a reply first.';
+    textarea.focus();
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = 'Saving…';
+  try {
+    const response = await fetch(`/roles/reply/${form.dataset.file}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: form.dataset.role, text })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || `Save failed (${response.status})`);
+    }
+    status.textContent = 'Saved.';
+    textarea.value = '';
+    window.location.reload();
+  } catch (error) {
+    status.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+if (typeof document.addEventListener === 'function') {
+  document.addEventListener('submit', event => {
+    const form = event.target.closest && event.target.closest('form.role-reply-form');
+    if (!form) return;
+    event.preventDefault();
+    sendRoleReply(form);
+  });
+  // Cmd/Ctrl+Enter sends; plain Enter makes a new line.
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return;
+    const form = event.target.closest && event.target.closest('form.role-reply-form');
+    if (!form) return;
+    event.preventDefault();
+    sendRoleReply(form);
+  });
+}
