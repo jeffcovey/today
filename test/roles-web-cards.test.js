@@ -141,6 +141,25 @@ describe('parseRoleBlock', () => {
     expect(parsed.segments[0].status).toBeUndefined();
     expect(parsed.segments[0].lines).toContain('**Status:** Blocked');
   });
+
+  test('ignores blockquote-fenced content but collects indented nested checkboxes', () => {
+    const parsed = parseRoleBlock([
+      '### 09:00',
+      '',
+      '> ```',
+      '> ### 10:00',
+      '> -> cpa: not a reply',
+      '> **Status:** Blocked',
+      '> - [ ] fenced task',
+      '> ```',
+      '',
+      '    - [ ] nested task'
+    ].join('\n'), ROLES);
+
+    expect(parsed.segments).toHaveLength(1);
+    expect(parsed.segments[0].status).toBeUndefined();
+    expect(parsed.openItems).toEqual(['    - [ ] nested task']);
+  });
 });
 
 describe('splitLatest', () => {
@@ -281,6 +300,15 @@ describe('renderNeedsYou', () => {
   test('is empty when nothing is open', () => {
     const parsed = new Map([['cpa', block(['### 04:05', '', '- [x] Done'])]]);
     expect(renderNeedsYou(parsed, new Map([['cpa', 'CPA']]))).toBe('');
+  });
+
+  test('strips addresses with names longer than 40 characters', () => {
+    const longName = 'A user name that is longer than forty characters';
+    const parsed = new Map([['cpa', block(['### 04:05', '', `- [ ] → ${longName}: Review the report`])]]);
+
+    expect(renderNeedsYou(parsed, new Map([['cpa', 'CPA']]))).toContain(
+      '- [ ] Review the report <span class="role-needs-who">CPA</span>'
+    );
   });
 
   test('comes right after the staff line, before the first card', () => {

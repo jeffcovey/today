@@ -59,14 +59,15 @@ export function parseRoleBlock(content, knownRoles) {
   let current = null;
   let fence = null;
   for (const line of lines) {
+    const fenceLine = line.replace(/^(?: {0,3}>[ \t]?)+/, '');
     let insideFence = Boolean(fence);
     if (fence) {
-      const closingFence = line.match(FENCE_CLOSE_RE);
+      const closingFence = fenceLine.match(FENCE_CLOSE_RE);
       if (closingFence && closingFence[1][0] === fence.character && closingFence[1].length >= fence.length) {
         fence = null;
       }
     } else {
-      const openingFence = line.match(FENCE_OPEN_RE);
+      const openingFence = fenceLine.match(FENCE_OPEN_RE);
       if (openingFence && !(openingFence[1][0] === '`' && openingFence[2].includes('`'))) {
         fence = { character: openingFence[1][0], length: openingFence[1].length };
         insideFence = true;
@@ -232,7 +233,7 @@ export function renderNeedsYou(parsedBlocks, titles) {
     for (const line of parsed.openItems) {
       const text = line
         .replace(/^\s*(?:>\s*)*- \[ \] /, '')
-        .replace(/^→\s*[^:]{1,40}:\s*/, '');
+        .replace(/^→\s*[^:]+:\s*/, '');
       items.push(`- [ ] ${text} <span class="role-needs-who">${escapeHtml(titles.get(role))}</span>`);
     }
   }
