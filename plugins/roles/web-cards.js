@@ -160,7 +160,7 @@ function renderCard(role, parsed, titles) {
   const title = parsed.title || titleCase(role);
   const { earlier, latest } = splitLatest(parsed.segments);
   const pill = statusPill(parsed.segments);
-  const lastEntry = [...parsed.segments].reverse().find(s => s.kind === 'entry' && s.heading && TIME_RE.test(s.heading));
+  const lastEntry = [...parsed.segments].reverse().find(s => s.kind === 'entry' && !s.dispatch && s.heading && TIME_RE.test(s.heading));
 
   const head = [`## 🤖 ${title}`];
   if (pill) head.push(`<span class="role-pill role-pill-${pill.tone}">${escapeHtml(pill.label)}</span>`);
@@ -221,7 +221,7 @@ export function roleBlocksToCards(markdown) {
 
   const times = [...parsedBlocks.values()]
     .flatMap(parsed => parsed.segments)
-    .filter(s => s.kind === 'entry' && s.heading && TIME_RE.test(s.heading))
+    .filter(s => s.kind === 'entry' && !s.dispatch && s.heading && TIME_RE.test(s.heading))
     .map(s => s.heading.padStart(5, '0'))
     .sort();
   const staffMeta = [`${blocks.length} role${blocks.length === 1 ? '' : 's'}`];

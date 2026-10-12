@@ -149,6 +149,29 @@ describe('roleBlocksToCards', () => {
     expect(html).toContain('<div class="role-card" id="role-cpa">');
   });
 
+  test('does not count a dispatch timestamp as a report time', () => {
+    const diary = [
+      '<!-- ROLE:innkeeper:START -->',
+      '## 🤖 Innkeeper',
+      '',
+      '### 09:00',
+      '',
+      'Report.',
+      '',
+      '### 10:00',
+      '',
+      '> [!abstract]- Dispatch: cpa',
+      '>',
+      '> - cpa: message',
+      '<!-- ROLE:innkeeper:END -->'
+    ].join('\n');
+    const cards = roleBlocksToCards(diary);
+
+    expect(cards).toContain('<span class="role-staff-meta">1 role · latest report 09:00</span>');
+    expect(cards).toContain('Updated 09:00');
+    expect(cards).not.toContain('Updated 10:00');
+  });
+
   test('renders replies as bubbles, Markdown intact, naming another role when addressed', () => {
     expect(html).toMatch(/<div class="role-you">\s*<span class="role-you-label">You<\/span>\s*<p>How does the income compare\?<\/p>\s*<ul>\s*<li>he wants the busy season<\/li>/);
     expect(html).toContain('<span class="role-you-label">You → CPA</span>');
