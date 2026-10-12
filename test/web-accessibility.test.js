@@ -200,3 +200,39 @@ describe('role reply forms', () => {
     }
   });
 });
+
+describe('needs you', () => {
+  test("ticking an item in the strip ticks the same item in its role's card", async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}/diary/2026-01-15.md`, { waitUntil: 'networkidle0' });
+      const strip = await page.$$eval('.role-needs li', items => items.map(li => li.textContent.replace(/\s+/g, ' ').trim()));
+      expect(strip).toHaveLength(2);
+      expect(strip[0]).toMatch(/^Reply to the listing inquiry for next week.*Innkeeper$/);
+
+      const line = await page.$eval('.role-needs li:nth-child(2) input.task-checkbox', el => el.dataset.line);
+      const cardBox = `#role-innkeeper .role-card-body input.task-checkbox[data-line="${line}"]`;
+      expect(await page.$eval(cardBox, el => el.checked)).toBe(false);
+
+      await page.click('.role-needs li:nth-child(2) input.task-checkbox');
+      await page.waitForFunction(selector => document.querySelector(selector)?.checked, { timeout: 15_000 }, cardBox);
+      expect(await page.$$eval('.role-needs li', items => items.length)).toBe(1);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+describe('timer banner', () => {
+  test("shows the configured vault's running timer, so the audits cover it", async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+      expect(await page.$eval('.alert-info[data-timer-start]', el => el.textContent)).toContain('Write the accessibility tests');
+    } finally {
+      await page.close();
+    }
+  });
+});

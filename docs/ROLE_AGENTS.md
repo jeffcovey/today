@@ -113,7 +113,10 @@ unchanged. The header shows the role's name, its latest declared status,
 and when it last reported. The latest report stays open with the replies
 and dispatch notes that led to it; earlier entries fold under one
 "Earlier" toggle that counts their still-open checkboxes. Your replies show
-as "You" bubbles, and dispatch notes as single quiet lines.
+as "You" bubbles, and dispatch notes as single quiet lines. Above the
+cards, **Needs you** lists every still-open checkbox from every role,
+labeled with the role's name; ticking one there ticks it in the diary,
+the same as ticking it in its card.
 
 On the web view of today's diary, each role block ends with a collapsed
 **Reply to <Role>** form. What you type there is saved as the block's last

@@ -99,6 +99,11 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     fs.writeFileSync(path.join(vaultDir, TODAY_DIARY_PATH),
       fs.readFileSync(fixtureDiary, 'utf8').replace(/^date: .*$/m, `date: ${TODAY}`));
   }
+  // A running timer, so the timer banner is audited too.
+  const timerDir = path.join(vaultDir, 'logs', 'time-tracking');
+  fs.mkdirSync(timerDir, { recursive: true });
+  fs.writeFileSync(path.join(timerDir, 'current-timer.md'),
+    `Write the accessibility tests #topic/sample\n${new Date(Date.now() - 25 * 60_000).toISOString()}\n`);
   initVaultRepo(vaultDir);
 
   // The server resolves vault_path against the project root, so it must be

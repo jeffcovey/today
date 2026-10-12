@@ -283,6 +283,49 @@ details.task-section summary::-webkit-details-marker {
   font-variant-numeric: tabular-nums;
 }
 
+/* "Needs you": every open role checkbox, above the cards */
+.role-needs {
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.5rem;
+  background: var(--today-card-bg);
+}
+
+.role-needs-title {
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--today-muted-text);
+}
+
+.role-needs-count {
+  color: var(--today-attn-text);
+}
+
+.markdown-content .role-needs ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.role-needs li {
+  padding: 0.35rem 0;
+}
+
+.role-needs li + li {
+  border-top: 1px solid var(--today-border);
+}
+
+.role-needs-who {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--today-muted-text);
+  white-space: nowrap;
+}
+
 .role-card {
   margin: 0 0 1rem;
   border: 1px solid var(--today-border);
@@ -1423,6 +1466,12 @@ html[data-theme="dark"] .alert-primary {
   background-color: #1e3a5f;
   color: #dbeafe;
   border-color: #1d4ed8;
+}
+
+/* MDB's info alert text (#3b7e94) is 4.05:1 on its own background */
+.alert-info {
+  --mdb-alert-color: #1d5566;
+  color: #1d5566;
 }
 
 html[data-theme="dark"] .alert-info {
