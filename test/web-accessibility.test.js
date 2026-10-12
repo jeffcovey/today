@@ -183,18 +183,18 @@ describe('role reply forms', () => {
         '-> innkeeper: Thanks. Two things:\n- check the side room\n- confirm the cleaner\n\n<!-- ROLE:innkeeper:END -->'
       );
 
-      // Rendered as a paragraph and a list inside the innkeeper block, after
-      // its last report and before the reply form.
-      const items = await page.$$eval('details:has(form[data-role="innkeeper"])', ([form]) => {
-        const texts = [];
-        for (let el = form.previousElementSibling; el && !/^H2$/.test(el.tagName); el = el.previousElementSibling) {
-          texts.unshift(el.textContent.trim());
-        }
-        return texts.slice(-2);
+      // Rendered in the innkeeper card as a "You" bubble holding a
+      // paragraph and a list, after the card's latest report.
+      const bubble = await page.$eval('#role-innkeeper .role-card-body > .role-you:last-of-type', el => ({
+        label: el.querySelector('.role-you-label').textContent,
+        paragraph: el.querySelector('p').textContent.trim(),
+        items: [...el.querySelectorAll('li')].map(li => li.textContent.trim())
+      }));
+      expect(bubble).toEqual({
+        label: 'You',
+        paragraph: 'Thanks. Two things:',
+        items: ['check the side room', 'confirm the cleaner']
       });
-      expect(items[0]).toBe('-> innkeeper: Thanks. Two things:');
-      expect(items[1]).toContain('check the side room');
-      expect(items[1]).toContain('confirm the cleaner');
     } finally {
       await page.close();
     }

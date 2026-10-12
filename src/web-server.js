@@ -79,6 +79,7 @@ import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
+import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -4236,6 +4237,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
     // Process inline dataview expressions
     content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
   }
+
+  // Role-agent sections in a diary render as cards (plugins/roles/web-cards.js)
+  content = roleBlocksToCards(content);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 

@@ -108,6 +108,13 @@ block is picked up on the next run. A reply can run over several lines
 (paragraphs, bullet lists): it continues until the next `### HH:MM` entry,
 the next reply, or the end of the block.
 
+On the web view, each role block is laid out as a card; the diary file is
+unchanged. The header shows the role's name, its latest declared status,
+and when it last reported. The latest report stays open with the replies
+and dispatch notes that led to it; earlier entries fold under one
+"Earlier" toggle that counts their still-open checkboxes. Your replies show
+as "You" bubbles, and dispatch notes as single quiet lines.
+
 On the web view of today's diary, each role block ends with a collapsed
 **Reply to <Role>** form. What you type there is saved as the block's last
 item with `-> <role>:` put in front of it, formatting kept as typed (a
