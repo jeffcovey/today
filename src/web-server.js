@@ -572,7 +572,7 @@ function getActiveRoutinesNow(db, today) {
 
 // Helper function to get current time tracking timer info
 async function getCurrentTimer() {
-  const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', 'current-timer.md');
+  const timerFile = path.join(VAULT_PATH, 'logs', 'time-tracking', 'current-timer.md');
   const timezone = getConfiguredTimezone();
 
   try {
