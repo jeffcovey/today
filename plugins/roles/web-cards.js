@@ -17,12 +17,13 @@
 import { ROLE_NAME_RE } from '../../src/diary-role-blocks.js';
 
 const BLOCK_RE = /<!-- ROLE:([a-z0-9-]+):START -->\n?([\s\S]*?)<!-- ROLE:\1:END -->/g;
-const ENTRY_HEADING_RE = /^### (.+?)\s*$/;
+const ENTRY_HEADING_RE = /^### (\d{1,2}:\d{2}(?::\d{2})?)\s*$/;
 const REPLY_RE = /^(?:->|→)\s*([a-z0-9][a-z0-9-]*)\s*:\s?(.*)$/;
 const STATUS_RE = /^\*\*Status:\*\*\s*(.+?)\s*$/;
 const OPEN_CHECKBOX_RE = /^\s*(?:>\s*)*- \[ \] /;
-const FENCE_RE = /^\s*(```|~~~)/;
-const TIME_RE = /^\d{1,2}:\d{2}$/;
+const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE_RE = /^ {0,3}(`+|~+)[ \t]*$/;
+const TIME_RE = /^\d{1,2}:\d{2}(?::\d{2})?$/;
 
 const STATUS_PILLS = {
   ok: { label: 'OK', tone: 'ok' },
@@ -55,13 +56,23 @@ export function parseRoleBlock(content, knownRoles) {
 
   const segments = [];
   let current = null;
-  let inFence = false;
+  let fence = null;
   for (const line of lines) {
-    if (FENCE_RE.test(line)) {
-      inFence = !inFence;
+    let insideFence = Boolean(fence);
+    if (fence) {
+      const closingFence = line.match(FENCE_CLOSE_RE);
+      if (closingFence && closingFence[1][0] === fence.character && closingFence[1].length >= fence.length) {
+        fence = null;
+      }
+    } else {
+      const openingFence = line.match(FENCE_OPEN_RE);
+      if (openingFence && !(openingFence[1][0] === '`' && openingFence[2].includes('`'))) {
+        fence = { character: openingFence[1][0], length: openingFence[1].length };
+        insideFence = true;
+      }
     }
-    const heading = !inFence && line.match(ENTRY_HEADING_RE);
-    const reply = !inFence && line.match(REPLY_RE);
+    const heading = !insideFence && line.match(ENTRY_HEADING_RE);
+    const reply = !insideFence && line.match(REPLY_RE);
     if (heading) {
       current = { kind: 'entry', heading: heading[1], lines: [] };
       segments.push(current);
@@ -74,6 +85,13 @@ export function parseRoleBlock(content, knownRoles) {
         current = { kind: 'entry', heading: null, lines: [] };
         segments.push(current);
       }
+      if (!insideFence && current.kind === 'entry') {
+        const status = line.match(STATUS_RE);
+        if (status) {
+          current.status = status[1];
+          continue;
+        }
+      }
       current.lines.push(line);
     }
   }
@@ -82,12 +100,6 @@ export function parseRoleBlock(content, knownRoles) {
     while (segment.lines.length && !segment.lines[segment.lines.length - 1].trim()) segment.lines.pop();
     while (segment.lines.length && !segment.lines[0].trim()) segment.lines.shift();
     if (segment.kind !== 'entry') continue;
-    const statusIndex = segment.lines.findIndex(line => STATUS_RE.test(line));
-    if (statusIndex !== -1) {
-      segment.status = segment.lines[statusIndex].match(STATUS_RE)[1];
-      segment.lines.splice(statusIndex, 1);
-      while (segment.lines.length && !segment.lines[0].trim()) segment.lines.shift();
-    }
     // A dispatch note is an entry that holds nothing but an [!abstract] callout.
     const body = segment.lines.filter(line => line.trim());
     segment.dispatch = body.length > 0 && /^>\s*\[!abstract\]/i.test(body[0]) && body.every(line => /^>/.test(line));

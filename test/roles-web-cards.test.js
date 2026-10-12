@@ -99,6 +99,48 @@ describe('parseRoleBlock', () => {
     const jeff = parseRoleBlock('### 09:00\n\n-> jeff: not one of the roles', ROLES);
     expect(jeff.segments).toHaveLength(1);
   });
+
+  test('only timestamp headings start new entries', () => {
+    const parsed = parseRoleBlock('### 09:00\n\nReport.\n\n### Details\n\nMore detail.\n\n### 10:00\n\nNext report.', ROLES);
+
+    expect(parsed.segments.map(s => s.heading)).toEqual(['09:00', '10:00']);
+    expect(parsed.segments[0].lines).toContain('### Details');
+  });
+
+  test('closes a fence only with a matching delimiter at least as long', () => {
+    const parsed = parseRoleBlock([
+      '### 09:00',
+      '',
+      '```',
+      '~~~',
+      '### 10:00',
+      '-> cpa: not a reply',
+      '``',
+      '````',
+      '',
+      '### 11:00',
+      '',
+      'Report.'
+    ].join('\n'), ROLES);
+
+    expect(parsed.segments.map(s => s.heading)).toEqual(['09:00', '11:00']);
+    expect(parsed.segments[0].lines).toEqual(['```', '~~~', '### 10:00', '-> cpa: not a reply', '``', '````']);
+  });
+
+  test('does not extract status lines inside code fences', () => {
+    const parsed = parseRoleBlock([
+      '### 09:00',
+      '',
+      '```',
+      '**Status:** Blocked',
+      '```',
+      '',
+      'No status declared.'
+    ].join('\n'), ROLES);
+
+    expect(parsed.segments[0].status).toBeUndefined();
+    expect(parsed.segments[0].lines).toContain('**Status:** Blocked');
+  });
 });
 
 describe('splitLatest', () => {
