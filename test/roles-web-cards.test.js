@@ -1,5 +1,5 @@
 import { marked } from 'marked';
-import { parseRoleBlock, splitLatest, roleBlocksToCards } from '../plugins/roles/web-cards.js';
+import { parseRoleBlock, splitLatest, roleBlocksToCards, renderNeedsYou } from '../plugins/roles/web-cards.js';
 
 const DIARY = [
   '## Journal',
@@ -235,5 +235,60 @@ describe('roleBlocksToCards', () => {
 
   test('keeps the END marker in the card footer for the reply form', () => {
     expect(html).toMatch(/<div class="role-card-foot">\s*<!-- ROLE:cpa:END -->\s*<\/div>\s*<\/div>/);
+  });
+});
+
+describe('renderNeedsYou', () => {
+  const block = (lines) => parseRoleBlock(lines.join('\n'), ROLES);
+
+  test('lists every open checkbox from every role, without the address, labeled by role', () => {
+    const parsed = new Map([
+      ['innkeeper', block([
+        '### 04:06',
+        '',
+        '- [ ] → Jeff: Reply to Dallas {data-file="diary/x.md" data-line="12"}',
+        '- [x] Done already',
+        '- [ ] Cancelled {data-file="diary/x.md" data-line="13" data-cancelled="true"}',
+        '',
+        '-> innkeeper: my own list',
+        '- [ ] not a role item',
+        '',
+        '### 08:07',
+        '',
+        '> - [ ] Inside a callout {data-file="diary/x.md" data-line="20"}',
+        '',
+        '```',
+        '- [ ] inside a fence',
+        '```'
+      ])],
+      ['cpa', block(['### 04:05', '', '- [ ] → Jeff: Delete the duplicate charge'])]
+    ]);
+    const titles = new Map([['innkeeper', 'Innkeeper'], ['cpa', 'CPA & Books']]);
+
+    expect(renderNeedsYou(parsed, titles).split('\n')).toEqual([
+      '<section class="role-needs" aria-labelledby="role-needs-title">',
+      '<div class="role-needs-title" id="role-needs-title">Needs you · <span class="role-needs-count">3 open</span></div>',
+      '',
+      '- [ ] Reply to Dallas {data-file="diary/x.md" data-line="12"} <span class="role-needs-who">Innkeeper</span>',
+      '- [ ] Inside a callout {data-file="diary/x.md" data-line="20"} <span class="role-needs-who">Innkeeper</span>',
+      '- [ ] Delete the duplicate charge <span class="role-needs-who">CPA &amp; Books</span>',
+      '',
+      '</section>',
+      ''
+    ]);
+  });
+
+  test('is empty when nothing is open', () => {
+    const parsed = new Map([['cpa', block(['### 04:05', '', '- [x] Done'])]]);
+    expect(renderNeedsYou(parsed, new Map([['cpa', 'CPA']]))).toBe('');
+  });
+
+  test('comes right after the staff line, before the first card', () => {
+    const html = marked.parse(roleBlocksToCards(DIARY));
+    const staff = html.indexOf('role-staff-head');
+    const needs = html.indexOf('<section class="role-needs"');
+    expect(needs).toBeGreaterThan(staff);
+    expect(needs).toBeLessThan(html.indexOf('id="role-chief-of-staff"'));
+    expect(html).toContain('<span class="role-needs-count">1 open</span>');
   });
 });

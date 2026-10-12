@@ -55,6 +55,7 @@ export function parseRoleBlock(content, knownRoles) {
   }
 
   const segments = [];
+  const openItems = [];
   let current = null;
   let fence = null;
   for (const line of lines) {
@@ -91,6 +92,9 @@ export function parseRoleBlock(content, knownRoles) {
           current.status = status[1];
           continue;
         }
+        if (isOpenCheckbox(line)) {
+          openItems.push(line);
+        }
       }
       current.lines.push(line);
     }
@@ -105,7 +109,12 @@ export function parseRoleBlock(content, knownRoles) {
     segment.dispatch = body.length > 0 && /^>\s*\[!abstract\]/i.test(body[0]) && body.every(line => /^>/.test(line));
   }
 
-  return { title, segments };
+  return { title, segments, openItems };
+}
+
+// The renderer has already turned "- [-]" into "- [ ]" tagged data-cancelled.
+function isOpenCheckbox(line) {
+  return OPEN_CHECKBOX_RE.test(line) && !/data-cancelled="true"/.test(line);
 }
 
 /**
@@ -159,9 +168,7 @@ function renderSegment(segment, role, titles) {
 
 function earlierSummary(earlier) {
   const times = earlier.filter(s => s.kind === 'entry' && s.heading).map(s => s.heading);
-  // The renderer has already turned "- [-]" into "- [ ]" tagged data-cancelled.
-  const isOpen = line => OPEN_CHECKBOX_RE.test(line) && !/data-cancelled="true"/.test(line);
-  const open = earlier.reduce((count, s) => count + s.lines.filter(isOpen).length, 0);
+  const open = earlier.reduce((count, s) => count + s.lines.filter(isOpenCheckbox).length, 0);
   const parts = ['Earlier'];
   if (times.length) parts.push(escapeHtml(times.join(', ')));
   if (open) parts.push(`${open} open item${open === 1 ? '' : 's'}`);
@@ -214,8 +221,39 @@ function renderCard(role, parsed, titles) {
 }
 
 /**
+ * "Needs you": every still-open checkbox from every role, in one list at
+ * the top of the staff section. Each item is the role's own task line
+ * (so toggling it updates the diary like any checkbox), without the
+ * blockquote prefix or the "→ Name:" address, followed by the role's name.
+ */
+export function renderNeedsYou(parsedBlocks, titles) {
+  const items = [];
+  for (const [role, parsed] of parsedBlocks) {
+    for (const line of parsed.openItems) {
+      const text = line
+        .replace(/^\s*(?:>\s*)*- \[ \] /, '')
+        .replace(/^→\s*[^:]{1,40}:\s*/, '');
+      items.push(`- [ ] ${text} <span class="role-needs-who">${escapeHtml(titles.get(role))}</span>`);
+    }
+  }
+  if (items.length === 0) {
+    return '';
+  }
+  return [
+    '<section class="role-needs" aria-labelledby="role-needs-title">',
+    `<div class="role-needs-title" id="role-needs-title">Needs you · <span class="role-needs-count">${items.length} open</span></div>`,
+    '',
+    items.join('\n'),
+    '',
+    '</section>',
+    ''
+  ].join('\n');
+}
+
+/**
  * Replace each ROLE block in a diary's Markdown with its card. A heading
- * line introduces the first card ("Staff · N roles · latest report HH:MM").
+ * line ("Staff · N roles · latest report HH:MM") and the "Needs you" list
+ * introduce the first card.
  * Markdown without ROLE blocks is returned unchanged.
  */
 export function roleBlocksToCards(markdown) {
@@ -238,7 +276,8 @@ export function roleBlocksToCards(markdown) {
     .sort();
   const staffMeta = [`${blocks.length} role${blocks.length === 1 ? '' : 's'}`];
   if (times.length) staffMeta.push(`latest report ${times[times.length - 1]}`);
-  const staffHead = `<div class="role-staff-head" role="heading" aria-level="2"><span class="role-staff-title">Staff</span> <span class="role-staff-meta">${staffMeta.join(' · ')}</span></div>\n\n`;
+  const staffHead = `<div class="role-staff-head" role="heading" aria-level="2"><span class="role-staff-title">Staff</span> <span class="role-staff-meta">${staffMeta.join(' · ')}</span></div>\n\n` +
+    renderNeedsYou(parsedBlocks, titles) + '\n';
 
   let first = true;
   return markdown.replace(BLOCK_RE, (match, role) => {
