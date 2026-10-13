@@ -1,0 +1,8 @@
+# Sample configuration, so the TOML viewer is audited
+timezone = "America/New_York"
+retries = 3
+enabled = true
+
+[profile]
+name = "Sam"
+tags = ["one", "two"]
