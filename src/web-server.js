@@ -78,6 +78,8 @@ import { DeferredBlockRegistry, deferredBlockPlaceholder, DEFERRED_BLOCK_ENDPOIN
 import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
+import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
+import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -570,7 +572,7 @@ function getActiveRoutinesNow(db, today) {
 
 // Helper function to get current time tracking timer info
 async function getCurrentTimer() {
-  const timerFile = path.join(__dirname, '..', 'vault', 'logs', 'time-tracking', 'current-timer.md');
+  const timerFile = path.join(VAULT_PATH, 'logs', 'time-tracking', 'current-timer.md');
   const timezone = getConfiguredTimezone();
 
   try {
@@ -2215,7 +2217,7 @@ async function renderToml(filePath, urlPath) {
                   </small>
                 </div>
 
-                <pre class="toml-content"><code class="language-toml hljs">${highlightedContent}</code></pre>
+                <pre class="toml-content" tabindex="0"><code class="language-toml hljs">${highlightedContent}</code></pre>
               </div>
             </div>
           </div>
@@ -4235,6 +4237,9 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
     // Process inline dataview expressions
     content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
   }
+
+  // Role-agent sections in a diary render as cards (plugins/roles/web-cards.js)
+  content = roleBlocksToCards(content);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering
 
@@ -6984,6 +6989,22 @@ app.get('/edit/*path', authMiddleware, async (req, res) => {
 });
 
 // Toggle checkbox route handler
+// Reply to a role agent from the form under its block in today's diary
+app.post(`${ROLE_REPLY_ENDPOINT}/*path`, authMiddleware, (req, res) => {
+  const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path;
+  const fullPath = path.resolve(VAULT_PATH, urlPath);
+  const relativePath = path.relative(VAULT_PATH, fullPath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  const { role, text } = req.body || {};
+  const { status, body } = saveRoleReply(VAULT_PATH, relativePath, role, text);
+  if (status === 200) {
+    console.log(`Role reply saved: ${relativePath} (${role})`);
+  }
+  res.status(status).json(body);
+});
+
 app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
   try {
     const urlPath = Array.isArray(req.params.path) ? req.params.path.join('/') : req.params.path; // Get the wildcard path
@@ -7996,7 +8017,10 @@ app.get('/*path', authMiddleware, async (req, res) => {
             </div>
           </div>`;
 
-        const html = cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
+        const html = injectRoleReplyForms(
+          cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml),
+          path.relative(VAULT_PATH, fullPath)
+        );
         res.send(html);
       } else if (fullPath.endsWith('.toml')) {
         const html = await renderToml(fullPath, urlPath);

@@ -15,9 +15,18 @@
   --today-accent: #1266f1;
   --today-code-text: #0b4ea2;
   --today-code-bg: rgba(18, 102, 241, 0.1);
+  --today-code-block-bg: #f6f8fa;
+  --today-code-block-text: #1f2328;
   --mdb-link-color: #2b5fb4;
   --mdb-link-color-rgb: 43, 95, 180;
   --mdb-secondary-color: #5c636a;
+  --today-you-bg: #e7f0fe;
+  --today-you-border: #b9d1fb;
+  --today-attn-text: #92400e;
+  --today-attn-bg: #fef3c7;
+  --today-attn-edge: #d97706;
+  --today-ok-text: #1e6b3d;
+  --today-ok-bg: #e3f4ea;
 }
 
 html[data-theme="dark"] {
@@ -35,9 +44,18 @@ html[data-theme="dark"] {
   --today-accent: #60a5fa;
   --today-code-text: #bfdbfe;
   --today-code-bg: #273a5c;
+  --today-code-block-bg: #0d1117;
+  --today-code-block-text: #e6edf3;
   --mdb-link-color: #93c5fd;
   --mdb-link-color-rgb: 147, 197, 253;
   --mdb-secondary-color: #9ca3af;
+  --today-you-bg: #1e3a5f;
+  --today-you-border: #2f5688;
+  --today-attn-text: #fcd34d;
+  --today-attn-bg: #45320d;
+  --today-attn-edge: #f59e0b;
+  --today-ok-text: #86efac;
+  --today-ok-bg: #173a27;
 }
 
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
@@ -249,6 +267,297 @@ details.task-section summary::-webkit-details-marker {
   margin-right: 0.5rem;
 }
 
+/* Role-agent sections in a diary, laid out as cards (plugins/roles/web-cards.js) */
+.role-staff-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.role-staff-title {
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.role-staff-meta {
+  font-size: 0.85rem;
+  color: var(--today-muted-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Needs you": every open role checkbox, above the cards */
+.role-needs {
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.5rem;
+  background: var(--today-card-bg);
+}
+
+.role-needs-title {
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--today-muted-text);
+}
+
+.role-needs-count {
+  color: var(--today-attn-text);
+}
+
+.markdown-content .role-needs ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.role-needs li {
+  padding: 0.35rem 0;
+}
+
+.role-needs li + li {
+  border-top: 1px solid var(--today-border);
+}
+
+.role-needs-who {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--today-muted-text);
+  white-space: nowrap;
+}
+
+.role-card {
+  margin: 0 0 1rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.5rem;
+  background: var(--today-card-bg);
+  overflow: hidden;
+}
+
+.role-card-attn {
+  border-left: 4px solid var(--today-attn-edge);
+}
+
+.role-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--today-surface-2);
+  border-bottom: 1px solid var(--today-border);
+}
+
+.role-card .role-card-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.role-card-head p {
+  margin: 0;
+}
+
+.role-card-head p:last-child {
+  margin-left: auto;
+}
+
+.role-pill {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.role-pill-attn {
+  background: var(--today-attn-bg);
+  color: var(--today-attn-text);
+}
+
+.role-pill-ok {
+  background: var(--today-ok-bg);
+  color: var(--today-ok-text);
+}
+
+.role-pill-quiet {
+  background: var(--today-muted-bg);
+  color: var(--today-muted-text);
+}
+
+.role-updated {
+  font-size: 0.8rem;
+  color: var(--today-muted-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.role-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.role-card-body > *,
+.role-earlier > * {
+  min-width: 0;
+}
+
+.role-entry > :last-child,
+.role-you > :last-child {
+  margin-bottom: 0;
+}
+
+/* The time is a small label; the bold headline under it leads. */
+.role-card .role-entry h3 {
+  margin: 0 0 0.25rem;
+  font-family: "Roboto Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--today-muted-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Details and dispatch notes are quiet links, not boxes. */
+.role-card details.task-section {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  border: 0;
+  border-left: 0;
+  background: none;
+}
+
+.role-card details.task-section > summary {
+  display: inline-flex;
+  margin: 0;
+  padding: 0.15rem 0;
+  min-height: 24px;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--today-link);
+}
+
+.role-card details.task-section > summary:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.role-card details.task-section[open] > summary {
+  border-bottom: 0;
+  margin-bottom: 0.35rem;
+}
+
+.role-card details.task-section > .section-content {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.375rem;
+  background: var(--today-surface-2);
+  font-size: 0.95rem;
+}
+
+.role-card .role-dispatch details.task-section > summary {
+  color: var(--today-muted-text);
+  font-size: 0.85rem;
+}
+
+/* Earlier entries fold away under one quiet toggle. */
+.role-earlier {
+  border-top: 1px dashed var(--today-border);
+  padding-top: 0.6rem;
+}
+
+.role-earlier > summary {
+  min-height: 24px;
+  font-size: 0.9rem;
+  color: var(--today-muted-text);
+  cursor: pointer;
+}
+
+.role-earlier[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.role-earlier > .role-entry,
+.role-earlier > .role-you {
+  margin-bottom: 0.75rem;
+}
+
+/* The user's replies: chat bubbles marked "You". */
+.role-you {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--today-you-border);
+  border-radius: 0.75rem 0.75rem 0.25rem 0.75rem;
+  background: var(--today-you-bg);
+}
+
+.role-earlier > .role-you {
+  margin-left: auto;
+}
+
+.role-you-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--today-muted-text);
+}
+
+.role-card-foot {
+  padding: 0 1rem;
+}
+
+.role-card-foot:has(.role-reply) {
+  padding-bottom: 0.75rem;
+}
+
+/* The reply form's toggle looks like a button at the foot of the card. */
+.role-card details.role-reply > summary {
+  padding: 0.3rem 0.85rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.375rem;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-weight: 500;
+}
+
+.role-card details.role-reply > summary:hover {
+  background: var(--today-hover-bg);
+  text-decoration: none;
+}
+
+.role-card details.role-reply[open] > summary {
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 480px) {
+  .role-card-head p:last-child {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .role-you {
+    max-width: 95%;
+  }
+}
+
+/* Reply form under each role block in today's diary */
+details.role-reply .form-label {
+  color: var(--today-text);
+}
+
+details.role-reply .form-text {
+  color: var(--today-muted-text);
+}
+
 /* Obsidian-style callout variations */
 details.callout-note { border-left: 4px solid #007bff; }
 details.callout-tip { border-left: 4px solid #28a745; }
@@ -304,9 +613,11 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.markdown-content pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
+.markdown-content pre,
+.toml-content {
+  background: var(--today-code-block-bg);
+  color: var(--today-code-block-text);
+  border: 1px solid var(--today-border);
   padding: 1rem;
   border-radius: 0.375rem;
   overflow-x: auto;
@@ -321,9 +632,10 @@ body {
   font-size: 0.875em;
 }
 
-.markdown-content pre code {
+.markdown-content pre code,
+.toml-content code.hljs {
   background: transparent;
-  color: #d4d4d4;
+  color: inherit;
   padding: 0;
 }
 
@@ -1145,8 +1457,14 @@ html[data-theme="dark"] .markdown-content td {
 }
 
 /* Let the focusable <pre> do the scrolling instead of highlight.js's <code>. */
-.markdown-content pre code.hljs {
+.markdown-content pre code.hljs,
+.toml-content code.hljs {
   overflow-x: visible;
+}
+
+/* github-dark's section blue is under 4.5:1 on its own background. */
+html[data-theme="dark"] :is(.markdown-content, .toml-content) .hljs-section {
+  color: #79c0ff;
 }
 
 /* Bootstrap alerts have no dark variants; these keep their meaning on a dark page. */
@@ -1161,6 +1479,12 @@ html[data-theme="dark"] .alert-primary {
   background-color: #1e3a5f;
   color: #dbeafe;
   border-color: #1d4ed8;
+}
+
+/* MDB's info alert text (#3b7e94) is 4.05:1 on its own background */
+.alert-info {
+  --mdb-alert-color: #1d5566;
+  color: #1d5566;
 }
 
 html[data-theme="dark"] .alert-info {
@@ -1223,76 +1547,115 @@ html:root {
   --d2h-dark-dim-color: #a3abb4;
 }
 
-/* highlight.js's github-dark theme is loaded for code blocks, which are dark
-   in both themes. Light diffs get a light palette instead. */
+/* highlight.js's github-dark theme supplies the dark token colours; light diffs
+   and code blocks in the light theme get this palette instead. */
 .d2h-light-color-scheme .hljs {
   color: #1f2328;
   background: transparent;
 }
 
 .d2h-light-color-scheme .hljs-keyword,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-keyword,
 .d2h-light-color-scheme .hljs-doctag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-doctag,
 .d2h-light-color-scheme .hljs-template-tag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-template-tag,
 .d2h-light-color-scheme .hljs-template-variable,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-template-variable,
 .d2h-light-color-scheme .hljs-type,
-.d2h-light-color-scheme .hljs-variable.language_ {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-type,
+.d2h-light-color-scheme .hljs-variable.language_,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-variable.language_ {
   color: #990016;
 }
 
 .d2h-light-color-scheme .hljs-title,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title,
 .d2h-light-color-scheme .hljs-title.class_,
-.d2h-light-color-scheme .hljs-title.function_ {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title.class_,
+.d2h-light-color-scheme .hljs-title.function_,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title.function_ {
   color: #5a2ea6;
 }
 
 .d2h-light-color-scheme .hljs-attr,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-attr,
 .d2h-light-color-scheme .hljs-attribute,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-attribute,
 .d2h-light-color-scheme .hljs-literal,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-literal,
 .d2h-light-color-scheme .hljs-meta,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-meta,
 .d2h-light-color-scheme .hljs-number,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-number,
 .d2h-light-color-scheme .hljs-operator,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-operator,
 .d2h-light-color-scheme .hljs-variable,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-variable,
 .d2h-light-color-scheme .hljs-selector-attr,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-attr,
 .d2h-light-color-scheme .hljs-selector-class,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-class,
 .d2h-light-color-scheme .hljs-selector-id,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-id,
 .d2h-light-color-scheme .hljs-section,
-.d2h-light-color-scheme .hljs-link {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-section,
+.d2h-light-color-scheme .hljs-link,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-link {
   color: #0349a6;
 }
 
 .d2h-light-color-scheme .hljs-regexp,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-regexp,
 .d2h-light-color-scheme .hljs-string,
-.d2h-light-color-scheme .hljs-meta .hljs-string {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-string,
+.d2h-light-color-scheme .hljs-meta .hljs-string,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-meta .hljs-string {
   color: #0a3069;
 }
 
 .d2h-light-color-scheme .hljs-built_in,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-built_in,
 .d2h-light-color-scheme .hljs-symbol,
-.d2h-light-color-scheme .hljs-bullet {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-symbol,
+.d2h-light-color-scheme .hljs-bullet,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-bullet {
   color: #7a3500;
 }
 
 .d2h-light-color-scheme .hljs-comment,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-comment,
 .d2h-light-color-scheme .hljs-code,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-code,
 .d2h-light-color-scheme .hljs-formula,
-.d2h-light-color-scheme .hljs-quote {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-formula,
+.d2h-light-color-scheme .hljs-quote,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-quote {
   color: #464c53;
 }
 
 .d2h-light-color-scheme .hljs-name,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-name,
 .d2h-light-color-scheme .hljs-selector-tag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-tag,
 .d2h-light-color-scheme .hljs-selector-pseudo,
-.d2h-light-color-scheme .hljs-addition {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-pseudo,
+.d2h-light-color-scheme .hljs-addition,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-addition {
   color: #0f5323;
 }
 
-.d2h-light-color-scheme .hljs-deletion {
+.d2h-light-color-scheme .hljs-deletion,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-deletion {
   color: #990016;
 }
 
 .d2h-light-color-scheme .hljs-subst,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-subst,
 .d2h-light-color-scheme .hljs-emphasis,
-.d2h-light-color-scheme .hljs-strong {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-emphasis,
+.d2h-light-color-scheme .hljs-strong,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-strong {
   color: #1f2328;
 }
 

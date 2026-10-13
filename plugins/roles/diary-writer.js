@@ -13,9 +13,10 @@ import fs from 'fs';
 import path from 'path';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 import { ROLE_NAME_RE, roleStartMarker, roleEndMarker } from '../../src/diary-role-blocks.js';
-import { getTimezone } from '../../src/config.js';
+import { getFullConfig, getTimezone } from '../../src/config.js';
 
 export const MAX_REPORT_LENGTH = 2000;
+export const MAX_REPLY_LENGTH = 4000;
 export const MAX_ROLE_TITLE_LENGTH = 80;
 export const ROLE_STATUSES = ['ok', 'blocked', 'needs-attention', 'quiet'];
 
@@ -70,7 +71,16 @@ export function validateRoleReport(role, text, { status, title } = {}) {
   return errors;
 }
 
-function defaultTitle(role) {
+/**
+ * True when any [plugins.roles.<source>] is enabled. Role writes (reports
+ * from agents, replies from the web) are refused otherwise.
+ */
+export function rolesPluginEnabled() {
+  const sources = getFullConfig().plugins?.roles || {};
+  return Object.values(sources).some(source => source && source.enabled);
+}
+
+export function defaultTitle(role) {
   return role
     .split('-')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
@@ -239,6 +249,101 @@ export function setRoleCheckboxState(filePath, role, match, state) {
       }
 
       return { ok: false, error: `Concurrent writes kept changing ${filePath}; checkbox not flipped` };
+    } finally {
+      releaseDiaryLock(lockPath, lockStat);
+    }
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+function releaseDiaryLock(lockPath, lockStat) {
+  try {
+    const current = fs.statSync(lockPath);
+    if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
+      fs.unlinkSync(lockPath);
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+}
+
+// A first line that opens a block (list, heading, quote, fence, table)
+// would be swallowed into the "-> role:" paragraph, so it starts on the
+// next line instead.
+const BLOCK_START_RE = /^\s*(?:[-*+]\s|\d+[.)]\s|#{1,6}\s|>|```|~~~|\|)/;
+
+/**
+ * Format the user's reply to a role. The text is kept as typed (lists,
+ * paragraphs, and all); only the "-> role:" prefix is added.
+ */
+export function formatRoleReply(role, text) {
+  const body = (text || '').replace(/\r\n?/g, '\n').replace(/^\s*\n/, '').trimEnd();
+  return BLOCK_START_RE.test(body) ? `-> ${role}:\n${body}` : `-> ${role}: ${body.trimStart()}`;
+}
+
+/**
+ * Append the user's reply as the last item in a role's block, just before
+ * its END marker. The block must already exist: a reply answers a role
+ * that has reported. Uses the same lock and compare-and-swap as role
+ * reports, so a reply and an agent's report can't overwrite each other.
+ *
+ * Returns { ok, reply } or { ok: false, error, code } where code is
+ * 'invalid', 'missing', or 'conflict'.
+ */
+export function appendRoleReply(filePath, role, text) {
+  if (!ROLE_NAME_RE.test(role || '')) {
+    return { ok: false, code: 'invalid', error: `Invalid role name "${role}"` };
+  }
+  const body = (text || '').trim();
+  if (!body) {
+    return { ok: false, code: 'invalid', error: 'Reply is empty' };
+  }
+  if (body.length > MAX_REPLY_LENGTH) {
+    return { ok: false, code: 'invalid', error: `Reply is ${body.length} characters; the limit is ${MAX_REPLY_LENGTH}` };
+  }
+  if (/<!--\s*(ROLE|TODAY):/i.test(body)) {
+    return { ok: false, code: 'invalid', error: 'Reply may not contain ROLE: or TODAY: markers' };
+  }
+
+  const reply = formatRoleReply(role, text);
+  const startMarker = roleStartMarker(role);
+  const endMarker = roleEndMarker(role);
+  const lockPath = `${filePath}.lock`;
+
+  let lockStat;
+  try {
+    lockStat = acquireDiaryLock(lockPath);
+    try {
+      for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
+        let original;
+        try {
+          original = fs.readFileSync(filePath, 'utf8');
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return { ok: false, code: 'missing', error: `Diary file ${filePath} does not exist` };
+          }
+          throw error;
+        }
+
+        const startIndex = original.indexOf(startMarker);
+        const endIndex = original.indexOf(endMarker);
+        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+          return { ok: false, code: 'missing', error: `No ${role} block in ${filePath}` };
+        }
+
+        const before = original.slice(0, endIndex).replace(/\n*$/, '\n\n');
+        const updated = `${before}${reply}\n\n${original.slice(endIndex)}`;
+
+        const { conflict } = writeFileAtomicCAS(filePath, updated, original);
+        if (!conflict) {
+          return { ok: true, reply };
+        }
+      }
+
+      return { ok: false, code: 'conflict', error: `Concurrent writes kept changing ${filePath}; reply not saved` };
     } finally {
       try {
         const current = fs.statSync(lockPath);

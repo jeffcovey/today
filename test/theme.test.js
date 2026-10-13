@@ -87,6 +87,36 @@ describe('theme behavior', () => {
   });
 });
 
+describe('role reply submission', () => {
+  test('ignores repeated submissions while the first request is pending', async () => {
+    const context = loadCommonJsContext();
+    let resolveFetch;
+    let fetchCount = 0;
+    context.fetch = () => {
+      fetchCount += 1;
+      return new Promise((resolve) => { resolveFetch = resolve; });
+    };
+    context.window.location.reload = () => {};
+
+    const button = { disabled: false };
+    const form = {
+      dataset: { file: 'diary/2026-10-12.md', role: 'cpa' },
+      querySelector(selector) {
+        if (selector === 'textarea') return { value: 'Please check this.' };
+        if (selector === 'button[type="submit"]') return button;
+        if (selector === '.role-reply-status') return { textContent: '' };
+      }
+    };
+
+    const firstSubmission = context.sendRoleReply(form);
+    const repeatedSubmission = context.sendRoleReply(form);
+    expect(fetchCount).toBe(1);
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await Promise.all([firstSubmission, repeatedSubmission]);
+  });
+});
+
 describe('navbar rendering', () => {
   test('getNavbar renders the display settings menu with three theme modes', () => {
     const navbarHtml = getNavbar();
