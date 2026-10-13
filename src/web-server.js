@@ -2217,7 +2217,7 @@ async function renderToml(filePath, urlPath) {
                   </small>
                 </div>
 
-                <pre class="toml-content"><code class="language-toml hljs">${highlightedContent}</code></pre>
+                <pre class="toml-content" tabindex="0"><code class="language-toml hljs">${highlightedContent}</code></pre>
               </div>
             </div>
           </div>

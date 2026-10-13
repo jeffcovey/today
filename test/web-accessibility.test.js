@@ -119,6 +119,31 @@ describe('git page diffs', () => {
   });
 });
 
+describe('code blocks', () => {
+  test.each([
+    ['kitchen-sink', '.markdown-content pre'],
+    ['toml', '.toml-content']
+  ].flatMap(([name, selector]) => THEMES.map(theme => [name, theme, selector])))('%s, %s theme: background follows the theme', async (name, theme, selector) => {
+    const page = await browser.newPage();
+    try {
+      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), theme);
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await page.goto(server.baseUrl + PAGES.find(p => p.name === name).path, { waitUntil: 'networkidle0' });
+      const background = await page.$eval(selector, el => {
+        const probe = document.createElement('div');
+        probe.style.backgroundColor = 'var(--today-code-block-bg)';
+        document.body.appendChild(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { actual: getComputedStyle(el).backgroundColor, expected };
+      });
+      expect(background.actual).toBe(background.expected);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
 describe('task markers', () => {
   const MARKER = /[🔺⏫🔼🔽⏬⏳🛫➕🔁📅✅❌]/u;
 

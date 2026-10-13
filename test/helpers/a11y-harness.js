@@ -34,6 +34,7 @@ export const PAGES = [
   { name: 'diary', path: '/diary/2026-01-15.md' },
   { name: 'diary-today', path: TODAY_DIARY_PATH },
   { name: 'kitchen-sink', path: '/notes/kitchen-sink.md' },
+  { name: 'toml', path: '/notes/settings.toml' },
   { name: 'project', path: '/projects/sample-project.md' },
   { name: 'directory', path: '/notes/' },
   { name: 'login', path: '/auth/login', public: true },
