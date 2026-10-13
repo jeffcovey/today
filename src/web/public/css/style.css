@@ -15,6 +15,8 @@
   --today-accent: #1266f1;
   --today-code-text: #0b4ea2;
   --today-code-bg: rgba(18, 102, 241, 0.1);
+  --today-code-block-bg: #f6f8fa;
+  --today-code-block-text: #1f2328;
   --mdb-link-color: #2b5fb4;
   --mdb-link-color-rgb: 43, 95, 180;
   --mdb-secondary-color: #5c636a;
@@ -42,6 +44,8 @@ html[data-theme="dark"] {
   --today-accent: #60a5fa;
   --today-code-text: #bfdbfe;
   --today-code-bg: #273a5c;
+  --today-code-block-bg: #0d1117;
+  --today-code-block-text: #e6edf3;
   --mdb-link-color: #93c5fd;
   --mdb-link-color-rgb: 147, 197, 253;
   --mdb-secondary-color: #9ca3af;
@@ -609,9 +613,11 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.markdown-content pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
+.markdown-content pre,
+.toml-content {
+  background: var(--today-code-block-bg);
+  color: var(--today-code-block-text);
+  border: 1px solid var(--today-border);
   padding: 1rem;
   border-radius: 0.375rem;
   overflow-x: auto;
@@ -626,9 +632,10 @@ body {
   font-size: 0.875em;
 }
 
-.markdown-content pre code {
+.markdown-content pre code,
+.toml-content code.hljs {
   background: transparent;
-  color: #d4d4d4;
+  color: inherit;
   padding: 0;
 }
 
@@ -1450,8 +1457,14 @@ html[data-theme="dark"] .markdown-content td {
 }
 
 /* Let the focusable <pre> do the scrolling instead of highlight.js's <code>. */
-.markdown-content pre code.hljs {
+.markdown-content pre code.hljs,
+.toml-content code.hljs {
   overflow-x: visible;
+}
+
+/* github-dark's section blue is under 4.5:1 on its own background. */
+html[data-theme="dark"] :is(.markdown-content, .toml-content) .hljs-section {
+  color: #79c0ff;
 }
 
 /* Bootstrap alerts have no dark variants; these keep their meaning on a dark page. */
@@ -1534,76 +1547,115 @@ html:root {
   --d2h-dark-dim-color: #a3abb4;
 }
 
-/* highlight.js's github-dark theme is loaded for code blocks, which are dark
-   in both themes. Light diffs get a light palette instead. */
+/* highlight.js's github-dark theme supplies the dark token colours; light diffs
+   and code blocks in the light theme get this palette instead. */
 .d2h-light-color-scheme .hljs {
   color: #1f2328;
   background: transparent;
 }
 
 .d2h-light-color-scheme .hljs-keyword,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-keyword,
 .d2h-light-color-scheme .hljs-doctag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-doctag,
 .d2h-light-color-scheme .hljs-template-tag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-template-tag,
 .d2h-light-color-scheme .hljs-template-variable,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-template-variable,
 .d2h-light-color-scheme .hljs-type,
-.d2h-light-color-scheme .hljs-variable.language_ {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-type,
+.d2h-light-color-scheme .hljs-variable.language_,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-variable.language_ {
   color: #990016;
 }
 
 .d2h-light-color-scheme .hljs-title,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title,
 .d2h-light-color-scheme .hljs-title.class_,
-.d2h-light-color-scheme .hljs-title.function_ {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title.class_,
+.d2h-light-color-scheme .hljs-title.function_,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-title.function_ {
   color: #5a2ea6;
 }
 
 .d2h-light-color-scheme .hljs-attr,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-attr,
 .d2h-light-color-scheme .hljs-attribute,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-attribute,
 .d2h-light-color-scheme .hljs-literal,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-literal,
 .d2h-light-color-scheme .hljs-meta,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-meta,
 .d2h-light-color-scheme .hljs-number,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-number,
 .d2h-light-color-scheme .hljs-operator,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-operator,
 .d2h-light-color-scheme .hljs-variable,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-variable,
 .d2h-light-color-scheme .hljs-selector-attr,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-attr,
 .d2h-light-color-scheme .hljs-selector-class,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-class,
 .d2h-light-color-scheme .hljs-selector-id,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-id,
 .d2h-light-color-scheme .hljs-section,
-.d2h-light-color-scheme .hljs-link {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-section,
+.d2h-light-color-scheme .hljs-link,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-link {
   color: #0349a6;
 }
 
 .d2h-light-color-scheme .hljs-regexp,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-regexp,
 .d2h-light-color-scheme .hljs-string,
-.d2h-light-color-scheme .hljs-meta .hljs-string {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-string,
+.d2h-light-color-scheme .hljs-meta .hljs-string,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-meta .hljs-string {
   color: #0a3069;
 }
 
 .d2h-light-color-scheme .hljs-built_in,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-built_in,
 .d2h-light-color-scheme .hljs-symbol,
-.d2h-light-color-scheme .hljs-bullet {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-symbol,
+.d2h-light-color-scheme .hljs-bullet,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-bullet {
   color: #7a3500;
 }
 
 .d2h-light-color-scheme .hljs-comment,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-comment,
 .d2h-light-color-scheme .hljs-code,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-code,
 .d2h-light-color-scheme .hljs-formula,
-.d2h-light-color-scheme .hljs-quote {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-formula,
+.d2h-light-color-scheme .hljs-quote,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-quote {
   color: #464c53;
 }
 
 .d2h-light-color-scheme .hljs-name,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-name,
 .d2h-light-color-scheme .hljs-selector-tag,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-tag,
 .d2h-light-color-scheme .hljs-selector-pseudo,
-.d2h-light-color-scheme .hljs-addition {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-selector-pseudo,
+.d2h-light-color-scheme .hljs-addition,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-addition {
   color: #0f5323;
 }
 
-.d2h-light-color-scheme .hljs-deletion {
+.d2h-light-color-scheme .hljs-deletion,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-deletion {
   color: #990016;
 }
 
 .d2h-light-color-scheme .hljs-subst,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-subst,
 .d2h-light-color-scheme .hljs-emphasis,
-.d2h-light-color-scheme .hljs-strong {
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-emphasis,
+.d2h-light-color-scheme .hljs-strong,
+html:not([data-theme="dark"]) :is(.markdown-content, .toml-content) .hljs-strong {
   color: #1f2328;
 }
 
