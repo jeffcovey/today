@@ -154,7 +154,7 @@ function importPayeeMatchState(tx) {
     const parsed = JSON.parse(tx.import_payee_name);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
         typeof parsed.accepted !== 'boolean' ||
-        !(typeof parsed.payeeId === 'string' || typeof parsed.importedSource === 'string')) {
+        ![parsed.payeeId, parsed.importedPayee, parsed.importedSource].some(value => typeof value === 'string')) {
       return null;
     }
     return parsed;

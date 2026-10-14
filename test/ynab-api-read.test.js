@@ -388,7 +388,7 @@ describe('ynab-api read plugin', () => {
       expect(cachedIds()).toEqual([rowId('user-entry')]);
     });
 
-    test('leading braces alone do not identify matched-import state', () => {
+    test('brace-prefixed imported payees without match-state fields are kept', () => {
       writeState({ server_knowledge: 5, last_full_refresh: new Date().toISOString() });
       const malformed = '{not json';
       const ordinaryJson = JSON.stringify({ note: 'literal statement payee' });
@@ -425,7 +425,7 @@ describe('ynab-api read plugin', () => {
           [CURRENT.id]: [tx('t1', {
             payee_name: null,
             import_payee_name: JSON.stringify({
-              payeeId: 'p', importedPayee: 'Bill Payment', accepted: false
+              importedPayee: 'Bill Payment', accepted: false
             })
           })]
         }
