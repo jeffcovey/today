@@ -7,6 +7,13 @@
 // On subsequent runs: pulls only records that changed since the last sync.
 // Deleted transactions are removed from the local DB directly.
 //
+// The delta feed alone does not converge: YNAB drops some transactions without
+// ever sending a `deleted: true` tombstone (a pending charge re-posted under a new
+// id, an import merged into a scheduled or manual entry), and it reports its
+// internal matched-import records as ordinary live transactions. So every
+// full_refresh_hours the plugin re-reads the whole retention window and removes
+// cached rows YNAB no longer returns (issue #604).
+//
 // IDs are stable YNAB UUIDs prefixed with the budget ID, so INSERT OR REPLACE
 // naturally handles updates without duplicates.
 
@@ -27,6 +34,7 @@ const apiToken = config.api_token || '';
 const budgetIdsConfig = (config.budget_ids || '').trim();
 const excludeBudgetIdsConfig = (config.exclude_budget_ids || '').trim();
 const retentionDays = config.retention_days || 365;
+const fullRefreshHours = Number(config.full_refresh_hours ?? 24);
 
 // Delta-sync state: server_knowledge per budget
 const statePath = path.join(projectRoot, '.data', `${sourceId.replace(/\//g, '-')}-state.json`);
@@ -121,15 +129,50 @@ function convertScheduled(st, budgetId, budgetName, categoryMap) {
   };
 }
 
-async function fetchTransactions(budgetId, lastKnowledge) {
+// Delta fetch when lastKnowledge is given; otherwise the full listing from
+// sinceDate on, which is what a full refresh reconciles the cache against.
+async function fetchTransactions(budgetId, lastKnowledge, sinceDate = null) {
   const url = lastKnowledge != null
     ? `${API_BASE}/budgets/${budgetId}/transactions?last_knowledge_of_server=${lastKnowledge}`
-    : `${API_BASE}/budgets/${budgetId}/transactions`;
+    : `${API_BASE}/budgets/${budgetId}/transactions${sinceDate ? `?since_date=${sinceDate}` : ''}`;
   const data = await apiFetch(url);
   return {
     transactions: data.data.transactions,
     server_knowledge: data.data.server_knowledge
   };
+}
+
+// YNAB's delta feed (last_knowledge_of_server) returns the hidden half of a
+// matched import — the bank-side record YNAB folded into a manual or scheduled
+// entry — as a live transaction. The normal listing never returns it, and its
+// import_payee_name is YNAB's internal JSON match state rather than a payee
+// ({"payeeId":...,"importedSource":...,"accepted":...}). Storing it double counts
+// the matched transaction, so it is treated as deleted.
+function isMatchedImportShadow(tx) {
+  return Boolean(tx.matched_transaction_id) &&
+    typeof tx.import_payee_name === 'string' &&
+    tx.import_payee_name.trim().startsWith('{');
+}
+
+// import_payee_name is normally the cleaned bank payee, but on matched-import
+// records it is a JSON blob; never surface that as a payee.
+function importPayeeName(tx) {
+  const raw = tx.import_payee_name || '';
+  if (!raw.trim().startsWith('{')) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.userImportedPayee || parsed.importedPayee || tx.import_payee_name_original || '';
+  } catch {
+    return tx.import_payee_name_original || '';
+  }
+}
+
+function isFullRefreshDue(budgetState, now = Date.now(), hours = fullRefreshHours) {
+  if (budgetState.server_knowledge == null) return true;
+  if (!budgetState.last_full_refresh) return true;
+  if (!(hours > 0)) return false;
+  const last = Date.parse(budgetState.last_full_refresh);
+  return !Number.isFinite(last) || now - last >= hours * 3600 * 1000;
 }
 
 function convertTransaction(tx, budgetId, budgetName, categoryMap) {
@@ -140,7 +183,7 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
     id: `${budgetId}:${tx.id}`,
     date: tx.date,
     account: tx.account_name || '',
-    payee: tx.payee_name || tx.import_payee_name || '',
+    payee: tx.payee_name || importPayeeName(tx),
     category: cat?.name || tx.category_name || '',
     category_group: cat?.group_name || '',
     amount,
@@ -163,6 +206,9 @@ function convertTransaction(tx, budgetId, budgetName, categoryMap) {
   };
 }
 
+// Rows superseded by a removed row keep a dangling superseded_by until the
+// finance reconcile that the plugin loader runs after every finance sync, which
+// clears and recomputes the column — so nothing extra is needed here.
 function removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) {
   let purgedRows = 0;
   if (toDelete.length === 0 && droppedBudgets.length === 0) return purgedRows;
@@ -198,6 +244,42 @@ function removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) {
   }
 
   return purgedRows;
+}
+
+// After a full refresh: drop this budget's cached real (non-scheduled) rows in
+// the refreshed window that YNAB did not return. Returns the number removed.
+function pruneMissingTransactions(projectRoot, sourceId, budgetId, sinceDate, liveIds) {
+  let removed = 0;
+  try {
+    const Database = require('better-sqlite3');
+    const dbPath = path.join(projectRoot, '.data', 'today.db');
+    if (!fs.existsSync(dbPath)) return 0;
+    const db = new Database(dbPath);
+    try {
+      const prefix = `${sourceId}:${budgetId}:`;
+      const escaped = prefix.replace(/[\\%_]/g, c => `\\${c}`);
+      const rows = db.prepare(`
+        SELECT id FROM financial_transactions
+        WHERE source = ? AND id LIKE ? ESCAPE '\\'
+          AND IFNULL(scheduled, 0) = 0
+          AND date >= ?
+      `).all(sourceId, `${escaped}%`, sinceDate);
+      const stale = rows
+        .map(r => r.id)
+        // Scheduled rules have their own endpoint and cursor; never touch them here
+        .filter(id => !id.startsWith(`${prefix}scheduled:`))
+        .filter(id => !liveIds.has(id.slice(prefix.length)));
+      const del = db.prepare('DELETE FROM financial_transactions WHERE id = ?');
+      db.transaction(ids => {
+        for (const id of ids) removed += del.run(id).changes;
+      })(stale);
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error(`Warning: could not prune transactions missing from YNAB: ${err.message}`);
+  }
+  return removed;
 }
 
 // Early exit for context-only mode — data is already in the DB cache
@@ -293,9 +375,13 @@ async function main() {
       console.error(`Warning: could not fetch categories for "${budget.name}": ${err.message}`);
     }
 
+    const fullRefresh = isFullRefreshDue(budgetState);
+
     let txResult;
     try {
-      txResult = await fetchTransactions(budget.id, budgetState.server_knowledge ?? null);
+      txResult = fullRefresh
+        ? await fetchTransactions(budget.id, null, cutoffStr)
+        : await fetchTransactions(budget.id, budgetState.server_knowledge ?? null);
     } catch (err) {
       console.error(`Warning: could not fetch transactions for "${budget.name}": ${err.message}`);
       continue;
@@ -303,7 +389,14 @@ async function main() {
 
     let added = 0;
     let deleted = 0;
+    let shadowsSkipped = 0;
+    const liveIds = new Set();
     for (const tx of txResult.transactions) {
+      if (!tx.deleted && isMatchedImportShadow(tx)) {
+        toDelete.push(`${sourceId}:${budget.id}:${tx.id}`);
+        shadowsSkipped++;
+        continue;
+      }
       if (tx.deleted) {
         // Full DB id = sourceId + ":" + entry.id (see plugin-loader insertEntries)
         toDelete.push(`${sourceId}:${budget.id}:${tx.id}`);
@@ -311,6 +404,7 @@ async function main() {
         continue;
       }
       if (tx.date < cutoffStr) continue;
+      liveIds.add(tx.id);
       entries.push(convertTransaction(tx, budget.id, budget.name, categoryMap));
       added++;
     }
@@ -340,17 +434,28 @@ async function main() {
       console.error(`Warning: could not fetch scheduled transactions for "${budget.name}": ${err.message}`);
     }
 
+    // Full ids compared as-is: scheduled-instance ids are `<uuid>_<YYYY-MM-DD>`
+    let staleRemoved = 0;
+    if (fullRefresh) {
+      staleRemoved = pruneMissingTransactions(projectRoot, sourceId, budget.id, cutoffStr, liveIds);
+    }
+
+    const nowIso = new Date().toISOString();
     state.budgets[budget.id] = {
       server_knowledge: txResult.server_knowledge,
       scheduled_server_knowledge: budgetState.scheduled_server_knowledge ?? null,
       budget_name: budget.name,
-      last_synced: new Date().toISOString()
+      last_synced: nowIso,
+      last_full_refresh: fullRefresh ? nowIso : (budgetState.last_full_refresh ?? null)
     };
 
     budgetsSynced.push({
       name: budget.name,
+      full_refresh: fullRefresh,
       added,
       deleted,
+      matched_import_shadows_skipped: shadowsSkipped,
+      stale_removed: staleRemoved,
       scheduled_added: scheduledAdded,
       scheduled_deleted: scheduledDeleted
     });
@@ -360,10 +465,11 @@ async function main() {
   // flow doesn't handle row deletions; we do it here the same way ynab-finance
   // handles budget_allocations. Rows for dropped budgets go in the same pass, so
   // excluding a budget actually removes its data rather than stranding it.
-  const purgedRows = removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets);
+  const staleRemovedTotal = budgetsSynced.reduce((n, b) => n + b.stale_removed, 0);
+  const purgedRows = removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) + staleRemovedTotal;
 
-  if (purgedRows > 0) {
-    console.error(`Removed ${purgedRows} row(s) belonging to ${droppedBudgets.length} excluded budget(s)`);
+  if (droppedBudgets.length > 0 && purgedRows > 0) {
+    console.error(`Removed ${purgedRows} row(s), including those of ${droppedBudgets.length} excluded budget(s)`);
   }
 
   saveState(state);
@@ -386,6 +492,7 @@ async function main() {
       rows_purged: purgedRows,
       transactions_upserted: entries.length,
       transactions_deleted: toDelete.length,
+      stale_removed: staleRemovedTotal,
       retention_days: retentionDays
     }
   }));

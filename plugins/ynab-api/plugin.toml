@@ -42,6 +42,12 @@ How it works:
 - On subsequent syncs, only changed records are fetched via YNAB's server_knowledge
   delta mechanism — fast, low-bandwidth incremental updates
 - Deleted transactions from YNAB are removed from the local database automatically
+- Every full_refresh_hours (default 24) the whole retention window is re-read
+  and cached transactions YNAB no longer returns are removed. Delta sync alone
+  never learns about some removals: a pending charge re-posted under a new id,
+  or a bank import merged into a scheduled or manual entry
+- YNAB's delta feed also reports the hidden half of a matched import (its
+  import_payee_name is a JSON blob); those records are dropped, not stored
 - Each transaction has a stable YNAB UUID, so duplicate-free INSERT OR REPLACE
   reconciliation works across syncs with no collision risk
 
@@ -87,4 +93,5 @@ api_token = { type = "string", default = "", description = "YNAB Personal Access
 budget_ids = { type = "string", default = "", description = "Only sync these budgets (single-line values are comma-separated; multi-line values are one rule per line; wrap names containing commas in CSV-style double quotes or put them on their own line; blank = all). Prefer exclude_budget_ids so new budgets are picked up automatically" }
 exclude_budget_ids = { type = "string", default = "", description = "Never sync these budgets (single-line values are comma-separated; multi-line values are one rule per line; wrap names containing commas in CSV-style double quotes or put them on their own line), e.g. an archived budget" }
 retention_days = { type = "number", default = 365, description = "Days of transaction history to keep in the database" }
+full_refresh_hours = { type = "number", default = 24, description = "Hours between full re-reads of the retention window. Delta sync misses transactions YNAB drops without a deletion record (merged imports, re-posted pending charges); a full refresh removes them from the cache. 0 = only on first sync" }
 precedence = { type = "number", default = 100, description = "Higher wins when two finance sources hold the same transaction. A live API outranks a point-in-time export" }
