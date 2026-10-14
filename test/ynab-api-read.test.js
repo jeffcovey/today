@@ -388,19 +388,71 @@ describe('ynab-api read plugin', () => {
       expect(cachedIds()).toEqual([rowId('user-entry')]);
     });
 
+    test('leading braces alone do not identify matched-import state', () => {
+      writeState({ server_knowledge: 5, last_full_refresh: new Date().toISOString() });
+      const malformed = '{not json';
+      const ordinaryJson = JSON.stringify({ note: 'literal statement payee' });
+      const run = runReadPlugin(tempRoot, createFetchMock(tempRoot, {
+        budgets: [CURRENT],
+        transactionsByBudgetId: {
+          [CURRENT.id]: [
+            tx('malformed-payee', {
+              payee_name: null,
+              matched_transaction_id: 'manual-1',
+              import_payee_name: malformed
+            }),
+            tx('ordinary-json-payee', {
+              payee_name: null,
+              matched_transaction_id: 'manual-2',
+              import_payee_name: ordinaryJson
+            })
+          ]
+        }
+      }));
+
+      expect(run.status).toBe(0);
+      expect(JSON.parse(run.stdout).entries.map(e => [e.id, e.payee])).toEqual([
+        [`${CURRENT.id}:malformed-payee`, malformed],
+        [`${CURRENT.id}:ordinary-json-payee`, ordinaryJson]
+      ]);
+      expect(JSON.parse(run.stdout).metadata.budgets[0].matched_import_shadows_skipped).toBe(0);
+    });
+
     test('a JSON import_payee_name is never used as the payee', () => {
       const run = runReadPlugin(tempRoot, createFetchMock(tempRoot, {
         budgets: [CURRENT],
         transactionsByBudgetId: {
           [CURRENT.id]: [tx('t1', {
             payee_name: null,
-            import_payee_name: JSON.stringify({ importedPayee: 'Bill Payment', accepted: false })
+            import_payee_name: JSON.stringify({
+              payeeId: 'p', importedPayee: 'Bill Payment', accepted: false
+            })
           })]
         }
       }));
 
       expect(run.status).toBe(0);
       expect(JSON.parse(run.stdout).entries[0].payee).toBe('Bill Payment');
+    });
+
+    test('a failed full-refresh prune leaves the next sync due for a full refresh', () => {
+      const previousRefresh = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+      writeState({ server_knowledge: 5, last_full_refresh: previousRefresh });
+      const db = new Database(path.join(tempRoot, '.data', 'today.db'));
+      db.exec('CREATE TABLE financial_transactions (id TEXT PRIMARY KEY, source TEXT)');
+      db.close();
+      const mock = createFetchMock(tempRoot, { budgets: [CURRENT] });
+
+      const firstRun = runReadPlugin(tempRoot, mock);
+      expect(firstRun.status).toBe(0);
+      expect(JSON.parse(fs.readFileSync(statePath(), 'utf8')).budgets[CURRENT.id].last_full_refresh)
+        .toBe(previousRefresh);
+
+      const secondRun = runReadPlugin(tempRoot, mock);
+      expect(secondRun.status).toBe(0);
+      const transactionUrls = requestedUrls().filter(u => /\/transactions\b/.test(u) && !u.includes('scheduled_'));
+      expect(transactionUrls).toHaveLength(2);
+      expect(transactionUrls.every(u => u.includes('since_date='))).toBe(true);
     });
   });
 });

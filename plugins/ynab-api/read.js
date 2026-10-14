@@ -148,23 +148,32 @@ async function fetchTransactions(budgetId, lastKnowledge, sinceDate = null) {
 // import_payee_name is YNAB's internal JSON match state rather than a payee
 // ({"payeeId":...,"importedSource":...,"accepted":...}). Storing it double counts
 // the matched transaction, so it is treated as deleted.
+function importPayeeMatchState(tx) {
+  if (typeof tx.import_payee_name !== 'string') return null;
+  try {
+    const parsed = JSON.parse(tx.import_payee_name);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) ||
+        typeof parsed.accepted !== 'boolean' ||
+        !(typeof parsed.payeeId === 'string' || typeof parsed.importedSource === 'string')) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function isMatchedImportShadow(tx) {
-  return Boolean(tx.matched_transaction_id) &&
-    typeof tx.import_payee_name === 'string' &&
-    tx.import_payee_name.trim().startsWith('{');
+  return Boolean(tx.matched_transaction_id) && importPayeeMatchState(tx) !== null;
 }
 
 // import_payee_name is normally the cleaned bank payee, but on matched-import
 // records it is a JSON blob; never surface that as a payee.
 function importPayeeName(tx) {
   const raw = tx.import_payee_name || '';
-  if (!raw.trim().startsWith('{')) return raw;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed.userImportedPayee || parsed.importedPayee || tx.import_payee_name_original || '';
-  } catch {
-    return tx.import_payee_name_original || '';
-  }
+  const parsed = importPayeeMatchState(tx);
+  if (!parsed) return raw;
+  return parsed.userImportedPayee || parsed.importedPayee || tx.import_payee_name_original || '';
 }
 
 function isFullRefreshDue(budgetState, now = Date.now(), hours = fullRefreshHours) {
@@ -253,7 +262,7 @@ function pruneMissingTransactions(projectRoot, sourceId, budgetId, sinceDate, li
   try {
     const Database = require('better-sqlite3');
     const dbPath = path.join(projectRoot, '.data', 'today.db');
-    if (!fs.existsSync(dbPath)) return 0;
+    if (!fs.existsSync(dbPath)) return { success: true, removed: 0 };
     const db = new Database(dbPath);
     try {
       const prefix = `${sourceId}:${budgetId}:`;
@@ -276,10 +285,11 @@ function pruneMissingTransactions(projectRoot, sourceId, budgetId, sinceDate, li
     } finally {
       db.close();
     }
+    return { success: true, removed };
   } catch (err) {
     console.error(`Warning: could not prune transactions missing from YNAB: ${err.message}`);
+    return { success: false, removed: 0 };
   }
-  return removed;
 }
 
 // Early exit for context-only mode — data is already in the DB cache
@@ -435,10 +445,11 @@ async function main() {
     }
 
     // Full ids compared as-is: scheduled-instance ids are `<uuid>_<YYYY-MM-DD>`
-    let staleRemoved = 0;
+    let pruneResult = { success: true, removed: 0 };
     if (fullRefresh) {
-      staleRemoved = pruneMissingTransactions(projectRoot, sourceId, budget.id, cutoffStr, liveIds);
+      pruneResult = pruneMissingTransactions(projectRoot, sourceId, budget.id, cutoffStr, liveIds);
     }
+    const staleRemoved = pruneResult.removed;
 
     const nowIso = new Date().toISOString();
     state.budgets[budget.id] = {
@@ -446,7 +457,9 @@ async function main() {
       scheduled_server_knowledge: budgetState.scheduled_server_knowledge ?? null,
       budget_name: budget.name,
       last_synced: nowIso,
-      last_full_refresh: fullRefresh ? nowIso : (budgetState.last_full_refresh ?? null)
+      last_full_refresh: fullRefresh && pruneResult.success
+        ? nowIso
+        : (budgetState.last_full_refresh ?? null)
     };
 
     budgetsSynced.push({
