@@ -174,6 +174,30 @@ For remote access, deploy Today to a server using `bin/today configure` and `bin
 - **Wiki links**: Full support for `[[internal links]]` and relative paths
 - **Table of contents**: Auto-generated TOC for long documents
 - **Responsive design**: Works on desktop and mobile devices
+- **Pomodoro timer**: Optional fixed-interval work/rest timer with repeating reminders
+
+### Pomodoro Timer
+
+An optional fixed-interval timer that appears under the Task Timer. It stays
+hidden until you add a `[pomodoro]` section to `vault/today.toml`:
+
+```toml
+[pomodoro]
+enabled = true
+work_periods = 4          # work periods before the long rest
+work_minutes = 25
+short_rest_minutes = 5
+long_rest_minutes = 15
+```
+
+Intervals run work → short rest → ... → work → long rest, and then the cycle
+starts over. You can pause, stop, or skip to the next interval at any time.
+
+Unlike the Task Timer, it never advances on its own: when an interval ends it
+waits for you to press **Start next**. If Pushover is configured under
+`[notifications.pushover]`, it notifies you when the interval is up and repeats
+every two minutes, up to five notifications, until you stop the timer or start
+the next interval.
 
 ### Obsidian Compatibility
 

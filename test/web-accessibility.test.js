@@ -249,6 +249,73 @@ describe('needs you', () => {
   });
 });
 
+describe('pomodoro banner', () => {
+  // The buttons are the only stable hook that distinguishes the pomodoro
+  // banner from the task timer's, which also offers a Start.
+  const control = (action) => `[onclick*="pomodoro/${action}"]`;
+
+  async function openPage() {
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+    await page.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+    return page;
+  }
+
+  async function press(page, action) {
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle0' }),
+      page.click(control(action))
+    ]);
+  }
+
+  // The banner, whichever of its three states is showing.
+  function bannerText(page) {
+    return page.$eval(
+      '[data-pomodoro-start], [data-pomodoro-awaiting], [onclick*="pomodoro/start"]',
+      el => el.closest('[role="alert"]').textContent.replace(/\s+/g, ' ').trim()
+    );
+  }
+
+  test('starts, pauses, resumes, skips and stops from the page', async () => {
+    const page = await openPage();
+    try {
+      // Idle: the configured schedule is on show.
+      expect(await bannerText(page)).toContain('Pomodoro');
+      expect(await bannerText(page)).toContain('2 × 25 min');
+
+      await press(page, 'start');
+      expect(await bannerText(page)).toContain('Work period 1 of 2');
+      expect(await page.$eval('[data-pomodoro-total-seconds]',
+        el => el.dataset.pomodoroTotalSeconds)).toBe('1500');
+
+      // The countdown is driven by the page's own script.
+      const first = await page.$eval('.pomodoro-countdown', el => el.textContent);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const second = await page.$eval('.pomodoro-countdown', el => el.textContent);
+      expect(second).not.toBe(first);
+
+      await press(page, 'pause');
+      expect(await page.$('[data-pomodoro-paused]')).not.toBeNull();
+      expect(await bannerText(page)).toContain('Paused');
+
+      await press(page, 'resume');
+      expect(await page.$('[data-pomodoro-paused]')).toBeNull();
+
+      await press(page, 'skip');
+      expect(await bannerText(page)).toContain('Short rest');
+
+      await press(page, 'skip');
+      expect(await bannerText(page)).toContain('Work period 2 of 2');
+
+      await press(page, 'stop');
+      expect(await bannerText(page)).toContain('Pomodoro');
+      expect(await page.$('[data-pomodoro-total-seconds]')).toBeNull();
+    } finally {
+      await page.close();
+    }
+  });
+});
+
 describe('timer banner', () => {
   test("shows the configured vault's running timer, so the audits cover it", async () => {
     const page = await browser.newPage();

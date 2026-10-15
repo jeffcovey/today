@@ -368,7 +368,7 @@ The primary user interface is the CLI in `bin/`. Important entry points include:
 | AI editing/chat | `POST /ai-edit/*path`, `POST /ai-chat/*path`, `POST /ai-chat-stream/*path`, `POST /ai-chat-directory/*path` | AI-assisted file and directory workflows |
 | Conversation storage | `GET/PUT/DELETE /api/ai-chat/conversations/*path` | Persist browser chat threads |
 | Search and editing | `GET /search`, `GET /edit/*path`, `POST /toggle-checkbox/*path` | Vault navigation and editing |
-| Tasks and timers | `POST /task/toggle`, `POST /task/edit`, `POST /api/track/start`, `POST /api/track/stop`, `POST /api/task-timer/*` | Interactive task and time tracking |
+| Tasks and timers | `POST /task/toggle`, `POST /task/edit`, `POST /api/track/start`, `POST /api/track/stop`, `POST /api/task-timer/*`, `POST /api/pomodoro/*` | Interactive task and time tracking |
 | Document views | `GET /`, `GET /*path`, `GET /task/*taskId` | Render vault content and task detail pages |
 
 ### Inbox API
