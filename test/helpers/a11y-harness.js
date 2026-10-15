@@ -120,6 +120,14 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     '',
     '[plugins.roles.default]',
     'enabled = true',
+    '',
+    // Switched on so the pomodoro banner is audited alongside everything else.
+    '[pomodoro]',
+    'enabled = true',
+    'work_periods = 2',
+    'work_minutes = 25',
+    'short_rest_minutes = 5',
+    'long_rest_minutes = 15',
     ''
   ].join('\n'));
 
