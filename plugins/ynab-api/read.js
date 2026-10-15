@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { selectBudgets } from './select-budgets.js';
+import { convertYnabAccount, replaceBudgetBalances, removeBudgetBalances } from '../../src/account-balances.js';
 
 const require = createRequire(import.meta.url);
 
@@ -79,6 +80,54 @@ async function fetchCategoryMap(budgetId) {
     }
   }
   return map;
+}
+
+// Accounts carry YNAB's own running balance. The transaction cache keeps only
+// retention_days of history, so summing it is not a balance (issue #608).
+async function fetchAccounts(budgetId) {
+  const data = await apiFetch(`${API_BASE}/budgets/${budgetId}/accounts`);
+  return data.data.accounts;
+}
+
+function openDb(projectRoot) {
+  const Database = require('better-sqlite3');
+  return new Database(path.join(projectRoot, '.data', 'today.db'));
+}
+
+// Store one budget's live account balances. Returns the number stored, or null
+// when they could not be written (the previous snapshot is then left in place).
+function storeAccountBalances(projectRoot, sourceId, budgetId, budgetName, accounts) {
+  try {
+    const asOf = new Date().toISOString();
+    const rows = accounts
+      .map(acc => convertYnabAccount(acc, budgetId, budgetName, asOf))
+      .filter(Boolean);
+    const db = openDb(projectRoot);
+    try {
+      replaceBudgetBalances(db, sourceId, budgetId, rows);
+    } finally {
+      db.close();
+    }
+    return rows.length;
+  } catch (err) {
+    console.error(`Warning: could not store account balances for "${budgetName}": ${err.message}`);
+    return null;
+  }
+}
+
+function purgeAccountBalances(projectRoot, sourceId, budgetIds) {
+  if (budgetIds.length === 0) return 0;
+  try {
+    const db = openDb(projectRoot);
+    try {
+      return removeBudgetBalances(db, sourceId, budgetIds);
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    console.error(`Warning: could not remove account balances: ${err.message}`);
+    return 0;
+  }
 }
 
 // Scheduled transactions live on their own endpoint — /transactions returns only
@@ -349,6 +398,7 @@ async function main() {
 
   if (budgets.length === 0) {
     const purgedRows = removeTransactions(projectRoot, sourceId, [], droppedBudgets);
+    purgeAccountBalances(projectRoot, sourceId, droppedBudgets.map(b => b.id));
     const hint = allBudgets.length === 0
       ? 'Your YNAB account has no budgets'
       : `All ${allBudgets.length} budget(s) were filtered out by budget_ids/exclude_budget_ids`;
@@ -444,6 +494,14 @@ async function main() {
       console.error(`Warning: could not fetch scheduled transactions for "${budget.name}": ${err.message}`);
     }
 
+    let accountsStored = null;
+    try {
+      const accounts = await fetchAccounts(budget.id);
+      accountsStored = storeAccountBalances(projectRoot, sourceId, budget.id, budget.name, accounts);
+    } catch (err) {
+      console.error(`Warning: could not fetch accounts for "${budget.name}": ${err.message}`);
+    }
+
     // Full ids compared as-is: scheduled-instance ids are `<uuid>_<YYYY-MM-DD>`
     let pruneResult = { success: true, removed: 0 };
     if (fullRefresh) {
@@ -470,7 +528,8 @@ async function main() {
       matched_import_shadows_skipped: shadowsSkipped,
       stale_removed: staleRemoved,
       scheduled_added: scheduledAdded,
-      scheduled_deleted: scheduledDeleted
+      scheduled_deleted: scheduledDeleted,
+      account_balances_stored: accountsStored
     });
   }
 
@@ -480,6 +539,7 @@ async function main() {
   // excluding a budget actually removes its data rather than stranding it.
   const staleRemovedTotal = budgetsSynced.reduce((n, b) => n + b.stale_removed, 0);
   const purgedRows = removeTransactions(projectRoot, sourceId, toDelete, droppedBudgets) + staleRemovedTotal;
+  purgeAccountBalances(projectRoot, sourceId, droppedBudgets.map(b => b.id));
 
   if (droppedBudgets.length > 0 && purgedRows > 0) {
     console.error(`Removed ${purgedRows} row(s), including those of ${droppedBudgets.length} excluded budget(s)`);

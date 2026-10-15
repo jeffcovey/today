@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { getTodayDate, formatDate } from '../src/date-utils.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
+import { getAccountList } from '../src/account-balances.js';
 import { execSync } from 'child_process';
 
 program
@@ -282,7 +283,8 @@ program
 
     // By account
     if (byAccount.length > 0) {
-      console.log(colors.bold('By Account'));
+      // A windowed sum is net flow, not a balance — `accounts` shows balances
+      console.log(colors.bold(`Net Flow by Account (last ${days} days; balances: bin/finance accounts)`));
       for (const acc of byAccount) {
         console.log(`  ${formatAmount(acc.total).padEnd(12)} ${acc.account} (${acc.count} txns)`);
       }
@@ -501,40 +503,20 @@ program
     console.log(getSyncStatusMessage(db, 'finance'));
   });
 
-// Accounts command - list all accounts
+// Accounts command - list all accounts with their balances
 program
   .command('accounts')
-  .description('List all accounts')
+  .description('List all accounts with balances')
   .option('--source <source>', 'Filter by plugin source')
   .option('--scheduled', 'Include scheduled/upcoming transactions (excluded by default)')
   .action(async (options) => {
     const db = getDatabase();
     await ensureSyncForType(db, 'finance');
 
-    // Same shape as `categories`: superseded_by is the always-present base clause.
-    let sql = `
-      SELECT account, COUNT(*) as count, SUM(amount) as balance,
-             MIN(date) as first_transaction, MAX(date) as last_transaction
-      FROM financial_transactions
-      WHERE superseded_by IS NULL
-    `;
-    const params = [];
-
-    if (!options.scheduled) {
-      sql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
-    }
-
-    if (options.source) {
-      sql += ` AND source LIKE ?`;
-      params.push(`%${options.source}%`);
-    }
-
-    sql += `
-      GROUP BY account
-      ORDER BY account
-    `;
-
-    const accounts = db.prepare(sql).all(...params);
+    // Balances reported by the source (e.g. the YNAB API) win; other accounts
+    // fall back to summing cached transactions, which only covers the
+    // retention window and is labelled partial (issue #608).
+    const accounts = getAccountList(db, { source: options.source, scheduled: options.scheduled });
 
     if (accounts.length === 0) {
       console.log(colors.blue('ℹ') + ' No accounts found');
@@ -545,15 +527,35 @@ program
     console.log(colors.cyan('Accounts'));
     console.log('');
 
+    let partialCount = 0;
     for (const acc of accounts) {
-      const balance = formatAmount(acc.balance);
       console.log(`${colors.bold(acc.account)}`);
-      console.log(`  Balance: ${balance} (${acc.count} transactions)`);
-      console.log(`  Period:  ${acc.first_transaction} to ${acc.last_transaction}`);
+      if (acc.partial) {
+        partialCount++;
+        console.log(`  Balance: ${formatAmount(acc.balance)} ${colors.yellow('(partial: sum of cached transactions only, not a true balance)')}`);
+      } else {
+        let line = `  Balance: ${formatAmount(acc.balance)}`;
+        if (acc.cleared_balance != null && Math.abs(acc.cleared_balance - acc.balance) >= 0.005) {
+          line += `  (cleared ${formatAmount(acc.cleared_balance)})`;
+        }
+        console.log(line);
+        console.log(colors.gray(`  As of:   ${acc.as_of} from ${acc.source}`));
+      }
+      if (acc.upcoming) {
+        console.log(`  Upcoming: ${formatAmount(acc.upcoming.total)} (${acc.upcoming.count} scheduled)`);
+      }
+      if (acc.count > 0) {
+        console.log(`  Cached:  ${acc.count} transactions, ${acc.first_transaction} to ${acc.last_transaction}`);
+      } else {
+        console.log(colors.gray('  Cached:  no transactions in the retention window'));
+      }
       console.log('');
     }
 
     console.log(colors.gray(`${accounts.length} accounts`));
+    if (partialCount > 0) {
+      console.log(colors.yellow(`${partialCount} account(s) have no source-reported balance; their figure covers only cached transactions`));
+    }
     console.log(getSyncStatusMessage(db, 'finance'));
   });
 
