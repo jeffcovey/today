@@ -482,13 +482,11 @@ describe('pomodoro route wiring', () => {
   });
 
   test('stopping and starting the next interval both silence the reminders', () => {
-    // These are the two answers the spec says must end the repeat.
+    // These are the two answers the spec says must end the repeat. stopPomodoro()
+    // cancels the boundary and the reminders together, which the fake-timer tests
+    // above exercise directly.
     expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('stopPomodoro()');
     expect(routeBody(webServerSource, '/api/pomodoro/next')).toContain('clearPomodoroNudges()');
-  });
-
-  test('stopping clears the boundary so no interval ends after the timer is off', () => {
-    expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('stopPomodoro()');
   });
 
   test('every route that starts a clock arms a boundary', () => {
