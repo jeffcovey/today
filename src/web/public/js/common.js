@@ -386,6 +386,35 @@ function updateTaskTimerCountdown() {
   }
 }
 
+// Pomodoro countdown. Its own data attributes, so it never collides with the
+// task timer's [data-timer-total-seconds] when both banners are on the page.
+function updatePomodoroCountdown() {
+  const pomodoroAlert = document.querySelector('[data-pomodoro-total-seconds]');
+  if (!pomodoroAlert) return;
+
+  // Don't count down while paused
+  if (pomodoroAlert.dataset.pomodoroPaused === 'true') return;
+
+  const startTime = new Date(pomodoroAlert.dataset.pomodoroStart);
+  const totalSeconds = parseInt(pomodoroAlert.dataset.pomodoroTotalSeconds);
+  const now = new Date();
+  const elapsed = Math.floor((now - startTime) / 1000);
+  const remaining = Math.max(0, totalSeconds - elapsed);
+
+  const countdownSpan = pomodoroAlert.querySelector('.pomodoro-countdown');
+  if (countdownSpan) {
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
+    countdownSpan.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    // The interval is over; reload to pick up the server's hold state, which
+    // is what offers the button to start the next one.
+    if (remaining === 0) {
+      location.reload();
+    }
+  }
+}
+
 // Collapse/expand functionality for sections
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
@@ -505,6 +534,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.querySelector('[data-timer-total-seconds]')) {
     updateTaskTimerCountdown();
     setInterval(updateTaskTimerCountdown, 1000);
+  }
+
+  // Start pomodoro countdown if there's an active pomodoro interval
+  if (document.querySelector('[data-pomodoro-total-seconds]')) {
+    updatePomodoroCountdown();
+    setInterval(updatePomodoroCountdown, 1000);
   }
 
   // Add event listeners for task checkboxes

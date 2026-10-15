@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
 import { sendPushover } from './pushover.js';
+import {
+  getPomodoroConfig, createPomodoroState, startPomodoro, holdInterval,
+  startHeldInterval, skipInterval, pausePomodoro, resumePomodoro,
+  remainingMs, isIntervalOver, nextInterval, intervalDescription,
+  phaseLabel, phaseMinutes, PHASE_WORK, NUDGE_INTERVAL_MS, MAX_NUDGES
+} from './pomodoro.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -1169,6 +1175,191 @@ async function getTaskTimerWidget() {
   }
 }
 
+// ── Pomodoro timer ──────────────────────────────────────────────────────────
+// Renders under the Task Timer and reuses its Pushover path. The state machine
+// itself lives in src/pomodoro.js; what stays here is the one live state
+// object, the boundary and reminder timers, and the banner.
+
+let pomodoroState = createPomodoroState();
+let pomodoroBoundaryTimeout = null;
+let pomodoroNudgeTimeout = null;
+
+function clearPomodoroBoundary() {
+  if (pomodoroBoundaryTimeout) {
+    clearTimeout(pomodoroBoundaryTimeout);
+    pomodoroBoundaryTimeout = null;
+  }
+}
+
+function clearPomodoroNudges() {
+  if (pomodoroNudgeTimeout) {
+    clearTimeout(pomodoroNudgeTimeout);
+    pomodoroNudgeTimeout = null;
+  }
+}
+
+function stopPomodoro() {
+  clearPomodoroBoundary();
+  clearPomodoroNudges();
+  pomodoroState = createPomodoroState();
+}
+
+// Same reason the Task Timer arms a boundary: iPadOS freezes a background tab's
+// timers, so the end of an interval has to be noticed server-side.
+function armPomodoroBoundary() {
+  clearPomodoroBoundary();
+  if (!pomodoroState.isRunning || pomodoroState.isPaused ||
+      pomodoroState.awaitingStart || !pomodoroState.startTime) return;
+
+  const delay = remainingMs(pomodoroState, getPomodoroConfig()) + 250;
+  pomodoroBoundaryTimeout = setTimeout(handlePomodoroBoundary, delay);
+  if (typeof pomodoroBoundaryTimeout.unref === 'function') pomodoroBoundaryTimeout.unref();
+}
+
+function handlePomodoroBoundary() {
+  pomodoroBoundaryTimeout = null;
+  advancePomodoroIfNeeded();
+  armPomodoroBoundary();
+}
+
+// The one path that ends an interval, called both by the boundary timer and by
+// a page render that gets there first. isIntervalOver() returns false once the
+// state is already holding, so the two can never both notify.
+function advancePomodoroIfNeeded() {
+  const config = getPomodoroConfig();
+  if (!config.enabled) {
+    stopPomodoro();
+    return;
+  }
+  if (!isIntervalOver(pomodoroState, config)) return;
+
+  pomodoroState = holdInterval(pomodoroState, config);
+  clearPomodoroBoundary();
+  clearPomodoroNudges();
+  sendPomodoroNudge();
+}
+
+// Fires when the interval ends and then every two minutes, up to MAX_NUDGES,
+// until the user stops the timer or starts the next interval.
+function sendPomodoroNudge() {
+  const config = getPomodoroConfig();
+  if (!config.enabled) {
+    stopPomodoro();
+    return;
+  }
+  const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
+  const upcoming = intervalDescription(pomodoroState.phase, pomodoroState.periodIndex, config);
+  const minutes = phaseMinutes(pomodoroState.phase, config);
+  const base = getPublicBaseUrl();
+
+  pomodoroState.nudgeCount++;
+  const reminder = pomodoroState.nudgeCount > 1
+    ? ` (reminder ${pomodoroState.nudgeCount} of ${MAX_NUDGES})`
+    : '';
+
+  // Deliberately not awaited, as with the Task Timer: a notification must never
+  // hold up the timer's own state.
+  sendPushover({
+    title: `Pomodoro — ${finished} done`,
+    message: `${finished} is up. Next: ${upcoming} (${minutes} min).${reminder}`,
+    ...(base ? { url: `${base}/`, urlTitle: 'Open Today' } : {})
+  }).then(result => {
+    if (!result.sent && !/not set|disabled/.test(result.reason || '')) {
+      console.error(`Pushover notification failed: ${result.reason}`);
+    }
+  });
+
+  if (pomodoroState.nudgeCount >= MAX_NUDGES) return;
+  pomodoroNudgeTimeout = setTimeout(() => {
+    pomodoroNudgeTimeout = null;
+    if (pomodoroState.isRunning && pomodoroState.awaitingStart) sendPomodoroNudge();
+  }, NUDGE_INTERVAL_MS);
+  if (typeof pomodoroNudgeTimeout.unref === 'function') pomodoroNudgeTimeout.unref();
+}
+
+function pomodoroButton(action, icon, label, style) {
+  return `<button class="btn btn-sm ${style}" onclick="
+    fetch('/api/pomodoro/${action}', {method: 'POST'}).then(function() { location.reload(); });">
+    <i class="fas ${icon}"></i> ${label}
+  </button>`;
+}
+
+function getPomodoroWidget() {
+  const config = getPomodoroConfig();
+  if (!config.enabled) return '';
+
+  advancePomodoroIfNeeded();
+  if (pomodoroState.isRunning && !pomodoroState.isPaused &&
+      !pomodoroState.awaitingStart && !pomodoroBoundaryTimeout) {
+    armPomodoroBoundary();
+  }
+
+  if (!pomodoroState.isRunning) {
+    return `
+      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
+        <i class="fas fa-stopwatch me-2"></i>
+        <div class="flex-grow-1">
+          <div class="row g-2 align-items-center">
+            <div class="col">
+              <strong>Pomodoro</strong> — ${config.workPeriods} × ${config.workMinutes} min,
+              ${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break
+            </div>
+            <div class="col-auto">
+              ${pomodoroButton('start', 'fa-play', 'Start', 'btn-primary')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const upcoming = intervalDescription(pomodoroState.phase, pomodoroState.periodIndex, config);
+
+  if (pomodoroState.awaitingStart) {
+    const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
+    return `
+      <div class="alert alert-info mb-3 py-2 px-3" role="alert" data-pomodoro-awaiting="true">
+        <div><i class="fas fa-bell me-2"></i><strong>${finished} complete</strong></div>
+        <div class="mt-1"><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
+        <div class="mt-1 d-flex gap-1">
+          ${pomodoroButton('next', 'fa-play', `Start ${upcoming.toLowerCase()}`, 'btn-outline-primary')}
+          ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
+        </div>
+      </div>`;
+  }
+
+  const { isPaused } = pomodoroState;
+  const totalSeconds = phaseMinutes(pomodoroState.phase, config) * 60;
+  const remaining = Math.ceil(remainingMs(pomodoroState, config) / 1000);
+  const initMin = Math.floor(remaining / 60);
+  const initSec = remaining % 60;
+
+  const isWork = pomodoroState.phase === PHASE_WORK;
+  const alertClass = isPaused ? 'alert-warning' : (isWork ? 'alert-success' : 'alert-info');
+  const iconClass = isPaused ? 'fa-pause-circle' : (isWork ? 'fa-play-circle' : 'fa-mug-hot');
+  const pausedAttr = isPaused ? ' data-pomodoro-paused="true"' : '';
+  const after = nextInterval(pomodoroState.phase, pomodoroState.periodIndex, config);
+  const afterLabel = intervalDescription(after.phase, after.periodIndex, config);
+
+  return `
+    <div class="alert ${alertClass} mb-3 py-2 px-3" role="alert"
+      data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}>
+      <div>
+        <i class="fas ${iconClass} me-2"></i>
+        <strong>${phaseLabel(pomodoroState.phase)}</strong> —
+        <span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>
+        ${isPaused ? ' <small>(Paused)</small>' : ''}
+      </div>
+      <div class="mt-1"><small>${upcoming} · then ${afterLabel}</small></div>
+      <div class="mt-1 d-flex gap-1">
+        ${isPaused
+          ? pomodoroButton('resume', 'fa-play', 'Resume', 'btn-outline-warning')
+          : pomodoroButton('pause', 'fa-pause', 'Pause', 'btn-outline-success')}
+        ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
+        ${pomodoroButton('skip', 'fa-forward', 'Skip', 'btn-outline-secondary')}
+      </div>
+    </div>`;
+}
+
 // Initialize markdown file cache
 const markdownCache = getMarkdownFileCache();
 
@@ -1964,6 +2155,7 @@ Contents:
       </div>
       <div class="col-12 col-lg-6">
         ${await getTaskTimerWidget()}
+        ${getPomodoroWidget()}
       </div>
     </div>`;
 
@@ -5276,6 +5468,7 @@ async function renderMarkdown(filePath, urlPath) {
       </div>
       <div class="col-12 col-lg-6">
         ${await getTaskTimerWidget()}
+        ${getPomodoroWidget()}
       </div>
     </div>`;
 
@@ -7671,6 +7864,60 @@ app.post('/api/task-timer/resume', authMiddleware, async (req, res) => {
 });
 
 
+// Pomodoro timer API endpoints
+app.post('/api/pomodoro/start', authMiddleware, async (req, res) => {
+  if (!getPomodoroConfig().enabled) {
+    return res.status(400).json({ success: false, message: 'Pomodoro timer is not enabled' });
+  }
+  clearPomodoroNudges();
+  pomodoroState = startPomodoro();
+  armPomodoroBoundary();
+  res.json({ success: true, message: 'Pomodoro started' });
+});
+
+app.post('/api/pomodoro/stop', authMiddleware, async (req, res) => {
+  stopPomodoro();
+  res.json({ success: true, message: 'Pomodoro stopped' });
+});
+
+app.post('/api/pomodoro/next', authMiddleware, async (req, res) => {
+  if (!pomodoroState.isRunning || !pomodoroState.awaitingStart) {
+    return res.status(400).json({ success: false, message: 'No interval waiting to start' });
+  }
+  clearPomodoroNudges();
+  pomodoroState = startHeldInterval(pomodoroState);
+  armPomodoroBoundary();
+  res.json({ success: true, message: 'Next interval started' });
+});
+
+app.post('/api/pomodoro/skip', authMiddleware, async (req, res) => {
+  if (!pomodoroState.isRunning || pomodoroState.awaitingStart) {
+    return res.status(400).json({ success: false, message: 'No interval running' });
+  }
+  clearPomodoroNudges();
+  pomodoroState = skipInterval(pomodoroState, getPomodoroConfig());
+  armPomodoroBoundary();
+  res.json({ success: true, message: 'Skipped to next interval' });
+});
+
+app.post('/api/pomodoro/pause', authMiddleware, async (req, res) => {
+  if (!pomodoroState.isRunning || pomodoroState.isPaused || pomodoroState.awaitingStart) {
+    return res.status(400).json({ success: false });
+  }
+  pomodoroState = pausePomodoro(pomodoroState);
+  clearPomodoroBoundary();
+  res.json({ success: true });
+});
+
+app.post('/api/pomodoro/resume', authMiddleware, async (req, res) => {
+  if (!pomodoroState.isRunning || !pomodoroState.isPaused) {
+    return res.status(400).json({ success: false });
+  }
+  pomodoroState = resumePomodoro(pomodoroState);
+  armPomodoroBoundary();
+  res.json({ success: true });
+});
+
 // Task detail page - uses tasks table (from plugins)
 // Use wildcard to capture task IDs with slashes (e.g., markdown-tasks/local:vault/file.md:123)
 app.get('/task/*taskId', authMiddleware, async (req, res) => {
@@ -8014,6 +8261,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
             </div>
             <div class="col-12 col-lg-6">
               ${await getTaskTimerWidget()}
+              ${getPomodoroWidget()}
             </div>
           </div>`;
 
