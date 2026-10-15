@@ -887,7 +887,8 @@ Transaction amounts use positive values for inflows (income) and negative for ou
       defaultCommand: 'bin/finance recent ; bin/finance summary',
       dateCommand: 'bin/finance --date $DATE',
       queryInstructions: `Commands: bin/finance recent, bin/finance summary, bin/finance categories, bin/finance accounts
-SQL: SELECT date, payee, category, amount, account FROM financial_transactions WHERE date >= DATE('now', '-30 days') ORDER BY date DESC`
+SQL: SELECT date, payee, category, amount, account FROM financial_transactions WHERE date >= DATE('now', '-30 days') ORDER BY date DESC
+Balances: use bin/finance accounts or SELECT account, balance, as_of FROM account_balances. Never SUM(amount) for a balance — transactions are kept only for a retention window.`
     },
     fields: {
       id: {

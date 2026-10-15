@@ -20,7 +20,8 @@ const MISSING = { id: '99999999-1111-2222-3333-444444444444', name: 'Removed Bud
 function createFetchMock(tempRoot, {
   budgets,
   transactionsByBudgetId = {},
-  deltaByBudgetId = null
+  deltaByBudgetId = null,
+  accountsByBudgetId = null
 }) {
   const mockPath = path.join(tempRoot, 'mock-fetch.mjs');
   const urlLog = path.join(tempRoot, 'urls.log');
@@ -28,6 +29,7 @@ function createFetchMock(tempRoot, {
 import fs from 'fs';
 const transactionsByBudgetId = ${JSON.stringify(transactionsByBudgetId)};
 const deltaByBudgetId = ${JSON.stringify(deltaByBudgetId)};
+const accountsByBudgetId = ${JSON.stringify(accountsByBudgetId)};
 
 globalThis.fetch = async (url) => {
   fs.appendFileSync(${JSON.stringify(urlLog)}, String(url) + '\\n');
@@ -42,6 +44,13 @@ globalThis.fetch = async (url) => {
     return {
       ok: true,
       json: async () => (${JSON.stringify({ data: { category_groups: [] } })})
+    };
+  }
+  const accountsMatch = String(url).match(/\\/v1\\/budgets\\/([^/]+)\\/accounts$/);
+  if (accountsMatch && accountsByBudgetId) {
+    return {
+      ok: true,
+      json: async () => ({ data: { accounts: accountsByBudgetId[accountsMatch[1]] || [], server_knowledge: 1 } })
     };
   }
   const transactionsMatch = String(url).match(/\\/v1\\/budgets\\/([^/]+)\\/transactions/);
@@ -453,6 +462,96 @@ describe('ynab-api read plugin', () => {
       const transactionUrls = requestedUrls().filter(u => /\/transactions\b/.test(u) && !u.includes('scheduled_'));
       expect(transactionUrls).toHaveLength(2);
       expect(transactionUrls.every(u => u.includes('since_date='))).toBe(true);
+    });
+  });
+  describe('account balances (issue #608)', () => {
+    const account = (id, name, balance, fields = {}) => ({
+      id, name, type: 'checking', on_budget: true, closed: false, deleted: false,
+      balance, cleared_balance: balance, uncleared_balance: 0, ...fields
+    });
+
+    function balanceRows() {
+      const db = new Database(path.join(tempRoot, '.data', 'today.db'), { readonly: true });
+      const rows = db.prepare('SELECT * FROM account_balances ORDER BY account').all();
+      db.close();
+      return rows;
+    }
+
+    test('stores YNAB balances for open accounts, skipping closed and deleted ones', () => {
+      createDbWithRows([]);
+      const mockPath = createFetchMock(tempRoot, {
+        budgets: [CURRENT],
+        transactionsByBudgetId: { [CURRENT.id]: [tx('t1')] },
+        accountsByBudgetId: {
+          [CURRENT.id]: [
+            account('a1', 'Chase Sapphire Reserve', -19165920, { type: 'creditCard', cleared_balance: -18000000 }),
+            account('a2', 'Charles Schwab Checking', 1234560),
+            account('a3', 'Old Card', 0, { closed: true }),
+            account('a4', 'Gone', 5000, { deleted: true })
+          ]
+        }
+      });
+      const result = runReadPlugin(tempRoot, mockPath);
+      expect(result.status).toBe(0);
+      const output = JSON.parse(result.stdout);
+      expect(output.metadata.budgets[0].account_balances_stored).toBe(2);
+
+      const rows = balanceRows();
+      expect(rows.map(r => r.account)).toEqual(['Charles Schwab Checking', 'Chase Sapphire Reserve']);
+      const sapphire = rows[1];
+      expect(sapphire.balance).toBeCloseTo(-19165.92);
+      expect(sapphire.cleared_balance).toBeCloseTo(-18000);
+      expect(sapphire.source).toBe('ynab-api/test');
+      expect(sapphire.budget_id).toBe(CURRENT.id);
+      expect(sapphire.type).toBe('creditCard');
+    });
+
+    test('each sync replaces the previous snapshot', () => {
+      createDbWithRows([]);
+      let mockPath = createFetchMock(tempRoot, {
+        budgets: [CURRENT],
+        accountsByBudgetId: { [CURRENT.id]: [account('a1', 'Checking', 100000), account('a2', 'Savings', 5000)] }
+      });
+      expect(runReadPlugin(tempRoot, mockPath).status).toBe(0);
+      mockPath = createFetchMock(tempRoot, {
+        budgets: [CURRENT],
+        accountsByBudgetId: { [CURRENT.id]: [account('a1', 'Checking', 250000), account('a2', 'Savings', 0, { closed: true })] }
+      });
+      expect(runReadPlugin(tempRoot, mockPath).status).toBe(0);
+      const rows = balanceRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].balance).toBeCloseTo(250);
+    });
+
+    test('a failed accounts fetch keeps the previous snapshot', () => {
+      createDbWithRows([]);
+      let mockPath = createFetchMock(tempRoot, {
+        budgets: [CURRENT],
+        accountsByBudgetId: { [CURRENT.id]: [account('a1', 'Checking', 100000)] }
+      });
+      expect(runReadPlugin(tempRoot, mockPath).status).toBe(0);
+      // No accounts endpoint: the mock throws for the URL
+      mockPath = createFetchMock(tempRoot, { budgets: [CURRENT] });
+      const result = runReadPlugin(tempRoot, mockPath);
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout).metadata.budgets[0].account_balances_stored).toBeNull();
+      expect(balanceRows().map(r => r.balance)).toEqual([100]);
+    });
+
+    test('balances of excluded budgets are removed', () => {
+      createDbWithRows([]);
+      let mockPath = createFetchMock(tempRoot, {
+        budgets: [CURRENT, ARCHIVED],
+        accountsByBudgetId: {
+          [CURRENT.id]: [account('a1', 'Checking', 100000)],
+          [ARCHIVED.id]: [account('b1', 'Archived Checking', 5000)]
+        }
+      });
+      expect(runReadPlugin(tempRoot, mockPath).status).toBe(0);
+      expect(balanceRows()).toHaveLength(2);
+
+      expect(runReadPlugin(tempRoot, mockPath, { exclude_budget_ids: ARCHIVED.name }).status).toBe(0);
+      expect(balanceRows().map(r => r.account)).toEqual(['Checking']);
     });
   });
 });

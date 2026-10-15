@@ -355,11 +355,12 @@ Each plugin type has a defined schema. Data is stored in a shared table for that
 
 | Type | Table | Description |
 |------|-------|-------------|
+| `contacts` | `contacts` | Address-book contacts (names, emails, phones, birthdays) |
 | `context` | *(none)* | Ephemeral AI context (weather, plans, day themes) |
 | `diary` | `diary` | Journal entries with date and text (including durable `ROLE:` report blocks written by the `roles` plugin — see [docs/ROLE_AGENTS.md](../docs/ROLE_AGENTS.md)) |
 | `email` | `email` | Email messages with headers and content |
 | `events` | `events` | Calendar events with start/end times |
-| `finance` | `financial_transactions` | Financial data (transactions, budget planning) |
+| `finance` | `financial_transactions` | Financial data (transactions, budget planning; source-reported balances in `account_balances`) |
 | `habits` | `habits` | Daily habit tracking with completion status |
 | `health` | `health_metrics` | Health measurements (steps, weight, sleep) |
 | `issues` | `issues` | Tickets, bugs, alerts from external systems |
