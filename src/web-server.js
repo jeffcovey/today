@@ -1198,6 +1198,12 @@ function clearPomodoroNudges() {
   }
 }
 
+function stopPomodoro() {
+  clearPomodoroBoundary();
+  clearPomodoroNudges();
+  pomodoroState = createPomodoroState();
+}
+
 // Same reason the Task Timer arms a boundary: iPadOS freezes a background tab's
 // timers, so the end of an interval has to be noticed server-side.
 function armPomodoroBoundary() {
@@ -1213,6 +1219,7 @@ function armPomodoroBoundary() {
 function handlePomodoroBoundary() {
   pomodoroBoundaryTimeout = null;
   advancePomodoroIfNeeded();
+  armPomodoroBoundary();
 }
 
 // The one path that ends an interval, called both by the boundary timer and by
@@ -1220,6 +1227,10 @@ function handlePomodoroBoundary() {
 // state is already holding, so the two can never both notify.
 function advancePomodoroIfNeeded() {
   const config = getPomodoroConfig();
+  if (!config.enabled) {
+    stopPomodoro();
+    return;
+  }
   if (!isIntervalOver(pomodoroState, config)) return;
 
   pomodoroState = holdInterval(pomodoroState, config);
@@ -1232,6 +1243,10 @@ function advancePomodoroIfNeeded() {
 // until the user stops the timer or starts the next interval.
 function sendPomodoroNudge() {
   const config = getPomodoroConfig();
+  if (!config.enabled) {
+    stopPomodoro();
+    return;
+  }
   const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
   const upcoming = intervalDescription(pomodoroState.phase, pomodoroState.periodIndex, config);
   const minutes = phaseMinutes(pomodoroState.phase, config);
@@ -7861,9 +7876,7 @@ app.post('/api/pomodoro/start', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/pomodoro/stop', authMiddleware, async (req, res) => {
-  clearPomodoroBoundary();
-  clearPomodoroNudges();
-  pomodoroState = createPomodoroState();
+  stopPomodoro();
   res.json({ success: true, message: 'Pomodoro stopped' });
 });
 

@@ -1,4 +1,6 @@
 import fs from 'fs';
+import vm from 'node:vm';
+import { jest } from '@jest/globals';
 import {
   getPomodoroConfig, nextInterval, intervalDescription, phaseLabel,
   phaseMinutes, phaseDurationMs,
@@ -332,6 +334,98 @@ describe('state machine – a whole session', () => {
 
 const webServerSource = fs.readFileSync(new URL('../src/web-server.js', import.meta.url), 'utf8');
 
+describe('pomodoro server timers', () => {
+  let cfg;
+  let timer;
+  let sendPushover;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    cfg = config();
+    sendPushover = jest.fn().mockResolvedValue({ sent: true });
+    const source = webServerSource.slice(
+      webServerSource.indexOf('let pomodoroState ='),
+      webServerSource.indexOf('function pomodoroButton(')
+    );
+    timer = vm.runInNewContext(`${source}
+      ({
+        start() {
+          pomodoroState = startPomodoro();
+          armPomodoroBoundary();
+        },
+        advancePomodoroIfNeeded,
+        stopPomodoro,
+        getState: () => pomodoroState
+      });
+    `, {
+      Date, setTimeout, clearTimeout, console,
+      createPomodoroState, startPomodoro, remainingMs, isIntervalOver,
+      holdInterval, intervalDescription, phaseMinutes, NUDGE_INTERVAL_MS, MAX_NUDGES,
+      getPomodoroConfig: () => cfg,
+      getPublicBaseUrl: () => '',
+      sendPushover
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  test('re-arms the boundary when a running interval gets longer', () => {
+    timer.start();
+    cfg = config({ work_minutes: 50 });
+    jest.advanceTimersByTime(25 * 60 * 1000 + 250);
+    expect(timer.getState().awaitingStart).toBe(false);
+    expect(sendPushover).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(1);
+
+    jest.advanceTimersByTime(25 * 60 * 1000);
+    expect(timer.getState().awaitingStart).toBe(true);
+    expect(sendPushover).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(1);
+  });
+
+  test('disabling before the boundary resets the session without notifying', () => {
+    timer.start();
+    cfg = config({ enabled: false });
+    jest.advanceTimersByTime(25 * 60 * 1000 + 250);
+    expect(timer.getState()).toEqual(createPomodoroState());
+    expect(sendPushover).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('checking a disabled session before completion cancels its boundary', () => {
+    timer.start();
+    cfg = config({ enabled: false });
+    timer.advancePomodoroIfNeeded();
+    expect(timer.getState()).toEqual(createPomodoroState());
+    expect(jest.getTimerCount()).toBe(0);
+    expect(sendPushover).not.toHaveBeenCalled();
+  });
+
+  test('disabling during a hold cancels further reminders and resets the session', () => {
+    timer.start();
+    jest.advanceTimersByTime(25 * 60 * 1000 + 250);
+    expect(sendPushover).toHaveBeenCalledTimes(1);
+
+    cfg = config({ enabled: false });
+    jest.advanceTimersByTime(NUDGE_INTERVAL_MS);
+    expect(timer.getState()).toEqual(createPomodoroState());
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(MAX_NUDGES * NUDGE_INTERVAL_MS);
+    expect(sendPushover).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['running', 'holding'])('stopping a %s session clears its timers', (state) => {
+    timer.start();
+    if (state === 'holding') jest.advanceTimersByTime(25 * 60 * 1000 + 250);
+    timer.stopPomodoro();
+    expect(timer.getState()).toEqual(createPomodoroState());
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});
+
 function routeBody(source, routePath) {
   const marker = `app.post('${routePath}'`;
   const start = source.indexOf(marker);
@@ -389,12 +483,12 @@ describe('pomodoro route wiring', () => {
 
   test('stopping and starting the next interval both silence the reminders', () => {
     // These are the two answers the spec says must end the repeat.
-    expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('clearPomodoroNudges()');
+    expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('stopPomodoro()');
     expect(routeBody(webServerSource, '/api/pomodoro/next')).toContain('clearPomodoroNudges()');
   });
 
   test('stopping clears the boundary so no interval ends after the timer is off', () => {
-    expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('clearPomodoroBoundary()');
+    expect(routeBody(webServerSource, '/api/pomodoro/stop')).toContain('stopPomodoro()');
   });
 
   test('every route that starts a clock arms a boundary', () => {

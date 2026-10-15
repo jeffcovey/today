@@ -179,7 +179,8 @@ For remote access, deploy Today to a server using `bin/today configure` and `bin
 ### Pomodoro Timer
 
 An optional fixed-interval timer that appears under the Task Timer. It stays
-hidden until you add a `[pomodoro]` section to `vault/today.toml`:
+hidden until you add a `[pomodoro]` section to your active configuration file
+(`config.toml` by default, overridden by `TODAY_CONFIG` or `.data/config-path`):
 
 ```toml
 [pomodoro]
