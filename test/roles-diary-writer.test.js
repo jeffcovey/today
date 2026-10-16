@@ -5,6 +5,7 @@ import { extractRoleBlocks } from '../src/diary-role-blocks.js';
 import {
   validateRoleReport,
   appendRoleReport,
+  amendRoleEntry,
   setRoleCheckboxState,
   formatRoleEntry,
   formatRoleReply,
@@ -510,5 +511,91 @@ describe('role reply web hooks', () => {
     } finally {
       fs.rmSync(vault, { recursive: true, force: true });
     }
+  });
+});
+
+describe('amendRoleEntry', () => {
+  let tempDir;
+  let filePath;
+
+  const first = [
+    '**Billie turns Friday — greeting to send by Thursday.**',
+    '',
+    '- [ ] → Jeff: Send Billie a birthday greeting',
+    '- [ ] → Jeff: Buy the tickets',
+    '',
+    '> [!info]- Details',
+    '>',
+    '> old detail'
+  ].join('\n');
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diary-roles-'));
+    filePath = path.join(tempDir, '2026-10-13.md');
+    appendRoleReport(filePath, 'secretary', first, { time: '04:07', status: 'needs-attention', fileDate: '2026-10-13' });
+    setRoleCheckboxState(filePath, 'secretary', 'birthday greeting', '-');
+    appendRoleReply(filePath, 'secretary', 'I don\'t even remember who Billie is. Drop this.');
+    appendRoleReport(filePath, 'secretary', 'Second entry stays.', { time: '08:05' });
+    appendRoleReport(filePath, 'cpa', '**Billie turns Friday — greeting to send by Thursday.**', { time: '04:07' });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function secretaryBlock() {
+    const content = fs.readFileSync(filePath, 'utf8');
+    return content.slice(content.indexOf('<!-- ROLE:secretary:START -->'), content.indexOf('<!-- ROLE:secretary:END -->'));
+  }
+
+  test('replaces the entry text, keeps the user\'s reply and a settled checkbox, and stamps the entry', () => {
+    const result = amendRoleEntry(filePath, 'secretary', '4:07', [
+      '**Nothing to do: Jeff declined Billie\'s greeting.**',
+      '',
+      '- [ ] → Jeff: Send Billie a birthday greeting',
+      '- [ ] → Jeff: Buy the tickets'
+    ].join('\n'), { amendedAt: '2026-10-16 10:00' });
+
+    expect(result).toMatchObject({ ok: true, line: '### 04:07', replies: 1, settled: 1 });
+
+    const block = secretaryBlock();
+    const amended = block.slice(block.indexOf('### 04:07'), block.indexOf('### 08:05'));
+    expect(amended).toContain('**Status:** Needs attention');
+    expect(amended).toContain('*Amended 2026-10-16 10:00.*');
+    expect(amended).toContain('**Nothing to do: Jeff declined Billie\'s greeting.**');
+    expect(amended).not.toContain('old detail');
+    expect(amended).toContain('- [-] → Jeff: Send Billie a birthday greeting');
+    expect(amended).toContain('- [ ] → Jeff: Buy the tickets');
+    expect(amended).toContain('-> secretary: I don\'t even remember who Billie is. Drop this.');
+    expect(amended.indexOf('Nothing to do')).toBeLessThan(amended.indexOf('-> secretary:'));
+
+    expect(block).toContain('### 08:05\n\nSecond entry stays.');
+    expect(fs.readFileSync(filePath, 'utf8')).toContain('<!-- ROLE:cpa:START -->\n## 🤖 Cpa\n\n### 04:07\n\n**Billie turns Friday');
+    expect(fs.existsSync(`${filePath}.lock`)).toBe(false);
+  });
+
+  test('a new status replaces the old one; amending twice leaves one stamp', () => {
+    amendRoleEntry(filePath, 'secretary', '04:07', 'First correction.', { status: 'ok', amendedAt: '2026-10-16 10:00' });
+    amendRoleEntry(filePath, 'secretary', '04:07', 'Second correction.', { amendedAt: '2026-10-16 11:00' });
+
+    const block = secretaryBlock();
+    expect(block).toContain('**Status:** OK');
+    expect(block).not.toContain('Needs attention');
+    expect(block).not.toContain('First correction.');
+    expect(block).toContain('Second correction.');
+    expect(block.match(/\*Amended /g)).toHaveLength(1);
+    expect(block).toContain('*Amended 2026-10-16 11:00.*');
+  });
+
+  test('refuses a missing entry, a missing block, a bad time, and marker injection, leaving the file untouched', () => {
+    const before = fs.readFileSync(filePath, 'utf8');
+
+    expect(amendRoleEntry(filePath, 'secretary', '09:00', 'x').error).toMatch(/No 09:00 entry/);
+    expect(amendRoleEntry(filePath, 'innkeeper', '04:07', 'x').error).toMatch(/No innkeeper block/);
+    expect(amendRoleEntry(filePath, 'secretary', 'noon', 'x').error).toMatch(/Invalid entry time/);
+    expect(amendRoleEntry(filePath, 'secretary', '04:07', '<!-- ROLE:cpa:END -->').error).toMatch(/markers/);
+    expect(amendRoleEntry(path.join(tempDir, 'missing.md'), 'secretary', '04:07', 'x').error).toMatch(/does not exist/);
+
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
   });
 });

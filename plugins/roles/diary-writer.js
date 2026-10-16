@@ -257,6 +257,160 @@ export function setRoleCheckboxState(filePath, role, match, state) {
   }
 }
 
+const ENTRY_HEADING_RE = /^### (\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/;
+const REPLY_LINE_RE = /^\s*(?:->|→)\s*[a-z0-9][a-z0-9-]*\s*:/;
+const STATUS_LINE_RE = /^\*\*Status:\*\*\s*(.+?)\s*$/;
+const CHECKBOX_RE = /^(\s*- \[)([ x-])(\] .*)$/;
+
+function normalizeTime(time) {
+  const match = (time || '').trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) {
+    return null;
+  }
+  return `${match[1].padStart(2, '0')}:${match[2]}${match[3] ? `:${match[3]}` : ''}`;
+}
+
+function headingTime(line) {
+  const match = line.match(ENTRY_HEADING_RE);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}${match[3] ? `:${match[3]}` : ''}` : null;
+}
+
+function statusKeyFromLabel(label) {
+  return ROLE_STATUSES.find((key) => statusLabel(key) === label) || null;
+}
+
+function localDate(date = new Date()) {
+  const tz = process.env.TZ || getTimezone();
+  return date.toLocaleDateString('en-CA', { timeZone: tz });
+}
+
+/**
+ * Replace the text of one of the role's own earlier entries (`### HH:MM`)
+ * in place, so an outdated headline or a wrong fact stops being repeated.
+ *
+ * What the user wrote survives: reply paragraphs inside the entry are kept
+ * verbatim, after the new text, and a checkbox the user ticked or that was
+ * cancelled keeps its state when the new text repeats the item. The entry
+ * is stamped "*Amended <date> <time>.*" so the record shows it changed.
+ * Without `status`, the entry's existing status line is kept.
+ *
+ * Returns { ok, line, replies, settled } or { ok: false, error }.
+ */
+export function amendRoleEntry(filePath, role, time, text, { status, amendedAt } = {}) {
+  const errors = validateRoleReport(role, text, { status });
+  if (errors.length > 0) {
+    return { ok: false, error: errors.join('; ') };
+  }
+  const wantedTime = normalizeTime(time);
+  if (!wantedTime) {
+    return { ok: false, error: `Invalid entry time "${time}": expected HH:MM` };
+  }
+
+  const startMarker = roleStartMarker(role);
+  const endMarker = roleEndMarker(role);
+  const lockPath = `${filePath}.lock`;
+
+  let lockStat;
+  try {
+    lockStat = acquireDiaryLock(lockPath);
+    try {
+      for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
+        let original;
+        try {
+          original = fs.readFileSync(filePath, 'utf8');
+        } catch (error) {
+          if (error.code === 'ENOENT') {
+            return { ok: false, error: `Diary file ${filePath} does not exist` };
+          }
+          throw error;
+        }
+
+        const startIndex = original.indexOf(startMarker);
+        const endIndex = original.indexOf(endMarker);
+        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+          return { ok: false, error: `No ${role} block in ${filePath}` };
+        }
+
+        const blockStart = startIndex + startMarker.length;
+        const lines = original.slice(blockStart, endIndex).split('\n');
+        const headings = lines
+          .map((line, index) => ({ index, time: headingTime(line) }))
+          .filter((h) => h.time !== null);
+        const matches = headings.filter((h) => h.time === wantedTime);
+        if (matches.length === 0) {
+          return { ok: false, error: `No ${wantedTime} entry in the ${role} block of ${filePath}` };
+        }
+        if (matches.length > 1) {
+          return { ok: false, error: `${matches.length} entries at ${wantedTime} in the ${role} block; cannot tell which to amend` };
+        }
+
+        const from = matches[0].index;
+        const next = headings.find((h) => h.index > from);
+        const to = next ? next.index : lines.length;
+        const region = lines.slice(from + 1, to);
+
+        const firstReply = region.findIndex((line) => REPLY_LINE_RE.test(line));
+        const old = firstReply === -1 ? region : region.slice(0, firstReply);
+        const replies = firstReply === -1 ? [] : region.slice(firstReply);
+        while (replies.length > 0 && replies[replies.length - 1].trim() === '') {
+          replies.pop();
+        }
+
+        let statusKey = status;
+        if (!statusKey) {
+          const oldStatus = old.map((line) => line.match(STATUS_LINE_RE)).find(Boolean);
+          statusKey = oldStatus ? statusKeyFromLabel(oldStatus[1]) : undefined;
+        }
+
+        const settledStates = new Map();
+        for (const line of old) {
+          const box = line.match(CHECKBOX_RE);
+          if (box && box[2] !== ' ') {
+            settledStates.set(box[3].trim().toLowerCase(), box[2]);
+          }
+        }
+        let settled = 0;
+        const body = text.trim().split('\n').map((line) => {
+          const box = line.match(CHECKBOX_RE);
+          if (!box || box[2] !== ' ') {
+            return line;
+          }
+          const state = settledStates.get(box[3].trim().toLowerCase());
+          if (!state) {
+            return line;
+          }
+          settled++;
+          return `${box[1]}${state}${box[3]}`;
+        });
+
+        const stamp = amendedAt || `${localDate()} ${localTime()}`;
+        const entry = [lines[from], ''];
+        if (statusKey) {
+          entry.push(`**Status:** ${statusLabel(statusKey)}`, '');
+        }
+        entry.push(`*Amended ${stamp}.*`, '', ...body, '');
+        if (replies.length > 0) {
+          entry.push(...replies, '');
+        }
+
+        const updatedLines = [...lines.slice(0, from), ...entry, ...lines.slice(to)];
+        const updated = original.slice(0, blockStart) + updatedLines.join('\n') + original.slice(endIndex);
+
+        const { conflict } = writeFileAtomicCAS(filePath, updated, original);
+        if (!conflict) {
+          return { ok: true, line: lines[from].trim(), replies: replies.filter((l) => REPLY_LINE_RE.test(l)).length, settled };
+        }
+      }
+
+      return { ok: false, error: `Concurrent writes kept changing ${filePath}; entry not amended` };
+    } finally {
+      releaseDiaryLock(lockPath, lockStat);
+    }
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
 function releaseDiaryLock(lockPath, lockStat) {
   try {
     const current = fs.statSync(lockPath);

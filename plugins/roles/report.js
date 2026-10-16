@@ -7,6 +7,7 @@
  *   echo "report text" | plugins/roles/report.js <role> --status ok
  *   plugins/roles/report.js <role> --check "item text"     # flip - [ ] to - [x]
  *   plugins/roles/report.js <role> --cancel "item text"    # flip - [ ] to - [-]
+ *   plugins/roles/report.js <role> --date 2026-10-15 --amend 16:10 "corrected text"
  *
  * Role agents must use this instead of editing diary files by hand: it
  * validates the report (length cap, no marker injection), appends inside
@@ -19,7 +20,7 @@ import path from 'path';
 import { program } from 'commander';
 import { getAbsoluteVaultPath, getTimezone } from '../../src/config.js';
 import { colors } from '../../src/cli-utils.js';
-import { appendRoleReport, setRoleCheckboxState, rolesPluginEnabled, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
+import { appendRoleReport, amendRoleEntry, setRoleCheckboxState, rolesPluginEnabled, ROLE_STATUSES, MAX_REPORT_LENGTH } from './diary-writer.js';
 
 function todayDateString() {
   const tz = process.env.TZ || getTimezone();
@@ -48,6 +49,7 @@ program
   .option('--date <date>', 'diary date (YYYY-MM-DD, default: today)')
   .option('--check <text>', 'flip a matching open checkbox in your block to done ([x]); repeatable', collect, [])
   .option('--cancel <text>', 'flip a matching open checkbox in your block to cancelled ([-]); repeatable', collect, [])
+  .option('--amend <time>', 'replace the text of your own earlier entry (### HH:MM) in place instead of appending; user replies and settled checkboxes in it are kept')
   .action(async (role, message, options) => {
     if (!rolesPluginEnabled()) {
       console.error(colors.red('✗') + ' The roles plugin is not enabled; enable [plugins.roles.<source>] in your config to use role reports.');
@@ -87,6 +89,21 @@ program
       }
       console.error(colors.red('✗') + ' Report text is empty');
       process.exit(1);
+    }
+
+    if (options.amend) {
+      const amended = amendRoleEntry(filePath, role, options.amend, text, { status: options.status });
+      if (!amended.ok) {
+        console.error(colors.red('✗') + ` ${amended.error}`);
+        process.exit(1);
+      }
+      const kept = [
+        amended.replies > 0 ? `${amended.replies} user ${amended.replies === 1 ? 'reply' : 'replies'}` : null,
+        amended.settled > 0 ? `${amended.settled} settled ${amended.settled === 1 ? 'checkbox' : 'checkboxes'}` : null
+      ].filter(Boolean);
+      const keptSuffix = kept.length > 0 ? ` (kept ${kept.join(' and ')})` : '';
+      console.log(colors.green('✓') + ` Amended ${role} entry ${amended.line} in ${filePath}${keptSuffix}`);
+      return;
     }
 
     const result = appendRoleReport(filePath, role, text, {
