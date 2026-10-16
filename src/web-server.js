@@ -4430,7 +4430,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
     content = await processInlineDataview(content, properties, vaultPath, filePath, allFiles);
   }
 
-  // Role-agent sections in a diary render as cards (plugins/roles/web-cards.js)
+  // Role-agent sections (in daily plans; older diaries) render as cards (plugins/roles/web-cards.js)
   content = roleBlocksToCards(content);
 
   // Don't process collapsible sections here - we'll do it after markdown rendering

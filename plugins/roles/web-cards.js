@@ -1,13 +1,13 @@
 /**
- * Lay out ROLE blocks as cards on the web view of a diary.
+ * Lay out ROLE blocks as cards on the web view of a daily plan.
  *
- * The web server calls roleBlocksToCards() on a diary's Markdown before
+ * The web server calls roleBlocksToCards() on a page's Markdown before
  * rendering it. Each block becomes a card: a header with the role's name,
  * its latest declared status and when it last reported; the latest report
  * open, with the replies and dispatch notes that led to it; earlier entries
  * folded away; the user's replies shown as "You" bubbles. The Markdown
  * inside is left as written, so checkboxes, callouts and links render as
- * they do everywhere else. The diary file itself is never changed.
+ * they do everywhere else. The file itself is never changed.
  *
  * Cards are HTML blocks wrapped around Markdown: each wrapper tag sits on
  * its own line with blank lines around the Markdown, which CommonMark
@@ -224,7 +224,7 @@ function renderCard(role, parsed, titles) {
 /**
  * "Needs you": every still-open checkbox from every role, in one list at
  * the top of the staff section. Each item is the role's own task line
- * (so toggling it updates the diary like any checkbox), without the
+ * (so toggling it updates the file like any checkbox), without the
  * blockquote prefix or the "→ Name:" address, followed by the role's name.
  */
 export function renderNeedsYou(parsedBlocks, titles) {
@@ -252,7 +252,7 @@ export function renderNeedsYou(parsedBlocks, titles) {
 }
 
 /**
- * Replace each ROLE block in a diary's Markdown with its card. A heading
+ * Replace each ROLE block in a page's Markdown with its card. A heading
  * line ("Staff · N roles · latest report HH:MM") and the "Needs you" list
  * introduce the first card.
  * Markdown without ROLE blocks is returned unchanged.

@@ -21,7 +21,6 @@ import {
 } from '../src/cli-utils.js';
 import { program } from 'commander';
 import { getFullConfig } from '../src/config.js';
-import { collectRoleHistory, formatRoleHistory } from '../src/diary-role-history.js';
 
 // Entry type emoji map
 const TYPE_EMOJI = {
@@ -388,25 +387,6 @@ async function cmdSync() {
   }
 }
 
-// Role command - a role's recent blocks, the chief of staff's, and the user's replies
-function cmdRole(role, options = {}) {
-  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(role)) {
-    console.error(colors.red('✗') + ` Invalid role name "${role}": use lowercase letters, digits, and hyphens`);
-    process.exit(1);
-  }
-  const days = Number.isInteger(options.days) && options.days > 0 ? options.days : 14;
-
-  const config = getFullConfig();
-  const diaryDir = path.join(PROJECT_ROOT, config.plugins?.['markdown-diary']?.default?.diary_directory || 'vault/diary');
-  const configuredChief = Object.values(config.plugins?.roles || {}).find((s) => s?.chief_role)?.chief_role;
-  const chief = options.chief === false ? null : options.chief || configuredChief || 'chief-of-staff';
-
-  const today = getTodayDate();
-  const roles = chief && chief !== role ? [role, chief] : [role];
-  const history = collectRoleHistory({ diaryDir, roles, days, today });
-  console.log(formatRoleHistory(history, { role, chief, days, today }));
-}
-
 // Add command - add a new diary entry
 async function cmdAdd(type, text, options = {}) {
   const validTypes = ['gratitude', 'progress', 'concern', 'journal'];
@@ -616,17 +596,6 @@ program
   .description('Sync all diary plugins to database')
   .action(async () => {
     await cmdSync();
-  });
-
-program
-  .command('role')
-  .description("Show a role's diary blocks and the chief of staff's from the last N days, with the user's replies, oldest first")
-  .argument('<role>', 'Role name, e.g. secretary')
-  .option('--days <n>', 'Days to include, ending today', (val) => parseInt(val, 10), 14)
-  .option('--chief <name>', 'Chief role to include alongside (default: the configured chief_role)')
-  .option('--no-chief', "Only the role's own blocks")
-  .action((role, options) => {
-    cmdRole(role, options);
   });
 
 program

@@ -20,12 +20,10 @@
  * writeFileAtomicCAS adds compare-and-swap for the genuine-change race: a
  * read-modify-write caller passes the bytes it originally read, and the write
  * is aborted if the on-disk bytes no longer match (another instance wrote in
- * between). A lockfile is deliberately NOT used: instances have separate DBs
- * and the vault may be backed by a file-sync service, so a lockfile placed in
- * the vault would itself sync between machines and become a stale, conflicting
- * artifact. CAS needs no shared state, tolerates the sync service, and shrinks
- * the race window from the whole read-modify-write down to compare->rename. A
- * lost update is simply retried on the next sync and converges.
+ * between). CAS is not a cross-process atomic compare-and-swap: operations that
+ * share a filesystem and update the same file must hold the shared per-file
+ * lock across their read/transform/write (see file-lock.js). CAS remains a
+ * defense against uncoordinated writers and sync-service changes.
  *
  * expectedContent === null means "create only if absent" and uses a tempfile +
  * hard link for kernel-level create-if-missing semantics with no partial-file

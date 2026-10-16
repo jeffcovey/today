@@ -19,7 +19,7 @@ import {
   PASSWORD,
   PAGES,
   THEMES,
-  TODAY_DIARY_PATH,
+  TODAY_PLAN_PATH,
   VIEWPORTS
 } from './helpers/a11y-harness.js';
 import fs from 'fs';
@@ -175,11 +175,11 @@ describe('task markers', () => {
 });
 
 describe('role reply forms', () => {
-  test("appear under each role block in today's diary only", async () => {
+  test("appear under each role block in today's plan only", async () => {
     const page = await browser.newPage();
     try {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
-      await page.goto(`${server.baseUrl}${TODAY_DIARY_PATH}`, { waitUntil: 'networkidle0' });
+      await page.goto(`${server.baseUrl}${TODAY_PLAN_PATH}`, { waitUntil: 'networkidle0' });
       expect(await page.$$eval('form.role-reply-form', forms => forms.map(f => f.dataset.role)))
         .toEqual(['chief-of-staff', 'innkeeper']);
       expect(await page.$eval('details.role-reply', el => el.open)).toBe(false);
@@ -195,7 +195,7 @@ describe('role reply forms', () => {
     const page = await browser.newPage();
     try {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
-      await page.goto(`${server.baseUrl}${TODAY_DIARY_PATH}`, { waitUntil: 'networkidle0' });
+      await page.goto(`${server.baseUrl}${TODAY_PLAN_PATH}`, { waitUntil: 'networkidle0' });
       await page.click('details.role-reply:has(form[data-role="innkeeper"]) > summary');
       await page.type('form[data-role="innkeeper"] textarea', 'Thanks. Two things:\n- check the side room\n- confirm the cleaner');
       await Promise.all([
@@ -203,8 +203,8 @@ describe('role reply forms', () => {
         page.click('form[data-role="innkeeper"] button[type="submit"]')
       ]);
 
-      const diary = fs.readFileSync(path.join(server.vaultDir, TODAY_DIARY_PATH), 'utf8');
-      expect(diary).toContain(
+      const plan = fs.readFileSync(path.join(server.vaultDir, TODAY_PLAN_PATH), 'utf8');
+      expect(plan).toContain(
         '-> innkeeper: Thanks. Two things:\n- check the side room\n- confirm the cleaner\n\n<!-- ROLE:innkeeper:END -->'
       );
 

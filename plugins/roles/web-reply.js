@@ -1,7 +1,7 @@
 /**
- * Reply forms for role blocks on the web view of today's diary.
+ * Reply forms for role blocks on the web view of today's daily plan.
  *
- * The rendered diary keeps each block's ROLE marker comments, so the web
+ * The rendered plan keeps each block's ROLE marker comments, so the web
  * server calls injectRoleReplyForms() on every page view (after the HTML
  * cache, so a page cached yesterday doesn't keep its forms today) and
  * saveRoleReply() when a form is sent. Both do nothing unless the roles
@@ -9,20 +9,11 @@
  */
 
 import path from 'path';
-import { getTimezone } from '../../src/config.js';
 import { ROLE_NAME_RE } from '../../src/diary-role-blocks.js';
-import { appendRoleReply, defaultTitle, rolesPluginEnabled } from './diary-writer.js';
+import { appendRoleReply, defaultTitle, rolesPluginEnabled } from './block-writer.js';
+import { todayPlanRelativePath } from './plan-file.js';
 
 export const ROLE_REPLY_ENDPOINT = '/roles/reply';
-
-function todayDateString(now = new Date()) {
-  return now.toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
-}
-
-/** Vault-relative path of today's diary, e.g. "diary/2026-10-12.md". */
-export function todayDiaryRelativePath(now = new Date()) {
-  return `diary/${todayDateString(now)}.md`;
-}
 
 function escapeHtml(text) {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
@@ -68,11 +59,11 @@ export function roleReplyFormHtml(role, title, relativePath) {
 
 /**
  * Add a reply form before each role block's END marker in rendered HTML,
- * when the page is today's diary and the roles plugin is enabled.
+ * when the page is today's plan and the roles plugin is enabled.
  */
 export function injectRoleReplyForms(html, relativePath, { now = new Date(), enabled = rolesPluginEnabled } = {}) {
   const normalized = normalizeRelativePath(relativePath);
-  if (normalized !== todayDiaryRelativePath(now) || !html.includes('<!-- ROLE:') || !enabled()) {
+  if (normalized !== todayPlanRelativePath(now) || !html.includes('<!-- ROLE:') || !enabled()) {
     return html;
   }
   return html.replace(/<!-- ROLE:([a-z0-9-]+):END -->/g, (marker, role, offset) => {
@@ -86,7 +77,7 @@ export function injectRoleReplyForms(html, relativePath, { now = new Date(), ena
 }
 
 /**
- * Save a reply from the web form. Only today's diary takes replies: the
+ * Save a reply from the web form. Only today's plan takes replies: the
  * agents read today's file, so a form left open past midnight is refused
  * rather than written somewhere nobody will read it.
  *
@@ -97,8 +88,8 @@ export function saveRoleReply(vaultPath, relativePath, role, text, { now = new D
     return { status: 404, body: { error: 'The roles plugin is not enabled' } };
   }
   const normalized = normalizeRelativePath(relativePath || '');
-  if (normalized !== todayDiaryRelativePath(now)) {
-    return { status: 409, body: { error: "This isn't today's diary any more. Reload the page and reply there." } };
+  if (normalized !== todayPlanRelativePath(now)) {
+    return { status: 409, body: { error: "This isn't today's plan any more. Reload the page and reply there." } };
   }
   if (typeof role !== 'string' || typeof text !== 'string') {
     return { status: 400, body: { error: 'role and text are required' } };

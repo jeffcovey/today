@@ -11,6 +11,7 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDailyPlanRelativePath } from '../../src/plan-utils.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,14 +26,15 @@ export const VIEWPORTS = {
   desktop: { width: 1280, height: 900, deviceScaleFactor: 1 }
 };
 
-// Today's diary gets the role reply forms; it's a copy of the fixture diary.
+// Today's daily plan gets the role reply forms; its role blocks are copied
+// from the fixture diary.
 export const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-export const TODAY_DIARY_PATH = `/diary/${TODAY}.md`;
+export const TODAY_PLAN_PATH = `/${getDailyPlanRelativePath(TODAY)}`;
 
 export const PAGES = [
   { name: 'home', path: '/' },
   { name: 'diary', path: '/diary/2026-01-15.md' },
-  { name: 'diary-today', path: TODAY_DIARY_PATH },
+  { name: 'plan-today', path: TODAY_PLAN_PATH },
   { name: 'kitchen-sink', path: '/notes/kitchen-sink.md' },
   { name: 'toml', path: '/notes/settings.toml' },
   { name: 'project', path: '/projects/sample-project.md' },
@@ -97,7 +99,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
   fs.cpSync(vaultSource, vaultDir, { recursive: true });
   const fixtureDiary = path.join(vaultDir, 'diary', '2026-01-15.md');
   if (fs.existsSync(fixtureDiary)) {
-    fs.writeFileSync(path.join(vaultDir, TODAY_DIARY_PATH),
+    const todayPlan = path.join(vaultDir, TODAY_PLAN_PATH);
+    fs.mkdirSync(path.dirname(todayPlan), { recursive: true });
+    fs.writeFileSync(todayPlan,
       fs.readFileSync(fixtureDiary, 'utf8').replace(/^date: .*$/m, `date: ${TODAY}`));
   }
   // A running timer, so the timer banner is audited too.

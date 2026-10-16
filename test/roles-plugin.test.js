@@ -167,7 +167,7 @@ describe('roles plugin report.js', () => {
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-report-'));
-    fs.mkdirSync(path.join(dir, 'vault', 'diary'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'vault', 'plans'), { recursive: true });
   });
 
   afterEach(() => {
@@ -196,13 +196,13 @@ describe('roles plugin report.js', () => {
     const result = runReport(false);
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/roles plugin is not enabled/);
-    expect(fs.existsSync(path.join(dir, 'vault', 'diary', '2026-10-09.md'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'vault', 'plans', '2026_Q4_10_W41_09.md'))).toBe(false);
   });
 
   test('writes the report when the plugin is enabled', () => {
     const result = runReport(true);
     expect(result.status).toBe(0);
-    const diary = fs.readFileSync(path.join(dir, 'vault', 'diary', '2026-10-09.md'), 'utf8');
+    const diary = fs.readFileSync(path.join(dir, 'vault', 'plans', '2026_Q4_10_W41_09.md'), 'utf8');
     expect(diary).toContain('<!-- ROLE:cpa:START -->');
     expect(diary).toContain('Books balanced.');
   });
@@ -213,7 +213,7 @@ describe('roles plugin report.js --amend', () => {
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-amend-'));
-    fs.mkdirSync(path.join(dir, 'vault', 'diary'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'vault', 'plans'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'config.toml'), [
       `vault_path = ${JSON.stringify(path.relative(REPO_ROOT, path.join(dir, 'vault')))}`,
       'timezone = "UTC"',
@@ -237,7 +237,7 @@ describe('roles plugin report.js --amend', () => {
 
   test('rewrites an earlier entry in place and reports what it kept', () => {
     expect(report('**Greeting to send today.**\n\n- [ ] → Jeff: send it').status).toBe(0);
-    const diary = path.join(dir, 'vault', 'diary', '2026-10-15.md');
+    const diary = path.join(dir, 'vault', 'plans', '2026_Q4_10_W42_15.md');
     const time = fs.readFileSync(diary, 'utf8').match(/### (\d{2}:\d{2})/)[1];
     expect(report('--cancel', 'send it').status).toBe(0);
 
