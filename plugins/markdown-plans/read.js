@@ -24,6 +24,9 @@ import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { withFileLocks } from '../../src/file-lock.js';
+import { extractRoleSections, removeRoleBlocks } from './role-context.js';
+import { updateTomorrowPlan } from './plan-updates.js';
 import { getTimezone } from '../../src/config.js';
 import { getLocalDayUTCRange } from '../../src/date-utils.js';
 
@@ -218,13 +221,15 @@ function parseFrontmatter(content) {
  * Returns true when the file was changed.
  */
 function rewritePlanFile(filePath, transform) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const original = fs.readFileSync(filePath, 'utf-8');
-    const updated = transform(original);
-    if (updated === null || updated === original) return false;
-    if (!writeFileAtomicCAS(filePath, updated, original, 'utf-8').conflict) return true;
-  }
-  return false;
+  return withFileLocks([filePath], () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const original = fs.readFileSync(filePath, 'utf-8');
+      const updated = transform(original);
+      if (updated === null || updated === original) return false;
+      if (!writeFileAtomicCAS(filePath, updated, original, 'utf-8').conflict) return true;
+    }
+    return false;
+  });
 }
 
 function planFileIsIntact(content) {
@@ -296,7 +301,7 @@ function extractSections(body) {
  */
 function formatPlanContext(planInfo, content) {
   const { frontmatter, body } = parseFrontmatter(content);
-  const sections = extractSections(body);
+  const sections = extractSections(planInfo.type === 'day' ? removeRoleBlocks(body) : body);
 
   const lines = [];
   lines.push(`### ${planInfo.label}`);
@@ -364,11 +369,12 @@ function formatPlanContext(planInfo, content) {
   // sections: headline, open asks, and the user's replies (details callouts
   // are stripped with the other blockquotes above).
   if (planInfo.type === 'day') {
-    for (const sectionName of Object.keys(sections)) {
-      if (!sectionName.startsWith('🤖')) continue;
+    for (const section of extractRoleSections(body)) {
+      const roleContent = cleanContent(section.content);
+      if (!roleContent) continue;
       lines.push('');
-      lines.push(`**Staff — ${sectionName.replace(/^🤖\s*/, '')}:**`);
-      lines.push(sections[sectionName]);
+      lines.push(`**Staff — ${section.title}:**`);
+      lines.push(roleContent);
     }
   }
 
@@ -1544,49 +1550,6 @@ Keep it concise and actionable. Tasks should be specific and achievable.`;
   } catch (error) {
     return null;
   }
-}
-
-/**
- * Update tomorrow's plan file with AI suggestions
- */
-function updateTomorrowPlan(filePath, suggestions) {
-  if (!suggestions || (!suggestions.focus && !suggestions.priorities)) return false;
-
-  const original = fs.readFileSync(filePath, 'utf-8');
-  let content = original;
-  let modified = false;
-
-  // Update TODAY_FOCUS section
-  if (suggestions.focus) {
-    const focusReplacement = `<!-- TODAY_FOCUS: Day theme and focus area -->\n## 🎯 Today's Focus\n\n${suggestions.focus}\n\n<!-- /TODAY_FOCUS -->`;
-    const newContent = content.replace(
-      /<!-- TODAY_FOCUS:.*?-->\s*## 🎯 Today's Focus\s*<!-- \/TODAY_FOCUS -->/s,
-      focusReplacement
-    );
-    if (newContent !== content) {
-      content = newContent;
-      modified = true;
-    }
-  }
-
-  // Update TOP_PRIORITIES section
-  if (suggestions.priorities) {
-    const prioritiesReplacement = `<!-- TOP_PRIORITIES: Auto-generated from database -->\n## 📋 Top Priorities\n\n${suggestions.priorities}\n\n<!-- /TOP_PRIORITIES -->`;
-    const newContent = content.replace(
-      /<!-- TOP_PRIORITIES:.*?-->\s*## 📋 Top Priorities\s*(?:\{\{PRIORITIES_FROM_DATABASE\}\})?\s*<!-- \/TOP_PRIORITIES -->/s,
-      prioritiesReplacement
-    );
-    if (newContent !== content) {
-      content = newContent;
-      modified = true;
-    }
-  }
-
-  if (modified) {
-    rewritePlanFile(filePath, (latest) => (latest === original ? content : null));
-  }
-
-  return modified;
 }
 
 /**

@@ -11,6 +11,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { acquireFileLock as acquireDiaryLock, releaseFileLock as releaseDiaryLock } from '../../src/file-lock.js';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 import { ROLE_NAME_RE, roleStartMarker, roleEndMarker } from '../../src/diary-role-blocks.js';
 import { getFullConfig, getTimezone } from '../../src/config.js';
@@ -21,9 +22,6 @@ export const MAX_ROLE_TITLE_LENGTH = 80;
 export const ROLE_STATUSES = ['ok', 'blocked', 'needs-attention', 'quiet'];
 
 const CAS_RETRIES = 3;
-const LOCK_RETRIES = 20;
-const LOCK_RETRY_DELAY_MS = 50;
-const STALE_LOCK_TIMEOUT_MS = 10_000;
 
 /**
  * Validate a role report before writing. Returns an array of error strings
@@ -109,58 +107,6 @@ export function formatRoleEntry(text, { time, status } = {}) {
 function localTime(date = new Date()) {
   const tz = process.env.TZ || getTimezone();
   return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
-}
-
-function acquireDiaryLock(lockPath) {
-  for (let attempt = 0; attempt <= LOCK_RETRIES; attempt++) {
-    let fd;
-    try {
-      fd = fs.openSync(lockPath, 'wx');
-      fs.writeFileSync(fd, `${process.pid}\n${Date.now()}`);
-      const stat = fs.fstatSync(fd);
-      fs.closeSync(fd);
-      fd = undefined;
-      return stat;
-    } catch (error) {
-      if (fd !== undefined) {
-        try {
-          fs.closeSync(fd);
-        } catch {
-          // The descriptor may already be closed.
-        }
-        try {
-          fs.unlinkSync(lockPath);
-        } catch {
-          // The lock may already have been removed.
-        }
-      }
-      if (error.code !== 'EEXIST') {
-        throw error;
-      }
-
-      try {
-        const stat = fs.statSync(lockPath);
-        if (Date.now() - stat.mtimeMs > STALE_LOCK_TIMEOUT_MS) {
-          const current = fs.statSync(lockPath);
-          if (current.dev === stat.dev && current.ino === stat.ino) {
-            fs.unlinkSync(lockPath);
-            continue;
-          }
-        }
-      } catch (statError) {
-        if (statError.code === 'ENOENT') {
-          continue;
-        }
-        throw statError;
-      }
-
-      if (attempt < LOCK_RETRIES) {
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_RETRY_DELAY_MS);
-      }
-    }
-  }
-
-  throw new Error(`Timed out acquiring diary lock ${lockPath}`);
 }
 
 export const CHECKBOX_STATES = ['x', '-'];
@@ -441,19 +387,6 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
   }
 }
 
-function releaseDiaryLock(lockPath, lockStat) {
-  try {
-    const current = fs.statSync(lockPath);
-    if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-      fs.unlinkSync(lockPath);
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-}
-
 // A first line that opens a block (list, heading, quote, fence, table)
 // would be swallowed into the "-> role:" paragraph, so it starts on the
 // next line instead.
@@ -529,16 +462,7 @@ export function appendRoleReply(filePath, role, text) {
 
       return { ok: false, code: 'conflict', error: `Concurrent writes kept changing ${filePath}; reply not saved` };
     } finally {
-      try {
-        const current = fs.statSync(lockPath);
-        if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-          fs.unlinkSync(lockPath);
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
+      releaseDiaryLock(lockPath, lockStat);
     }
   } catch (error) {
     return { ok: false, error: error.message };
@@ -606,16 +530,7 @@ export function appendRoleReport(filePath, role, text, { time, status, title, in
 
       return { ok: false, error: `Concurrent writes kept changing ${filePath}; report not written` };
     } finally {
-      try {
-        const current = fs.statSync(lockPath);
-        if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-          fs.unlinkSync(lockPath);
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
+      releaseDiaryLock(lockPath, lockStat);
     }
   } catch (error) {
     return { ok: false, error: error.message };

@@ -16,39 +16,80 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import { program } from 'commander';
 import { getAbsoluteVaultPath } from '../../src/config.js';
 import { colors } from '../../src/cli-utils.js';
-import { writeFileAtomic } from '../../src/fs-atomic.js';
+import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { withFileLocks } from '../../src/file-lock.js';
 import { getDailyPlanRelativePath } from '../../src/plan-utils.js';
-import { minimalDailyPlan } from './plan-file.js';
+import { minimalDailyPlan, rolePlanDirectory } from './plan-file.js';
 
-const BLOCK_RE = /<!-- ROLE:([a-z0-9-]+):START -->\n[\s\S]*?<!-- ROLE:\1:END -->\n?/g;
+const BLOCK_RE = /<!-- ROLE:([a-z0-9-]+):START -->\r?\n[\s\S]*?<!-- ROLE:\1:END -->(?:\r?\n)?/g;
 
 /** Split a diary body into the role blocks (verbatim) and what remains. */
 export function liftRoleBlocks(content) {
   const blocks = [];
-  const remainder = content
-    .replace(BLOCK_RE, (block) => {
-      blocks.push(block.endsWith('\n') ? block : `${block}\n`);
-      return '';
-    })
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/\n+$/, '\n');
+  const remainder = content.replace(BLOCK_RE, (block) => {
+    blocks.push(block);
+    return '';
+  });
   return { blocks, remainder };
 }
 
-/** Append blocks to a plan file's content, one blank line apart. */
+function roleAndBody(block) {
+  const marker = block.match(/^<!-- ROLE:([a-z0-9-]+):START -->\r?\n/);
+  if (!marker) return null;
+  const endIndex = block.lastIndexOf(`<!-- ROLE:${marker[1]}:END -->`);
+  const inner = block.slice(marker[0].length, endIndex);
+  const heading = inner.match(/^## 🤖[^\r\n]*(?:\r?\n)/);
+  if (!heading) return null;
+  return { role: marker[1], entries: inner.slice(heading[0].length) };
+}
+
+function mergeIntoRoleBlock(planContent, block) {
+  const migrated = roleAndBody(block);
+  if (!migrated) return null;
+  const match = [...planContent.matchAll(BLOCK_RE)].find((item) => item[1] === migrated.role);
+  if (!match) return null;
+
+  const existingBlock = match[0];
+  const existing = roleAndBody(existingBlock);
+  if (!existing) return null;
+  const entries = migrated.entries.replace(/\r\n/g, '\n').trim();
+  const existingEntries = existing.entries.replace(/\r\n/g, '\n');
+  if (!entries || existingEntries.includes(entries)) return planContent;
+
+  const entryHeading = /^### \d{1,2}:\d{2}(?::\d{2})?\s*$/m.exec(existingEntries);
+  const insertAt = entryHeading ? entryHeading.index : existingEntries.length;
+  const before = existingEntries.slice(0, insertAt).replace(/\s*$/, '');
+  const after = existingEntries.slice(insertAt).replace(/^\s*/, '');
+  const combinedEntries = [before, entries, after].filter(Boolean).join('\n\n');
+  const replacement = existingBlock.replace(existing.entries, `\n\n${combinedEntries}\n`);
+  return planContent.slice(0, match.index) + replacement + planContent.slice(match.index + existingBlock.length);
+}
+
+/** Append new blocks and merge older diary entries into existing role blocks. */
 export function appendBlocksToPlan(planContent, blocks) {
-  const base = planContent.replace(/\n*$/, '\n\n');
-  return base + blocks.join('\n');
+  let result = planContent;
+  const append = [];
+  for (const block of blocks) {
+    const merged = mergeIntoRoleBlock(result, block);
+    if (merged === null) {
+      append.push(block.replace(/(?:\r?\n)+$/, ''));
+    } else {
+      result = merged;
+    }
+  }
+  if (append.length === 0) return result;
+  return `${result.replace(/(?:\r?\n)*$/, '\n\n')}${append.join('\n\n')}\n`;
 }
 
 /**
  * Compute every move without writing. Returns [{ date, diaryPath, planPath,
  * planExists, roles, diaryAfter, planAfter }].
  */
-export function planMigration(vaultPath) {
+export function planMigration(vaultPath, plansDirectory = path.join(vaultPath, 'plans')) {
   const diaryDir = path.join(vaultPath, 'diary');
   if (!fs.existsSync(diaryDir)) {
     return [];
@@ -69,20 +110,53 @@ export function planMigration(vaultPath) {
       continue;
     }
     const date = match[1];
-    const planPath = path.join(vaultPath, getDailyPlanRelativePath(date));
+    const planPath = path.join(plansDirectory, path.basename(getDailyPlanRelativePath(date)));
     const planExists = fs.existsSync(planPath);
     const planBefore = planExists ? fs.readFileSync(planPath, 'utf8') : minimalDailyPlan(date);
+    const planOriginal = planExists ? planBefore : null;
     moves.push({
       date,
       diaryPath,
       planPath,
       planExists,
+      diaryBefore: diary,
+      planBefore: planOriginal,
       roles: blocks.map((block) => block.match(/^<!-- ROLE:([a-z0-9-]+):START -->/)[1]),
       diaryAfter: remainder,
       planAfter: appendBlocksToPlan(planBefore, blocks)
     });
   }
   return moves;
+}
+
+export function applyMigrationMoves(moves) {
+  for (const move of moves) {
+    withFileLocks([move.diaryPath, move.planPath], () => {
+      const currentDiary = fs.readFileSync(move.diaryPath, 'utf8');
+      let currentPlan = null;
+      try {
+        currentPlan = fs.readFileSync(move.planPath, 'utf8');
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      if (currentDiary !== move.diaryBefore || currentPlan !== move.planBefore) {
+        throw new Error(`Migration conflict for ${move.date}; no changes made to its source or plan`);
+      }
+
+      const planResult = writeFileAtomicCAS(move.planPath, move.planAfter, move.planBefore);
+      if (planResult.conflict) {
+        throw new Error(`Migration conflict writing ${move.planPath}; diary source was preserved`);
+      }
+      const diaryResult = writeFileAtomicCAS(move.diaryPath, move.diaryAfter, move.diaryBefore);
+      if (diaryResult.conflict) {
+        throw new Error(`Migration conflict clearing ${move.diaryPath}; diary source was preserved`);
+      }
+    });
+  }
+}
+
+export function isInvokedDirectly(argvPath, moduleUrl) {
+  return Boolean(argvPath) && path.resolve(argvPath) === fileURLToPath(moduleUrl);
 }
 
 function showDiff(label, before, after, outDir) {
@@ -117,7 +191,7 @@ async function main() {
   const options = program.opts();
 
   const vaultPath = getAbsoluteVaultPath();
-  const moves = planMigration(vaultPath);
+  const moves = planMigration(vaultPath, rolePlanDirectory(vaultPath));
   if (moves.length === 0) {
     console.log(colors.blue('ℹ') + ' No diary file holds a ROLE block; nothing to move.');
     return;
@@ -126,8 +200,8 @@ async function main() {
   if (!options.write) {
     fs.mkdirSync(options.out, { recursive: true });
     for (const move of moves) {
-      const diaryBefore = fs.readFileSync(move.diaryPath, 'utf8');
-      const planBefore = move.planExists ? fs.readFileSync(move.planPath, 'utf8') : '';
+      const diaryBefore = move.diaryBefore;
+      const planBefore = move.planBefore || '';
       showDiff(path.relative(vaultPath, move.diaryPath), diaryBefore, move.diaryAfter, options.out);
       showDiff(path.relative(vaultPath, move.planPath), planBefore, move.planAfter, options.out);
     }
@@ -140,9 +214,8 @@ async function main() {
     return;
   }
 
+  applyMigrationMoves(moves);
   for (const move of moves) {
-    writeFileAtomic(move.planPath, move.planAfter, 'utf-8');
-    writeFileAtomic(move.diaryPath, move.diaryAfter, 'utf-8');
     console.log(colors.green('✓') + ` ${move.date}: moved ${move.roles.join(', ')} → ${path.relative(vaultPath, move.planPath)}`);
   }
 
@@ -153,7 +226,7 @@ async function main() {
   }
 }
 
-const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+const invokedDirectly = isInvokedDirectly(process.argv[1], import.meta.url);
 if (invokedDirectly) {
   main().catch((error) => {
     console.error(colors.red('✗') + ` ${error.message}`);

@@ -3,21 +3,41 @@
  */
 
 import path from 'path';
-import { getTimezone } from '../../src/config.js';
+import { fileURLToPath } from 'url';
+import { getAbsoluteVaultPath, getFullConfig, getTimezone } from '../../src/config.js';
 import { getDailyPlanRelativePath } from '../../src/plan-utils.js';
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export function todayDateString(now = new Date()) {
   return now.toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
 }
 
-/** Vault-relative path of today's daily plan, e.g. "plans/2026_Q4_10_W42_16.md". */
-export function todayPlanRelativePath(now = new Date()) {
-  return getDailyPlanRelativePath(todayDateString(now));
+export function rolePlanDirectory(vaultPath, config = getFullConfig()) {
+  const sources = Object.values(config.plugins?.['markdown-plans'] || {});
+  const source = sources.find((item) => item?.enabled === true);
+  const configured = source?.plans_directory;
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(PROJECT_ROOT, configured);
+  }
+  if (process.env.VAULT_PATH) {
+    return path.resolve(PROJECT_ROOT, process.env.VAULT_PATH, 'plans');
+  }
+  return path.join(vaultPath, 'plans');
+}
+
+/** Path used by the web view for today's configured daily plan. */
+export function todayPlanRelativePath(now = new Date(), vaultPath = getAbsoluteVaultPath(), config = getFullConfig()) {
+  const directory = rolePlanDirectory(vaultPath, config);
+  const relativeDirectory = (path.relative(vaultPath, directory) || '.').split(path.sep).join('/');
+  return getDailyPlanRelativePath(todayDateString(now), relativeDirectory);
 }
 
 /** Absolute path of the daily plan that holds the role blocks for a date. */
-export function rolePlanFile(vaultPath, dateStr) {
-  return path.join(vaultPath, getDailyPlanRelativePath(dateStr));
+export function rolePlanFile(vaultPath, dateStr, config = getFullConfig()) {
+  const directory = rolePlanDirectory(vaultPath, config);
+  const filename = path.basename(getDailyPlanRelativePath(dateStr));
+  return path.join(directory, filename);
 }
 
 /**

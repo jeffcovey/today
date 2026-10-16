@@ -113,13 +113,19 @@ export function getPlanFilePath(date = new Date()) {
  * @param {string} dateStr - "YYYY-MM-DD"
  * @returns {string} Path like "plans/2026_Q4_10_W42_16.md"
  */
-export function getDailyPlanRelativePath(dateStr) {
+export function getDailyPlanRelativePath(dateStr, plansDirectory = 'plans') {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) {
     throw new Error(`Invalid date "${dateStr}": expected YYYY-MM-DD`);
   }
   const [year, month, day] = dateStr.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth) {
+    throw new Error(`Invalid date "${dateStr}": expected a real calendar date`);
+  }
   const components = getDateComponents(new Date(year, month - 1, day, 12));
-  return getDailyPlanPath(components).replace(/^vault\//, '');
+  const filename = getDailyPlanPath(components).replace(/^vault\//, '').replace(/^plans\//, '');
+  const directory = String(plansDirectory).replace(/\/+$/, '');
+  return directory && directory !== '.' ? `${directory}/${filename}` : filename;
 }
 
 /**

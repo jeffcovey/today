@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { extractRoleBlocks } from '../../src/diary-role-blocks.js';
 import { getDailyPlanRelativePath } from '../../src/plan-utils.js';
+import { rolePlanDirectory } from './plan-file.js';
 
 const REPLY_RE = /^\s*(?:->|→)\s*[a-z0-9][a-z0-9-]*\s*:/;
 
@@ -22,13 +23,13 @@ function shiftDate(date, days) {
  * `days` days ending at `today`. Oldest first, file order within a day.
  * Returns [{ date, role, content }].
  */
-export function collectRoleHistory({ vaultPath, roles, days = 14, today }) {
+export function collectRoleHistory({ vaultPath, roles, days = 14, today, plansDirectory = rolePlanDirectory(vaultPath) }) {
   const wanted = new Set(roles);
   const history = [];
 
   for (let offset = days - 1; offset >= 0; offset--) {
     const date = shiftDate(today, -offset);
-    const file = path.join(vaultPath, getDailyPlanRelativePath(date));
+    const file = path.join(plansDirectory, path.basename(getDailyPlanRelativePath(date)));
     if (!fs.existsSync(file)) {
       continue;
     }

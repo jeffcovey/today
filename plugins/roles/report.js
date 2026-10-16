@@ -20,6 +20,7 @@ import path from 'path';
 import { program } from 'commander';
 import { getAbsoluteVaultPath } from '../../src/config.js';
 import { colors } from '../../src/cli-utils.js';
+import { getDailyPlanRelativePath } from '../../src/plan-utils.js';
 import { appendRoleReport, amendRoleEntry, setRoleCheckboxState, rolesPluginEnabled, ROLE_STATUSES, MAX_REPORT_LENGTH } from './block-writer.js';
 import { minimalDailyPlan, rolePlanFile, todayDateString } from './plan-file.js';
 
@@ -61,8 +62,10 @@ program
     const text = message !== undefined ? message : flips.length > 0 ? '' : await readStdin();
 
     const date = options.date || todayDateString();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      console.error(colors.red('✗') + ` Invalid date "${options.date}": expected YYYY-MM-DD`);
+    try {
+      getDailyPlanRelativePath(date);
+    } catch {
+      console.error(colors.red('✗') + ` Invalid date "${date}": expected a real calendar date in YYYY-MM-DD format`);
       process.exit(1);
     }
 

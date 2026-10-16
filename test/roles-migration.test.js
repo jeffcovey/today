@@ -8,10 +8,12 @@ import {
   liftRoleBlocks,
   appendBlocksToPlan,
   planMigration,
-  dropStaleDiaryRows
+  applyMigrationMoves,
+  dropStaleDiaryRows,
+  isInvokedDirectly
 } from '../plugins/roles/migrate-diary-to-plans.js';
 import { getDailyPlanRelativePath } from '../src/plan-utils.js';
-import { minimalDailyPlan, rolePlanFile, todayPlanRelativePath } from '../plugins/roles/plan-file.js';
+import { minimalDailyPlan, rolePlanDirectory, rolePlanFile, todayPlanRelativePath } from '../plugins/roles/plan-file.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -70,7 +72,18 @@ describe('plan-file helpers', () => {
     expect(getDailyPlanRelativePath('2026-10-11')).toBe('plans/2026_Q4_10_W41_11.md');
     expect(getDailyPlanRelativePath('2026-01-01')).toBe('plans/2026_Q1_01_W01_01.md');
     expect(() => getDailyPlanRelativePath('16/10/2026')).toThrow(/YYYY-MM-DD/);
+    expect(() => getDailyPlanRelativePath('2026-02-31')).toThrow(/real calendar date/);
     expect(rolePlanFile('/v', '2026-10-16')).toBe('/v/plans/2026_Q4_10_W42_16.md');
+  });
+
+  test('role paths use the enabled markdown-plans directory setting', () => {
+    const configured = path.join(os.tmpdir(), 'custom-plans');
+    const config = { plugins: { 'markdown-plans': { default: { enabled: true, plans_directory: configured } } } };
+    expect(rolePlanDirectory('/v', config)).toBe(configured);
+    expect(rolePlanFile('/v', '2026-10-16', config)).toBe(path.join(configured, '2026_Q4_10_W42_16.md'));
+    expect(todayPlanRelativePath(new Date('2026-10-16T12:00:00Z'), '/v', {
+      plugins: { 'markdown-plans': { default: { enabled: true, plans_directory: path.join('/v', 'custom') } } }
+    })).toBe('custom/2026_Q4_10_W42_16.md');
   });
 
   test("today's plan path follows the configured zone", () => {
@@ -91,12 +104,23 @@ describe('plan-file helpers', () => {
 });
 
 describe('liftRoleBlocks / appendBlocksToPlan', () => {
-  test('lifts every block verbatim and leaves the diary without a gap', () => {
+  test('lifts every block verbatim without normalizing unrelated diary content', () => {
     const { blocks, remainder } = liftRoleBlocks(DIARY);
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toBe(BLOCK);
     expect(blocks[1]).toContain('Books balanced.');
-    expect(remainder).toBe('---\ndate: 2026-10-13\n---\n\n## Journal\n\n### 21:00\n\nA real diary line.\n');
+    expect(remainder).toContain('A real diary line.');
+    expect(remainder).not.toContain('ROLE:');
+    const preserved = '## Journal\n\n### 21:00\n\nA real diary line.\n\n';
+    expect(remainder).toContain(preserved);
+  });
+
+  test('lifts CRLF role blocks and preserves blank lines outside them', () => {
+    const crlfBlock = BLOCK.replace(/\n/g, '\r\n');
+    const source = `## Journal\r\n\r\n\`\`\`text\r\n\r\n\r\n\`\`\`\r\n\r\n${crlfBlock}`;
+    const { blocks, remainder } = liftRoleBlocks(source);
+    expect(blocks).toEqual([crlfBlock]);
+    expect(remainder).toBe('## Journal\r\n\r\n```text\r\n\r\n\r\n```\r\n\r\n');
   });
 
   test('appends blocks at the end of the plan, one blank line apart', () => {
@@ -105,6 +129,33 @@ describe('liftRoleBlocks / appendBlocksToPlan', () => {
     expect(after.startsWith(PLAN.trimEnd() + '\n\n<!-- ROLE:secretary:START -->')).toBe(true);
     expect(after).toContain('<!-- ROLE:secretary:END -->\n\n<!-- ROLE:cpa:START -->');
     expect(after.endsWith('<!-- ROLE:cpa:END -->\n')).toBe(true);
+  });
+
+  test('merges an older overlapping diary block before the plan entries, preserving replies and retry safety', () => {
+    const current = [
+      PLAN.trimEnd(),
+      '<!-- ROLE:secretary:START -->',
+      '## 🤖 Secretary',
+      '',
+      '### 05:00',
+      '',
+      'New plan entry.',
+      '',
+      '-> secretary: Keep this.',
+      '<!-- ROLE:secretary:END -->',
+      ''
+    ].join('\n');
+    const merged = appendBlocksToPlan(current, [BLOCK]);
+    expect(merged.match(/<!-- ROLE:secretary:START -->/g)).toHaveLength(1);
+    expect(merged.match(/<!-- ROLE:secretary:END -->/g)).toHaveLength(1);
+    expect(merged.indexOf('### 04:07')).toBeLessThan(merged.indexOf('### 05:00'));
+    expect(merged).toContain('-> secretary: Drop this.');
+    expect(merged).toContain('-> secretary: Keep this.');
+    expect(appendBlocksToPlan(merged, [BLOCK])).toBe(merged);
+  });
+
+  test('direct invocation comparison decodes escaped file URLs', () => {
+    expect(isInvokedDirectly('/tmp/a b/migrate.js', 'file:///tmp/a%20b/migrate.js')).toBe(true);
   });
 });
 
@@ -137,6 +188,27 @@ describe('migration', () => {
     expect(moves[1].planAfter.startsWith(minimalDailyPlan('2026-10-15'))).toBe(true);
     expect(fs.readFileSync(path.join(vault, 'diary', '2026-10-13.md'), 'utf8')).toBe(before);
     expect(fs.existsSync(path.join(vault, getDailyPlanRelativePath('2026-10-15')))).toBe(false);
+  });
+
+  test.each(['diary', 'plan'])('write aborts and preserves both files when the %s snapshot changed', (changedFile) => {
+    const moves = planMigration(vault);
+    const diaryPath = path.join(vault, 'diary', '2026-10-13.md');
+    const planPath = path.join(vault, getDailyPlanRelativePath('2026-10-13'));
+    const changedDiary = `${DIARY}\nUser edit.\n`;
+    const changedPlan = `${PLAN}\nUser edit.\n`;
+    if (changedFile === 'diary') fs.writeFileSync(diaryPath, changedDiary);
+    else fs.writeFileSync(planPath, changedPlan);
+    const beforeDiary = fs.readFileSync(diaryPath, 'utf8');
+    const beforePlan = fs.readFileSync(planPath, 'utf8');
+    expect(() => applyMigrationMoves([moves[0]])).toThrow(/Migration conflict/);
+    expect(fs.readFileSync(planPath, 'utf8')).toBe(beforePlan);
+    expect(fs.readFileSync(diaryPath, 'utf8')).toBe(beforeDiary);
+  });
+
+  test('planMigration targets the configured plans directory', () => {
+    const customPlans = path.join(vault, 'custom-plans');
+    const moves = planMigration(vault, customPlans);
+    expect(moves[0].planPath).toBe(path.join(customPlans, '2026_Q4_10_W42_13.md'));
   });
 
   function run(...args) {

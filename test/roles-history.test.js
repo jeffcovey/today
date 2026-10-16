@@ -59,6 +59,24 @@ describe('collectRoleHistory', () => {
     const history = collectRoleHistory({ vaultPath, roles: ['secretary'], days: 3, today: '2026-10-15' });
     expect(history.map((h) => h.date)).toEqual(['2026-10-13']);
   });
+
+  test('reads history from an explicitly configured plans directory', () => {
+    const customPlans = path.join(vaultPath, 'custom-plans');
+    fs.mkdirSync(customPlans);
+    fs.writeFileSync(
+      path.join(customPlans, path.basename(getDailyPlanRelativePath('2026-10-15'))),
+      block('secretary', '### 08:00\n\nFrom custom plans.')
+    );
+    const history = collectRoleHistory({
+      vaultPath,
+      plansDirectory: customPlans,
+      roles: ['secretary'],
+      days: 1,
+      today: '2026-10-15'
+    });
+    expect(history).toHaveLength(1);
+    expect(history[0].content).toContain('From custom plans.');
+  });
 });
 
 describe('formatRoleHistory', () => {

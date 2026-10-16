@@ -9,6 +9,7 @@ import {
   STAGE_MAPPING,
   getStageInfo,
   getDailyPlanPath,
+  getDailyPlanRelativePath,
   getPlanFilePath,
   getPlanFileHierarchy,
   walkMarkdownFiles,
@@ -22,6 +23,11 @@ import {
 } from '../src/plan-utils.js';
 
 describe('Plan Utils', () => {
+  test('daily plan paths reject impossible calendar dates and accept custom directories', () => {
+    expect(() => getDailyPlanRelativePath('2026-02-31')).toThrow(/real calendar date/);
+    expect(getDailyPlanRelativePath('2026-10-16', 'custom/daily')).toBe('custom/daily/2026_Q4_10_W42_16.md');
+  });
+
   describe('getQuarter', () => {
     test('should return Q1 for months 1-3', () => {
       expect(getQuarter(1)).toBe('Q1');
