@@ -35,12 +35,16 @@ longest it may go without a report, e.g. "or a week has passed">.
 
 ## Run
 
-1. Read today's diary for your block and any reply lines addressed to you
+1. Review the last two weeks with `bin/diary role <role-name> --days 14`:
+   your own blocks, the chief of staff's, and the user's reply lines
    (lines like `-> <role-name>: ...` — accept both the plain `->` and the
-   typographic `→` as the arrow). A reply can span several lines, up to
-   the next entry heading or reply. Replies outrank everything below.
-2. Check your sources (see Owns) for anything new since your last report —
-   your past reports are in previous days' diary files (`bin/diary search`).
+   typographic `→` as the arrow; a reply can span several lines, up to the
+   next entry heading or reply). Precedence: the user's replies first
+   (today's are your work order for this run), then the chief of staff,
+   then your own earlier entries; within a level the later statement wins.
+   A decline from the user stands until the user reverses it — a new
+   email or an approaching date does not reopen it.
+2. Check your sources (see Owns) for anything new since your last report.
 3. Do the work you may do alone; note anything that belongs to the user.
 4. Settle your earlier checkboxes before writing: anything now done gets
    `plugins/roles/report.js <role-name> --check "<item text>"`, anything no longer
@@ -48,7 +52,9 @@ longest it may go without a report, e.g. "or a week has passed">.
    day's diary, include that file's date with `--date`. Never restate a
    superseded item. Flip one checkbox per invocation; flips are applied
    immediately, and a later failure does not undo an earlier successful
-   flip.
+   flip. An earlier entry of yours that is now wrong or outdated gets
+   rewritten in place with `--date <day> --amend <HH:MM> "<corrected
+   text>"`; the user's replies and settled checkboxes in it are kept.
 5. Report with `plugins/roles/report.js <role-name> --status <ok|blocked|needs-attention>`
    following `roles/REPORTING.md` in the vault: new information only, as a
    bold headline, then new `- [ ]` items (an actionable ask for the user is
@@ -60,12 +66,18 @@ longest it may go without a report, e.g. "or a week has passed">.
 ## Red flags
 
 - Never edit diary files directly — only `plugins/roles/report.js`. The checkbox
-  flip (`--check`/`--cancel`) is the only change ever made to earlier
-  content; a checkbox the user ticked themselves means "done" too.
+  flip (`--check`/`--cancel`) and `--amend` of your own entries are the only
+  changes ever made to earlier content; a checkbox the user ticked
+  themselves means "done" too.
 - Current state is your first full report of the day, updated by each later
   entry that day (a later entry wins where they conflict), plus every
   still-open `- [ ]` checkbox anywhere in your block. Before your first
-  report of the day, the previous day's state carries over the same way.
+  report of the day, the previous day's state carries over the same way,
+  and what the user and the chief of staff said in the last two weeks
+  still governs it.
+- Never re-raise an item the user declined, whatever new email or date
+  prompts it. If you can't tell whether they did, run
+  `bin/diary role <role-name> --days 14` and look.
 - Keep checkbox flips separate from report appends; a failed later operation
   does not roll back an earlier successful mutation.
 - A tool failure is reported as `--status blocked`, not worked around.

@@ -43,6 +43,11 @@ It is the one role exempt from dispatch.
    `- [ ]` checkbox anywhere in the block. Before its first report today,
    the previous day's state carries over the same way. A checked (`[x]`) or
    cancelled (`[-]`) checkbox is settled.
+
+   Then review the last two weeks with `bin/diary role chief-of-staff
+   --days 14`: your own entries and every reply the user addressed to you.
+   What the user said there outranks everything a role reports; a later
+   statement wins over an earlier one.
 2. List the roster. Launch a role only for a reason you can name:
    - a `->` reply addressed to it is waiting;
    - something its **Run when** line names has happened (each role file
@@ -81,14 +86,25 @@ It is the one role exempt from dispatch.
      watching for next run.
 
    Settle your own earlier checkboxes first, if you have any, with
-   `--check` / `--cancel`, one flip per invocation.
+   `--check` / `--cancel`, one flip per invocation. If one of your earlier
+   summaries is now wrong, amend it in place with `--date <day> --amend
+   <HH:MM>` rather than leaving it to mislead.
+
+   Before relaying a role's item, make sure the user hasn't already
+   answered it: if it looks familiar, run `bin/diary role <role> --days 14`
+   and look for the user's `->` lines about it. An item the user declined
+   in the last two weeks stays out of your summary, however the role
+   phrased it this time; note the correction in your details callout.
 
 ## Red flags
 
 - Role reports are leads, not facts — verify anything surprising at its
   source before putting it in front of the user. When two roles disagree on
   a fact, check the source and say which is right in your details callout.
-- Never edit another role's block or any diary content by hand.
+- Never edit another role's block or any diary content by hand. Your own
+  earlier entries change only through `--check`, `--cancel`, and `--amend`.
+- A role re-raising something the user already declined is a role error,
+  not news: leave it out of the summary and say so in your run notes.
 - Never launch a role twice in one run.
 - The diary report is your only output channel. You may run with shell
   access on a machine holding credentials for channels that reach the
