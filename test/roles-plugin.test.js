@@ -207,3 +207,54 @@ describe('roles plugin report.js', () => {
     expect(diary).toContain('Books balanced.');
   });
 });
+
+describe('roles plugin report.js --amend', () => {
+  let dir;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-amend-'));
+    fs.mkdirSync(path.join(dir, 'vault', 'diary'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'config.toml'), [
+      `vault_path = ${JSON.stringify(path.relative(REPO_ROOT, path.join(dir, 'vault')))}`,
+      'timezone = "UTC"',
+      '',
+      '[plugins.roles.default]',
+      'enabled = true',
+      ''
+    ].join('\n'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  function report(...args) {
+    return spawnSync(process.execPath, [REPORT_JS, 'secretary', ...args, '--date', '2026-10-15'], {
+      env: cleanEnv({ TODAY_CONFIG: path.join(dir, 'config.toml') }),
+      encoding: 'utf8'
+    });
+  }
+
+  test('rewrites an earlier entry in place and reports what it kept', () => {
+    expect(report('**Greeting to send today.**\n\n- [ ] → Jeff: send it').status).toBe(0);
+    const diary = path.join(dir, 'vault', 'diary', '2026-10-15.md');
+    const time = fs.readFileSync(diary, 'utf8').match(/### (\d{2}:\d{2})/)[1];
+    expect(report('--cancel', 'send it').status).toBe(0);
+
+    const result = report('--amend', time, '**Jeff declined the greeting.**\n\n- [ ] → Jeff: send it');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/Amended secretary entry ### \d{2}:\d{2} .*kept 1 settled checkbox/);
+
+    const after = fs.readFileSync(diary, 'utf8');
+    expect(after).not.toContain('Greeting to send today');
+    expect(after).toContain('**Jeff declined the greeting.**');
+    expect(after).toContain('- [-] → Jeff: send it');
+    expect(after).toMatch(/\*Amended \d{4}-\d{2}-\d{2} \d{2}:\d{2}\.\*/);
+  });
+
+  test('fails cleanly when the entry does not exist', () => {
+    const result = report('--amend', '23:59', 'nothing here');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/does not exist|No 23:59 entry/);
+  });
+});

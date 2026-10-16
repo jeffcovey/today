@@ -7,7 +7,10 @@ runs or installs unless it is enabled. The diary is the whole interaction model:
 blocks, the user replies inline from any device, and the next run reads the
 replies. Because diary entries already feed AI context, every `bin/today`
 session sees the reports for free, and past diary files are each role's
-permanent memory.
+permanent memory: every run starts by reading its own blocks and the chief
+of staff's from the last two weeks (`bin/diary role <name> --days 14`),
+where the user's replies outrank the chief's entries, which outrank the
+role's own.
 
 See [jeffcovey/today#573](https://github.com/jeffcovey/today/issues/573) for
 the original design discussion.
@@ -61,6 +64,14 @@ it by hand.
   they conflict), plus every still-open `- [ ]` checkbox in its block. Before
   its first report of the day, the previous day's state carries over the same
   way.
+- **Decisions stick.** Each run begins with `bin/diary role <name> --days 14`,
+  which prints the role's own blocks and the chief of staff's from the last
+  two weeks, oldest first, with the user's `->` replies where they were
+  written. Precedence: the user's replies, then the chief of staff, then the
+  role itself; within a level the later statement wins. A decline from the
+  user stands until the user reverses it — a fresh email or an approaching
+  date does not reopen the item. An entry that is now wrong or outdated is
+  amended in place (`--amend`, below) rather than left standing or restated.
 - **Headline, checkboxes, then a toggle.** One bold headline sentence, then
   any new `- [ ]` items, then everything else inside a collapsed callout
   (`> [!info]- Details`, followed by an empty `>` line, which the web view
@@ -98,13 +109,15 @@ writes them). Properties:
 - **Parsed.** Each `### HH:MM` entry inside a block becomes a diary table
   row with `metadata.type: "role"` and `metadata.role: "<name>"` — visible
   to `bin/diary today`, `bin/diary search`, and AI context.
-- **Append-only.** New entries are inserted before the END marker; existing
-  lines are never rewritten, so replies the user writes inside a block
-  survive every later report. The one exception is a checkbox state flip
-  (below) — a single-character substitution that never touches prose.
+- **Append-only, with two guarded exceptions.** New entries are inserted
+  before the END marker, and what the user writes inside a block is never
+  rewritten, so their replies survive every later report. A role may flip
+  the state of one of its own checkboxes, and may amend one of its own
+  entries with `--amend` (below), which keeps the user's replies and settled
+  checkboxes in that entry untouched.
 
-Replies use routing lines: `-> cpa: yes, do it` inside (or near) a role's
-block is picked up on the next run. A reply can run over several lines
+Replies use routing lines: `-> cpa: yes, do it` inside a role's block is
+picked up on the next run. A reply can run over several lines
 (paragraphs, bullet lists): it continues until the next `### HH:MM` entry,
 the next reply, or the end of the block.
 
@@ -165,13 +178,29 @@ operations apply sequentially, not transactionally: a later failure does
 not undo an earlier successful flip. Prefer one flip-only invocation at a
 time, then write the report separately. To settle an item in an earlier
 day's file, pass that file's date with `--date`; report separately to
-today's file. The flip is the **only**
-permitted mutation of existing block content: a single state-character
-substitution, only inside the role's own block, and the match must
-identify exactly one open checkbox — zero matches, an already-settled
-match, or an ambiguous match is an error that leaves the file untouched.
-Prose, including user replies, stays append-only; freehand edits of
-earlier entries (strikethroughs included) remain forbidden.
+today's file. The flip is a single state-character substitution, only
+inside the role's own block, and the match must identify exactly one open
+checkbox — zero matches, an already-settled match, or an ambiguous match is
+an error that leaves the file untouched.
+
+**Amending an entry.** A headline that was right at 04:00 ("greeting to
+send today") keeps being read after the user has declined it, by the web
+card, the AI context, and the role's own next run. So a role may rewrite
+one of its own entries in place:
+
+```bash
+plugins/roles/report.js secretary --date 2026-10-15 --amend 16:10 "**Nothing to send: the user declined the greeting.**"
+```
+
+The entry is found by its `### HH:MM` heading inside the role's own block
+(missing or ambiguous is an error). Its text is replaced; the user's reply
+paragraphs inside it are kept verbatim after the new text; a checkbox the
+user ticked or that was cancelled keeps its state when the new text repeats
+the item; the status line is kept unless `--status` is given; and the entry
+gains a `*Amended <date> <time>.*` line so the record shows it changed.
+Those are the only permitted mutations of existing block content. User
+replies are never rewritten, and freehand edits of earlier entries
+(strikethroughs included) remain forbidden.
 
 ## Writing reports: plugins/roles/report.js
 
@@ -191,7 +220,20 @@ would corrupt the file's block structure), creates today's diary file and
 the role's block when missing, and writes atomically with compare-and-swap
 retries. Statuses: `ok`, `blocked`, `needs-attention`, `quiet`.
 `--check "<text>"` / `--cancel "<text>"` flip one open checkbox in the
-role's own block (see **Snapshots and checkboxes**).
+role's own block, and `--amend <HH:MM>` rewrites one of the role's own
+entries in place (see **Snapshots and checkboxes**).
+
+## Reading the past: bin/diary role
+
+```bash
+bin/diary role secretary            # secretary + chief-of-staff blocks, last 14 days
+bin/diary role cpa --days 7 --no-chief
+```
+
+Prints the blocks straight from the diary files (not the database), oldest
+first, each verbatim with the user's reply lines in place, under a header
+that states the precedence rule. The chief role comes from the plugin's
+`chief_role` setting. This is the first command every role runs.
 
 ## Running the staff
 
