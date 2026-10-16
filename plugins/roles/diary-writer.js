@@ -267,7 +267,7 @@ const FENCE_CLOSE_RE = /^ {0,3}(`+|~+)[ \t]*$/;
 function linesInsideFences(lines) {
   let fence = null;
   return lines.map((line) => {
-    const fenceLine = line.replace(/^(?: {0,3}>[ \t]?)+/, '');
+    const fenceLine = line.replace(/\r$/, '').replace(/^(?: {0,3}>[ \t]?)+/, '');
     let insideFence = Boolean(fence);
     if (fence) {
       const closingFence = fenceLine.match(FENCE_CLOSE_RE);

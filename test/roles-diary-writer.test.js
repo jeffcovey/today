@@ -605,7 +605,11 @@ describe('amendRoleEntry', () => {
 
   test('preserves settled states across replacement states and CRLF diary lines', () => {
     setRoleCheckboxState(filePath, 'secretary', 'Buy the tickets', 'x');
-    const crlf = fs.readFileSync(filePath, 'utf8').replace(/\n/g, '\r\n');
+    const withFence = fs.readFileSync(filePath, 'utf8').replace(
+      '-> secretary: I don\'t even remember who Billie is. Drop this.\n',
+      '-> secretary: I don\'t even remember who Billie is. Drop this.\n\n```markdown\n### 09:00\n```\n'
+    );
+    const crlf = withFence.replace(/\n/g, '\r\n');
     fs.writeFileSync(filePath, crlf);
 
     const result = amendRoleEntry(filePath, 'secretary', '04:07', [
@@ -618,6 +622,7 @@ describe('amendRoleEntry', () => {
     expect(amended).toContain('- [-] → Jeff: Send Billie a birthday greeting\r');
     expect(amended).toContain('- [x] → Jeff: Buy the tickets');
     expect(amended).toContain('-> secretary: I don\'t even remember who Billie is. Drop this.\r\n');
+    expect(secretaryBlock()).toContain('### 08:05\r\n\r\nSecond entry stays.');
   });
 
   test('a new status replaces the old one; amending twice leaves one stamp', () => {
