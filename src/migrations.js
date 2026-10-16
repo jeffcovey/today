@@ -2,6 +2,7 @@
 // Schema definitions are in plugin-schemas.js (single source of truth)
 
 import { schemas, getSqlColumns, getTableName, getIndexes } from './plugin-schemas.js';
+import { ensureAccountBalancesTable } from './account-balances.js';
 
 /**
  * System migrations (not tied to plugin types)
@@ -148,6 +149,16 @@ const systemMigrations = [
                ON financial_transactions(dedup_key)`);
       db.exec(`CREATE INDEX IF NOT EXISTS idx_financial_transactions_superseded_by
                ON financial_transactions(superseded_by)`);
+    }
+  },
+  {
+    version: 109,
+    description: 'Create account_balances table for source-reported account balances',
+    fn: (db) => {
+      // financial_transactions keeps only a retention window, so its sum is not
+      // a balance (issue #608). DDL lives in account-balances.js so the plugin
+      // that writes the table can create it too.
+      ensureAccountBalancesTable(db);
     }
   }
 ];

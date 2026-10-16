@@ -48,6 +48,10 @@ How it works:
   or a bank import merged into a scheduled or manual entry
 - YNAB's delta feed also reports the hidden half of a matched import (its
   import_payee_name is a JSON blob); those records are dropped, not stored
+- Each sync also stores every open account's live balance from YNAB (the
+  /accounts endpoint) in the account_balances table, replacing the previous
+  snapshot. bin/finance accounts shows these; a transaction sum over the
+  retention window would not be a balance
 - Each transaction has a stable YNAB UUID, so duplicate-free INSERT OR REPLACE
   reconciliation works across syncs with no collision risk
 
@@ -80,6 +84,12 @@ Spending by category this month:
     AND date >= DATE('now', 'start of month')
   GROUP BY category_group, category
   ORDER BY total ASC
+
+Account balances: the transaction table keeps only retention_days of history, so
+SUM(amount) is NOT an account balance. YNAB's own balances are stored on every sync
+in account_balances (open accounts only; amounts in dollars):
+  SELECT account, balance, cleared_balance, type, as_of FROM account_balances
+  WHERE source LIKE 'ynab-api/%' ORDER BY account
 
 Commands: bin/finance recent, bin/finance summary, bin/finance categories, bin/finance accounts
 """
