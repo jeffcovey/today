@@ -24,6 +24,9 @@ import { execSync } from 'child_process';
 import { schemas, getPluginTypes } from '../../src/plugin-schemas.js';
 import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { withFileLocks } from '../../src/file-lock.js';
+import { extractRoleSections, removeRoleBlocks } from './role-context.js';
+import { updateTomorrowPlan } from './plan-updates.js';
 import { getTimezone } from '../../src/config.js';
 import { getLocalDayUTCRange } from '../../src/date-utils.js';
 
@@ -211,6 +214,24 @@ function parseFrontmatter(content) {
  * mid-restore. Freshly templated plans always have frontmatter (every template
  * starts with a `---` block), so normal operation is unaffected.
  */
+/**
+ * Read a plan file, transform it, and write it back only if nothing else
+ * changed the file meanwhile; retry a few times on conflict. Role agents
+ * append to the same files, so a plain overwrite could drop their report.
+ * Returns true when the file was changed.
+ */
+function rewritePlanFile(filePath, transform) {
+  return withFileLocks([filePath], () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const original = fs.readFileSync(filePath, 'utf-8');
+      const updated = transform(original);
+      if (updated === null || updated === original) return false;
+      if (!writeFileAtomicCAS(filePath, updated, original, 'utf-8').conflict) return true;
+    }
+    return false;
+  });
+}
+
 function planFileIsIntact(content) {
   if (!content || content.trim() === '') return false;
   const { frontmatter } = parseFrontmatter(content);
@@ -280,7 +301,7 @@ function extractSections(body) {
  */
 function formatPlanContext(planInfo, content) {
   const { frontmatter, body } = parseFrontmatter(content);
-  const sections = extractSections(body);
+  const sections = extractSections(planInfo.type === 'day' ? removeRoleBlocks(body) : body);
 
   const lines = [];
   lines.push(`### ${planInfo.label}`);
@@ -341,6 +362,19 @@ function formatPlanContext(planInfo, content) {
       lines.push('');
       lines.push(`**${sectionName}:**`);
       lines.push(sections[sectionName]);
+    }
+  }
+
+  // Role-agent blocks live at the end of a day plan as "## 🤖 <Role>"
+  // sections: headline, open asks, and the user's replies (details callouts
+  // are stripped with the other blockquotes above).
+  if (planInfo.type === 'day') {
+    for (const section of extractRoleSections(body)) {
+      const roleContent = cleanContent(section.content);
+      if (!roleContent) continue;
+      lines.push('');
+      lines.push(`**Staff — ${section.title}:**`);
+      lines.push(roleContent);
     }
   }
 
@@ -984,7 +1018,8 @@ function needsSummary(filePath) {
  * Add summary to a plan file's frontmatter and add display callout
  */
 function addSummaryToFile(filePath, summary) {
-  let content = fs.readFileSync(filePath, 'utf-8');
+  rewritePlanFile(filePath, (original) => {
+  let content = original;
 
   // Escape quotes in summary for YAML
   const escapedSummary = summary.replace(/"/g, '\\"');
@@ -1012,7 +1047,8 @@ function addSummaryToFile(filePath, summary) {
     );
   }
 
-  writeFileAtomic(filePath, content, 'utf-8');
+  return content;
+  });
 }
 
 /**
@@ -1042,8 +1078,7 @@ function addSummaryCalloutToPastFiles(today, maxDaysBack = 7) {
       `${summaryCallout}\n<!-- /TODAY_FOCUS -->`
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       added.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1114,8 +1149,7 @@ function fixDoneTodayInPastFiles(today, maxDaysBack = 7) {
       `\`\`\`tasks\n$1done on ${dateStr}\n`
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       fixed.push({
         file: path.basename(planInfo.day.path),
         date: dateStr,
@@ -1151,8 +1185,7 @@ function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
       ''
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1191,8 +1224,7 @@ function removeEmptyReflectionFromPastFiles(today, maxDaysBack = 7) {
     // Remove the unedited reflection section
     const newContent = content.replace(emptyReflectionPattern, '');
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1518,48 +1550,6 @@ Keep it concise and actionable. Tasks should be specific and achievable.`;
   } catch (error) {
     return null;
   }
-}
-
-/**
- * Update tomorrow's plan file with AI suggestions
- */
-function updateTomorrowPlan(filePath, suggestions) {
-  if (!suggestions || (!suggestions.focus && !suggestions.priorities)) return false;
-
-  let content = fs.readFileSync(filePath, 'utf-8');
-  let modified = false;
-
-  // Update TODAY_FOCUS section
-  if (suggestions.focus) {
-    const focusReplacement = `<!-- TODAY_FOCUS: Day theme and focus area -->\n## 🎯 Today's Focus\n\n${suggestions.focus}\n\n<!-- /TODAY_FOCUS -->`;
-    const newContent = content.replace(
-      /<!-- TODAY_FOCUS:.*?-->\s*## 🎯 Today's Focus\s*<!-- \/TODAY_FOCUS -->/s,
-      focusReplacement
-    );
-    if (newContent !== content) {
-      content = newContent;
-      modified = true;
-    }
-  }
-
-  // Update TOP_PRIORITIES section
-  if (suggestions.priorities) {
-    const prioritiesReplacement = `<!-- TOP_PRIORITIES: Auto-generated from database -->\n## 📋 Top Priorities\n\n${suggestions.priorities}\n\n<!-- /TOP_PRIORITIES -->`;
-    const newContent = content.replace(
-      /<!-- TOP_PRIORITIES:.*?-->\s*## 📋 Top Priorities\s*(?:\{\{PRIORITIES_FROM_DATABASE\}\})?\s*<!-- \/TOP_PRIORITIES -->/s,
-      prioritiesReplacement
-    );
-    if (newContent !== content) {
-      content = newContent;
-      modified = true;
-    }
-  }
-
-  if (modified) {
-    writeFileAtomic(filePath, content, 'utf-8');
-  }
-
-  return modified;
 }
 
 /**

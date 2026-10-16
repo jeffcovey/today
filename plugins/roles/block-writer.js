@@ -1,7 +1,7 @@
 /**
- * Writes role-agent reports into the day's diary, inside the durable ROLE
- * marker blocks defined in src/diary-role-blocks.js. Used by report.js, the
- * only way roles write to the diary.
+ * Writes role-agent reports into the day's plan file, inside the durable
+ * ROLE marker blocks defined in src/diary-role-blocks.js. Used by report.js,
+ * the only way roles write to the vault.
  *
  * Content inside a block is append-only: new entries are inserted before the
  * END marker, and existing lines (including the user's replies) are never
@@ -11,6 +11,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { acquireFileLock as acquireDiaryLock, releaseFileLock as releaseDiaryLock } from '../../src/file-lock.js';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 import { ROLE_NAME_RE, roleStartMarker, roleEndMarker } from '../../src/diary-role-blocks.js';
 import { getFullConfig, getTimezone } from '../../src/config.js';
@@ -21,9 +22,6 @@ export const MAX_ROLE_TITLE_LENGTH = 80;
 export const ROLE_STATUSES = ['ok', 'blocked', 'needs-attention', 'quiet'];
 
 const CAS_RETRIES = 3;
-const LOCK_RETRIES = 20;
-const LOCK_RETRY_DELAY_MS = 50;
-const STALE_LOCK_TIMEOUT_MS = 10_000;
 
 /**
  * Validate a role report before writing. Returns an array of error strings
@@ -111,58 +109,6 @@ function localTime(date = new Date()) {
   return date.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
 }
 
-function acquireDiaryLock(lockPath) {
-  for (let attempt = 0; attempt <= LOCK_RETRIES; attempt++) {
-    let fd;
-    try {
-      fd = fs.openSync(lockPath, 'wx');
-      fs.writeFileSync(fd, `${process.pid}\n${Date.now()}`);
-      const stat = fs.fstatSync(fd);
-      fs.closeSync(fd);
-      fd = undefined;
-      return stat;
-    } catch (error) {
-      if (fd !== undefined) {
-        try {
-          fs.closeSync(fd);
-        } catch {
-          // The descriptor may already be closed.
-        }
-        try {
-          fs.unlinkSync(lockPath);
-        } catch {
-          // The lock may already have been removed.
-        }
-      }
-      if (error.code !== 'EEXIST') {
-        throw error;
-      }
-
-      try {
-        const stat = fs.statSync(lockPath);
-        if (Date.now() - stat.mtimeMs > STALE_LOCK_TIMEOUT_MS) {
-          const current = fs.statSync(lockPath);
-          if (current.dev === stat.dev && current.ino === stat.ino) {
-            fs.unlinkSync(lockPath);
-            continue;
-          }
-        }
-      } catch (statError) {
-        if (statError.code === 'ENOENT') {
-          continue;
-        }
-        throw statError;
-      }
-
-      if (attempt < LOCK_RETRIES) {
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_RETRY_DELAY_MS);
-      }
-    }
-  }
-
-  throw new Error(`Timed out acquiring diary lock ${lockPath}`);
-}
-
 export const CHECKBOX_STATES = ['x', '-'];
 
 /**
@@ -201,7 +147,7 @@ export function setRoleCheckboxState(filePath, role, match, state) {
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, error: `Diary file ${filePath} does not exist` };
+            return { ok: false, error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -343,7 +289,7 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, error: `Diary file ${filePath} does not exist` };
+            return { ok: false, error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -441,19 +387,6 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
   }
 }
 
-function releaseDiaryLock(lockPath, lockStat) {
-  try {
-    const current = fs.statSync(lockPath);
-    if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-      fs.unlinkSync(lockPath);
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-}
-
 // A first line that opens a block (list, heading, quote, fence, table)
 // would be swallowed into the "-> role:" paragraph, so it starts on the
 // next line instead.
@@ -507,7 +440,7 @@ export function appendRoleReply(filePath, role, text) {
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, code: 'missing', error: `Diary file ${filePath} does not exist` };
+            return { ok: false, code: 'missing', error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -529,16 +462,7 @@ export function appendRoleReply(filePath, role, text) {
 
       return { ok: false, code: 'conflict', error: `Concurrent writes kept changing ${filePath}; reply not saved` };
     } finally {
-      try {
-        const current = fs.statSync(lockPath);
-        if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-          fs.unlinkSync(lockPath);
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
+      releaseDiaryLock(lockPath, lockStat);
     }
   } catch (error) {
     return { ok: false, error: error.message };
@@ -546,14 +470,14 @@ export function appendRoleReply(filePath, role, text) {
 }
 
 /**
- * Append a role report to a diary file. Creates the file (with minimal
- * front matter) and the role's block when missing; otherwise inserts the
- * new entry just before the block's END marker, leaving existing content
- * untouched.
+ * Append a role report to a plan file. Creates the file (from
+ * `initialContent`) and the role's block when missing; otherwise inserts
+ * the new entry just before the block's END marker, leaving existing
+ * content untouched.
  *
  * Returns { ok, createdFile, createdBlock, error }.
  */
-export function appendRoleReport(filePath, role, text, { time, status, title, fileDate } = {}) {
+export function appendRoleReport(filePath, role, text, { time, status, title, initialContent = '' } = {}) {
   const errors = validateRoleReport(role, text, { status, title });
   if (errors.length > 0) {
     return { ok: false, error: errors.join('; ') };
@@ -570,9 +494,6 @@ export function appendRoleReport(filePath, role, text, { time, status, title, fi
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     lockStat = acquireDiaryLock(lockPath);
     try {
-      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
-      const initialContent = `---\ndate: ${date}\ncssclasses: dashboard\nobsidianUIMode: preview\n---\n\n`;
-
       for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
         let original;
         try {
@@ -609,16 +530,7 @@ export function appendRoleReport(filePath, role, text, { time, status, title, fi
 
       return { ok: false, error: `Concurrent writes kept changing ${filePath}; report not written` };
     } finally {
-      try {
-        const current = fs.statSync(lockPath);
-        if (current.dev === lockStat.dev && current.ino === lockStat.ino) {
-          fs.unlinkSync(lockPath);
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
+      releaseDiaryLock(lockPath, lockStat);
     }
   } catch (error) {
     return { ok: false, error: error.message };

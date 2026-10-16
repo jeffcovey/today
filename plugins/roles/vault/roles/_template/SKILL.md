@@ -35,8 +35,8 @@ longest it may go without a report, e.g. "or a week has passed">.
 
 ## Run
 
-1. Review the last two weeks with `bin/diary role <role-name> --days 14`:
-   your own blocks, the chief of staff's, and the user's reply lines
+1. Review the last two weeks with `plugins/roles/history.js <role-name>
+   --days 14`: your own blocks, the chief of staff's, and the user's reply lines
    (lines like `-> <role-name>: ...` — accept both the plain `->` and the
    typographic `→` as the arrow; a reply can span several lines, up to the
    next entry heading or reply). Precedence: the user's replies first
@@ -49,7 +49,7 @@ longest it may go without a report, e.g. "or a week has passed">.
 4. Settle your earlier checkboxes before writing: anything now done gets
    `plugins/roles/report.js <role-name> --check "<item text>"`, anything no longer
    relevant gets `--cancel "<item text>"`. If the checkbox is in an earlier
-   day's diary, include that file's date with `--date`. Never restate a
+   day's plan, include that day with `--date`. Never restate a
    superseded item. Flip one checkbox per invocation; flips are applied
    immediately, and a later failure does not undo an earlier successful
    flip. An earlier entry of yours that is now wrong or outdated gets
@@ -65,7 +65,7 @@ longest it may go without a report, e.g. "or a week has passed">.
 
 ## Red flags
 
-- Never edit diary files directly — only `plugins/roles/report.js`. The checkbox
+- Never edit plan files directly — only `plugins/roles/report.js`. The checkbox
   flip (`--check`/`--cancel`) and `--amend` of your own entries are the only
   changes ever made to earlier content; a checkbox the user ticked
   themselves means "done" too.
@@ -77,7 +77,7 @@ longest it may go without a report, e.g. "or a week has passed">.
   still governs it.
 - Never re-raise an item the user declined, whatever new email or date
   prompts it. If you can't tell whether they did, run
-  `bin/diary role <role-name> --days 14` and look.
+  `plugins/roles/history.js <role-name> --days 14` and look.
 - Keep checkbox flips separate from report appends; a failed later operation
   does not roll back an earlier successful mutation.
 - A tool failure is reported as `--status blocked`, not worked around.

@@ -1,11 +1,11 @@
 name = "roles"
 displayName = "Roles"
-description = "Runs your staff of AI role agents, which report into the daily diary"
+description = "Runs your staff of AI role agents, which report into the daily plan"
 type = "utility"
 longDescription = """
 A staff of AI helpers (a bookkeeper, an innkeeper, a fitness coach…) that each
-look after one part of your life and report into the day's diary. You read their
-reports and reply inline; they pick up your replies on their next run.
+look after one part of your life and report into the day's plan file. You read
+their reports and reply inline; they pick up your replies on their next run.
 
 Each role is a SKILL.md file under vault/roles/<name>/. Installing the plugin's
 vault files adds:
@@ -22,8 +22,10 @@ plugin is first enabled, it waits for the next run time instead of starting a
 run immediately.
 
 Roles write only through `plugins/roles/report.js`, which appends to durable
-<!-- ROLE:<name>:START/END --> blocks in the diary. The markdown-diary plugin
-reads those blocks into the diary table. See docs/ROLE_AGENTS.md.
+<!-- ROLE:<name>:START/END --> blocks at the end of the day's plan file; the
+markdown-plans plugin puts those blocks into the planning context. Each run
+starts with `plugins/roles/history.js <role>`, the last two weeks of the
+role's own blocks and the chief's. See docs/ROLE_AGENTS.md.
 """
 
 [commands]
