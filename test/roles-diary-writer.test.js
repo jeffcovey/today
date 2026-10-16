@@ -574,6 +574,52 @@ describe('amendRoleEntry', () => {
     expect(fs.existsSync(`${filePath}.lock`)).toBe(false);
   });
 
+  test('ignores headings and reply lines inside fenced code and preserves reply text verbatim', () => {
+    const oldFencedExample = [
+      '```markdown',
+      '### 08:00',
+      '-> secretary: only an example before the user reply',
+      '```'
+    ].join('\n');
+    const replyFencedExample = [
+      '```markdown',
+      '### 09:00',
+      '-> secretary: this is only an example',
+      '```'
+    ].join('\n');
+    const original = fs.readFileSync(filePath, 'utf8');
+    const updated = original.replace(
+      '-> secretary: I don\'t even remember who Billie is. Drop this.\n',
+      `${oldFencedExample}\n\n-> secretary: I don't even remember who Billie is. Drop this.\n\n${replyFencedExample}\n`
+    );
+    fs.writeFileSync(filePath, updated);
+
+    expect(amendRoleEntry(filePath, 'secretary', '08:00', 'Not a real entry.').error).toMatch(/No 08:00 entry/);
+    expect(amendRoleEntry(filePath, 'secretary', '09:00', 'Not a real entry.').error).toMatch(/No 09:00 entry/);
+
+    const result = amendRoleEntry(filePath, 'secretary', '04:07', 'Corrected.', { amendedAt: '2026-10-16 10:00' });
+    expect(result).toMatchObject({ ok: true, replies: 1 });
+    expect(secretaryBlock()).not.toContain('only an example before the user reply');
+    expect(secretaryBlock()).toContain(`-> secretary: I don't even remember who Billie is. Drop this.\n\n${replyFencedExample}`);
+  });
+
+  test('preserves settled states across replacement states and CRLF diary lines', () => {
+    setRoleCheckboxState(filePath, 'secretary', 'Buy the tickets', 'x');
+    const crlf = fs.readFileSync(filePath, 'utf8').replace(/\n/g, '\r\n');
+    fs.writeFileSync(filePath, crlf);
+
+    const result = amendRoleEntry(filePath, 'secretary', '04:07', [
+      '- [x] → Jeff: Send Billie a birthday greeting',
+      '- [-] → Jeff: Buy the tickets'
+    ].join('\r\n'), { amendedAt: '2026-10-16 10:00' });
+
+    expect(result).toMatchObject({ ok: true, settled: 2 });
+    const amended = secretaryBlock().slice(secretaryBlock().indexOf('### 04:07'), secretaryBlock().indexOf('### 08:05'));
+    expect(amended).toContain('- [-] → Jeff: Send Billie a birthday greeting\r');
+    expect(amended).toContain('- [x] → Jeff: Buy the tickets');
+    expect(amended).toContain('-> secretary: I don\'t even remember who Billie is. Drop this.\r\n');
+  });
+
   test('a new status replaces the old one; amending twice leaves one stamp', () => {
     amendRoleEntry(filePath, 'secretary', '04:07', 'First correction.', { status: 'ok', amendedAt: '2026-10-16 10:00' });
     amendRoleEntry(filePath, 'secretary', '04:07', 'Second correction.', { amendedAt: '2026-10-16 11:00' });

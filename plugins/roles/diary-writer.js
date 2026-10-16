@@ -260,7 +260,30 @@ export function setRoleCheckboxState(filePath, role, match, state) {
 const ENTRY_HEADING_RE = /^### (\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/;
 const REPLY_LINE_RE = /^\s*(?:->|→)\s*[a-z0-9][a-z0-9-]*\s*:/;
 const STATUS_LINE_RE = /^\*\*Status:\*\*\s*(.+?)\s*$/;
-const CHECKBOX_RE = /^(\s*- \[)([ x-])(\] .*)$/;
+const CHECKBOX_RE = /^(\s*- \[)([ x-])(\] .*\r?)$/;
+const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE_RE = /^ {0,3}(`+|~+)[ \t]*$/;
+
+function linesInsideFences(lines) {
+  let fence = null;
+  return lines.map((line) => {
+    const fenceLine = line.replace(/^(?: {0,3}>[ \t]?)+/, '');
+    let insideFence = Boolean(fence);
+    if (fence) {
+      const closingFence = fenceLine.match(FENCE_CLOSE_RE);
+      if (closingFence && closingFence[1][0] === fence.character && closingFence[1].length >= fence.length) {
+        fence = null;
+      }
+    } else {
+      const openingFence = fenceLine.match(FENCE_OPEN_RE);
+      if (openingFence && !(openingFence[1][0] === '`' && openingFence[2].includes('`'))) {
+        fence = { character: openingFence[1][0], length: openingFence[1].length };
+        insideFence = true;
+      }
+    }
+    return insideFence;
+  });
+}
 
 function normalizeTime(time) {
   const match = (time || '').trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
@@ -333,8 +356,9 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
 
         const blockStart = startIndex + startMarker.length;
         const lines = original.slice(blockStart, endIndex).split('\n');
+        const insideFences = linesInsideFences(lines);
         const headings = lines
-          .map((line, index) => ({ index, time: headingTime(line) }))
+          .map((line, index) => ({ index, time: insideFences[index] ? null : headingTime(line) }))
           .filter((h) => h.time !== null);
         const matches = headings.filter((h) => h.time === wantedTime);
         if (matches.length === 0) {
@@ -349,7 +373,8 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
         const to = next ? next.index : lines.length;
         const region = lines.slice(from + 1, to);
 
-        const firstReply = region.findIndex((line) => REPLY_LINE_RE.test(line));
+        const regionInsideFences = insideFences.slice(from + 1, to);
+        const firstReply = region.findIndex((line, index) => !regionInsideFences[index] && REPLY_LINE_RE.test(line));
         const old = firstReply === -1 ? region : region.slice(0, firstReply);
         const replies = firstReply === -1 ? [] : region.slice(firstReply);
         while (replies.length > 0 && replies[replies.length - 1].trim() === '') {
@@ -372,7 +397,7 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
         let settled = 0;
         const body = text.trim().split('\n').map((line) => {
           const box = line.match(CHECKBOX_RE);
-          if (!box || box[2] !== ' ') {
+          if (!box) {
             return line;
           }
           const state = settledStates.get(box[3].trim().toLowerCase());
@@ -398,7 +423,12 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
 
         const { conflict } = writeFileAtomicCAS(filePath, updated, original);
         if (!conflict) {
-          return { ok: true, line: lines[from].trim(), replies: replies.filter((l) => REPLY_LINE_RE.test(l)).length, settled };
+          return {
+            ok: true,
+            line: lines[from].trim(),
+            replies: replies.filter((line, index) => !regionInsideFences[firstReply + index] && REPLY_LINE_RE.test(line)).length,
+            settled
+          };
         }
       }
 
