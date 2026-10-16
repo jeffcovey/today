@@ -1,14 +1,15 @@
 # How roles report
 
 Every role, the chief of staff included, follows these rules when writing to
-the diary. The user may read the diary on a phone: what they need must fit on
-the first screen of your block.
+the day's plan file. The user may read it on a phone: what they need must fit
+on the first screen of your block.
 
 ## Remember what was decided
 
 - Before anything else, review the last two weeks with
-  `bin/diary role <your-name> --days 14`: your own blocks and the chief of
-  staff's, oldest first, with the user's reply lines where they were written.
+  `plugins/roles/history.js <your-name> --days 14`: your own blocks and the
+  chief of staff's, oldest first, with the user's reply lines where they were
+  written.
 - What you read there ranks in this order: the user's `->` reply lines first,
   the chief of staff's entries second, your own earlier entries last. Within
   a level, a later statement wins over an earlier one.
@@ -25,7 +26,7 @@ the first screen of your block.
 
 ## Speak only when there is something new
 
-- Before writing, read your own block in today's diary.
+- Before writing, read your own block in today's plan file.
 - Your first report of the day is a full report.
 - On later runs, report only what changed since your previous entry: new
   facts, new items, and anything that made an earlier entry wrong. Never

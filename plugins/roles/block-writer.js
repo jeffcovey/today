@@ -1,7 +1,7 @@
 /**
- * Writes role-agent reports into the day's diary, inside the durable ROLE
- * marker blocks defined in src/diary-role-blocks.js. Used by report.js, the
- * only way roles write to the diary.
+ * Writes role-agent reports into the day's plan file, inside the durable
+ * ROLE marker blocks defined in src/diary-role-blocks.js. Used by report.js,
+ * the only way roles write to the vault.
  *
  * Content inside a block is append-only: new entries are inserted before the
  * END marker, and existing lines (including the user's replies) are never
@@ -201,7 +201,7 @@ export function setRoleCheckboxState(filePath, role, match, state) {
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, error: `Diary file ${filePath} does not exist` };
+            return { ok: false, error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -343,7 +343,7 @@ export function amendRoleEntry(filePath, role, time, text, { status, amendedAt }
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, error: `Diary file ${filePath} does not exist` };
+            return { ok: false, error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -507,7 +507,7 @@ export function appendRoleReply(filePath, role, text) {
           original = fs.readFileSync(filePath, 'utf8');
         } catch (error) {
           if (error.code === 'ENOENT') {
-            return { ok: false, code: 'missing', error: `Diary file ${filePath} does not exist` };
+            return { ok: false, code: 'missing', error: `${filePath} does not exist` };
           }
           throw error;
         }
@@ -546,14 +546,14 @@ export function appendRoleReply(filePath, role, text) {
 }
 
 /**
- * Append a role report to a diary file. Creates the file (with minimal
- * front matter) and the role's block when missing; otherwise inserts the
- * new entry just before the block's END marker, leaving existing content
- * untouched.
+ * Append a role report to a plan file. Creates the file (from
+ * `initialContent`) and the role's block when missing; otherwise inserts
+ * the new entry just before the block's END marker, leaving existing
+ * content untouched.
  *
  * Returns { ok, createdFile, createdBlock, error }.
  */
-export function appendRoleReport(filePath, role, text, { time, status, title, fileDate } = {}) {
+export function appendRoleReport(filePath, role, text, { time, status, title, initialContent = '' } = {}) {
   const errors = validateRoleReport(role, text, { status, title });
   if (errors.length > 0) {
     return { ok: false, error: errors.join('; ') };
@@ -570,9 +570,6 @@ export function appendRoleReport(filePath, role, text, { time, status, title, fi
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     lockStat = acquireDiaryLock(lockPath);
     try {
-      const date = fileDate || new Date().toLocaleDateString('en-CA', { timeZone: process.env.TZ || getTimezone() });
-      const initialContent = `---\ndate: ${date}\ncssclasses: dashboard\nobsidianUIMode: preview\n---\n\n`;
-
       for (let attempt = 0; attempt < CAS_RETRIES; attempt++) {
         let original;
         try {

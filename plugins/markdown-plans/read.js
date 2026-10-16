@@ -211,6 +211,22 @@ function parseFrontmatter(content) {
  * mid-restore. Freshly templated plans always have frontmatter (every template
  * starts with a `---` block), so normal operation is unaffected.
  */
+/**
+ * Read a plan file, transform it, and write it back only if nothing else
+ * changed the file meanwhile; retry a few times on conflict. Role agents
+ * append to the same files, so a plain overwrite could drop their report.
+ * Returns true when the file was changed.
+ */
+function rewritePlanFile(filePath, transform) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const original = fs.readFileSync(filePath, 'utf-8');
+    const updated = transform(original);
+    if (updated === null || updated === original) return false;
+    if (!writeFileAtomicCAS(filePath, updated, original, 'utf-8').conflict) return true;
+  }
+  return false;
+}
+
 function planFileIsIntact(content) {
   if (!content || content.trim() === '') return false;
   const { frontmatter } = parseFrontmatter(content);
@@ -340,6 +356,18 @@ function formatPlanContext(planInfo, content) {
     if (isPriority) {
       lines.push('');
       lines.push(`**${sectionName}:**`);
+      lines.push(sections[sectionName]);
+    }
+  }
+
+  // Role-agent blocks live at the end of a day plan as "## 🤖 <Role>"
+  // sections: headline, open asks, and the user's replies (details callouts
+  // are stripped with the other blockquotes above).
+  if (planInfo.type === 'day') {
+    for (const sectionName of Object.keys(sections)) {
+      if (!sectionName.startsWith('🤖')) continue;
+      lines.push('');
+      lines.push(`**Staff — ${sectionName.replace(/^🤖\s*/, '')}:**`);
       lines.push(sections[sectionName]);
     }
   }
@@ -984,7 +1012,8 @@ function needsSummary(filePath) {
  * Add summary to a plan file's frontmatter and add display callout
  */
 function addSummaryToFile(filePath, summary) {
-  let content = fs.readFileSync(filePath, 'utf-8');
+  rewritePlanFile(filePath, (original) => {
+  let content = original;
 
   // Escape quotes in summary for YAML
   const escapedSummary = summary.replace(/"/g, '\\"');
@@ -1012,7 +1041,8 @@ function addSummaryToFile(filePath, summary) {
     );
   }
 
-  writeFileAtomic(filePath, content, 'utf-8');
+  return content;
+  });
 }
 
 /**
@@ -1042,8 +1072,7 @@ function addSummaryCalloutToPastFiles(today, maxDaysBack = 7) {
       `${summaryCallout}\n<!-- /TODAY_FOCUS -->`
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       added.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1114,8 +1143,7 @@ function fixDoneTodayInPastFiles(today, maxDaysBack = 7) {
       `\`\`\`tasks\n$1done on ${dateStr}\n`
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       fixed.push({
         file: path.basename(planInfo.day.path),
         date: dateStr,
@@ -1151,8 +1179,7 @@ function removeDueTodayFromPastFiles(today, maxDaysBack = 7) {
       ''
     );
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1191,8 +1218,7 @@ function removeEmptyReflectionFromPastFiles(today, maxDaysBack = 7) {
     // Remove the unedited reflection section
     const newContent = content.replace(emptyReflectionPattern, '');
 
-    if (newContent !== content) {
-      writeFileAtomic(planInfo.day.path, newContent, 'utf-8');
+    if (newContent !== content && rewritePlanFile(planInfo.day.path, (latest) => (latest === content ? newContent : latest.replace(content, newContent)))) {
       removed.push({
         file: path.basename(planInfo.day.path),
         date: formatDateStr(pastDate),
@@ -1526,7 +1552,8 @@ Keep it concise and actionable. Tasks should be specific and achievable.`;
 function updateTomorrowPlan(filePath, suggestions) {
   if (!suggestions || (!suggestions.focus && !suggestions.priorities)) return false;
 
-  let content = fs.readFileSync(filePath, 'utf-8');
+  const original = fs.readFileSync(filePath, 'utf-8');
+  let content = original;
   let modified = false;
 
   // Update TODAY_FOCUS section
@@ -1556,7 +1583,7 @@ function updateTomorrowPlan(filePath, suggestions) {
   }
 
   if (modified) {
-    writeFileAtomic(filePath, content, 'utf-8');
+    rewritePlanFile(filePath, (latest) => (latest === original ? content : null));
   }
 
   return modified;

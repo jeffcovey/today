@@ -2,15 +2,23 @@
 
 Role agents are standing AI helpers — a bookkeeper, a fitness coach, an
 innkeeper — defined by the user in their vault and reporting into the daily
-diary. They are the optional `roles` plugin (`plugins/roles/`); nothing here
-runs or installs unless it is enabled. The diary is the whole interaction model: roles write durable report
-blocks, the user replies inline from any device, and the next run reads the
-replies. Because diary entries already feed AI context, every `bin/today`
-session sees the reports for free, and past diary files are each role's
-permanent memory: every run starts by reading its own blocks and the chief
-of staff's from the last two weeks (`bin/diary role <name> --days 14`),
-where the user's replies outrank the chief's entries, which outrank the
-role's own.
+plan. They are the optional `roles` plugin (`plugins/roles/`); nothing here
+runs or installs unless it is enabled. The plan file is the whole
+interaction model: roles write durable report blocks at the end of the
+day's plan, the user replies inline from any device, and the next run reads
+the replies. The daily plan is about what to do, which is what this
+back-and-forth is about; the diary stays the user's record of what
+happened. Because the plans plugin already feeds the daily plan to AI
+context, every `bin/today` session sees the reports for free, and past plan
+files are each role's permanent memory: every run starts by reading its own
+blocks and the chief of staff's from the last two weeks
+(`plugins/roles/history.js <name> --days 14`), where the user's replies
+outrank the chief's entries, which outrank the role's own.
+
+Reports lived in the diary until October 2026;
+`plugins/roles/migrate-diary-to-plans.js` moves existing blocks (dry run by
+default, `--write` to apply), and the `markdown-diary` plugin still parses
+blocks it finds in old diary files.
 
 See [jeffcovey/today#573](https://github.com/jeffcovey/today/issues/573) for
 the original design discussion.
@@ -22,7 +30,7 @@ A role is a directory in the vault with an
 
 ```text
 vault/roles/
-  REPORTING.md              # how every role writes to the diary
+  REPORTING.md              # how every role writes to the plan file
   _template/SKILL.md        # copy to create a new role
   chief-of-staff/SKILL.md   # the orchestrator (the only scheduled role)
   <your-role>/SKILL.md
@@ -64,8 +72,8 @@ it by hand.
   they conflict), plus every still-open `- [ ]` checkbox in its block. Before
   its first report of the day, the previous day's state carries over the same
   way.
-- **Decisions stick.** Each run begins with `bin/diary role <name> --days 14`,
-  which prints the role's own blocks and the chief of staff's from the last
+- **Decisions stick.** Each run begins with `plugins/roles/history.js <name>
+  --days 14`, which prints the role's own blocks and the chief of staff's from the last
   two weeks, oldest first, with the user's `->` replies where they were
   written. Precedence: the user's replies, then the chief of staff, then the
   role itself; within a level the later statement wins. A decline from the
@@ -81,9 +89,11 @@ it by hand.
   as numbered prose naming the owning role; the checkbox itself lives once,
   in that role's block.
 
-## Diary ROLE blocks
+## ROLE blocks in the daily plan
 
-Reports live in the day's diary file inside marker blocks:
+Reports live at the end of the day's plan file
+(`plans/YYYY_Qn_MM_Wnn_DD.md`, after the plan's own sections) inside marker
+blocks:
 
 ```markdown
 <!-- ROLE:cpa:START -->
@@ -99,16 +109,19 @@ Categorized 12 transactions.
 <!-- ROLE:cpa:END -->
 ```
 
-The block format lives in `src/diary-role-blocks.js`, shared by the
-`markdown-diary` plugin (which parses blocks) and the roles plugin (which
-writes them). Properties:
+The block format lives in `src/diary-role-blocks.js`, shared by the plugins
+that read blocks and the roles plugin, which writes them. Properties:
 
-- **Durable.** The `TODAY:` marker namespace is stripped from past days'
-  files; `ROLE:` blocks never are. They also count as real content, so a
-  day holding only role reports is not cleaned up as empty.
-- **Parsed.** Each `### HH:MM` entry inside a block becomes a diary table
-  row with `metadata.type: "role"` and `metadata.role: "<name>"` — visible
-  to `bin/diary today`, `bin/diary search`, and AI context.
+- **Durable.** The plans plugin's end-of-day maintenance (removing the
+  due-today query, dating the completed-tasks query, adding the summary
+  callout, filling tomorrow's focus) rewrites sections above the blocks and
+  never touches them; those rewrites are compare-and-swap, so a role report
+  landing in the same file at the same moment is not lost.
+- **In context.** A day plan's `## 🤖 <Role>` sections reach the planning
+  context as `**Staff — <Role>:**` with their headline, open asks, and the
+  user's replies (the details callouts are dropped with other blockquotes).
+  Role entries are not diary rows and don't appear in `bin/diary` output;
+  `plugins/roles/history.js` reads them from the plan files.
 - **Append-only, with two guarded exceptions.** New entries are inserted
   before the END marker, and what the user writes inside a block is never
   rewritten, so their replies survive every later report. A role may flip
@@ -121,21 +134,21 @@ picked up on the next run. A reply can run over several lines
 (paragraphs, bullet lists): it continues until the next `### HH:MM` entry,
 the next reply, or the end of the block.
 
-On the web view, each role block is laid out as a card; the diary file is
+On the web view, each role block is laid out as a card; the file is
 unchanged. The header shows the role's name, its latest declared status,
 and when it last reported. The latest report stays open with the replies
 and dispatch notes that led to it; earlier entries fold under one
 "Earlier" toggle that counts their still-open checkboxes. Your replies show
 as "You" bubbles, and dispatch notes as single quiet lines. Above the
 cards, **Needs you** lists every still-open checkbox from every role,
-labeled with the role's name; ticking one there ticks it in the diary,
+labeled with the role's name; ticking one there ticks it in the file,
 the same as ticking it in its card.
 
-On the web view of today's diary, each role block ends with a collapsed
+On the web view of today's plan, each role block ends with a collapsed
 **Reply to <Role>** form. What you type there is saved as the block's last
 item with `-> <role>:` put in front of it, formatting kept as typed (a
 reply that starts with a list or heading starts on the line after the
-arrow). The form appears only on today's diary, because that's the file
+arrow). The form appears only on today's plan, because that's the file
 the next run reads, and only while the roles plugin is enabled. Replies
 wait for the next scheduled run; sending one doesn't start a run. The arrow is typed as plain `->`
 (hyphen + greater-than); roles treat the typographic `→` as identical, so
@@ -164,7 +177,7 @@ occurrence remains.
 **Open items are checkboxes, not prose.** A role writes action items as
 `- [ ]` lines. The markdown-tasks plugin picks them up like any other
 vault checkbox, and the web UI's checkbox toggling means the user can
-check one off from the rendered diary page without editing text. Put the
+check one off from the rendered plan page without editing text. Put the
 checkbox first for actionable user escalations:
 
 ```bash
@@ -204,7 +217,7 @@ replies are never rewritten, and freehand edits of earlier entries
 
 ## Writing reports: plugins/roles/report.js
 
-Roles never edit diary files by hand. The guarded writer, run from the
+Roles never edit plan files by hand. The guarded writer, run from the
 project root:
 
 ```bash
@@ -216,21 +229,21 @@ It refuses to run unless the roles plugin is enabled.
 
 It validates the role name (`[a-z0-9-]`, max 32 chars), caps reports at
 2,000 characters, rejects text containing `ROLE:`/`TODAY:` markers (which
-would corrupt the file's block structure), creates today's diary file and
-the role's block when missing, and writes atomically with compare-and-swap
-retries. Statuses: `ok`, `blocked`, `needs-attention`, `quiet`.
+would corrupt the file's block structure), creates the role's block when
+missing (and a minimal plan file, if the plans plugin never templated that
+day), and writes atomically with compare-and-swap retries. Statuses: `ok`, `blocked`, `needs-attention`, `quiet`.
 `--check "<text>"` / `--cancel "<text>"` flip one open checkbox in the
 role's own block, and `--amend <HH:MM>` rewrites one of the role's own
 entries in place (see **Snapshots and checkboxes**).
 
-## Reading the past: bin/diary role
+## Reading the past: plugins/roles/history.js
 
 ```bash
-bin/diary role secretary            # secretary + chief-of-staff blocks, last 14 days
-bin/diary role cpa --days 7 --no-chief
+plugins/roles/history.js secretary            # secretary + chief-of-staff blocks, last 14 days
+plugins/roles/history.js cpa --days 7 --no-chief
 ```
 
-Prints the blocks straight from the diary files (not the database), oldest
+Prints the blocks straight from the plan files (not the database), oldest
 first, each verbatim with the user's reply lines in place, under a header
 that states the precedence rule. The chief role comes from the plugin's
 `chief_role` setting. This is the first command every role runs.
@@ -266,7 +279,7 @@ subagent of its session.
 Guardrails (borrowed from a system running in production since 2026-09):
 
 - at most one launch per role per run; one retry, then report the failure;
-- roles never launch other roles, and nothing triggers on diary edits —
+- roles never launch other roles, and nothing triggers on plan-file edits —
   only the scheduled run reads them, which is the anti-loop defense;
 - dispatch decisions are recorded before launching, as a one-line collapsed
   callout, so a crashed run leaves no unaccountable subagents and every run
