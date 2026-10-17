@@ -7407,13 +7407,15 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
         debug(`[TASK] Processing recurring task with pattern: ${recurrencePattern}`);
 
         // Parse the recurrence pattern and calculate next date
+        const isWhenDone = /when\s+done/i.test(recurrencePattern);
         const nextDate = calculateNextRecurrence(recurrencePattern, today);
 
         if (nextDate) {
           // Create new task line by copying the original but with:
           // 1. Unchecked checkbox
           // 2. Updated scheduled date (⏳)
-          // 3. No completion date
+          // 3. For "when done" recurrences, updated due date (📅) to match
+          // 4. No completion date
           newTaskLine = taskLine
             .replace(/^((?:\s*>)*\s*)- \[[ xX]\]/, '$1- [ ]')  // Unchecked
             .replace(/✅ \d{4}-\d{2}-\d{2}/, '');  // Remove any completion date
@@ -7430,6 +7432,12 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
             } else {
               newTaskLine = newTaskLine + ` ⏳ ${nextDate}`;
             }
+          }
+
+          // For "when done" recurrences, advance the due date (📅) to match —
+          // otherwise the new instance is due today and re-appears immediately.
+          if (isWhenDone && newTaskLine.includes('📅')) {
+            newTaskLine = newTaskLine.replace(/📅 \d{4}-\d{2}-\d{2}/, `📅 ${nextDate}`);
           }
 
           // Preserve creation date if original task doesn't have one
