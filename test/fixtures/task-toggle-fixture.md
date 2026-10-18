@@ -9,3 +9,4 @@ Do not modify manually.
 - [ ] Another test task #test
 - [ ] Recurring with tag before date 🔁 every 6 months when done #test ⏳ 2099-01-01 ➕ 2025-01-01
 - [ ] Recurring with start date after rule 🔁 every week 🛫 2099-01-01 ⏳ 2099-01-08 ➕ 2025-01-01
+- [ ] Recurring when done with due date 🔁 every 6 weeks when done ⏳ 2025-06-01 📅 2025-04-20 ➕ 2025-01-01

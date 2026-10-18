@@ -17,6 +17,7 @@ const TEST_FILE_PATH = path.join(VAULT_PATH, TEST_FILE);
 const TEST_LINE = 8; // "Test task for toggle testing" - stable fixture line
 const RECUR_TAG_LINE = 10; // recurring task with a #tag between the 🔁 rule and the ⏳ date
 const RECUR_START_LINE = 11; // recurring task with a 🛫 start date immediately after the rule
+const RECUR_WHEN_DONE_DUE_LINE = 12; // recurring "when done" task with both ⏳ and 📅
 
 // Original fixture content for reset
 const FIXTURE_CONTENT = `# Test Tasks
@@ -30,6 +31,7 @@ Do not modify manually.
 - [ ] Another test task #test
 - [ ] Recurring with tag before date 🔁 every 6 months when done #test ⏳ 2099-01-01 ➕ 2025-01-01
 - [ ] Recurring with start date after rule 🔁 every week 🛫 2099-01-01 ⏳ 2099-01-08 ➕ 2025-01-01
+- [ ] Recurring when done with due date 🔁 every 6 weeks when done ⏳ 2025-06-01 📅 2025-04-20 ➕ 2025-01-01
 `;
 
 // Reset fixture to clean state
@@ -424,6 +426,46 @@ describe('Task Toggle - Edge Cases', () => {
     expect(regenerated).toHaveLength(1);
     expect(regenerated[0]).toContain('🔁 every week');
     expect(regenerated[0]).not.toContain('✅');
+  });
+
+  // Regression: "when done" recurrences that have both ⏳ and 📅 were advancing
+  // ⏳ correctly but leaving 📅 at the original (today's) date, causing the new
+  // instance to surface immediately in today's task list. See issue #616.
+  test('should advance 📅 on a "when done" recurring task that has both ⏳ and 📅', async () => {
+    const running = await isServerConfiguredForTests();
+    if (!running) return;
+
+    const response = await fetchWithAuth(`${BASE_URL}/task/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: TEST_FILE,
+        lineNumber: RECUR_WHEN_DONE_DUE_LINE,
+        completed: true
+      })
+    });
+
+    expect(response.ok).toBe(true);
+    const result = await response.json();
+    expect(result.success).toBe(true);
+
+    const content = await fs.readFile(TEST_FILE_PATH, 'utf-8');
+    const lines = content.split('\n');
+    const matching = lines.filter(l => l.includes('Recurring when done with due date'));
+    const regenerated = matching.filter(l => /- \[ \]/.test(l));
+
+    expect(matching.filter(l => /- \[x\]/.test(l))).toHaveLength(1);
+    expect(regenerated).toHaveLength(1);
+
+    // Both ⏳ and 📅 must be advanced — neither may be the old fixture date
+    expect(regenerated[0]).not.toMatch(/📅 2025-04-20/);
+    expect(regenerated[0]).not.toMatch(/⏳ 2025-06-01/);
+    // 📅 and ⏳ should match each other (6 weeks from completion date)
+    const scheduledMatch = regenerated[0].match(/⏳ (\d{4}-\d{2}-\d{2})/);
+    const dueMatch = regenerated[0].match(/📅 (\d{4}-\d{2}-\d{2})/);
+    expect(scheduledMatch).not.toBeNull();
+    expect(dueMatch).not.toBeNull();
+    expect(scheduledMatch[1]).toBe(dueMatch[1]);
   });
 });
 
