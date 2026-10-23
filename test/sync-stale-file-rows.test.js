@@ -250,7 +250,7 @@ fs.readFileSync = function(file, ...args) {
     });
   });
 
-  test('Unicode paths clear old rows after edits, emptying, and moves', async () => {
+  test('Unicode paths clear obsolete rows after edits', async () => {
     const file = 'projects/📋.md';
     write(file, '- [ ] First\n- [ ] Second\n');
     await fullSync();
@@ -259,10 +259,20 @@ fs.readFileSync = function(file, ...args) {
     expect(db.prepare('SELECT title FROM tasks WHERE id IN (?, ?)').all(
       `${SOURCE}:${rel(file)}:1`, `${SOURCE}:${rel(file)}:2`
     )).toEqual([{ title: 'Only' }]);
+  });
+
+  test('Unicode paths clear rows after emptying', async () => {
+    const file = 'projects/📋.md';
+    write(file, '- [ ] First\n');
+    await fullSync();
     write(file, 'No tasks\n');
     await syncPluginSource(plugin, 'local', cfg, ctx, { fileFilter: rel(file), _caller: 'test' });
     expect(filesInDb()).not.toContain(file);
-    write(file, '- [ ] Back\n');
+  });
+
+  test('Unicode paths clear rows after moves', async () => {
+    const file = 'projects/📋.md';
+    write(file, '- [ ] First\n');
     await fullSync();
     fs.renameSync(path.join(vault, file), path.join(vault, 'projects/moved.md'));
     await fullSync();
