@@ -155,6 +155,40 @@ fs.readFileSync = function(file, ...args) {
     expect(snapshot()).toEqual(before);
   });
 
+  test.each([false, true])('files deleted before reading are skipped and reconciled (filtered: %s)', async (filtered) => {
+    const file = path.join(vault, 'projects/keep.md');
+    const result = await readWithPrelude(`
+import fs from 'node:fs';
+const originalRead = fs.readFileSync;
+fs.readFileSync = function(file, ...args) {
+  if (file === ${JSON.stringify(file)}) fs.rmSync(file);
+  return originalRead.call(this, file, ...args);
+};
+`, filtered ? { fileFilter: rel('projects/keep.md') } : {});
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(file)).toBe(false);
+    expect(filesInDb()).not.toContain('projects/keep.md');
+    expect(filesInDb()).toContain('projects/drink-less.md');
+    const processed = JSON.parse(db.prepare('SELECT last_sync_files FROM sync_metadata WHERE source = ?').get(SOURCE).last_sync_files);
+    expect(processed).not.toContain(rel('projects/keep.md'));
+  });
+
+  test('the cache is preserved if the vault disappears between discovery and reading', async () => {
+    const before = snapshot();
+    const result = await readWithPrelude(`
+import fs from 'node:fs';
+const originalRead = fs.readFileSync;
+fs.readFileSync = function(file, ...args) {
+  if (typeof file === 'string' && file.startsWith(${JSON.stringify(vault + path.sep)})) {
+    fs.rmSync(${JSON.stringify(vault)}, { recursive: true, force: true });
+  }
+  return originalRead.call(this, file, ...args);
+};
+`);
+    expect(result.success).toBe(true);
+    expect(snapshot()).toEqual(before);
+  });
+
   test('full sync drops rows of a newly excluded folder, at any depth', async () => {
     await fullSync({ ...cfg, exclude_paths: 'templates,.obsidian,archive,exports/bear' });
     expect(filesInDb()).toEqual(['exports/other/note.md', 'projects/drink-less.md', 'projects/keep.md']);

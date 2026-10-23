@@ -154,6 +154,7 @@ for (const filePath of filesToSync) {
   try {
     content = fs.readFileSync(filePath, 'utf8');
   } catch (error) {
+    if (error.code === 'ENOENT') continue; // File disappeared after discovery
     console.error(JSON.stringify({ error: `Cannot read task file ${relativePath}: ${error.message}` }));
     process.exit(1);
   }
