@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { resolveVaultDirectory } from '../plugins/markdownlint-cleanup/directory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,27 @@ describe('markdownlint-cleanup read plugin', () => {
 
   afterEach(() => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  test('resolves an absolute VAULT_PATH for the initial recursive scan', () => {
+    const vaultPath = path.join(tempRoot, 'vault');
+    const nestedDir = path.join(vaultPath, 'nested');
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.writeFileSync(path.join(nestedDir, 'note.md'), '# Note\n');
+
+    const { vaultDir, absolutePath } = resolveVaultDirectory(
+      `${vaultPath}/**/*.md`,
+      repoRoot
+    );
+
+    expect(vaultDir).toBe(vaultPath);
+    expect(absolutePath).toBe(vaultPath);
+    expect(fs.existsSync(path.join(absolutePath, 'nested', 'note.md'))).toBe(true);
+  });
+
+  test('rejects a directory setting with an unsupported glob pattern', () => {
+    expect(() => resolveVaultDirectory('vault/notes-*.md', repoRoot))
+      .toThrow(/directory must be a directory root; glob patterns are not supported/);
   });
 
   // Regression test for #623: read.js imported 'glob', which was never a

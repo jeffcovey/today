@@ -1,14 +1,14 @@
 # Markdownlint Cleanup Plugin
-# Auto-fixes markdown formatting issues using markdownlint-cli2
+# Auto-fixes markdown formatting issues using markdownlint
 
 name = "markdownlint-cleanup"
 displayName = "Markdownlint Cleanup"
-description = "Auto-fix markdown formatting issues using markdownlint-cli2"
+description = "Auto-fix markdown formatting issues using markdownlint"
 type = "utility"
 
 
 longDescription = """
-Runs markdownlint-cli2 with --fix to automatically correct markdown formatting
+Uses the markdownlint Node API to automatically correct markdown formatting
 issues in your vault files.
 
 This plugin uses the markdownlint Node API directly, so it needs no external
@@ -28,4 +28,4 @@ Configure rules in .markdownlint.jsonc at the project root.
 read = "./read.js"
 
 [settings]
-directory = { type = "string", default = "vault/**/*.md", description = "Glob pattern for files to lint" }
+directory = { type = "string", default = "vault/**/*.md", description = "Directory root to recursively scan for Markdown files. The legacy /*.md suffix is accepted but does not limit scanning to top-level files." }
