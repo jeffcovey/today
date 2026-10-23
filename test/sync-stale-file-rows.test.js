@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import Database from 'better-sqlite3';
 import { syncPluginSource } from '../src/plugin-loader.js';
 import { getSqlColumns } from '../src/plugin-schemas.js';
@@ -26,6 +26,18 @@ describe('stale rows for files no longer in the source (#621)', () => {
     db.prepare('SELECT metadata FROM tasks WHERE source = ?').all(SOURCE)
       .map(r => path.relative(path.relative(repoRoot, vault), JSON.parse(r.metadata).file_path))
   )].sort();
+  const snapshot = () => db.prepare('SELECT * FROM tasks ORDER BY id').all();
+  const readWithPrelude = async (prelude, options = {}) => {
+    fs.writeFileSync(path.join(tmp, 'reader.js'), `#!/usr/bin/env node
+${prelude}
+await import(${JSON.stringify(pathToFileURL(path.join(repoRoot, 'plugins/markdown-tasks/read.js')).href)});
+`);
+    fs.chmodSync(path.join(tmp, 'reader.js'), 0o755);
+    return syncPluginSource(
+      { ...plugin, _path: tmp, commands: { read: './reader.js' } },
+      'local', { ...cfg, include_completed: false }, ctx, { _caller: 'test', ...options }
+    );
+  };
   // A full read without touching the real vault-changes baseline: the plugin
   // only goes incremental when LAST_SYNC_TIME is set.
   const fullSync = async (config = cfg) => {
@@ -83,6 +95,66 @@ describe('stale rows for files no longer in the source (#621)', () => {
     expect(filesInDb()).not.toContain('projects/keep.md');
   });
 
+  test('a full scan with no matches clears cached rows for existing empty files', async () => {
+    for (const file of filesInDb()) write(file, 'No tasks here\n');
+    const result = await fullSync();
+    expect(result.success).toBe(true);
+    expect(snapshot()).toEqual([]);
+  });
+
+  test('a complete scan preserves the cache when only an empty mount point remains', async () => {
+    const before = snapshot();
+    fs.rmSync(vault, { recursive: true });
+    fs.mkdirSync(vault);
+    const result = await fullSync();
+    expect(result.success).toBe(true);
+    expect(snapshot()).toEqual(before);
+  });
+
+  test('an explicit filtered deletion still clears rows when every source file is gone', async () => {
+    fs.rmSync(vault, { recursive: true });
+    fs.mkdirSync(vault);
+    const result = await syncPluginSource(plugin, 'local', cfg, ctx, {
+      fileFilter: rel('projects/keep.md'), _caller: 'test'
+    });
+    expect(result.success).toBe(true);
+    expect(filesInDb()).not.toContain('projects/keep.md');
+    expect(filesInDb()).toContain('archive/old.md');
+  });
+
+  test('grep errors fail the sync and preserve the cache even with partial output', async () => {
+    const before = snapshot();
+    const result = await readWithPrelude(`
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+childProcess.execFileSync = () => {
+  throw Object.assign(new Error('grep traversal failed'), {
+    status: 2, stdout: ${JSON.stringify(path.join(vault, 'projects/keep.md') + '\n')}
+  });
+};
+syncBuiltinESMExports();
+`);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Cannot find task files');
+    expect(snapshot()).toEqual(before);
+  });
+
+  test.each([false, true])('read errors fail the sync and preserve the cache (filtered: %s)', async (filtered) => {
+    const before = snapshot();
+    const file = path.join(vault, 'projects/keep.md');
+    const result = await readWithPrelude(`
+import fs from 'node:fs';
+const originalRead = fs.readFileSync;
+fs.readFileSync = function(file, ...args) {
+  if (file === ${JSON.stringify(file)}) throw new Error('read denied');
+  return originalRead.call(this, file, ...args);
+};
+`, filtered ? { fileFilter: rel('projects/keep.md') } : {});
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Cannot read task file');
+    expect(snapshot()).toEqual(before);
+  });
+
   test('full sync drops rows of a newly excluded folder, at any depth', async () => {
     await fullSync({ ...cfg, exclude_paths: 'templates,.obsidian,archive,exports/bear' });
     expect(filesInDb()).toEqual(['exports/other/note.md', 'projects/drink-less.md', 'projects/keep.md']);
@@ -115,7 +187,7 @@ describe('stale rows for files no longer in the source (#621)', () => {
     expect(db.prepare('SELECT count(*) AS n FROM tasks WHERE id LIKE ?').get('%keep.md%').n).toBe(2);
   });
 
-  describe('partial (incremental) reads', () => {
+  describe('plugin-reported reads', () => {
     let stubDir;
     const stub = (output) => {
       fs.writeFileSync(path.join(stubDir, 'read.js'),
@@ -142,6 +214,60 @@ describe('stale rows for files no longer in the source (#621)', () => {
       expect(filesInDb()).not.toContain('projects/keep.md');
       expect(filesInDb()).toContain('projects/drink-less.md');
     });
+
+    test('validation failure preserves the cache before reconciling a moved file', async () => {
+      const before = snapshot();
+      fs.renameSync(path.join(vault, 'projects/keep.md'), path.join(vault, 'projects/moved.md'));
+      const p = stub({
+        entries: [{ id: `${rel('projects/moved.md')}:1`, status: 'open' }],
+        files_processed: [rel('projects/moved.md')],
+        files_complete: true
+      });
+      const result = await syncPluginSource(p, 'local', cfg, ctx, { _caller: 'test' });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('invalid data');
+      expect(snapshot()).toEqual(before);
+    });
+
+    test('insertion failure rolls back reconciliation and processed-file replacement', async () => {
+      const before = snapshot();
+      const metadataBefore = db.prepare('SELECT last_synced_at, extra_data FROM sync_metadata WHERE source = ?').get(SOURCE);
+      fs.renameSync(path.join(vault, 'projects/keep.md'), path.join(vault, 'projects/moved.md'));
+      db.exec(`CREATE TRIGGER reject_task BEFORE INSERT ON tasks
+        WHEN NEW.title = 'Reject me'
+        BEGIN SELECT RAISE(ABORT, 'insertion failed'); END`);
+      const p = stub({
+        entries: [
+          { id: `${rel('projects/drink-less.md')}:1`, title: 'Replacement', status: 'open' },
+          { id: `${rel('projects/moved.md')}:1`, title: 'Reject me', status: 'open' }
+        ],
+        files_processed: [rel('projects/drink-less.md'), rel('projects/moved.md')],
+        files_complete: true
+      });
+      await expect(syncPluginSource(p, 'local', cfg, ctx, { _caller: 'test' })).rejects.toThrow('insertion failed');
+      expect(snapshot()).toEqual(before);
+      expect(db.prepare('SELECT last_synced_at, extra_data FROM sync_metadata WHERE source = ?').get(SOURCE)).toEqual(metadataBefore);
+    });
+  });
+
+  test('Unicode paths clear old rows after edits, emptying, and moves', async () => {
+    const file = 'projects/📋.md';
+    write(file, '- [ ] First\n- [ ] Second\n');
+    await fullSync();
+    write(file, '- [ ] Only\n');
+    await syncPluginSource(plugin, 'local', cfg, ctx, { fileFilter: rel(file), _caller: 'test' });
+    expect(db.prepare('SELECT title FROM tasks WHERE id IN (?, ?)').all(
+      `${SOURCE}:${rel(file)}:1`, `${SOURCE}:${rel(file)}:2`
+    )).toEqual([{ title: 'Only' }]);
+    write(file, 'No tasks\n');
+    await syncPluginSource(plugin, 'local', cfg, ctx, { fileFilter: rel(file), _caller: 'test' });
+    expect(filesInDb()).not.toContain(file);
+    write(file, '- [ ] Back\n');
+    await fullSync();
+    fs.renameSync(path.join(vault, file), path.join(vault, 'projects/moved.md'));
+    await fullSync();
+    expect(filesInDb()).not.toContain(file);
+    expect(filesInDb()).toContain('projects/moved.md');
   });
 
   test('per-file deletes match the exact path, not a LIKE pattern', async () => {

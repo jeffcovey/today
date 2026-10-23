@@ -9,7 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 
 // Read config from environment
@@ -112,16 +112,17 @@ function findAllTaskFiles() {
     // then applies the full rule, including multi-segment paths.
     const excludeArgs = excludePaths
       .filter(p => !p.includes('/'))
-      .map(p => `--exclude-dir="${p}"`)
-      .join(' ');
+      .map(p => `--exclude-dir=${p}`);
 
     // Find files containing task checkboxes using grep -r
-    const cmd = `grep -rl ${excludeArgs} --include="*.md" "^- \\[[x ]\\]" "${rootDir}" 2>/dev/null || true`;
-    return execSync(cmd, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    return execFileSync('grep', [
+      '-rl', ...excludeArgs, '--include=*.md', '--', '^- \\[[x ]\\]', rootDir
+    ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
       .split('\n')
       .filter(f => f.trim())
       .filter(f => !isExcluded(f));
   } catch (error) {
+    if (error.status === 1) return []; // grep found no matches
     console.error(JSON.stringify({ error: `Cannot find task files: ${error.message}` }));
     process.exit(1);
   }
@@ -148,14 +149,15 @@ const taskRegex = /^- \[([x ])\] (.+)$/;
 
 for (const filePath of filesToSync) {
   const relativePath = path.relative(projectRoot, filePath);
-  filesProcessed.push(relativePath);
 
   let content;
   try {
     content = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    continue;
+  } catch (error) {
+    console.error(JSON.stringify({ error: `Cannot read task file ${relativePath}: ${error.message}` }));
+    process.exit(1);
   }
+  filesProcessed.push(relativePath);
 
   const lines = content.split('\n');
 

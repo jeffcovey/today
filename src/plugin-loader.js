@@ -871,6 +871,30 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
+  // Get the standardized table name for this plugin type
+  const tableName = getTableNameForType(plugin.type);
+  if (!tableName) {
+    return {
+      success: false,
+      count: 0,
+      message: `Unknown plugin type: ${plugin.type}`
+    };
+  }
+
+  // Validate before making any loader-managed changes to the cached rows.
+  const validation = validateEntries(plugin.type, entries, {
+    pluginName: sourceId,
+    logger: console
+  });
+
+  if (!validation.valid) {
+    return {
+      success: false,
+      count: 0,
+      message: `Plugin ${sourceId} returned invalid data (${validation.errors.length} errors)`
+    };
+  }
+
   // Reconcile rows of files that should no longer have any (#621): files
   // deleted or moved away, and — when the plugin says its scan was complete —
   // files it no longer reads at all (excluded, emptied of tasks). A filtered
@@ -884,10 +908,9 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // immediately triggers a filtered sync. Unless the scan was complete, the
   // file must actually be gone.
   let reconciledDeletions = 0;
-  if (isFileBased && Array.isArray(filesProcessed)) {
-    const reconcileTable = getTableNameForType(plugin.type);
-    if (reconcileTable) {
-      reconciledDeletions = reconcileFileRows(db, reconcileTable, sourceId, filesProcessed, {
+  const reconcileFiles = () => {
+    if (isFileBased && Array.isArray(filesProcessed)) {
+      reconciledDeletions = reconcileFileRows(db, tableName, sourceId, filesProcessed, {
         complete: result.data.files_complete === true,
         requested: fileFilter ? fileFilter.split(',').map(f => f.trim()).filter(Boolean) : []
       });
@@ -896,33 +919,18 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
       // processed files. Those files yielded nothing (emptied, or now
       // excluded), so clear their rows here.
       if (entries.length === 0 && isIncremental && filesProcessed.length > 0) {
-        db.transaction(() => {
-          for (const file of filesProcessed) {
-            reconciledDeletions += deleteRowsForFile(db, reconcileTable, sourceId, file);
-          }
-        })();
+        for (const file of filesProcessed) {
+          reconciledDeletions += deleteRowsForFile(db, tableName, sourceId, file);
+        }
       }
     }
-  }
-
-  // Get the standardized table name for this plugin type
-  const tableName = getTableNameForType(plugin.type);
-  if (!tableName) {
-    return {
-      success: false,
-      count: 0,
-      message: `Unknown plugin type: ${plugin.type}`
-    };
-  }
+  };
 
   let extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
   if (isFileBased) {
     const fingerprint = fileFilter ? previousFingerprint : configFingerprint;
     if (fingerprint) extraData = { ...(extraData || {}), config_fingerprint: fingerprint };
   }
-  const reconciledMsg = reconciledDeletions > 0
-    ? `\n    Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`
-    : '';
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged || 0);
   const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
   const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
@@ -964,6 +972,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   let reconcileMsg = buildReconcileMsg(reconcileReport);
 
   if (entries.length === 0 && isIncremental) {
+    db.transaction(reconcileFiles)();
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
       updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
@@ -983,22 +992,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  // Validate entries against schema
-  const validation = validateEntries(plugin.type, entries, {
-    pluginName: sourceId,
-    logger: console
-  });
-
-  if (!validation.valid) {
-    return {
-      success: false,
-      count: 0,
-      message: `Plugin ${sourceId} returned invalid data (${validation.errors.length} errors)`
-    };
-  }
-
-  // Insert entries with source identifier
-  const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  // Reconciliation and replacement must commit together or preserve the old snapshot.
+  const count = db.transaction(() => {
+    reconcileFiles();
+    return insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  })();
+  const reconciledMsg = reconciledDeletions > 0
+    ? `\n    Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`
+    : '';
   reconcileReport = await runFinanceReconcile();
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
@@ -1219,8 +1220,8 @@ function getTableNameForType(pluginType) {
 function deleteRowsForFile(db, tableName, sourceId, file) {
   const prefix = `${sourceId}:${file}:`;
   return db.prepare(
-    `DELETE FROM ${tableName} WHERE source = ? AND substr(id, 1, ?) = ?`
-  ).run(sourceId, prefix.length, prefix).changes;
+    `DELETE FROM ${tableName} WHERE source = ? AND substr(id, 1, length(?)) = ?`
+  ).run(sourceId, prefix, prefix).changes;
 }
 
 /**
@@ -1261,7 +1262,9 @@ function reconcileFileRows(db, tableName, sourceId, filesProcessed, { complete =
   // not mounted, directory renamed), not a source the user emptied: keep the
   // cache, except for files a filtered sync named explicitly — the watcher
   // reporting a deletion is exactly that case (#508).
-  const unreachable = !complete && processed.size === 0 && stale.length === candidates.size;
+  const unreachable = processed.size === 0 && [...candidates].every(
+    file => !fs.existsSync(path.resolve(PROJECT_ROOT, file))
+  );
   const requestedSet = new Set(requested);
   const toDelete = unreachable ? stale.filter(file => requestedSet.has(file)) : stale;
   if (toDelete.length === 0) return 0;
