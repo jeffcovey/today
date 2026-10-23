@@ -244,7 +244,9 @@ fs.readFileSync = function(file, ...args) {
         files_processed: [rel('projects/drink-less.md'), rel('projects/moved.md')],
         files_complete: true
       });
-      await expect(syncPluginSource(p, 'local', cfg, ctx, { _caller: 'test' })).rejects.toThrow('insertion failed');
+      const outcome = await syncPluginSource(p, 'local', cfg, ctx, { _caller: 'test' })
+        .catch(error => error.message);
+      expect(outcome).toBe('insertion failed');
       expect(snapshot()).toEqual(before);
       expect(db.prepare('SELECT last_synced_at, extra_data FROM sync_metadata WHERE source = ?').get(SOURCE)).toEqual(metadataBefore);
     });
