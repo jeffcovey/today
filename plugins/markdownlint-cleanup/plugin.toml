@@ -11,7 +11,8 @@ longDescription = """
 Runs markdownlint-cli2 with --fix to automatically correct markdown formatting
 issues in your vault files.
 
-This plugin requires markdownlint-cli2 to be installed (included in devDependencies).
+This plugin uses the markdownlint Node API directly, so it needs no external
+command-line tool.
 
 ## Common Fixes
 

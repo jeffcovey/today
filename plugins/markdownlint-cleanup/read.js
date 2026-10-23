@@ -13,10 +13,14 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { glob } from 'glob';
 import { lint, readConfig } from 'markdownlint/sync';
 import { applyFixes } from 'markdownlint';
-import { getChangedFilePaths, updateBaseline, getBaselineStatus } from '../../src/vault-changes.js';
+import {
+  getChangedFilePaths,
+  updateBaseline,
+  getBaselineStatus,
+  findAllMarkdownFiles
+} from '../../src/vault-changes.js';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -87,7 +91,7 @@ function sync() {
     console.error('Baseline initialized - subsequent runs will be incremental');
 
     // Do a full lint on first run
-    const allFiles = glob.sync(directory, { cwd: PROJECT_ROOT });
+    const allFiles = findAllMarkdownFiles(path.join(PROJECT_ROOT, vaultDir));
     const result = lintAndFix(allFiles);
     console.log(JSON.stringify({ ...result, mode: 'initial' }));
     return;
