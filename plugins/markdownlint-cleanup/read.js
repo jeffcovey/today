@@ -91,7 +91,7 @@ function sync() {
     console.error('Baseline initialized - subsequent runs will be incremental');
 
     // Do a full lint on first run
-    const allFiles = findAllMarkdownFiles(path.join(PROJECT_ROOT, vaultDir));
+    const allFiles = findAllMarkdownFiles(path.resolve(PROJECT_ROOT, vaultDir));
     const result = lintAndFix(allFiles);
     console.log(JSON.stringify({ ...result, mode: 'initial' }));
     return;
