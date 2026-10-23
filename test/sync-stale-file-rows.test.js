@@ -173,19 +173,22 @@ fs.readFileSync = function(file, ...args) {
     expect(processed).not.toContain(rel('projects/keep.md'));
   });
 
-  test('the cache is preserved if the vault disappears between discovery and reading', async () => {
+  test.each([false, true])('the cache is preserved if the vault disappears during reading (after a successful read: %s)', async (afterRead) => {
     const before = snapshot();
     const result = await readWithPrelude(`
 import fs from 'node:fs';
 const originalRead = fs.readFileSync;
+let reads = 0;
 fs.readFileSync = function(file, ...args) {
-  if (typeof file === 'string' && file.startsWith(${JSON.stringify(vault + path.sep)})) {
+  if (typeof file === 'string' && file.startsWith(${JSON.stringify(vault + path.sep)})
+      && reads++ >= ${afterRead ? 1 : 0}) {
     fs.rmSync(${JSON.stringify(vault)}, { recursive: true, force: true });
   }
   return originalRead.call(this, file, ...args);
 };
 `);
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Cannot read task file');
     expect(snapshot()).toEqual(before);
   });
 
