@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync, spawnSync, execFile } from 'child_process';
 import { promisify } from 'util';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import { parse as parseToml } from 'smol-toml';
 import { getFullConfig, getVaultPath, getAbsoluteVaultPath, getConfigPath } from './config.js';
@@ -21,6 +22,10 @@ const PROCESS_GROUP_SHUTDOWN_KILL_GRACE_MS = 2 * 1000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+// Plugin types whose rows are keyed by `${sourceId}:${file}:${line}` and
+// reconciled per file against the vault.
+const FILE_BASED_TYPES = new Set(['tasks', 'time-logs']);
 const execFileAsync = promisify(execFile);
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
@@ -782,9 +787,19 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const syncMeta = getSyncMetadata(db, sourceId);
   const lastSyncTime = syncMeta?.last_synced_at || null;
 
+  // File-based sources: a config change (e.g. a new exclude_paths) changes
+  // which files should have rows at all, and an incremental read only looks at
+  // files whose content changed. Force a full read so stale rows reconcile
+  // (#621). A filtered sync keeps the previous fingerprint, since it does not
+  // rescan the source.
+  const isFileBased = FILE_BASED_TYPES.has(plugin.type);
+  const previousFingerprint = isFileBased ? parseExtraData(syncMeta?.extra_data)?.config_fingerprint : undefined;
+  const configFingerprint = isFileBased ? fingerprintConfig(sourceConfig) : undefined;
+  const configChanged = isFileBased && !fileFilter && previousFingerprint !== configFingerprint;
+
   // Build environment variables for read command
   const envVars = {
-    LAST_SYNC_TIME: lastSyncTime || '',
+    LAST_SYNC_TIME: configChanged ? '' : (lastSyncTime || ''),
     SOURCE_ID: sourceId
   };
 
@@ -856,42 +871,6 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  // Reconcile deletions for targeted (fileFilter) syncs of file-based plugins.
-  // A deleted file is requested in the fileFilter but never appears in
-  // files_processed — the plugin skips paths that no longer exist — so its rows
-  // would otherwise be orphaned in the DB and keep surfacing (e.g. in the task
-  // timer). Emptied-but-existing files already reconcile via files_processed.
-  //
-  // "Requested but not processed" is NOT sufficient on its own: a reader may
-  // also skip a file it could not read coherently because a writer was mid-
-  // update (#508). Treating that as a deletion purged every row of a file that
-  // was sitting intact on disk — on this very path, since stopping a timer
-  // writes the month file and immediately triggers a filtered sync. Require the
-  // file to actually be gone.
-  let reconciledDeletions = 0;
-  if (fileFilter && (plugin.type === 'tasks' || plugin.type === 'time-logs')) {
-    const reconcileTable = getTableNameForType(plugin.type);
-    if (reconcileTable) {
-      const processed = new Set(filesProcessed || []);
-      const deletedFiles = fileFilter
-        .split(',')
-        .map(f => f.trim())
-        .filter(f => f && !processed.has(f))
-        .filter(f => !fs.existsSync(path.join(PROJECT_ROOT, f)));
-      if (deletedFiles.length > 0) {
-        // Escape LIKE wildcards (% _ \) in the file path so e.g. a filename with
-        // underscores can't match unrelated rows.
-        const escapeLike = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
-        const deleteStmt = db.prepare(
-          `DELETE FROM ${reconcileTable} WHERE source = ? AND id LIKE ? ESCAPE '\\'`
-        );
-        for (const file of deletedFiles) {
-          reconciledDeletions += deleteStmt.run(sourceId, `${sourceId}:${escapeLike(file)}:%`).changes;
-        }
-      }
-    }
-  }
-
   // Get the standardized table name for this plugin type
   const tableName = getTableNameForType(plugin.type);
   if (!tableName) {
@@ -902,7 +881,56 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  const extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
+  // Validate before making any loader-managed changes to the cached rows.
+  const validation = validateEntries(plugin.type, entries, {
+    pluginName: sourceId,
+    logger: console
+  });
+
+  if (!validation.valid) {
+    return {
+      success: false,
+      count: 0,
+      message: `Plugin ${sourceId} returned invalid data (${validation.errors.length} errors)`
+    };
+  }
+
+  // Reconcile rows of files that should no longer have any (#621): files
+  // deleted or moved away, and — when the plugin says its scan was complete —
+  // files it no longer reads at all (excluded, emptied of tasks). A filtered
+  // sync never sees a deleted file in files_processed (the plugin skips paths
+  // that no longer exist), and neither does an incremental one.
+  //
+  // "Not processed" is NOT sufficient on its own for a partial scan: a reader
+  // may skip a file it could not read coherently because a writer was mid-
+  // update (#508). Treating that as a deletion purged every row of a file that
+  // was sitting intact on disk — stopping a timer writes the month file and
+  // immediately triggers a filtered sync. Unless the scan was complete, the
+  // file must actually be gone.
+  let reconciledDeletions = 0;
+  const reconcileFiles = () => {
+    if (isFileBased && Array.isArray(filesProcessed)) {
+      reconciledDeletions = reconcileFileRows(db, tableName, sourceId, filesProcessed, {
+        complete: result.data.files_complete === true,
+        requested: fileFilter ? fileFilter.split(',').map(f => f.trim()).filter(Boolean) : []
+      });
+      // An incremental read with no entries returns early below without
+      // reaching insertEntries, which is what normally clears the rows of
+      // processed files. Those files yielded nothing (emptied, or now
+      // excluded), so clear their rows here.
+      if (entries.length === 0 && isIncremental && filesProcessed.length > 0) {
+        for (const file of filesProcessed) {
+          reconciledDeletions += deleteRowsForFile(db, tableName, sourceId, file);
+        }
+      }
+    }
+  };
+
+  let extraData = pluginMetadata?.folder_state ? { folder_state: pluginMetadata.folder_state } : null;
+  if (isFileBased) {
+    const fingerprint = fileFilter ? previousFingerprint : configFingerprint;
+    if (fingerprint) extraData = { ...(extraData || {}), config_fingerprint: fingerprint };
+  }
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged || 0);
   const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
   const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
@@ -944,11 +972,12 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   let reconcileMsg = buildReconcileMsg(reconcileReport);
 
   if (entries.length === 0 && isIncremental) {
+    db.transaction(reconcileFiles)();
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
       updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
       const messages = [];
-      if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted file(s)`);
+      if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
       return {
         success: true,
@@ -963,22 +992,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     };
   }
 
-  // Validate entries against schema
-  const validation = validateEntries(plugin.type, entries, {
-    pluginName: sourceId,
-    logger: console
-  });
-
-  if (!validation.valid) {
-    return {
-      success: false,
-      count: 0,
-      message: `Plugin ${sourceId} returned invalid data (${validation.errors.length} errors)`
-    };
-  }
-
-  // Insert entries with source identifier
-  const count = insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  // Reconciliation and replacement must commit together or preserve the old snapshot.
+  const count = db.transaction(() => {
+    reconcileFiles();
+    return insertEntries(db, tableName, plugin.type, entries, sourceId, filesProcessed);
+  })();
+  const reconciledMsg = reconciledDeletions > 0
+    ? `\n    Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`
+    : '';
   reconcileReport = await runFinanceReconcile();
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
@@ -1178,7 +1199,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconciledMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
   };
 }
 
@@ -1188,6 +1209,90 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
  */
 function getTableNameForType(pluginType) {
   return getTableName(pluginType);
+}
+
+/**
+ * Delete every row of one file for a file-based source. Row ids are
+ * `${sourceId}:${file}:${line}`. Matched with an exact prefix comparison rather
+ * than LIKE, which is case-insensitive and treats `_` in paths as a wildcard.
+ * @returns {number} rows deleted
+ */
+function deleteRowsForFile(db, tableName, sourceId, file) {
+  const prefix = `${sourceId}:${file}:`;
+  return db.prepare(
+    `DELETE FROM ${tableName} WHERE source = ? AND substr(id, 1, length(?)) = ?`
+  ).run(sourceId, prefix, prefix).changes;
+}
+
+/**
+ * The file part of a file-based row id (`${sourceId}:${file}:${line}`).
+ * @returns {string|null}
+ */
+function fileFromRowId(id, sourceId) {
+  const prefix = `${sourceId}:`;
+  if (typeof id !== 'string' || !id.startsWith(prefix)) return null;
+  const rest = id.slice(prefix.length);
+  const lastColon = rest.lastIndexOf(':');
+  return lastColon > 0 ? rest.slice(0, lastColon) : null;
+}
+
+/**
+ * Remove rows of a file-based source whose file was not part of this read and
+ * should no longer contribute rows: the file is gone from disk, or the plugin
+ * reported a complete scan (so any file it did not process has no rows).
+ * Files in filesProcessed are left alone — insertEntries replaces their rows.
+ * @param {object} options
+ * @param {boolean} [options.complete] - plugin's files_processed lists every
+ *   file that should have rows for this source
+ * @param {string[]} [options.requested] - files a filtered sync asked for
+ * @returns {number} rows deleted
+ */
+function reconcileFileRows(db, tableName, sourceId, filesProcessed, { complete = false, requested = [] } = {}) {
+  const processed = new Set(filesProcessed);
+  const candidates = new Set();
+  for (const { id } of db.prepare(`SELECT id FROM ${tableName} WHERE source = ?`).all(sourceId)) {
+    const file = fileFromRowId(id, sourceId);
+    if (file && !processed.has(file)) candidates.add(file);
+  }
+  const stale = [...candidates].filter(
+    file => complete || !fs.existsSync(path.resolve(PROJECT_ROOT, file))
+  );
+  if (stale.length === 0) return 0;
+  // Every file gone and nothing read looks like an unreachable source (vault
+  // not mounted, directory renamed), not a source the user emptied: keep the
+  // cache, except for files a filtered sync named explicitly — the watcher
+  // reporting a deletion is exactly that case (#508).
+  const unreachable = processed.size === 0 && [...candidates].every(
+    file => !fs.existsSync(path.resolve(PROJECT_ROOT, file))
+  );
+  const requestedSet = new Set(requested);
+  const toDelete = unreachable ? stale.filter(file => requestedSet.has(file)) : stale;
+  if (toDelete.length === 0) return 0;
+  let deleted = 0;
+  db.transaction(() => {
+    for (const file of toDelete) deleted += deleteRowsForFile(db, tableName, sourceId, file);
+  })();
+  return deleted;
+}
+
+function parseExtraData(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function fingerprintConfig(sourceConfig) {
+  const stable = (value) => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.keys(value).sort().map(k => [k, stable(value[k])]));
+    }
+    return value;
+  };
+  return createHash('sha256').update(JSON.stringify(stable(sourceConfig || {}))).digest('hex').slice(0, 16);
 }
 
 /**
@@ -1237,9 +1342,8 @@ function insertEntries(db, tableName, pluginType, entries, sourceId, filesProces
     if ((pluginType === 'time-logs' || pluginType === 'tasks') && filesProcessed && filesProcessed.length > 0) {
       // For file-based plugins, delete entries from re-processed files before re-inserting
       // This handles line number shifts when files are edited
-      const deleteStmt = db.prepare(`DELETE FROM ${tableName} WHERE source = ? AND id LIKE ?`);
       for (const file of filesProcessed) {
-        deleteStmt.run(sourceId, `${sourceId}:${file}:%`);
+        deleteRowsForFile(db, tableName, sourceId, file);
       }
     } else if (!filesProcessed || pluginType === 'events') {
       // Full sync: delete all entries for this source
