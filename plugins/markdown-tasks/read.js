@@ -9,7 +9,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { getChangedFilePaths, getBaselineStatus } from '../../src/vault-changes.js';
 
 // Read config from environment
@@ -21,11 +21,27 @@ const fileFilter = process.env.FILE_FILTER || '';  // Sync only specific file(s)
 const directory = config.directory || process.env.VAULT_PATH;
 const excludePaths = (config.exclude_paths || 'templates,.obsidian')
   .split(',')
-  .map(p => p.trim())
+  .map(p => p.trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, ''))
   .filter(Boolean);
 const includeCompleted = config.include_completed !== false;
 
 const rootDir = path.join(projectRoot, directory);
+
+/**
+ * Whether an absolute file path falls under exclude_paths. One rule for every
+ * sync mode (#621):
+ * - an entry without a slash (e.g. "archive") matches a directory of that
+ *   name at any depth, like grep --exclude-dir;
+ * - an entry with a slash (e.g. "archive/exports/bear") matches that path,
+ *   relative to the tasks directory, and everything under it.
+ */
+function isExcluded(filePath) {
+  const rel = path.relative(rootDir, filePath).split(path.sep).join('/');
+  const dirSegments = rel.split('/').slice(0, -1);
+  return excludePaths.some(exc => exc.includes('/')
+    ? rel === exc || rel.startsWith(`${exc}/`)
+    : dirSegments.includes(exc));
+}
 
 // Check if directory exists
 if (!fs.existsSync(rootDir)) {
@@ -50,10 +66,19 @@ const filterFiles = fileFilter
 // Find markdown files with tasks
 let filesWithTasks;
 let isIncremental = false;
+// True when filesWithTasks is every file in the source that has tasks, so the
+// loader may drop rows of any file not in files_processed (#621).
+let filesComplete = false;
+// Files that were asked about (filtered or changed) but are excluded. They are
+// reported as processed with no entries, so the loader drops any rows they
+// still have from before they were excluded.
+let excludedFiles = [];
 
 // If file filter is specified, only process those files
 if (filterFiles) {
-  filesWithTasks = filterFiles.filter(f => fs.existsSync(f));
+  const existing = filterFiles.filter(f => fs.existsSync(f));
+  excludedFiles = existing.filter(isExcluded);
+  filesWithTasks = existing.filter(f => !isExcluded(f));
   isIncremental = true;
 } else if (lastSyncDate) {
   // Use vault-changes for efficient incremental sync
@@ -65,37 +90,39 @@ if (filterFiles) {
       todayOnly: false,
       includeGit: false
     });
-    // Filter to only include files that might have tasks
-    filesWithTasks = changedFiles.filter(f => {
-      // Skip excluded paths
-      const relativePath = path.relative(rootDir, f);
-      return !excludePaths.some(exc => relativePath.startsWith(exc));
-    });
+    excludedFiles = changedFiles.filter(isExcluded);
+    filesWithTasks = changedFiles.filter(f => !isExcluded(f));
     isIncremental = true;
   } else {
     // No baseline yet - fall back to grep for first run
     filesWithTasks = findAllTaskFiles();
+    filesComplete = true;
     isIncremental = true;
   }
 } else {
   // Full sync - find all files with tasks using grep -r
   filesWithTasks = findAllTaskFiles();
+  filesComplete = true;
 }
 
 // Helper function to find all task files via grep
 function findAllTaskFiles() {
   try {
-    // Build exclude args for grep
+    // grep prunes single-name exclusions while walking (cheap); isExcluded()
+    // then applies the full rule, including multi-segment paths.
     const excludeArgs = excludePaths
-      .map(p => `--exclude-dir="${p}"`)
-      .join(' ');
+      .filter(p => !p.includes('/'))
+      .map(p => `--exclude-dir=${p}`);
 
     // Find files containing task checkboxes using grep -r
-    const cmd = `grep -rl ${excludeArgs} --include="*.md" "^- \\[[x ]\\]" "${rootDir}" 2>/dev/null || true`;
-    return execSync(cmd, { encoding: 'utf8' })
+    return execFileSync('grep', [
+      '-rl', ...excludeArgs, '--include=*.md', '--', '^- \\[[x ]\\]', rootDir
+    ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
       .split('\n')
-      .filter(f => f.trim());
+      .filter(f => f.trim())
+      .filter(f => !isExcluded(f));
   } catch (error) {
+    if (error.status === 1) return []; // grep found no matches
     console.error(JSON.stringify({ error: `Cannot find task files: ${error.message}` }));
     process.exit(1);
   }
@@ -122,14 +149,16 @@ const taskRegex = /^- \[([x ])\] (.+)$/;
 
 for (const filePath of filesToSync) {
   const relativePath = path.relative(projectRoot, filePath);
-  filesProcessed.push(relativePath);
 
   let content;
   try {
     content = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    continue;
+  } catch (error) {
+    if (error.code === 'ENOENT' && fs.existsSync(rootDir)) continue; // File disappeared after discovery
+    console.error(JSON.stringify({ error: `Cannot read task file ${relativePath}: ${error.message}` }));
+    process.exit(1);
   }
+  filesProcessed.push(relativePath);
 
   const lines = content.split('\n');
 
@@ -168,11 +197,16 @@ for (const filePath of filesToSync) {
   }
 }
 
+for (const filePath of excludedFiles) {
+  filesProcessed.push(path.relative(projectRoot, filePath));
+}
+
 // Output JSON
 console.log(JSON.stringify({
   entries,
   files_processed: filesProcessed,
-  incremental: isIncremental
+  incremental: isIncremental,
+  files_complete: filesComplete
 }));
 
 /**

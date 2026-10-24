@@ -33,7 +33,8 @@ function loadCommonJsContext(prefersDark = false) {
       documentElement: {
         dataset: {},
         setAttribute(name, value) {
-          this.dataset[name.replace(/^data-/, '')] = value;
+          const key = name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          this.dataset[key] = value;
         },
       },
     },
@@ -67,6 +68,20 @@ describe('theme behavior', () => {
     expect(context.getThemeMode()).toBe('system');
     expect(() => context.applyTheme()).not.toThrow();
     expect(context.document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  test('applyTheme keeps the MDB and Bootstrap theme attributes in sync', () => {
+    const context = loadCommonJsContext(true);
+
+    context.applyTheme('light');
+    expect(context.document.documentElement.dataset.theme).toBe('light');
+    expect(context.document.documentElement.dataset.mdbTheme).toBe('light');
+    expect(context.document.documentElement.dataset.bsTheme).toBe('light');
+
+    context.applyTheme('system');
+    expect(context.document.documentElement.dataset.theme).toBe('dark');
+    expect(context.document.documentElement.dataset.mdbTheme).toBe('dark');
+    expect(context.document.documentElement.dataset.bsTheme).toBe('dark');
   });
 
   test('theme mode cycle order is system -> dark -> light -> system', () => {
@@ -115,6 +130,32 @@ describe('role reply submission', () => {
     resolveFetch({ ok: true, json: async () => ({}) });
     await Promise.all([firstSubmission, repeatedSubmission]);
   });
+
+  test('bootstrap sets the theme, MDB and Bootstrap attributes before first paint', () => {
+    const script = getThemeBootstrapScript().slice('<script>'.length, -'</script>'.length);
+    const documentElement = { dataset: {}, style: {}, appendChild() {} };
+    const context = {
+      CSS: { supports: () => false },
+      document: {
+        documentElement,
+        createElement: () => ({ style: {}, remove() {} }),
+        addEventListener: () => {},
+      },
+      getComputedStyle: () => ({ fontSize: '17px' }),
+      localStorage: { getItem: () => null },
+      navigator: { userAgent: 'Mozilla/5.0', platform: 'Linux', maxTouchPoints: 0 },
+      window: {
+        addEventListener: () => {},
+        matchMedia: () => ({ matches: true }),
+      },
+    };
+
+    vm.runInNewContext(script, context);
+
+    expect(documentElement.dataset.theme).toBe('dark');
+    expect(documentElement.dataset.mdbTheme).toBe('dark');
+    expect(documentElement.dataset.bsTheme).toBe('dark');
+  });
 });
 
 describe('navbar rendering', () => {
@@ -158,6 +199,7 @@ describe('navbar rendering', () => {
     context.setThemeMode('light');
     expect(context.localStorage.getItem('todayThemeMode')).toBe('light');
     expect(context.document.documentElement.dataset.theme).toBe('light');
+    expect(context.document.documentElement.dataset.mdbTheme).toBe('light');
     expect(buttons[0].classes.has('active')).toBe(true);
     expect(buttons[0].attrs['aria-pressed']).toBe('true');
     expect(buttons[2].classes.has('active')).toBe(false);

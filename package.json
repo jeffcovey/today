@@ -78,6 +78,7 @@
     "markdownlint-cli2": "^0.24.0"
   },
   "overrides": {
-    "smol-toml": "^1.8.0"
+    "smol-toml": "^1.8.0",
+    "katex": "^0.19.1"
   }
 }
