@@ -287,9 +287,16 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
       throw new Error(`${pageSpec.path} returned ${response ? response.status() : 'no response'}`);
     }
 
-    const appliedTheme = await page.evaluate(() => document.documentElement.dataset.theme);
-    if (appliedTheme !== theme) {
-      throw new Error(`${pageSpec.path}: expected data-theme="${theme}", got "${appliedTheme}"`);
+    // MDB and Bootstrap switch their own components on their own attributes, so
+    // all three have to agree or half the page stays in the other theme.
+    const applied = await page.evaluate(() => {
+      const { theme, mdbTheme, bsTheme } = document.documentElement.dataset;
+      return { 'data-theme': theme, 'data-mdb-theme': mdbTheme, 'data-bs-theme': bsTheme };
+    });
+    for (const [attribute, value] of Object.entries(applied)) {
+      if (value !== theme) {
+        throw new Error(`${pageSpec.path}: expected ${attribute}="${theme}", got "${value}"`);
+      }
     }
 
     if (pageSpec.openDiff) {

@@ -33,9 +33,19 @@ function updateThemeToggle(mode, effectiveTheme) {
   }
 }
 
+// MDB and Bootstrap read their own attributes to switch their components
+// (buttons, form controls, tables, alerts) between light and dark, so keep all
+// three in sync. Mirrors getThemeBootstrapScript() in src/web/navbar.js.
+function setThemeAttributes(effectiveTheme) {
+  const root = document.documentElement;
+  root.setAttribute('data-theme', effectiveTheme);
+  root.setAttribute('data-mdb-theme', effectiveTheme);
+  root.setAttribute('data-bs-theme', effectiveTheme);
+}
+
 function applyTheme(mode = getThemeMode()) {
   const effectiveTheme = getEffectiveTheme(mode);
-  document.documentElement.setAttribute('data-theme', effectiveTheme);
+  setThemeAttributes(effectiveTheme);
   updateThemeToggle(mode, effectiveTheme);
 }
 
@@ -59,7 +69,7 @@ function initializeTheme() {
   const mode = getThemeMode();
   const effectiveTheme = getEffectiveTheme(mode);
   if (!document.documentElement.dataset.theme) {
-    document.documentElement.setAttribute('data-theme', effectiveTheme);
+    setThemeAttributes(effectiveTheme);
   }
   updateThemeToggle(mode, effectiveTheme);
 
