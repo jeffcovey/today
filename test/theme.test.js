@@ -115,7 +115,7 @@ describe('theme behavior', () => {
       return Promise.resolve({ ok: true });
     };
 
-    context.setThemeMode('dark');
+    await context.setThemeMode('dark');
 
     expect(context.document.documentElement.dataset.theme).toBe('dark');
     expect(context.localStorage.getItem('todayThemeMode')).toBe('dark');
@@ -123,11 +123,26 @@ describe('theme behavior', () => {
     expect(posted).toEqual([{ url: '/api/theme', mode: 'dark' }]);
   });
 
+  test('setThemeMode resolves after the server save', async () => {
+    const context = loadCommonJsContext();
+    let resolveSave;
+    context.fetch = () => new Promise(resolve => { resolveSave = resolve; });
+
+    let saved = false;
+    const pending = context.setThemeMode('dark').then(() => { saved = true; });
+    await Promise.resolve();
+    expect(saved).toBe(false);
+
+    resolveSave({ ok: true });
+    await pending;
+    expect(saved).toBe(true);
+  });
+
   test('a server that rejects the change still leaves the theme applied', async () => {
     const context = loadCommonJsContext();
     context.fetch = () => Promise.reject(new Error('offline'));
 
-    expect(() => context.setThemeMode('dark')).not.toThrow();
+    await expect(context.setThemeMode('dark')).resolves.toBeUndefined();
     expect(context.document.documentElement.dataset.theme).toBe('dark');
     expect(context.localStorage.getItem('todayThemeMode')).toBe('dark');
   });

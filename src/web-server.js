@@ -252,6 +252,8 @@ const deferredBlocks = new DeferredBlockRegistry();
 const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
+// Bump when rendered HTML or the head bootstrap changes.
+const HTML_CACHE_RENDER_VERSION = 1;
 
 // Disk-based HTML cache (persists across server restarts)
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
@@ -283,7 +285,7 @@ async function readFromDiskCache(urlPath, sourceMtime) {
   try {
     const metaRaw = await fs.readFile(metaPath, 'utf-8');
     const meta = JSON.parse(metaRaw);
-    if (meta.mtime !== sourceMtime) return null; // stale
+    if (meta.mtime !== sourceMtime || meta.renderVersion !== HTML_CACHE_RENDER_VERSION) return null;
     const html = await fs.readFile(htmlPath, 'utf-8');
     return html;
   } catch {
@@ -298,7 +300,11 @@ async function writeToDiskCache(urlPath, html, sourceMtime) {
   try {
     await fs.mkdir(path.dirname(htmlPath), { recursive: true });
     await fs.writeFile(htmlPath, html, 'utf-8');
-    await fs.writeFile(metaPath, JSON.stringify({ mtime: sourceMtime, timestamp: Date.now() }), 'utf-8');
+    await fs.writeFile(metaPath, JSON.stringify({
+      mtime: sourceMtime,
+      renderVersion: HTML_CACHE_RENDER_VERSION,
+      timestamp: Date.now()
+    }), 'utf-8');
   } catch (err) {
     debug('Failed to write disk cache:', err.message);
   }

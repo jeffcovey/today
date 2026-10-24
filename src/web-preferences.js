@@ -10,6 +10,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -91,7 +92,7 @@ export async function setStoredThemeMode(mode) {
   const preferencesPath = getPreferencesPath();
 
   await fs.mkdir(path.dirname(preferencesPath), { recursive: true });
-  const tempPath = `${preferencesPath}.${process.pid}.tmp`;
+  const tempPath = `${preferencesPath}.${process.pid}.${randomUUID()}.tmp`;
   await fs.writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
   await fs.rename(tempPath, preferencesPath);
 

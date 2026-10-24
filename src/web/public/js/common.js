@@ -95,7 +95,7 @@ function setThemeMode(mode) {
   try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* storage blocked */ }
   writeThemeCookie(next);
   applyTheme(next);
-  saveThemeMode(next);
+  return saveThemeMode(next);
 }
 
 function saveThemeMode(mode) {

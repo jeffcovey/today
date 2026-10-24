@@ -49,6 +49,16 @@ describe('web preferences', () => {
     }
   });
 
+  test('overlapping saves use independent temporary files', async () => {
+    await expect(Promise.all([
+      setStoredThemeMode('light'),
+      setStoredThemeMode('dark')
+    ])).resolves.toEqual(['light', 'dark']);
+
+    expect(['light', 'dark']).toContain(await getStoredThemeMode());
+    expect(await fs.readdir(workDir)).toEqual(['web-preferences.json']);
+  });
+
   test('the stored file is the plain JSON it looks like', async () => {
     await setStoredThemeMode('dark');
     const raw = await fs.readFile(getPreferencesPath(), 'utf-8');

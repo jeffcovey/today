@@ -269,12 +269,20 @@ async function gotoAndVerifyAssets(page, url) {
 }
 
 /**
- * Ask for a theme the way the app decides one. The stored preference is shared
- * by every device and the fixture server leaves it at 'system', so the browser's
- * own colour-scheme preference is what selects the theme; localStorage is still
- * seeded as the fallback a browser uses when the cookie is missing.
+ * Set the shared preference and browser colour scheme before loading a page.
  */
-export async function useTheme(page, theme) {
+export async function useTheme(page, theme, baseUrl) {
+  const response = await fetch(`${baseUrl}/api/theme`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + PASSWORD,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ mode: theme })
+  });
+  if (!response.ok) {
+    throw new Error(`Could not set fixture theme: ${response.status}`);
+  }
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
   await page.evaluateOnNewDocument((mode) => {
     try { localStorage.setItem('todayThemeMode', mode); } catch { /* storage blocked */ }
@@ -291,7 +299,7 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
   const page = await browser.newPage();
   try {
     await page.setViewport(VIEWPORTS[viewport]);
-    await useTheme(page, theme);
+    await useTheme(page, theme, baseUrl);
     if (!pageSpec.public) {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
     }
@@ -409,7 +417,7 @@ export async function findPinnedOverlaps(browser, { baseUrl, page: pageSpec, the
   const page = await browser.newPage();
   try {
     await page.setViewport(VIEWPORTS[viewport]);
-    await useTheme(page, theme);
+    await useTheme(page, theme, baseUrl);
     await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
     await gotoAndVerifyAssets(page, baseUrl + pageSpec.path);
     await page.evaluate((y) => window.scrollTo(0, y), scrollY);
