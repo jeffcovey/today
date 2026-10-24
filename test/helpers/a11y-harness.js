@@ -312,12 +312,52 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
         ? { runOnly: { type: 'rule', values: ruleIds } }
         : { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] } };
       const result = await window.axe.run(document, options);
-      return result.violations.map(v => ({
+      const describe = (v) => ({
         id: v.id,
         impact: v.impact,
         help: v.help,
         nodes: v.nodes.map(n => ({ target: n.target.join(' '), summary: n.failureSummary, html: n.html.slice(0, 200) }))
-      }));
+      });
+
+      // axe files short strings — a count badge, a single-letter label — under
+      // `incomplete` rather than `violations`, because it can't tell real text
+      // from decoration. It has measured the contrast all the same, so judge
+      // those itself: anything holding a letter or digit is real text. Other
+      // incomplete reasons (background image, overlapping element) stay out,
+      // since those really are undeterminable and would fail at random.
+      const shortText = result.incomplete
+        .filter(v => v.id === 'color-contrast')
+        .map(v => ({
+          ...describe(v),
+          nodes: v.nodes.filter((n) => {
+            const data = n.any.find(a => a.data?.messageKey === 'shortTextContent')?.data;
+            // axe only hands back a DOM reference when asked, so read the text
+            // off the page, falling back to the markup it reports when the
+            // target names a frame or isn't a selector this document accepts.
+            let node = null;
+            try {
+              node = typeof n.target[0] === 'string' ? document.querySelector(n.target[0]) : null;
+            } catch {
+              node = null;
+            }
+            const text = node ? node.textContent : n.html.replace(/<[^>]*>/g, '');
+            if (!data || !/[\p{L}\p{N}]/u.test(text)) return false;
+            const expected = parseFloat(data.expectedContrastRatio);
+            return Number.isFinite(expected) && data.contrastRatio < expected;
+          }).map((n) => {
+            const data = n.any.find(a => a.data?.messageKey === 'shortTextContent').data;
+            return {
+              target: n.target.join(' '),
+              summary: `Fix any of the following:\n  Element has insufficient colour contrast of ` +
+                `${data.contrastRatio} (foreground ${data.fgColor}, background ${data.bgColor}), ` +
+                `expected ${data.expectedContrastRatio}`,
+              html: n.html.slice(0, 200)
+            };
+          })
+        }))
+        .filter(v => v.nodes.length > 0);
+
+      return [...result.violations.map(describe), ...shortText];
     }, rules || null);
 
     const collapsed = await runAxe();
