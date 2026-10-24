@@ -1441,6 +1441,13 @@ html[data-theme="dark"] .bg-info .text-dark {
   color: #212529 !important;
 }
 
+/* A chip sitting on one of those surfaces keeps its own light background too.
+   Dark mode otherwise turns .bg-light dark while the rule above holds its text
+   at #212529, leaving a count badge dark-on-dark. */
+html[data-theme="dark"] :is(.bg-warning, .bg-info) :is(.bg-light, .bg-white) {
+  background-color: #f8f9fa !important;
+}
+
 html[data-theme="dark"] .table,
 html[data-theme="dark"] .markdown-content table {
   --mdb-table-bg: transparent;
