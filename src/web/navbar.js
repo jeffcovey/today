@@ -25,6 +25,10 @@ export function getThemeBootstrapScript() {
       ? mode
       : (prefersDark ? 'dark' : 'light');
     document.documentElement.dataset.theme = theme;
+    // MDB and Bootstrap read their own attributes to switch their components
+    // (buttons, form controls, tables, alerts) between light and dark.
+    document.documentElement.dataset.mdbTheme = theme;
+    document.documentElement.dataset.bsTheme = theme;
   } catch {
     // Ignore storage/matchMedia failures
   }

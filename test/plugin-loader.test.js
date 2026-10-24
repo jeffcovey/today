@@ -351,9 +351,14 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
 
     test('removes rows for a deleted file while preserving unfiltered and updating existing files', async () => {
       const db = makeTasksDb();
+      // A file outside the filter that is still on disk keeps its rows. (One
+      // that is gone from disk is reconciled too — see sync-stale-file-rows.)
+      const untouchedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'untouched-'));
+      const untouched = path.relative(path.resolve(__dirname, '..'), path.join(untouchedDir, 'untouched.md'));
+      fs.writeFileSync(path.join(untouchedDir, 'untouched.md'), '- [ ] safe\n');
       insertTask(db, 'vault/deleted.md:20', 'orphan');     // in filter, file gone -> delete
       insertTask(db, 'vault/exists.md:1', 'old title');    // in filter, file present -> update
-      insertTask(db, 'vault/untouched.md:5', 'safe');      // not in filter -> keep
+      insertTask(db, `${untouched}:5`, 'safe');            // not in filter, on disk -> keep
 
       const result = await syncPluginSource(plugin, 'default', {}, { db, vaultPath: 'vault' }, {
         fileFilter: 'vault/deleted.md,vault/exists.md',
@@ -361,13 +366,14 @@ console.log(JSON.stringify({ entries, files_processed, incremental: true }));
       });
 
       expect(result.success).toBe(true);
-      expect(ids(db)).toEqual([
-        `${sourceId}:vault/exists.md:1`,
-        `${sourceId}:vault/untouched.md:5`
-      ]);
+      expect(ids(db).sort()).toEqual([
+        `${sourceId}:${untouched}:5`,
+        `${sourceId}:vault/exists.md:1`
+      ].sort());
       expect(
         db.prepare(`SELECT title FROM tasks WHERE id = ?`).get(`${sourceId}:vault/exists.md:1`).title
       ).toBe('kept task');
+      fs.rmSync(untouchedDir, { recursive: true, force: true });
     });
 
     test('reconciles a pure deletion (no entries returned) past the empty-incremental short-circuit', async () => {
