@@ -3,12 +3,44 @@
  */
 
 // Theme functionality
+//
+// The theme is stored on the server so every device agrees. It reaches the
+// browser as a cookie the server sets on each page response, which the head
+// script reads before first paint. localStorage keeps the last known value for
+// when the cookie is missing or blocked, and so a change applies instantly
+// without waiting on the round trip.
 const THEME_STORAGE_KEY = 'todayThemeMode';
+const THEME_COOKIE_NAME = 'todayThemeMode';
+const THEME_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
 let themeMediaQuery = null;
 
+function isThemeMode(mode) {
+  return mode === 'light' || mode === 'dark' || mode === 'system';
+}
+
+function readThemeCookie() {
+  try {
+    const match = (document.cookie || '').match(/(?:^|;\s*)todayThemeMode=([^;]*)/);
+    const mode = match && decodeURIComponent(match[1]);
+    return isThemeMode(mode) ? mode : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeThemeCookie(mode) {
+  try {
+    document.cookie = `${THEME_COOKIE_NAME}=${encodeURIComponent(mode)}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; samesite=lax`;
+  } catch {
+    // Cookies blocked; localStorage still carries this browser through.
+  }
+}
+
 function getThemeMode() {
+  const stored = readThemeCookie();
+  if (stored) return stored;
   const mode = localStorage.getItem(THEME_STORAGE_KEY);
-  return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system';
+  return isThemeMode(mode) ? mode : 'system';
 }
 
 function getEffectiveTheme(mode) {
@@ -56,9 +88,26 @@ function getNextThemeMode(mode) {
 }
 
 function setThemeMode(mode) {
-  const next = mode === 'dark' || mode === 'light' ? mode : 'system';
-  localStorage.setItem(THEME_STORAGE_KEY, next);
+  const next = isThemeMode(mode) ? mode : 'system';
+  // Apply and remember it here first, so the change is instant and survives a
+  // server that is slow or unreachable; then tell the server, for the next
+  // device that asks.
+  try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* storage blocked */ }
+  writeThemeCookie(next);
   applyTheme(next);
+  saveThemeMode(next);
+}
+
+function saveThemeMode(mode) {
+  if (typeof fetch !== 'function') return Promise.resolve();
+  return fetch('/api/theme', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode })
+  }).catch(() => {
+    // Offline or logged out: this browser keeps the choice, and the server
+    // learns it the next time one sticks.
+  });
 }
 
 function cycleThemeMode() {
@@ -71,6 +120,9 @@ function initializeTheme() {
   if (!document.documentElement.dataset.theme) {
     setThemeAttributes(effectiveTheme);
   }
+  // Keep this browser's fallback in step with what the server just told us,
+  // so it stays right if the cookie is later cleared.
+  try { localStorage.setItem(THEME_STORAGE_KEY, mode); } catch { /* storage blocked */ }
   updateThemeToggle(mode, effectiveTheme);
 
   themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

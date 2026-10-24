@@ -16,6 +16,7 @@ import {
   auditPage,
   findPinnedOverlaps,
   openDiff,
+  useTheme,
   PASSWORD,
   PAGES,
   THEMES,
@@ -68,7 +69,7 @@ describe('git page diffs', () => {
   test('dark theme directory headers differ from file rows in the same list', async () => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument(() => localStorage.setItem('todayThemeMode', 'dark'));
+      await useTheme(page, 'dark');
       await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
       expect(await page.$eval('html', el => el.dataset.theme)).toBe('dark');
@@ -89,7 +90,7 @@ describe('git page diffs', () => {
   test.each([['light', 'dark'], ['dark', 'light']])('follow the theme: %s, then switched to %s', async (first, second) => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), first);
+      await useTheme(page, first);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
       const headerBackground = () => page.$eval('.git-dir-header', el => {
@@ -126,7 +127,7 @@ describe('code blocks', () => {
   ].flatMap(([name, selector]) => THEMES.map(theme => [name, theme, selector])))('%s, %s theme: background follows the theme', async (name, theme, selector) => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), theme);
+      await useTheme(page, theme);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(server.baseUrl + PAGES.find(p => p.name === name).path, { waitUntil: 'networkidle0' });
       const background = await page.$eval(selector, el => {

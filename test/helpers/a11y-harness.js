@@ -168,6 +168,10 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
   }
   Object.assign(env, {
     TODAY_CONFIG: configPath,
+    // Kept inside the temp directory: the default sits beside the source, so
+    // runs would otherwise inherit each other's theme — and a run in a live
+    // checkout would overwrite the real one.
+    TODAY_WEB_PREFERENCES: path.join(workDir, 'web-preferences.json'),
     WEB_PORT: String(port),
     WEB_PASSWORD: PASSWORD,
     NODE_ENV: 'test',
@@ -265,6 +269,19 @@ async function gotoAndVerifyAssets(page, url) {
 }
 
 /**
+ * Ask for a theme the way the app decides one. The stored preference is shared
+ * by every device and the fixture server leaves it at 'system', so the browser's
+ * own colour-scheme preference is what selects the theme; localStorage is still
+ * seeded as the fallback a browser uses when the cookie is missing.
+ */
+export async function useTheme(page, theme) {
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+  await page.evaluateOnNewDocument((mode) => {
+    try { localStorage.setItem('todayThemeMode', mode); } catch { /* storage blocked */ }
+  }, theme);
+}
+
+/**
  * Load a page in the given theme and viewport and run axe on it twice: as
  * rendered (collapsed toggles closed), then with every <details> opened so
  * hidden content is checked too. Returns a list of violations, each tagged
@@ -274,10 +291,7 @@ export async function auditPage(browser, { baseUrl, page: pageSpec, theme, viewp
   const page = await browser.newPage();
   try {
     await page.setViewport(VIEWPORTS[viewport]);
-    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
-    await page.evaluateOnNewDocument((mode) => {
-      try { localStorage.setItem('todayThemeMode', mode); } catch { /* storage blocked */ }
-    }, theme);
+    await useTheme(page, theme);
     if (!pageSpec.public) {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
     }
@@ -395,9 +409,7 @@ export async function findPinnedOverlaps(browser, { baseUrl, page: pageSpec, the
   const page = await browser.newPage();
   try {
     await page.setViewport(VIEWPORTS[viewport]);
-    await page.evaluateOnNewDocument((mode) => {
-      try { localStorage.setItem('todayThemeMode', mode); } catch { /* storage blocked */ }
-    }, theme);
+    await useTheme(page, theme);
     await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
     await gotoAndVerifyAssets(page, baseUrl + pageSpec.path);
     await page.evaluate((y) => window.scrollTo(0, y), scrollY);
