@@ -13,10 +13,15 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { glob } from 'glob';
 import { lint, readConfig } from 'markdownlint/sync';
 import { applyFixes } from 'markdownlint';
-import { getChangedFilePaths, updateBaseline, getBaselineStatus } from '../../src/vault-changes.js';
+import { resolveVaultDirectory } from './directory.js';
+import {
+  getChangedFilePaths,
+  updateBaseline,
+  getBaselineStatus,
+  findAllMarkdownFiles
+} from '../../src/vault-changes.js';
 import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,8 +29,8 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 const pluginConfig = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
-const directory = pluginConfig.directory || `${process.env.VAULT_PATH}/**/*.md`;
-const vaultDir = directory.replace('/**/*.md', '').replace('/*.md', '');
+const directory = pluginConfig.directory || `${process.env.VAULT_PATH || 'vault'}/**/*.md`;
+const { vaultDir, absolutePath: resolvedVaultDir } = resolveVaultDirectory(directory, PROJECT_ROOT);
 
 // Load config once
 const markdownlintConfig = readConfig(path.join(PROJECT_ROOT, '.markdownlint.json'));
@@ -77,18 +82,22 @@ function sync() {
     return;
   }
 
+  if (!fs.existsSync(resolvedVaultDir) || !fs.statSync(resolvedVaultDir).isDirectory()) {
+    throw new Error(`markdownlint-cleanup: vault directory does not exist: ${resolvedVaultDir}`);
+  }
+
   // Check if baseline exists
   const status = getBaselineStatus({ sourceId: 'vault-changes/default' });
 
   if (!status.exists) {
     // Initialize baseline - first run establishes tracking
     console.error('No vault-changes baseline found, initializing...');
-    updateBaseline({ directory: vaultDir });
-    console.error('Baseline initialized - subsequent runs will be incremental');
 
     // Do a full lint on first run
-    const allFiles = glob.sync(directory, { cwd: PROJECT_ROOT });
+    const allFiles = findAllMarkdownFiles(resolvedVaultDir);
     const result = lintAndFix(allFiles);
+    updateBaseline({ directory: vaultDir });
+    console.error('Baseline initialized - subsequent runs will be incremental');
     console.log(JSON.stringify({ ...result, mode: 'initial' }));
     return;
   }
