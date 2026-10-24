@@ -16,6 +16,7 @@ import {
   auditPage,
   findPinnedOverlaps,
   openDiff,
+  useTheme,
   PASSWORD,
   PAGES,
   THEMES,
@@ -68,7 +69,7 @@ describe('git page diffs', () => {
   test('dark theme directory headers differ from file rows in the same list', async () => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument(() => localStorage.setItem('todayThemeMode', 'dark'));
+      await useTheme(page, 'dark', server.baseUrl);
       await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
       expect(await page.$eval('html', el => el.dataset.theme)).toBe('dark');
@@ -89,9 +90,10 @@ describe('git page diffs', () => {
   test.each([['light', 'dark'], ['dark', 'light']])('follow the theme: %s, then switched to %s', async (first, second) => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), first);
+      await useTheme(page, first, server.baseUrl);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      expect(await page.$eval('html', el => el.dataset.theme)).toBe(first);
       const headerBackground = () => page.$eval('.git-dir-header', el => {
         const probe = document.createElement('div');
         probe.style.backgroundColor = 'var(--today-surface-2)';
@@ -110,6 +112,7 @@ describe('git page diffs', () => {
 
       await page.evaluate((mode) => setThemeMode(mode), second);
       await page.waitForSelector(`#diffContent .d2h-wrapper.d2h-${second}-color-scheme .hljs`, { timeout: 10_000 });
+      expect(await page.$eval('html', el => el.dataset.theme)).toBe(second);
       expect(await scheme()).toBe(`d2h-${second}-color-scheme`);
       background = await headerBackground();
       expect(background.actual).toBe(background.expected);
@@ -126,9 +129,10 @@ describe('code blocks', () => {
   ].flatMap(([name, selector]) => THEMES.map(theme => [name, theme, selector])))('%s, %s theme: background follows the theme', async (name, theme, selector) => {
     const page = await browser.newPage();
     try {
-      await page.evaluateOnNewDocument((mode) => localStorage.setItem('todayThemeMode', mode), theme);
+      await useTheme(page, theme, server.baseUrl);
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(server.baseUrl + PAGES.find(p => p.name === name).path, { waitUntil: 'networkidle0' });
+      expect(await page.$eval('html', el => el.dataset.theme)).toBe(theme);
       const background = await page.$eval(selector, el => {
         const probe = document.createElement('div');
         probe.style.backgroundColor = 'var(--today-code-block-bg)';

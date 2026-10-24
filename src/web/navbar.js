@@ -14,11 +14,23 @@ export const TEXT_SIZE_NAMES = [
 export const DEFAULT_TEXT_SIZE_INDEX = 3;
 export const TEXT_SIZE_STORAGE_KEY = 'todayTextSizeOffset';
 
+// The theme is stored on the server so every device agrees, and travels to the
+// browser as a cookie: the server sets it on each page response, and the head
+// script below reads it before first paint, so there is no flash even on a
+// device that has never been here. It cannot be baked into the markup instead,
+// because rendered pages are cached to disk and would freeze whichever theme
+// was current when they were rendered.
+export const THEME_COOKIE_NAME = 'todayThemeMode';
+
 export function getThemeBootstrapScript() {
   return `<script>
 (() => {
   try {
-    const mode = localStorage.getItem('todayThemeMode') || 'system';
+    // The cookie is the server's answer and wins; localStorage is the last
+    // one this browser saw, for when the cookie is missing or blocked.
+    const cookie = ((document.cookie || '').match(/(?:^|;\\s*)todayThemeMode=([^;]*)/) || [])[1];
+    const mode = (cookie && decodeURIComponent(cookie)) ||
+      localStorage.getItem('todayThemeMode') || 'system';
     const prefersDark = typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = mode === 'dark' || mode === 'light'
