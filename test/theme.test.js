@@ -26,6 +26,7 @@ function loadCommonJsContext(prefersDark = false) {
       location: { href: '' },
     },
     document: {
+      cookie: '',
       addEventListener: (name, listener) => { const prev = documentListeners[name]; documentListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
       querySelector: () => null,
       querySelectorAll: () => [],
@@ -84,6 +85,92 @@ describe('theme behavior', () => {
     expect(context.document.documentElement.dataset.bsTheme).toBe('dark');
   });
 
+  test('the server cookie beats this browser\'s stored mode', () => {
+    const context = loadCommonJsContext();
+    context.localStorage.setItem('todayThemeMode', 'light');
+    context.document.cookie = 'todayThemeMode=dark';
+
+    expect(context.getThemeMode()).toBe('dark');
+  });
+
+  test('a missing or unusable cookie falls back to the stored mode', () => {
+    const context = loadCommonJsContext();
+    context.localStorage.setItem('todayThemeMode', 'light');
+
+    context.document.cookie = '';
+    expect(context.getThemeMode()).toBe('light');
+
+    context.document.cookie = 'todayThemeMode=garbage';
+    expect(context.getThemeMode()).toBe('light');
+
+    context.localStorage.setItem('todayThemeMode', 'garbage');
+    expect(context.getThemeMode()).toBe('system');
+  });
+
+  test('setThemeMode applies at once and tells the server', async () => {
+    const context = loadCommonJsContext();
+    const posted = [];
+    context.fetch = (url, options) => {
+      posted.push({ url, ...JSON.parse(options.body) });
+      return Promise.resolve({ ok: true });
+    };
+
+    await context.setThemeMode('dark');
+
+    expect(context.document.documentElement.dataset.theme).toBe('dark');
+    expect(context.localStorage.getItem('todayThemeMode')).toBe('dark');
+    expect(context.document.cookie).toContain('todayThemeMode=dark');
+    expect(posted).toEqual([{ url: '/api/theme', mode: 'dark' }]);
+  });
+
+  test('setThemeMode resolves after the server save', async () => {
+    const context = loadCommonJsContext();
+    let resolveSave;
+    context.fetch = () => new Promise(resolve => { resolveSave = resolve; });
+
+    let saved = false;
+    const pending = context.setThemeMode('dark').then(() => { saved = true; });
+    await Promise.resolve();
+    expect(saved).toBe(false);
+
+    resolveSave({ ok: true });
+    await pending;
+    expect(saved).toBe(true);
+  });
+
+  test('a server that rejects the change still leaves the theme applied', async () => {
+    const context = loadCommonJsContext();
+    context.fetch = () => Promise.reject(new Error('offline'));
+
+    await expect(context.setThemeMode('dark')).resolves.toBeUndefined();
+    expect(context.document.documentElement.dataset.theme).toBe('dark');
+    expect(context.localStorage.getItem('todayThemeMode')).toBe('dark');
+  });
+
+  test('bootstrap reads the server cookie before first paint', () => {
+    const script = getThemeBootstrapScript().slice('<script>'.length, -'</script>'.length);
+    const documentElement = { dataset: {}, style: {}, appendChild() {} };
+    const context = {
+      CSS: { supports: () => false },
+      document: {
+        documentElement,
+        // No stored mode, system prefers light: only the cookie can make it dark.
+        cookie: 'other=1; todayThemeMode=dark; another=2',
+        createElement: () => ({ style: {}, remove() {} }),
+        addEventListener: () => {},
+      },
+      getComputedStyle: () => ({ fontSize: '17px' }),
+      localStorage: { getItem: () => null },
+      navigator: { userAgent: 'Mozilla/5.0', platform: 'Linux', maxTouchPoints: 0 },
+      window: { addEventListener: () => {}, matchMedia: () => ({ matches: false }) },
+    };
+
+    vm.runInNewContext(script, context);
+
+    expect(documentElement.dataset.theme).toBe('dark');
+    expect(documentElement.dataset.mdbTheme).toBe('dark');
+  });
+
   test('theme mode cycle order is system -> dark -> light -> system', () => {
     const context = loadCommonJsContext();
     expect(context.getNextThemeMode('system')).toBe('dark');
@@ -138,6 +225,7 @@ describe('role reply submission', () => {
       CSS: { supports: () => false },
       document: {
         documentElement,
+        cookie: '',
         createElement: () => ({ style: {}, remove() {} }),
         addEventListener: () => {},
       },
@@ -407,6 +495,7 @@ describe('text size behavior', () => {
       CSS: { supports: () => true },
       document: {
         documentElement,
+        cookie: '',
         createElement: () => ({ style: {}, remove() {} }),
         addEventListener: (name, listener) => { const prev = documentListeners[name]; documentListeners[name] = prev ? (e) => { prev(e); listener(e); } : listener; },
       },

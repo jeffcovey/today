@@ -63,7 +63,8 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
-import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml } from './web/navbar.js';
+import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
+import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES } from './web-preferences.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -251,6 +252,8 @@ const deferredBlocks = new DeferredBlockRegistry();
 const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
+// Bump when rendered HTML or the head bootstrap changes.
+const HTML_CACHE_RENDER_VERSION = 1;
 
 // Disk-based HTML cache (persists across server restarts)
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
@@ -282,7 +285,7 @@ async function readFromDiskCache(urlPath, sourceMtime) {
   try {
     const metaRaw = await fs.readFile(metaPath, 'utf-8');
     const meta = JSON.parse(metaRaw);
-    if (meta.mtime !== sourceMtime) return null; // stale
+    if (meta.mtime !== sourceMtime || meta.renderVersion !== HTML_CACHE_RENDER_VERSION) return null;
     const html = await fs.readFile(htmlPath, 'utf-8');
     return html;
   } catch {
@@ -297,7 +300,11 @@ async function writeToDiskCache(urlPath, html, sourceMtime) {
   try {
     await fs.mkdir(path.dirname(htmlPath), { recursive: true });
     await fs.writeFile(htmlPath, html, 'utf-8');
-    await fs.writeFile(metaPath, JSON.stringify({ mtime: sourceMtime, timestamp: Date.now() }), 'utf-8');
+    await fs.writeFile(metaPath, JSON.stringify({
+      mtime: sourceMtime,
+      renderVersion: HTML_CACHE_RENDER_VERSION,
+      timestamp: Date.now()
+    }), 'utf-8');
   } catch (err) {
     debug('Failed to write disk cache:', err.message);
   }
@@ -394,6 +401,28 @@ function sessionAuth(req, res, next) {
   res.redirect("/auth/login");
 }
 
+// Publish the stored theme to the browser on every page response, including
+// the login page. The head script reads this cookie before first paint, so a
+// device that has never been here still opens in the chosen theme. It is
+// deliberately not httpOnly: the page's own script has to read it.
+const THEME_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
+app.use(async (req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  try {
+    res.cookie(THEME_COOKIE_NAME, await getStoredThemeMode(), {
+      path: '/',
+      sameSite: 'lax',
+      httpOnly: false,
+      maxAge: THEME_COOKIE_MAX_AGE
+    });
+  } catch (error) {
+    // A preference we can't read is not worth failing a page load over; the
+    // browser falls back to its own last known theme.
+    debug('Could not publish theme cookie:', error.message);
+  }
+  next();
+});
+
 app.get("/auth/login", async (req, res) => {
   if (req.session && req.session.authenticated) return res.redirect("/");
   const template = await loadTemplate('login');
@@ -416,6 +445,41 @@ app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/au
 
 const authMiddleware = sessionAuth;
 app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAge: '1d' }));
+
+// Read and change the shared theme. The browser applies the change itself and
+// tells the server, so one device's choice reaches the others on their next
+// page load.
+app.get('/api/theme', authMiddleware, async (req, res) => {
+  try {
+    res.json({ success: true, mode: await getStoredThemeMode() });
+  } catch (error) {
+    console.error('Error reading theme preference:', error);
+    res.status(500).json({ success: false, message: 'Failed to read theme' });
+  }
+});
+
+app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
+  const { mode } = req.body || {};
+  if (!isThemeMode(mode)) {
+    return res.status(400).json({
+      success: false,
+      message: `Theme must be one of: ${THEME_MODES.join(', ')}`
+    });
+  }
+  try {
+    await setStoredThemeMode(mode);
+    res.cookie(THEME_COOKIE_NAME, mode, {
+      path: '/',
+      sameSite: 'lax',
+      httpOnly: false,
+      maxAge: THEME_COOKIE_MAX_AGE
+    });
+    res.json({ success: true, mode });
+  } catch (error) {
+    console.error('Error saving theme preference:', error);
+    res.status(500).json({ success: false, message: 'Failed to save theme' });
+  }
+});
 
 // MDBootstrap and custom styles (CSS moved to web/public/css/style.css)
 const pageStyle = `
