@@ -58,6 +58,15 @@ describe('web preferences', () => {
     expect(await readWebPreferences()).toEqual({ themeMode: 'dark', themeName: 'cocoa' });
   });
 
+  test('concurrent mode and palette changes both survive', async () => {
+    await Promise.all([
+      setStoredThemeMode('dark'),
+      setStoredThemeName('cocoa')
+    ]);
+
+    expect(await readWebPreferences()).toEqual({ themeMode: 'dark', themeName: 'cocoa' });
+  });
+
   test('a palette that is not a usable id reads as the built-in one', async () => {
     await fs.writeFile(getPreferencesPath(), JSON.stringify({ themeName: '../escape' }), 'utf-8');
     clearWebPreferencesCache();

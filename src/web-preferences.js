@@ -39,6 +39,7 @@ export function getPreferencesPath() {
 // re-read only when it changes on disk. Hand edits are picked up without a
 // restart, and a normal request costs one stat.
 let cached = null;
+let preferenceWriteChain = Promise.resolve();
 
 export function isThemeMode(mode) {
   return THEME_MODES.includes(mode);
@@ -109,15 +110,19 @@ export async function getStoredThemeName() {
  * keep any keys this version does not know about.
  */
 async function writePreferences(changes) {
-  const next = { ...(await readRawPreferences()), ...changes };
-  const preferencesPath = getPreferencesPath();
+  const write = preferenceWriteChain.then(async () => {
+    const next = { ...(await readRawPreferences()), ...changes };
+    const preferencesPath = getPreferencesPath();
 
-  await fs.mkdir(path.dirname(preferencesPath), { recursive: true });
-  const tempPath = `${preferencesPath}.${process.pid}.${randomUUID()}.tmp`;
-  await fs.writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
-  await fs.rename(tempPath, preferencesPath);
+    await fs.mkdir(path.dirname(preferencesPath), { recursive: true });
+    const tempPath = `${preferencesPath}.${process.pid}.${randomUUID()}.tmp`;
+    await fs.writeFile(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf-8');
+    await fs.rename(tempPath, preferencesPath);
 
-  cached = null;
+    cached = null;
+  });
+  preferenceWriteChain = write.catch(() => {});
+  await write;
 }
 
 /** Store the theme mode. Returns the mode that was stored. */
