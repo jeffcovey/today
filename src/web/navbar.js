@@ -87,8 +87,14 @@ export function getThemeBootstrapScript() {
 </script>`;
 }
 
-// Display settings menu: theme (light / system / dark) and text size live
-// behind one gear button so the navbar stays uncluttered on phones.
+// Display settings menu: theme (light / system / dark), palette and text size
+// live behind one gear button so the navbar stays uncluttered on phones.
+//
+// The palette row ships empty and hidden. Its options come from the vault, and
+// rendered pages are cached to disk, so a list baked in here would be whatever
+// the vault held when the page was first rendered; common.js asks
+// /api/themes instead. It stays hidden unless the vault has a palette to
+// offer, so a vault with no themes/ directory sees no empty control.
 export function getDisplayMenuHtml() {
   return `<div class="display-menu" id="displayMenu">
             <button class="nav-link navbar-icon-btn px-2" type="button" id="displayMenuBtn" onclick="toggleDisplayMenu(event)" title="Display settings" aria-label="Display settings" aria-expanded="false" aria-controls="displayMenuPanel">
@@ -102,6 +108,12 @@ export function getDisplayMenuHtml() {
                   <button type="button" class="btn btn-outline-secondary" data-theme-mode="system" onclick="setThemeMode('system')" aria-pressed="false"><i class="fas fa-circle-half-stroke me-1" aria-hidden="true"></i>System</button>
                   <button type="button" class="btn btn-outline-secondary" data-theme-mode="dark" onclick="setThemeMode('dark')" aria-pressed="false"><i class="fas fa-moon me-1" aria-hidden="true"></i>Dark</button>
                 </div>
+              </div>
+              <div class="display-menu-row" id="paletteRow" hidden>
+                <label class="display-menu-label" for="paletteSelect">Palette</label>
+                <select class="form-select form-select-sm display-menu-select" id="paletteSelect" onchange="setThemePalette(this.value)">
+                  <option value="today">Today</option>
+                </select>
               </div>
               <div class="display-menu-row">
                 <span class="display-menu-label">Text size</span>
