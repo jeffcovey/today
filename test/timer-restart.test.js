@@ -237,6 +237,24 @@ describe('a paused timer', () => {
     expectAboutSeconds(taskCountdown(resumed), taskCountdown(before));
     expectAboutSeconds(pomodoroCountdown(resumed), pomodoroCountdown(before));
   });
+
+  test('keeps a paused pomodoro across a task-timer catch-up and another restart', async () => {
+    if (workDir) fs.rmSync(statePath(), { force: true });
+    await withServer(async (server) => {
+      await startTaskTimer(server);
+      await startPomodoro(server);
+      await api(server.baseUrl, '/api/pomodoro/pause');
+    });
+
+    simulateDowntime((WORK_MINUTES * 60 + REST_SECONDS + 60) * 1000);
+    const afterCatchUp = await withServer((server) => home(server.baseUrl));
+    expect(afterCatchUp).toContain('data-pomodoro-paused="true"');
+    expect(afterCatchUp).toContain('Item 2 of');
+
+    const afterSecondRestart = await withServer((server) => home(server.baseUrl));
+    expect(afterSecondRestart).toContain('data-pomodoro-paused="true"');
+    expect(afterSecondRestart).toContain('Item 2 of');
+  });
 });
 
 describe('stopping a timer', () => {

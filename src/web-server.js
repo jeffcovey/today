@@ -8490,28 +8490,39 @@ async function restoreTimers() {
     return;
   }
 
-  // A stopped Task Timer is worth restoring for one thing: the minutes per
-  // item the user last chose, which the start form offers back.
+  // Install both saved states before catch-up: advancing either timer can
+  // persist the pair, so the other must already be restored.
+  let restoreTaskTimer = false;
   if (restored.taskTimer) {
-    const wasRunning = restored.taskTimer.isRunning;
+    restoreTaskTimer = restored.taskTimer.isRunning;
     taskTimerState = restored.taskTimer;
-    if (wasRunning) {
-      advanceTimerIfNeeded();
-      armTaskTimerBoundary();
-      // advanceTimerIfNeeded() stops a timer whose items all elapsed while the
-      // server was down, so this reads the state after the catch-up.
-      console.log(taskTimerState.isRunning
-        ? 'Task timer restored.'
-        : 'Task timer restored, and finished: no items left.');
-    }
   }
 
   if (restored.pomodoro?.isRunning) {
     pomodoroState = restored.pomodoro;
+  }
+
+  if (restoreTaskTimer) {
+    advanceTimerIfNeeded();
+    armTaskTimerBoundary();
+    // advanceTimerIfNeeded() stops a timer whose items all elapsed while the
+    // server was down, so this reads the state after the catch-up.
+    console.log(taskTimerState.isRunning
+      ? 'Task timer restored.'
+      : 'Task timer restored, and finished: no items left.');
+  }
+
+  if (restored.pomodoro?.isRunning) {
     advancePomodoroIfNeeded();
     armPomodoroBoundary();
     console.log('Pomodoro restored.');
   }
+}
+
+try {
+  await restoreTimers();
+} catch (error) {
+  console.error('Timer restore failed:', error.message);
 }
 
 // Start server with extended timeout
@@ -8522,9 +8533,6 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   // Build the vault file index now so the first dataview page doesn't wait for it
   DataviewAPI.getCachedAllFiles(VAULT_PATH).catch((error) => {
     console.error('Initial vault file index build failed:', error.message);
-  });
-  restoreTimers().catch((error) => {
-    console.error('Timer restore failed:', error.message);
   });
 });
 
