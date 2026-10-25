@@ -12,11 +12,14 @@ import {
   readWebPreferences,
   getStoredThemeMode,
   setStoredThemeMode,
+  getStoredThemeName,
+  setStoredThemeName,
   clearWebPreferencesCache,
   getPreferencesPath,
   isThemeMode,
   THEME_MODES,
-  DEFAULT_THEME_MODE
+  DEFAULT_THEME_MODE,
+  DEFAULT_THEME_NAME
 } from '../src/web-preferences.js';
 
 let workDir;
@@ -39,7 +42,35 @@ afterEach(async () => {
 describe('web preferences', () => {
   test('a missing file reads as the default theme', async () => {
     expect(await getStoredThemeMode()).toBe(DEFAULT_THEME_MODE);
-    expect(await readWebPreferences()).toEqual({ themeMode: 'system' });
+    expect(await readWebPreferences()).toEqual({ themeMode: 'system', themeName: 'today' });
+  });
+
+  test('stores and reads back a palette, and refuses one that is not an id', async () => {
+    await setStoredThemeName('cocoa');
+    expect(await getStoredThemeName()).toBe('cocoa');
+    await expect(setStoredThemeName('../escape')).rejects.toThrow();
+    expect(await getStoredThemeName()).toBe('cocoa');
+  });
+
+  test('the mode and the palette do not overwrite each other', async () => {
+    await setStoredThemeName('cocoa');
+    await setStoredThemeMode('dark');
+    expect(await readWebPreferences()).toEqual({ themeMode: 'dark', themeName: 'cocoa' });
+  });
+
+  test('concurrent mode and palette changes both survive', async () => {
+    await Promise.all([
+      setStoredThemeMode('dark'),
+      setStoredThemeName('cocoa')
+    ]);
+
+    expect(await readWebPreferences()).toEqual({ themeMode: 'dark', themeName: 'cocoa' });
+  });
+
+  test('a palette that is not a usable id reads as the built-in one', async () => {
+    await fs.writeFile(getPreferencesPath(), JSON.stringify({ themeName: '../escape' }), 'utf-8');
+    clearWebPreferencesCache();
+    expect(await getStoredThemeName()).toBe(DEFAULT_THEME_NAME);
   });
 
   test('stores and reads back each mode', async () => {

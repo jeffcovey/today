@@ -1,0 +1,64 @@
+# A palette in the fixture vault, so the accessibility audit covers pages that
+# are wearing a theme from the vault rather than the built-in one. The values
+# are contrast-tuned the same way Today's are, because the audit holds them to
+# it — this file doubles as a worked example of a usable theme.
+
+name = "Cocoa"
+
+[light]
+bg = "#f6f1ea"
+card-bg = "#fffdf9"
+muted-bg = "#f1ebe2"
+border = "#ded3c4"
+control-border = "#8a7f70"
+text = "#2b2119"
+muted-text = "#6a5c4d"
+hover-bg = "#f1ebe2"
+overlay = "rgba(255, 253, 249, 0.9)"
+surface-2 = "#efe7dc"
+link = "#8a4b14"
+accent = "#a1551a"
+button-bg = "#7a4210"
+button-hover-bg = "#633509"
+code-text = "#8a3e0f"
+code-bg = "rgba(161, 85, 26, 0.12)"
+# Syntax highlighting inside a code block comes from highlight.js, not from
+# this file, and its colours are chosen per mode. So a code block has to
+# stay light in [light] and dark in [dark], whatever the rest of the
+# palette does, or the highlighted tokens land on the wrong background.
+code-block-bg = "#f3ece2"
+code-block-text = "#2b2119"
+you-bg = "#f6ead9"
+you-border = "#e0c9a8"
+attn-text = "#7a4a00"
+attn-bg = "#fdf0d5"
+attn-edge = "#b07400"
+ok-text = "#1f5c38"
+ok-bg = "#e2f1e6"
+
+[dark]
+bg = "#1b1510"
+card-bg = "#272019"
+muted-bg = "#1b1510"
+border = "#3e362c"
+control-border = "#8a7f70"
+text = "#f2eade"
+muted-text = "#b3a695"
+hover-bg = "#3e362c"
+overlay = "rgba(27, 21, 16, 0.9)"
+surface-2 = "#2f2720"
+link = "#e0a96d"
+accent = "#e0a96d"
+button-bg = "#a1551a"
+button-hover-bg = "#8a4714"
+code-text = "#f0c48a"
+code-bg = "#3a2a17"
+code-block-bg = "#120e0a"
+code-block-text = "#ece2d4"
+you-bg = "#332818"
+you-border = "#4e3e24"
+attn-text = "#f5c86b"
+attn-bg = "#3c2e10"
+attn-edge = "#d79a24"
+ok-text = "#86efac"
+ok-bg = "#17331f"
