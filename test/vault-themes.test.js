@@ -136,6 +136,33 @@ describe('rendering the stylesheet', () => {
     expect(css).toContain('--mdb-body-color-rgb: 242, 234, 222;');
   });
 
+  // MDB composes .bg-primary — the navbar, the day tiles, the badges — as
+  // rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)), so the brand fill
+  // needs its triple spelled out too, or a palette stops at the navbar.
+  test('the brand fill moves MDB\'s primary, in both modes', () => {
+    const { theme } = buildTheme('cocoa', {
+      name: 'Cocoa',
+      light: { 'brand-bg': '#7a4210', 'brand-text': '#ffffff' },
+      // MDB ships no dark override for its primary, so the dark block has to
+      // carry the triple itself rather than inherit the light one.
+      dark: { 'brand-bg': '#a1551a' }
+    });
+    const css = renderThemeCss(theme);
+    expect(css).toContain('--today-brand-bg: rgb(122, 66, 16);');
+    expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).toContain('--mdb-primary-rgb: 122, 66, 16;');
+    expect(css).toContain('--mdb-primary-rgb: 161, 85, 26;');
+  });
+
+  // The ink is only ever read through a var(), so it has no triple of its
+  // own: a theme that sets it alone has not moved MDB's primary.
+  test('the brand ink alone does not move MDB\'s primary', () => {
+    const { theme } = buildTheme('cocoa', { light: { 'brand-text': '#ffffff' } });
+    const css = renderThemeCss(theme);
+    expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).not.toContain('--mdb-primary-rgb');
+  });
+
   test('alpha survives', () => {
     const { theme } = buildTheme('cocoa', { light: { overlay: 'rgba(255, 253, 249, 0.9)' } });
     expect(renderThemeCss(theme)).toContain('--today-overlay: rgba(255, 253, 249, 0.9);');

@@ -369,9 +369,12 @@ describe('a palette from the vault', () => {
     expect(css).toContain(':root {');
     expect(css).toContain('html[data-theme="dark"] {');
     expect(css).toContain('--today-bg: rgb(246, 241, 234);');
-    // The bridge MDB reads for links, which style.css cannot express as a
-    // var() because MDB composes it as rgba(var(--…-rgb), a).
+    // The bridges MDB reads for links and for the brand fill, which
+    // style.css cannot express as a var() because MDB composes them as
+    // rgba(var(--…-rgb), a).
     expect(css).toContain('--mdb-link-color-rgb: 138, 75, 20;');
+    expect(css).toContain('--mdb-primary-rgb: 122, 66, 16;');
+    expect(css).toContain('--mdb-primary-rgb: 161, 85, 26;');
     // Only custom properties, one per line, and no way out of the block.
     for (const line of css.split('\n')) {
       const body = line.trim();
@@ -448,6 +451,56 @@ describe('a palette from the vault', () => {
       }
     } finally {
       await page.close();
+    }
+  });
+
+  // The navbar is the thing a palette most visibly has to reach, and it is
+  // MDB's .bg-primary: rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)).
+  // That composition is why the triple is emitted as digits rather than as a
+  // var() — a var() colour cannot feed an rgba(). Both halves are checked
+  // here: the fill at full opacity, and a tint of it, which is the case that
+  // would silently come out transparent if the triple were ever a var().
+  const BRAND_FILL = { light: 'rgb(122, 66, 16)', dark: 'rgb(161, 85, 26)' };
+
+  test.each(THEMES)('%s theme: the vault\'s brand fill reaches the navbar', async (theme) => {
+    const view = await browser.newPage();
+    try {
+      await view.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await useTheme(view, theme, server.baseUrl);
+
+      const brandColours = () => view.evaluate(() => {
+        // Nothing Today renders carries bg-opacity today, so the tint is
+        // built here rather than hunted for: it is the construction the
+        // literal triple exists for.
+        const tint = document.createElement('div');
+        tint.className = 'bg-primary bg-opacity-10';
+        document.body.appendChild(tint);
+        const colours = {
+          navbar: getComputedStyle(document.querySelector('.navbar.bg-primary')).backgroundColor,
+          tint: getComputedStyle(tint).backgroundColor
+        };
+        tint.remove();
+        return colours;
+      });
+
+      await usePalette('today', server.baseUrl);
+      await view.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+      // The built-in palette holds MDB's own primary, so bridging it moved
+      // nothing: this is the colour the navbar had before the bridge existed.
+      expect(await brandColours()).toEqual({
+        navbar: 'rgb(59, 113, 202)',
+        tint: 'rgba(59, 113, 202, 0.1)'
+      });
+
+      await usePalette('cocoa', server.baseUrl);
+      await view.reload({ waitUntil: 'networkidle0' });
+      const fill = BRAND_FILL[theme];
+      expect(await brandColours()).toEqual({
+        navbar: fill,
+        tint: fill.replace('rgb(', 'rgba(').replace(')', ', 0.1)')
+      });
+    } finally {
+      await view.close();
     }
   });
 
