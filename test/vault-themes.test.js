@@ -8,6 +8,7 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 import {
   parseColor,
@@ -38,6 +39,20 @@ async function writeTheme(name, contents) {
   await fs.mkdir(themesDir, { recursive: true });
   await fs.writeFile(path.join(themesDir, name), contents, 'utf-8');
 }
+
+test('source never uses the brand fill as text-primary foreground ink', async () => {
+  const srcDir = fileURLToPath(new URL('../src/', import.meta.url));
+  const consumers = [];
+  for (const file of await fs.readdir(srcDir, { recursive: true })) {
+    if (!/\.(js|css|html)$/.test(file)) continue;
+    const source = await fs.readFile(path.join(srcDir, file), 'utf8');
+    const withoutComments = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    if (/\btext-primary\b/.test(withoutComments)) consumers.push(file);
+  }
+  expect(consumers).toEqual([]);
+});
 
 describe('reading a colour', () => {
   test.each([
