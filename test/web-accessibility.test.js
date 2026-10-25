@@ -533,7 +533,19 @@ describe('a palette from the vault', () => {
 
       await view.goto(`${baseUrl}/_git`, { waitUntil: 'networkidle0' });
       await openDiff(view, 'code/example.js');
-      colors.activeFile = await view.$eval('.file-item.active', el => getComputedStyle(el).color);
+      colors.activeFile = await view.$eval('.file-item.active', el => new Promise(resolve => {
+        let previous;
+        const sample = () => {
+          const color = getComputedStyle(el).color;
+          if (color === previous) {
+            resolve(color);
+          } else {
+            previous = color;
+            requestAnimationFrame(sample);
+          }
+        };
+        requestAnimationFrame(sample);
+      }));
       colors.activeFileText = await view.$$eval('.file-item.active span', els =>
         els.map(el => getComputedStyle(el).color));
 
