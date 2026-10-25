@@ -91,11 +91,37 @@ function freePort() {
 
 /**
  * Start the web server on a free port against a temporary copy of the
- * fixture vault. Returns { baseUrl, stop }.
+ * fixture vault. Returns { baseUrl, vaultDir, workDir, stop, output }.
+ *
+ * Pass `workDir` (a directory an earlier call returned, started with
+ * `keepWorkDir`) to start a second server over the first one's vault, config
+ * and .data -- which is how a restart is tested. The new server gets a new
+ * port; everything on disk is left exactly as the first one left it.
  */
-export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_000, configLines = [] } = {}) {
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'today-a11y-'));
+export async function startServer({
+  vaultSource = FIXTURE_VAULT,
+  timeoutMs = 60_000,
+  configLines = [],
+  workDir: existingWorkDir = null,
+  keepWorkDir = false
+} = {}) {
+  const workDir = existingWorkDir || fs.mkdtempSync(path.join(os.tmpdir(), 'today-a11y-'));
   const vaultDir = path.join(workDir, 'vault');
+  const configPath = path.join(workDir, 'config.toml');
+  if (existingWorkDir) {
+    // The config and the vault are whatever the first server left behind, so
+    // say so rather than quietly dropping a caller's settings.
+    if (configLines.length > 0 || vaultSource !== FIXTURE_VAULT) {
+      throw new Error('startServer: configLines and vaultSource apply only to a fresh workDir');
+    }
+  } else {
+    await prepareWorkDir({ workDir, vaultDir, configPath, vaultSource, configLines });
+  }
+
+  return launchServer({ workDir, vaultDir, configPath, timeoutMs, keepWorkDir });
+}
+
+async function prepareWorkDir({ workDir, vaultDir, configPath, vaultSource, configLines }) {
   fs.cpSync(vaultSource, vaultDir, { recursive: true });
   const fixtureDiary = path.join(vaultDir, 'diary', '2026-01-15.md');
   if (fs.existsSync(fixtureDiary)) {
@@ -113,7 +139,6 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
 
   // The server resolves vault_path against the project root, so it must be
   // relative even though the vault lives in a temp directory.
-  const configPath = path.join(workDir, 'config.toml');
   fs.writeFileSync(configPath, [
     `vault_path = ${JSON.stringify(path.relative(PROJECT_ROOT, vaultDir))}`,
     'timezone = "America/New_York"',
@@ -159,7 +184,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
   } finally {
     db.close();
   }
+}
 
+async function launchServer({ workDir, vaultDir, configPath, timeoutMs, keepWorkDir }) {
   const port = await freePort();
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
@@ -173,6 +200,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     // runs would otherwise inherit each other's theme — and a run in a live
     // checkout would overwrite the real one.
     TODAY_WEB_PREFERENCES: path.join(workDir, 'web-preferences.json'),
+    // Kept inside the temp directory for the same reason, and so a restart
+    // test can restore from the state the first server wrote.
+    TODAY_TIMER_STATE: path.join(workDir, 'timer-state.json'),
     WEB_PORT: String(port),
     WEB_PASSWORD: PASSWORD,
     NODE_ENV: 'test',
@@ -224,7 +254,9 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
         child.once('exit', () => { clearTimeout(timer); resolve(); });
       });
     }
-    fs.rmSync(workDir, { recursive: true, force: true });
+    if (!keepWorkDir) {
+      fs.rmSync(workDir, { recursive: true, force: true });
+    }
   };
 
   if (!ready) {
@@ -232,7 +264,7 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     throw new Error(`Web server did not start within ${timeoutMs}ms:\n${output.slice(-3000)}`);
   }
 
-  return { baseUrl, vaultDir, stop, output: () => output };
+  return { baseUrl, vaultDir, workDir, stop, output: () => output };
 }
 
 export function axeSource() {

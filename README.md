@@ -200,6 +200,21 @@ waits for you to press **Start next**. If Pushover is configured under
 every two minutes, up to five notifications, until you stop the timer or start
 the next interval.
 
+### Timers and restarts
+
+A running Task Timer or Pomodoro survives a web-server restart — a deploy,
+`bin/today web restart`, or a crash. The state is kept in
+`.data/timer-state.json` and read back when the server comes up, with the time
+the server spent down taken off the interval: a 25-minute work period you
+started half an hour before a deploy comes back finished and waiting for you,
+not reset to 25 minutes. A timer that was paused comes back paused, holding the
+time it had left.
+
+Timers answer "what am I doing right now", so a saved one is thrown away rather
+than resumed once more than four hours have passed since you last touched it.
+One left running over lunch, overnight, or until the next day does not come
+back.
+
 ### Themes
 
 The gear menu in the navbar switches between light, dark and system. That
