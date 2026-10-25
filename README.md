@@ -200,6 +200,62 @@ waits for you to press **Start next**. If Pushover is configured under
 every two minutes, up to five notifications, until you stop the timer or start
 the next interval.
 
+### Themes
+
+The gear menu in the navbar switches between light, dark and system. That
+choice is stored on the server, so every device you open the vault on agrees
+on it.
+
+The colours themselves come from a palette, and you can keep your own in the
+vault. Put a TOML file in `vault/themes/`, one per palette, and it appears in
+the gear menu as soon as you reload a page — no restart:
+
+```toml
+# vault/themes/cocoa.toml
+name = "Cocoa"
+
+[light]
+bg = "#f6f1ea"
+card-bg = "#fffdf9"
+text = "#2b2119"
+link = "#8a4b14"
+button-bg = "#7a4210"
+
+[dark]
+bg = "#1b1510"
+card-bg = "#272019"
+text = "#f2eade"
+link = "#e0a96d"
+button-bg = "#a1551a"
+```
+
+Both sections are optional and so is every key in them: anything you leave out
+keeps Today's own value, so a palette that only moves the link colour is two
+lines. The full list of keys is in `src/web/themes.js`; they are the
+`--today-*` custom properties from `src/web/public/css/style.css` without the
+prefix.
+
+Values have to be colours Today can read — `#abc`, `#aabbcc`, `#aabbccdd`,
+`rgb()`, `rgba()`, `hsl()` or `hsla()`. Named colours and anything else are
+ignored, and that key keeps its default. A file that isn't valid TOML is
+skipped rather than breaking the page.
+
+Two things to watch:
+
+- **Contrast is yours to get right.** Today's own palette is tuned to WCAG 2.2
+  AA and the test suite holds it there, but nothing can check a file in your
+  vault. Text wants 4.5:1 against what's behind it; `control-border` and
+  `button-bg` are separate keys from `border` and `accent` precisely because
+  they carry that duty — an input outline needs 3:1 against the surface
+  behind it, and a button needs 4.5:1 against the white text on it.
+- **Code blocks keep their polarity.** Syntax highlighting comes from
+  highlight.js, which picks its own colours per mode, so `code-block-bg`
+  should stay light under `[light]` and dark under `[dark]` whatever the rest
+  of the palette does.
+
+`test/fixtures/a11y-vault/themes/cocoa.toml` is a complete, contrast-checked
+example.
+
 ### Obsidian Compatibility
 
 The web interface supports Obsidian markdown features:

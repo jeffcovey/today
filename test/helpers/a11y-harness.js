@@ -290,6 +290,24 @@ export async function useTheme(page, theme, baseUrl) {
 }
 
 /**
+ * Choose a palette. Unlike the mode, this one is purely server-side: the
+ * colours arrive as /theme.css, so there is nothing to set in the browser.
+ */
+export async function usePalette(name, baseUrl) {
+  const response = await fetch(`${baseUrl}/api/theme`, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + PASSWORD,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name })
+  });
+  if (!response.ok) {
+    throw new Error(`Could not set fixture palette: ${response.status}`);
+  }
+}
+
+/**
  * Load a page in the given theme and viewport and run axe on it twice: as
  * rendered (collapsed toggles closed), then with every <details> opened so
  * hidden content is checked too. Returns a list of violations, each tagged

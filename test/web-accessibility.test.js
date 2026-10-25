@@ -17,6 +17,7 @@ import {
   findPinnedOverlaps,
   openDiff,
   useTheme,
+  usePalette,
   PASSWORD,
   PAGES,
   THEMES,
@@ -330,5 +331,131 @@ describe('timer banner', () => {
     } finally {
       await page.close();
     }
+  });
+});
+
+// A palette from the vault replaces the colours every other audit above runs
+// against, so it gets its own pass. The fixture vault's themes/cocoa.toml is
+// contrast-tuned the same way Today's palette is, which is what makes this a
+// test of the mechanism rather than of that one file: if the server ever
+// stopped serving a vault palette, or served it without the --mdb-* bridge
+// properties, these pages would come out in colours nobody tuned and axe
+// would say so.
+describe('a palette from the vault', () => {
+  const page = PAGES.find(p => p.name === 'kitchen-sink');
+
+  afterAll(async () => {
+    await usePalette('today', server.baseUrl);
+  });
+
+  test('is offered alongside the built-in one', async () => {
+    const response = await fetch(`${server.baseUrl}/api/themes`, {
+      headers: { Authorization: `Bearer ${PASSWORD}` }
+    });
+    expect(response.ok).toBe(true);
+    const { themes, selected } = await response.json();
+    expect(themes).toEqual([
+      { id: 'today', name: 'Today' },
+      { id: 'cocoa', name: 'Cocoa' }
+    ]);
+    expect(selected).toBe('today');
+  });
+
+  test('is served as a stylesheet that only sets colours', async () => {
+    await usePalette('cocoa', server.baseUrl);
+    const response = await fetch(`${server.baseUrl}/theme.css`);
+    expect(response.ok).toBe(true);
+    const css = await response.text();
+    expect(css).toContain(':root {');
+    expect(css).toContain('html[data-theme="dark"] {');
+    expect(css).toContain('--today-bg: rgb(246, 241, 234);');
+    // The bridge MDB reads for links, which style.css cannot express as a
+    // var() because MDB composes it as rgba(var(--…-rgb), a).
+    expect(css).toContain('--mdb-link-color-rgb: 138, 75, 20;');
+    // Only custom properties, one per line, and no way out of the block.
+    for (const line of css.split('\n')) {
+      const body = line.trim();
+      if (!body || body.startsWith('/*') || body.endsWith('{') || body === '}') continue;
+      expect(body).toMatch(/^--[a-z0-9-]+: [^;{}]+;$/);
+    }
+  });
+
+  test('revalidates instead of being cached, so a change shows up', async () => {
+    await usePalette('cocoa', server.baseUrl);
+    const first = await fetch(`${server.baseUrl}/theme.css`);
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    expect(first.headers.get('cache-control')).toBe('no-cache');
+
+    const unchanged = await fetch(`${server.baseUrl}/theme.css`, {
+      headers: { 'If-None-Match': etag }
+    });
+    expect(unchanged.status).toBe(304);
+
+    await usePalette('today', server.baseUrl);
+    const changed = await fetch(`${server.baseUrl}/theme.css`, {
+      headers: { 'If-None-Match': etag }
+    });
+    expect(changed.status).toBe(200);
+    expect(await changed.text()).toBe('');
+  });
+
+  test('an unknown palette is refused rather than stored', async () => {
+    const response = await fetch(`${server.baseUrl}/api/theme`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${PASSWORD}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'no-such-palette' })
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test('shows up in the display menu, and choosing it repaints the page', async () => {
+    await usePalette('today', server.baseUrl);
+    const page = await browser.newPage();
+    try {
+      await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      // The mode is server-wide and the audits above leave it wherever they
+      // finished, so this names the one it is checking a colour from.
+      await useTheme(page, 'light', server.baseUrl);
+      await page.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+
+      // The row is filled in from /api/themes after load, not rendered into
+      // the page, because pages are cached to disk.
+      await page.waitForFunction(() => !document.getElementById('paletteRow').hidden);
+      expect(await page.$$eval('#paletteSelect option', options =>
+        options.map(option => [option.value, option.textContent]))).toEqual([
+        ['today', 'Today'],
+        ['cocoa', 'Cocoa']
+      ]);
+
+      const before = await page.evaluate(() =>
+        getComputedStyle(document.body).backgroundColor);
+      await page.select('#paletteSelect', 'cocoa');
+      await page.waitForFunction(() =>
+        getComputedStyle(document.body).backgroundColor === 'rgb(246, 241, 234)');
+
+      expect(before).not.toBe('rgb(246, 241, 234)');
+      // And it stuck: a fresh load comes up in it with no repaint.
+      const other = await browser.newPage();
+      try {
+        await other.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+        await useTheme(other, 'light', server.baseUrl);
+        await other.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+        expect(await other.evaluate(() =>
+          getComputedStyle(document.body).backgroundColor)).toBe('rgb(246, 241, 234)');
+      } finally {
+        await other.close();
+      }
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.each(THEMES)('%s theme: no violations with the vault palette applied', async (theme) => {
+    await usePalette('cocoa', server.baseUrl);
+    const violations = await auditPage(browser, {
+      baseUrl: server.baseUrl, page, theme, viewport: 'desktop'
+    });
+    expect(violations.map(describeViolation)).toEqual([]);
   });
 });
